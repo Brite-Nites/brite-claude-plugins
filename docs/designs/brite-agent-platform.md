@@ -1820,7 +1820,7 @@ Interview (3 phases)
 
 3. **AGENTS.md**: Should project-start generate AGENTS.md alongside CLAUDE.md for cross-tool compatibility? The standard is adopted by 60k+ repos (Linux Foundation backed), but it's still maturing. Could be a quick win for projects that use multiple AI tools.
 
-4. **Plugin marketplace vs monorepo**: Should domain plugins be installable from a registry (like npm), or always bundled in the monorepo? Registry is more scalable but adds complexity. Monorepo is simpler but doesn't support community plugins.
+4. ~~**Plugin marketplace vs monorepo**~~: **Resolved** — Monorepo marketplace. See [ADR-003](../decisions/003-plugin-distribution-architecture.md). Matches Anthropic's official distribution model; existing infrastructure already supports multi-plugin. Community plugins use separate repos/marketplaces.
 
 5. **Handbook repo cross-references**: How do @imports work cross-repo? CLAUDE.md @imports resolve relative to the project. Handbook lives in a separate repo. Options: (a) git submodule, (b) symlink, (c) copy-on-setup script, (d) MCP-based fetch.
 
