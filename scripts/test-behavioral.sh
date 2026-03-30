@@ -172,14 +172,19 @@ collect_result() {
 # Write all collected results to the results JSON file at once
 write_results() {
   local tmp results_json
-  tmp=$(mktemp)
   if [[ ${#all_results[@]} -eq 0 ]]; then
     # No results to write
     return
   fi
-  results_json=$(printf '%s\n' "${all_results[@]}" | jq -s '.')
-  jq --argjson results "$results_json" '.results = $results' "$RESULTS_FILE" > "$tmp" \
-    && mv "$tmp" "$RESULTS_FILE"
+  tmp=$(mktemp)
+  results_json=$(printf '%s\n' "${all_results[@]}" | jq -s '.') || { rm -f "$tmp"; echo "write_results: failed to serialize results JSON" >&2; return 1; }
+  if jq --argjson results "$results_json" '.results = $results' "$RESULTS_FILE" > "$tmp"; then
+    mv "$tmp" "$RESULTS_FILE"
+  else
+    rm -f "$tmp"
+    echo "write_results: jq failed, results not written" >&2
+    return 1
+  fi
 }
 
 # ── Helper: check markers in output ──────────────────────────────────
