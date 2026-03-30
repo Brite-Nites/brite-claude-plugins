@@ -175,7 +175,7 @@ CLONE_PATH=$(mktemp -d /tmp/handbook-promote-XXXXXX)
 gh repo clone Brite-Nites/handbook "$CLONE_PATH" -- --depth 1
 ```
 
-Using `mktemp -d` prevents TOCTOU race conditions on the clone path. If the clone fails, present via AskUserQuestion:
+Using `mktemp -d` prevents TOCTOU race conditions on the clone path. Do not use `trap EXIT` here — each Bash tool call runs in a separate subprocess, so the trap would delete the clone immediately on exit before subsequent calls can use it. Cleanup is handled explicitly in the "Clean up" section below. If the clone fails, present via AskUserQuestion:
 - **Retry** — Try the clone again
 - **Stop** — Halt for manual intervention
 
