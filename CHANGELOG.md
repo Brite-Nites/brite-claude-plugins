@@ -7,31 +7,108 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Added
+- Health scoring rubrics for 10 inner-loop skills (BC-2468)
+  - LLM-as-judge rubric YAML format with weighted dimensions and pass thresholds
+  - `scripts/score-skill-output.sh` and `scripts/score-behavioral.sh` scoring harnesses
+  - Rubric helper library at `scripts/_lib/rubric-helpers.sh`
+- Anti-slop quality guardrails for 5 inner-loop skills (BC-2470)
+  - 13-pattern detection across 3 layers: self-check, machine script, rubric integration
+  - PL1–PL4 severity namespace to avoid P1/P2/P3 collision with review findings
+
+## [3.29.0] - 2026-03-28
+
+### Added
+- Skill usage telemetry and analytics dashboard (BC-2467)
+  - `scripts/telemetry-log.sh` event logging with start/end/outcome tracking
+  - `scripts/brite-analytics.sh` dashboard with duration, success rates, frequency analysis
+  - `/workflows:analytics` command for viewing usage data
+- Template-driven skill documentation pipeline (BC-2466)
+  - `scripts/gen-skill-docs.py` generates docs from skill YAML frontmatter
+  - `scripts/gen-skill-docs.sh` wrapper with `--skill` single-skill mode
+  - Section 14 in validate.sh for `%PARAM%` placeholder detection
+- Deep gstack architectural analysis for Brite adoption (BC-2465)
+  - Research document at `docs/research/gstack-analysis.md`
+  - Pattern mapping: 26 gstack skills → Brite adoption priorities
+- Report-issue command for plugin misbehavior capture (BC-2527)
+  - `/workflows:report-issue` creates Linear issues with regression test cases
+- Runtime behavioral test framework (BC-2462)
+  - `scripts/test-behavioral.sh` with test case registry and scoring
+  - Subprocess isolation for realistic skill execution testing
+- Behavioral testing evaluation research (BC-2458)
+  - Evaluation of 4 approaches: subprocess, mock, snapshot, hybrid
+- Context audit trail and flywheel metrics commands (BC-1964, BC-1965)
+  - `/workflows:audit-trail` for per-issue context history
+  - `/workflows:flywheel-metrics` for compound knowledge dashboard
+- Precedent promotion workflow command (BC-1958)
+  - `/workflows:promote-precedent` reviews and promotes project precedents to org handbook
+- CDR compliance review agent (BC-1963)
+  - New Tier 2 review agent checking code against Company Decision Records
+- Handbook drift detection skill (BC-2204)
+  - Auto-detects when shipped changes diverge from handbook content
+- Precedent-search skill — INDEX + Context7 two-tier search (BC-1961)
+- Precedent INDEX format — templates, conventions, contract (BC-1959)
+- Structured instrumentation in executing-plans subagent prompt (BC-1962)
+- E2E scenario validation for project-start (BC-2005)
+- Trait evolution mechanism — hybrid auto-detect + manual (BC-2012)
+- Brownfield support in project-start (BC-1951)
+- Trait definition validation in validate.sh (BC-1954)
+- Express mode for project-start (BC-1950)
+- Post-setup verification in project-start (BC-1952)
+- Execution trace emission in executing-plans (BC-1956)
+- Decision trace extraction in compound-learnings (BC-1957)
+  - CDR/ADR cross-reference via Context7 MCP with graceful degradation
+  - Precedent storage in docs/precedents/ with INDEX.md
+- Decision trace format specification (BC-1955)
+  - Execution trace YAML and decision trace markdown schemas
+  - Accumulation flow: emit → extract → store → promote
+- Context-skill standard specification (BC-1966)
+  - Formal contract for domain plugin context-skills
+  - YAML contract block in workflow-spec.md (section 3e)
+  - Domain plugin template skeleton with context-skill placeholder
+
+### Changed
+- Instruction coherence audit — extract contributor docs, sync routing tables (BC-2461)
+- Instruction coherence audit methodology research (BC-2459)
+
+### Removed
+- Visual-explainer skill and 6 visual generation commands (BC-2460)
+
+## [3.28.0] - 2026-03-19
+
+### Added
+- Dynamic MCP verification in project-start (BC-1949)
+  - Two-tier: global MCPs (Linear, Sequential-thinking, Context7) + trait-gated (`involves-data` → data warehouse)
+  - Non-blocking WARN with setup instructions; missing MCPs noted in generated CLAUDE.md
 - Trait-based classification system in project-start (BC-2127)
   - Three-phase interview methodology (Discovery → Classification → Configuration)
   - 11 project traits with detection signals and evidence tracking
   - Trait-conditional documentation scaffolding from shared templates
   - Trait-to-infrastructure dispatch (Git, Linear, CI/CD gated by traits)
-- Context-skill standard specification (BC-1966)
-  - Formal contract for domain plugin context-skills
-  - YAML contract block in workflow-spec.md (section 3e)
-  - Domain plugin template skeleton with context-skill placeholder
-  - Data Safety rules for SoR integration (sanitization, structural defense)
-- Dynamic MCP verification in project-start (BC-1949)
-  - Two-tier: global MCPs (Linear, Sequential-thinking, Context7) + trait-gated (`involves-data` → data warehouse)
-  - Non-blocking WARN with setup instructions; missing MCPs noted in generated CLAUDE.md
-- Decision trace format specification (BC-1955)
-  - Execution trace YAML and decision trace markdown schemas
-  - Field validation, size limits, data safety, and integration contract
-  - Accumulation flow: emit → extract → store → promote
-- Execution trace emission in executing-plans (BC-1956)
-  - Subagent decision reporting in task prompt template
-  - Checkpoint step 5: construct and emit execution-trace-v1 YAML blocks
-  - Emission rules, categories, limits, and data safety enforcement
-- Decision trace extraction in compound-learnings (BC-1957)
-  - Phase 2: scan, parse, filter, convert, cross-reference, write, and promote
-  - CDR/ADR cross-reference via Context7 MCP with graceful degradation
-  - Precedent storage in docs/precedents/ with INDEX.md
+- GitHub repo creation + pre-commit hooks + VS Code settings (BC-1946)
+- JTBD/MI/SPIN interview methodology rewrite (BC-1943)
+- Trait validation tests + docs update (BC-2132)
+- Trait label creation step (BC-2129)
+- Trait output wiring for downstream consumption (BC-2131)
+- Unified trait-conditional template (BC-2130)
+- Trait-conditional doc scaffolding + templates (BC-1944)
+- Trait classification + confirmation step (BC-2126, BC-2128)
+- Trait model validation against 5 real Brite projects (BC-2124)
+- Freshness tracking in session-start (BC-1938)
+- Context budget management strategy (BC-2003)
+- Context loading cascade architecture (BRI-2006)
+
+### Changed
+- Version bump: 3.27.0 → 3.28.0
+
+## [3.27.0] - 2026-03-16
+
+### Added
+- CDR-check pattern in writing-plans (BRI-1939)
+  - Plans reference Company Decision Records for architectural compliance
+  - Context7 MCP lookup for relevant CDRs during plan generation
+
+### Changed
+- Version bump: 3.26.0 → 3.27.0
 
 ## [3.26.0] - 2026-03-13
 
@@ -277,7 +354,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Changed
 - **Rebrand from "Britenites" to "Brite"** — org/brand name simplified across all files
 - **Plugin renamed from `britenites` to `workflows`** — all commands now `/workflows:*` (e.g., `/workflows:session-start`)
-- **Repo renamed from `britenites-claude-plugins` to `brite-claude-plugins`** — GitHub auto-redirects old URLs
+- **Repo renamed from `britenites-claude-plugins` to `britenites-claude-plugins`** — GitHub auto-redirects old URLs
 - **Linear project renamed to "Brite Plugin Marketplace"**
 - MCP tool namespace updated from `mcp__plugin_britenites_*` to `mcp__plugin_workflows_*`
 
@@ -465,39 +542,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Linear MCP server renamed from `linear` to `linear-server`
 - Linear MCP URL updated from `.dev` to `.app`
 
-[Unreleased]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.26.0...HEAD
-[3.26.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.25.0...v3.26.0
-[3.25.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.24.0...v3.25.0
-[3.24.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.23.0...v3.24.0
-[3.23.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.22.0...v3.22.0
-[3.22.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.21.0...v3.22.0
-[3.21.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.20.0...v3.21.0
-[3.18.1]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.18.0...v3.18.1
-[3.18.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.17.0...v3.18.0
-[3.17.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.16.0...v3.17.0
-[3.16.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.15.0...v3.16.0
-[3.15.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.14.0...v3.15.0
-[3.14.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.13.0...v3.14.0
-[3.13.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.12.0...v3.13.0
-[3.12.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.11.0...v3.12.0
-[3.11.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.10.0...v3.11.0
-[3.10.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.9.0...v3.10.0
-[3.9.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.8.0...v3.9.0
-[3.8.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.7.0...v3.8.0
-[3.7.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.6.0...v3.7.0
-[3.6.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.5.0...v3.6.0
-[3.5.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.4.0...v3.5.0
-[3.4.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.3.0...v3.4.0
-[3.3.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.2.0...v3.3.0
-[3.2.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.1.0...v3.2.0
-[3.1.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.0.1...v3.1.0
-[3.0.1]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v3.0.0...v3.0.1
-[3.0.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v2.3.0...v3.0.0
-[2.3.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v2.0.1...v2.3.0
-[2.0.1]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v2.0.0...v2.0.1
-[2.0.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v1.5.0...v2.0.0
-[1.5.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v1.3.0...v1.5.0
-[1.3.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/Brite-Nites/brite-claude-plugins/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/Brite-Nites/brite-claude-plugins/releases/tag/v1.0.0
+[Unreleased]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.29.0...HEAD
+[3.29.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.28.0...v3.29.0
+[3.28.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.27.0...v3.28.0
+[3.27.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.26.0...v3.27.0
+[3.26.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.25.0...v3.26.0
+[3.25.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.24.0...v3.25.0
+[3.24.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.23.0...v3.24.0
+[3.23.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.22.0...v3.23.0
+[3.22.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.21.0...v3.22.0
+[3.21.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.20.0...v3.21.0
+[3.18.1]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.18.0...v3.18.1
+[3.18.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.17.0...v3.18.0
+[3.17.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.16.0...v3.17.0
+[3.16.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.15.0...v3.16.0
+[3.15.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.14.0...v3.15.0
+[3.14.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.13.0...v3.14.0
+[3.13.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.12.0...v3.13.0
+[3.12.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.11.0...v3.12.0
+[3.11.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.10.0...v3.11.0
+[3.10.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.9.0...v3.10.0
+[3.9.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.8.0...v3.9.0
+[3.8.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.7.0...v3.8.0
+[3.7.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.6.0...v3.7.0
+[3.6.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.5.0...v3.6.0
+[3.5.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.4.0...v3.5.0
+[3.4.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.3.0...v3.4.0
+[3.3.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.2.0...v3.3.0
+[3.2.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.1.0...v3.2.0
+[3.1.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.0.1...v3.1.0
+[3.0.1]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v3.0.0...v3.0.1
+[3.0.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v2.3.0...v3.0.0
+[2.3.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v2.0.1...v2.3.0
+[2.0.1]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v1.5.0...v2.0.0
+[1.5.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v1.3.0...v1.5.0
+[1.3.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/Brite-Nites/britenites-claude-plugins/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/Brite-Nites/britenites-claude-plugins/releases/tag/v1.0.0

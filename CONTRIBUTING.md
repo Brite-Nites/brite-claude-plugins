@@ -197,11 +197,25 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **Minor** (0.X.0): New commands, skills, agents, or hooks
 - **Patch** (0.0.X): Bug fixes, documentation updates, typo corrections
 
-When bumping a version:
+### During development
 
-1. Update `version` in `.claude-plugin/marketplace.json` (under the plugin's entry)
-2. Add an entry to `CHANGELOG.md` under `[Unreleased]` or a new version heading
-3. Follow [Keep a Changelog](https://keepachangelog.com/) format
+Add entries to the `[Unreleased]` section of `CHANGELOG.md` as you go. Follow [Keep a Changelog](https://keepachangelog.com/) format.
+
+### Cutting a release
+
+Run the release script from `main`:
+
+```bash
+scripts/release.sh minor "Release Name"    # or: major, patch
+```
+
+This bumps version in `VERSION`, `plugin.json`, and `marketplace.json`, moves `[Unreleased]` entries under the new version heading, commits, and creates a git tag. Then push:
+
+```bash
+git push && git push --tags
+```
+
+The `VERSION` file is the single source of truth. `scripts/validate.sh` checks that all version files stay in sync.
 
 ## Skill Routing Updates
 
