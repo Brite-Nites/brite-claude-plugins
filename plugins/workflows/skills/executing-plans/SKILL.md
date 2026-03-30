@@ -390,3 +390,4 @@ Proceeding to → /workflows:review
 - Independent tasks should be parallelized when possible
 - Reference `_shared/validation-pattern.md` for the self-check protocol
 - Emit an execution-trace-v1 YAML block at every task checkpoint after verification — even if `decisions_made` is empty
+- Check output against anti-slop guardrails (see `_shared/anti-slop-guardrails.md`). Relevant patterns: E1-E5 (skipped TDD, unverified claims, context pollution, missing traces, blind retry). Violations cap Adherence score at 3 in rubric evaluation.

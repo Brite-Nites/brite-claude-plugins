@@ -1033,7 +1033,26 @@ for plugin_dir in "${plugin_dirs[@]}"; do
 done
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 15 — Summary
+# Section 15 — Quality Guardrails
+# ══════════════════════════════════════════════════════════════════════
+section "Quality Guardrails"
+
+guardrail_script="$REPO_ROOT/scripts/check-guardrails.sh"
+if [[ -x "$guardrail_script" ]] && [[ -f "$REPO_ROOT/CLAUDE.md" ]]; then
+  guardrail_output=$("$guardrail_script" --claude-md "$REPO_ROOT/CLAUDE.md" 2>&1) || true
+  if echo "$guardrail_output" | grep -q "FAIL"; then
+    warn "CLAUDE.md guardrail check reported violations (run scripts/check-guardrails.sh --claude-md CLAUDE.md for details)"
+  elif echo "$guardrail_output" | grep -q "WARN"; then
+    warn "CLAUDE.md approaching size limit (run scripts/check-guardrails.sh --claude-md CLAUDE.md for details)"
+  else
+    pass "CLAUDE.md guardrail check clean"
+  fi
+else
+  pass "Quality guardrails (skipped — no check-guardrails.sh or CLAUDE.md)"
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 16 — Summary
 # ══════════════════════════════════════════════════════════════════════
 section "Summary"
 

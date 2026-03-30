@@ -72,8 +72,8 @@ Does the output follow the executing-plans skill's defined protocol?
 
 | Score | Anchor |
 |-------|--------|
-| 1 | Ignores protocol entirely — executes tasks ad-hoc without subagents, TDD, or verification |
-| 2 | Follows some protocol but skips major required steps (e.g., no subagent isolation, no checkpoints) |
+| 1 | Ignores protocol entirely — executes tasks ad-hoc without subagents, TDD, or verification. Anti-slop violations throughout (E1-E5) |
+| 2 | Follows some protocol but skips major steps or contains multiple anti-slop violations (skipped TDD, blind retries, missing traces) |
 | 3 | Follows general protocol but misses specific requirements (e.g., trace emission, stuck detection, context classification) |
 | 4 | Follows all major steps with minor deviations |
 | 5 | Strict compliance — subagent-per-task, TDD enforced, all checkpoints, all traces, all rules followed |
@@ -99,3 +99,13 @@ Does the output follow the executing-plans skill's defined protocol?
 - Progress report printed after each task with task status and next task
 - Completion marker printed with artifacts summary
 - Hands off to /workflows:review
+
+### Anti-Slop Criteria
+
+Guardrail violations cap Adherence score at 3 (see `docs/quality-guardrails.md`):
+
+- **E1**: Skipped TDD — testable code committed without a red-green-refactor cycle
+- **E2**: "It should work" declarations — claiming success without command output evidence
+- **E3**: Context pollution — subagent receives full plan or unrelated context instead of task-scoped data
+- **E4**: Missing execution traces — task checkpoint completed without `execution-trace-v1` YAML block
+- **E5**: Blind retry — retrying failed commands without root cause analysis

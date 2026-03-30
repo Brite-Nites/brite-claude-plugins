@@ -190,7 +190,7 @@ call_judge_api() {
 
   # Escape the prompt for JSON payload
   local escaped_prompt
-  escaped_prompt=$(printf '%s' "$prompt_text" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+  escaped_prompt=$(printf '%s' "$prompt_text" | jq -Rs .)
 
   local api_response
   api_response=$(curl -s -w "\n%{http_code}" \

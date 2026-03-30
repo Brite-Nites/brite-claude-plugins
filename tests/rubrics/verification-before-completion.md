@@ -66,8 +66,8 @@ Does the output follow the verification-before-completion skill's defined protoc
 
 | Score | Anchor |
 |-------|--------|
-| 1 | Ignores protocol entirely — declares success without running any verification commands |
-| 2 | Follows some protocol but skips major verification levels |
+| 1 | Ignores protocol entirely — declares success without running commands. Anti-slop violations (R1 premature completion, R2 skipped levels) |
+| 2 | Follows some protocol but skips major verification levels or declares completion despite FAIL/BLOCKED status |
 | 3 | Follows general protocol but misses specific requirements (e.g., test genuineness check, max retries) |
 | 4 | Follows all major levels with minor deviations |
 | 5 | Strict compliance — all 4 levels, all failure handling, all reporting rules followed |
@@ -90,3 +90,12 @@ Does the output follow the verification-before-completion skill's defined protoc
 - Applies task-specific verification strategy for bug fixes, new features, and refactors
 - Flags missing test suite as risk without blocking
 - Flags slow verification (>2 minutes) as project improvement needed
+
+### Anti-Slop Criteria
+
+<!-- Cap is 2 (stricter than the default 3) because verification is the final quality gate.
+     Premature completion or skipped levels are higher-severity anti-patterns. -->
+Guardrail violations cap Adherence score at 2 (see `docs/quality-guardrails.md`):
+
+- **R1**: Premature completion — declaring task complete or printing completion marker when verification shows FAIL or BLOCKED
+- **R2**: Skipped verification levels — jumping from Level 1 to Level 3 or skipping Level 4 entirely
