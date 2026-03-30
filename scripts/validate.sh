@@ -98,6 +98,67 @@ if not errors:
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b — Version Consistency
+# ══════════════════════════════════════════════════════════════════════
+section "2b. Version Consistency"
+
+VERSION_FILE="$REPO_ROOT/VERSION"
+if [ ! -f "$VERSION_FILE" ]; then
+  warn "VERSION file not found — skipping consistency check"
+else
+  ver_file=$(head -1 "$VERSION_FILE")
+
+  # Collect all plugin.json paths
+  pj_paths=()
+  for pdir in "$REPO_ROOT"/plugins/*/; do
+    pj="$pdir.claude-plugin/plugin.json"
+    if [ -f "$pj" ]; then
+      pj_paths+=("$pj")
+    fi
+  done
+
+  # Single python3 call checks marketplace + all plugin.json versions
+  ver_result=$(python3 - "$ver_file" "$MARKETPLACE" "${pj_paths[@]}" <<'PYEOF'
+import json, sys
+
+expected = sys.argv[1]
+marketplace_path = sys.argv[2]
+plugin_paths = sys.argv[3:]
+errors = []
+
+try:
+    with open(marketplace_path) as f:
+        data = json.load(f)
+    mp_ver = data.get('plugins', [{}])[0].get('version', '')
+    if mp_ver and mp_ver != expected:
+        errors.append(f'marketplace.json={mp_ver}')
+except (FileNotFoundError, json.JSONDecodeError):
+    pass
+
+for path in plugin_paths:
+    try:
+        with open(path) as f:
+            pj_ver = json.load(f).get('version', '')
+        if pj_ver and pj_ver != expected:
+            errors.append(f'{path}={pj_ver}')
+    except (FileNotFoundError, json.JSONDecodeError):
+        errors.append(f'{path}=UNREADABLE')
+
+if errors:
+    print('MISMATCH:' + ', '.join(errors))
+else:
+    print('OK')
+PYEOF
+  )
+
+  if [[ "$ver_result" == MISMATCH:* ]]; then
+    fail "Version mismatch: VERSION=$ver_file ${ver_result#MISMATCH:}"
+  else
+    pass "Version consistent: $ver_file"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
 # ══════════════════════════════════════════════════════════════════════
 
