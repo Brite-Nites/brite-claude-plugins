@@ -125,4 +125,4 @@ exclude:
 
 ## No Build Process
 
-This repository has no dependencies, build steps, or tests. Changes are version-controlled with Git and distributed directly.
+This repository has no dependencies or build steps. Changes are version-controlled with Git and distributed directly. Validation scripts run in CI and locally — see `.github/workflows/validate-plugin.yml`.
