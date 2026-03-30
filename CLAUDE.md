@@ -125,4 +125,4 @@ exclude:
 
 ## No Build Process
 
-This repository has no dependencies, build steps, or tests. Changes are version-controlled with Git and distributed directly.
+This repository has no dependencies, build steps, or tests. Changes are version-controlled with Git and distributed directly. Release with `scripts/release.sh <major|minor|patch> [name]` — see CONTRIBUTING.md for details.
