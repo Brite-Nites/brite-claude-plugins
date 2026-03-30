@@ -183,13 +183,12 @@ else
   printf "Judge:    %s\n" "$JUDGE_MODEL"
   printf "\n"
 
-  # Read from dimensions_json instead of re-querying
+  # Read all dimension fields in a single jq call per dimension
   local_dim_count=$(printf '%s' "$dimensions_json" | jq 'length')
   for idx in $(seq 0 $((local_dim_count - 1))); do
-    dim_name=$(printf '%s' "$dimensions_json" | jq -r ".[$idx].name")
-    dim_score=$(printf '%s' "$dimensions_json" | jq ".[$idx].score")
-    dim_thresh=$(printf '%s' "$dimensions_json" | jq ".[$idx].threshold")
-    dim_passed=$(printf '%s' "$dimensions_json" | jq -r ".[$idx].pass")
+    read -r dim_name dim_score dim_thresh dim_passed < <(
+      printf '%s' "$dimensions_json" | jq -r ".[$idx] | [.name, (.score|tostring), (.threshold|tostring), .pass] | @tsv"
+    )
     if [[ "$dim_passed" == "true" ]]; then
       printf "  \033[32mPASS\033[0m  %-20s %s/5 (threshold: %s)\n" "$dim_name" "$dim_score" "$dim_thresh"
     else

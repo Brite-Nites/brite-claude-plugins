@@ -65,8 +65,8 @@ Does the output follow the brainstorming skill's defined protocol?
 
 | Score | Anchor |
 |-------|--------|
-| 1 | Ignores protocol entirely — no phases, no artifacts, skips to implementation |
-| 2 | Follows some protocol but skips major required steps |
+| 1 | Ignores protocol entirely — no phases, no artifacts, skips to implementation. Anti-slop violation (PL1 vague descriptions) |
+| 2 | Follows some protocol but skips major steps or produces vague scope/problem definitions that would carry forward |
 | 3 | Follows general protocol but misses specific requirements |
 | 4 | Follows all major steps with minor deviations |
 | 5 | Strict compliance — all phases, all artifacts, all rules followed |
@@ -80,3 +80,9 @@ Does the output follow the brainstorming skill's defined protocol?
 - Saves design document to `docs/designs/<id>-<slug>.md`
 - Prints completion marker with artifacts, key decisions, and scope
 - Hands off to writing-plans
+
+### Anti-Slop Criteria
+
+Guardrail violations cap Adherence score at 3 (see `docs/quality-guardrails.md`):
+
+- **PL1**: Vague problem statements or scope descriptions that lack concrete specifics — carries forward as vague task descriptions in planning

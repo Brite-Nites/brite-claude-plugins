@@ -189,3 +189,4 @@ Proceeding to → writing-plans
 - If the developer says "just do it" or signals impatience, respect that and produce a minimal design doc with your best judgment.
 - Keep the design document concise. If it's over 40 lines, you're over-thinking it.
 - Reference the validation pattern from `_shared/validation-pattern.md` for self-checking.
+- Check output against anti-slop guardrails (see `_shared/anti-slop-guardrails.md`). Relevant patterns: PL1 (vague descriptions carry forward to planning). Violations cap Adherence score at 3 in rubric evaluation.

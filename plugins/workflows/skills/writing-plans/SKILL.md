@@ -195,3 +195,4 @@ Proceeding to → git-worktrees
 - Reference `_shared/validation-pattern.md` for self-checking after plan creation.
 - CDR check is advisory, not blocking. If Context7 is unavailable, handbook not indexed, or no CDR INDEX found — skip the check, log why, and proceed with planning.
 - Plan files persist across sessions — a new session can pick up where the last left off.
+- Check output against anti-slop guardrails (see `_shared/anti-slop-guardrails.md`). Relevant patterns: PL1-PL4 (vague descriptions, oversized tasks, missing file paths, missing verification). Violations cap Adherence score at 3 in rubric evaluation.

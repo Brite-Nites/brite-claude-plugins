@@ -68,8 +68,8 @@ Does the output follow the writing-plans skill's defined protocol?
 
 | Score | Anchor |
 |-------|--------|
-| 1 | Ignores protocol entirely — no plan file, no structure, skips to implementation |
-| 2 | Follows some protocol but skips major required steps (e.g., no context loading, no approval) |
+| 1 | Ignores protocol entirely — no plan file, no structure, skips to implementation. Anti-slop violations throughout (PL1-PL4) |
+| 2 | Follows some protocol but skips major steps or contains multiple anti-slop violations (vague tasks, missing paths) |
 | 3 | Follows general protocol but misses specific requirements (e.g., task size limits, CDR check) |
 | 4 | Follows all major steps with minor deviations |
 | 5 | Strict compliance — all 3 steps, all task rules, all artifacts produced correctly |
@@ -89,3 +89,12 @@ Does the output follow the writing-plans skill's defined protocol?
 - Approval requested with iteration support (max 3 iterations before error recovery)
 - Completion marker printed with artifacts, key decisions, and task counts
 - Hands off to git-worktrees
+
+### Anti-Slop Criteria
+
+Guardrail violations cap Adherence score at 3 (see `docs/quality-guardrails.md`):
+
+- **PL1**: Vague task descriptions using hedge phrases ("implement the feature", "set up the module") without exact file paths or function signatures
+- **PL2**: Oversized tasks with >5 implementation steps or >3 files
+- **PL3**: Tasks missing file paths entirely — no concrete file references in task body
+- **PL4**: Tasks missing verification steps — no `Verify:` or `Test:` section with a runnable command

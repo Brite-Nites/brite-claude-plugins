@@ -67,8 +67,8 @@ Does the output follow the compound-learnings skill's defined protocol?
 
 | Score | Anchor |
 |-------|--------|
-| 1 | Ignores protocol entirely — dumps learnings without phases, no artifacts |
-| 2 | Follows some protocol but skips major required steps |
+| 1 | Ignores protocol entirely — dumps learnings without phases, no artifacts. Anti-slop violations (C1 ephemeral knowledge, C2 bloat) |
+| 2 | Follows some protocol but skips major steps or saves ephemeral/session-specific content to CLAUDE.md |
 | 3 | Follows general protocol but misses specific requirements |
 | 4 | Follows all major steps with minor deviations |
 | 5 | Strict compliance — all phases, all artifacts, all rules followed |
@@ -85,3 +85,10 @@ Does the output follow the compound-learnings skill's defined protocol?
 - Verifies at most 20 CLAUDE.md claims with priority ordering (paths, commands, configs, names)
 - Checks CLAUDE.md size and extracts to docs/ with @import if over ~100 lines
 - Prints completion marker with artifact summary and handoff to best-practices-audit
+
+### Anti-Slop Criteria
+
+Guardrail violations cap Adherence score at 3 (see `docs/quality-guardrails.md`):
+
+- **C1**: Ephemeral knowledge in CLAUDE.md — session narrative ("today we refactored..."), generic advice, or temporary state saved as durable knowledge
+- **C2**: CLAUDE.md bloat — adding entries without pruning stale ones, causing CLAUDE.md to exceed ~100 lines without extracting to `docs/` with `@import`

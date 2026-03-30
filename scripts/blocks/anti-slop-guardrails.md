@@ -1,0 +1,1 @@
+- Check output against anti-slop guardrails (see `_shared/anti-slop-guardrails.md`). Relevant patterns: %SUFFIX%. Violations cap Adherence score at %CAP% in rubric evaluation.
