@@ -169,9 +169,17 @@ The GitHub Actions workflow (`validate-plugin.yml`) validates on every push/PR t
 
 ## Testing Changes Locally
 
+### Dev mode (fast iteration)
+
+For a fast edit-validate-test loop, see [`docs/dev-guide.md`](docs/dev-guide.md). Key scripts:
+
+- `scripts/dev-setup.sh` / `scripts/dev-teardown.sh` — symlink plugin for live editing
+- `scripts/validate-single.sh <name>` — validate one skill/command/agent (~1s)
+- `scripts/test-single-trigger.sh <skill> "phrase"` — test trigger matching for one skill
+
 ### Automated validation
 
-Run the validation script (requires `python3`):
+Run the full validation script (requires `python3`):
 
 ```bash
 ./scripts/validate.sh
