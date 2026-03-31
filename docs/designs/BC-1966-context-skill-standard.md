@@ -370,8 +370,8 @@ context-skill starts
 | Tier | Available | Experience |
 |------|-----------|-----------|
 | Full enrichment | Handbook + domain MCP + SoR access + interview data | Complete context doc with handbook + SoR-sourced data |
-| Domain SoR only | Domain MCP available, handbook unavailable | SoR-enriched but missing handbook company context |
 | Handbook-only | Context7 available, domain MCP unavailable | Handbook-enriched, `<!-- needs-enrichment -->` markers on domain SoR sections |
+| Domain SoR only | Domain MCP available, handbook unavailable | SoR-enriched but missing handbook company context |
 | Interview-only | No MCP available (neither Context7 nor domain SoR) | All content from project-start interview data |
 | No SoR dependency | Domain has no relevant SoR | Context doc from interview data; no `## SoR Sources` section |
 
