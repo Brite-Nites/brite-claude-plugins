@@ -7,7 +7,6 @@ set -euo pipefail
 # ──────────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REGISTRY="$REPO_ROOT/plugins/workflows/skills/_shared/trigger-registry.json"
 
 pass_count=0
 fail_count=0
@@ -23,13 +22,21 @@ if ! command -v python3 &>/dev/null; then
   exit 2
 fi
 
-if [ ! -f "$REGISTRY" ]; then
-  echo "ERROR: trigger-registry.json not found at $REGISTRY" >&2
+# ── Discover trigger registries across all plugins ────────────────────
+registries=()
+for reg in "$REPO_ROOT"/plugins/*/skills/_shared/trigger-registry.json; do
+  [ -f "$reg" ] && registries+=("$reg")
+done
+
+if [ ${#registries[@]} -eq 0 ]; then
+  echo "ERROR: No trigger-registry.json found in any plugin" >&2
   exit 2
 fi
 
-# ── Run matching engine ───────────────────────────────────────────────
-section "Skill Trigger Matching"
+# ── Test each registry ────────────────────────────────────────────────
+for REGISTRY in "${registries[@]}"; do
+  plugin_name="$(basename "$(dirname "$(dirname "$(dirname "$REGISTRY")")")")"
+  section "Skill Trigger Matching ($plugin_name)"
 
 results=$(TRIGGER_REGISTRY="$REGISTRY" python3 << 'PYEOF'
 import json, os
@@ -111,8 +118,10 @@ while IFS= read -r line; do
   fi
 done <<< "$results"
 
+done  # end per-plugin registry loop
+
 if [ "$total" -eq 0 ]; then
-  echo "ERROR: no test cases executed — registry may be empty or Python output malformed" >&2
+  echo "ERROR: no test cases executed — registries may be empty or Python output malformed" >&2
   exit 2
 fi
 

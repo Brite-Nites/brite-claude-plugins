@@ -33,18 +33,26 @@ handbook-topics: architecture, coding-standards, tools, team-structure, onboardi
 
 ## Repository Structure
 
+Multi-plugin monorepo. Each plugin under `plugins/<domain>/` follows the same structure.
+
 ```
-.claude-plugin/marketplace.json    # Plugin registry
+.claude-plugin/marketplace.json    # Plugin registry (lists all plugins)
 plugins/
-  workflows/
+  workflows/                       # Process + org plugin (primary)
     .claude-plugin/plugin.json     # Plugin metadata
     commands/*.md                  # Slash commands
     commands/_shared/              # Shared command templates
     skills/*/SKILL.md              # Auto-invoked skills
-    skills/_shared/                # Shared skill utilities
+    skills/_shared/                # Shared skill utilities (trigger-registry.json)
     agents/*.md                    # Review and utility agents
-    hooks/hooks.json               # PreToolUse, PostToolUse, SessionStart hooks
+    hooks/hooks.json               # SessionStart hooks
     .mcp.json                      # MCP server configurations
+  marketing/                       # Marketing domain plugin
+    .claude-plugin/plugin.json
+    skills/*/SKILL.md              # Domain skills (context-skill pattern)
+    tools/                         # CLI wrappers + integration guides
+    hooks/hooks.json
+    .mcp.json
 ```
 
 Hooks are auto-loaded from `hooks/hooks.json` — do NOT add a `hooks` field to `plugin.json`. **plugin.json uses a strict allowlist schema — any unrecognized field silently breaks the entire plugin with no error message.** See [CONTRIBUTING.md](CONTRIBUTING.md) for the full schema, plugin development instructions, and testing commands.

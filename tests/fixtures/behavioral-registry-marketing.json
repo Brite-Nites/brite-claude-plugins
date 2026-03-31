@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "description": "Behavioral test registry for marketing plugin skills",
+  "consumed_by": "scripts/test-behavioral.sh",
+  "test_cases": [
+    {
+      "id": "M01",
+      "description": "product-marketing-context activates for brand positioning task",
+      "tier": 2,
+      "prompt": "I need to define our brand positioning and messaging pillars for a new product launch. We need to understand our ICP and create consistent marketing copy across channels.",
+      "expected_skill": "product-marketing-context",
+      "expected_markers": ["brand", "positioning"],
+      "not_expected_markers": [],
+      "not_expected_skills": [],
+      "judge_rubric": null,
+      "estimated_cost": "$0.25",
+      "notes": "Core positive case — brand/positioning keywords should trigger product-marketing-context"
+    },
+    {
+      "id": "M02",
+      "description": "social-media-strategy activates for social media planning",
+      "tier": 2,
+      "prompt": "Create a social media content calendar for Q2. We need a strategy covering LinkedIn, Twitter, and Instagram with consistent posting cadence and engagement tactics.",
+      "expected_skill": "social-media-strategy",
+      "expected_markers": [],
+      "not_expected_markers": [],
+      "not_expected_skills": [],
+      "judge_rubric": null,
+      "estimated_cost": "$0.25",
+      "notes": "Social media planning should trigger social-media-strategy skill"
+    },
+    {
+      "id": "M03",
+      "description": "content-strategy activates for content planning task",
+      "tier": 2,
+      "prompt": "Plan a content strategy for our blog and newsletter. We need to map content to funnel stages, define our editorial calendar, and establish SEO-driven topic clusters.",
+      "expected_skill": "content-strategy",
+      "expected_markers": [],
+      "not_expected_markers": [],
+      "not_expected_skills": [],
+      "judge_rubric": null,
+      "estimated_cost": "$0.25",
+      "notes": "Content strategy/planning keywords should trigger content-strategy skill"
+    }
+  ]
+}

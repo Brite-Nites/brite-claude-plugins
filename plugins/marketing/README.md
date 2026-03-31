@@ -32,9 +32,18 @@ hooks/hooks.json              # Lifecycle hooks (SessionStart only — see note)
 .mcp.json                     # MCP server configurations
 ```
 
-## Context-Skill Pattern (Experimental)
+## Context-Skill Pattern
 
 This plugin uses the **context-skill pattern** defined in `docs/designs/BC-1966-context-skill-standard.md`.
+
+### How it works
+
+```
+project-start (trait: needs-marketing)
+  └─> product-marketing-context (foundational skill)
+        └─> writes docs/marketing-context.md in target project
+              └─> ALL domain skills read this context before acting
+```
 
 The foundational skill `product-marketing-context` creates `docs/marketing-context.md` in the target project. This context doc:
 
@@ -42,6 +51,15 @@ The foundational skill `product-marketing-context` creates `docs/marketing-conte
 - Contains project-specific marketing knowledge (brand positioning, ICP, messaging pillars, voice/tone)
 - Is read by ALL other skills in this plugin before they act
 - Includes `last_refreshed` / `refresh_cadence` frontmatter for staleness tracking
+- Enriched from the Brite Handbook via Context7 MCP (`/brite-nites/handbook`)
+
+### Adding new domain skills
+
+New skills should follow this pattern:
+
+1. Create `skills/<skill-name>/SKILL.md` with standard frontmatter
+2. Include an instruction to read `docs/marketing-context.md` before acting
+3. Reference the context-skill standard for trait-to-SoR mapping
 
 ## Upstream Attribution
 

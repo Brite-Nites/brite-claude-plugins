@@ -13,6 +13,7 @@ set -euo pipefail
 #
 # Environment:
 #   EVALS=1              Required. Safety guard against accidental runs.
+#   EVALS_PLUGIN_DIR     Plugin directory to test (default: plugins/workflows)
 #   EVALS_MODEL          Model to use (default: claude-sonnet-4-6)
 #   EVALS_TRIALS         Trials per test for non-determinism (default: 1)
 #   EVALS_TIMEOUT        Timeout per invocation in seconds (default: 120)
@@ -20,8 +21,14 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-FIXTURE="$REPO_ROOT/tests/fixtures/behavioral-registry.json"
-PLUGIN_DIR="$REPO_ROOT/plugins/workflows"
+PLUGIN_DIR="${EVALS_PLUGIN_DIR:-$REPO_ROOT/plugins/workflows}"
+# Derive default fixture from plugin name: behavioral-registry-<plugin>.json (falls back to behavioral-registry.json)
+_plugin_name="$(basename "$PLUGIN_DIR")"
+_default_fixture="$REPO_ROOT/tests/fixtures/behavioral-registry-${_plugin_name}.json"
+if [ ! -f "$_default_fixture" ]; then
+  _default_fixture="$REPO_ROOT/tests/fixtures/behavioral-registry.json"
+fi
+FIXTURE="${EVALS_FIXTURE:-$_default_fixture}"
 MODEL="${EVALS_MODEL:-claude-sonnet-4-6}"
 TRIALS="${EVALS_TRIALS:-1}"
 TIMEOUT="${EVALS_TIMEOUT:-120}"
@@ -55,6 +62,7 @@ usage() {
   printf "  --help      Show this help message\n\n"
   printf "Environment:\n"
   printf "  EVALS=1           Required safety guard\n"
+  printf "  EVALS_PLUGIN_DIR  Plugin directory (default: plugins/workflows)\n"
   printf "  EVALS_MODEL       Model override (default: claude-sonnet-4-6)\n"
   printf "  EVALS_TRIALS      Trials per test (default: 1)\n"
   printf "  EVALS_TIMEOUT     Timeout per invocation in seconds (default: 120)\n"
