@@ -4,12 +4,12 @@ Marketing domain plugin — brand-aware marketing skills ported from [coreyhaine
 
 ## Setup
 
-This plugin is part of the [brite-claude-plugins](https://github.com/brite-nites/brite-claude-plugins) marketplace.
+This plugin is part of the [britenites-claude-plugins](https://github.com/Brite-Nites/britenites-claude-plugins) marketplace.
 
 ### Install via marketplace
 
 ```bash
-claude install-plugin https://github.com/brite-nites/brite-claude-plugins
+claude install-plugin https://github.com/Brite-Nites/britenites-claude-plugins
 # Then enable this plugin in the marketplace selector
 ```
 
@@ -45,7 +45,7 @@ The foundational skill `product-marketing-context` creates `docs/marketing-conte
 
 ## Upstream Attribution
 
-Skills and tools are ported from [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills), licensed under MIT. Each ported skill credits the upstream source in its SKILL.md.
+Skills and tools are ported from [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills), licensed under MIT. Ported skills will credit the upstream source in their SKILL.md.
 
 ## Conventions
 
