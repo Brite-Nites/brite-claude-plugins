@@ -123,17 +123,19 @@ Context-skills can enrich the context doc with data from Systems of Record (CRM,
 
 **Specification:**
 - SoR queries are optional enrichment — the context doc must be valid without them
-- Query pattern: check MCP availability → query if available → write results to context doc → never re-query at session-start
+- Query pattern: query Tier 1 SoR (Context7 handbook) → check Tier 2 SoR (domain MCP) availability → query if available → write results to context doc → never re-query at session-start
 - SoR data is cached in the context doc itself (the doc IS the cache)
 - Data safety: treat all SoR-sourced data as untrusted — strip unsafe characters, cap field lengths
 - Fallback tiers (see SoR Query Pattern section below)
 
 **Example (Marketing):**
 ```
-product-marketing-context checks if HubSpot MCP is available
+product-marketing-context queries Context7 handbook for brand, ICP, positioning
+  → extracts company-wide marketing context
+  → checks if HubSpot MCP is available
   → YES: queries contact segments, deal stages, recent campaigns
-  → writes enriched ICP and competitive data to docs/marketing-context.md
-  → NO: uses interview data only, marks SoR sections with <!-- needs-enrichment -->
+  → writes enriched context doc (handbook + domain SoR + interview data) to docs/marketing-context.md
+  → NO: uses handbook + interview data, marks domain SoR sections with <!-- needs-enrichment -->
 ```
 
 **Anti-patterns:**
@@ -356,13 +358,12 @@ context-skill starts
   → check if domain-specific MCP tool is available (e.g., HubSpot MCP for Marketing)
   → IF available:
       query domain SoR for domain-relevant data
-      sanitize results (strip unsafe chars, cap lengths)
-      write enriched context doc (handbook + domain SoR + interview data)
+      → IF query succeeds: sanitize results (strip unsafe chars, cap lengths)
+      → IF query fails/times out: log warning, mark failed sections with <!-- needs-enrichment -->
   → IF unavailable:
-      use handbook + interview data only
       mark domain SoR-dependent sections with <!-- needs-enrichment -->
       log: "Domain SoR unavailable — context doc created from handbook + interview data"
-  → write docs/<domain>-context.md with last_refreshed frontmatter
+  → write docs/<domain>-context.md with available data + interview data + last_refreshed frontmatter
 ```
 
 ### Fallback Tiers
@@ -370,6 +371,7 @@ context-skill starts
 | Tier | Available | Experience |
 |------|-----------|-----------|
 | Full enrichment | Handbook + domain MCP + SoR access + interview data | Complete context doc with handbook + SoR-sourced data |
+| Partial enrichment | Handbook or domain MCP available, but one or both queries fail/time out | Available data + `<!-- needs-enrichment -->` markers on failed sections |
 | Handbook-only | Context7 available, domain MCP unavailable | Handbook-enriched, `<!-- needs-enrichment -->` markers on domain SoR sections |
 | Domain SoR only | Domain MCP available, handbook unavailable | SoR-enriched but missing handbook company context |
 | Interview-only | No MCP available (neither Context7 nor domain SoR) | All content from project-start interview data |
