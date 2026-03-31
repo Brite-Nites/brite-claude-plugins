@@ -38,15 +38,33 @@ generated_by: {{SKILL_NAME}}
 
 ## SoR Integration
 
-If a relevant MCP tool is available (see spec for trait-to-SoR mapping), query it to enrich the context doc:
+Context-skills query two tiers of Systems of Record to enrich the context doc:
 
-1. Check MCP availability
-2. Query SoR for domain-relevant data
+### Tier 1 — Handbook (Universal, query first)
+
+The Brite Handbook on Context7 (`/brite-nites/handbook`) is a universal SoR available to all context-skills. It provides company-wide knowledge: brand guidelines, ICP definitions, coding standards, competitive positioning, org structure.
+
+1. Call `resolve-library-id("brite-nites handbook")` to get the Context7 library ID
+2. Call `query-docs` with domain-relevant topics (see spec § Handbook Query Pattern for recommended topics per domain)
+3. Extract relevant context for this domain and project
+4. If Context7 is unavailable, log a warning and continue without handbook context
+
+### Tier 2 — Domain MCP (query second, if available)
+
+If a domain-specific MCP tool is available (see spec for trait-to-SoR mapping), query it for live data:
+
+1. Check domain MCP availability
+2. Query domain SoR for domain-relevant data
 3. **MANDATORY: Follow Data Safety rules** before writing any SoR data — see `docs/designs/BC-1966-context-skill-standard.md` § Data Safety for: newline stripping, character allowlist, field/list caps, frontmatter exclusion, blockquote wrapping
 4. Write enriched sections to context doc
 5. Record query metadata in `## SoR Sources`
 
-If MCP is unavailable, create the context doc from interview data only and mark SoR sections with `<!-- needs-enrichment -->`.
+### Fallback behavior
+
+- **Both available:** Full enrichment — handbook + domain SoR + interview data
+- **Handbook only:** Handbook-enriched context, `<!-- needs-enrichment -->` on domain SoR sections
+- **Domain SoR only:** SoR-enriched but missing handbook company context
+- **Neither available:** Interview data only
 
 ## How Sibling Skills Use This
 

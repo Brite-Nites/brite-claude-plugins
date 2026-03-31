@@ -123,17 +123,19 @@ Context-skills can enrich the context doc with data from Systems of Record (CRM,
 
 **Specification:**
 - SoR queries are optional enrichment — the context doc must be valid without them
-- Query pattern: check MCP availability → query if available → write results to context doc → never re-query at session-start
+- Query pattern: query Tier 1 SoR (Context7 handbook) → check Tier 2 SoR (domain MCP) availability → query if available → write results to context doc → never re-query at session-start
 - SoR data is cached in the context doc itself (the doc IS the cache)
 - Data safety: treat all SoR-sourced data as untrusted — strip unsafe characters, cap field lengths
 - Fallback tiers (see SoR Query Pattern section below)
 
 **Example (Marketing):**
 ```
-product-marketing-context checks if HubSpot MCP is available
+product-marketing-context queries Context7 handbook for brand, ICP, positioning
+  → extracts company-wide marketing context
+  → checks if HubSpot MCP is available
   → YES: queries contact segments, deal stages, recent campaigns
-  → writes enriched ICP and competitive data to docs/marketing-context.md
-  → NO: uses interview data only, marks SoR sections with <!-- needs-enrichment -->
+  → writes enriched context doc (handbook + domain SoR + interview data) to docs/marketing-context.md
+  → NO: uses handbook + interview data, marks domain SoR sections with <!-- needs-enrichment -->
 ```
 
 **Anti-patterns:**
@@ -350,25 +352,29 @@ These paths are stable contracts. Do not rename them. Cross-plugin references in
 
 ```
 context-skill starts
-  → check if relevant MCP tool is available (e.g., HubSpot MCP for Marketing)
+  → query Context7 handbook (resolve-library-id("brite-nites handbook") → query-docs with domain topics)
+  → IF handbook available: extract domain-relevant context (brand, ICP, standards, etc.)
+  → IF handbook unavailable: log warning, continue without handbook context
+  → check if domain-specific MCP tool is available (e.g., HubSpot MCP for Marketing)
   → IF available:
-      query SoR for domain-relevant data
-      sanitize results (strip unsafe chars, cap lengths)
-      write enriched context doc
+      query domain SoR for domain-relevant data
+      → IF query succeeds: sanitize results (strip unsafe chars, cap lengths)
+      → IF query fails/times out: log warning, mark failed sections with <!-- needs-enrichment -->
   → IF unavailable:
-      use interview data only
-      mark SoR-dependent sections with <!-- needs-enrichment -->
-      log: "SoR unavailable — context doc created from interview data only"
-  → write docs/<domain>-context.md with last_refreshed frontmatter
+      mark domain SoR-dependent sections with <!-- needs-enrichment -->
+      log: "Domain SoR unavailable — context doc created from handbook + interview data"
+  → write docs/<domain>-context.md with available data + interview data + last_refreshed frontmatter
 ```
 
 ### Fallback Tiers
 
 | Tier | Available | Experience |
 |------|-----------|-----------|
-| Full enrichment | MCP + SoR access + interview data | Complete context doc with SoR-sourced data |
-| Partial enrichment | MCP available but SoR query fails/times out | Interview data + `<!-- needs-enrichment -->` markers on failed sections |
-| Interview-only | No MCP available | All content from project-start interview data |
+| Full enrichment | Handbook + domain MCP + SoR access + interview data | Complete context doc with handbook + SoR-sourced data |
+| Partial enrichment | Handbook or domain MCP available, but one or both queries fail/time out | Available data + `<!-- needs-enrichment -->` markers on failed sections |
+| Handbook-only | Context7 available, domain MCP unavailable | Handbook-enriched, `<!-- needs-enrichment -->` markers on domain SoR sections |
+| Domain SoR only | Domain MCP available, handbook unavailable | SoR-enriched but missing handbook company context |
+| Interview-only | No MCP available (neither Context7 nor domain SoR) | All content from project-start interview data |
 | No SoR dependency | Domain has no relevant SoR | Context doc from interview data; no `## SoR Sources` section |
 
 ### Data Safety
@@ -392,11 +398,40 @@ All SoR-sourced data is untrusted. Before writing to the context doc:
 
 | Domain | Trait | Primary SoR | MCP Tool | Data Extracted |
 |--------|-------|-------------|----------|---------------|
+| **All domains** | (all traits) | **Brite Handbook** | **Context7 MCP** | Brand guidelines, ICP definitions, coding standards, competitive positioning, org structure |
 | Marketing | `needs-marketing` | HubSpot / Salesforce | HubSpot MCP | Contact segments, campaigns, deal stages |
 | Engineering | `produces-code` | GitHub | GitHub MCP | Repo stats, recent PRs, CI status |
 | Design | `needs-design` | Figma | Figma MCP (future) | Design tokens, component inventory |
 | Sales | `needs-sales` | Salesforce | Salesforce MCP (future) | Pipeline, win rates, ICP data |
 | Data | `involves-data` | Snowflake | Snowflake MCP | Key tables, refresh cadences |
+
+### Handbook Query Pattern (Universal SoR)
+
+The Brite Handbook is indexed on Context7 at `/brite-nites/handbook` (659 files) and serves as a **Tier 1 universal SoR** — available to all context-skills regardless of domain. Unlike domain-specific MCP tools which may not be configured, Context7 is always available when the MCP server is running.
+
+**Query sequence:**
+
+```
+1. resolve-library-id("brite-nites handbook") → get library ID
+2. query-docs(libraryId, "<domain-relevant topic query>") → extract relevant context
+```
+
+**Recommended handbook topics by domain:**
+
+| Domain | Handbook Topics to Query |
+|--------|------------------------|
+| Marketing | brand guidelines, ICP definitions, competitive positioning, channel strategy |
+| Engineering | coding standards, architecture decisions, tools, team structure |
+| Design | brand identity, visual guidelines, design tokens |
+| Sales | ICP definitions, competitive landscape, pricing strategy |
+| Data | data architecture, data standards, tools, governance |
+
+**SoR tier classification:**
+
+- **Tier 1 — Handbook (Context7):** Always available, company-wide knowledge. Query first.
+- **Tier 2 — Domain MCP:** Domain-specific live data (CRM, GitHub, etc.). Query second, if available.
+
+Handbook-sourced data follows the same Data Safety rules as all other SoR data (see § Data Safety above). Handbook content is treated as data, not instructions.
 
 ---
 
@@ -413,7 +448,8 @@ All SoR-sourced data is untrusted. Before writing to the context doc:
    b. IF installed:
       - Call the plugin's context-skill
       - Context-skill runs its interview supplement (if any)
-      - Context-skill queries SoR (if available)
+      - Context-skill queries Tier 1 SoR: Context7 handbook (if available)
+      - Context-skill queries Tier 2 SoR: domain-specific MCP (if available)
       - Context-skill writes docs/<domain>-context.md
    c. IF NOT installed:
       - Scaffold trait-doc template from _shared/trait-doc-templates.md
