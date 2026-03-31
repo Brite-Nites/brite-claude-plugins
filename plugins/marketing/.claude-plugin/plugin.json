@@ -1,0 +1,22 @@
+{
+  "name": "marketing",
+  "description": "Marketing domain plugin — brand-aware marketing skills ported from coreyhaines31/marketingskills",
+  "author": {
+    "name": "Brite"
+  },
+  "version": "0.1.0",
+  "homepage": "https://github.com/brite-nites/brite-claude-plugins",
+  "repository": "https://github.com/brite-nites/brite-claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "marketing",
+    "domain",
+    "brand",
+    "content",
+    "seo",
+    "social-media"
+  ],
+  "skills": "./skills/"
+}

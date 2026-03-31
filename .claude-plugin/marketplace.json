@@ -12,6 +12,12 @@
       "source": "./plugins/workflows",
       "description": "Process + Org plugin — structured workflow methodology with Linear integration",
       "version": "3.29.0"
+    },
+    {
+      "name": "marketing",
+      "source": "./plugins/marketing",
+      "description": "Marketing domain plugin — brand-aware marketing skills ported from coreyhaines31/marketingskills",
+      "version": "0.1.0"
     }
   ]
 }
