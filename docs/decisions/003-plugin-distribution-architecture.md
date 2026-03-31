@@ -85,7 +85,7 @@ COMMUNITY (future, if needed):
   No changes needed to the Brite monorepo
 ```
 
-**Versioning:** Single version across all plugins, managed by `release.sh`. Plugin versions are bumped together because they share infrastructure (hooks, MCP servers, templates) and are tested together.
+**Versioning:** Independent per-plugin versioning. Each plugin has its own version in `plugin.json` and its corresponding `marketplace.json` entry. New plugins start at `0.1.0`. The `workflows` plugin retains its existing version lineage. `validate.sh` checks that each plugin's `plugin.json` version matches its marketplace entry. `release.sh` needs per-plugin release support (tracked by BC-1728).
 
 **Rationale:** The monorepo approach requires zero new infrastructure, matches Anthropic's official distribution model, and leverages existing tooling that already supports multiple plugins (validate.sh uses `plugins/*/` glob, release.sh discovers all plugin.json files dynamically). The "community plugins" concern is a non-issue — Claude Code's marketplace system natively supports adding multiple marketplaces from different repos.
 
@@ -97,12 +97,12 @@ COMMUNITY (future, if needed):
 - Atomic cross-plugin changes (shared templates, hooks, MCP configs)
 - Single CI pipeline validates all plugins together
 - External consumers get a one-command install for all Brite plugins
-- Consistent versioning eliminates compatibility concerns between plugins
+- Independent versioning allows new plugins to start at `0.1.0` and iterate at their own pace
 - Unblocks BC-1724 (scaffold marketing plugin) and all M4/M5 work
 
 ### Negative
 
-- All plugins share a version number — can't release one plugin independently
+- Independent versions require per-plugin release tooling (BC-1728)
 - Repo size grows with each plugin (mitigated: plugins are markdown, not heavy assets)
 - Community plugins require separate repos (mitigated: this is how the ecosystem works anyway)
 
@@ -111,7 +111,7 @@ COMMUNITY (future, if needed):
 | Component | Multi-plugin ready? | Notes |
 |-----------|-------------------|-------|
 | validate.sh | Yes | Uses `plugins/*/` glob |
-| release.sh | Yes | `find plugins/ -name plugin.json` |
+| release.sh | No (BC-1728) | Hardcodes `plugins[0]` — needs per-plugin release support |
 | create-plugin command | Yes | Scaffolds into `plugins/<name>/` |
 | marketplace.json | Yes | Array of plugin entries |
 | Test scripts | No (BC-1728) | Hardcoded to `plugins/workflows/` — tracked separately |

@@ -102,45 +102,42 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 section "2b. Version Consistency"
 
-VERSION_FILE="$REPO_ROOT/VERSION"
-if [ ! -f "$VERSION_FILE" ]; then
-  warn "VERSION file not found — skipping consistency check"
-else
-  ver_file=$(head -1 "$VERSION_FILE")
+# Collect all plugin.json paths
+pj_paths=()
+for pdir in "$REPO_ROOT"/plugins/*/; do
+  pj="$pdir.claude-plugin/plugin.json"
+  if [ -f "$pj" ]; then
+    pj_paths+=("$pj")
+  fi
+done
 
-  # Collect all plugin.json paths
-  pj_paths=()
-  for pdir in "$REPO_ROOT"/plugins/*/; do
-    pj="$pdir.claude-plugin/plugin.json"
-    if [ -f "$pj" ]; then
-      pj_paths+=("$pj")
-    fi
-  done
-
-  # Single python3 call checks marketplace + all plugin.json versions
-  ver_result=$(python3 - "$ver_file" "$MARKETPLACE" "${pj_paths[@]}" <<'PYEOF'
+# Check each plugin.json version against its marketplace entry version
+ver_result=$(python3 - "$MARKETPLACE" "${pj_paths[@]}" <<'PYEOF'
 import json, sys
 
-expected = sys.argv[1]
-marketplace_path = sys.argv[2]
-plugin_paths = sys.argv[3:]
+marketplace_path = sys.argv[1]
+plugin_paths = sys.argv[2:]
 errors = []
 
+# Build marketplace version lookup by plugin name
+mp_versions = {}
 try:
     with open(marketplace_path) as f:
         data = json.load(f)
-    mp_ver = data.get('plugins', [{}])[0].get('version', '')
-    if mp_ver and mp_ver != expected:
-        errors.append(f'marketplace.json={mp_ver}')
+    for entry in data.get('plugins', []):
+        mp_versions[entry.get('name', '')] = entry.get('version', '')
 except (FileNotFoundError, json.JSONDecodeError):
     pass
 
 for path in plugin_paths:
     try:
         with open(path) as f:
-            pj_ver = json.load(f).get('version', '')
-        if pj_ver and pj_ver != expected:
-            errors.append(f'{path}={pj_ver}')
+            pj = json.load(f)
+        pj_name = pj.get('name', '')
+        pj_ver = pj.get('version', '')
+        mp_ver = mp_versions.get(pj_name, '')
+        if pj_ver and mp_ver and pj_ver != mp_ver:
+            errors.append(f'{pj_name}: plugin.json={pj_ver} marketplace={mp_ver}')
     except (FileNotFoundError, json.JSONDecodeError):
         errors.append(f'{path}=UNREADABLE')
 
@@ -149,13 +146,12 @@ if errors:
 else:
     print('OK')
 PYEOF
-  )
+)
 
-  if [[ "$ver_result" == MISMATCH:* ]]; then
-    fail "Version mismatch: VERSION=$ver_file ${ver_result#MISMATCH:}"
-  else
-    pass "Version consistent: $ver_file"
-  fi
+if [[ "$ver_result" == MISMATCH:* ]]; then
+  fail "Version mismatch: ${ver_result#MISMATCH:}"
+else
+  pass "Version consistent across plugins"
 fi
 
 # ══════════════════════════════════════════════════════════════════════

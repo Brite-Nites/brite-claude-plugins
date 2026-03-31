@@ -223,7 +223,7 @@ This bumps version in `VERSION`, `plugin.json`, and `marketplace.json`, moves `[
 git push && git push --tags
 ```
 
-The `VERSION` file is the single source of truth. `scripts/validate.sh` checks that all version files stay in sync.
+Each plugin has its own version in `plugin.json` and `marketplace.json`. `scripts/validate.sh` checks that each plugin's versions match across these two files. The `VERSION` file tracks the workflows plugin version. Per-plugin release support is tracked by BC-1728.
 
 ## Skill Routing Updates
 
