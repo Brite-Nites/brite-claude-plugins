@@ -63,14 +63,26 @@ generate_session_id() {
 }
 
 read_version() {
-  # Read plugin version from plugin.json. Called once at startup, cached.
+  # Read plugin version from the primary (workflows) plugin.json. Called once at startup, cached.
   local repo_root=""
   if [ -f "$REPO_ROOT_FILE" ]; then
     repo_root="$(cat "$REPO_ROOT_FILE" 2>/dev/null)"
   fi
-  # Path assumption: plugin lives at plugins/workflows/ under repo root.
-  # If the repo structure changes, update this path.
+  if [ -z "$repo_root" ]; then
+    echo "unknown"
+    return
+  fi
+  # Use workflows as the canonical version source for telemetry.
+  # Falls back to first discovered plugin if workflows is missing.
   local plugin_json="$repo_root/plugins/workflows/.claude-plugin/plugin.json"
+  if [ ! -f "$plugin_json" ]; then
+    for candidate in "$repo_root"/plugins/*/.claude-plugin/plugin.json; do
+      if [ -f "$candidate" ]; then
+        plugin_json="$candidate"
+        break
+      fi
+    done
+  fi
   if [ -f "$plugin_json" ]; then
     grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$plugin_json" 2>/dev/null \
       | head -1 \

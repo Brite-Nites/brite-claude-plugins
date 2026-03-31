@@ -11,7 +11,34 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REGISTRY="$REPO_ROOT/plugins/workflows/skills/_shared/trigger-registry.json"
+# Discover all trigger registries across plugins, then pick the one containing the target skill.
+# Falls back to first found if skill isn't in any registry. Override with TRIGGER_REGISTRY_PATH.
+_all_registries=()
+for _reg in "$REPO_ROOT"/plugins/*/skills/_shared/trigger-registry.json; do
+  [ -f "$_reg" ] && _all_registries+=("$_reg")
+done
+REGISTRY=""
+if [ -z "${TRIGGER_REGISTRY_PATH:-}" ]; then
+  # Search all registries for the target skill (first arg)
+  _target="${1:-}"
+  for _reg in "${_all_registries[@]}"; do
+    if [ -n "$_target" ] && python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    r = json.load(f)
+sys.exit(0 if any(s['name'] == sys.argv[2] for s in r['skills']) else 1)
+" "$_reg" "$_target" 2>/dev/null; then
+      REGISTRY="$_reg"
+      break
+    fi
+  done
+  # Fall back to first found if skill not in any registry
+  if [ -z "$REGISTRY" ] && [ ${#_all_registries[@]} -gt 0 ]; then
+    REGISTRY="${_all_registries[0]}"
+  fi
+else
+  REGISTRY="$TRIGGER_REGISTRY_PATH"
+fi
 
 pass_count=0
 fail_count=0
@@ -41,8 +68,9 @@ if ! command -v python3 &>/dev/null; then
   exit 2
 fi
 
-if [ ! -f "$REGISTRY" ]; then
-  echo "ERROR: trigger-registry.json not found at $REGISTRY" >&2
+if [ -z "$REGISTRY" ] || [ ! -f "$REGISTRY" ]; then
+  echo "ERROR: No trigger-registry.json found in any plugin" >&2
+  echo "Set TRIGGER_REGISTRY_PATH to specify a registry file." >&2
   exit 2
 fi
 

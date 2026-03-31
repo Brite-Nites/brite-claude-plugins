@@ -14,6 +14,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FIXTURE="$REPO_ROOT/tests/fixtures/scenario-registry.json"
+# Intentionally workflows-specific: validates project-start command against PRD scenarios.
+# Domain plugins (marketing, etc.) do not have equivalent E2E scenario tests.
 PROJECT_START="$REPO_ROOT/plugins/workflows/commands/project-start.md"
 
 pass_count=0

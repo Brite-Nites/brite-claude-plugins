@@ -12,7 +12,8 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PLUGIN_ROOT="$REPO_ROOT/plugins/workflows"
+# Override with VALIDATE_PLUGIN env var for non-workflows plugins
+PLUGIN_ROOT="${VALIDATE_PLUGIN:-$REPO_ROOT/plugins/workflows}"
 
 errors=0
 warnings=0
