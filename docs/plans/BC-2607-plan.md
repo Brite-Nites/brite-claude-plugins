@@ -13,7 +13,7 @@ Port the `launch-strategy` skill from coreyhaines31/marketingskills into `plugin
 - [ ] Behavioral test spec section added
 - [ ] Cross-skill references updated to Brite plugin paths
 - [ ] Context path points to `docs/marketing-context.md`
-- [ ] Registered in `plugins/marketing/.claude-plugin/plugin.json`
+- [ ] Skill directory exists under `plugins/marketing/skills/` (auto-discovered)
 
 ## Tasks
 
@@ -57,8 +57,8 @@ gh api "repos/coreyhaines31/marketingskills/contents/skills/launch-strategy/eval
 - CREATE `plugins/marketing/skills/launch-strategy/SKILL.md`
 **Verify:** Frontmatter is valid YAML, no upstream context paths remain, quality sections present
 
-### Task 4: Register in plugin.json
-**Action:** Add launch-strategy to the skills listing. Note: plugin.json uses `"skills": "./skills/"` (directory glob), so skills are auto-discovered. Verify this means no manual registration is needed.
+### Task 4: Verify plugin discovery
+**Action:** Confirm launch-strategy is auto-discovered. Plugin.json uses `"skills": "./skills/"` (directory glob) — no manual registration needed.
 **Files:**
 - READ `plugins/marketing/.claude-plugin/plugin.json`
 **Verify:** Skill is discoverable (directory exists under skills/)
