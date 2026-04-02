@@ -60,14 +60,14 @@ skills/{name}/evals/evals.json              → plugins/marketing/skills/{name}/
 ```
 
 #### Section 3: Required modifications to SKILL.md
-1. **Frontmatter**: Add `metadata.filePattern` and `metadata.bashPattern` for Brite plugin skill injection
+1. **Frontmatter**: Add `metadata.version`, `metadata.upstream`, and `metadata.category` for Brite plugin metadata. Set `user-invocable: true` for skills that should appear as slash commands
 2. **Context path**: Replace `.agents/product-marketing-context.md` with `docs/marketing-context.md` (Brite's path)
 3. **Cross-skill references**: Update paths from `../other-skill/SKILL.md` to Brite plugin paths
 4. **Add Brite plugin sections** (if not in upstream):
    - Health scoring rubric section
    - Anti-slop guardrails section
    - Behavioral test spec (minimum Tier 1 free assertions)
-5. **Register** in `plugins/marketing/.claude-plugin/plugin.json`
+5. **Verify** skill directory exists under `plugins/marketing/skills/` (auto-discovered by plugin.json glob)
 
 #### Section 4: Reference files
 - Copy all `references/*.md` files as-is (they contain frameworks, templates, examples)
@@ -85,7 +85,7 @@ skills/{name}/evals/evals.json              → plugins/marketing/skills/{name}/
 - [ ] Anti-slop guardrails section included
 - [ ] Cross-skill references use Brite plugin paths
 - [ ] Context path points to `docs/marketing-context.md`
-- [ ] Registered in `plugin.json`
+- [ ] Skill directory exists under `plugins/marketing/skills/` (auto-discovered)
 - [ ] Skill description matches upstream (preserves trigger phrases)
 
 ### 🔲 CHECKPOINT: Show Holden the porting guide for review before proceeding to issue enrichment.
@@ -198,7 +198,7 @@ Follow [marketing-skill-porting.md](docs/guides/marketing-skill-porting.md) for 
 - [ ] Anti-slop guardrails section included
 - [ ] Cross-skill references updated to Brite plugin paths
 - [ ] Depends on `product-marketing-context` foundation skill
-- [ ] Registered in `plugins/marketing/.claude-plugin/plugin.json`
+- [ ] Skill directory exists under `plugins/marketing/skills/` (auto-discovered)
 
 ## Related Skills
 
@@ -284,4 +284,4 @@ Save a memory entry updating the Marketing Skills Plugin status to reflect the e
 - Actually porting any skills (that's the work the enriched issues describe)
 - Creating new skill issues (the 33 existing ones cover all 32 upstream skills + product-marketing-context already done)
 - Tool stack re-evaluation (done last session — 2026-03-31)
-- Writing the actual porting guide content for Brite plugin metadata (filePattern/bashPattern) — that requires understanding the Brite plugin skill injection system, which is documented elsewhere
+- Writing the actual porting guide content for Brite plugin metadata — that requires understanding the Brite plugin skill injection system, which is documented elsewhere (note: marketing skills use `user-invocable: true`, not filePattern/bashPattern)

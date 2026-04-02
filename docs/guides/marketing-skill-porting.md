@@ -146,7 +146,7 @@ Copy all `references/*.md` files as-is. These contain the real depth:
 - Data and benchmarks (e.g., `benchmarks.md` — reply rate data for cold email)
 - Playbooks (e.g., `scoring-models.md` — 247 lines of lead scoring models)
 
-**No modifications needed** unless they reference tools Brite doesn't use. Check against the [validated tool stack](../../memory/project_marketing_tool_stack.md).
+**No modifications needed** unless they reference tools Brite doesn't use. Check against the Brite marketing tool stack (documented in auto-memory under `project_marketing_tool_stack.md`).
 
 ---
 
@@ -156,16 +156,14 @@ Copy `evals/evals.json` to the skill directory. These are behavioral test specs 
 
 ---
 
-## 7. Register in plugin.json
+## 7. Verify plugin discovery
 
-Add the skill to `plugins/marketing/.claude-plugin/plugin.json` under the `skills` array:
+The marketing plugin uses directory-glob auto-discovery (`"skills": "./skills/"`). New skills are auto-discovered when their directory exists under `plugins/marketing/skills/`. No manual `plugin.json` edits are needed.
 
-```json
-{
-  "name": "{name}",
-  "path": "skills/{name}/SKILL.md",
-  "description": "{short description}"
-}
+Verify the skill is discoverable:
+
+```bash
+ls plugins/marketing/skills/{name}/SKILL.md
 ```
 
 ---
@@ -182,7 +180,7 @@ Before marking the port issue as Done:
 - [ ] Health scoring rubric added
 - [ ] Anti-slop guardrails added
 - [ ] Behavioral test spec added
-- [ ] Registered in `plugin.json`
+- [ ] Skill directory exists under `plugins/marketing/skills/` (auto-discovered)
 - [ ] Skill description preserved from upstream (contains trigger phrases)
 - [ ] If replacing a stub skill, old content fully replaced
 
