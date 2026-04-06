@@ -88,6 +88,12 @@ Connects to `https://mcp.linear.app/mcp` over HTTP. Requires Linear authenticati
 
 If the Linear server isn't connecting, check that you have a Linear account and have authorized the MCP integration.
 
+### context7
+
+Connects to `https://mcp.context7.com/mcp` over HTTP. Requires Context7 authentication — you'll be prompted to authorize on first use in Claude Code.
+
+If the Context7 server isn't connecting, check that you have a Context7 account and have authorized the MCP integration. The Brite Handbook is indexed at `/brite-nites/handbook`.
+
 ## Testing Changes
 
 1. **Edit** any markdown or JSON file in `plugins/workflows/`
