@@ -106,8 +106,8 @@ Verify the plugin is loaded by checking that `/workflows:tech-stack` is availabl
 
 ## Step 8: Context7 Setup
 
-1. Confirm Context7 Pro seat (org admin at context7.com)
-2. Run: `npx ctx7 setup --claude --api-key <key>`
+1. Confirm Context7 account (org admin at context7.com can add seats)
+2. Context7 is bundled with the plugin — you'll be prompted to authorize on first use
 3. Verify: `resolve-library-id` returns results for "react" and "brite-nites handbook"
 4. Note: Context7 is strongly recommended but sessions degrade gracefully without it
 

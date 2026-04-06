@@ -25,7 +25,7 @@ Before starting, confirm critical dependencies:
 3. **Context7 MCP** — Call `resolve-library-id` with query "react" (lightweight check). Confirms MCP server is running and authenticated.
    - If it succeeds, also check for handbook: `resolve-library-id` with "brite-nites handbook".
    - Report: "Context7: [OK/unavailable]. Handbook: [OK/not found/N/A]."
-   - If Context7 fails: WARN "Context7 is not available. Library docs and handbook context will be missing this session. Run `npx ctx7 setup --claude` to configure."
+   - If Context7 fails: WARN "Context7 is not available. Library docs and handbook context will be missing this session. Authorize Context7 when prompted on next session start."
    - Do NOT stop — continue with degraded experience.
 
 If Linear or sequential-thinking fails:

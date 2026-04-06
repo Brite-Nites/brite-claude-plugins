@@ -333,7 +333,7 @@ Context7 provides two capabilities:
 1. **Library documentation** — up-to-date docs for any framework/library (React, Prisma, etc.)
 2. **Company knowledge** — the Brite Handbook indexed at `/brite-nites/handbook` (org structure, engineering processes, brand, conventions)
 
-Setup: `npx ctx7 setup --claude --api-key <key>`. Without Context7, sessions degrade gracefully — library docs fall back to training data, and company context is gathered manually during the interview.
+Setup: Bundled with the plugin — authorize on first use. Without Context7, sessions degrade gracefully — library docs fall back to training data, and company context is gathered manually during the interview.
 
 ### Diagnostics
 

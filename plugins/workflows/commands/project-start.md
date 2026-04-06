@@ -601,7 +601,7 @@ After infrastructure dispatch but before generating CLAUDE.md, verify that requi
 |-------|-------|------------|-------------|-------------------|
 | Global | — | Linear | `list_teams` (limit 1) | "Linear MCP unavailable. Linear project creation will be skipped. Run `/workflows:smoke-test` to diagnose." |
 | Global | — | Sequential-thinking | Trivial thought: `"MCP verification"`, thoughtNumber 1, totalThoughts 1, nextThoughtNeeded false | "Sequential-thinking unavailable. Planning quality will be degraded." |
-| Global | — | Context7 | `resolve-library-id` query "react" | "Context7 unavailable. Library docs and handbook context missing. Run `npx ctx7 setup --claude`." |
+| Global | — | Context7 | `resolve-library-id` query "react" | "Context7 unavailable. Library docs and handbook context missing. Authorize Context7 when prompted, or restart your session." |
 | Trait-gated | `involves-data` | Data warehouse | Attempt any available data MCP tool (e.g., Snowflake list schemas, BigQuery list datasets) | "No data warehouse MCP configured. `involves-data` active but no Snowflake/BigQuery MCP found. See Brite Handbook data platform setup." |
 
 ### Verification Algorithm

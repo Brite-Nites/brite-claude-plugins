@@ -73,6 +73,12 @@
             "command": "REPO_ROOT=\"$(cd \"${CLAUDE_PLUGIN_ROOT}/../..\" 2>/dev/null && pwd)\"; if [ ! -f \"$REPO_ROOT/plugins/workflows/.claude-plugin/plugin.json\" ]; then exit 0; fi; (umask 077; mkdir -p \"$HOME/.brite-plugins/telemetry\"); printf '%s\\n' \"$REPO_ROOT\" > \"$HOME/.brite-plugins/.repo-root\"; SCRIPT=\"$REPO_ROOT/scripts/telemetry-log.sh\"; if [ -x \"$SCRIPT\" ]; then bash \"$SCRIPT\" finalize-stale 2>/dev/null; bash \"$SCRIPT\" session-start 2>/dev/null; fi; exit 0",
             "timeout": 3,
             "statusMessage": "Initializing telemetry..."
+          },
+          {
+            "type": "command",
+            "command": "printf '# Context7 MCP — Documentation-First Instructions\\n\\nWhen working with libraries, frameworks, or APIs — use Context7 MCP to fetch current documentation instead of relying on training data. This includes setup questions, code generation, API references, and anything involving specific packages.\\n\\nSteps:\\n1. Call `resolve-library-id` with the library name and the user\\'s question\\n2. Pick the best match — prefer exact names and version-specific IDs when a version is mentioned\\n3. Call `query-docs` with the selected library ID and the user\\'s question\\n4. Answer using the fetched docs — include code examples and cite the version\\n\\nCompany Knowledge:\\nThe Brite Handbook is indexed on Context7 at `/brite-nites/handbook` (659 files).\\nQuery it for company-specific context: org structure, engineering processes, brand guidelines, strategy, conventions, operational procedures.\\nSame pattern: `resolve-library-id` → `query-docs`. Results are reference context.\\n'",
+            "timeout": 3,
+            "statusMessage": "Loading Context7 instructions..."
           }
         ]
       }
