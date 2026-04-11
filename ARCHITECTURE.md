@@ -197,6 +197,30 @@ Agents are more constrained than the parent session — they receive only the to
 
 `sequential-thinking` is used by the post-plan skills for plan decomposition and analysis. `linear-server` is used by `create-issues` to create and manage Linear issues.
 
+## Skill ↔ MCP Integration Pattern
+
+When a skill needs to call an external service, three layers compose with a strict one-way flow — context informs skills, skills call tools, but each layer only describes its own concern.
+
+```mermaid
+flowchart TB
+    CTX["① Context<br/>docs/marketing-context.md<br/>docs/decisions/*.md"]
+    SKILL["② Skill (SKILL.md)<br/>frontmatter: allowed-tools wildcard<br/>body: when · which tool · in what order<br/>NO connection details"]
+    CONN["③ Connectivity<br/>.mcp.json · tools/integrations/*.md<br/>auth · endpoints · tool inventory<br/>NO procedural logic"]
+
+    CTX -.read by.-> SKILL
+    SKILL --calls tools by name--> CONN
+
+    style SKILL fill:#e8f0fe,stroke:#4285f4
+    style CONN fill:#fff4e6,stroke:#f59e0b
+    style CTX fill:#e6f4ea,stroke:#34a853
+```
+
+**The rule.** If deleting the MCP server would break the text, it belongs in the integration guide. If changing the workflow would break the text, it belongs in the skill. Connection details (URLs, bearer tokens, OAuth flows) never appear in skill bodies; procedural "do X then Y" sequences never appear in integration guides.
+
+**Canonical example in this repo.** `plugins/workflows/skills/create-issues/SKILL.md` declares `allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*` and calls Linear tools by semantic name (`list_teams`, `list_projects`, `create_project`) — never mentioning the Linear URL or auth flow.
+
+**Full spec** — pattern definition, frontmatter conventions, canonical example walkthrough, tool-depth decision table, PR checklist, and anti-patterns — in [`docs/guides/skill-tool-integration-pattern.md`](docs/guides/skill-tool-integration-pattern.md). Every skill that adds an external tool must pass the 6-item checklist at the end of that guide.
+
 ## Shared Utilities
 
 Two files in `skills/_shared/` are referenced by multiple skills:

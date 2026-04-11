@@ -15,5 +15,10 @@ Thumbs.db
 # Claude Code local settings
 .claude/settings.local.json
 
+# Repo-root MCP config — dev-scoped, may contain real credentials.
+# Plugin .mcp.json files (plugins/*/.mcp.json) are NOT ignored — they ship with
+# the plugin and must use ${ENV_VAR} substitution for any credentials.
+/.mcp.json
+
 # Behavioral test results (generated, uploaded as CI artifacts)
 tests/evals/behavioral-*.json
