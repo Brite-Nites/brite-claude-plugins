@@ -73,6 +73,30 @@ sequenceDiagram
 
 Skills activate based on their `description` field — Claude reads descriptions and selects the best match for the user's intent.
 
+### Inner Loop (auto-activate in sequence)
+
+| Skill | Triggers on | Purpose |
+|-------|-------------|---------|
+| `brainstorming` | Non-trivial issue, before planning | Socratic discovery, design document |
+| `precedent-search` | During brainstorming or planning | Search past decision traces from project and org INDEX |
+| `writing-plans` | Multi-step task, before coding | Bite-sized tasks with TDD, verification |
+| `git-worktrees` | After plan approval, before coding | Isolated workspace with Linear issue ID |
+| `executing-plans` | Given an approved plan | Subagent-per-task + TDD + checkpoints |
+| `verification-before-completion` | Task checkpoints | 4-level verification before marking done |
+| `compound-learnings` | After completing work (via ship) | Knowledge capture to CLAUDE.md + memory |
+| `best-practices-audit` | After compound (via ship) | CLAUDE.md audit + auto-fix |
+| `handbook-drift-check` | After best-practices audit (via ship) | Detect handbook drift, open handbook PR |
+| `systematic-debugging` | Bug investigation (anytime) | 4-phase root-cause analysis |
+
+### Backend & Quality
+
+| Skill | Triggers on | Purpose |
+|-------|-------------|---------|
+| `python-best-practices` | Writing, reviewing, refactoring FastAPI/Python code | Architectural patterns audit |
+| `react-best-practices` | Writing, reviewing React or Next.js code | Performance optimization patterns |
+| `testing-strategy` | Writing, reviewing, or refactoring test code | Testing patterns (Vitest, RTL, MSW, Playwright, pytest) |
+| `code-quality` | Setting up or reviewing ESLint, Prettier, Ruff, mypy | Linting/formatting config |
+
 ### Design Skills (Three-Way Split)
 
 | Skill | Triggers | Purpose | Example Prompt |
@@ -81,17 +105,21 @@ Skills activate based on their `description` field — Claude reads descriptions
 | `ui-ux-pro-max` | "choose palette", "design system", "plan visual direction" | Design planning & exploration | "Help me pick colors for a SaaS app" |
 | `web-design-guidelines` | "review", "audit", "check" existing UI | Compliance review | "Review my landing page for accessibility" |
 
-### Other Skills
+### Post-Plan
 
-| Skill | Domain | Trigger |
-|-------|--------|---------|
-| `react-best-practices` | React / Next.js | Writing, reviewing, or optimizing React components |
-| `agent-browser` | Browser automation | Navigating websites, filling forms, screenshots |
-| `find-skills` | Skill discovery | Looking for new skills or capabilities |
-| `post-plan-setup` | Project workflow | After `/plan-project` produces a v1 plan |
-| `refine-plan` | Plan refinement | Called by post-plan-setup (not user-invocable) |
-| `create-issues` | Issue creation | Called by post-plan-setup (not user-invocable) |
-| `setup-claude-md` | CLAUDE.md generation | Called by post-plan-setup (not user-invocable) |
+| Skill | Triggers on | Purpose |
+|-------|-------------|---------|
+| `post-plan-setup` | After `/plan-project` produces a v1 plan | Orchestrates refine → create-issues → setup-claude-md |
+| `refine-plan` | Called by post-plan-setup (not user-invocable) | Refine v1 plans into agent-ready tasks |
+| `create-issues` | Called by post-plan-setup (not user-invocable) | Create Linear issues from refined plans |
+| `setup-claude-md` | Called by post-plan-setup (not user-invocable) | Generate best-practices CLAUDE.md |
+
+### Utility
+
+| Skill | Triggers on | Purpose |
+|-------|-------------|---------|
+| `agent-browser` | Navigate websites, fill forms, take screenshots | Browser automation for web testing |
+| `find-skills` | "how do I do X", "find a skill for X" | Discover and install agent skills |
 
 ## Post-Plan Workflow
 
