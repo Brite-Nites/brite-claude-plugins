@@ -42,6 +42,17 @@ If you're unsure whether something belongs here, ask: "Is this about *how* we wo
 4. Set a `matcher` regex for which tools trigger the hook
 5. Run `python3 -m json.tool hooks/hooks.json` to validate JSON
 
+### Add a tool-using skill
+
+A skill that calls an external service (Linear, Email Bison, Salesforce, etc.) follows a specific three-layer pattern — read [`docs/guides/skill-tool-integration-pattern.md`](docs/guides/skill-tool-integration-pattern.md) before starting. Quick version:
+
+1. **Pick an MCP server.** MCP-first is the default — only add a CLI wrapper when you can name a concrete non-Claude caller.
+2. **Register the server** in the plugin's `.mcp.json`. Use `${ENV_VAR}` substitution for credentials — never commit real keys.
+3. **Write the integration guide** at `plugins/<plugin>/tools/integrations/<tool>.md` using [`plugins/marketing/tools/integrations/_template.md`](plugins/marketing/tools/integrations/_template.md). Connection details, auth, and full tool inventory go here — zero procedural logic.
+4. **Write the skill** with `allowed-tools: mcp__plugin_<plugin>_<server>__*` in the frontmatter. Call tools by semantic name in the body. Zero connection details. See `plugins/workflows/skills/create-issues/SKILL.md` as the working reference.
+
+Every tool-using PR must pass the 6-item checklist at the end of the pattern guide.
+
 ## plugin.json Schema (STRICT — read before editing)
 
 **Claude Code validates plugin.json against a strict Zod schema. Any unrecognized field causes a silent hard failure — the entire plugin won't load (no commands, no skills, nothing). There is no error message shown to the user.**
