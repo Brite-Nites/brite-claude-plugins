@@ -219,7 +219,9 @@ flowchart TB
 
 **Canonical example in this repo.** `plugins/workflows/skills/create-issues/SKILL.md` declares `allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*` and calls Linear tools by semantic name (`list_teams`, `list_projects`, `create_project`) — never mentioning the Linear URL or auth flow.
 
-**Full spec** — pattern definition, frontmatter conventions, canonical example walkthrough, tool-depth decision table, PR checklist, and anti-patterns — in [`docs/guides/skill-tool-integration-pattern.md`](docs/guides/skill-tool-integration-pattern.md). Every skill that adds an external tool must pass the 6-item checklist at the end of that guide.
+**Frontmatter form.** `mcp__plugin_<plugin>_<server>__*` for multi-tool servers; `mcp__plugin_<plugin>_<server>__<tool_name>` for single-tool servers. See the guide for the full rule set.
+
+**Full spec** — pattern definition, frontmatter conventions, integration guide structure, canonical example walkthrough, tool-depth decision table, PR checklist, and anti-patterns — in [`docs/guides/skill-tool-integration-pattern.md`](docs/guides/skill-tool-integration-pattern.md). Every skill that adds an external tool must pass the 6-item checklist at the end of that guide.
 
 ## Shared Utilities
 

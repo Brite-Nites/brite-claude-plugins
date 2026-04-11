@@ -67,7 +67,7 @@ Source: [research WIP §8 row 4](../../../../docs/research/outbound-pipeline-res
 
 ## Tool inventory
 
-The server exposes **141 tools across 16 categories** (23 core + 118 extended) per [research WIP §8 row 4](../../../../docs/research/outbound-pipeline-research-wip.md#1a-mcp-servers-8-checked). The 14 documented categories below cover ~125 tools; the remaining ~16 tools across 2 further categories are not enumerated in the research WIP — use `discover_tools` for the full live inventory.
+The server exposes **141 tools across 16 categories** (23 core + 118 extended) per [research WIP §8 row 4](../../../../docs/research/outbound-pipeline-research-wip.md#1a-mcp-servers-8-checked). The 14 documented categories below cover 125 tools; the remaining 16 tools across 2 further categories are not enumerated in the research WIP — use `discover_tools` for the full live inventory.
 
 ### Campaigns (21 tools)
 

@@ -88,6 +88,24 @@ The `plugin_<plugin>_` segment is Claude Code's automatic namespacing — it's d
 
 A good test: if deleting the MCP server would break the text, it belongs in the integration guide. If changing the workflow would break the text, it belongs in the skill.
 
+## Integration guide structure
+
+The *What goes where* table above captures the principle; this section captures the document shape that enforces it. An integration guide must contain these nine sections, in this order. The template at [`plugins/marketing/tools/integrations/_template.md`](../../plugins/marketing/tools/integrations/_template.md) is the fillable form — every integration guide in this repo must conform to it.
+
+| Section | Captures | Why it's required |
+|---|---|---|
+| Purpose | Which pipeline layer the tool serves and why the plugin needs it | A reader arriving from a skill needs to confirm at a glance they're in the right doc |
+| Consumed by | The skill files that reference this integration | Signals when the guide can be retired — an empty list means the integration has no users |
+| Auth | Credential type, source, scopes, multi-instance routing | The skill body cannot contain any of this, so the guide is the only place it can live |
+| Registration | Exact `.mcp.json` snippet with `${ENV_VAR}` placeholders | Copy-pasteable truth for every new environment, including future plugin installs |
+| Tool inventory | All MCP tools grouped by category, plus discovery escape hatches | The reference skill authors grep when choosing which tool to call for a given step |
+| Rate limits and quotas | Per-call, per-minute, and bulk-operation limits | Skill-level retry logic derives from these, but the limits themselves belong here |
+| Known gotchas | Behaviors that will bite a first-time user | Each entry is symptom + cause + workaround, not a troubleshooting runbook |
+| Related skills | Primary consumers, upstream/downstream integrations, alternatives considered and rejected | The cross-link map between skills and integrations |
+| Last verified | ISO date of the last re-validation against the live API | Stale inventories are the top failure mode for integration guides; date it explicitly |
+
+A section that genuinely does not apply stays in the file marked `N/A — <one-line reason>` so reviewers can see the thought. Do not silently omit sections — the structure is a contract, not a suggestion.
+
 ## Canonical example — `create-issues`
 
 `plugins/workflows/skills/create-issues/SKILL.md` is the working reference. Read it alongside this section.
@@ -126,7 +144,7 @@ Three options when adding tool support. Pick by asking who the non-Claude caller
 | **CLI wrapper + MCP** | The tool is *also* invoked from non-Claude contexts (CI, cron, deployment scripts) OR the MCP server is incomplete and the CLI fills gaps. | Doubled surface area — two code paths, two auth flows, two test matrices. Only pay this when you can name a concrete non-Claude caller. |
 | **Integration guide only** | Exploration / third-party tool under evaluation, not ready to claim an MCP slot. | Skills can't reliably call the tool across sessions — defeats the purpose. Treat as a staging area only. |
 
-**Default: MCP-first.** Claude Code has a soft cap around 5–6 active MCP servers before latency and context overhead get noticeable ([Claude Code docs — MCP](https://code.claude.com/docs/en/mcp)). Treat MCP slots as a budget. The workflows plugin already uses 3 (sequential-thinking, linear-server, context7); the marketing plugin can afford 3–4 more (Email Bison, Salesforce, Apollo, one analytics) before crowding.
+**Default: MCP-first.** Claude Code has a soft cap around 5–6 active MCP servers before latency and context overhead get noticeable ([Claude Code docs — MCP](https://code.claude.com/docs/en/mcp)). Treat MCP slots as a budget — **the cap is per-plugin**, not global. Each plugin in this repo has its own 5–6 budget. The workflows plugin currently uses 3 (sequential-thinking, linear-server, context7); the marketing plugin has room for 3–4 likely additions (Email Bison, Salesforce, Apollo, one analytics) before crowding.
 
 **Escalation rule:** only add a CLI wrapper when you can name a non-Claude caller. Don't mirror the upstream `tools/clis/` layout as theater — an empty wrapper is worse than no wrapper.
 
@@ -136,9 +154,9 @@ Every PR that adds a tool-using skill, or ports an upstream skill that reference
 
 - [ ] **Frontmatter wildcard.** `allowed-tools` uses `mcp__plugin_<plugin>_<server>__*` for every multi-tool MCP server; single-tool servers name the exact tool.
 - [ ] **Semantic tool calls.** The skill body references tools by name only (`list_teams`, `create_campaign`). No `mcp__...` paths in prose.
-- [ ] **No connection details.** No URLs, API keys, bearer tokens, OAuth scopes, or auth flows anywhere in the skill body. Grep: `grep -rE "https://[a-z]+\.(mcp\|api)\." plugins/*/skills/` returns zero.
+- [ ] **No connection details.** No URLs, API keys, bearer tokens, OAuth scopes, or auth flows anywhere in the skill body. Grep: `grep -rE "https://[a-z]+\.(mcp|api)\." plugins/*/skills/` returns zero.
 - [ ] **Context reads via `Read`.** When the skill needs brand/architecture/decision context, it calls `Read` on `docs/marketing-context.md` or similar — not via tool calls.
-- [ ] **Matching integration guide.** Every referenced MCP server has `plugins/<plugin>/tools/integrations/<tool>.md` OR is a workflows-plugin server already documented in `ARCHITECTURE.md#mcp-server-integration`.
+- [ ] **Matching integration guide.** Every referenced MCP server has `plugins/<plugin>/tools/integrations/<tool>.md` — in this PR or already merged — conforming to the *Integration guide structure* section above. Workflows-plugin servers may use the `ARCHITECTURE.md#mcp-server-integration` exception.
 - [ ] **Server budget.** Adding the skill does not push the plugin's active MCP server count above 6. If it does, retire one first.
 
 ## Anti-patterns

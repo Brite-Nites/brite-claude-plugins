@@ -1,8 +1,8 @@
 # {Tool Name} Integration
 
-> **Template.** Copy this file to `plugins/marketing/tools/integrations/<tool>.md` and fill in each section. Delete this blockquote and any section that genuinely does not apply (rare — prefer "N/A — reason" over deletion so reviewers can see the thought).
+> **Template.** Copy this file to `plugins/marketing/tools/integrations/<tool>.md` and fill in each section. Delete this blockquote on copy. Do not silently omit sections — if one genuinely does not apply, mark it `N/A — <reason>` so reviewers can see the thought.
 >
-> **Golden rule:** this file documents *how to connect* and *what tools exist*. It does NOT document *when to call them, in what order, or why*. That's the consuming skill's job. See `docs/guides/skill-tool-integration-pattern.md` for the split.
+> **Golden rule:** this file documents *how to connect* and *what tools exist*. It does NOT document *when to call them, in what order, or why*. That's the consuming skill's job. See [`docs/guides/skill-tool-integration-pattern.md`](../../../../docs/guides/skill-tool-integration-pattern.md) for the pattern — in particular its *Integration guide structure* section, which is the contract this template implements.
 
 ## Purpose
 
@@ -60,8 +60,8 @@ The full list of MCP tools this server exposes, grouped by category. Use a table
 
 | Tool | Purpose | Notes |
 |---|---|---|
-| `create_campaign` | ... | ... |
-| `list_campaigns` | ... | ... |
+| `create_campaign` | {short description} | {caveat or leave empty} |
+| `list_campaigns` | {short description} | {caveat or leave empty} |
 
 ### {Next category}
 
