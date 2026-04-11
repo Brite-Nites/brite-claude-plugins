@@ -112,7 +112,7 @@
 > | Salesforce | `@salesforce/mcp` | VERIFIED | 120+ (14 toolsets incl. orgs, metadata, data, users) | SFDX CLI auth | 348 | 2026-04-03 | Many tools non-GA (need `--allow-non-ga-tools`) |
 > | Apollo | `apolloio/apollo-mcp-plugin` | VERIFIED | **4** (not broad API) | OAuth 2.0 | 8 | 2026-04-03 | Only 4 tools: enrich-lead, prospect, sequence-load, analytics. Early stage |
 > | Smartlead | `LeadMagic/smartlead-mcp-server` | VERIFIED | ~112 (116+ credible) | API key | 16 | 2025-07-02 | LeadMagic is partner, not Smartlead itself. 9 months since last commit |
-> | Email Bison | `laviefatigue/emailbison-mcp-server` | **CORRECTED** | **REPO NOT FOUND** (404) | n/a | n/a | n/a | laviefatigue repo returns 404 on GitHub. Only accessible repo: `Sirkunle001/email-bison-claude-mcp` (~13 tools, 2 stars, Oct 2025, HAS writes: add_leads, stop_future_emails, warmup control). "Read-only" claim is wrong |
+> | Email Bison | **Official: `mcp.emailbison.com/mcp` (Beta)** | **CORRECTED — OFFICIAL MCP EXISTS** | **141 tools** (23 core + 118 extended) across 16 categories | API key + Instance-URL headers | n/a (vendor-hosted) | n/a (live service) | **MAJOR DISCOVERY (2026-04-10):** Email Bison has an official first-party MCP server (Beta), accessed via Settings > Integrations > EmailBison MCP in the workspace UI. NOT published on GitHub/npm — vendor-hosted at `https://mcp.emailbison.com/mcp`. Full CRUD: campaigns (21 tools), leads (15), inbox/replies (13), blocklist (8 — includes `add_email_to_blocklist`, `bulk_add_emails_to_blocklist`, `add_domain_to_blocklist`), senders (11), tags (9), webhooks (7), schedules (6), warmup (5), sequences (4), templates (4), tracking (3), variables (2), workspace (17). Both Brite workspaces connected and verified: `send.outbase.so` (Brite Nites, ID 52) + `personal.outbase.so` (BriteNites Team, ID 11). Community repos (laviefatigue 404, Sirkunle001 13 tools) are superseded. |
 > | Resend | `resend/resend-mcp` | VERIFIED (1 correction) | 10+ categories | API key | 492 | 2026-04-09 | No separate "agent skills" product (original claim incorrect) |
 > | OutboundSync | — | CONFIRMED ABSENT | n/a | n/a | n/a | n/a | Native webhooks + HubSpot Marketplace connector only |
 > | Master Inbox | — | CONFIRMED ABSENT | n/a | n/a | n/a | n/a | No MCP server; only generic inbox (IMAP/Gmail) MCPs exist |
@@ -180,7 +180,7 @@ MCP Servers (API connectivity)
 3. **Skill design pattern:** How much operational detail goes in the skill vs. in the MCP server? How do skills reference MCP tools?
 4. **Cross-repo agents:** When an agent in `brite-salesforce` needs enrichment data, how does it access the enrichment engine in `brite-data-platform`?
 5. **Audience views:** The golden records exist but audience filtering doesn't. Where does this logic live?
-6. **Email Bison MCP completeness:** Community MCP is read-only. Is that sufficient or do we need write access (load campaigns, manage block lists)? [CORRECTED 2026-04-09: Sirkunle001 repo HAS write operations (add_leads_to_campaign, stop_future_emails, warmup control). The "read-only" premise is wrong. ADR 2b should evaluate the available write surface and whether it's sufficient for block list management and campaign loading]
+6. **Email Bison MCP completeness:** Community MCP is read-only. Is that sufficient or do we need write access (load campaigns, manage block lists)? [CORRECTED 2026-04-09: Sirkunle001 repo HAS write operations. FURTHER CORRECTED 2026-04-10: **Official Email Bison MCP Server (Beta) discovered** — 141 tools including full blocklist CRUD (8 tools: add/remove/bulk-add emails AND domains), campaign management (21 tools: create, import leads, attach senders, pause/resume), lead management (15 tools: create, bulk-create 500/req, upsert, blacklist), inbox/reply management (13 tools: send reply, mark interested, push to followup). Question is now fully answered — the vendor's own MCP has comprehensive write access. No custom MCP needed.]
 
 ---
 
@@ -229,7 +229,7 @@ ICP Definition + Intent Signals
 | 1 | `@salesforce/mcp` | VERIFIED | 120+ tools, 14 toolsets, 348 stars, official. Many non-GA tools. SFDX CLI auth |
 | 2 | `apolloio/apollo-mcp-plugin` | VERIFIED | 4 tools only (enrich-lead, prospect, sequence-load, analytics). OAuth 2.0. 8 stars, early stage |
 | 3 | `LeadMagic/smartlead-mcp-server` | VERIFIED | ~112 tools (116+ credible). LeadMagic is partner, not Smartlead. API key. Last commit 2025-07-02 (9 months stale) |
-| 4 | `laviefatigue/emailbison-mcp-server` | **CORRECTED** | Repo returns 404 — likely doesn't exist publicly. Only accessible: `Sirkunle001/email-bison-claude-mcp` (~13 tools, HAS writes, 2 stars, Oct 2025) |
+| 4 | Email Bison MCP | **CORRECTED — OFFICIAL MCP EXISTS** | Original `laviefatigue` repo returns 404. Community `Sirkunle001` has ~13 tools. But **Email Bison has an official first-party MCP server (Beta)** at `mcp.emailbison.com/mcp` with **141 tools** (23 core + 118 extended) across 16 categories including blocklist management (8 tools with bulk add/remove for emails AND domains). Vendor-hosted, not on GitHub/npm. Both Brite workspaces verified: send.outbase.so + personal.outbase.so. This supersedes all community repos and eliminates the "read-only" / "need custom MCP" concern entirely. |
 | 5 | `resend/resend-mcp` | VERIFIED | 10+ tool categories, 492 stars, official. No "agent skills" product (original claim wrong) |
 | 6 | OutboundSync MCP | CONFIRMED ABSENT | Native webhooks + HubSpot connector only. No MCP on GitHub/npm/registry |
 | 7 | Master Inbox MCP | CONFIRMED ABSENT | No MCP server. Only generic inbox MCPs exist (IMAP/Gmail — don't match) |
@@ -276,7 +276,7 @@ ICP Definition + Intent Signals
 
 ### Open questions for Phase 2 (BC-5041)
 
-1. **Email Bison MCP adoption:** Which repo to adopt (Sirkunle001 with writes, or a future one)? Is the existing write surface sufficient for block-list management?
+1. ~~**Email Bison MCP adoption:** Which repo to adopt?~~ **RESOLVED (2026-04-10):** Official Email Bison MCP Server (Beta) exists at `mcp.emailbison.com/mcp`. 141 tools including full blocklist management (8 tools), campaign CRUD (21 tools), lead import (15 tools). Both Brite workspaces connected and verified. Community repos (laviefatigue, Sirkunle001) are superseded. ADR 2a should recommend the official MCP; ADR 2b's "custom MCP for Email Bison" question is answered — no custom MCP needed.
 2. **Apollo MCP scope:** Only 4 tools — how much of the prospecting pipeline can it automate?
 3. **Salesforce MCP non-GA tools:** Which non-GA toolsets are needed for outbound? What's the risk of depending on non-GA?
 4. **Smartlead MCP relevance:** If Brite never used Smartlead, should the MCP be adopted (for Email Bison migration future-proofing) or skipped?
