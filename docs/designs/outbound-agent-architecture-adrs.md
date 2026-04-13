@@ -194,7 +194,7 @@ This ADR exists to formally ratify that work as an architecture decision and to 
 
 - The pattern guide at `docs/guides/skill-tool-integration-pattern.md` is the canonical reference for all tool-using skills. No changes to it.
 - **Degradation policy:** when a skill's `allowed-tools` MCP server is unreachable, the skill:
-  1. Calls a lightweight read-only tool (e.g. `get_active_workspace_info` for Email Bison, `list_objects` for Salesforce) as an availability check.
+  1. Calls a lightweight read-only tool (e.g. `get_active_workspace_info` for Email Bison, or a metadata read tool for Salesforce — verify the exact tool name when writing the Salesforce integration guide) as an availability check.
   2. If the check fails, reports the failure to the user with the server name and suggests checking credentials / connectivity.
   3. Does **not** fall back to `Bash(curl)`, direct API calls, or any other bypass. The skill stops. This preserves anti-pattern #3 ("bypassing `allowed-tools` with Bash(curl)") from the pattern guide and keeps the three-layer boundary clean.
   4. If a specific MCP proves unreliable enough in practice to warrant a temporary escape hatch, that's a per-server decision documented in the server's integration guide — not a blanket policy change. The default remains "no bypass."
@@ -216,7 +216,7 @@ Ratify the existing pattern guide as the architecture decision for skill-to-MCP 
 
 ### Decision
 
-Use MCP servers as the access layer where they exist; use read-only git (`git show origin/main:<path>`) for everything else. Never build a custom MCP just to bridge two repos.
+Use domain MCP servers for runtime data, GitHub MCP (`@modelcontextprotocol/server-github`) for cross-repo file reads, and Context7 for semantic search. No local clone dependency. Never build a custom MCP just to bridge two repos.
 
 ### Context
 
@@ -558,7 +558,7 @@ Tier 1 (free assertions — no tool calls needed) + Tier 2 (tool-assisted — re
 
 ### Outcome (if adopted)
 
-- **BC-5042** creates the template file at `plugins/marketing/skills/_template/OUTBOUND-SKILL-TEMPLATE.md` implementing this spec.
+- **BC-5042** creates the template file at `plugins/marketing/skills/_template/OUTBOUND-SKILL-TEMPLATE.md` implementing this spec. (Named "outbound" because outbound skills drove the design; applies to all tool-calling marketing skills.)
 - **All tool-calling marketing skills** conform to this template — this includes the 5 Outbound Lead Gen skills (BC-2717–2721), the Demand Gen `outbound-playbook` (BC-2722), and Marketing Ops skills like `lead-routing` (BC-2725) that also call MCP tools. The template applies to any marketing skill that declares `allowed-tools` in its frontmatter, regardless of category.
 - Upstream methodology-only ports continue using the existing `docs/guides/marketing-skill-porting.md` flow — sections 4–6 are simply omitted.
 - The review agents can check for structural conformance: if `allowed-tools` is present in frontmatter, sections 4–6 must exist.
