@@ -230,26 +230,44 @@ Skills in this repo need data from all three others. The question is: what's the
 
 Key constraints from BC-5040 validation:
 - `outbound-sales-ops` has no MCP server, but Email Bison MCP covers the runtime data (replies, campaigns) and Salesforce MCP covers the CRM data.
-- `brite-data-platform` has a CLI (`python -m enrichment.cli`, 9 commands) but no MCP. Skills need enrichment schema knowledge (dbt models, recipe definitions) more than they need to *run* enrichment.
+- `brite-data-platform` has a CLI (`python -m enrichment.cli`, 9 commands) but no MCP. Skills need enrichment schema knowledge (dbt models, recipe definitions) more than they need to *run* enrichment (running recipes is a future need — deferred until a skill requires it, likely via the enrichment CLI or a future MCP wrapper in `brite-data-platform`).
 - `brite-salesforce` is SFDX source — skills access Salesforce runtime data via the Salesforce MCP, not by reading Apex source files.
-- All three repos are cloned locally at `~/Projects/work/brite-nites/`.
+- **No local clone dependency.** Skills must not assume sibling repos are cloned locally. Cross-repo file access uses the GitHub API (via MCP or `gh` CLI), not local filesystem reads.
 
 ### Alternatives considered
 
-**Alternative 1: MCP servers as universal access layer.**
-- Pros: Uniform pattern — every cross-repo interaction is a tool call. Clean, discoverable, auth-consistent.
-- Cons: Requires MCP servers for every repo. `brite-data-platform` and `outbound-sales-ops` don't have them. Building custom MCPs just for cross-repo access is premature (ADR 2b rejected this).
-- Rejected because: We'd need to build 2–3 custom MCP servers just to satisfy the "everything is MCP" constraint. That's building bridges before we know the traffic.
+**Alternative 1: Clone everything locally.**
+- Pros: Fast reads (`git show origin/main:<path>`). Simple mental model. How most Claude Code users handle multi-repo today.
+- Cons: Requires every developer to clone 3+ repos and keep them fetched. Fragile — a stale clone silently serves old data. Fails in CI/CD environments. Not portable across team members without a setup script.
+- Rejected because: Local clone dependencies are unnecessary infrastructure friction. The GitHub API provides the same read access without the setup burden.
 
-**Alternative 2: Repo-specific CLI wrappers called via Bash.**
-- Pros: Each repo exposes a CLI; skills call `Bash(python -m enrichment.cli ...)` or `Bash(npx outbound-ops ...)`.
-- Cons: Violates the "no Bash escape hatch" principle from the pattern guide. Skills need broad `Bash(*)` permissions. Different auth per CLI. Error handling is string-parsing, not structured responses.
+**Alternative 2: Build custom MCP servers for each repo.**
+- Pros: Uniform pattern — every cross-repo interaction is a structured tool call.
+- Cons: Requires building 2–3 custom MCP servers for repos that don't have them. Significant maintenance burden. ADR 2b already rejected building custom MCPs.
+- Rejected because: Building bridges before we know the traffic.
+
+**Alternative 3: Repo-specific CLI wrappers called via Bash.**
+- Pros: Each repo exposes a CLI; skills call `Bash(python -m enrichment.cli ...)`.
+- Cons: Violates the "no Bash escape hatch" principle from the pattern guide. Different auth per CLI. Error handling is string-parsing.
 - Rejected because: CLI-via-Bash is the anti-pattern the skill↔tool integration pattern was designed to avoid.
 
-**Alternative 3 (recommended): MCP where it exists, read-only git for everything else.**
-- Pros: Uses the best available mechanism for each path. MCP for runtime data (Email Bison, Salesforce) gives structured, authenticated access. Read-only git for architecture knowledge (dbt models, CF architecture docs, SFDX metadata) is sufficient — skills need to *understand* these repos, not *run* them. No new infrastructure needed.
-- Cons: Two access patterns to explain (MCP vs git). Read-only git can't execute queries or trigger pipelines — if a skill needs enrichment *results* (not just enrichment *schemas*), this pattern is insufficient.
-- Accepted because: Matches the actual need. 90% of cross-repo access is "read the architecture docs to understand how this layer works" — read-only git handles that. The 10% that needs runtime data (replies, CRM records, campaign stats) goes through MCP.
+**Alternative 4 (recommended): GitHub MCP server for file access, domain MCPs for runtime data, Context7 for semantic search.**
+- Pros: Three complementary tools, each doing what it's best at. GitHub MCP (`@modelcontextprotocol/server-github`) reads files from any private repo via GitHub API — structured tool calls, no local clones, PAT auth. Domain MCPs (Email Bison, Salesforce) provide runtime data. Context7 provides semantic search when a skill needs to "find docs about X" rather than "read this specific file." No local dependencies beyond `gh` CLI (already required by the plugin environment).
+- Cons: GitHub MCP costs an MCP server slot. Three access patterns to explain. Context7 returns snippets, not full files.
+- Accepted because: Eliminates the local clone dependency entirely. Each access method serves a distinct need (file reads, runtime data, semantic search). The GitHub MCP server already exists and is maintained by the MCP org — no custom code needed.
+
+### Access layer overview
+
+| Need | Tool | Auth | Local dependency |
+|---|---|---|---|
+| **Read a specific file** from another repo | GitHub MCP server (`@modelcontextprotocol/server-github`) | GitHub PAT (scoped to Brite-Nites org) | None |
+| **Query runtime data** (campaigns, CRM records, replies) | Domain MCPs (Email Bison, Salesforce) | Per-server credentials (ADR 2a) | None |
+| **Semantic search** across another repo's docs | Context7 MCP (`query-docs`) | Context7 Pro (already adopted, ADR-001) | None |
+| **Fallback: targeted file reads** in existing skills | `gh api` via Bash | `gh` CLI auth (already required) | None |
+
+**GitHub MCP adoption:** Adopt as the recommended approach for new skills. Register in `plugins/marketing/.mcp.json` alongside the first skill that needs cross-repo file access. Existing skills that use `gh api` via Bash (`handbook-drift-check`, `promote-precedent`) continue working — migration to GitHub MCP is optional for them.
+
+**Context7 for sibling repos:** Add `brite-data-platform`, `outbound-sales-ops`, and `brite-salesforce` to the Context7 dashboard (one-time setup). Skills can then query architecture docs via `resolve-library-id` → `query-docs` — same pattern as handbook access (ADR-001).
 
 ### Per-scenario matrix
 
@@ -257,35 +275,37 @@ Key constraints from BC-5040 validation:
 |---|---|---|---|
 | → **Salesforce runtime data** | Salesforce MCP (`@salesforce/mcp`) | SOQL queries, CRUD on Contacts/Leads/Opportunities, lifecycle state | Non-GA tools may change. SFDX CLI auth required per developer. |
 | → **Email Bison runtime data** | Email Bison MCP (`emailbison-b2b` / `emailbison-personal`) | Campaigns, leads, replies, blocklist, warmup, analytics | Beta server — tool names may change. |
-| → **Enrichment schemas** (`brite-data-platform`) | Read-only git: `git show origin/main:<path>` | dbt model definitions (`dim_people.sql`, `dim_companies.sql`), recipe YAML files, CLI help text, CLAUDE.md architecture overview | Can't *run* enrichment recipes or query Snowflake. If a skill needs enrichment *results*, it needs a different path (manual export, future MCP, or direct Snowflake access). |
-| → **Reply pipeline architecture** (`outbound-sales-ops`) | Read-only git for docs; Email Bison MCP for runtime data | Architecture docs (label→action mappings, BDR workflow, CF flow diagrams), plus live reply/campaign data via Email Bison MCP | Can't invoke CFs on demand. CF state (dead-letter queue, dedup cache) is in Supabase — not accessible without a separate integration. |
-| → **Salesforce metadata** (`brite-salesforce`) | Read-only git for SFDX source; Salesforce MCP for runtime | Object definitions, field models, lifecycle GlobalValueSets, validation rules | SFDX source may drift from production SF org. Salesforce MCP reads production state. Prefer MCP for runtime truth, git for schema understanding. |
+| → **Enrichment schemas** (`brite-data-platform`) | GitHub MCP: `read_file(repo, path)` | dbt model definitions (`dim_people.sql`, `dim_companies.sql`), recipe YAML files, CLI help text, CLAUDE.md | Can't *run* enrichment recipes or query Snowflake. Running recipes is a deferred need — will likely require the enrichment CLI or a future MCP wrapper. |
+| → **Reply pipeline architecture** (`outbound-sales-ops`) | GitHub MCP for docs; Email Bison MCP for runtime data | Architecture docs (label→action mappings, BDR workflow, CF flow diagrams), plus live reply/campaign data via Email Bison MCP | Can't invoke CFs on demand. CF state (dead-letter queue, dedup cache) is in Supabase — not accessible without a separate integration. |
+| → **Salesforce metadata** (`brite-salesforce`) | GitHub MCP for SFDX source; Salesforce MCP for runtime | Object definitions, field models, lifecycle GlobalValueSets, validation rules | SFDX source may drift from production SF org. Salesforce MCP reads production state. Prefer MCP for runtime truth, GitHub MCP for schema understanding. |
 
 ### Default rule
 
-If the target repo has an MCP server registered in this plugin, use it. If not, `git show origin/main:<path>` for read-only access. Constraints:
-- **No branch switching** in external repos — always read from `origin/main`.
-- **No modifications** to external repos — read-only throughout.
-- **Fetch before reading** — `git -C <repo> fetch origin` to ensure freshness, then `git show origin/main:<path>`.
-- **Never build a custom MCP just to bridge two repos** — that's a premature abstraction. When a repo stabilizes an MCP server (e.g. if `brite-data-platform` eventually wraps its enrichment CLI in MCP), adopt it then.
+Three tiers, in priority order:
+1. **Domain MCP** — if the target data has a registered MCP server (Email Bison, Salesforce), use it. This gives structured, authenticated, runtime access.
+2. **GitHub MCP** — if the skill needs a specific file from another repo, use the GitHub MCP server's `read_file` tool. This gives exact file contents via GitHub API, no local clone required.
+3. **Context7** — if the skill needs to search across another repo's documentation (not a specific file), use `query-docs`. Returns relevant snippets with source pointers.
+
+**Never build a custom MCP just to bridge two repos.** When a repo stabilizes its own MCP server (e.g. if `brite-data-platform` wraps its enrichment CLI), adopt it as a domain MCP at tier 1.
 
 ### Outcome (if adopted)
 
-- Skills document their cross-repo data sources in a "## Data Sources" section (or equivalent) specifying which access pattern they use for each source.
-- No new MCP servers or CLI wrappers built for cross-repo access.
-- Read-only git access to external repos is an accepted, documented pattern — not a hack to be replaced. It *may* be replaced by MCP servers in the future, but the replacement is pull-based (we adopt when the server exists), not push-based (we don't build servers to make the pattern "cleaner").
-- The three local clones (`outbound-sales-ops`, `brite-data-platform`, `brite-salesforce`) are assumed present at `~/Projects/work/brite-nites/` for development. CI/CD environments that run skills would need these clones or an alternative — but no skill currently runs in CI.
+- **No local clone dependency.** Skills do not assume sibling repos are cloned. All cross-repo access goes through GitHub API (via MCP or `gh` CLI) or Context7.
+- Skills document their cross-repo data sources in a "## Data Sources" section specifying which access tier they use for each source.
+- GitHub MCP server registered in `plugins/marketing/.mcp.json` alongside the first skill that needs cross-repo file access. Uses a PAT scoped to Brite-Nites org, stored as `${GITHUB_PAT}` in the `.mcp.json` credential pattern (ADR 2a).
+- Context7 dashboard updated to index `brite-data-platform`, `outbound-sales-ops`, and `brite-salesforce` (one-time setup, same mechanism as the handbook — ADR-001).
+- Existing skills using `gh api` via Bash continue working. New skills should prefer the GitHub MCP server.
 
 ### Recommendation
 
-MCP for runtime data, read-only git for architecture knowledge. Don't build bridges before you know the traffic — the existing access paths cover 100% of the skills we're planning to build in the Marketing Skills Plugin milestone. If a future skill genuinely needs to *run* an enrichment recipe or *trigger* a Cloud Function, that's the signal to build a dedicated integration — not before.
+Eliminate local clone dependencies. Use domain MCPs for runtime data, GitHub MCP for file reads, Context7 for semantic search. Three tiers, each serving a distinct need, all operating through structured tool calls or existing MCP servers — no local filesystem assumptions. Register the GitHub MCP server alongside the first consuming skill, same pattern as Salesforce and Email Bison.
 
 ### Review notes
 
-- Is read-only git sufficient for enrichment data, or will skills need to *run* enrichment recipes (which would require the CLI in `brite-data-platform`, not just reading model definitions)?
-- Should we formalize `git show origin/main:<path>` as a documented access pattern in the pattern guide, or keep it as ADR-level guidance?
-- The three local clones are assumed present — is that a reasonable assumption for all team members, or should we document a setup step?
-- If `brite-data-platform` eventually ships an MCP server for its enrichment CLI, should this plugin auto-adopt it, or does it need its own ADR?
+- *(Resolved during review)* Read-only file access is sufficient for enrichment schemas. Running enrichment recipes is a future need — deferred until a skill requires it.
+- *(Resolved during review)* Local clones are removed as a dependency. GitHub MCP + Context7 replace `git show origin/main`.
+- Should the GitHub MCP server be registered in the marketing plugin or the workflows plugin? Marketing skills are the primary consumers, but workflow skills (`handbook-drift-check`, `promote-precedent`) also do cross-repo reads.
+- The GitHub MCP server requires a PAT. Should this be a personal PAT (per-developer) or a machine PAT (shared, stored as org secret)?
 
 ---
 
@@ -363,21 +383,36 @@ Naming: `audience_view_<segment_name>`. Lives in `models/marts/audience_views/`.
 
 ### Outcome (if adopted)
 
-- **No audience views built in this PR.** The convention is defined; the first implementation is the responsibility of the first skill that needs targeting data (likely BC-2717 list-building or BC-2718 campaign-orchestration).
-- The skill workflow for "build a campaign list" becomes: (1) skill reads the audience view definition from `brite-data-platform` via read-only git (ADR 2d), (2) skill either references an existing audience view or helps the user define a new one, (3) skill calls Email Bison MCP to import the leads (`bulk_create` in chunks of 500), (4) skill calls Email Bison MCP to attach senders and configure the campaign.
-- Ad-hoc filtering is expressed as a dbt model variant or a temporary audience view — not as freeform SQL embedded in a skill body.
+- **No audience views built in this PR.** The convention is defined; the first implementation is a separate issue in the `brite-data-platform` backlog, blocked by the first consuming skill's contract definition (see ownership model below).
+- The skill workflow for "build a campaign list" becomes: (1) skill reads the audience view definition from `brite-data-platform` via GitHub MCP (ADR 2d), (2) skill either references an existing audience view or helps the user define a new one, (3) skill calls Email Bison MCP to import the leads (`bulk_create` in chunks of 500), (4) skill calls Email Bison MCP to attach senders and configure the campaign.
 - Exclusion logic is split: dbt models handle historical exclusions (recently emailed, opted out, low quality score); Email Bison blocklist handles real-time exclusions (suppressed prospects from reply processing).
+
+### Ownership model (interface contract pattern)
+
+Audience views follow the **interface contract pattern** recommended by the dbt community for cross-team data consumption:
+
+1. **The consuming skill defines the contract** — its Linear issue specifies what columns, filters, and freshness SLA the audience view must provide. This is the "what I need" spec.
+2. **The data platform fulfills the contract** — a separate issue in `brite-data-platform`'s backlog implements the `audience_view_*` dbt model. The data platform team (or the same person, on a small team) owns naming, testing, and performance.
+3. **The skill issue is blocked by the dbt issue.** The skill can't be marked done until the view exists. The same person can do both, but separate issues preserve clean lineage — one dbt project, one `dbt test`, one lineage graph.
+
+This keeps all SQL in the dbt project (no SQL scattered across the plugin repo) and maintains the dbt project as the single source of truth for data transformations.
+
+### Ad-hoc targeting
+
+**dbt-first, with a pragmatic escape hatch for one-off test campaigns.** Reusable segments and anything going to production must go through dbt. But for a quick test campaign (e.g. "50 property managers in Dallas to test a new sequence"), ad-hoc filtering through the skill is acceptable — the skill conversation itself serves as the audit trail. If the same ad-hoc filter is used twice, that's the signal to promote it to a dbt model.
+
+The exact mechanism for ad-hoc Snowflake access from a skill (direct query, MCP wrapper, export) is deferred to when the first skill actually needs it.
 
 ### Recommendation
 
-dbt for the *who*, Email Bison for the *how*, skills for the *when*. Audience views are dbt models that filter golden records — governed, testable, reusable. Campaign lists are the output of audience views imported into Email Bison via MCP. Build the first audience view alongside the first skill that needs it, not before.
+dbt for the *who*, Email Bison for the *how*, skills for the *when*. Audience views are dbt models owned by `brite-data-platform`, defined by interface contracts from consuming skills. Separate issues, separate repos, blocking relationship. Ad-hoc filtering is acceptable for one-off tests; reusable segments always go through dbt.
 
 ### Review notes
 
-- Should audience views be a separate issue in the `brite-data-platform` backlog, or embedded in the first consuming skill's scope?
+- *(Resolved during review)* Audience views are separate issues in `brite-data-platform` backlog, with the consuming skill blocked by them. Interface contract pattern.
+- *(Resolved during review)* Ad-hoc SQL is acceptable for one-off test campaigns. Reusable segments must go through dbt. Promote to dbt model on second use.
 - Is the `audience_view_*` naming convention clear enough, or should we write a more detailed spec in `brite-data-platform`'s CLAUDE.md?
 - Does the 500-lead `bulk_create` limit in Email Bison constrain campaign sizes, or is chunking sufficient for Brite's volumes?
-- Should skills be allowed to write ad-hoc SQL against Snowflake for one-off campaigns, or must everything go through dbt models for governance?
 
 ---
 
