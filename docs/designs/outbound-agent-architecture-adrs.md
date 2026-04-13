@@ -5,7 +5,7 @@
 **Date:** 2026-04-12
 **Blocked by:** BC-5040 (Phase 1 validation — Done, PR #115)
 **Blocks:** BC-5042 (Phase 3 — design doc, template, findings)
-**Pre-resolved:** ADR 2c largely answered by PR #116 (skill↔tool integration pattern, merged 2026-04-11)
+**Pre-resolved:** ADR 2c ratifies PR #116's pattern and adds a degradation policy (no fallback to curl when MCP is unreachable)
 
 ---
 
@@ -87,7 +87,7 @@ BC-5040 (Phase 1, PR #115) validated 8 MCP servers. Key findings:
 
 **Developer setup:** Each developer sets env vars in their shell profile. The plugin README documents required vars per server. This is the simplest pattern that works today. If Claude Code ships native secret management, we upgrade — the `${VAR}` form is forward-compatible.
 
-**Graceful degradation:** Skills include a "check availability" step that calls a lightweight read-only tool (e.g. `get_active_workspace_info` for Email Bison, `list_objects` for Salesforce) before mutating anything. If the check fails, the skill reports the failure and stops — no fallback to `Bash(curl)`.
+**Graceful degradation:** Skills include a "check availability" step that calls a lightweight read-only tool (e.g. `get_active_workspace_info` for Email Bison, or a metadata read tool for Salesforce — verify the exact tool name when writing the Salesforce integration guide) before mutating anything. If the check fails, the skill reports the failure and stops — no fallback to `Bash(curl)`.
 
 ### Recommendation
 
@@ -136,7 +136,7 @@ Key validated facts:
 - Rejected because: Waiting for an OutboundSync MCP from a vendor that doesn't exist is indefinite deferral. And the Master Inbox MCP already exists inside Email Bison.
 
 **Alternative 4 (recommended): Use existing CFs for OutboundSync, Email Bison MCP for Master Inbox, defer enrichment.**
-- Pros: Zero new infrastructure. OutboundSync's CFs already mediate all writes — a skill that needs to "sync a reply to Salesforce" lets the webhook pipeline handle it. A skill that needs to "read replies" or "manage blocklist" calls Email Bison MCP directly. The enrichment engine stays in `brite-data-platform` and is accessed via read-only git (ADR 2d).
+- Pros: Zero new infrastructure. OutboundSync's CFs already mediate all writes — a skill that needs to "sync a reply to Salesforce" lets the webhook pipeline handle it. A skill that needs to "read replies" or "manage blocklist" calls Email Bison MCP directly. The enrichment engine stays in `brite-data-platform` and is accessed via GitHub MCP (ADR 2d).
 - Cons: Skills can't trigger an OutboundSync "re-sync" on demand — they must wait for the webhook pipeline. If a skill needs to force a sync, there's no tool to call.
 - Accepted because: Matches the existing architecture ("Cloud Functions are the only writers" — outbound-sales-ops architecture rule 2) and adds zero new infrastructure. The "no on-demand re-sync" gap is real but minor — the `replay-pending` cron handles retries every 5 minutes.
 
@@ -145,7 +145,7 @@ Key validated facts:
 - **No custom MCP servers built.** Zero new infrastructure in this milestone.
 - **OutboundSync interactions** — skills that need CRM sync trust the webhook pipeline. Skills that need to *read* CRM state use the Salesforce MCP directly (ADR 2a). Skills that need to *write* to the Email Bison blocklist use the Email Bison MCP directly. The CFs handle the ambient sync between them. Known limitation: skills can't trigger an on-demand re-sync — they must wait for the webhook pipeline (seconds in the happy path) or the 5-minute `replay-pending` cron if something fails. This is addressable by adding an on-demand trigger endpoint to `outbound-sales-ops` if a skill needs it — not blocked by this decision.
 - **Master Inbox interactions** — skills use Email Bison MCP's reply tools. The `list_replies`, `search_replies`, `send_reply`, `get_replies_analytics` tools cover the read/write surface. If a skill needs MI-specific features that the Email Bison MCP can't reach, that's a signal to re-evaluate — but no such case exists today.
-- **Enrichment engine** — stays in `brite-data-platform`. Skills in this plugin access enrichment data via read-only git (ADR 2d). If the enrichment CLI needs an MCP wrapper, that's a `brite-data-platform` issue, not a marketing-plugin issue.
+- **Enrichment engine** — stays in `brite-data-platform`. Skills in this plugin access enrichment data via GitHub MCP (ADR 2d). If the enrichment CLI needs an MCP wrapper, that's a `brite-data-platform` issue, not a marketing-plugin issue.
 - **Integration guide for OutboundSync** — write `tools/integrations/outboundsync.md` alongside the first skill that touches the sync layer (likely BC-2720 reply-processing). Not in this PR — grounded in a real use case, not speculative. Documents the CF-mediated architecture so skill authors understand how the sync layer works without an MCP.
 
 ### Recommendation
@@ -263,7 +263,8 @@ Key constraints from BC-5040 validation:
 | **Read a specific file** from another repo | GitHub MCP server (`@modelcontextprotocol/server-github`) | GitHub PAT (scoped to Brite-Nites org) | None |
 | **Query runtime data** (campaigns, CRM records, replies) | Domain MCPs (Email Bison, Salesforce) | Per-server credentials (ADR 2a) | None |
 | **Semantic search** across another repo's docs | Context7 MCP (`query-docs`) | Context7 Pro (already adopted, ADR-001) | None |
-| **Fallback: targeted file reads** in existing skills | `gh api` via Bash | `gh` CLI auth (already required) | None |
+
+> **Legacy note:** Existing skills (`handbook-drift-check`, `promote-precedent`) use `gh api` via Bash for cross-repo file reads. These continue working but new skills should prefer the GitHub MCP server (tier 1 above).
 
 **GitHub MCP adoption:** Adopt as the recommended approach for new skills. Register in `plugins/marketing/.mcp.json` alongside the first skill that needs cross-repo file access. Existing skills that use `gh api` via Bash (`handbook-drift-check`, `promote-precedent`) continue working — migration to GitHub MCP is optional for them.
 
@@ -292,7 +293,7 @@ Three tiers, in priority order:
 
 - **No local clone dependency.** Skills do not assume sibling repos are cloned. All cross-repo access goes through GitHub API (via MCP or `gh` CLI) or Context7.
 - Skills document their cross-repo data sources in a "## Data Sources" section specifying which access tier they use for each source.
-- GitHub MCP server registered in `plugins/marketing/.mcp.json` alongside the first skill that needs cross-repo file access. Uses a PAT scoped to Brite-Nites org, stored as `${GITHUB_PAT}` in the `.mcp.json` credential pattern (ADR 2a).
+- GitHub MCP server registered in `plugins/marketing/.mcp.json` alongside the first skill that needs cross-repo file access. Uses a PAT scoped to Brite-Nites org, stored as `${GITHUB_PAT}` in the `.mcp.json` credential pattern (ADR 2a). This brings the marketing plugin's MCP server count to 4 of ~6 (3 from ADR 2a + GitHub MCP), leaving 2 slots for future servers (e.g. Apollo, Resend).
 - Context7 dashboard updated to index `brite-data-platform`, `outbound-sales-ops`, and `brite-salesforce` (one-time setup, same mechanism as the handbook — ADR-001).
 - Existing skills using `gh api` via Bash continue working. New skills should prefer the GitHub MCP server.
 
@@ -424,20 +425,20 @@ Outbound skills follow a 9-section template that extends the upstream marketing-
 
 ### Context
 
-The marketing plugin already has a porting convention for upstream skills (`docs/guides/marketing-skill-porting.md`) and a tool integration pattern for MCP-calling skills (`docs/guides/skill-tool-integration-pattern.md`). The 6 outbound skills (BC-2717–2722) are net-new, not ports — they need to teach methodology *and* orchestrate real tools against real repos. Neither existing guide covers this combination.
+The marketing plugin already has a porting convention for upstream skills (`docs/guides/marketing-skill-porting.md`) and a tool integration pattern for MCP-calling skills (`docs/guides/skill-tool-integration-pattern.md`). Multiple net-new marketing skills — including 5 Outbound Lead Gen skills (BC-2717–2721), the Demand Gen `outbound-playbook` skill (BC-2722), and Marketing Ops skills like `lead-routing` (BC-2725) — need to teach methodology *and* orchestrate real tools against real repos. Neither existing guide covers this combination.
 
 ADRs 2a–2e produced decisions that shape the template:
 - **2a:** Email Bison + Salesforce MCPs adopted. `${ENV_VAR}` credentials. Graceful degradation via availability check.
 - **2b:** No custom MCPs. CFs are the OutboundSync integration layer. Email Bison MCP covers Master Inbox.
 - **2c:** Pattern guide ratified. Skills call tools by semantic name. 6-item PR checklist.
-- **2d:** MCP for runtime data, read-only git for architecture knowledge. Per-scenario access matrix.
+- **2d:** Domain MCPs for runtime data, GitHub MCP for cross-repo file reads, Context7 for semantic search. No local clone dependency.
 - **2e:** dbt for audience segments, Email Bison for campaign lists. Skills orchestrate the handoff.
 
 ### Alternatives considered
 
 **Alternative 1: Use upstream marketing-skill structure as-is.**
 - Pros: Consistency with the 33 upstream ports. One template for all marketing skills.
-- Cons: Upstream skills are methodology-only — they teach frameworks and best practices but never call external tools. The 6 outbound skills need to orchestrate Email Bison, Salesforce, and cross-repo data. The upstream structure has no sections for MCP tool references, Brite-specific repo architecture, or step-by-step runbooks.
+- Cons: Upstream skills are methodology-only — they teach frameworks and best practices but never call external tools. Tool-calling marketing skills need to orchestrate Email Bison, Salesforce, and cross-repo data. The upstream structure has no sections for MCP tool references, Brite-specific repo architecture, or step-by-step runbooks.
 - Rejected because: The upstream structure is necessary but insufficient. The outbound skills need 3 additional sections.
 
 **Alternative 2: Create a completely separate template for outbound skills.**
@@ -558,8 +559,8 @@ Tier 1 (free assertions — no tool calls needed) + Tier 2 (tool-assisted — re
 ### Outcome (if adopted)
 
 - **BC-5042** creates the template file at `plugins/marketing/skills/_template/OUTBOUND-SKILL-TEMPLATE.md` implementing this spec.
-- All 6 outbound skills (BC-2717–2722) conform to this template.
-- Upstream ports continue using the existing `docs/guides/marketing-skill-porting.md` flow — sections 4–6 are simply omitted.
+- **All tool-calling marketing skills** conform to this template — this includes the 5 Outbound Lead Gen skills (BC-2717–2721), the Demand Gen `outbound-playbook` (BC-2722), and Marketing Ops skills like `lead-routing` (BC-2725) that also call MCP tools. The template applies to any marketing skill that declares `allowed-tools` in its frontmatter, regardless of category.
+- Upstream methodology-only ports continue using the existing `docs/guides/marketing-skill-porting.md` flow — sections 4–6 are simply omitted.
 - The review agents can check for structural conformance: if `allowed-tools` is present in frontmatter, sections 4–6 must exist.
 
 ### Recommendation
