@@ -119,12 +119,15 @@ Brite Implementation section guidance:
     (e.g. list-building → campaign-orchestration).
 -->
 
-### Which repos this skill touches
+### Tools this skill calls
 
-| Need | Repo | Access method | Reason |
+Organized tool-first because that's how a skill author thinks: "what does my skill need to do?" before "where does the data live?" This matches Section 5 (MCP Tool Reference) which is also tool-first.
+
+| What the skill needs to do | MCP server / tool | Repo or system it reaches | Reason (ADR / source) |
 |---|---|---|---|
-| {e.g. Audience view definitions} | `brite-data-platform` | GitHub MCP (`get_file_contents`) | ADR 2d: no local clone dependency |
-| {e.g. CRM lifecycle state} | `brite-salesforce` (production org) | Salesforce MCP (SOQL) | ADR 2a: Salesforce is CRM SoR |
+| {e.g. Read audience view definition} | GitHub MCP (`get_file_contents`) | `brite-data-platform` | ADR 2d — no local clone dependency |
+| {e.g. Dedup against known prospects} | Salesforce MCP (`run_soql`) | `brite-salesforce` (production org) | ADR 2a — Salesforce is CRM SoR |
+| {e.g. Import leads + create campaign} | Email Bison MCP (`emailbison-b2b`) | Email Bison workspace 52 (`send.outbase.so`) | ADR 2a — sole sequencer |
 | {...} | {...} | {...} | {...} |
 
 ### Architectural rules that apply
