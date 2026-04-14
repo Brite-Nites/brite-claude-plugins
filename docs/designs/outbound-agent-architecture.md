@@ -4,31 +4,39 @@
 **Status:** Draft — human review at PR
 **Date:** 2026-04-14
 **Depends on:** BC-5040 (Phase 1 research validation, PR #115), BC-5041 (Phase 2 ADRs, PR #118)
-**Blocks:** BC-2714 (research findings doc), BC-2717–2722 (6 outbound marketing skills)
+**Completes:** BC-2714 (research findings doc)
+**Blocks:** BC-2717–2722 (6 outbound marketing skills: 5 Outbound Lead Gen + 1 Demand Gen)
 
 ---
 
 ## Context
 
-Brite's outbound pipeline spans four repos (`britenites-claude-plugins` for skills, `outbound-sales-ops` for reply-processing Cloud Functions, `brite-data-platform` for Snowflake + dbt + enrichment, `brite-salesforce` for the CRM SoR) and dozens of external tools. Before any outbound *skill* can be authored, three questions had to be answered: which MCP servers does the plugin adopt, how do skills access data across repos, and what shape does an "outbound skill" actually take.
+Brite's outbound pipeline spans four repos and dozens of external tools:
 
-This document assembles the answers into a single design. It does not re-open any decision. Validated facts come from BC-5040 (read-only audit against `origin/main` of all three sibling repos + handbook). Architecture decisions come from BC-5041 (6 ADRs covering MCP adoption, custom servers, skill-to-MCP pattern, cross-repo access, audience views, and the skill template spec). This phase produces the outputs those two predecessor issues were driving toward — one design doc, one skill template file, one promoted research findings doc.
+- `britenites-claude-plugins` — this repo; skills orchestrate
+- `outbound-sales-ops` — reply-processing Cloud Functions
+- `brite-data-platform` — Snowflake + dbt + enrichment
+- `brite-salesforce` — the CRM system of record (SoR)
+
+Before any outbound *skill* can be authored, three questions had to be answered: which MCP servers does the plugin adopt, how do skills access data across repos, and what shape does an "outbound skill" actually take.
+
+This document assembles the answers into a single design. It does not re-open any decision. Validated facts come from BC-5040 (read-only audit against `origin/main` of all three sibling repos + handbook). Architecture decisions come from BC-5041 (6 ADRs covering MCP adoption, custom servers, skill-to-MCP pattern, cross-repo access, audience views, and the skill template spec). This phase produces `outbound-agent-architecture.md` (this design doc), `OUTBOUND-SKILL-TEMPLATE.md` (the skill scaffold), and `outbound-pipeline-findings.md` (the promoted research doc).
 
 ---
 
 ## Validated facts
 
-Summarized from BC-5040 §1–8 and the research WIP. Full evidence links in [Links](#links).
+Summarized from BC-5040 §1–8 and the research findings doc. Full evidence links in [Links](#links).
 
 **Layer 1 — List Building / Enrichment (`brite-data-platform`)** — Snowflake + dbt Cloud + Fivetran + Airbyte Cloud + custom Python pipelines (Prefect flows + Pydantic). Acquisition via Serper Places; people discovery via Apollo. Email waterfall is built: IcyPeas → Prospeo → LeadMagic (verified exact order and prices in `services/enrichment/recipes/work_email_waterfall.yml`). Verification via BounceBan (deliverability) + EmailGuard (ESP detection). Golden records (`dim_people`, `dim_companies`) in Snowflake with field-level survivorship and a 10-point `data_quality_score`. CLI is `python -m enrichment.cli` with 9 commands (not 4 as the WIP originally stated); the provider directory contains 14 real providers (not 5). Architecture rule: single-writer gold — Python writes to `RAW.PIPELINE_ENRICHMENT`, dbt writes to `dim_*` marts, Python never writes production. **Audience views are not yet built** — the first outbound skill creates them per ADR 2e.
 
-**Layer 2 — Sending / Sequencing (Email Bison)** — Email Bison is the sole sequencer. Smartlead appears in the handbook only as a market alternative, never Brite-active. OutboundSync webhooks handle 7 event types (delivery, opens, replies, bounces, unsubscribes, plus send + reply). OutboundSync creates Salesforce *Contacts*, not Leads — a deliberate pattern (BC-2705 production audit: 6,235 Contacts, 0 Leads). Campaign loading from golden records is currently manual — this handoff is the primary pain point addressed by the `list-building` + `campaign-orchestration` skills (ADR 2e).
+**Layer 2 — Sending / Sequencing (Email Bison)** — Email Bison is the sole sequencer. Smartlead appears in the handbook only as a market alternative, never Brite-active. OutboundSync webhooks handle 7 event types (delivery, opens, replies, bounces, unsubscribes, plus send + reply). OutboundSync creates Salesforce *Contacts*, not Leads — a deliberate pattern (BC-2705 production audit: 6,235 Contacts, 0 Leads). Master Inbox (MI) — Email Bison's aggregated reply inbox — is the upstream of the reply-processing layer (Layer 3). Campaign loading from golden records is currently manual — this handoff is the primary pain point addressed by the `list-building` + `campaign-orchestration` skills (ADR 2e).
 
-**Layer 3 — Reply Processing (`outbound-sales-ops`)** — TypeScript on Vercel Serverless + Supabase Postgres. Master Inbox aggregates replies across sender accounts and AI-classifies into 11 labels mapped to 8 actions (full table in `docs/architecture.md`). Three Cloud Functions: `label-sync` (priority resolution → dedup → SF sync → MI routing → side effects), `reply-notification` (Speed-to-Lead to Slack), `message-router` (BDR reply tracking). Six cron jobs including `validate-sf-schema` daily. Priority resolution order is strict (Suppress > Escalate > Speed-to-Lead > Redirect > Archive > Deferred > Triage > No Action). Architectural rules: no tool-to-tool writes (CFs are the only writers), single-label enforcement in MI, upgrade-only transitions on `Lifecycle_Stage__c` and `Lead_Status__c` (field-specific, not universal). BDR workflow uses 6 MI lists (Hot, Pending Action, Needs Triage, Connected, Follow-Up, Archived).
+**Layer 3 — Reply Processing (`outbound-sales-ops`)** — TypeScript on Vercel Serverless + Supabase Postgres. MI aggregates replies across sender accounts and AI-classifies into 11 labels mapped to 8 actions (full table in `docs/architecture.md`). Three Cloud Functions: `label-sync` runs a 5-step pipeline (priority resolution, dedup, SF sync, MI routing, action side effects); `reply-notification` pushes Speed-to-Lead alerts to Slack; `message-router` handles BDR reply tracking. Six cron jobs including `validate-sf-schema` daily. Priority resolution order is strict (Suppress > Escalate > Speed-to-Lead > Redirect > Archive > Deferred > Triage > No Action). Architectural rules: no tool-to-tool writes (CFs are the only writers), single-label enforcement in MI, upgrade-only transitions on `Lifecycle_Stage__c` and `Lead_Status__c` (field-specific, not universal). BDR workflow uses 6 MI lists (Hot, Pending Action, Needs Triage, Connected, Follow-Up, Archived).
 
 **Layer 4 — CRM (`brite-salesforce`)** — Salesforce Enterprise Edition, SFDX source-driven. HubSpot migration is **complete** (13.4K accounts, 35.8K contacts, 4.3K leads, 4.9K opportunities loaded). Three business lines: Brite Nites (holiday + exterior lighting, residential *and* commercial), Brite Labs (commercial/experiential), Brite Supply (B2B marketplace + Brite Base SaaS). Lifecycle has 12 `Lifecycle_Stage__c` values (not 8 — the 4 edge states Lost, Disqualified, Do_Not_Prospect, Subscriber matter for reply-processing). Ten Opportunity record types. Custom objects: `Territory__c`, `Lifecycle_Stage_History__c`. 13 integration endpoints including Aircall (live via CTI managed package v3).
 
-**Layer 5 — Engagement** — Slack for alerts (#positive-replies, #system-health). Aircall is **live**; Dialpad is planned, not started (confirmed by user on 2026-04-09: "we are moving to Dialpad even though we are in Aircall right now"). Calendly for scheduling. Front for post-reply dialog (CC-based handoff from MI). HeyReach partially active for LinkedIn outreach via Clay, but not in the reply pipeline. SMS planned via Twilio (env vars present), not implemented.
+**Layer 5 — Engagement** — Slack for alerts (#positive-replies, #system-health). Aircall is **live**; Dialpad is planned, not started (confirmed by user on 2026-04-09: "we are moving to Dialpad even though we are in Aircall right now"). Calendly for scheduling. Front for post-reply dialog (email-CC-based handoff from MI — MI adds the BDR's Front address to the reply thread). HeyReach partially active for LinkedIn outreach via Clay, but not in the reply pipeline. SMS planned via Twilio (env vars present), not implemented.
 
 **MCP landscape** — 8 servers evaluated. Email Bison has an **official vendor-hosted MCP (Beta) at `mcp.emailbison.com/mcp` with 141 tools across 16 categories** — discovered 2026-04-10, supersedes all community Email Bison repos. Both Brite workspaces connected (`send.outbase.so` B2B, `personal.outbase.so`). Salesforce official MCP has 120+ tools across 14 toolsets. Apollo MCP has only 4 tools. Smartlead community MCP has ~112 tools but Brite has never used Smartlead. Resend has 10+ categories. No MCP exists (or will exist) for OutboundSync or Master Inbox — OutboundSync is a Brite-built webhook receiver with no external vendor, and Master Inbox is an Email Bison feature already covered by Email Bison's MCP.
 
@@ -42,7 +50,7 @@ Six ADRs from [`outbound-agent-architecture-adrs.md`](outbound-agent-architectur
 
 **Decision:** Adopt Email Bison (both workspaces) and Salesforce MCP servers. Defer Apollo and Resend. Skip Smartlead. `${ENV_VAR}` substitution in committed `.mcp.json`.
 
-**Rationale:** Email Bison + Salesforce together cover the sending layer and the CRM layer — the two layers every outbound skill must touch. Together they consume 3 of the plugin's ~6 MCP slots (B2B + personal + Salesforce), leaving room for GitHub MCP and future additions. Apollo has only 4 tools and Brite uses Apollo's REST API directly in `brite-data-platform`; Resend has no current consumer; Smartlead was never a Brite tool. Deferring unused servers preserves startup latency and context budget.
+**Rationale:** Email Bison + Salesforce together cover the sending layer and the CRM layer — the two layers every outbound skill must touch. Together they consume 3 of the plugin's ~5–6 MCP slots (`emailbison-b2b` + `emailbison-personal` + `salesforce`; per-plugin soft cap documented in `CLAUDE.md`), leaving room for GitHub MCP (ADR 2d) and future additions. Apollo has only 4 tools and Brite uses Apollo's REST API directly in `brite-data-platform`; Resend has no current consumer; Smartlead was never a Brite tool. Deferring unused servers preserves startup latency and context budget.
 
 See [ADR 2a](outbound-agent-architecture-adrs.md#adr-2a-mcp-server-adoption-strategy).
 
@@ -56,7 +64,7 @@ See [ADR 2b](outbound-agent-architecture-adrs.md#adr-2b-custom-mcp-server-strate
 
 ### ADR 2c — Skill-to-MCP orchestration pattern
 
-**Decision:** Ratify the three-layer pattern from [`skill-tool-integration-pattern.md`](../guides/skill-tool-integration-pattern.md) (PR #116) as the architecture standard for all tool-using skills. Add a degradation policy: skills call a lightweight read-only tool as an availability check before mutating; on failure, the skill stops and reports — no fallback to `Bash(curl)` or direct API calls.
+**Decision:** Ratify the three-layer pattern from [`skill-tool-integration-pattern.md`](../guides/skill-tool-integration-pattern.md) (PR #116) as the architecture standard for all tool-using skills. Add a degradation policy: skills call a lightweight read-only probe (the specific tool per server is documented in that server's integration guide) as an availability check before mutating; on failure, the skill stops and reports — no fallback to `Bash(curl)` or direct API calls.
 
 **Rationale:** The pattern was merged and validated before BC-5041 began (4 post-plan skills + 1 marketing integration guide already use it). This ADR formally blesses it and closes the one gap the guide didn't cover — what happens when a server is unreachable. Never bypassing `allowed-tools` preserves the three-layer boundary; per-server escape hatches belong in integration guides, not policy.
 
@@ -66,7 +74,7 @@ See [ADR 2c](outbound-agent-architecture-adrs.md#adr-2c-skill-to-mcp-orchestrati
 
 **Decision:** Domain MCP servers for runtime data. GitHub MCP (`@modelcontextprotocol/server-github`) for cross-repo file reads. Context7 for semantic search. No local clone dependency. Never build a custom MCP just to bridge two repos.
 
-**Rationale:** Skills need three distinct kinds of cross-repo access — structured runtime queries, specific file reads, and semantic search over docs. Each tier exists and serves a distinct need; together they eliminate the local-clone setup burden. Legacy skills using `gh api` via Bash (`handbook-drift-check`, `promote-precedent`) keep working; new skills should prefer the GitHub MCP. Register GitHub MCP in `plugins/marketing/.mcp.json` alongside the first consuming skill, bringing the plugin to 4 of ~6 MCP slots.
+**Rationale:** Skills need three distinct kinds of cross-repo access — structured runtime queries, specific file reads, and semantic search over docs. Each tier exists and serves a distinct need; together they eliminate the local-clone setup burden. Legacy skills using `gh api` via Bash (`handbook-drift-check`, `promote-precedent`) keep working; new skills should prefer the GitHub MCP. Register GitHub MCP in `plugins/marketing/.mcp.json` alongside the first consuming skill, bringing the plugin to 4 of ~5–6 MCP slots (3 from ADR 2a + GitHub MCP).
 
 See [ADR 2d](outbound-agent-architecture-adrs.md#adr-2d-cross-repo-agent-pattern).
 
@@ -82,7 +90,7 @@ See [ADR 2e](outbound-agent-architecture-adrs.md#adr-2e-audience-view-architectu
 
 **Decision:** Outbound skills follow a 9-section template extending the upstream marketing-skill structure. Sections 4–6 (Brite Implementation, MCP Tool Reference, Operational Runbook) are required for tool-calling skills and omitted for methodology-only upstream ports. One template, one checklist, one review agent rule.
 
-**Rationale:** Upstream skills are methodology-only; the 5 outbound skills need to orchestrate Email Bison + Salesforce + cross-repo data — the upstream shape has no place for those layers. Forking into two templates doubles the maintenance surface without improving the outcome. Extending with three clearly-marked "tool-calling skills only" sections keeps one template usable by both outbound skills (fill all 9) and upstream ports (ignore 4–6). BC-5042 produces the template file; ADR 2f is the spec.
+**Rationale:** Upstream skills are methodology-only; the 6 tool-calling outbound marketing skills (5 Outbound Lead Gen + the Demand Gen `outbound-playbook`) need to orchestrate Email Bison + Salesforce + cross-repo data — the upstream shape has no place for those layers. Forking into two templates doubles the maintenance surface without improving the outcome. Extending with three clearly-marked "tool-calling skills only" sections keeps one template usable by both outbound skills (fill all 9) and upstream ports (ignore 4–6). BC-5042 produces the template file; ADR 2f is the spec.
 
 See [ADR 2f](outbound-agent-architecture-adrs.md#adr-2f-skill-design-pattern-for-outbound).
 
@@ -181,9 +189,9 @@ This scenario exercises all four cross-repo access tiers (domain MCP, GitHub MCP
 
 **Step 6 — Lead import (chunked).** The skill calls `mcp__plugin_marketing_emailbison-b2b__bulk_create` with lead data from the audience view, chunked at 500 leads per call (Email Bison's `bulk_create` limit per ADR 2e and Email Bison integration guide). For a 2,300-lead segment that's 5 calls. The skill respects the chunking convention documented in `plugins/marketing/tools/integrations/email-bison.md`.
 
-**Step 7 — Sender attachment + warmup check.** The skill calls `mcp__plugin_marketing_emailbison-b2b__attach_senders` to bind the campaign to a rotation of sending inboxes. It then calls a warmup-state read tool (verify exact name against integration guide) to confirm each sender is past warmup and within the 30–50/day cap documented in the research findings §7 Industry Best Practices. If a sender is still warming, the skill flags it and asks the BDR to confirm or swap.
+**Step 7 — Sender attachment + warmup check.** The skill calls `mcp__plugin_marketing_emailbison-b2b__attach_senders` to bind the campaign to a rotation of sending inboxes. It then calls a warmup-state read tool (exact tool name documented in the Email Bison integration guide) to confirm each sender is past warmup and within the 30–50/day industry guideline for per-mailbox send volume (findings §7 Industry Best Practices). If a sender is still warming, the skill flags it and asks the BDR to confirm or swap.
 
-**Step 8 — Schedule + launch confirmation.** The skill calls `mcp__plugin_marketing_emailbison-b2b__set_schedule` (or the equivalent documented in the integration guide) to apply the campaign's send window (business hours, BDR timezone, blackout days). The skill reports the campaign URL, lead count imported, senders attached, and scheduled start time. It does not auto-launch; the BDR confirms in Email Bison's UI.
+**Step 8 — Schedule + launch confirmation.** The skill calls the Email Bison schedule-configuration tool (exact tool name documented in the Email Bison integration guide) to apply the campaign's send window (business hours, BDR timezone, blackout days). The skill reports the campaign URL, lead count imported, senders attached, and scheduled start time. It does not auto-launch; the BDR confirms in Email Bison's UI.
 
 **Step 9 — Handoff to `campaign-orchestration` skill.** If the BDR wants deeper sequence design (step count, timing, subject variants), `list-building` hands off to `campaign-orchestration` — a cross-skill handoff documented in each skill's Operational Runbook (ADR 2f §6).
 

@@ -7,7 +7,12 @@
 **Architecture decisions:** 2026-04-12 ([BC-5041](https://linear.app/brite-nites/issue/BC-5041), PR #118) — see [`docs/designs/outbound-agent-architecture-adrs.md`](../designs/outbound-agent-architecture-adrs.md)
 **Design synthesis:** [`docs/designs/outbound-agent-architecture.md`](../designs/outbound-agent-architecture.md)
 
-> This doc is the **data** (what Brite's outbound pipeline actually looks like today). The design doc is the **decisions** (which MCP servers to adopt, how skills access repos, what shape outbound skills take). The ADRs document are the **alternatives analysis** for each decision. Read the design doc for orientation; come here for ground-truth detail on tools, repos, providers, cron jobs, lifecycle states, and handbook drift.
+> Three docs, three jobs:
+> - **This doc (findings)** — the *data*: what Brite's outbound pipeline actually looks like today.
+> - **Design doc** (`docs/designs/outbound-agent-architecture.md`) — the *decisions*: which MCP servers to adopt, how skills access repos, what shape outbound skills take.
+> - **ADRs doc** (`docs/designs/outbound-agent-architecture-adrs.md`) — the *alternatives analysis* behind each decision.
+>
+> Read the design doc for orientation; come here for ground-truth detail on tools, repos, providers, cron jobs, lifecycle states, and handbook drift.
 
 ---
 

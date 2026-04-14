@@ -1,27 +1,8 @@
-<!--
-OUTBOUND SKILL TEMPLATE — scaffold, not a working skill
-
-Implements the 9-section template from ADR 2f (docs/designs/outbound-agent-architecture-adrs.md).
-Applies to any marketing skill that declares `allowed-tools` in its frontmatter, regardless of
-category. Upstream methodology-only ports omit sections 4, 5, 6 — see docs/guides/marketing-skill-porting.md.
-
-To use: copy this file to plugins/marketing/skills/<skill-name>/SKILL.md, replace every
-{placeholder} and instructional HTML comment with real content, delete this header block,
-and delete any "tool-calling skills only" sections your skill does not need.
-
-Read alongside:
-  - docs/designs/outbound-agent-architecture.md (Context, Decisions, Architecture diagram)
-  - docs/designs/outbound-agent-architecture-adrs.md (ADR 2f for the section-by-section rationale)
-  - docs/guides/skill-tool-integration-pattern.md (three-layer pattern, PR checklist)
-  - docs/guides/marketing-skill-porting.md (upstream → Brite conventions)
-  - plugins/marketing/tools/integrations/email-bison.md (first real instance)
--->
-
 ---
 name: {skill-name}
 description: {trigger phrases that activate this skill. If ported from upstream, keep the original description and add Brite-relevant triggers. Avoid vague triggers that collide with other skills.}
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_emailbison-b2b__*, mcp__plugin_marketing_emailbison-personal__*, mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep
+allowed-tools: mcp__plugin_marketing_emailbison-b2b__*, Read, Write, Glob, Grep
 metadata:
   version: 0.1.0
   upstream: {coreyhaines31/marketingskills — if ported; omit this key entirely if net-new}
@@ -29,12 +10,37 @@ metadata:
 ---
 
 <!--
+OUTBOUND SKILL TEMPLATE — delete this comment block after you copy this file
+
+This file is a scaffold, not a working skill. It implements the 9-section template from ADR 2f
+(docs/designs/outbound-agent-architecture-adrs.md). Applies to any marketing skill that declares
+`allowed-tools` in its frontmatter, regardless of category. Upstream methodology-only ports omit
+sections 4, 5, 6 — see docs/guides/marketing-skill-porting.md — AND remove `allowed-tools` from
+the frontmatter entirely.
+
+To use:
+  1. Copy this file to plugins/marketing/skills/<skill-name>/SKILL.md.
+  2. Replace every {placeholder} and instructional HTML comment with real content.
+  3. Edit `allowed-tools` to list ONLY the servers this skill actually calls. The default
+     scaffolding shows one Email Bison server; the other adopted servers (add as needed) are:
+       - mcp__plugin_marketing_emailbison-personal__*   (personal.outbase.so workspace)
+       - mcp__plugin_marketing_salesforce__*            (Salesforce MCP — CRM runtime)
+       - mcp__plugin_marketing_github__*                (GitHub MCP — cross-repo file reads)
+     Do NOT list servers the skill will not call — that violates pattern guide anti-pattern #4.
+  4. Delete this entire comment block and any "tool-calling skills only" sections your skill
+     does not need.
+
+Reference reading:
+  - docs/designs/outbound-agent-architecture.md (Context, Decisions, Architecture diagram)
+  - docs/designs/outbound-agent-architecture-adrs.md (ADR 2f for the section-by-section rationale)
+  - docs/guides/skill-tool-integration-pattern.md (three-layer pattern, PR checklist)
+  - docs/guides/marketing-skill-porting.md (upstream → Brite conventions)
+  - plugins/marketing/tools/integrations/email-bison.md (first real instance)
+
 Frontmatter notes:
-  - `allowed-tools` uses the wildcard form (`mcp__plugin_marketing_<server>__*`) per ADR 2c. Only
-    include servers the skill actually calls. Remove the Email Bison lines if the skill doesn't
-    touch Email Bison; remove the Salesforce line if it doesn't touch Salesforce.
-  - `category` must be one of the three Brite-native categories. Enforced by the validator if
-    category gating is later added to scripts/validate.sh (ADR 2f review note).
+  - `allowed-tools` uses the wildcard form (`mcp__plugin_marketing_<server>__*`) per ADR 2c.
+  - `category` must be one of the three Brite-native categories. May be enforced by the validator
+    if category gating lands (ADR 2f review note).
 -->
 
 # {Skill Title}
@@ -148,6 +154,12 @@ MCP Tool Reference section guidance:
     already establishes the server prefix).
   - Every mutating workflow must start with an availability check (ADR 2c degradation policy):
     a lightweight read-only tool call. On failure, stop.
+  - Availability-check tool names by server:
+      - Email Bison: `get_active_workspace_info` (verified).
+      - Salesforce: TBD — confirm with the Salesforce integration guide when it lands alongside
+        the first Salesforce-consuming skill (ADR 2c review note).
+      - GitHub MCP: a low-cost repo-metadata read (e.g. `get_repository`) pending integration
+        guide publication.
   - Link to the integration guide at the top of each workflow block for deeper reference.
   - For each workflow, note any Email Bison limits (e.g. `bulk_create` max 500 leads per call),
     Salesforce gotchas (non-GA tools, governor limits), or cross-repo prerequisites.
