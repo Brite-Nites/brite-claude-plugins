@@ -632,33 +632,7 @@ else:
   section "11. Hooks Structure ($plugin_name)"
 
   if [ -f "$HOOKS_JSON" ]; then
-    hooks_result=$(python3 -c "
-import json, sys
-
-with open('$HOOKS_JSON') as f:
-    data = json.load(f)
-
-errors = []
-hooks = data.get('hooks')
-if hooks is None:
-    errors.append('Missing top-level \"hooks\" key')
-else:
-    valid_events = ['PreToolUse', 'PostToolUse', 'SessionStart']
-    for event, handlers in hooks.items():
-        if event not in valid_events:
-            errors.append(f'Unknown event: {event} (expected one of {valid_events})')
-            continue
-        for i, handler in enumerate(handlers):
-            for hook in handler.get('hooks', []):
-                htype = hook.get('type')
-                if htype not in ('prompt', 'command'):
-                    errors.append(f'{event}[{i}]: hook type must be prompt or command, got {htype}')
-                else:
-                    print(f'OK:{event} -> {htype} hook')
-
-for e in errors:
-    print(f'ERROR:{e}')
-" 2>&1)
+    hooks_result=$(python3 "$REPO_ROOT/scripts/_lib/lint_hooks.py" "$HOOKS_JSON" 2>&1)
 
     while IFS= read -r line; do
       if [[ "$line" == OK:* ]]; then

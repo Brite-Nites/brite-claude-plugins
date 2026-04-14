@@ -41,6 +41,9 @@ If you're unsure whether something belongs here, ask: "Is this about *how* we wo
 3. Choose type: `prompt` (LLM-evaluated) or `command` (shell script)
 4. Set a `matcher` regex for which tools trigger the hook
 5. Run `python3 -m json.tool hooks/hooks.json` to validate JSON
+6. If `type: "prompt"`: `model` must be a concrete ID (e.g. `claude-haiku-4-5`). Tier aliases (`haiku`/`sonnet`/`opus`) are rejected by the hook evaluator — see the gotcha in `CLAUDE.md`.
+   - `scripts/validate.sh` enforces this repo-wide.
+   - `scripts/validate-single.sh hooks` runs just the hook-config checks for fast single-file feedback.
 
 ### Add a tool-using skill
 
