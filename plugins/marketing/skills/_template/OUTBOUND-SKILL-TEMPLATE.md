@@ -1,0 +1,324 @@
+<!--
+OUTBOUND SKILL TEMPLATE — scaffold, not a working skill
+
+Implements the 9-section template from ADR 2f (docs/designs/outbound-agent-architecture-adrs.md).
+Applies to any marketing skill that declares `allowed-tools` in its frontmatter, regardless of
+category. Upstream methodology-only ports omit sections 4, 5, 6 — see docs/guides/marketing-skill-porting.md.
+
+To use: copy this file to plugins/marketing/skills/<skill-name>/SKILL.md, replace every
+{placeholder} and instructional HTML comment with real content, delete this header block,
+and delete any "tool-calling skills only" sections your skill does not need.
+
+Read alongside:
+  - docs/designs/outbound-agent-architecture.md (Context, Decisions, Architecture diagram)
+  - docs/designs/outbound-agent-architecture-adrs.md (ADR 2f for the section-by-section rationale)
+  - docs/guides/skill-tool-integration-pattern.md (three-layer pattern, PR checklist)
+  - docs/guides/marketing-skill-porting.md (upstream → Brite conventions)
+  - plugins/marketing/tools/integrations/email-bison.md (first real instance)
+-->
+
+---
+name: {skill-name}
+description: {trigger phrases that activate this skill. If ported from upstream, keep the original description and add Brite-relevant triggers. Avoid vague triggers that collide with other skills.}
+user-invocable: true
+allowed-tools: mcp__plugin_marketing_emailbison-b2b__*, mcp__plugin_marketing_emailbison-personal__*, mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep
+metadata:
+  version: 0.1.0
+  upstream: {coreyhaines31/marketingskills — if ported; omit this key entirely if net-new}
+  category: {Outbound Lead Gen | Demand Generation | Marketing Ops}
+---
+
+<!--
+Frontmatter notes:
+  - `allowed-tools` uses the wildcard form (`mcp__plugin_marketing_<server>__*`) per ADR 2c. Only
+    include servers the skill actually calls. Remove the Email Bison lines if the skill doesn't
+    touch Email Bison; remove the Salesforce line if it doesn't touch Salesforce.
+  - `category` must be one of the three Brite-native categories. Enforced by the validator if
+    category gating is later added to scripts/validate.sh (ADR 2f review note).
+-->
+
+# {Skill Title}
+
+{One-paragraph opening: who this skill helps, what problem it solves, the one-line purpose statement. This is what a developer sees when deciding whether to invoke the skill.}
+
+<!--
+Skill opener guidance:
+  - State the audience (BDR, RevOps, Marketing, "anyone launching a campaign").
+  - State the problem in business terms ("manual handoff from Snowflake to Email Bison").
+  - End with the one-line outcome ("...by generating a governed audience list and an Email Bison
+    campaign configuration in a single flow").
+  - Do NOT list tool names, MCP servers, or repo paths here. Those belong in sections 4 and 5.
+-->
+
+---
+
+## Before Starting
+
+**Check for product marketing context first.** If `docs/marketing-context.md` exists, read it before asking questions and use that context for Brite entity selection, voice, and ICP. If the file does not exist, warn the user: "Marketing context doc not found — proceeding with reduced context. Run `/marketing:product-marketing-context` to generate it." Then continue using only user-provided information.
+
+<!--
+Before Starting section guidance:
+  - The marketing-context check is a hard requirement for every marketing skill. Do not remove it.
+  - If the skill also depends on the outbound architecture design doc or the research findings,
+    add a second bullet: "Read docs/designs/outbound-agent-architecture.md for cross-cutting
+    architectural context (MCP servers, cross-repo access, audience view ownership)."
+  - Do NOT duplicate ADR content here — link to the design doc instead.
+-->
+
+---
+
+## Methodology
+
+{Portable, non-Brite-specific best practices, frameworks, benchmarks. This section is what makes the skill valuable to anyone running outbound, not just Brite.}
+
+<!--
+Methodology section guidance:
+  - This is the "teach Claude the domain expertise" section. Think of it as the chapter you'd
+    write if this were a public marketing skill.
+  - For upstream ports, this is the ported content from coreyhaines31/marketingskills.
+  - For net-new skills, structure around frameworks (e.g. ICP → enrichment → waterfall →
+    verification → send) and name specific benchmarks (reply rate, bounce rate, positive reply
+    rate) from the research findings §7.
+  - Include at least one named framework or rubric so the skill has something concrete to apply.
+  - Do NOT reference Brite tools, repos, or MCP servers in this section — that content belongs
+    in section 4 (Brite Implementation).
+-->
+
+### {Framework or concept 1}
+
+{Explain the framework, include an example, tie to an industry benchmark where available.}
+
+### {Framework or concept 2}
+
+{...}
+
+---
+
+## Brite Implementation *(tool-calling skills only — omit for methodology-only upstream ports)*
+
+{Translates the generic methodology into Brite's concrete stack: which repo, which tool, which architectural rule. Cross-links to other skills for boundary clarity.}
+
+<!--
+Brite Implementation section guidance:
+  - Draw from:
+    * Research findings §1 (pipeline layers) for repo/tool mapping
+    * ADR 2d (cross-repo pattern) for access methods
+    * ADR 2e (audience views) for targeting conventions
+    * Architectural rules from outbound-sales-ops: no tool-to-tool writes, single-label
+      enforcement, upgrade-only lifecycle transitions
+  - Structure this section as a table or as "For X, do Y because Z (rule from ADR N)".
+  - Always cite the source of each rule — an ADR number, a repo path, or a research findings
+    section — so a skill reader can trace the claim.
+  - Include a "Cross-skill boundaries" subsection if the skill hands off to another skill
+    (e.g. list-building → campaign-orchestration).
+-->
+
+### Which repos this skill touches
+
+| Need | Repo | Access method | Reason |
+|---|---|---|---|
+| {e.g. Audience view definitions} | `brite-data-platform` | GitHub MCP (`get_file_contents`) | ADR 2d: no local clone dependency |
+| {e.g. CRM lifecycle state} | `brite-salesforce` (production org) | Salesforce MCP (SOQL) | ADR 2a: Salesforce is CRM SoR |
+| {...} | {...} | {...} | {...} |
+
+### Architectural rules that apply
+
+- {Rule 1 from outbound-sales-ops, brite-data-platform, or brite-salesforce, with source citation.}
+- {Rule 2.}
+- {...}
+
+### Cross-skill boundaries
+
+- **Hands off to:** {other-skill} when {condition}. See {other-skill}'s Operational Runbook for the continuation.
+- **Receives from:** {other-skill} when {condition}.
+- **Does not own:** {concern outside this skill's scope — point to the skill that does}.
+
+---
+
+## MCP Tool Reference *(tool-calling skills only — omit for methodology-only upstream ports)*
+
+"When you need to X, call `tool_name`." Grouped by workflow, not by server. Connection details live in the integration guides — this section names tools semantically.
+
+<!--
+MCP Tool Reference section guidance:
+  - Group by workflow (import, configure, analyze, clean up), NOT by server. A skill author
+    thinks in tasks; don't make them cross-reference server groupings.
+  - Name tools by their bare semantic name (e.g. `create_campaign`, not the full
+    `mcp__plugin_marketing_emailbison-b2b__create_campaign` — the `allowed-tools` frontmatter
+    already establishes the server prefix).
+  - Every mutating workflow must start with an availability check (ADR 2c degradation policy):
+    a lightweight read-only tool call. On failure, stop.
+  - Link to the integration guide at the top of each workflow block for deeper reference.
+  - For each workflow, note any Email Bison limits (e.g. `bulk_create` max 500 leads per call),
+    Salesforce gotchas (non-GA tools, governor limits), or cross-repo prerequisites.
+-->
+
+### {Workflow 1: e.g. Import leads into a campaign}
+
+See `plugins/marketing/tools/integrations/email-bison.md` for connection details and auth setup.
+
+1. Availability check: call `get_active_workspace_info`. On failure, stop and report.
+2. Call `create_campaign` with {params}.
+3. Call `bulk_create` with lead data (max 500 per call — chunk larger lists).
+4. Call `attach_senders` to assign sending inboxes.
+
+### {Workflow 2: e.g. Check campaign health}
+
+1. Call `get_campaign_stats` for open/reply/bounce rates.
+2. Call `get_leads_analytics` for per-lead delivery status.
+
+### {Workflow 3: ...}
+
+{...}
+
+---
+
+## Operational Runbook *(tool-calling skills only — omit for methodology-only upstream ports)*
+
+4–8 step-by-step common tasks. Each task is a complete workflow with preconditions, steps, expected output, and error handling. More detailed than the MCP Tool Reference — this is the *procedure*, including user confirmations and cross-skill handoffs.
+
+<!--
+Operational Runbook section guidance:
+  - Target 4-8 tasks. Fewer than 4 means the skill probably doesn't need this section (consider
+    folding into MCP Tool Reference). More than 8 means split the skill.
+  - Each task:
+    * States preconditions (what must be true before starting)
+    * Lists the steps, which reference section 5 workflows by name
+    * Describes expected output (what the skill reports back to the user)
+    * Notes error handling (what happens when a step fails — especially the degradation policy)
+  - User confirmations: explicitly mark steps where the skill pauses for user input. Don't
+    auto-launch campaigns, auto-suppress prospects, or auto-anything with external side effects.
+  - Cross-skill handoffs: name the other skill and the condition that triggers the handoff.
+-->
+
+### Task 1: {e.g. Launch a new outbound campaign}
+
+**Preconditions:**
+- `docs/marketing-context.md` exists and identifies the Brite entity.
+- Audience view exists in `brite-data-platform` (or the skill helps create an interface contract — see section 4).
+
+**Steps:**
+1. Confirm segment and Brite entity with user.
+2. Run Workflow {N}: Audience view discovery.
+3. Run Workflow {N}: CRM de-duplication query.
+4. Run Workflow {N}: Import leads into a campaign.
+5. Pause for user to review imported lead count and confirm campaign name.
+6. Run Workflow {N}: Attach senders and verify warmup.
+7. Report campaign URL, lead count, senders attached, scheduled start time.
+
+**Error handling:**
+- Any MCP availability check failure → stop and report server name + suggestion to check credentials.
+- `bulk_create` chunk failure → retry once; on second failure, stop and report which chunk failed.
+
+**Handoff:**
+- If user wants sequence design depth, hand off to `campaign-orchestration`.
+
+### Task 2: {...}
+
+{...}
+
+### Task 3: {...}
+
+{...}
+
+### Task 4: {...}
+
+{...}
+
+---
+
+## Health Scoring Rubric
+
+10-point rubric tailored to this skill's output. Review agents use this rubric; keep it specific enough to distinguish good from mediocre output.
+
+<!--
+Health Scoring guidance:
+  - Every marketing skill must have a rubric. This is unchanged from the upstream convention.
+  - Criteria must be skill-specific, not generic ("follows best practices" is too vague).
+  - Anchor the top score (10) to concrete, observable behaviors — "applies Framework X with
+    specific data from docs/marketing-context.md", not "does a great job".
+  - The 1-3 band should describe what "slop" looks like for this skill specifically.
+-->
+
+| Score | Criteria |
+|------:|----------|
+| 10 | {Skill-specific excellence criteria — uses all named frameworks, cites specific benchmarks, respects cross-skill boundaries, no hallucinated tool names, every MCP call preceded by availability check where required.} |
+| 7-9 | {Good output with minor gaps — applies frameworks but skips one benchmark, or misses one cross-skill handoff opportunity.} |
+| 4-6 | {Functional but missing key elements — correct tool calls but no methodology framing, or generic framework application without Brite specifics.} |
+| 1-3 | {Poor output — generic marketing advice, hallucinated tool names or repo paths, ignores product-marketing-context, or uses a framework this skill explicitly rejects in its Anti-Slop list.} |
+
+---
+
+## Anti-Slop Guardrails
+
+Skill-specific guardrails plus the standard base. These are what the skill must *not* do — the guardrails against common failure modes.
+
+<!--
+Anti-Slop guidance:
+  - The four standard base guardrails below apply to every marketing skill. Do not remove them.
+  - Add 3-6 skill-specific guardrails that reflect how THIS skill can go wrong.
+  - Prefer "Do not X" over "Always Y" — negative rules are clearer constraints.
+  - Draw skill-specific guardrails from: past mistakes the skill author has seen, anti-patterns
+    documented in the research findings or ADRs, domain-specific traps (e.g. "do not recommend
+    domains that have been part of a Gmail/Yahoo block").
+-->
+
+- Do not generate generic marketing jargon ("synergy", "leverage", "best-in-class").
+- Do not fabricate statistics, case studies, or testimonials — always attribute to a source.
+- Do not produce output that ignores `docs/marketing-context.md`.
+- Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
+- {Skill-specific guardrail 1}
+- {Skill-specific guardrail 2}
+- {Skill-specific guardrail 3}
+
+---
+
+## Behavioral Tests
+
+Tier 1 (free assertions, no tool calls needed) + Tier 2 (tool-assisted, requires file read or MCP call). Minimum 6 scenarios.
+
+<!--
+Behavioral Tests guidance:
+  - Tier 1: assertions that can be evaluated from the skill's text response alone. Examples:
+    "output references Framework X", "output includes a checklist", "output does not contain
+    jargon from the Anti-Slop list".
+  - Tier 2: assertions that require the skill to have read a specific file or called a specific
+    MCP tool. Examples: "output references Brite entity from docs/marketing-context.md",
+    "output includes results from Salesforce SOQL query".
+  - Minimum 6 scenarios across both tiers combined (per ADR 2f §9). More is fine.
+  - Structured eval scenarios with full assertions and expected outputs go in
+    `evals/evals.json` alongside the skill (not in this file).
+-->
+
+### Tier 1 — Free assertions
+
+- Given {scenario A}, output must reference {Framework or rubric from section 3}.
+- Given {scenario B}, output must include {expected section or checklist}.
+- Output must not contain {anti-slop item 1}.
+- Given {Product Hunt-equivalent question for this skill}, output must cover {expected topics}.
+- Given {edge-case scenario}, output must {handle the edge case} before prescribing tactics.
+
+### Tier 2 — Tool-assisted
+
+- If `docs/marketing-context.md` exists, output must reference brand context (ICP, channels, voice) from that file.
+- {Additional Tier 2 scenarios specific to this skill's MCP calls}.
+
+---
+
+<!--
+Section ordering validator hint (for future use by scripts/validate.sh):
+  Required sections in this order:
+    1. Frontmatter
+    2. {Skill Title} (H1)
+    3. Before Starting (H2)
+    4. Methodology (H2)
+    5. Brite Implementation (H2) — required if `allowed-tools` present
+    6. MCP Tool Reference (H2) — required if `allowed-tools` present
+    7. Operational Runbook (H2) — required if `allowed-tools` present
+    8. Health Scoring Rubric (H2)
+    9. Anti-Slop Guardrails (H2)
+   10. Behavioral Tests (H2)
+
+  Sections 5, 6, 7 may be omitted only when `allowed-tools` is absent from frontmatter
+  (methodology-only upstream ports).
+-->
