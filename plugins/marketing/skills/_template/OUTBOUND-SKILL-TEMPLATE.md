@@ -160,19 +160,29 @@ MCP Tool Reference section guidance:
         the first Salesforce-consuming skill (ADR 2c review note).
       - GitHub MCP: a low-cost repo-metadata read (e.g. `get_repository`) pending integration
         guide publication.
-  - Link to the integration guide at the top of each workflow block for deeper reference.
-  - For each workflow, note any Email Bison limits (e.g. `bulk_create` max 500 leads per call),
-    Salesforce gotchas (non-GA tools, governor limits), or cross-repo prerequisites.
+  - Link to the integration guide at the top of each workflow block for deeper reference — it
+    holds the canonical workflow recipes.
+  - For each workflow, note any Email Bison limits (e.g. `bulk_create_leads` max 500 leads per
+    call), Salesforce gotchas (non-GA tools, governor limits), or cross-repo prerequisites.
+  - If a tool has an MCP-level confirmation gate (e.g. `resume_campaign`, `import_leads_to_campaign`,
+    `archive_campaign`, `unsubscribe_lead`, `blacklist_lead`, `enable_warmup`, `remove_email_from_blocklist`,
+    `remove_domain_from_blocklist`), call it WITHOUT the confirmation parameter first, relay the
+    returned prompt to the user, then repeat with confirmation only after explicit approval. Do
+    not auto-confirm.
 -->
 
-### {Workflow 1: e.g. Import leads into a campaign}
+### {Workflow 1: e.g. Launch a campaign end-to-end}
 
-See `plugins/marketing/tools/integrations/email-bison.md` for connection details and auth setup.
+See [`plugins/marketing/tools/integrations/email-bison.md` §Common Workflows](../../../tools/integrations/email-bison.md#common-workflows) for the canonical 8-step recipe, API paths, and request body shapes.
 
 1. Availability check: call `get_active_workspace_info`. On failure, stop and report.
-2. Call `create_campaign` with {params}.
-3. Call `bulk_create` with lead data (max 500 per call — chunk larger lists).
-4. Call `attach_senders` to assign sending inboxes.
+2. Call `bulk_create_leads` (or `upsert_multiple_leads`) with lead data — max 500 per call, chunk larger lists. Store the returned lead IDs.
+3. Call `create_campaign` with `{name, max_emails_per_day, max_new_leads_per_day, tracking options}`. Store the returned campaign ID.
+4. Call `import_leads_to_campaign` with the lead IDs from step 2 — **MCP confirmation gate**. Do not auto-confirm. If the response flags leads already in another campaign, surface the `allow_parallel_sending` prompt to the user; never enable without explicit approval.
+5. Call `list_sender_emails`, filter `status: "connected"`, then call `attach_sender_emails_to_campaign` with the ID array.
+6. Call `create_schedule_from_template` with a `schedule_id`.
+7. Call `create_sequence_steps` (v1.1 endpoint — avoid the deprecated path) with `title` and the `sequence_steps` array.
+8. Call `resume_campaign` to start sending — **MCP confirmation gate**: this tool's description says "STARTS SENDING REAL EMAILS." First call returns a prompt; relay it verbatim; only repeat with confirmation after user approval.
 
 ### {Workflow 2: e.g. Check campaign health}
 
