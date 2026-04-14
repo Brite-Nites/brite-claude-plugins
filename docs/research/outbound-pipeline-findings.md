@@ -1,8 +1,18 @@
-# Outbound Pipeline Research — Working Document
+# Outbound Pipeline Research — Findings
 
-**Issue:** BC-2714 (paused — needs system design first)
-**Status:** Research complete, architecture design needed before findings doc
-**Date:** 2026-04-01
+**Issue:** BC-2714 (output delivered via BC-5042 Phase 3)
+**Status:** Final — validated in BC-5040, architecture decided in BC-5041, promoted to findings in BC-5042
+**Originally drafted:** 2026-04-01
+**Validated:** 2026-04-09 ([BC-5040](https://linear.app/brite-nites/issue/BC-5040), PR #115)
+**Architecture decisions:** 2026-04-12 ([BC-5041](https://linear.app/brite-nites/issue/BC-5041), PR #118) — see [`docs/designs/outbound-agent-architecture-adrs.md`](../designs/outbound-agent-architecture-adrs.md)
+**Design synthesis:** [`docs/designs/outbound-agent-architecture.md`](../designs/outbound-agent-architecture.md)
+
+> Three docs, three jobs:
+> - **This doc (findings)** — the *data*: what Brite's outbound pipeline actually looks like today.
+> - **Design doc** (`docs/designs/outbound-agent-architecture.md`) — the *decisions*: which MCP servers to adopt, how skills access repos, what shape outbound skills take.
+> - **ADRs doc** (`docs/designs/outbound-agent-architecture-adrs.md`) — the *alternatives analysis* behind each decision.
+>
+> Read the design doc for orientation; come here for ground-truth detail on tools, repos, providers, cron jobs, lifecycle states, and handbook drift.
 
 ---
 
