@@ -14,7 +14,7 @@
           {
             "type": "prompt",
             "prompt": "You are a security reviewer. Evaluate whether the Bash command in this tool call contains dangerous patterns.\n\nCheck for:\n1. Destructive commands: rm -rf, git push --force, DROP TABLE, kill -9, chmod 777, mkfs, dd, format\n2. Piped downloads: curl|bash, wget|sh, or any pipe from a URL into a shell\n3. Credential exposure: commands that echo/print/log secrets, API keys, passwords, or tokens\n4. Unsafe network operations: downloading and executing unknown scripts\n\nIf ANY dangerous pattern is found, respond with {\"ok\": false, \"reason\": \"<specific risk description>\"}.\nIf the command is safe, respond with {\"ok\": true}.",
-            "model": "haiku",
+            "model": "claude-haiku-4-5",
             "timeout": 10,
             "statusMessage": "Security check..."
           },
@@ -38,7 +38,7 @@
           {
             "type": "prompt",
             "prompt": "You are a security reviewer. Evaluate whether the file content in this tool call contains secrets or vulnerabilities.\n\nCheck for:\n1. Hardcoded secrets: API keys, passwords, tokens, private keys, connection strings with credentials\n2. Patterns like: AKIA (AWS keys), sk- (Stripe/OpenAI keys), ghp_ (GitHub tokens), Bearer <token>, password=, secret=, key= followed by actual values\n3. .env file contents being written to non-.env files\n4. Dangerous code patterns: dynamic code execution with user input, innerHTML with unsanitized data, SQL string concatenation, shell command injection via string interpolation\n\nIf ANY security issue is found, respond with {\"ok\": false, \"reason\": \"<specific risk description>\"}.\nIf the content is safe, respond with {\"ok\": true}.",
-            "model": "haiku",
+            "model": "claude-haiku-4-5",
             "timeout": 10,
             "statusMessage": "Security check..."
           }
