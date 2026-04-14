@@ -35,13 +35,14 @@ yaml_val() {
 
 # ── Usage ────────────────────────────────────────────────────────────
 if [ $# -lt 1 ]; then
-  echo "Usage: $(basename "$0") <skill-name|command.md|agents/name>"
+  echo "Usage: $(basename "$0") <skill-name|command.md|agents/name|hooks>"
   echo ""
   echo "Examples:"
   echo "  $(basename "$0") brainstorming           # skill"
   echo "  $(basename "$0") session-start.md        # command"
   echo "  $(basename "$0") session-start           # command (auto-adds .md)"
   echo "  $(basename "$0") agents/code-reviewer    # agent"
+  echo "  $(basename "$0") hooks                   # plugin hooks.json"
   exit 1
 fi
 
@@ -53,8 +54,12 @@ resolve_target() {
   local file=""
   local kind=""
 
+  # Hooks target — "hooks", "hooks.json", or "hooks/hooks.json"
+  if [[ "$target" == "hooks" ]] || [[ "$target" == "hooks.json" ]] || [[ "$target" == hooks/hooks.json ]]; then
+    file="$PLUGIN_ROOT/hooks/hooks.json"
+    kind="hooks"
   # Explicit agents/ prefix
-  if [[ "$target" == agents/* ]]; then
+  elif [[ "$target" == agents/* ]]; then
     local agent_name="${target#agents/}"
     agent_name="${agent_name%.md}"
     file="$PLUGIN_ROOT/agents/$agent_name.md"
@@ -109,6 +114,29 @@ if [ ! -f "$FILE" ]; then
 fi
 
 echo "Validating $KIND: $(basename "$(dirname "$FILE")")/$(basename "$FILE")"
+
+# ── Hooks mode — JSON-only, separate exit path ──────────────────────
+if [ "$KIND" = "hooks" ]; then
+  section "Hooks Structure"
+
+  hooks_result=$(python3 "$REPO_ROOT/scripts/_lib/lint_hooks.py" "$FILE" 2>&1)
+
+  while IFS= read -r line; do
+    if [[ "$line" == OK:* ]]; then
+      pass "${line#OK:}"
+    elif [[ "$line" == ERROR:* ]]; then
+      fail "${line#ERROR:}"
+    fi
+  done <<< "$hooks_result"
+
+  section "Summary"
+  if [ $errors -gt 0 ]; then
+    printf "  \033[31m%d error(s)\033[0m, %d warning(s)\n" "$errors" "$warnings"
+    exit 1
+  fi
+  printf "  \033[32m0 error(s)\033[0m, %d warning(s)\n" "$warnings"
+  exit 0
+fi
 
 # ── Frontmatter check ───────────────────────────────────────────────
 section "Frontmatter"

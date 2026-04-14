@@ -24,6 +24,9 @@ jobs:
       - name: Test security hook regexes
         run: bash scripts/test-hooks.sh
 
+      - name: Test hook model tier-alias lint
+        run: bash scripts/test-hook-model-lint.sh
+
       - name: Test skill trigger matching
         run: bash scripts/test-skill-triggers.sh  # discovers all plugins/*/skills/_shared/trigger-registry.json
 

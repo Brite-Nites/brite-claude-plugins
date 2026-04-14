@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "model": "claude-haiku-4-5",
+            "prompt": "accept-me"
+          },
+          {
+            "type": "prompt",
+            "model": "claude-haiku-4-5-20251001",
+            "prompt": "accept-me-dated"
+          }
+        ]
+      }
+    ]
+  }
+}
