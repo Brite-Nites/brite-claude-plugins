@@ -217,6 +217,8 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 
 **Downstream integration (consumes Email Bison events):** OutboundSync webhooks → Salesforce Contacts → Master Inbox classification → Front for BDR handoff ([WIP §1 Layers 2–5](../../../../docs/research/outbound-pipeline-findings.md#layer-2-sending--sequencing)).
 
+**Adjacent integration:** [Salesforce](salesforce.md) — the CRM system of record. Email Bison is the sending runtime; Salesforce holds the authoritative lead/contact/reply state. Most outbound skills touch both: Salesforce for suppression reads + lifecycle stage, Email Bison for the send itself.
+
 **Alternatives considered and rejected:** Smartlead (market alternative, never Brite-active), Instantly (same), community `Sirkunle001/email-bison-claude-mcp` (13 tools, superseded).
 
 ## Last verified
