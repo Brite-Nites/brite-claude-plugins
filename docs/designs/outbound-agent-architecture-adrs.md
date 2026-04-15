@@ -87,11 +87,11 @@ BC-5040 (Phase 1, PR #115) validated 8 MCP servers. Key findings:
 
 **Developer setup:** Each developer sets env vars in their shell profile. The plugin README documents required vars per server. This is the simplest pattern that works today. If Claude Code ships native secret management, we upgrade — the `${VAR}` form is forward-compatible.
 
-**Graceful degradation:** Skills include a "check availability" step that calls a lightweight read-only tool (e.g. `get_active_workspace_info` for Email Bison, or a metadata read tool for Salesforce — verify the exact tool name when writing the Salesforce integration guide) before mutating anything. If the check fails, the skill reports the failure and stops — no fallback to `Bash(curl)`.
+**Graceful degradation:** Skills include a "check availability" step that calls a lightweight read-only tool before mutating anything. Canonical per-server tools: `get_active_workspace_info` for Email Bison; `run_soql_query` with a trivial SOQL (`SELECT Id FROM User LIMIT 1`) for Salesforce (per [BC-5534 findings §Q1](../research/salesforce-mcp-findings.md#q1-availability-check-tool) — `get_username` is rejected because it reads the local SFDX auth store without contacting Salesforce and returns a stale username after the access token expires). If the check fails, the skill reports the failure and stops — no fallback to `Bash(curl)`.
 
 ### Recommendation
 
-Adopt Email Bison (official, 141 tools, both workspaces) and Salesforce (official, 120+ tools, CRM SoR) into `plugins/marketing/.mcp.json` with `${ENV_VAR}` credential substitution. Defer Apollo and Resend until a skill needs them. Skip Smartlead entirely — Brite has never used it and the MCP is stale.
+Adopt Email Bison (official, 141 tools, both workspaces) and Salesforce (official, ~80 tools across 15 toolsets, CRM SoR) into `plugins/marketing/.mcp.json`. Email Bison uses `${ENV_VAR}` credential substitution; Salesforce uses the `DEFAULT_TARGET_ORG` sentinel + local SFDX auth store (no env vars — see [BC-5534 findings §Q4](../research/salesforce-mcp-findings.md#q4-credential-storage)). Defer Apollo and Resend until a skill needs them. Skip Smartlead entirely — Brite has never used it and the MCP is stale.
 
 ### Review notes
 
@@ -194,7 +194,9 @@ This ADR exists to formally ratify that work as an architecture decision and to 
 
 - The pattern guide at `docs/guides/skill-tool-integration-pattern.md` is the canonical reference for all tool-using skills. No changes to it.
 - **Degradation policy:** when a skill's `allowed-tools` MCP server is unreachable, the skill:
-  1. Calls a lightweight read-only tool (e.g. `get_active_workspace_info` for Email Bison, or a metadata read tool for Salesforce — verify the exact tool name when writing the Salesforce integration guide) as an availability check.
+  1. Calls a lightweight read-only tool as an availability check. Canonical per-server tools:
+     - **Email Bison:** `get_active_workspace_info`.
+     - **Salesforce** (`@salesforce/mcp`): `run_soql_query` with `SELECT Id FROM User LIMIT 1` — exercises the full round-trip including refresh-token exchange (resolved in [BC-5534 findings §Q1](../research/salesforce-mcp-findings.md#q1-availability-check-tool)). `get_username` is rejected because it reads the local SFDX auth store without contacting the org and will return a stale username when the cached token has expired.
   2. If the check fails, reports the failure to the user with the server name and suggests checking credentials / connectivity.
   3. Does **not** fall back to `Bash(curl)`, direct API calls, or any other bypass. The skill stops. This preserves anti-pattern #3 ("bypassing `allowed-tools` with Bash(curl)") from the pattern guide and keeps the three-layer boundary clean.
   4. If a specific MCP proves unreliable enough in practice to warrant a temporary escape hatch, that's a per-server decision documented in the server's integration guide — not a blanket policy change. The default remains "no bypass."
@@ -428,7 +430,7 @@ Outbound skills follow a 9-section template that extends the upstream marketing-
 The marketing plugin already has a porting convention for upstream skills (`docs/guides/marketing-skill-porting.md`) and a tool integration pattern for MCP-calling skills (`docs/guides/skill-tool-integration-pattern.md`). Multiple net-new marketing skills — including 5 Outbound Lead Gen skills (BC-2717–2721), the Demand Gen `outbound-playbook` skill (BC-2722), and Marketing Ops skills like `lead-routing` (BC-2725) — need to teach methodology *and* orchestrate real tools against real repos. Neither existing guide covers this combination.
 
 ADRs 2a–2e produced decisions that shape the template:
-- **2a:** Email Bison + Salesforce MCPs adopted. `${ENV_VAR}` credentials. Graceful degradation via availability check.
+- **2a:** Email Bison + Salesforce MCPs adopted. Email Bison uses `${ENV_VAR}` credentials; Salesforce uses `DEFAULT_TARGET_ORG` sentinel + SFDX auth store (no env vars). Graceful degradation via availability check.
 - **2b:** No custom MCPs. CFs are the OutboundSync integration layer. Email Bison MCP covers Master Inbox.
 - **2c:** Pattern guide ratified. Skills call tools by semantic name. 6-item PR checklist.
 - **2d:** Domain MCPs for runtime data, GitHub MCP for cross-repo file reads, Context7 for semantic search. No local clone dependency.

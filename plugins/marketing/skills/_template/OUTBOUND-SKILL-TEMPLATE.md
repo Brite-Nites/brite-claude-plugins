@@ -126,7 +126,7 @@ Organized tool-first because that's how a skill author thinks: "what does my ski
 | What the skill needs to do | MCP server / tool | Repo or system it reaches | Reason (ADR / source) |
 |---|---|---|---|
 | {e.g. Read audience view definition} | GitHub MCP (`get_file_contents`) | `brite-data-platform` | ADR 2d — no local clone dependency |
-| {e.g. Dedup against known prospects} | Salesforce MCP (`run_soql`) | `brite-salesforce` (production org) | ADR 2a — Salesforce is CRM SoR |
+| {e.g. Dedup against known prospects} | Salesforce MCP (`run_soql_query`) | `brite-salesforce` (production org) | ADR 2a — Salesforce is CRM SoR |
 | {e.g. Import leads + create campaign} | Email Bison MCP (`emailbison-b2b`) | Email Bison workspace 52 (`send.outbase.so`) | ADR 2a — sole sequencer |
 | {...} | {...} | {...} | {...} |
 
@@ -159,8 +159,9 @@ MCP Tool Reference section guidance:
     a lightweight read-only tool call. On failure, stop.
   - Availability-check tool names by server:
       - Email Bison: `get_active_workspace_info` (verified).
-      - Salesforce: TBD — confirm with the Salesforce integration guide when it lands alongside
-        the first Salesforce-consuming skill (ADR 2c review note).
+      - Salesforce: `run_soql_query` with `SELECT Id FROM User LIMIT 1` (verified — per
+        BC-5534 findings §Q1; `get_username` is NOT a valid liveness check, see the
+        Salesforce integration guide).
       - GitHub MCP: a low-cost repo-metadata read (e.g. `get_repository`) pending integration
         guide publication.
   - Link to the integration guide at the top of each workflow block for deeper reference — it

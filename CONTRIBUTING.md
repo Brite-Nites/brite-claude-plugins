@@ -121,6 +121,37 @@ The plugin includes hooks in `plugins/workflows/hooks/hooks.json` (auto-loaded b
 
 A standalone version of the pre-commit hook is available at `scripts/pre-commit.sh` for direct installation as a git hook (`cp scripts/pre-commit.sh .git/hooks/pre-commit`). This works today regardless of the upstream plugin hook bug.
 
+## Salesforce MCP Onboarding
+
+The `marketing` plugin ships `@salesforce/mcp` for skills that read from the prod Salesforce org (`list-building`, `reply-processing`, `lead-routing`, `data-enrichment`, `crm-hygiene`). Unlike most MCPs, `@salesforce/mcp` **reads no runtime env vars** — it delegates 100% to the local SFDX auth store (`~/.sfdx/`). Onboarding is a one-time SFDX CLI provisioning step, not an `.env` file.
+
+**What's committed:** the MCP entry in `plugins/marketing/.mcp.json` uses the `DEFAULT_TARGET_ORG` sentinel — no alias, no URL, no creds.
+
+**One-time per-dev setup:**
+
+1. Install the Salesforce CLI: `brew install --cask sfdx`
+2. Retrieve the **Marketing Claude MCP — JWT private key** from the Engineering Bitwarden collection.
+3. Run the JWT login (derive `--client-id` and `--instance-url` out-of-band — see [`plugins/marketing/tools/integrations/salesforce.md`](plugins/marketing/tools/integrations/salesforce.md)):
+
+   ```bash
+   sf org login jwt \
+     --client-id <consumer-key> \
+     --jwt-key-file <path-to-key> \
+     --username <service-user> \
+     --alias <your-alias> \
+     --instance-url https://<instance>.my.salesforce.com
+   ```
+
+4. Map the sentinel: `sf config set target-org <your-alias>`.
+5. `/reload-plugins` in Claude Code.
+6. Smoke-test from a skill: the MCP's `run_soql_query` with `SELECT Id FROM User LIMIT 1` should return a row. This is the canonical availability check.
+
+**Not needed:** no env vars, no `.env` file, no GitHub secret. Access is entirely mediated by the local SFDX auth store; the MCP server reads only `NODE_ENV` at runtime (for telemetry tagging).
+
+**Troubleshooting:** if `run_soql_query` fails with a stale-token error, re-run step 3. `get_username` is **not** a reliable liveness check — it reads the local auth store without contacting Salesforce and will return a cached username after the access token expires.
+
+Full onboarding reference, confirmation-gate patterns for destructive tools, and the supported toolset inventory live in [`plugins/marketing/tools/integrations/salesforce.md`](plugins/marketing/tools/integrations/salesforce.md). See [`docs/research/salesforce-mcp-findings.md`](docs/research/salesforce-mcp-findings.md) for the research record behind these decisions.
+
 ## ADR Convention
 
 Architecture Decision Records live in `docs/decisions/NNN-kebab-title.md`. They are imported into CLAUDE.md via individual `@` imports (directory imports are not supported). The `/workflows:architecture-decision` command generates ADRs and auto-appends the import. `/workflows:project-start` generates ADRs for all major tech decisions made during the interview.
