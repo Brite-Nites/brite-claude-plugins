@@ -45,16 +45,21 @@ None of the non-GA tools (scratch org lifecycle, LWC/SLDS experts, DevOps Center
 
 ## Q3. Auth strategy
 
-**Decision: JWT Bearer flow via a net-new dedicated Connected App ("Marketing Claude MCP").**
+**Decision: JWT Bearer flow via a net-new dedicated External Client App ("Marketing Claude MCP").**
+
+> **BC-5579 amendment (2026-04-16):** Originally specified a classic ConnectedApp. Spring '26 disabled new ConnectedApp creation org-wide (requires SF Support to re-enable, treated as temporary migration runway). Pivoted to standalone ECA — Salesforce's forward-certified path. This is Brite's first pure ECA; `Outbound_Sales_Ops` remains a legacy CA auto-wrapped by SF during the Spring '26 migration.
+>
+> **Scope correction:** `RefreshToken` scope was re-added alongside `Api`. The SFDX CLI's `sf org login jwt` command requires `RefreshToken` scope to persist the auth record in `~/.sfdx/`. Without it, JWT exchange fails with "refresh_token scope is required." The `Outbound_Sales_Ops` exemplar has both scopes for this reason — it was not an oversight. `refreshTokenPolicy: ZERO` remains as belt-and-suspenders (if a token is somehow minted via another flow, it expires immediately).
 
 **Rationale:**
 - The `@salesforce/mcp` server has no auth of its own — it reads whatever the SFDX auth store holds (Appendix A.1). So the real decision is "which CLI login command do we run to provision the auth store."
-- Brite's production runtime integration pattern is JWT-via-dedicated-Connected-App (Outbound Sales Ops). The marketing MCP is runtime, not CI, so it matches that pattern — not the CI refresh-token pattern.
-- A **dedicated** Connected App (not reusing Outbound Sales Ops) gives:
+- Brite's production runtime integration pattern is JWT-via-dedicated-app (Outbound Sales Ops). The marketing MCP is runtime, not CI, so it matches that pattern — not the CI refresh-token pattern.
+- A **dedicated** ECA (not reusing Outbound Sales Ops) gives:
   - Rotatable blast radius — revoke the marketing app without breaking CF reply-sync.
-  - **Scope minimization: `Api` only** (drop `RefreshToken`). JWT Bearer flow doesn't rely on refresh tokens the way web OAuth does — the CLI pre-step exchanges the JWT assertion for an access token each session, so `RefreshToken` scope is unnecessary surface. Least-privilege says omit it.
-  - Auditable — distinct `ConnectedAppHistory` / login history so BC-5535's adoption doc can cite specific events.
+  - **Scopes: `Api` + `RefreshToken`** — `Api` for data access, `RefreshToken` required by the SFDX CLI auth layer. `refreshTokenPolicy: ZERO` ensures no long-lived tokens persist.
+  - Auditable — distinct login history so BC-5535's adoption doc can cite specific events.
 - Known caveat: JWT-from-ECA is broken for scratch-org creation per upstream SFDX bugs ([forcedotcom/cli#3025](https://github.com/forcedotcom/cli/issues/3025), [#3482](https://github.com/forcedotcom/cli/issues/3482)). The marketing MCP doesn't create scratch orgs (GA-only, no `orgs` toolset), so this caveat doesn't apply here — but document it so future skills don't hit it.
+- Known SFDX CLI bug (sf@2.130.9): `ExtlClntAppOauthSettings` metadata type cannot be deployed or retrieved for new ECAs. The oauth settings file was hand-authored and configured via Setup UI. Track upstream for a fix.
 
 **Rejected alternatives:**
 - **Reusing Outbound Sales Ops Connected App** — couples blast radius; revoking one means revoking both. Rejected.
@@ -63,10 +68,11 @@ None of the non-GA tools (scratch org lifecycle, LWC/SLDS experts, DevOps Center
 - **Device flow** — interactive; wrong for a plugin meant to run headless.
 
 **Provisioning (what a new dev does once):**
-1. Admin creates `Marketing Claude MCP` Connected App + ECA wrapper in prod org (mirror `extlClntAppOauthSettings/Outbound_Sales_Ops_oauth.ecaOauth-meta.xml` with a new name + new cert).
-2. Dev retrieves JWT cert private key from 1Password / handbook credential store (source TBD by BC-5535 — see Q4).
-3. Dev runs: `sf org login jwt --client-id <consumer-key> --jwt-key-file <key-path> --username <service-user> --alias brite-prod --instance-url https://<instance>.my.salesforce.com` — derives instance URL via `sf org display` out-of-band.
-4. MCP server at `.mcp.json` references the `brite-prod` alias.
+1. Admin creates `Marketing Claude MCP` ECA in prod org via source deploy + Setup UI config. See `brite-salesforce` PR #175.
+2. Dev retrieves JWT cert private key from the Engineering Bitwarden collection.
+3. Dev runs: `sf org login jwt --client-id <consumer-key> --jwt-key-file <key-path> --username <service-user> --alias <chosen-alias> --instance-url <from-credential-store>`.
+4. Dev runs: `sf config set target-org <chosen-alias> --global` (so `DEFAULT_TARGET_ORG` resolves).
+5. MCP server at `.mcp.json` references `DEFAULT_TARGET_ORG` — no alias committed.
 
 **Citations:** [`packages/mcp/src/utils/auth.ts`](https://raw.githubusercontent.com/salesforcecli/mcp/02e99fabe59a5dc189c3c7a7acb6430204e2c024/packages/mcp/src/utils/auth.ts); Appendix B.1 (existing Outbound Sales Ops pattern); [`packages/mcp/src/index.ts`](https://raw.githubusercontent.com/salesforcecli/mcp/02e99fabe59a5dc189c3c7a7acb6430204e2c024/packages/mcp/src/index.ts) `--orgs` flag.
 
@@ -231,7 +237,7 @@ Before calling any @salesforce/mcp tool annotated destructiveHint: true:
 The prescriptive payload [BC-5535](https://linear.app/brite-nites/issue/BC-5535) executes against. Concrete values, no hedge words.
 
 1. **Availability-check tool:** `run_soql_query` with `SELECT Id FROM User LIMIT 1`. Exercises the full round-trip including refresh-token exchange.
-2. **Auth strategy:** JWT Bearer flow via a **net-new dedicated Connected App "Marketing Claude MCP"** in the prod org. Scope: `Api` only (drop `RefreshToken`). Mirrors the Outbound Sales Ops ECA pattern structurally; isolates blast radius.
+2. **Auth strategy:** JWT Bearer flow via a **net-new dedicated External Client App "Marketing Claude MCP"** in the prod org. Scopes: `Api` + `RefreshToken` (RefreshToken required by SFDX CLI auth layer; `refreshTokenPolicy: ZERO` prevents long-lived tokens). Standalone ECA — classic CA creation blocked since Spring '26. See BC-5579 amendment in Q3.
 3. **Default toolsets:** `--toolsets data` at the plugin level. `core` is always on. All other toolsets remain off by default.
 4. **Plugin `.mcp.json` shape:** `"args": ["-y", "@salesforce/mcp@0.30.5", "--orgs", "DEFAULT_TARGET_ORG", "--toolsets", "data"]`. No env-var substitution required (MCP reads no runtime env vars).
 5. **Non-GA posture:** GA-only. Do NOT set `--allow-non-ga-tools`. Enabling any non-GA tool requires a new ADR, not an ad-hoc flag flip.
@@ -240,11 +246,11 @@ The prescriptive payload [BC-5535](https://linear.app/brite-nites/issue/BC-5535)
 
 ## Provisioning checklist (for BC-5535)
 
-Salesforce admin (one-time):
-- [ ] Create Connected App "Marketing Claude MCP" with JWT Bearer flow, `Api` scope only, self-signed X.509 cert (10-yr CN=`Marketing Claude MCP`, O=`Brite Nites`).
-- [ ] Deploy matching `ExternalClientApplication` wrapper in source (mirror `Outbound_Sales_Ops_oauth.ecaOauth-meta.xml` in `brite-salesforce`).
-- [ ] Set `isAdminApproved=true`, `refreshTokenPolicy=ZERO`, `ipRelaxation=ENFORCE`.
-- [ ] Retrieve consumer key from Setup UI, store JWT cert private key in credential vault.
+Salesforce admin (one-time) — **completed by BC-5579 (2026-04-16)**:
+- [x] Create standalone ECA "Marketing Claude MCP" via source deploy + Setup UI (Spring '26 blocked classic CA creation). PR: `brite-salesforce#175`.
+- [x] Self-signed X.509 cert (10-yr). Cert uploaded via Setup UI; private key distributed via credential vault.
+- [x] Scopes: `Api` + `RefreshToken`. JWT Bearer Flow enabled. Policies: admin-approved, IP-enforced, refresh-token-zero, System Administrator profile.
+- [x] Consumer key + private key stored in credential vault (see `salesforce.md` onboarding for location).
 
 Per-dev (one-time during onboarding):
 - [ ] Install `sf` CLI.

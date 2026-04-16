@@ -22,3 +22,7 @@ Thumbs.db
 
 # Behavioral test results (generated, uploaded as CI artifacts)
 tests/evals/behavioral-*.json
+
+# Local-only provisioning artifacts (certs, keys, consumer keys, etc.)
+# Never committed — secrets live in Bitwarden, this is just a workspace
+.local/
