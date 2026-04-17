@@ -14,11 +14,11 @@ The official Email Bison MCP Server (Beta) exposes the full sending-layer API su
 
 ## Auth
 
-**Credential type.** Email Bison API key per workspace. Passed as `Authorization: Bearer <key>` plus a mandatory `Instance-URL` header that routes the request to the correct vendor instance.
+**Credential type.** Email Bison API token per workspace. Passed as `Authorization: Bearer <token>` plus a mandatory `Instance-URL` header that routes the request to the correct vendor instance. The vendor's canonical term is "API token" (see [authentication docs](https://docs.emailbison.com/get-started/authentication)) — not "API key", despite occasional interchangeable use in community posts.
 
-**Where it comes from.** Workspace UI → Settings → Integrations → EmailBison MCP. The workspace admin generates a key scoped to that workspace. The MCP endpoint itself is vendor-hosted and public; the key is what identifies the workspace ([research WIP §8 row 4](../../../../docs/research/outbound-pipeline-findings.md#1a-mcp-servers-8-checked)).
+**Where it comes from.** Workspace UI → Settings → Integrations → EmailBison MCP. The workspace admin generates a token scoped to that workspace. The MCP endpoint itself is vendor-hosted and public; the token is what identifies the workspace ([research WIP §8 row 4](../../../../docs/research/outbound-pipeline-findings.md#1a-mcp-servers-8-checked)).
 
-**Scopes.** Workspace-level full access. There is no documented sub-scoping — a key either has access to the workspace or it doesn't.
+**Scopes.** Workspace-level full access. There is no documented sub-scoping — a token either has access to the workspace or it doesn't.
 
 **Multi-workspace routing.** Brite runs two Email Bison instances, and the skill must pick the right one based on recipient type:
 
@@ -29,9 +29,23 @@ The official Email Bison MCP Server (Beta) exposes the full sending-layer API su
 
 Both were verified live on 2026-04-10 ([research WIP §8 row 4](../../../../docs/research/outbound-pipeline-findings.md#1a-mcp-servers-8-checked)) and the current session's `get_active_workspace_info` calls (2026-04-11).
 
-**Credential storage.** The marketing plugin's credential pattern is an open question owned by ADR 2a (BC-5041). Until that lands, keys live in the repo-root `.mcp.json` for dev convenience and are NOT distributed with the plugin. Do not commit real keys into `plugins/marketing/.mcp.json` — use `${ENV_VAR}` substitution once ADR 2a finalizes the pattern.
+**Credential storage.** Raw tokens live in the Engineering Bitwarden collection, item **"Email Bison MCP — API tokens"**. Each dev pastes `export` lines from the Bitwarden item's Notes field into their shell profile, then the two HTTP MCP entries in the user-level `.mcp.json` reference `${EMAILBISON_B2B_TOKEN}` and `${EMAILBISON_PERSONAL_TOKEN}` via `${…}` substitution at load time. Raw tokens are never committed.
+
+Plugin-scoped registration (`plugins/marketing/.mcp.json`) is **not viable today** — see § [Known Claude Code limitation](#known-claude-code-limitation). BC-5551 shipped the credential distribution (Bitwarden + shell profile) but left the MCP entries at user-level until the upstream bug is fixed.
+
+### One-time per-dev onboarding
+
+1. Retrieve the **"Email Bison MCP — API tokens"** item from the Engineering Bitwarden collection. The Notes field carries the exact `export EMAILBISON_B2B_TOKEN=…` / `export EMAILBISON_PERSONAL_TOKEN=…` lines, ready to paste.
+2. Paste both `export` lines into your shell profile (`~/.zshrc` or `~/.bashrc`). Start a new shell so the vars are exported.
+3. Register the two servers in your user-level MCP config. Simplest way is to add them to the gitignored repo-root `.mcp.json` using the shape in § Registration below. Alternative: `claude mcp add` from the CLI (project scope).
+4. `/reload-plugins` in Claude Code (or restart if `/reload-plugins` doesn't pick the entries up).
+5. Smoke-test: a skill allowed `mcp__emailbison-b2b__*` calls `get_active_workspace_info` — expect workspace ID `52`, domain `send.outbase.so`. Same for `-personal` → workspace ID `11`, `personal.outbase.so`.
+
+**Fallback.** If the Bitwarden item is unreachable, re-issue tokens in the vendor UI (Workspace → Settings → Integrations → EmailBison MCP) and update the Bitwarden item after rotation.
 
 ## Registration
+
+Today the servers live at user level (repo-root gitignored `.mcp.json` or equivalent user-scope config). The shape:
 
 ```json
 {
@@ -56,7 +70,30 @@ Both were verified live on 2026-04-10 ([research WIP §8 row 4](../../../../docs
 }
 ```
 
-**File location.** Today: repo-root `.mcp.json` (dev convenience). Target: `plugins/marketing/.mcp.json` once ADR 2a resolves credential storage.
+**File location.** User-level (repo-root `.mcp.json`, gitignored via the `/` anchor — plugin-scoped `.mcp.json` files remain committable but don't house these entries). Env-var substitution happens at Claude Code's load-time resolution.
+
+**Future state.** When the Claude Code bugs blocking plugin-scoped HTTP+env-var headers are fixed (see below), migrate these two entries to `plugins/marketing/.mcp.json` so teammates inherit them automatically without user-level setup. Track via Linear follow-up (TODO: link).
+
+### Known Claude Code limitation
+
+The plugin-scoped distribution originally scoped for BC-5551 could not ship because plugin-scoped `.mcp.json` does not correctly resolve `${ENV_VAR}` inside `headers` for HTTP-type servers in current Claude Code (v2.1.112). Multiple open bugs:
+
+- [anthropics/claude-code#6204](https://github.com/anthropics/claude-code/issues/6204) — "MCP headers with environment variable substitution not being sent from .mcp.json" (closed but resurfaced)
+- [anthropics/claude-code#9427](https://github.com/anthropics/claude-code/issues/9427) — explicitly notes plugin-scoped expansion fails where project-root works; still open
+- [anthropics/claude-code#28293](https://github.com/anthropics/claude-code/issues/28293) — headers not forwarded on POST
+- [anthropics/claude-code#14977](https://github.com/anthropics/claude-code/issues/14977) — custom headers not sent
+
+Workarounds attempted in BC-5551 and rejected:
+
+| Attempt | Why rejected |
+|---|---|
+| HTTP-type with `${VAR}` in `headers` | Bug class above — env var sent literally, vendor returns 401. |
+| Stdio wrapper via `npx -y mcp-remote <URL> --header "..."` | `claude mcp list` still extracts the URL substring from args and classifies the server as HTTP-type, bypassing the stdio proxy. Handshake never completes. |
+| `sh -c "npx -y mcp-remote ..."` to hide the URL | Same result — the URL is still inside the quoted arg string and Claude Code's substring match finds it. |
+
+`mcp-remote@0.1.38` itself proxies Email Bison correctly when run from a shell, verified during BC-5551 investigation. The block is strictly in how Claude Code's plugin-scoped MCP loader handles the configuration, not in the vendor or proxy layers.
+
+**If you retry this pattern:** be aware that `mcp-remote` prints the raw `Authorization` header on startup to stderr. If stderr gets captured (CI, some MCP client log buffers), the token leaks. File an upstream issue asking for a `--redact-headers` flag, or patch around it.
 
 **Superseded alternatives** — do not adopt any of these:
 
@@ -223,8 +260,10 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 
 ## Last verified
 
-`2026-04-14` — Common workflows section, MCP confirmation-gate inventory, and new gotchas (parallel_sending, deprecated sequence endpoints) verified live via `discover_tools` on 11 categories + `search_api_spec` on `POST /api/campaigns/{id}/resume`, `POST /api/campaigns/{id}/attach-sender-emails`, `POST /api/campaigns/{id}/create-schedule-from-template`, and the v1.1 vs deprecated sequence-steps pair. Workspace connection re-verified via `get_active_workspace_info` (active workspace ID 52, `send.outbase.so`, primary).
+`2026-04-17` — BC-5551 shipped credential centralization (Engineering Bitwarden item "Email Bison MCP — API tokens") + shell-profile onboarding + §Known Claude Code limitation documenting the plugin-scoped MCP blocker. Plugin-scoped MCP registration deferred until upstream Claude Code bugs [#6204](https://github.com/anthropics/claude-code/issues/6204)/[#9427](https://github.com/anthropics/claude-code/issues/9427) are resolved; servers continue to live at user level for now. Prose consistency fix: "API key" → "API token" throughout §Auth (vendor canonical term per `docs.emailbison.com/get-started/authentication`). Tokens rotated fresh during BC-5551 (the prior tokens were in a gitignored repo-root file that got cleared).
 
-Prior verification: `2026-04-11` — tool counts and categories copied from `docs/research/outbound-pipeline-findings.md` Phase 1 validation log (2026-04-09/10).
+Prior: `2026-04-14` — Common workflows section, MCP confirmation-gate inventory, and new gotchas (parallel_sending, deprecated sequence endpoints) verified live via `discover_tools` on 11 categories + `search_api_spec` on `POST /api/campaigns/{id}/resume`, `POST /api/campaigns/{id}/attach-sender-emails`, `POST /api/campaigns/{id}/create-schedule-from-template`, and the v1.1 vs deprecated sequence-steps pair. Workspace connection re-verified via `get_active_workspace_info` (active workspace ID 52, `send.outbase.so`, primary).
+
+Prior: `2026-04-11` — tool counts and categories copied from `docs/research/outbound-pipeline-findings.md` Phase 1 validation log (2026-04-09/10).
 
 Run `discover_tools` on each server before shipping any skill that hard-codes a tool name from this document.
