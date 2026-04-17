@@ -8,7 +8,9 @@ Salesforce is Brite's **CRM system of record** — Leads, Contacts, Accounts, Op
 
 The `marketing` plugin ships the official [`@salesforce/mcp`](https://github.com/salesforcecli/mcp) server. It's currently in Developer Preview (`0.x` semver, multi-release-per-day cadence) — see [findings §Q7](../../../../docs/research/salesforce-mcp-findings.md#q7-upgrade-cadence) for the upgrade policy.
 
-Decisions backing this integration: [`docs/research/salesforce-mcp-findings.md`](../../../../docs/research/salesforce-mcp-findings.md) (BC-5534) + [ADR 2a/2c](../../../../docs/designs/outbound-agent-architecture-adrs.md).
+Provisioned as a standalone External Client App (ECA) — classic ConnectedApp creation is blocked org-wide since Spring '26. This is Brite's first pure ECA; future integrations should follow this as the new exemplar.
+
+Decisions backing this integration: [`docs/research/salesforce-mcp-findings.md`](../../../../docs/research/salesforce-mcp-findings.md) (BC-5534, amended by BC-5579) + [ADR 2a/2c](../../../../docs/designs/outbound-agent-architecture-adrs.md).
 
 ## Consumed by
 
@@ -22,7 +24,7 @@ _(none yet — the 5 skills below are blocked by this integration landing)_
 
 ## Auth
 
-**Credential type.** JWT Bearer flow against a dedicated Connected App named **"Marketing Claude MCP"** in the prod Salesforce org. Scope: `Api` only. See [findings §Q3](../../../../docs/research/salesforce-mcp-findings.md#q3-auth-strategy) for why JWT over web/device/client-credentials and why `RefreshToken` scope is explicitly omitted.
+**Credential type.** JWT Bearer flow against a dedicated External Client App (ECA) named **"Marketing Claude MCP"** in the prod Salesforce org. Scopes: `Api` + `RefreshToken`. See [findings §Q3](../../../../docs/research/salesforce-mcp-findings.md#q3-auth-strategy) for why JWT over web/device/client-credentials. `RefreshToken` scope is required by the SFDX CLI auth layer (`sf org login jwt` fails without it); `refreshTokenPolicy: ZERO` prevents long-lived tokens.
 
 **Where the server reads from.** `@salesforce/mcp` has **no auth mechanism of its own**. It delegates 100% to `AuthInfo.create({ username })` in `@salesforce/core`, which loads whatever auth record is persisted in the local `~/.sfdx/` store. The MCP server does not log in — it only reads pre-provisioned auth ([findings §A.1](../../../../docs/research/salesforce-mcp-findings.md#a1-authentication-options)).
 
@@ -174,6 +176,6 @@ Never auto-execute. Never degrade the confirmation to a prose "please confirm" �
 
 ## Last verified
 
-`2026-04-14` — Integration landed as part of BC-5535. Upstream inventory + per-toolset GA flags + confirmation-gate absence verified at pinned commit `02e99fabe59a5dc189c3c7a7acb6430204e2c024` during BC-5534 research. Live availability-check transcript deferred to the admin-provisioning follow-up issue (Connected App + ECA wrapper not yet in `brite-salesforce`).
+`2026-04-16` — End-to-end verified by BC-5579. JWT login as service user succeeded; `run_soql_query` with `SELECT Id FROM User LIMIT 1` returned a row. ECA provisioned as standalone (not classic CA — Spring '26 blocked CA creation). `RefreshToken` scope re-added (required by SFDX CLI auth layer; original BC-5534 guidance to drop it was incorrect). Upstream inventory + per-toolset GA flags + confirmation-gate absence verified at pinned commit `02e99fabe59a5dc189c3c7a7acb6430204e2c024` during BC-5534 research.
 
 Re-verify `discover_tools`-equivalent (`--toolsets all` local run) whenever the version pin bumps.
