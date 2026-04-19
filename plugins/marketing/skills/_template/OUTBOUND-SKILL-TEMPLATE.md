@@ -127,7 +127,7 @@ Organized tool-first because that's how a skill author thinks: "what does my ski
 |---|---|---|---|
 | {e.g. Read audience view definition} | GitHub MCP (`get_file_contents`) | `brite-data-platform` | ADR 2d — no local clone dependency |
 | {e.g. Dedup against known prospects} | Salesforce MCP (`run_soql_query`) | `brite-salesforce` (production org) | ADR 2a — Salesforce is CRM SoR |
-| {e.g. Import leads + create campaign} | Email Bison MCP (`emailbison-b2b`) | Email Bison workspace 52 (`send.outbase.so`) | ADR 2a — sole sequencer |
+| {e.g. Import leads + create campaign} | Email Bison MCP (`emailbison-b2b`) | Email Bison workspace 55 (`send.outbase.so`) | ADR 2a — sole sequencer |
 | {...} | {...} | {...} | {...} |
 
 ### Architectural rules that apply

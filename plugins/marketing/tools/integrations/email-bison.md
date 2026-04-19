@@ -24,10 +24,10 @@ The official Email Bison MCP Server (Beta) exposes the full sending-layer API su
 
 | Server name | Instance | Workspace | Used when | Workspace ID |
 |---|---|---|---|---|
-| `emailbison-b2b` | `send.outbase.so` | Brite Nites | Sending to business recipients | 52 |
-| `emailbison-personal` | `personal.outbase.so` | BriteNites Team | Sending to consumer / personal recipients | 11 |
+| `emailbison-b2b` | `send.outbase.so` | Brite Nites | Sending to business recipients | 55 |
+| `emailbison-personal` | `personal.outbase.so` | BriteNites Team | Sending to consumer / personal recipients | 13 |
 
-Both were verified live on 2026-04-10 ([research WIP §8 row 4](../../../../docs/research/outbound-pipeline-findings.md#1a-mcp-servers-8-checked)) and the current session's `get_active_workspace_info` calls (2026-04-11).
+Re-verified live via `get_active_workspace_info` on 2026-04-19 during BC-5551 post-merge onboarding smoke test. Prior BC-5040 record (2026-04-10) showed 52 / 11 — the numbers changed between then and now; current values are authoritative.
 
 **Credential storage.** Raw tokens live in the Engineering Bitwarden collection, item **"Email Bison MCP — API tokens"**. Each dev pastes `export` lines from the Bitwarden item's Notes field into their shell profile, then the two HTTP MCP entries in the user-level `.mcp.json` reference `${EMAILBISON_B2B_TOKEN}` and `${EMAILBISON_PERSONAL_TOKEN}` via `${…}` substitution at load time. Raw tokens are never committed.
 
@@ -43,7 +43,7 @@ Plugin-scoped registration (`plugins/marketing/.mcp.json`) is **not viable today
 2. Paste both `export` lines into your shell profile (`~/.zshrc` or `~/.bashrc`). Start a new shell so the vars are exported.
 3. Register the two servers in your user-level MCP config. Simplest way is to add them to the gitignored repo-root `.mcp.json` using the shape in § Registration below. Alternative: `claude mcp add` from the CLI (project scope).
 4. `/reload-plugins` in Claude Code (or restart if `/reload-plugins` doesn't pick the entries up).
-5. Smoke-test: a skill allowed `mcp__emailbison-b2b__*` calls `get_active_workspace_info` — expect workspace ID `52`, domain `send.outbase.so`. Same for `-personal` → workspace ID `11`, `personal.outbase.so`.
+5. Smoke-test: a skill allowed `mcp__emailbison-b2b__*` calls `get_active_workspace_info` — expect workspace ID `55`, domain `send.outbase.so`. Same for `-personal` → workspace ID `13`, `personal.outbase.so`.
 
 **Fallback.** If the Bitwarden item is unreachable, re-issue tokens in the vendor UI (Workspace → Settings → Integrations → EmailBison MCP) and update the Bitwarden item after rotation.
 
