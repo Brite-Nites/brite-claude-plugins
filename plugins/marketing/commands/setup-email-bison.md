@@ -102,7 +102,7 @@ claude mcp list 2>&1 | grep -E "emailbison-b2b|emailbison-personal"
 
 Branching:
 
-- Both entries show `✓ Connected` → call `mcp__emailbison-b2b__get_active_workspace_info` (expect workspace ID `52`, domain `send.outbase.so`) and `mcp__emailbison-personal__get_active_workspace_info` (expect workspace ID `11`, domain `personal.outbase.so`). The `mcp__plugin_<plugin>_<server>__*` namespace is reserved for servers registered inside a plugin's `.mcp.json`; user-level registrations (which this command produces) use the shorter `mcp__<server>__*` form. If both return correctly, print `✓ Email Bison setup complete. Both workspaces reachable.` and jump to Phase 7.
+- Both entries show `✓ Connected` → call `mcp__emailbison-b2b__get_active_workspace_info` (expect workspace ID `55`, domain `send.outbase.so`) and `mcp__emailbison-personal__get_active_workspace_info` (expect workspace ID `13`, domain `personal.outbase.so`). The `mcp__plugin_<plugin>_<server>__*` namespace is reserved for servers registered inside a plugin's `.mcp.json`; user-level registrations (which this command produces) use the shorter `mcp__<server>__*` form. If both return correctly, print `✓ Email Bison setup complete. Both workspaces reachable.` and jump to Phase 7.
 
 - One or both show `✗ Failed to connect` → troubleshooting loop:
   1. Ask user to open a fresh terminal and run `echo "b2b=${EMAILBISON_B2B_TOKEN:+set} personal=${EMAILBISON_PERSONAL_TOKEN:+set}"` — expect output `b2b=set personal=set`.

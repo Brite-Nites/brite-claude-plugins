@@ -16,15 +16,23 @@ err()   { printf "\033[31mERR\033[0m  %s\n" "$1" >&2; }
 
 # ── Find the installed marketplace clone ─────────────────────────────
 find_install_path() {
-  # 1. Try .brite-plugins/.repo-root
+  # 1. Try .brite-plugins/.repo-root (a shortcut written by the SessionStart
+  #    telemetry hook). Only trust it if it points inside $MARKETPLACE_DIR —
+  #    otherwise `.repo-root` may hold a dev-repo path (e.g. when Claude Code
+  #    loaded the plugin from a source outside the marketplace) and returning
+  #    that here would cause the subsequent `mv` to move the user's dev repo.
   local repo_root_file="$HOME/.brite-plugins/.repo-root"
   if [ -f "$repo_root_file" ]; then
     local path
     path="$(cat "$repo_root_file")"
-    if [ -d "$path" ] || [ -L "$path" ]; then
-      echo "$path"
-      return 0
-    fi
+    case "$path" in
+      "$MARKETPLACE_DIR"/*)
+        if [ -d "$path" ] || [ -L "$path" ]; then
+          echo "$path"
+          return 0
+        fi
+        ;;
+    esac
   fi
 
   # 2. Scan marketplace dir for matching plugin name
