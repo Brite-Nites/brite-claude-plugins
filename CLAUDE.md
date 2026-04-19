@@ -83,7 +83,7 @@ Override the default review agent selection by adding a `## Review Agents` secti
 
 ## Gotchas
 
-- **`plugin.json` strict schema.** Any unrecognized field causes silent hard failure with no error. Allowlist: `name`, `description`, `author`, `version`, `homepage`, `repository`, `license`, `keywords`, `commands`, `skills`, `mcpServers` (inline object only). **Never** add `agents`, `hooks`, or `mcpServers` as string path — they're auto-discovered by convention.
+- **`plugin.json` strict schema.** Any unrecognized field causes silent hard failure with no error. Allowlist: `name`, `description`, `author`, `version`, `homepage`, `repository`, `license`, `keywords`, `commands`, `skills`, `mcpServers` (inline object only), `userConfig` (inline object declaring user-prompted settings; use with `sensitive: true` for secrets stored in OS keychain — but note that `${user_config.*}` substitution into HTTP MCP headers is currently broken in Claude Code, see `email-bison.md` § Known Claude Code limitation). **Never** add `agents`, `hooks`, or `mcpServers` as string path — they're auto-discovered by convention.
 - **MCP server soft cap ~5–6 per plugin.** The cap is per-plugin, not global. Adding a 6th eats context budget and startup latency — retire one first.
 - **Anchor `/.mcp.json` in `.gitignore`**, never unanchored `.mcp.json`. The unanchored form would match at any depth and silently ignore `plugins/*/.mcp.json` files, breaking plugin distribution.
 - **Skill frontmatter for MCP tools:** `allowed-tools: mcp__plugin_<plugin>_<server>__*` for multi-tool servers, `mcp__plugin_<plugin>_<server>__<tool_name>` for single-tool servers. The `plugin_<plugin>_` namespace is auto-generated — don't hand-edit. See the pattern guide for the full rule set.

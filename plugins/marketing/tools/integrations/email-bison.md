@@ -35,6 +35,10 @@ Plugin-scoped registration (`plugins/marketing/.mcp.json`) is **not viable today
 
 ### One-time per-dev onboarding
 
+**Easy path — guided walkthrough:** run `/marketing:setup-email-bison` in Claude Code. The command detects current registration state, walks you through each step (Bitwarden retrieval, shell profile, `.mcp.json` edit, reload, verify), and asks for explicit confirmation at each checkpoint. See `plugins/marketing/commands/setup-email-bison.md` for the full script. Roughly 3 minutes end-to-end.
+
+**Manual path (fallback if the command isn't available or you prefer step-by-step control):**
+
 1. Retrieve the **"Email Bison MCP — API tokens"** item from the Engineering Bitwarden collection. The Notes field carries the exact `export EMAILBISON_B2B_TOKEN=…` / `export EMAILBISON_PERSONAL_TOKEN=…` lines, ready to paste.
 2. Paste both `export` lines into your shell profile (`~/.zshrc` or `~/.bashrc`). Start a new shell so the vars are exported.
 3. Register the two servers in your user-level MCP config. Simplest way is to add them to the gitignored repo-root `.mcp.json` using the shape in § Registration below. Alternative: `claude mcp add` from the CLI (project scope).
@@ -90,6 +94,9 @@ Workarounds attempted in BC-5551 and rejected:
 | HTTP-type with `${VAR}` in `headers` | Bug class above — env var sent literally, vendor returns 401. |
 | Stdio wrapper via `npx -y mcp-remote <URL> --header "..."` | `claude mcp list` still extracts the URL substring from args and classifies the server as HTTP-type, bypassing the stdio proxy. Handshake never completes. |
 | `sh -c "npx -y mcp-remote ..."` to hide the URL | Same result — the URL is still inside the quoted arg string and Claude Code's substring match finds it. |
+| HTTP-type with `${user_config.<key>}` in `headers` + `userConfig` block declaring the keys with `sensitive: true` | **Validated broken on 2026-04-19.** Direct curl with the stored keychain value against the vendor returns HTTP 200 and a valid MCP `initialize` response — so the token itself is good. Claude Code's plugin MCP client, configured with the same value via `${user_config.*}` substitution, shows `✗ Failed to connect` in `claude mcp list`. Evidence: token-via-curl = 200, same-token-via-Claude-Code = Failed. Same class of substitution bug as `${ENV_VAR}`, different mechanism. See upstream tracker (filed 2026-04-19, link forthcoming). |
+
+**Secondary bug observed 2026-04-19:** when two HTTP MCP entries share the same `url` but differ only by header values (both emailbison-b2b and emailbison-personal point at `https://mcp.emailbison.com/mcp` with different `Instance-URL` headers), only one registers in `claude mcp list`. The second is silently deduped. Workaround: none known today; register one at a time under a URL-distinct wrapper if both are needed, or accept a single workspace until upstream ships a fix.
 
 `mcp-remote@0.1.38` itself proxies Email Bison correctly when run from a shell, verified during BC-5551 investigation. The block is strictly in how Claude Code's plugin-scoped MCP loader handles the configuration, not in the vendor or proxy layers.
 

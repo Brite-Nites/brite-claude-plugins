@@ -137,7 +137,7 @@ with open('$plugin_json') as f:
     data = json.load(f)
 allowed = {'name', 'description', 'author', 'version', 'homepage',
            'repository', 'license', 'keywords', 'commands', 'skills',
-           'mcpServers'}
+           'mcpServers', 'userConfig'}
 unknown = set(data.keys()) - allowed
 if unknown:
     print(f'FAIL:Disallowed fields: {sorted(unknown)}')
