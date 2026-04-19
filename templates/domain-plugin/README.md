@@ -46,7 +46,7 @@ The template at `skills/domain-context/SKILL.md` provides the starting skeleton.
 
 Only these fields are allowed (unrecognized fields silently break the plugin):
 
-`name`, `description`, `author`, `version`, `homepage`, `repository`, `license`, `keywords`, `commands`, `skills`, `mcpServers` (inline object only)
+`name`, `description`, `author`, `version`, `homepage`, `repository`, `license`, `keywords`, `commands`, `skills`, `mcpServers` (inline object only), `userConfig` (inline object; use `sensitive: true` for keychain-stored secrets)
 
 **Never add:** `agents`, `hooks`, or `mcpServers` as a string path — these are auto-discovered.
 

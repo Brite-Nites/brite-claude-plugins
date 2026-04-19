@@ -59,7 +59,7 @@ Then print this fenced JSON block:
 
 ```json
 "emailbison-b2b": {
-  "type": "remote",
+  "type": "http",
   "url": "https://mcp.emailbison.com/mcp",
   "headers": {
     "Authorization": "Bearer ${EMAILBISON_B2B_TOKEN}",
@@ -67,7 +67,7 @@ Then print this fenced JSON block:
   }
 },
 "emailbison-personal": {
-  "type": "remote",
+  "type": "http",
   "url": "https://mcp.emailbison.com/mcp",
   "headers": {
     "Authorization": "Bearer ${EMAILBISON_PERSONAL_TOKEN}",
@@ -102,10 +102,10 @@ claude mcp list 2>&1 | grep -E "emailbison-b2b|emailbison-personal"
 
 Branching:
 
-- Both entries show `✓ Connected` → call `mcp__plugin_marketing_emailbison-b2b__get_active_workspace_info` (expect workspace ID `52`, domain `send.outbase.so`) and `mcp__plugin_marketing_emailbison-personal__get_active_workspace_info` (expect workspace ID `11`, domain `personal.outbase.so`). If both return correctly, print `✓ Email Bison setup complete. Both workspaces reachable.` and jump to Phase 7.
+- Both entries show `✓ Connected` → call `mcp__emailbison-b2b__get_active_workspace_info` (expect workspace ID `52`, domain `send.outbase.so`) and `mcp__emailbison-personal__get_active_workspace_info` (expect workspace ID `11`, domain `personal.outbase.so`). The `mcp__plugin_<plugin>_<server>__*` namespace is reserved for servers registered inside a plugin's `.mcp.json`; user-level registrations (which this command produces) use the shorter `mcp__<server>__*` form. If both return correctly, print `✓ Email Bison setup complete. Both workspaces reachable.` and jump to Phase 7.
 
 - One or both show `✗ Failed to connect` → troubleshooting loop:
-  1. Ask user to open a fresh terminal and run `echo ${EMAILBISON_B2B_TOKEN:+set}` — expect output `set`.
+  1. Ask user to open a fresh terminal and run `echo "b2b=${EMAILBISON_B2B_TOKEN:+set} personal=${EMAILBISON_PERSONAL_TOKEN:+set}"` — expect output `b2b=set personal=set`.
   2. If not `set` → env var didn't reach the shell that launched Claude Code. Tell user to restart Claude Code fully (not just `/reload-plugins`) from the freshly-sourced shell, then re-run this command from Phase 6.
   3. If `set` but still failing → likely token mismatch between Bitwarden and the vendor. Suggest: log into the EB UI, verify the two tokens are active, rotate if needed, update Bitwarden + shell profile, restart.
   4. If only `emailbison-personal` is missing from `claude mcp list` output (not merely failed) → known Claude Code bug where two MCP entries with the same URL can collide; workaround is to restart Claude Code fully. File upstream issue if it persists.
