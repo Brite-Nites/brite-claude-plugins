@@ -245,7 +245,7 @@ if not author.get('name'):
 allowed_fields = {
     'name', 'description', 'author', 'version',
     'homepage', 'repository', 'license', 'keywords',
-    'commands', 'skills', 'mcpServers'
+    'commands', 'skills', 'mcpServers', 'userConfig'
 }
 unknown = set(data.keys()) - allowed_fields
 if unknown:

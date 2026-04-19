@@ -71,7 +71,7 @@ Skills and tools are ported from [coreyhaines31/marketingskills](https://github.
 
 Only these fields are allowed (unrecognized fields silently break the plugin):
 
-`name`, `description`, `author`, `version`, `homepage`, `repository`, `license`, `keywords`, `commands`, `skills`, `mcpServers` (inline object only)
+`name`, `description`, `author`, `version`, `homepage`, `repository`, `license`, `keywords`, `commands`, `skills`, `mcpServers` (inline object only), `userConfig` (inline object; use `sensitive: true` for keychain-stored secrets — but note that `${user_config.*}` substitution into HTTP MCP headers is currently broken in Claude Code, see `tools/integrations/email-bison.md` § Known Claude Code limitation)
 
 **Never add:** `agents`, `hooks`, or `mcpServers` as a string path — these are auto-discovered.
 

@@ -152,6 +152,24 @@ The `marketing` plugin ships `@salesforce/mcp` for skills that read from the pro
 
 Full onboarding reference, confirmation-gate patterns for destructive tools, and the supported toolset inventory live in [`plugins/marketing/tools/integrations/salesforce.md`](plugins/marketing/tools/integrations/salesforce.md). See [`docs/research/salesforce-mcp-findings.md`](docs/research/salesforce-mcp-findings.md) for the research record behind these decisions.
 
+## Email Bison MCP Onboarding
+
+Email Bison exposes two vendor-hosted HTTP MCP endpoints (`emailbison-b2b`, `emailbison-personal`) used by the outbound-sending skills. Credentials are centralized in Bitwarden; MCP server registration lives at the **user level** today (not plugin-scoped) — see [`plugins/marketing/tools/integrations/email-bison.md`](plugins/marketing/tools/integrations/email-bison.md#known-claude-code-limitation) for why.
+
+**Easy path:** run `/marketing:setup-email-bison` in Claude Code. It detects current state, walks you through each step with explicit confirmations (Bitwarden retrieval → shell profile → `.mcp.json` edit → reload → verify), and smoke-tests both workspaces at the end. Roughly 3 minutes. See [`plugins/marketing/commands/setup-email-bison.md`](plugins/marketing/commands/setup-email-bison.md) for the full walkthrough.
+
+**Manual path** (fallback or if you want full control):
+
+1. Retrieve the **Email Bison MCP — API tokens** item from the Engineering Bitwarden collection. Paste the two `export` lines from its Notes field into your shell profile (`~/.zshrc` or `~/.bashrc`) and start a new shell.
+2. Register the two HTTP MCP entries in your user-level `.mcp.json` (repo-root file, gitignored) using the shape in `email-bison.md` § Registration. The entries reference `${EMAILBISON_B2B_TOKEN}` / `${EMAILBISON_PERSONAL_TOKEN}` — no raw tokens in the file.
+3. `/reload-plugins` (or restart Claude Code). Smoke-test with `get_active_workspace_info` on each namespace — expect workspace ID `52` (`send.outbase.so`) for b2b and `11` (`personal.outbase.so`) for personal.
+
+**Troubleshooting:** a `401` or an `Authorization` header that logs literally as `Bearer ${…}` (not substituted) means the Claude Code client didn't inherit the env var — re-launch from a shell that has it exported.
+
+**Why not plugin-scoped?** Claude Code bugs [#6204](https://github.com/anthropics/claude-code/issues/6204) / [#9427](https://github.com/anthropics/claude-code/issues/9427) prevent env-var substitution in plugin-scoped HTTP `headers`. The `${user_config.*}` keychain-backed alternative was tested and also found broken (2026-04-19 validation: token-via-curl = 200, same-token-via-Claude-Code = Failed to connect). We'll migrate to plugin-scoped when fixes land upstream. Full investigation + all workarounds that failed are documented in `email-bison.md` § Known Claude Code limitation.
+
+Full onboarding flow, workspace-routing rules, 141-tool inventory, confirmation-gate list, and known gotchas live in [`plugins/marketing/tools/integrations/email-bison.md`](plugins/marketing/tools/integrations/email-bison.md).
+
 ## ADR Convention
 
 Architecture Decision Records live in `docs/decisions/NNN-kebab-title.md`. They are imported into CLAUDE.md via individual `@` imports (directory imports are not supported). The `/workflows:architecture-decision` command generates ADRs and auto-appends the import. `/workflows:project-start` generates ADRs for all major tech decisions made during the interview.
