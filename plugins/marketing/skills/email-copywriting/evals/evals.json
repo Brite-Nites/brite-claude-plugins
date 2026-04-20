@@ -1,0 +1,162 @@
+{
+  "skill": "email-copywriting",
+  "version": "0.1.0",
+  "scenarios": [
+    {
+      "id": "happy-path-municipalities-seed",
+      "tier": 2,
+      "description": "Situation artifact + municipalities vertical + offer_tier 2 produces a complete EB-format JSON artifact.",
+      "input": {
+        "company_name": "Denver Parks & Rec",
+        "entity": "brite-nites",
+        "vertical": "municipalities",
+        "offer_tier": 2,
+        "situation_artifact_path": "docs/campaigns/brite-nites/situation-denver-parks.md",
+        "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
+      },
+      "assertions": [
+        "output artifact file written to path matching 'docs/campaigns/brite-(nites|labs)/copy-*.json'",
+        "output.template_preset == 'list-building'",
+        "output.vertical == 'municipalities'",
+        "output.offer_tier == 2",
+        "output.step_1.body contains '<br><br>'",
+        "output.step_1.body contains zero '—' characters",
+        "output.step_2.body contains zero '—' characters",
+        "output.step_1.subject does NOT contain '{FIRST_NAME}'",
+        "output.step_1 has keys: 'subject', 'body', 'wait_in_days'",
+        "output.step_2 has keys: 'subject', 'body', 'wait_in_days'",
+        "output.step_1.wait_in_days >= 1"
+      ]
+    },
+    {
+      "id": "scratch-path-value-equation",
+      "tier": 1,
+      "description": "No situation artifact supplied — skill must run the value-equation interview before writing copy.",
+      "input": {
+        "company_name": "Denver Parks & Rec",
+        "entity": "brite-nites",
+        "situation_artifact_path": null,
+        "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
+      },
+      "assertions": [
+        "first_response mentions at least 3 of: 'Dream Outcome', 'Perceived Likelihood', 'Time Delay', 'Effort', 'Sacrifice'",
+        "first_tool_calls does NOT contain Write of 'docs/campaigns/brite-nites/copy-*.json'",
+        "no output artifact written until operator responds to the interview questions"
+      ]
+    },
+    {
+      "id": "format-violation-self-correct",
+      "tier": 1,
+      "description": "Operator supplies a draft body containing '{{firstname}}' — skill must self-correct to '{FIRST_NAME}'.",
+      "input": {
+        "company_name": "Any Prospect",
+        "entity": "brite-nites",
+        "vertical": "municipalities",
+        "offer_tier": 2,
+        "situation_artifact_path": "docs/campaigns/brite-nites/situation-any.md",
+        "operator_draft_body": "Hi {{firstname}}, I saw your downtown plan."
+      },
+      "assertions": [
+        "output.step_1.body contains zero '{{' tokens",
+        "output.step_1.body contains '{FIRST_NAME}'",
+        "output.step_2.body contains zero '{{' tokens"
+      ]
+    },
+    {
+      "id": "em-dash-auto-replace",
+      "tier": 1,
+      "description": "Operator-supplied proof point contains em-dashes — output must sanitize them out of both step bodies.",
+      "input": {
+        "company_name": "Any Prospect",
+        "entity": "brite-nites",
+        "vertical": "municipalities",
+        "offer_tier": 2,
+        "situation_artifact_path": "docs/campaigns/brite-nites/situation-any.md",
+        "operator_proof_point": "foot traffic rose — up 40% — year over year"
+      },
+      "assertions": [
+        "output.step_1.body contains zero '—' characters",
+        "output.step_2.body contains zero '—' characters",
+        "output.step_1.subject contains zero '—' characters"
+      ]
+    },
+    {
+      "id": "entity-switching",
+      "tier": 2,
+      "description": "Same situation artifact run once with entity=brite-nites and once with entity=brite-labs produces distinct offer_tier and messaging.",
+      "input": {
+        "company_name": "Midtown Municipality",
+        "situation_artifact_path": "docs/campaigns/shared/situation-midtown.md",
+        "vertical": "municipalities",
+        "runs": [
+          {"entity": "brite-nites"},
+          {"entity": "brite-labs"}
+        ]
+      },
+      "assertions": [
+        "run[entity=brite-nites].output.offer_tier == 2",
+        "run[entity=brite-labs].output.offer_tier IN [3, 4]",
+        "run[entity=brite-nites].output.step_1.subject != run[entity=brite-labs].output.step_1.subject",
+        "run[entity=brite-nites].output.step_1.body CTA language differs from run[entity=brite-labs].output.step_1.body CTA language",
+        "both runs produce output.step_1.body containing '<br><br>' and zero '—' characters"
+      ]
+    },
+    {
+      "id": "missing-marketing-context-hard-gate",
+      "tier": 2,
+      "description": "docs/marketing-context.md is absent — skill must hard-gate before emitting any artifact.",
+      "input": {
+        "company_name": "Any Prospect",
+        "situation_artifact_path": "docs/campaigns/shared/situation-any.md",
+        "vertical": "municipalities",
+        "offer_tier": 2,
+        "mocked_marketing_context": "absent"
+      },
+      "assertions": [
+        "first_response does NOT write a JSON artifact",
+        "first_response mentions 'marketing-context' OR asks for 'entity' explicitly",
+        "first_response contains one of: 'pause', 'hard gate', 'Missing'",
+        "first_tool_calls does NOT contain Write of 'docs/campaigns/*/copy-*.json'"
+      ]
+    },
+    {
+      "id": "unknown-vertical-fallback",
+      "tier": 1,
+      "description": "Operator supplies vertical=hoas (no preset file shipped yet) — skill falls back to base inline skeleton and surfaces the BC-5879 reference.",
+      "input": {
+        "company_name": "Cherry Creek HOA",
+        "entity": "brite-nites",
+        "vertical": "hoas",
+        "offer_tier": 2,
+        "situation_artifact_path": "docs/campaigns/brite-nites/situation-cherry-creek.md",
+        "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
+      },
+      "assertions": [
+        "output artifact file is written (fallback succeeds, not halted)",
+        "output.template_preset == 'list-building'",
+        "output.vertical == 'hoas'",
+        "response log or warning mentions 'BC-5879'",
+        "output.step_1.body matches base inline skeleton shape, not a vertical-override variant"
+      ]
+    },
+    {
+      "id": "missing-offer-tier-gate",
+      "tier": 1,
+      "description": "Operator supplies situation + entity but omits offer_tier — skill must prompt with entity-aware recommendation before emitting.",
+      "input": {
+        "company_name": "Denver Parks & Rec",
+        "entity": "brite-nites",
+        "vertical": "municipalities",
+        "offer_tier": null,
+        "situation_artifact_path": "docs/campaigns/brite-nites/situation-denver-parks.md",
+        "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
+      },
+      "assertions": [
+        "first_response contains 'tier'",
+        "first_response references entity-aware recommendation (e.g. 'brite-nites' maps to Tier 2, 'T2', or 'Tier 2')",
+        "first_tool_calls does NOT contain Write of 'docs/campaigns/brite-nites/copy-*.json'",
+        "no JSON artifact emitted until operator confirms the tier"
+      ]
+    }
+  ]
+}
