@@ -35,6 +35,7 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-001: Cross-repo import solution](docs/decisions/001-cross-repo-import-solution.md) — Context7 for cross-repo handbook access
 - [ADR-002: Trait evolution mechanism](docs/decisions/002-trait-evolution-mechanism.md) — Trait add/remove commands + auto-detect
 - [ADR-003: Plugin distribution architecture](docs/decisions/003-plugin-distribution-architecture.md)
+- [ADR-007: RevOps plugin design decisions](docs/decisions/007-revops-plugin-design.md) — naming, subtree, augment-not-replace, skill filter, MCP scope
 - [Context-Skill Standard](docs/designs/BC-1966-context-skill-standard.md)
 
 ## Company Context
