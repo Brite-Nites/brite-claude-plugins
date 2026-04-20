@@ -77,7 +77,48 @@ Apply the 5 Variables orthogonally to the Phase 2 data. Rank all campaigns in th
 
 Map every Phase 3 finding to a specific action via the §3.5 verdict table. Prioritize actions in this order: `SCALE` winners first (they produce the next campaign's budget), `UNDERPERFORM` kills second (they stop the bleed on senders, domains, and list spend), `TEST MORE` experiments third (they feed future hypotheses and seed the next Phase 1). End the phase with the mandatory handoff prompt to `campaign-debrief` — the skill does not consider Phase 4 complete until the operator confirms the handoff. Per-campaign analysis artifacts are disposable; the durable learnings belong in the org's compounding knowledge base, and `campaign-debrief` is the skill that promotes them there.
 
-<!-- TASK 4: §3.3 benchmarks + §3.4 report sections + §3.5 verdict mapping go here -->
+### Benchmarks
+
+These benchmarks are Brite-specific targets for b2b campaigns running in the `emailbison-b2b` workspace (Brite Supply and Brite Labs). b2c campaigns in the `emailbison-personal` workspace (Brite Nites) use softer targets documented in the §4 Brite Implementation table — do not duplicate them here. The numbers below are the scoreboard against which the §3.4 report's §1 Quick Health Check runs and the §3.5 verdict mapping resolves each ranked row; every Phase 3 comparison and Phase 4 verdict traces back to this table.
+
+**b2b benchmark targets (emailbison-b2b workspace — Brite Supply + Labs):**
+
+| Metric | Healthy | Attention | Critical |
+|--------|---------|-----------|----------|
+| Reply Rate | above 1% | 0.5% – 1% | below 0.5% |
+| Interested Rate | above 25% of replies | 15% – 25% of replies | below 15% of replies |
+| Bounce Rate | below 3% | 3% – 5% | above 5% |
+
+Reply Rate measures (replies ÷ sent), Interested Rate measures (interested-replies ÷ replies), and Bounce Rate measures (bounces ÷ sent). Interested replies are EB MCP's reply-sentiment classification — see §5 for the exact tool call. Below the statistical-significance floor stated in §3.2 Phase 2 (500 sent AND 7 days), none of these benchmarks apply — all verdicts auto-map to `TEST MORE` regardless of how the raw numbers look.
+
+b2c (emailbison-personal, Brite Nites) benchmarks live in §4 Brite Implementation and shift each Healthy threshold downward by roughly half — residential cold email runs longer decision cycles and softer response rates than b2b commercial.
+
+### 6-section report structure
+
+Every analysis run emits one report artifact at `docs/campaigns/{entity}/analysis-{campaign-name}-{YYYY-MM-DD}.md` (per §1) containing the full 6-section template below. Sections are omitted ONLY when the data floor was not met and the whole report degrades to a `TEST MORE` stub; in every other case all six sections render, even when one section is brief. The section order is load-bearing — health check precedes ranking precedes attribution precedes recommendations — and downstream readers (including `campaign-debrief`) expect that ordering.
+
+1. **Quick Health Check.** Purpose: snapshot the campaign against the §3.3 benchmarks. Output: a three-row comparison table (Reply Rate / Interested Rate / Bounce Rate — actual vs Healthy / Attention / Critical band, with a one-word verdict per row). Also surfaces any benchmark overrides the operator recorded during Gate 4 of §2.
+2. **Segment Performance Ranking.** Purpose: rank every campaign in the analysis window by Interested Rate (desc) with a per-row verdict drawn from §3.5. Output: a ranked table with columns Campaign / Sends / Reply Rate / Interested Rate / Verdict.
+3. **Infrastructure Analysis.** Purpose: compare sender infrastructure cohorts (Google Workspace vs Microsoft 365 domains; warmup-complete vs warmup-in-progress; by-domain deliverability). Output: a cohort comparison table plus a narrative paragraph calling out any 2x+ cohort differential (per §3.2 Phase 3's anomaly rule).
+4. **Reply Sentiment Analysis.** Purpose: break down reply-sentiment distribution (Interested / Not Interested / Information / Out of Office / Objection) across the ranked campaigns. Output: a distribution table plus a narrative on the two dominant non-Interested sentiments (which usually diagnose Message or Segment problems).
+5. **Attribution Analysis.** Purpose: attribute the top 2 winners and bottom 2 underperformers to exactly one of the 5 Core Variables each (orthogonality rule from §3.1). Output: a four-row table with columns Campaign / Performance Band / Attributed Variable / Evidence (1-2 sentences).
+6. **Next Iteration Recommendations.** Purpose: convert every finding into an actionable recommendation prioritized by verdict (`SCALE` first, `UNDERPERFORM` second, `TEST MORE` third, `MONITOR` / `TOP PERFORMER` observational). Output: a prioritized action list plus the mandatory campaign-debrief handoff prompt.
+
+Every recommendation in §6 must trace back to at least one §5 Attribution row — a recommendation without an attribution is a narrative slip and §8 anti-slop will flag it.
+
+### Verdict mapping
+
+Verdict mapping runs in Phase 4 after all §3.3 benchmark comparisons and §3.4 attributions are complete. Each ranked campaign in §3.4 §2 Segment Performance Ranking gets exactly one verdict; the table below is the authoritative assignment key. The verdict labels are fixed — they are the exact strings the operator sees in the rendered report and the exact tokens §8 anti-slop and §9 behavioral tests match against.
+
+| Verdict | Assignment rule | Priority in §6 |
+|---------|-----------------|----------------|
+| `TOP PERFORMER` | Reply Rate Healthy AND Interested Rate Healthy AND sends ≥ 500 over ≥ 7 days | Observational — record template, do not touch |
+| `SCALE` | Reply Rate Healthy OR (Interested Rate Healthy AND Reply Rate Attention) AND Bounce Rate not Critical | Priority 1 — expand senders / volume next campaign |
+| `TEST MORE` | Sends < 500 OR days < 7 OR every verdict-critical metric in Attention band with insufficient cohort data | Priority 3 — allocate small follow-up budget, re-analyze after floor met |
+| `MONITOR` | Mixed signals — some metrics Healthy, some Attention, no clear Infrastructure or Segment attribution | Priority 4 — observational, re-check in 7 days |
+| `UNDERPERFORM` | Reply Rate Critical OR Bounce Rate Critical OR (Interested Rate Critical AND sends ≥ 500) | Priority 2 — kill the campaign, attribute the failure variable, feed into next hypothesis |
+
+Verdicts are attributed at the campaign level, not the reply level. A single unusual reply does not promote `UNDERPERFORM` to `MONITOR`. The priority ordering in §6 — `SCALE` first (wins compound), `UNDERPERFORM` second (bleeds stop), `TEST MORE` third (experiments seed future hypotheses), `MONITOR` and `TOP PERFORMER` observational — is fixed by §3.2 Phase 4. Do NOT reorder the priorities in the report.
 
 ---
 
