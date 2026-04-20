@@ -94,6 +94,7 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
   "_cq3_parse_errors": [ {                                        // Phase 3 § 2.2 CQ3 free-text parse failures
       "project_id", "issue_id", "raw_cq3_answer"
   } ],
+  "_create_preflight_cache": { /* [projectId]: list_issues-response */ },  // Phase 3 § 3 per-project list_issues memoization
   "housekeeping_log_path": null,                                  // Phase 3 resolves once at § 7 entry
   "_executed_mutation_ids": [],                                   // Phase 3 resume cache
   "narrative_draft": null

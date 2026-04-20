@@ -32,6 +32,7 @@ Populates / mutates:
 - `state._cq3_parse_errors[]` — carry-over rows where CQ3's "superseded by" answer contained zero `^BC-\d+$` tokens. Each entry `{project_id, issue_id, raw_cq3_answer}`. Surfaced in the § 5 preview under `## CQ3 parse errors (resolve before execute)` and resolved via § 6.0 pre-preview re-parse (not through the quality-gate, which only handles the 7-check tuple on live issues).
 - `state.housekeeping_log_path` — resolved once at § 7 entry.
 - `state._executed_mutation_ids[]` — resume cache (populated on successful writes).
+- `state._create_preflight_cache` — `{ [projectId]: list_issues-response }` memoization used by § 3's `create` pre-flight so multiple create rows in the same project share one fetch. Phase-3-scoped; reset on each invocation.
 - `state.projects[i].overrides[]` — appended to when the user picks "Override with reason" during the § 6 `Gate failures` group prompt (the gate re-run in § 4 is read-only and stages failures under `gate_status="fail"`).
 
 Writes no fields used by Phase 4 beyond what Phase 2 already populated (`overrides` + `scope_decisions`). Phase 4 narrative reads those directly.
@@ -54,7 +55,7 @@ Every row in `state.mutations[]` has:
   "gate_detail": [ … ],       // 7-tuple from issue-quality-gate; empty if path != "cycle"
   "override_reason": "<string>" | null,
   "executed_at": "<ISO-8601>" | null,
-  "result": "executed" | "skipped-idempotent" | "errored" | "dropped-by-user" | "no-op" | null,
+  "result": "executed" | "skipped-idempotent" | "errored" | "dropped-by-user" | "no-op" | "pending-cq3-reparse" | null,
   "error": "<string>" | null,
   "source_project": "<project_name>"  // "(global)" for milestone renames
 }
@@ -69,7 +70,7 @@ For each carry-over answer tuple keyed by `issue_id`:
 | Answer condition | Decision path | Mutation type(s) emitted |
 |---|---|---|
 | CQ1 answered "Park indefinitely" *(per sprint-scoping § 3: CQ5 is auto-skipped in this case; rule fires before any CQ5 row so the user's explicit park intent is not silently dropped)* | `backlog` | `backlog-return` (`cycleId` → null, `state.type` → `backlog`, `assignee` → null) |
-| CQ3 answered "superseded by <IDs>" | `cancel` | `cancel` (parse IDs from CQ3 free-text: split on comma/whitespace, match each token against `^BC-\d+$`. If ≥1 token matches: primary valid ID → `duplicateOf`; rest → `relatedTo`; plain-text comment `"Superseded by BC-X, BC-Y per W<NN> planning."` using only the validated IDs. If ZERO tokens match: do NOT emit the cancel row — instead append `{project_id, issue_id, raw_cq3_answer}` to `state._cq3_parse_errors[]` and surface in a dedicated § 6.0 pre-preview group for inline re-parse. This avoids overloading the 7-check quality-gate with a non-gate concern.) |
+| CQ3 answered "superseded by <IDs>" | `cancel` | `cancel` (parse IDs from CQ3 free-text: split on comma/whitespace, dedup tokens via set semantics, match each token against `^BC-\d+$` requiring a non-zero integer suffix (`^BC-[1-9]\d*$`), cap at 10 IDs. If ≥1 token matches: primary valid ID → `duplicateOf`; rest → `relatedTo`; plain-text comment `"Superseded by BC-X, BC-Y per W<NN> planning."` using only the validated IDs. If ZERO tokens match: append `{project_id, issue_id, raw_cq3_answer}` to `state._cq3_parse_errors[]` AND emit a placeholder row `{decision_path: "cancel", mutation_type: "cancel", result: "pending-cq3-reparse", gate_status: "n/a"}` under the `cancel` group so the § 5 preview shows the full intent count, then surface in § 6.0 for inline re-parse before § 6.3 approves the `cancel` group. This preserves the "what you see in the preview is what you approve" contract. |
 | CQ5 answered "back to backlog" | `backlog` | `backlog-return` (`cycleId` → null, `state.type` → `backlog`, `assignee` → null) |
 | CQ5 answered "specific future cycle <X>" (not W+1) | `cycle` | `cycle-assign` with target = that cycle |
 | CQ1 answered "move to W+1" AND CQ3 not "superseded" AND CQ5 not "backlog" | `cycle` | `cycle-assign` with target = `state.cycle.current.id` |
@@ -159,9 +160,11 @@ Target cycle: <state.cycle.current.name> (<state.cycle.current.id>)
 
 _Rendered only if `state._cq3_parse_errors[]` is non-empty. Each row shows the carry-over issue + the raw CQ3 answer that produced zero `^BC-\d+$` tokens. Resolved FIRST in § 6.0 before any other group._
 
+Rendering sanitization for the Raw CQ3 answer column: replace `|` with `\|`, replace newlines / carriage returns with the visible glyph `␤`, truncate to 120 characters with ellipsis, and wrap the entire cell in backticks so markdown/HTML inside the user's text is inert. Raw values are logged to the housekeeping log with the same escaping (§ 7.5).
+
 | Issue | Project | Raw CQ3 answer |
 |---|---|---|
-| BC-XXXX | <project> | `<verbatim free-text>` |
+| BC-XXXX | <project> | `<sanitized free-text>` |
 
 ## Conflicts (resolve before execute)
 
@@ -234,20 +237,20 @@ Render the full preview before any `AskUserQuestion`. The user reads the whole t
 
 After the preview renders, iterate over the distinct non-empty groups in this order — three pre-groups first so that CQ3 parse errors, conflicts, and gate failures are resolved before any regular decision-path group is approved:
 
-0. **CQ3 parse errors** (from `state._cq3_parse_errors[]`, § 2.2 cancel-row derivation). For each entry, `AskUserQuestion` showing the original carry-over issue + the raw CQ3 free-text answer with three options: **Re-enter IDs** (follow-up free-text `AskUserQuestion`, re-parse with `^BC-\d+$`; on ≥1 valid ID, emit the cancel row and remove from `_cq3_parse_errors[]`), **Drop cancel** (the carry-over issue stays in its prior path — e.g. cycle or leave), **Keep as leave** (explicit no-op for this issue). Handler is inline re-parse — does NOT call the quality-gate.
+0. **CQ3 parse errors** (from `state._cq3_parse_errors[]`, § 2.2 cancel-row derivation). For each entry, surface the carry-over issue's *current derived path* explicitly in the prompt (per § 2.2 rules, when CQ3 was answered but parse failed, rows 3–5 are gated by "CQ3 not superseded" so the issue typically falls to `leave` or `backlog`, never `cycle`). `AskUserQuestion` with three options: **Re-enter IDs** (follow-up free-text `AskUserQuestion`; re-parse with `^BC-\d+$`; dedup tokens via set semantics; cap at 10 IDs; on ≥1 valid ID, synthesize the cancel row AND remove the issue's current `leave`/`backlog` row from `state.mutations[]` (see P2 #4 flow below), append to the `cancel` decision-path group so it appears when § 6.3 reaches that group), **Drop cancel** (the carry-over issue stays in the derived fallback path shown in the prompt — typically `leave`), **Keep as leave** (force `leave` regardless of what § 2.2 derived). Handler is inline re-parse — does NOT call the quality-gate.
 1. **Conflicts** (from `state._mutation_conflicts[]`, § 2.5). For each conflict row, `AskUserQuestion` with three options:
 
    | Option | Effect |
    |---|---|
    | **Pick source A/B** | Replace the issue's mutation row(s) with A's (or B's) decision; drop the other source's row. |
-   | **Merge manually** | Open a follow-up free-text `AskUserQuestion` collecting the merged target state (cycle + assignee + state + labels). Replace existing rows with the merged row. |
+   | **Merge manually** | Open a follow-up free-text `AskUserQuestion` collecting the merged target state (cycle + assignee + state + labels). Validate each field against Phase-0-cached lookups: cycle name must exist on the team, assignee must resolve to a known user, state must be in the team's workflow, labels must exist. Re-derive `decision_path` from the merged `state`/`cycleId` — if the derived path is `cycle`, re-run `cadence:issue-quality-gate` on the merged row before replacing existing rows. Reject invalid values with a follow-up prompt. This prevents merge-flow bypass of the § 4 gate. |
    | **Drop the issue** | Remove every mutation row for this `issue_id` across all groups (not just the conflicting pair). |
 
    Resolution updates `state.mutations[]` in place before the next group runs.
 2. **Gate failures** (rows with `gate_status == "fail"` from § 4). For each failing row, `AskUserQuestion` with three options: Fix now (echo `https://linear.app/brite-nites/issue/<id>`, wait for user confirmation, re-run gate, on pass the row re-enters its primary decision-path group), Override with reason (collect a one-line free-text reason via follow-up `AskUserQuestion`, append `{issue_id, check, reason}` to `state.projects[i].overrides`, set `gate_status = "override"`, re-enter primary group), or Drop from scope (remove the row from `state.mutations[]`).
 3. **Regular decision-path groups** — iterate `cycle`, `cancel`, `reassign`, `backlog`, `global` — skipping any empty group. For each, one `AskUserQuestion` call with the three options defined below.
 
-The count of `AskUserQuestion` group-approval calls equals the number of distinct non-empty groups (AC #3). Fix-now and Override follow-ups are conditional per failing row and are not part of the group-approval count.
+The count of `AskUserQuestion` group-approval calls for the **regular decision-path groups** (step 3) equals the number of distinct non-empty decision-path groups in the checkpoint — this is the literal AC #3 assertion. Pre-groups (0/1/2) are per-row by necessity — each CQ3 parse error, conflict, or live gate failure requires individual resolution because merging them into a single batch prompt would lose the per-row context the user needs to decide. Fix-now and Override follow-ups inside regular groups are also per-row conditional and not part of the AC #3 regular-group count. When tallying AC #3 evidence, count only the prompts fired in step 3.
 
 Each group prompt offers three options:
 
