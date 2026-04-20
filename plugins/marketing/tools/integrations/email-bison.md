@@ -11,6 +11,7 @@ The official Email Bison MCP Server (Beta) exposes the full sending-layer API su
 ## Consumed by
 
 - `email-bison` (`plugins/marketing/skills/email-bison/`) — default entry point; owns the long tail (workspace, senders, tags, blocklist, webhooks, schedule templates, variables, quick stats) and routes to the specialized siblings below when intent matches.
+- `email-copywriting` (`plugins/marketing/skills/email-copywriting/`) — generates EB-format subject + body step 1 + step 2 as a JSON artifact for `/marketing:launch-campaign` to consume. Does NOT call EB MCP tools — pure content generation.
 - `campaign-orchestration` (`plugins/marketing/skills/campaign-orchestration/`) — sequence design, inbox rotation, warmup strategy, end-to-end campaign launch.
 - `reply-processing` (BC-2720 — not yet landed) — reply classification + OutboundSync CRM sync.
 - `deliverability-audit` (BC-2719 — not yet landed) — SPF/DKIM/DMARC, domain reputation, bounce analysis.
@@ -256,6 +257,7 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 
 - `campaign-orchestration` (`plugins/marketing/skills/campaign-orchestration/`, BC-2718) — sequence design, inbox rotation, warmup strategy, end-to-end campaign launch
 - `deliverability-audit` (BC-2719) — domain reputation, bounce rate analysis
+- `email-copywriting` (`plugins/marketing/skills/email-copywriting/`, BC-5825) — content generation for campaign sequences; feeds `/marketing:launch-campaign` command
 - `reply-processing` (BC-2720) — pairs Email Bison blocklist with Master Inbox label actions
 - `list-building` (BC-2717) — pipes enriched leads from `brite-data-platform` into Email Bison campaigns
 - `campaign-analysis` (BC-2721) — pulls reply / open / bounce analytics
