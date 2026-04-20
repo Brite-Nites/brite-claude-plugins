@@ -1,0 +1,111 @@
+{
+  "skill": "situation-mining",
+  "version": "0.1.0",
+  "scenarios": [
+    {
+      "id": "happy-path-dense-signal",
+      "tier": 1,
+      "description": "New prospect with rich public signal across all 6 sources.",
+      "input": {
+        "company_name": "Denver Parks & Rec",
+        "domain": "denvergov.org",
+        "category": "municipalities"
+      },
+      "assertions": [
+        "output.frontmatter.confidence IN ['HIGH', 'MEDIUM']",
+        "output.frontmatter.vertical == 'municipalities'",
+        "output.frontmatter.entity IN ['brite-nites', 'brite-labs']",
+        "output.frontmatter.sf_enriched IS false OR true",
+        "output.body contains '## Diagnostic Messages' with between 3 and 4 options",
+        "every inference line in '## Situations' starts with one of: 'Based on public data', 'This suggests', 'Test this hypothesis'",
+        "every data point in '## Raw Data' cites a source URL inline"
+      ]
+    },
+    {
+      "id": "thin-data-fallback",
+      "tier": 1,
+      "description": "Small private prospect with <2 sources returning usable data.",
+      "input": {
+        "company_name": "Quiet Provincial LLC",
+        "domain": "quietprovinciallc.example",
+        "category": null
+      },
+      "assertions": [
+        "output.frontmatter.confidence == 'LOW'",
+        "output.body contains '## Diagnostic Messages' with between 1 and 2 options",
+        "output.body contains '## Recommendations' referencing 'list-building' OR 'ICP review'",
+        "every message option body contains one of: 'Based on public data', 'This suggests', 'Test this hypothesis'"
+      ]
+    },
+    {
+      "id": "ambiguous-name-pause",
+      "tier": 1,
+      "description": "Generic common name with no category hint; skill must pause before searches.",
+      "input": {
+        "company_name": "Apex",
+        "domain": null,
+        "category": null
+      },
+      "assertions": [
+        "first_tool_calls does NOT contain 'WebSearch'",
+        "first_response contains 'category' OR 'ambiguous' OR 'disambiguate'",
+        "no output artifact written"
+      ]
+    },
+    {
+      "id": "anti-slop-compliance",
+      "tier": 1,
+      "description": "Output must satisfy all anti-slop guardrails regardless of input.",
+      "input": {
+        "company_name": "Any Prospect",
+        "domain": "anyprospect.example"
+      },
+      "assertions": [
+        "output.body does NOT contain em-dashes '—' in any Diagnostic Message body",
+        "output.body does NOT contain words: 'synergy', 'leverage', 'best-in-class'",
+        "output.body does NOT contain words: 'Serper', 'serper', 'Apollo'",
+        "output.body does NOT contain words: 'installer', 'property management', 'property mgmt'",
+        "no inference uses fact-claim framing ('They are', 'We know', 'The company is definitely')"
+      ]
+    },
+    {
+      "id": "existing-sf-account-internal-signals",
+      "tier": 2,
+      "description": "Prospect domain matches a Salesforce Account with lapsed Opportunity.",
+      "input": {
+        "company_name": "Midtown Municipality",
+        "domain": "midtown-mun.example",
+        "mocked_sf_account": {
+          "Id": "0011a00000xyz",
+          "Name": "Midtown Municipality",
+          "Lifecycle_Stage_History__c": "Stage 3 -> Stage 1 (2025-Q3 downgrade)",
+          "opportunities": [
+            {"Id": "0061b00000abc", "Name": "Q3 2025 Downtown Lights", "StageName": "Closed Lost", "CloseDate": "2025-09-30"}
+          ]
+        }
+      },
+      "assertions": [
+        "output.frontmatter.sf_enriched == true",
+        "output.frontmatter.internal_signals contains 'Opportunity:0061b00000abc'",
+        "output.body '## Diagnostic Messages' contains at least one option referencing 'lapsed' OR 'Q3' OR the Opportunity name",
+        "output.frontmatter.confidence == 'HIGH' for the internal-signal-grounded option"
+      ]
+    },
+    {
+      "id": "enrichment-mcp-unavailable",
+      "tier": 2,
+      "description": "Enrichment MCP returns error on availability check; skill must degrade.",
+      "input": {
+        "company_name": "Test Prospect",
+        "domain": "testprospect.example",
+        "mocked_enrichment_availability": "error: MCP_UNAVAILABLE"
+      },
+      "assertions": [
+        "output.frontmatter.enrichment_used == false",
+        "first_response contains warning text mentioning 'enrichment' AND 'unavailable'",
+        "skill did NOT halt — output artifact was still written",
+        "output.body contains '## Diagnostic Messages' with between 3 and 4 options sourced from public sources only"
+      ]
+    }
+  ]
+}
