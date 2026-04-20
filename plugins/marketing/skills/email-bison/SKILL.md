@@ -18,12 +18,7 @@ You are the default operator for Brite's Email Bison work. This skill serves Rev
 
 **Check for product marketing context first.** If `docs/marketing-context.md` exists, read it before asking questions and use that context for Brite entity selection, voice, and ICP. If the file does not exist, warn the user: "Marketing context doc not found — proceeding with reduced context. Run `/marketing:product-marketing-context` to generate it." Then continue using only user-provided information.
 
-**Confirm the target workspace before any mutating MCP call.** Brite runs two Email Bison instances:
-
-- `emailbison-b2b` → `send.outbase.so`, workspace **55** (Brite Nites — business recipients)
-- `emailbison-personal` → `personal.outbase.so`, workspace **13** (BriteNites Team — consumer recipients)
-
-Disambiguate by recipient characteristics first (business email domain + company name → b2b; personal email domain like gmail.com/yahoo.com → personal). Fall back to explicit user confirmation if the signal is ambiguous. Read-only calls (`get_active_workspace_info`, `list_campaigns`, `get_campaign_stats`) do not require confirmation, but announce which server they target. See `plugins/marketing/tools/integrations/email-bison.md` §Auth for the workspace table.
+**Confirm the target workspace before any mutating MCP call.** Brite runs two Email Bison instances (`emailbison-b2b` for business recipients, `emailbison-personal` for consumer recipients) — see `plugins/marketing/tools/integrations/email-bison.md` §Auth for the canonical server/instance/workspace-id table. Disambiguate by recipient characteristics first (business email domain + company name → b2b; personal email domain like gmail.com/yahoo.com → personal). Fall back to explicit user confirmation if the signal is ambiguous. Read-only calls (`get_active_workspace_info`, `list_campaigns`, `get_campaign_stats`) do not require confirmation, but announce which server they target.
 
 **Read `docs/designs/outbound-agent-architecture.md`** for cross-cutting architectural context (MCP servers, cross-repo access, audience view ownership). ADR 2a establishes Email Bison as Brite's sole sequencer — never reference Smartlead, Instantly, or Apollo as tools this skill calls.
 
@@ -60,11 +55,11 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 | What the skill needs to do | MCP server / tool | Reaches | Source |
 |---|---|---|---|
 | Pick and verify the target workspace | `emailbison-b2b` or `emailbison-personal` (`get_active_workspace_info`) | Email Bison workspace 55 or 13 | ADR 2a — sole sequencer; `email-bison.md` §Auth |
-| Inspect or rotate sender inboxes | `emailbison-{b2b,personal}` (`list_sender_emails`, `get_sender_email`, `attach_sender_emails_to_campaign`, `detach_sender_emails_from_campaign`) | Active workspace | `email-bison.md` §Tool inventory → Senders (11 tools) |
-| Manage email-level and domain-level blocklist | `emailbison-{b2b,personal}` (`add_email_to_blocklist`, `add_domain_to_blocklist`, `bulk_add_to_blocklist`, `remove_email_from_blocklist`, `remove_domain_from_blocklist`) | Active workspace | `email-bison.md` §Tool inventory → Blocklist (8 tools) |
-| Tag operations on leads or campaigns | `emailbison-{b2b,personal}` (tags category, 9 tools) | Active workspace | `email-bison.md` §Tool inventory → Tags |
-| Webhook subscription management | `emailbison-{b2b,personal}` (webhooks category, 7 tools) | Active workspace | `email-bison.md` §Tool inventory → Webhooks |
-| Schedule templates and variable management | `emailbison-{b2b,personal}` (schedules 6 + variables 2) | Active workspace | `email-bison.md` §Tool inventory |
+| Inspect or rotate sender inboxes | `emailbison-{b2b,personal}` (`list_sender_emails`, `get_sender_email`, `attach_sender_emails_to_campaign`, `detach_sender_emails_from_campaign`) | Active workspace | `email-bison.md` §Tool inventory → Senders |
+| Manage email-level and domain-level blocklist | `emailbison-{b2b,personal}` (`add_email_to_blocklist`, `add_domain_to_blocklist`, `bulk_add_to_blocklist`, `remove_email_from_blocklist`, `remove_domain_from_blocklist`) | Active workspace | `email-bison.md` §Tool inventory → Blocklist |
+| Tag operations on leads or campaigns | `emailbison-{b2b,personal}` (tags category) | Active workspace | `email-bison.md` §Tool inventory → Tags |
+| Webhook subscription management | `emailbison-{b2b,personal}` (webhooks category) | Active workspace | `email-bison.md` §Tool inventory → Webhooks |
+| Schedule templates and variable management | `emailbison-{b2b,personal}` (schedules + variables categories) | Active workspace | `email-bison.md` §Tool inventory |
 | Pull quick stats (not full analytics — hand off to `campaign-analysis` for depth) | `emailbison-{b2b,personal}` (`get_campaign_stats`, `get_leads_analytics`, `list_workspace_stats`) | Active workspace | `email-bison.md` §Common workflows |
 
 **Wildcard form per ADR 2c** — `allowed-tools` uses `mcp__plugin_marketing_emailbison-{b2b,personal}__*` because the skill exercises tools across most of the 141-tool surface. Narrower cherry-picking would require enumerating dozens of tool names and updating the list every time the vendor adds one.
@@ -75,7 +70,7 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 - **Workspace disambiguation gates every mutating call** — b2b vs personal are distinct data domains with distinct recipient sets; cross-posting leaks personal contacts into business campaigns or vice versa. `email-bison.md` §Auth.
 - **OutboundSync owns the event sync to Salesforce** — do not have this skill subscribe to Email Bison webhooks for CRM syncing. The skill manages webhook CRUD for one-off notifiers (Slack alerts, internal dashboards) only. `email-bison.md` §Known gotchas bullet 4.
 - **The MCP itself gates 8 consequential tools** — mirror the two-call confirmation pattern in the Operational Runbook; do not introduce a parallel skill-level confirmation layer. `email-bison.md` §MCP confirmation gates.
-- **`bulk_create_leads` caps at 500 per call** — the skill does not run bulk imports end-to-end (that's `list-building`'s scope), but when helping with lead-side housekeeping like `blacklist_lead` on a list, chunk anything over 500.
+- **Bulk lead imports cap at 500 per call** — `bulk_create_leads` and `upsert_multiple_leads` are documented bulk tools with a 500-lead-per-call cap (`email-bison.md` §Rate limits). This skill does not run bulk imports end-to-end (that's `list-building`'s scope), but when helping with any tool whose name starts with `bulk_`, check `email-bison.md` or `discover_tools` for the documented cap before sending larger requests. Single-lead, confirmation-gated tools like `blacklist_lead` have no chunking concept — each call requires a separate user approval cycle; never loop them unattended.
 
 ### Cross-skill boundaries
 
@@ -127,15 +122,15 @@ Use before any mutating call or as a standalone "am I pointing at the right plac
 ### Workflow 2: Rotate or attach sender inboxes
 
 1. Availability check — `get_active_workspace_info`. On failure, stop.
-2. `list_sender_emails` with `status: "connected"`. Filter out any in warmup ramp under day-14.
+2. `list_sender_emails` with `status: "connected"`. Filter out any in warmup ramp under day-14. Cache this result — it is the "before" state.
 3. For a campaign rotate: `detach_sender_emails_from_campaign` with the IDs being pulled, then `attach_sender_emails_to_campaign` with the new set.
-4. Verify with `list_sender_emails` on the campaign context; report the before/after sender IDs and daily-cap totals.
+4. Report the before/after sender IDs and daily-cap totals from the cached step-2 result and the intended new set. Do not re-call `list_sender_emails` — the attach response and the step-2 cache are sufficient.
 
 ### Workflow 3: Add to the blocklist (email-level)
 
 1. Availability check — `get_active_workspace_info`.
-2. Call `add_email_to_blocklist` with the email address. If the list is large, batch via `bulk_add_to_blocklist` (respect the 500-per-call cap).
-3. Verify with `get_email_from_blocklist` (or category-appropriate list tool). Report count added.
+2. Call `add_email_to_blocklist` with the email address. If the list is large, batch via `bulk_add_to_blocklist` — check `email-bison.md` §Rate limits or call `discover_tools` for the vendor-documented per-call cap before sending; do not assume 500.
+3. Verify via the blocklist category's read tool (run `discover_tools` in the `blocklist` category once to pin the canonical read-tool name; it is not explicitly enumerated in the current `email-bison.md` §Tool inventory). Report count added.
 
 ### Workflow 4: Remove from the blocklist — **MCP confirmation gate**
 
@@ -144,10 +139,10 @@ The `remove_email_from_blocklist` and `remove_domain_from_blocklist` tools are g
 1. Availability check — `get_active_workspace_info`.
 2. **First call (no confirmation parameter):** `remove_email_from_blocklist` with the target email. The MCP returns a confirmation prompt describing what will happen ("Un-blocks an email that was explicitly suppressed").
 3. Relay the prompt verbatim to the user. Do not paraphrase, do not summarize, do not auto-confirm.
-4. On explicit user approval, **second call:** `remove_email_from_blocklist` with the confirmation parameter set. On any other user response — including "proceed", "yes do it", or silence — stop and ask for a clearer confirmation.
+4. The user responds. If the response is clear affirmative consent scoped to this operation ("yes", "approved", "go ahead", "proceed", "do it"), make the **second call** with the confirmation parameter set. If the response is ambiguous ("maybe", "what are my options", silence, or a response that doesn't address the operation), stop and re-ask with clearer context. The anti-pattern this gate blocks is the skill issuing both calls in the same turn without a real user response between them — not the wording of the affirmative.
 5. Report the result and the audit trail (who approved, when, which entry).
 
-The same pattern applies to all 8 gated tools: `resume_campaign`, `archive_campaign`, `import_leads_to_campaign`, `unsubscribe_lead`, `blacklist_lead`, `enable_warmup`, `remove_email_from_blocklist`, `remove_domain_from_blocklist`. See `email-bison.md` §MCP confirmation gates for the full table and vendor wording on each.
+The same pattern applies to every gated tool listed in `email-bison.md` §MCP confirmation gates (currently 8 tools; that table is the single source of truth and will grow as the vendor adds gates).
 
 ### Workflow 5: Tag CRUD on leads or campaigns
 
@@ -195,7 +190,7 @@ Complete procedures for the long-tail ops that do not route to a sibling skill. 
 
 1. Confirm with user: "Block this domain on b2b, personal, or both?"
 2. For each selected workspace, run Workflow 1 (verify/switch).
-3. Run Workflow 3 substituting `add_domain_to_blocklist` for `add_email_to_blocklist`.
+3. Run Workflow 3, substituting `add_domain_to_blocklist` for `add_email_to_blocklist` in step 2 and the blocklist category's domain-level read tool for the email-level verify call in step 3 (run `discover_tools` in the `blocklist` category to pin the canonical domain-level read-tool name).
 4. Report count added per workspace.
 
 **Expected output:** bullet list per workspace with the domain blocked and the timestamp.
@@ -259,7 +254,7 @@ Complete procedures for the long-tail ops that do not route to a sibling skill. 
 
 1. Run Workflow 1.
 2. Run Workflow 7 (templates branch).
-3. After `create_schedule_template`, immediately `list_schedule_templates` to confirm the new template is returned and shows the expected `days`, `start_time`, `end_time`.
+3. Report from the `create_schedule_template` response (which returns the created template with `days`, `start_time`, `end_time`) — do not re-list.
 
 **Expected output:** template ID, days, window, timezone, and a human-readable summary.
 
@@ -280,7 +275,7 @@ Complete procedures for the long-tail ops that do not route to a sibling skill. 
 
 1. Run Workflow 1.
 2. Run Workflow 7 (variables branch).
-3. List the variables after creation to confirm.
+3. Report from the `create_custom_variable` response — do not re-list.
 
 **Expected output:** variable name, ID, associated default, and a reminder that leads must carry the variable value before a sequence references it (see `email-bison.md` §Common workflows prerequisite note).
 
@@ -326,7 +321,7 @@ Structured eval scenarios with assertions and expected outputs are in `evals/eva
 - Given a request to mutate (block an email, rotate senders, create a webhook), output must identify the target workspace (b2b or personal) before the first MCP call.
 - Given a request that clearly belongs to a sibling skill ("design a 5-step sequence with A/B content"), output must name the sibling and hand off rather than attempting the work inline.
 - Output must not contain the strings "Smartlead", "Instantly", or "Apollo" as sequencer recommendations.
-- Given a gated tool (`remove_email_from_blocklist`, `unsubscribe_lead`, `blacklist_lead`, `resume_campaign`, `archive_campaign`, `import_leads_to_campaign`, `enable_warmup`, `remove_domain_from_blocklist`), output must describe the two-call pattern and relay the vendor's confirmation prompt — not auto-confirm.
+- Given any tool listed in `email-bison.md` §MCP confirmation gates, output must describe the two-call pattern and relay the vendor's confirmation prompt — not auto-confirm.
 - Output must reference `plugins/marketing/tools/integrations/email-bison.md` when describing tool categories, workspace auth, or common workflows — not duplicate that content inline.
 - Given a webhook-creation request with a target URL that pattern-matches OutboundSync, output must warn about the double-subscription gotcha before proceeding.
 

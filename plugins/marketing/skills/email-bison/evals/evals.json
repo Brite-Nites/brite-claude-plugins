@@ -51,6 +51,32 @@
         "Mentions testing the webhook if test_webhook is available"
       ],
       "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Our bounce rate on the b2b workspace jumped from 2% to 8% this week. What do we do?",
+      "expected_output": "Should recognize this as deliverability-audit's scope (bounce-rate diagnosis, domain reputation, SPF/DKIM/DMARC). Should name deliverability-audit as the handoff target and carry the workspace context (b2b) forward. Should NOT attempt to diagnose bounce causes inline, and should NOT auto-rotate senders before the audit runs. Should confirm workspace first, then route.",
+      "assertions": [
+        "Identifies request as deliverability-audit's scope",
+        "Names deliverability-audit explicitly as the handoff target",
+        "Carries the b2b workspace context forward to the sibling",
+        "Does not attempt bounce diagnosis or sender rotation inline",
+        "Does not reference Smartlead, Instantly, or Apollo"
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Subscribe our brite-data-platform OutboundSync endpoint to Email Bison reply events so our Salesforce contacts update in real time. URL: https://sync.brite-data-platform.internal/emailbison/events",
+      "expected_output": "Should detect that the URL pattern-matches OutboundSync (brite-data-platform host, /emailbison/events path) and STOP before creating the webhook. Should warn about the double-subscription gotcha — OutboundSync owns the canonical CRM-sync path; having this skill subscribe the same endpoint directly creates dedup headaches. Should point the user at OutboundSync's own webhook configuration rather than create a parallel subscription here. Should cite email-bison.md §Known gotchas bullet 4 as the source of the rule.",
+      "assertions": [
+        "Detects URL matches OutboundSync pattern",
+        "Stops before calling create_webhook",
+        "Warns about the double-subscription gotcha",
+        "References email-bison.md §Known gotchas or §Related skills for OutboundSync ownership",
+        "Points the user at OutboundSync configuration rather than create a parallel subscription"
+      ],
+      "files": []
     }
   ]
 }
