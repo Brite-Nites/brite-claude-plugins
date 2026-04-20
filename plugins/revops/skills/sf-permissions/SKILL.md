@@ -1,6 +1,6 @@
 ---
 name: sf-permissions
-description: Salesforce Permission Set / Permission Set Group analysis and access auditing for Brite's brite-salesforce repo. TRIGGER when user asks "who has access to X?", analyzes permsets or permset groups, adds CustomField FLS (reminder: 7-permset sync across Base_CRM_Access + Finance_Read + Deal_Financial_Read + Sales_Operations + Marketing + Account_Location_Edit + Acquisition_Full_Access), touches {Team}_Group / {Team}_Management_Group naming, debugs Lifecycle_Stage__c automation-only restrictions, session-based permset activation (HubSpot_Migration, SessionPermissionSetActivation), CreateAuditFields INSERT-only gotcha, or restricted record-type visibility scoping (Acquisition, Partner_Fulfillment). DO NOT TRIGGER when creating new metadata (use sf-metadata), deploying permission sets (use sf-deploy), or Apex-managed sharing logic (use sf-apex).
+description: Salesforce Permission Set / Permission Set Group analysis and access auditing for Brite's brite-salesforce repo. TRIGGER when user asks "who has access to X?", analyzes permsets or permset groups, adds CustomField FLS (7-permset sync reminder), touches Base_CRM_Access or {Team}_Group / {Team}_Management_Group naming, debugs Lifecycle_Stage__c automation-only restrictions, session-based permset activation (HubSpot_Migration, SessionPermissionSetActivation), CreateAuditFields INSERT-only gotcha, or restricted record-type visibility scoping (Acquisition, Partner_Fulfillment). DO NOT TRIGGER when creating new metadata (use sf-metadata), deploying permission sets (use sf-deploy), or Apex-managed sharing logic (use sf-apex).
 user-invocable: false
 license: MIT
 metadata:
@@ -10,22 +10,21 @@ metadata:
   inspiration: "PSLab by Oumaima Arbani (github.com/OumArbani/PSLab)"
 ---
 
-<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Permissions & Security (lines 164–173) and @imports docs/decisions/004-permission-set-strategy.md. -->
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). Layers Brite conventions sourced from brite-salesforce/CLAUDE.md §Permissions & Security (lines 164–173) + brite-salesforce/docs/decisions/004-permission-set-strategy.md. -->
 
 # sf-permissions: Permission Analysis (Brite edition)
 
-Permission-set analysis and access auditing for the **brite-salesforce** org: hierarchy views, "who has access to X?" investigations, user-permission analysis, and permission-metadata review. Layered with Brite's capability-named permset taxonomy, 7-permset FLS sync discipline, Lifecycle automation-only restrictions, restricted record-type scoping, and session-based activation caveats.
+Permission-set analysis and access auditing for the **brite-salesforce** org: hierarchy views, "who has access to X?" investigations, user-permission analysis, and permission-metadata review.
 
 ---
 
 ## Brite Context
 
-Brite's permission model (per `brite-salesforce/CLAUDE.md` §Engineering Standards + §Permissions & Security):
+Brite's permission model:
 
 - **Profiles:** only `Minimum Access` is tracked in source; all grants flow through Permission Sets.
-- **Permset naming:** permsets named for capabilities (`Base_CRM_Access`, `Work_Order_Read`); permset groups named for teams — `{Team}_Group` for ICs, `{Team}_Management_Group` for leads.
-- **Canonical role map:** `brite-salesforce/docs/artifacts/user-role-matrix.md` §3.
-- **Strategy ADR:** `brite-salesforce/docs/decisions/004-permission-set-strategy.md` (imported by `brite-salesforce/CLAUDE.md`).
+- **Permset naming:** permsets named for capabilities (`Base_CRM_Access`, `Work_Order_Read`); permset groups named for teams — `{Team}_Group` for ICs, `{Team}_Management_Group` for leads. `{Team}` is a placeholder — e.g., `Sales_Group` / `Sales_Management_Group`, `Marketing_Group` / `Marketing_Management_Group`.
+- **See also:** `brite-salesforce/docs/artifacts/user-role-matrix.md` §3 (canonical role map) and `brite-salesforce/docs/decisions/004-permission-set-strategy.md` (strategy ADR, @imported by `brite-salesforce/CLAUDE.md`).
 
 ---
 
@@ -74,11 +73,11 @@ When adding a new Opportunity record type, also update the `Minimum Access` prof
 - verify with `FeatureManagement.checkPermission()` first
 - workarounds: `sf data create record` (single REST call), patch data after load, or temporarily flip `hasActivationRequired: false`
 
-All validation rules should gate on `NOT($Permission.Bypass_Validation_Rules)` as the first `AND` argument so the bypass is universally available when activated.
+All validation rules **must** gate on `NOT($Permission.Bypass_Validation_Rules)` as the first `AND` argument — the bypass only works on rules that include this guard.
 
 ### `CreateAuditFields` — INSERT-only, capitalization matters
 
-The `CreateAuditFields` user permission (API name **capitalized** — `createAuditFields` is rejected with "Unknown user permission" at deploy time) allows setting `CreatedDate` on record creation. Salesforce silently **ignores it on UPDATE**. Records inserted without the permission must be DELETED and re-inserted — `upsert` takes the UPDATE path for existing records and `CreatedDate` remains unchanged.
+The `CreateAuditFields` user permission (API name is PascalCase `CreateAuditFields` — lowercase `createAuditFields` is rejected with "Unknown user permission" at deploy time) allows setting `CreatedDate` on record creation. Salesforce silently **ignores it on UPDATE**. Records inserted without the permission must be DELETED and re-inserted — `upsert` takes the UPDATE path for existing records and `CreatedDate` remains unchanged.
 
 Requires the org-level **"Set Audit Fields upon Record Creation"** toggle (Setup → User Interface). Verified empirically during BC-2744 activity-date fix.
 

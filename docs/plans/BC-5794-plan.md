@@ -12,11 +12,11 @@ Layer Brite permission-set discipline from `brite-salesforce/CLAUDE.md` §Permis
 
 ## Issue-body overrides (locked at Plan gate)
 
-Carried forward from BC-5793 precedent; re-applies here because BC-5794 was filed before ADR-007 §3.6:
+Three overrides inherited from the BC-5793 sibling-zero precedent (issue body pre-dates ADR-007 §3.6):
 
-1. **No directory rename.** Keep `plugins/revops/skills/sf-permissions/`. ADR-007 §3.6 supersedes the issue title and T1/T3 path expectations.
-2. **Attribution form:** `Adapted from Jaganpro/sf-skills@ff1ab74 (MIT)` (matches BC-5793 + UPSTREAM.md canonical form).
-3. **No `git mv`.** Execute step 1 in the issue body is a no-op.
+1. Keep upstream dir `plugins/revops/skills/sf-permissions/` — no rename, no `git mv`.
+2. Attribution form: `Adapted from Jaganpro/sf-skills@ff1ab74 (MIT)`.
+3. T1/T3 paths in issue Verify table re-pointed to `sf-permissions` (see table below).
 
 ## Tasks
 
