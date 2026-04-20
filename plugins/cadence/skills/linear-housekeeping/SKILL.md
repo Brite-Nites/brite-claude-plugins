@@ -147,7 +147,7 @@ Non-cycle-path mutations (`cancel`, `reassign`, `backlog`, `milestone-rename`, g
 
 ## § 5 Preview rendering
 
-After § 2 derivation + § 4 gate pass, render the preview to the user as plain markdown (one tool-call message, no interactive prompts yet). Group first by `decision_path`, then by `mutation_type` within each path. `leave`-path rows are omitted. Each path with ≥1 row gets its own `## Decision path: <path>` header. A final `## Global mutations` section covers `milestone-rename` + global `create` rows.
+After § 2 derivation + § 4 gate pass, render the preview to the user as plain markdown (one tool-call message, no interactive prompts yet). Group first by `decision_path`, then by `mutation_type` within each path. `leave`-path issues emit no mutation row so they never appear here (see § 2.2 trailing paragraph). Each path with ≥1 row gets its own `## Decision path: <path>` header. A final `## Global mutations` section covers `milestone-rename` + global `create` rows.
 
 ```markdown
 # W<NN> Housekeeping Preview
