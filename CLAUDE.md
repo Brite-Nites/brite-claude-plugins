@@ -75,7 +75,7 @@ plugins/
   revops/                          # SF dev + CRM data (subtree from Jaganpro/sf-skills, MIT — see UPSTREAM.md)
     skills/                        # 14 retained SF skills (filtered from upstream 36)
     .mcp.json                      # plugin:revops:salesforce
-  cadence/                         # Weekly planning cadence (commands/weekly.md)
+  cadence/                         # Weekly planning cadence (commands/weekly.md — 5 phases, 3 gates, resume breadcrumb; agents/narrative-writer.md drives Phase 4)
 ```
 
 ## Skill Routing
