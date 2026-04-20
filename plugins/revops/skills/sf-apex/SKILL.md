@@ -1,17 +1,97 @@
 ---
 name: sf-apex
-description: Generates and reviews Salesforce Apex code with 150-point scoring. TRIGGER when: user writes, reviews, or fixes Apex classes, triggers, test classes, batch/queueable/schedulable jobs, or touches .cls/.trigger files. DO NOT TRIGGER when: LWC JavaScript (use sf-lwc), Flow XML (use sf-flow), SOQL-only queries (use sf-soql), or non-Salesforce code.
+description: Generates and reviews Salesforce Apex code (Brite edition) with 150-point scoring. TRIGGER when user writes, reviews, or fixes Apex classes, triggers, test classes, batch/queueable/schedulable jobs, touches .cls/.trigger files, works in brite-salesforce, asks about LeadTriggerHandler / LeadAfterInsertService dispatch, Queueable BATCH_SIZE=90 self-chaining, @TestVisible + Test.isRunningTest() escape hatches, Bypass_Validation_Rules pattern, DisqualifiedRecycleScheduler, or Apex-first automation decisions. DO NOT TRIGGER when LWC JavaScript (use sf-lwc), Flow XML (use sf-flow), SOQL-only queries (use sf-soql), permission metadata (use sf-permissions), or non-Salesforce code.
 user-invocable: false
 license: MIT
 metadata:
-  version: "1.1.0"
-  author: "Jag Valaiyapathy"
+  version: "1.1.0-brite.1"
+  author: "Jag Valaiyapathy (upstream); Brite Company (customization)"
+  upstream: "Jaganpro/sf-skills@ff1ab74"
   scoring: "150 points across 8 categories"
 ---
 
-# sf-apex: Salesforce Apex Code Generation and Review
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Apex & Automation (lines 175-196) + §Engineering Standards (lines 41-42). -->
+
+# sf-apex: Salesforce Apex Code Generation and Review (Brite edition)
 
 Use this skill when the user needs **production Apex**: new classes, triggers, selectors, services, async jobs, invocable methods, test classes, or evidence-based review of existing `.cls` / `.trigger` code.
+
+## Brite Context
+
+Brite's Apex stance:
+
+- **Apex-first automation.** Flows are limited to screen flows and simple notifications; all business logic lives in Apex (`brite-salesforce/CLAUDE.md` §Engineering Standards line 41).
+- **Trigger handler dispatch.** One trigger per object delegates to a handler class. After-insert work goes through a `*AfterInsertService` interface and per-LeadSource registries — new services register themselves under the matching source list, never in the handler body directly. Canonical example: `LeadTriggerHandler` + `LeadAfterInsertService` with `webFormAfterInsertServices` / `newsletterAfterInsertServices` registries.
+- **Test coverage target.** 100% per class (not the 75% SF floor); 90%+ org-wide. Required for all triggers and service classes (`brite-salesforce/CLAUDE.md` §Engineering Standards line 42).
+- **Async defaults.** Queueable for standard async, Schedulable for recurring work, Batch only for very large record volumes. Governor-limit discipline is enforced through `BATCH_SIZE=90` self-chaining and `LIMIT 2500` per Schedulable query.
+
+**See also:** `brite-salesforce/CLAUDE.md` §Apex & Automation (lines 175-196 — the 20 gotchas this section summarizes), §Engineering Standards (Apex-first principle, coverage targets), §Permissions & Security line 171 (`Bypass_Validation_Rules` pattern), and `brite-salesforce/docs/artifacts/testing-strategy.md`.
+
+## Brite Apex Conventions
+
+These rules are non-negotiable on `brite-salesforce` and must surface during trigger handler work, async job design, validation-rule changes, and test authoring.
+
+### 1. Apex-first — Flows only for screen flows and simple notifications
+
+Business logic, data mutations, and anything with meaningful conditional branching belongs in Apex. Flows are reserved for Screen Flows (user-facing forms) and thin notification flows where Apex would be overkill. Source: §Engineering Standards line 41.
+
+### 2. Trigger handler pattern — one trigger, one handler, per-source service registries
+
+One trigger per object delegates to a handler class. After-insert services implement a `*AfterInsertService` interface and register in per-LeadSource lists on the handler. Canonical: `LeadTriggerHandler` holds `webFormAfterInsertServices` (for `LeadSource = 'Web_Form'`) and `newsletterAfterInsertServices` (for `LeadSource = 'Newsletter_Signup'`); the handler filters incoming leads by source and dispatches only to the matching registry. **Add new services via the interface and register them under the correct source — never inline business logic in the handler itself.** Source: §Apex line 177.
+
+### 3. Queueable callout limit = 100 — BATCH_SIZE=90, self-chain, MAX_RETRIES=3
+
+Any Queueable that performs callouts must cap processing to under the 100-callouts-per-transaction governor limit. Canonical pattern: `SlackWebformAlertJob` sets `BATCH_SIZE = 90` and self-chains for overflow, with `MAX_RETRIES = 3` to cap the retry fan-out. Source: §Apex line 178.
+
+### 4. Queueable silent-retry diagnostic — N consecutive "Completed" jobs = silent failure
+
+N consecutive `AsyncApexJob` rows with `Status = 'Completed'` for the same class = 1 original + (N-1) silent retries. This is the signature of a callout failure inside a self-chaining Queueable where the exception was caught (e.g., Named Credential misconfigured — jobs appear "Completed" because the exception did not propagate). **First debug step: check the Named Credential endpoint, not the Apex logic.** Source: §Apex line 179.
+
+### 5. Schedulable DML row limit = 10,000 — use multiple LIMIT 2500 queries
+
+Schedulable Apex has a hard 10,000-DML-row ceiling per execution. `DisqualifiedRecycleScheduler` runs 4 separate queries (DQ Contacts, DQ Leads, Lost Contacts, Lost Leads) each with `LIMIT 2500`, totaling exactly 10,000. Do not raise individual `LIMIT`s above 2500 without switching to Batchable. Source: §Apex line 184.
+
+### 6. Scheduled Apex jobs don't survive sandbox refresh — re-schedule manually
+
+`CronTrigger` records are copied on refresh but do not execute. After every sandbox refresh, re-schedule via Developer Console:
+
+```apex
+System.schedule('Annual Disqualified Recycle', '0 0 6 1 1 ?', new DisqualifiedRecycleScheduler());
+```
+
+Source: §Apex line 182.
+
+### 7. Test escape hatches — `@TestVisible` + `Test.isRunningTest()` together
+
+Security-critical handler bypass flags must use **both** `@TestVisible` (access-gate: keeps a `private` member callable from test classes without widening production access — note that any class in the same namespace can still write it, so this is not a write-time guard) and `Test.isRunningTest()` (runtime-gate: the bypass effect only fires in test context, so a non-test Apex write becomes a no-op). Narrow the scope — if only one check needs the hatch (e.g., free-email Name block), don't let the flag disable sibling checks (Website block). Canonical: `AccountTriggerHandler.skipFreeEmailNameBlockInTestsOnly`. Source: §Apex line 192.
+
+### 8. `@TestSetup` static state doesn't persist into `@IsTest` methods
+
+Each `@IsTest` method runs in its own transaction with fresh static state — mutations inside `@TestSetup` are rolled back for the test body. **To enable a flag for every test, set it as the first line of each `@IsTest` method** (or in a shared helper called from each), not inside `@TestSetup`. Source: §Apex line 191.
+
+### 9. Queueables in `Test.stopTest()` re-enter handlers with current static state
+
+`Test.stopTest()` synchronously drains enqueued Queueables. If a test flipped a `@TestVisible` handler-bypass flag and never reset it, the flag is **still active** when the Queueable fires — any DML it performs goes through the handler with the bypass on. **Reset the flag immediately after the specific fixture DML that needs it, before any `Test.startTest()` / `Test.stopTest()` block.** Source: §Apex line 193.
+
+### 10. Before-update self-query caveat — exclude trigger records
+
+SOQL inside a `before update` trigger sees the **pre-update** database state, so when checking "does this Contact have other open Opps?" while closing an Opp, the closing Opp still appears as open. Exclude the current trigger records from the query:
+
+```apex
+AND OpportunityId NOT IN :closedLostOpps.keySet()
+```
+
+Source: §Apex line 183.
+
+### 11. `with sharing` does not restrict `User` queries
+
+The `User` object is always org-wide-visible to any authenticated Apex context (including Guest and Integration Users) — sharing rules don't apply. `public with sharing` on a handler that queries `User` is misleading; the queries stay safe via parameter binding (bind variables, no injection), but **add a comment noting this distinction**. Does not apply to other standard objects. Source: §Apex line 196.
+
+### 12. `Bypass_Validation_Rules` pattern
+
+Every validation rule at Brite **must** include `NOT($Permission.Bypass_Validation_Rules)` as the first `AND` argument. Source: §Permissions & Security line 171. Activation caveat: the `Bypass_Validation_Rules` custom permission sits on `HubSpot_Migration` (`hasActivationRequired: true`) and only activates per UI session via `SessionPermissionSetActivation` — it does **not** take effect in Bulk API or `sf` CLI sessions. For data loads needing the bypass, verify with `FeatureManagement.checkPermission()`; workarounds: `sf data create record` (single REST call), patch after load, or temporarily flip `hasActivationRequired: false`. Source: §Permissions & Security line 172.
+
+---
 
 ## When This Skill Owns the Task
 
