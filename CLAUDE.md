@@ -70,6 +70,7 @@ plugins/
   marketing/                       # Marketing domain plugin
     skills/*/SKILL.md              # Domain skills (context-skill pattern)
     tools/integrations/*.md        # Tool integration guides (see pattern)
+    references/                    # Shared reference content read by skills (MIT upstream port, see UPSTREAM.md)
     hooks/hooks.json
     .mcp.json
   revops/                          # SF dev + CRM data (subtree from Jaganpro/sf-skills, MIT — see UPSTREAM.md)
