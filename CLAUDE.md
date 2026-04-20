@@ -72,6 +72,10 @@ plugins/
     tools/integrations/*.md        # Tool integration guides (see pattern)
     hooks/hooks.json
     .mcp.json
+  revops/                          # SF dev + CRM data (subtree from Jaganpro/sf-skills, MIT — see UPSTREAM.md)
+    skills/                        # 14 retained SF skills (filtered from upstream 36)
+    .mcp.json                      # plugin:revops:salesforce
+  cadence/                         # Weekly planning cadence (commands/weekly.md)
 ```
 
 ## Skill Routing
