@@ -65,14 +65,26 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
     "current":  { "id", "name", "startsAt", "endsAt" },
     "previous": { "id", "title", "startsAt", "endsAt", "issueCountHistory", "completedIssueCountHistory" }
   },
-  "projects": [ { "id", "name", "audit_card", "scope_decisions", "overrides" } ],
-  "cross_project_stats": { "completion_rate", "shipped_total", "carry_over_total", "dropped_total", "team_standouts" },
+  "projects": [ {
+      "id", "name", "status",               // id/name/status from Phase 0.3 list_projects
+      "audit_card",                          // populated by Phase 1 project-audit agent
+      "scope_decisions", "overrides",        // populated by Phase 2 sprint-scoping skill
+      "skip_log", "scope_confirmed",         // populated by Phase 2 sprint-scoping skill
+      "_fetched_issues"                      // Phase 2 carry-over + gate fetch cache
+  } ],
+  "cross_project_stats": { "completion_rate", "shipped_total", "carry_over_total", "dropped_total", "team_standouts", "unplanned_ratio" },
+  "bottleneck_warnings": [ { "assignee", "count", "issues" } ],   // Phase 2 sprint-scoping § 7
+  "bottleneck_threshold": 4,                                      // Phase 2 config (default 4)
+  "weekly_planning_root": null,                                   // Phase 2 optional path override
+  "checkpoint_path": null,                                        // Phase 2 resolves once at entry
+  "_scoped_project_names": [],                                    // Phase 2 resume cache
+  "leadership_planning_notes": null,                              // Phase 2 optional input
   "mutations": [ ... ],
   "narrative_draft": null
 }
 ```
 
-`cycle.current` is populated by Phase 0.2 (the cycle the user is *planning*); `cycle.previous` is populated by Phase 1 § 1.0 (the cycle being *audited*). `team` is populated by Phase 0 (`list_teams` lookup of `"Brite Company"` — currently inlined per the Phase 1 prerequisite note below). `cross_project_stats.unplanned_ratio` and per-assignee planned attribution are computed in Phase 2 once the prior-narrative parser lands (BC-5760 owns the parser per BC-5757 § 2.6).
+`cycle.current` is populated by Phase 0.2 (the cycle the user is *planning*); `cycle.previous` is populated by Phase 1 § 1.0 (the cycle being *audited*). `team` is populated by Phase 0 (`list_teams` lookup of `"Brite Company"` — currently inlined per the Phase 1 prerequisite note below). `cross_project_stats.unplanned_ratio` and per-assignee planned attribution require a prior-narrative parser tracked as a sibling follow-up (see BC-5821 — Cadence prior-narrative parser); until that ships, the field remains `null` and Phase 4 narrative falls back to raw cycle-completion ratios.
 
 ## Phase 1: Audit
 
@@ -110,10 +122,10 @@ Compute and store under `state.cross_project_stats`:
 - `shipped_total`, `dropped_total`, `carry_over_total` (each = sum across projects).
 - `team_standouts` = list of assignees with completion ratio ≥90% in this cycle, where ratio = `shipped_count / (shipped_count + carry_over_count + dropped_count)` from the `by_assignee` rollups. Only count assignees with `(shipped + carry_over + dropped) ≥ 3` to avoid noise from one-issue owners.
 
-**Deferred to Phase 2** (BC-5760, requires prior-narrative parser per BC-5757 § 2.6):
+**Deferred to a sibling follow-up (BC-5821 — Cadence prior-narrative parser):**
 
-- `unplanned_ratio` — needs `planned_count_from_prior_narrative`, which only the Phase 2 narrative parser can extract. Phase 1 leaves the field unset; Phase 2 fills it in once the prior `w<NN-1>-sprint-narrative.md` is parsed for declared planned scope.
-- Per-assignee *planned* attribution — same dependency. AC #4's "≥90% planned completion" framing is approximated by the cycle-completion ratio above until Phase 2 lands.
+- `unplanned_ratio` — needs `planned_count_from_prior_narrative`, which only the prior-narrative parser can extract. Phase 1 leaves the field `null`; BC-5821 will populate it by parsing the prior `w<NN-1>-sprint-narrative.md` for declared planned scope, then updating Phase 1 § 1.4 synthesis + Phase 1 § 1.6 headline anchors to include it.
+- Per-assignee *planned* attribution — same dependency. AC #4's "≥90% planned completion" framing is approximated by the cycle-completion ratio above until BC-5821 lands.
 
 ### 1.5 Persist audit file
 

@@ -2,7 +2,7 @@
 name: sprint-scoping
 description: Phase 2 of /cadence:weekly. Sequential per-project scope interview (5 carry-over Qs + 5 scope Qs, one at a time) with brainstorming and the issue-quality-gate. Triggers on "sprint planning", "weekly scope", "what ships this week", "scope the next cycle", or "/cadence:weekly phase 2".
 user-invocable: false
-allowed-tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, AskUserQuestion, Read, Write, Edit, Bash, Skill
+allowed-tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__list_comments, AskUserQuestion, Read, Write, Edit, Bash, Skill
 ---
 
 # Phase 2 — Sprint Scoping
@@ -31,13 +31,18 @@ Populates / mutates:
 
 ## § 2 Per-project loop entry
 
-For each `state.projects[i]` selected in Phase 0.3 (`status.type == "started"`, deduped by id):
+**Pre-loop (once per Phase 2 invocation):**
 
-1. **Resume check** — read the current-week checkpoint file (path resolved per § 6). If the file already contains a `### N. <project_name>` heading matching this project, set `state.projects[i].scope_confirmed = true` and skip to `state.projects[i+1]`. Log: `Project <name> already scoped — skipping (resume).`
-2. **Enrich carry-over** — if `audit_card.carry_over.count > 0`, parallel `get_issue` for every ID in `audit_card.carry_over.issues[].id` with `includeRelations: true`. Store the returned `relations.blockedBy` length under `audit_card.carry_over.issues[i].enriched.blocker_count` and the first `relations.duplicateOf.id` (if any) under `audit_card.carry_over.issues[i].enriched.auto_superseded_by`. Bounded cost — carry-over count is small per project.
+- **Resume parse.** Read the current-week checkpoint file (path resolved per § 6) once. Parse every `### N. <project_name>` heading and build `state._scoped_project_names: Set<string>`. This is the single source of truth for resume state — § 2 step 1 and § 8 both consult this set. (If the file does not exist, the set is empty.)
+- **Backlog enrichment** *(needed because Phase 1's `project-audit` agent only queries the prior cycle — the backlog candidate count is not in the audit card).* For each project, call `list_issues` filtered by `project: <id>`, `cycle: null`, `priority` ∈ {1 Urgent, 2 High}, `state: backlog`. Store the returned count under `state.projects[i].audit_card.backlog_high_count` and the returned ID list under `...backlog_high_candidates[]`. These feed § 4's brainstorming prompt.
+
+**For each `state.projects[i]` selected in Phase 0.3 (`status.type == "started"`, deduped by id):**
+
+1. **Resume skip.** If `state.projects[i].name ∈ state._scoped_project_names`, set `state.projects[i].scope_confirmed = true` and continue to the next project. Log: `Project <name> already scoped — skipping (resume).` If this is the last project and it was already scoped, exit the loop cleanly.
+2. **Enrich carry-over** — if `audit_card.carry_over.count > 0`, parallel `get_issue` for every ID in `audit_card.carry_over.issues[].id` with `includeRelations: true`. Store the returned issue object under `state.projects[i]._fetched_issues[id]` (authoritative cache — § 5 reads through this). Derive `audit_card.carry_over.issues[i].enriched.blocker_count` from `relations.blockedBy.length` and `enriched.auto_superseded_by` from the first `relations.duplicateOf.id` if any. Bounded cost — carry-over count is small per project.
 3. **Run § 3 carry-over interview** (skipped entirely if `carry_over.count == 0` per BC-5810 § 2.3).
 4. **Run § 4 scope interview**.
-5. **Run § 5 quality gate** on every issue ID in `q2_ship_ids`.
+5. **Run § 5 quality gate** on every issue ID in `q2_ship_ids` (pre-fan-out `get_issue` for any ID not already in `_fetched_issues`).
 6. **Run § 6 checkpoint append**.
 
 After all projects: **§ 7 cross-project bottleneck pass**.
@@ -52,7 +57,7 @@ Every question carries: issue ID + title, one-line audit summary snippet (e.g. *
 |---|---|---|---|
 | CQ1 | Move `<id>` to next cycle? | Move to W+1 | (never skipped) |
 | CQ2 | Assignee still correct (`<current>`)? | Unchanged | (never skipped) |
-| CQ3 | Superseded by a different chain? | Keep as-is *(or prefilled `<auto_superseded_by>` if set)* | Skipped if `auto_superseded_by` set AND user confirmed CQ1 = "Move" — prefill is shown for confirmation only |
+| CQ3 | Superseded by a different chain? | Keep as-is *(or prefilled with `<auto_superseded_by>` chain as `(Recommended)` if set)* | Never skipped. If `enriched.auto_superseded_by` is set, the chain is prefilled as the recommended default but the question is still asked for confirmation (per BC-5810 § 2.3). |
 | CQ4 | Blockers still live? | Yes, keep declared blockers | `enriched.blocker_count == 0` → skip + log `"CQ4 skipped — 0 blockers per Linear relations"` |
 | CQ5 | If staying, which cycle/milestone lands it? | Next cycle | Skipped if CQ1 == "Park indefinitely" |
 
@@ -60,20 +65,20 @@ Answers are stored under `state.projects[i].scope_decisions.carry_over_answers[]
 
 ## § 4 Scope interview (5 questions per project)
 
-Once per project after carry-over completes (or immediately if carry-over was skipped). If `audit_card.project_status == "parked"`, only SQ1 is asked (for acknowledgement) and SQ2–SQ5 are skipped + logged.
+Once per project after carry-over completes (or immediately if carry-over was skipped). If `state.projects[i].status.type == "parked"` (from the Linear project shape captured in Phase 0.3, not from the audit card), only SQ1 is asked (for acknowledgement) and SQ2–SQ5 are skipped + logged.
 
-**Brainstorming invocation.** Before SQ2, invoke `workflows:brainstorming` via the `Skill` tool with this prompt body — exactly once per active project (counted by AC #3):
+**Brainstorming invocation.** Before SQ2, invoke `workflows:brainstorming` via the `Skill` tool with this prompt body — exactly once per active project (counted by AC #3). Bind each placeholder from the listed state field:
 
-> *"Propose next-cycle scope for project `<project_name>`. Inputs: carry-over count `<carry_over_count>`, backlog candidates at High-or-Urgent priority `<backlog_high_count>`, recent shipped pace `<shipped_total>` issues last cycle. Surface 2–3 alternative scope shapes and explicit `what-if-we-parked-X` prompts. Output: ranked candidate IDs with one-line rationale each."*
+> *"Propose next-cycle scope for project `<project_name>` (= `state.projects[i].name`). Inputs: carry-over count `<carry_over_count>` (= `audit_card.carry_over.count`), backlog candidates at High-or-Urgent priority `<backlog_high_count>` (= `audit_card.backlog_high_count`, populated by § 2 pre-loop), recent shipped pace `<project_shipped_last_cycle>` issues last cycle (= `audit_card.shipped.count` — the per-project count, not the cross-project total). Surface 2–3 alternative scope shapes and explicit `what-if-we-parked-X` prompts. Output: ranked candidate IDs with one-line rationale each."*
 
-The brainstorming output feeds SQ2's candidate list as the `(Recommended)` default plus 2–3 alternatives.
+The brainstorming output feeds SQ2's candidate list as the `(Recommended)` default plus 2–3 alternatives. Quality-gate filtering happens in § 5 on the user's confirmed SQ2 picks, not on the candidate list surfaced here.
 
 The 5 questions from BC-5810 § 2.2 verbatim, each a **separate** `AskUserQuestion` call:
 
 | Q-ID | Question | Recommended default |
 |---|---|---|
 | SQ1 | Headline outcome sentence for `<project>`? | Agent draft from top-priority carry-over + top backlog |
-| SQ2 | Which issue IDs ship this cycle? | Brainstorming output (top-ranked candidates after the quality gate) |
+| SQ2 | Which issue IDs ship this cycle? | Brainstorming output (top-ranked candidates; quality-gate filtering runs in § 5 on the user's picks, not here) |
 | SQ3 | Owner per issue, if different from existing? | Keep existing assignees |
 | SQ4 | Dependencies between picked issues? | Agent infers from descriptions + `relations.blockedBy` |
 | SQ5 | Explicitly parked this cycle? | Agent proposes from stale current-cycle items + Low-priority carry-over |
@@ -92,14 +97,21 @@ No global "skip all gates" escape exists. Per-check override with a reason is th
 
 ## § 6 Checkpoint append (per project, after § 5 passes)
 
-Resolve the checkpoint path:
+Resolve the checkpoint path **once at Phase 2 entry** and cache under `state.checkpoint_path`. Both § 6 and § 8 read that cached value — no `git rev-parse` calls inside the per-project loop.
 
-```bash
-WEEK_NN=$(printf "%02d" "<cycle_number_parsed_from_cycle.current.title>")
-WEEK_DATE="<cycle.current.startsAt formatted YYYY-MM-DD>"
-ROOT=$(git rev-parse --show-toplevel)
-CHECKPOINT="$ROOT/../weekly-planning/w${WEEK_NN}-${WEEK_DATE}/w${WEEK_NN}-planning-checkpoint.md"
+Resolution algorithm (pseudocode — the skill pre-extracts the numeric and date components from `state.cycle.current` before calling bash, since `cycle.current.name` is the cycle title string like `"W17"` and `startsAt` is an ISO timestamp):
+
 ```
+# Pre-extracted by the skill from state:
+#   CYCLE_NN  = numeric week from state.cycle.current.name (e.g. "W17" → 17)
+#   CYCLE_DATE = state.cycle.current.startsAt formatted YYYY-MM-DD
+# Then in Bash:
+WEEK_NN=$(printf "%02d" "$CYCLE_NN")
+ROOT=$(git rev-parse --show-toplevel)
+CHECKPOINT="$ROOT/../weekly-planning/w${WEEK_NN}-${CYCLE_DATE}/w${WEEK_NN}-planning-checkpoint.md"
+```
+
+Reject `CYCLE_DATE` if it does not match `^[0-9]{4}-[0-9]{2}-[0-9]{2}$` — fail the phase with a clear error rather than writing a malformed path.
 
 If `state.weekly_planning_root` is set in the state object, use that as the prefix instead of `$ROOT/..`. Mirrors Phase 1's `audit.json` resolution (BC-5759 § 1.1).
 
@@ -141,10 +153,10 @@ If `bottleneck_warnings == []`, append a single line: `## Cross-project flags\n\
 
 ## § 8 Idempotency + resume
 
-- **On re-invoke**: read the current checkpoint file (path from § 6). Parse `### N. <name>` headers. For each match, set `state.projects[i].scope_confirmed = true` and skip-ahead in the § 2 loop. Log: `Resume: <count> project(s) already scoped from prior session.`
+- **Resume pass** is owned by § 2's pre-loop *Resume parse* step, which populates `state._scoped_project_names` once per invocation. § 2 step 1 is an O(1) set-membership check against that cache. Log at the end of the pre-loop parse: `Resume: <|_scoped_project_names|> project(s) already scoped from prior session.`
 - **Atomic append** per project — the block is written only after § 5 completes. Partial failure (e.g. user `Cancel` mid-interview, MCP timeout, kernel SIGINT) leaves the checkpoint in a recoverable spot and the next invocation continues from the next unconfirmed project.
-- **Cancel mid-interview**: if the user picks "Cancel" inside any `AskUserQuestion`, do not append to the checkpoint, do not mutate state for the in-flight project. Exit cleanly with `Phase 2 paused. <N> project(s) scoped, <M> remaining. Re-run /cadence:weekly to resume.`
-- **Cycle change detection**: if the file's parsed `<NN>` does not match `state.cycle.current.title`'s number, refuse to append and stop with an error pointing the user at `/cadence:weekly --resume-phase 2` after they confirm the cycle.
+- **Cancel mid-interview**: if the user picks "Cancel" inside any `AskUserQuestion`, do not append to the checkpoint, do not mutate state for the in-flight project. Exit cleanly with `Phase 2 paused at <project_name>. Re-run /cadence:weekly to resume.`
+- **Cycle change detection**: if a checkpoint file already exists at `state.checkpoint_path` AND its filename's `w<NN>` segment does not match the cycle number derived from `state.cycle.current.name`, refuse to append and stop with an error pointing the user at `/cadence:weekly --resume-phase 2` after they confirm the cycle. Guards against a stale `state.weekly_planning_root` override pointing at a prior cycle's folder.
 
 ## § 9 References
 
@@ -162,5 +174,5 @@ If `bottleneck_warnings == []`, append a single line: `## Cross-project flags\n\
 
 ## Deferred to follow-up issues
 
-- **Prior-narrative parser** for `state.cycle.previous`'s sprint narrative — needed to compute `cross_project_stats.unplanned_ratio` and per-assignee *planned* attribution. Filed as a sibling Cadence-milestone issue when this PR opens. Out of scope for BC-5760 to keep the skill atomic.
+- **Prior-narrative parser** for `state.cycle.previous`'s sprint narrative — needed to compute `cross_project_stats.unplanned_ratio` and per-assignee *planned* attribution. Filed as **BC-5821** in the Cadence Plugin milestone. Out of scope for BC-5760 to keep the skill atomic.
 - **Configurable `state.bottleneck_threshold`** beyond the default `N == 4` — currently hard-coded; surface as `--bottleneck-threshold` flag on `/cadence:weekly` if user demand emerges.
