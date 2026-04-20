@@ -144,9 +144,11 @@ Options:
 
 ## Phase 2: Scope
 
-> **Not yet implemented — see BC-5760.**
+Sequential per-project loop. Implemented by the `sprint-scoping` skill (`plugins/cadence/skills/sprint-scoping/SKILL.md`, BC-5760). For each project, the skill reads the Phase 1 audit card, invokes `workflows:brainstorming` to surface scope alternatives, runs the BC-5810 § 2 interview (5 carry-over Qs + 5 scope Qs, one at a time via separate `AskUserQuestion` calls), enforces the `cadence:issue-quality-gate` with block-with-override (BC-5810 § 3), and appends a project block to the weekly-planning checkpoint as decisions accumulate. Inline (not subagent) — interactive Q&A cannot run inside a dispatched agent.
 
-Sequential per-project loop. For each project, read the Phase 1 audit card and run the adaptive interview (10 questions max, one at a time) per BC-5810 § 2. Calls the quality gate on scope-in candidates; blocks with per-check override.
+Phase 2 is idempotent — re-invoking after a partial session resumes from the next unconfirmed project (skill § 8). After every project is scoped, the skill emits a `## Cross-project flags` section flagging any owner with > 4 primary assignments.
+
+The deferred prior-narrative parser (needed for `state.cross_project_stats.unplanned_ratio`) lands in a sibling Cadence-milestone follow-up — see PR #__ for the issue link.
 
 ## Phase 3: Housekeeping
 
