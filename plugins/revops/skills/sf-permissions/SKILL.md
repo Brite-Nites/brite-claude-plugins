@@ -1,17 +1,88 @@
 ---
 name: sf-permissions
-description: Permission Set analysis, hierarchy viewer, and access auditing. TRIGGER when: user asks "who has access to X?", analyzes permission sets/groups, or touches .permissionset-meta.xml / .permissionsetgroup-meta.xml files. DO NOT TRIGGER when: creating new metadata (use sf-metadata), deploying permission sets (use sf-deploy), or Apex sharing logic (use sf-apex).
+description: Salesforce Permission Set / Permission Set Group analysis and access auditing for Brite's brite-salesforce repo. TRIGGER when user asks "who has access to X?", analyzes permsets or permset groups, adds CustomField FLS (reminder: 7-permset sync across Base_CRM_Access + Finance_Read + Deal_Financial_Read + Sales_Operations + Marketing + Account_Location_Edit + Acquisition_Full_Access), touches {Team}_Group / {Team}_Management_Group naming, debugs Lifecycle_Stage__c automation-only restrictions, session-based permset activation (HubSpot_Migration, SessionPermissionSetActivation), CreateAuditFields INSERT-only gotcha, or restricted record-type visibility scoping (Acquisition, Partner_Fulfillment). DO NOT TRIGGER when creating new metadata (use sf-metadata), deploying permission sets (use sf-deploy), or Apex-managed sharing logic (use sf-apex).
 user-invocable: false
 license: MIT
 metadata:
-  version: "1.1.0"
-  author: "Jag Valaiyapathy"
+  version: "1.2.0-brite.1"
+  author: "Jag Valaiyapathy (upstream); Brite Company (customization)"
+  upstream: "Jaganpro/sf-skills@ff1ab74"
   inspiration: "PSLab by Oumaima Arbani (github.com/OumArbani/PSLab)"
 ---
 
-# sf-permissions
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Permissions & Security (lines 164–173) and @imports docs/decisions/004-permission-set-strategy.md. -->
 
-Use this skill when the user needs **permission analysis and access auditing**: Permission Set / Permission Set Group hierarchy views, “who has access to X?” investigations, user-permission analysis, or permission-set metadata review.
+# sf-permissions: Permission Analysis (Brite edition)
+
+Permission-set analysis and access auditing for the **brite-salesforce** org: hierarchy views, "who has access to X?" investigations, user-permission analysis, and permission-metadata review. Layered with Brite's capability-named permset taxonomy, 7-permset FLS sync discipline, Lifecycle automation-only restrictions, restricted record-type scoping, and session-based activation caveats.
+
+---
+
+## Brite Context
+
+Brite's permission model (per `brite-salesforce/CLAUDE.md` §Engineering Standards + §Permissions & Security):
+
+- **Profiles:** only `Minimum Access` is tracked in source; all grants flow through Permission Sets.
+- **Permset naming:** permsets named for capabilities (`Base_CRM_Access`, `Work_Order_Read`); permset groups named for teams — `{Team}_Group` for ICs, `{Team}_Management_Group` for leads.
+- **Canonical role map:** `brite-salesforce/docs/artifacts/user-role-matrix.md` §3.
+- **Strategy ADR:** `brite-salesforce/docs/decisions/004-permission-set-strategy.md` (imported by `brite-salesforce/CLAUDE.md`).
+
+---
+
+## Brite Permission Conventions
+
+These rules are non-negotiable on brite-salesforce and must surface during permset edits, FLS changes, and access investigations.
+
+### 7-permset FLS sync
+
+When adding a `CustomField`, update FLS in **all seven** of these permission sets:
+
+1. `Base_CRM_Access`
+2. `Finance_Read`
+3. `Deal_Financial_Read`
+4. `Sales_Operations`
+5. `Marketing`
+6. `Account_Location_Edit`
+7. `Acquisition_Full_Access`
+
+Missing any of these ships a field that Dynamic Forms silently hides — **even for System Administrators** — because `View All Data` / `Modify All Data` do **not** bypass Field-Level Security. When a `--source-dir` deploy rolls back (e.g., ECA failure), deploy fields and FLS individually with `-m` flags so partial progress is preserved.
+
+### Lifecycle fields = automation-only
+
+`Lifecycle_Stage__c` and `Lifecycle_*_Date__c` must be `editable: false` in every permset **except** `Sales_Operations`. These drive the `Lifecycle_Stage_History__c` audit trail; manual edits corrupt history.
+
+### App visibility lives in permsets, not the profile
+
+Custom Lightning apps default to `visible: false` in the `Minimum Access` profile. Grant via `applicationVisibilities` on relevant permsets:
+- `Base_CRM_Access` for all-user apps
+- Dedicated `App_*` permsets for team-scoped apps (see `App_Business_Development`, `App_Sales_Leader` as templates)
+
+Manual org toggles get reverted on every deploy — always enforce via source.
+
+### Restricted record-type visibility — intentional scope gaps
+
+Acquisition and Partner_Fulfillment record-type visibility is intentionally **absent** from `Base_CRM_Access`, `Sales_Operations`, `Finance_Read`, `Marketing`, and `Minimum Access`. Only dedicated permsets (`Acquisition_Full_Access`, `Acquisition_Pipeline_View`, `Partner_Fulfillment_Access`) grant visibility. Adding RT visibility to baseline permsets breaks the scoping model — audit carefully before widening.
+
+### New record type → Minimum Access profile updates required
+
+When adding a new Opportunity record type, also update the `Minimum Access` profile with `layoutAssignments`, `recordTypeVisibilities`, and `fieldPermissions` (for any new fields). Missing entries cause deploy failures or unintended default-layout assignment.
+
+### Session-based permsets ≠ Bulk API / `sf` CLI
+
+`HubSpot_Migration` has `hasActivationRequired: true`. The `Bypass_Validation_Rules` custom permission activates **per-UI-session** via `SessionPermissionSetActivation` — it does **not** take effect in Bulk API or `sf` CLI sessions. For data loads that need the bypass:
+
+- verify with `FeatureManagement.checkPermission()` first
+- workarounds: `sf data create record` (single REST call), patch data after load, or temporarily flip `hasActivationRequired: false`
+
+All validation rules should gate on `NOT($Permission.Bypass_Validation_Rules)` as the first `AND` argument so the bypass is universally available when activated.
+
+### `CreateAuditFields` — INSERT-only, capitalization matters
+
+The `CreateAuditFields` user permission (API name **capitalized** — `createAuditFields` is rejected with "Unknown user permission" at deploy time) allows setting `CreatedDate` on record creation. Salesforce silently **ignores it on UPDATE**. Records inserted without the permission must be DELETED and re-inserted — `upsert` takes the UPDATE path for existing records and `CreatedDate` remains unchanged.
+
+Requires the org-level **"Set Audit Fields upon Record Creation"** toggle (Setup → User Interface). Verified empirically during BC-2744 activity-date fix.
+
+---
 
 ## When This Skill Owns the Task
 
