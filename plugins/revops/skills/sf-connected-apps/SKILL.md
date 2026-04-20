@@ -5,8 +5,9 @@ user-invocable: false
 license: MIT
 allowed-tools: Bash Read Write Edit Glob Grep WebFetch AskUserQuestion TodoWrite
 metadata:
-  version: "1.1.0-brite.1"
-  author: "Jag Valaiyapathy"
+  version: "1.1.0-brite.2"
+  author: "Jag Valaiyapathy (upstream); Brite Company (customization)"
+  upstream: "Jaganpro/sf-skills@ff1ab74"
   scoring: "120 points across 6 categories"
 ---
 
@@ -18,34 +19,34 @@ Use this skill when the user needs **OAuth app configuration** in Salesforce: Co
 
 ## Brite Context
 
-Brite's integration auth landscape is **ECA-based, not classic ConnectedApp**. Classic `ConnectedApp` creation is blocked org-wide since Spring '26, so every net-new OAuth app must be an `ExternalClientApplication`. Four ECAs are live today; each has a distinct use case and scope posture:
+Brite's integration auth landscape sits mid-migration. Spring '26 disabled org-wide creation of classic Connected Apps (SF Support re-enable required — treated as temporary migration runway), so every net-new OAuth app must be an `ExternalClientApplication`. Current inventory:
 
-- **`Marketing_Claude_MCP`** — plugin-side MCP runtime access. JWT bearer flow. Scopes `Api` + `RefreshToken`. `refreshTokenPolicy: ZERO`. Private key in the Engineering Bitwarden collection.
-- **`Outbound_Sales_Ops`** — outbound automation runtime (JWT bearer, dedicated service user).
-- **`CI_Deploy`** — GitHub Actions metadata deploys. SFDX refresh-token flow (long-lived creds needed in CI).
-- **`OutboundSync`** — webhook relay from Email Bison into Salesforce.
+- **`Marketing_Claude_MCP`** — **Brite's first pure ECA**, provisioned post-Spring-'26 per BC-5579. Plugin-side MCP runtime access. JWT bearer. Scopes `Api` + `RefreshToken`. `refreshTokenPolicy: zero`. Private key in the Engineering Bitwarden collection.
+- **`Outbound_Sales_Ops`** — live runtime integration writing CF-owned fields on Lead/Contact. **Legacy ConnectedApp auto-wrapped with an ECA settings file during the Spring '26 migration** — NOT a pure ECA. Parent `.connectedApp-meta.xml` + wrapper `.eca-meta.xml`. JWT bearer. `isAdminApproved=true`, `refreshTokenPolicy=zero`, `ipRelaxation=ENFORCE`.
+- **`CI_Deploy`** — ECA committed but **inactive** ("compliance-posture-only"). CI does NOT use this app. GitHub Actions deploys authenticate via `SFDX_AUTH_URL` under Salesforce's built-in `PlatformCLI` Connected App.
+- **`OutboundSync`** — separate sync path.
 
-Credential home: **Engineering Bitwarden collection**. JWT private keys named `<ECAName> — JWT private key`; consumer secrets named `<ECAName> — consumer secret`. Per-user distribution is out-of-band.
+Credential home: Engineering Bitwarden collection. Naming convention and binding rule in Convention 7.
 
-**CI ≠ runtime auth.** `CI_Deploy` uses refresh-token for long-lived pipeline credentials; `Marketing_Claude_MCP` uses JWT for short-lived, cert-gated tokens. Don't cross-wire — it breaks blast-radius isolation.
+**See also:** `brite-salesforce/CLAUDE.md` §External Client Apps, `docs/research/salesforce-mcp-findings.md` Q3 + Appendix B.1, and memory `gotcha_spring26_ca_blocked`.
 
 ## Brite ECA Conventions
 
-These rules bind any sf-connected-apps work done in a Brite repo. Violations are review blockers.
+These rules bind any sf-connected-apps work done in a Brite repo. Violations block PR review.
 
-1. **Always prefer `ExternalClientApplication` for new OAuth apps.** Classic `ConnectedApp` creation is disabled org-wide since Spring '26. Even for "just a single-org app," use the ECA metadata type. Upstream table recommending Connected App for "simple single-org OAuth" does not apply at Brite.
+1. **Use `ExternalClientApplication` for new OAuth apps.** Classic `ConnectedApp` creation is disabled org-wide since Spring '26. Even for a simple single-org app, use the ECA metadata type. The upstream "First Decision" table below still lists Connected App as preferred for some cases — treat those rows as upstream reference only; at Brite the answer is always ECA.
 
-2. **JWT flow requires BOTH `Api` and `RefreshToken` scopes.** The SFDX CLI auth layer needs `RefreshToken` to complete `sf org login jwt`, even though pure JWT token exchange does not require it. Dropping `RefreshToken` breaks CLI auth. Source: `docs/research/salesforce-mcp-findings.md` Q3.
+2. **JWT-via-SFDX-CLI flow requires BOTH `Api` and `RefreshToken` scopes.** The `sf org login jwt` command persists auth records in `~/.sfdx/` and needs `RefreshToken` for that persistence — drop it and JWT exchange fails with "refresh_token scope is required." Pure JWT exchange at a non-CLI runtime (e.g. a Python MCP calling the token endpoint directly) does NOT require `RefreshToken` — apply the scope requirement where SFDX handles the handshake, not universally. Source: `docs/research/salesforce-mcp-findings.md` Q3 lines 50-52.
 
-3. **Set `refreshTokenPolicy: ZERO` on ECA OAuth policies.** Belt-and-suspenders: prevents long-lived refresh tokens even if a client mis-requests them. Applied to `Marketing_Claude_MCP`; default for new ECAs unless a flow provably needs persistence.
+3. **Set `refreshTokenPolicy: zero` on ECA OAuth policies (lowercase `zero`).** The Salesforce XML enum is lowercase — see `assets/connected-app-jwt.xml` and the `infinite | zero | specific_lifetime` enumeration in `assets/eca-policies.xml`. Uppercase `ZERO` will not validate. Belt-and-suspenders against long-lived refresh tokens even when clients mis-request them; default for new ECAs unless a flow documents a specific persistence need in its PR.
 
-4. **Exclude `ExtlClntAppOauthSettings` via `.forceignore` for sandbox deploys.** The file embeds an org-specific `oauthLink` (`OrgId:ConsumerRecordId`) that does not resolve cross-org. Excluded alongside `ExternalClientApplication` type for sandbox work. Temporarily comment out those exclusions when deploying to production.
+4. **Exclude `ExtlClntAppOauthSettings` via `.forceignore` for sandbox deploys.** The file embeds an org-specific `oauthLink` (`OrgId:ConsumerRecordId`) that does not resolve cross-org. Excluded alongside the `ExternalClientApplication` type for sandbox work; temporarily comment the exclusions out before running a production deploy, then re-enable. The canonical toggle procedure lives in [sf-deploy](../sf-deploy/SKILL.md).
 
-5. **JWT-from-ECA breaks `sf org create scratch`.** Upstream bugs: `forcedotcom/cli#3025`, `forcedotcom/cli#3482`. `sf org create scratch` rejects JWT sessions authenticated against ECAs. Workaround: authenticate via `SFDX_AUTH_URL` through the CLI's built-in PlatformCLI Connected App for scratch-org provisioning. Runtime MCP calls are unaffected.
+5. **JWT-from-ECA breaks `sf org create scratch`.** Upstream bugs: `forcedotcom/cli#3025`, `forcedotcom/cli#3482`. Scratch-org creation rejects JWT sessions authenticated against ECAs. Workaround: authenticate via `SFDX_AUTH_URL` through the CLI's built-in `PlatformCLI` Connected App for scratch-org provisioning. Runtime MCP calls are unaffected.
 
-6. **Separate CI auth from runtime auth.** `CI_Deploy` (refresh-token) is for long-lived GitHub Actions deploys; `Marketing_Claude_MCP` (JWT) is for short-lived MCP sessions. Do not point CI at a JWT ECA or MCP at a refresh-token ECA — the blast-radius story depends on the split.
+6. **CI auth is `SFDX_AUTH_URL` via built-in `PlatformCLI` — not `CI_Deploy`.** The `CI_Deploy` ECA in source is compliance-posture-only (committed but inactive). GitHub Actions deploys authenticate via an `SFDX_AUTH_URL` secret loaded into the CLI's built-in `PlatformCLI` Connected App. Runtime MCP access goes through JWT against `Marketing_Claude_MCP`. Don't repurpose `CI_Deploy` without explicit ADR approval — the blast-radius story depends on the CI path and runtime path staying independent.
 
-7. **All ECA secrets live in Engineering Bitwarden, never in source.** JWT private keys and consumer secrets are stored in the Engineering Bitwarden collection with names `<ECAName> — JWT private key` and `<ECAName> — consumer secret`. Per-user distribution is out-of-band. Never commit, never echo to logs, never put in env templates with real values.
+7. **All ECA secrets live in the Engineering Bitwarden collection, never in source.** JWT private keys and consumer secrets are stored with item names `<ECAName> — JWT private key` and `<ECAName> — consumer secret`. Per-user distribution is out-of-band. Never commit, never echo to logs, never put in env templates with real values.
 
 ## When This Skill Owns the Task
 
@@ -66,6 +67,8 @@ Delegate elsewhere when the user is:
 
 ## First Decision: Connected App or External Client App
 
+> **At Brite: always ECA.** See § Brite ECA Conventions rule 1. The table and default guidance below are upstream reference only — rows recommending Connected App do not apply in Brite repos because Spring '26 blocks new Connected App creation org-wide.
+
 | If the need is... | Prefer |
 |---|---|
 | simple single-org OAuth app | Connected App |
@@ -76,7 +79,7 @@ Delegate elsewhere when the user is:
 Default guidance:
 - choose **ECA** for new regulated, packageable, or automation-heavy solutions
 - choose **Connected App** when simplicity and legacy compatibility matter more
-- Spring ’26 note: creation of new Connected Apps is disabled by default in orgs. For new integrations, prefer External Client Apps unless Connected App compatibility is explicitly required.
+- Spring ’26 note: creation of new Connected Apps is disabled org-wide (SF Support re-enable required, treated as temporary migration runway). At Brite, always use ECA — see Brite ECA Conventions rule 1.
 
 ---
 
