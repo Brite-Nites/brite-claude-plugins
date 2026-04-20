@@ -13,7 +13,7 @@
 ### 1.1 Method
 
 - **Linear side:** `mcp__plugin_workflows_linear-server__list_projects` with cursor pagination, `limit: 20` per call. The `team: "Brite Company", state: "started"` combo returns empty (documented gotcha in [`docs/designs/cadence-plugin.md` § 2.3](../designs/cadence-plugin.md)); the reliable pattern is list-all then client-side filter. Pagination cursor did not advance past page 2 during this session — the sample below is 20 unique projects across 5 teams (BC, BN, BL, BS, EXE, DRO) rather than the full active set. Sample covers every project status visible at a glance plus the cross-team projects that matter for the `/cadence:weekly` flow.
-- **GitHub side:** `gh repo list Brite-Nites --limit 100 --json name,url,description,pushedAt,isArchived,isPrivate` — 55 repos, 5 archived. Live snapshot, pasted inline below.
+- **GitHub side:** `gh repo list Brite-Nites --limit 100 --json name,url,description,pushedAt,isArchived,isPrivate` — 55 repos, 7 archived. Live snapshot, pasted inline below.
 
 ### 1.2 Mapping table (20 projects)
 
@@ -99,7 +99,7 @@ strand-smart
 go-to-market-data-platform (legacy)
 ```
 
-Archived repos (5) excluded: `brite-cpq`, `brite-supply-hydrogen`, `campaign-manager`, `creative-process-discovery`, `imagekit-metafield-validator`, `master-inbox`, `serper_tap`.
+Archived repos (7) excluded: `brite-cpq`, `brite-supply-hydrogen`, `campaign-manager`, `creative-process-discovery`, `imagekit-metafield-validator`, `master-inbox`, `serper_tap`.
 
 ---
 
@@ -109,7 +109,7 @@ Three options, scored on seven axes.
 
 | Axis | (a) `gh` CLI via Bash | (b) Official GitHub MCP | (c) No integration |
 |---|---|---|---|
-| **Auth** | Ambient — every Brite dev has `gh auth login` already; no new flow. | OAuth (works for HTTP MCP on Claude Code — same class as Linear/Context7) **or** PAT via `Authorization: Bearer ${...}` header (header substitution is broken by [upstream bug class documented in BC-5551](../../memory_todo_not_real_path_placeholder#see-gotcha_http_mcp_substitution_broken)). OAuth route is viable; PAT route is not. | N/A |
+| **Auth** | Ambient — every Brite dev has `gh auth login` already; no new flow. | OAuth (works for HTTP MCP on Claude Code — same class as Linear/Context7) **or** PAT via `Authorization: Bearer ${...}` header (header substitution is broken by the BC-5551 bug class — see `memory/gotcha_http_mcp_substitution_broken.md`). OAuth route is viable; PAT route is not. | N/A |
 | **Tool surface** | Full `gh` CLI — reads, writes, search, workflows, runs, releases. Shell-native. | ~40+ MCP tools (repos, issues, PRs, actions, code-security, discussions). 29,081 GitHub stars, actively maintained (pushedAt 2026-04-20). Hosted at `https://api.githubcopilot.com/mcp/`. | Zero — Cadence plugin cannot see any GitHub data. |
 | **MCP server-budget impact** | 0 slots on any plugin. | +1 slot on the host plugin. If registered in `plugins/cadence/.mcp.json`: Cadence 0→1 of 6. If registered in `plugins/workflows/.mcp.json`: workflows 3→4 of 6. Either path is under the soft cap today, but consumes a slot before a phase issue names a specific consumer. | 0 slots. |
 | **Developer friction on first run** | Zero. `gh` is already installed and authed on every Brite dev machine (CLAUDE.md assumes it). | Medium. OAuth popup per dev on first MCP connect. If we ever fall back to PAT, we inherit the EB-style user-level `.mcp.json` onboarding flow — an entire slash command exists (`/marketing:setup-email-bison`) to paper over that friction. | None. |
