@@ -18,6 +18,12 @@
       "source": "./plugins/marketing",
       "description": "Marketing domain plugin — brand-aware marketing skills ported from coreyhaines31/marketingskills",
       "version": "0.3.0"
+    },
+    {
+      "name": "cadence",
+      "source": "./plugins/cadence",
+      "description": "Weekly planning cadence plugin — audit, scope, housekeep, narrate",
+      "version": "0.1.0"
     }
   ]
 }
