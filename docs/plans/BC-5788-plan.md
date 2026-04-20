@@ -62,7 +62,7 @@ Per the issue's objective test table:
 | # | Command | Pass |
 |---|---------|------|
 | T1 | `ls docs/decisions/007-*.md` | File exists |
-| T2 | `grep -E "Plugin name\|Adoption method\|Workflow integration\|MCP scope\|Skill filter\|Naming convention\|Renames deferred" docs/decisions/007-revops-plugin-design.md` | All 7 decisions present |
+| T2 | `grep -E "Plugin name|Adoption method|Workflow integration|MCP scope|Skill filter|Naming convention|Renames deferred" docs/decisions/007-revops-plugin-design.md` | All 7 decisions present |
 | T3 | `grep "Rejected Alternatives" docs/decisions/007-revops-plugin-design.md` | Section exists, ≥4 alternatives |
 | T4 | `grep "007" CLAUDE.md` | ADR referenced in top-level CLAUDE.md |
 | T5 | `./scripts/check-guardrails.sh --claude-md CLAUDE.md` | Pass |

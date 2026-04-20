@@ -14,7 +14,7 @@ This ADR locks the architectural decisions made during the 2026-04-19 scoping se
 ## Decision Drivers
 
 - **Gap in workflows for SF ship discipline** — `workflows:ship` doesn't know about Brite SF conventions; agents operating outside `brite-salesforce/` miss them entirely.
-- **Jaganpro availability** — CTA-authored, MIT-licensed, 13 of 36 skills directly applicable to Brite (the other 23 cover Data Cloud / Agentforce / Industries / Vlocity / consulting — not in scope).
+- **Jaganpro availability** — CTA-authored, MIT-licensed. Of 36 upstream skills: 13 directly applicable and Brite-customized, 1 shipped unmodified (sf-diagram-mermaid), 22 out of scope (Data Cloud, Agentforce, Industries, Vlocity, flex-estimator, nanobananapro-diagramming). All 7 upstream consulting agents are also out of scope.
 - **Brite-specific conventions** — ~15 metadata pitfalls, Apex-first principle, Queueable patterns, 7-permset FLS sync, 4 active ECAs, all documented in `brite-salesforce/CLAUDE.md` and `docs/artifacts/`.
 - **Augment, not replace** — the existing inner loop (brainstorm → plan → worktree → execute → review → ship) works; SF knowledge should inject during those phases, not bypass them.
 - **Cross-repo reach** — a Brite engineer working in `brite-gtm` should see zero SF noise; one working in `brite-salesforce` should see Brite deploy discipline surfaced automatically.
@@ -48,9 +48,9 @@ Claude Code project-scope precedence means the three MCP instances (marketing na
 
 **Keep (13):** sf-apex, sf-flow, sf-lwc, sf-soql, sf-testing, sf-debug, sf-metadata, sf-data, sf-docs, sf-permissions, sf-connected-apps, sf-integration, sf-deploy.
 
-**Defer (1):** sf-diagram-mermaid — no customization issue filed; leaves upstream as-is for now.
+**Defer (1):** sf-diagram-mermaid — installed unmodified, no Brite customization issue filed yet. The plugin ships 14 skill directories total (13 customized + this one).
 
-**Skip (21 skills + 7 agents):** Data Cloud family (7), Agentforce AI family (5), Industries/Vlocity (7), sf-flex-estimator, sf-diagram-nanobananapro, all 7 consulting agents. None apply to Brite's stack.
+**Skip (22 skills + 7 agents):** Data Cloud family (7), Agentforce AI family (5), Industries (7), Vlocity (1), sf-flex-estimator, sf-diagram-nanobananapro, all 7 consulting agents. None apply to Brite's stack.
 
 ### 3.6 Naming convention: keep upstream skill names
 
