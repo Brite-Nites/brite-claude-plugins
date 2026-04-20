@@ -189,6 +189,43 @@ flowchart LR
 
 All agents produce findings in the same `**[P1/P2/P3]** file:line — title` format with confidence scores (1-10). Agent selection is dynamic — see `/workflows:review` Step 4. Per-finding validation (Step 6) uses Opus for P1s and Sonnet for P2/P3s.
 
+## Cadence Plugin: Weekly Planning Workflow
+
+`/cadence:weekly` orchestrates a five-phase loop that replaces the manual Brite weekly-planning flow. Phases flow via a session-scoped state object; a `.cadence-phase-state.json` breadcrumb in the week folder supports kill-and-resume across phases.
+
+```mermaid
+flowchart LR
+    P0["Phase 0<br/>Preflight"] --> P05["Phase 0.5<br/>Resume<br/>detection"]
+    P05 --> P1["Phase 1<br/>Audit<br/>(fan-out)"]
+    P1 --> G1{"Gate #1<br/>approve<br/>scope"}
+    G1 --> P2["Phase 2<br/>Scope<br/>(per-project)"]
+    P2 --> P3["Phase 3<br/>Housekeep<br/>(batch writes)"]
+    P3 --> G2{"Gate #2<br/>per-group +<br/>Execute now"}
+    G2 --> P4["Phase 4<br/>Narrative<br/>(subagent)"]
+    P4 --> G3{"Gate #3<br/>approve<br/>draft"}
+    G3 --> PDF["PDF export<br/>primary or<br/>fallback"]
+    PDF --> P5["Phase 5<br/>Ops file<br/>(template)"]
+```
+
+**Agents used by Cadence:**
+
+| Agent | Model | Phase | Purpose |
+|---|---|---|---|
+| `project-audit` | haiku | 1 | Per-project audit card: shipped / carry-over / dropped / by-assignee rollup / quality-gate flags. Read-only Linear MCP. |
+| `narrative-writer` | opus | 4 | Voice-bound draft of `w<NN>-sprint-narrative.md`. `Read`-only tools; Linear data provided via state JSON in the dispatch body. |
+
+**Skills used by Cadence:**
+
+| Skill | Phase | Purpose |
+|---|---|---|
+| `sprint-scoping` | 2 | Sequential per-project interview (5 carry-over + 5 scope Qs, one at a time), issue-quality gate with block-with-override, appends checkpoint per project. |
+| `linear-housekeeping` | 3 | Derives mutations from Phase 2 scope; re-runs quality gate on cycle-path rows; renders preview grouped by decision path; collects per-group approval + final execute gate; writes audit log. |
+| `_shared/issue-quality-gate` | 1, 2, 3 | 7-check gate primitive: assignee / title / priority / state-cycle alignment / dependencies / AC / done-with-evidence. |
+
+**MCP servers.** None registered by Cadence — Linear is inherited from the `workflows` plugin via `mcp__plugin_workflows_linear-server__*`. `gh` CLI covers the GitHub probe in Phase 0.4.
+
+**Artifacts per week.** The week folder at `weekly-planning/w<NN>-<YYYY-MM-DD>/` accumulates: `.cadence-phase-state.json` (breadcrumb), `audit.json` (Phase 1), `w<NN>-planning-checkpoint.md` (Phase 2), `w<NN>-housekeeping-log.md` (Phase 3), `w<NN>-sprint-narrative.md` + `.pdf` (Phase 4), `w<NN>-remaining-ops.md` (Phase 5).
+
 ## Hook Execution
 
 Hooks use a **two-layer security architecture**: deterministic regex command hooks run first (fast, no LLM), then haiku prompt hooks as fallback for anything the regex misses.
