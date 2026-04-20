@@ -5,14 +5,47 @@ user-invocable: false
 license: MIT
 allowed-tools: Bash Read Write Edit Glob Grep WebFetch AskUserQuestion TodoWrite
 metadata:
-  version: "1.1.0"
+  version: "1.1.0-brite.1"
   author: "Jag Valaiyapathy"
   scoring: "120 points across 6 categories"
 ---
 
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md. -->
+
 # sf-connected-apps: Salesforce Connected Apps & External Client Apps
 
 Use this skill when the user needs **OAuth app configuration** in Salesforce: Connected Apps, External Client Apps (ECAs), JWT bearer setup, PKCE decisions, scope design, or migration from older Connected App patterns to newer ECA patterns.
+
+## Brite Context
+
+Brite's integration auth landscape is **ECA-based, not classic ConnectedApp**. Classic `ConnectedApp` creation is blocked org-wide since Spring '26, so every net-new OAuth app must be an `ExternalClientApplication`. Four ECAs are live today; each has a distinct use case and scope posture:
+
+- **`Marketing_Claude_MCP`** — plugin-side MCP runtime access. JWT bearer flow. Scopes `Api` + `RefreshToken`. `refreshTokenPolicy: ZERO`. Private key in the Engineering Bitwarden collection.
+- **`Outbound_Sales_Ops`** — outbound automation runtime (JWT bearer, dedicated service user).
+- **`CI_Deploy`** — GitHub Actions metadata deploys. SFDX refresh-token flow (long-lived creds needed in CI).
+- **`OutboundSync`** — webhook relay from Email Bison into Salesforce.
+
+Credential home: **Engineering Bitwarden collection**. JWT private keys named `<ECAName> — JWT private key`; consumer secrets named `<ECAName> — consumer secret`. Per-user distribution is out-of-band.
+
+**CI ≠ runtime auth.** `CI_Deploy` uses refresh-token for long-lived pipeline credentials; `Marketing_Claude_MCP` uses JWT for short-lived, cert-gated tokens. Don't cross-wire — it breaks blast-radius isolation.
+
+## Brite ECA Conventions
+
+These rules bind any sf-connected-apps work done in a Brite repo. Violations are review blockers.
+
+1. **Always prefer `ExternalClientApplication` for new OAuth apps.** Classic `ConnectedApp` creation is disabled org-wide since Spring '26. Even for "just a single-org app," use the ECA metadata type. Upstream table recommending Connected App for "simple single-org OAuth" does not apply at Brite.
+
+2. **JWT flow requires BOTH `Api` and `RefreshToken` scopes.** The SFDX CLI auth layer needs `RefreshToken` to complete `sf org login jwt`, even though pure JWT token exchange does not require it. Dropping `RefreshToken` breaks CLI auth. Source: `docs/research/salesforce-mcp-findings.md` Q3.
+
+3. **Set `refreshTokenPolicy: ZERO` on ECA OAuth policies.** Belt-and-suspenders: prevents long-lived refresh tokens even if a client mis-requests them. Applied to `Marketing_Claude_MCP`; default for new ECAs unless a flow provably needs persistence.
+
+4. **Exclude `ExtlClntAppOauthSettings` via `.forceignore` for sandbox deploys.** The file embeds an org-specific `oauthLink` (`OrgId:ConsumerRecordId`) that does not resolve cross-org. Excluded alongside `ExternalClientApplication` type for sandbox work. Temporarily comment out those exclusions when deploying to production.
+
+5. **JWT-from-ECA breaks `sf org create scratch`.** Upstream bugs: `forcedotcom/cli#3025`, `forcedotcom/cli#3482`. `sf org create scratch` rejects JWT sessions authenticated against ECAs. Workaround: authenticate via `SFDX_AUTH_URL` through the CLI's built-in PlatformCLI Connected App for scratch-org provisioning. Runtime MCP calls are unaffected.
+
+6. **Separate CI auth from runtime auth.** `CI_Deploy` (refresh-token) is for long-lived GitHub Actions deploys; `Marketing_Claude_MCP` (JWT) is for short-lived MCP sessions. Do not point CI at a JWT ECA or MCP at a refresh-token ECA — the blast-radius story depends on the split.
+
+7. **All ECA secrets live in Engineering Bitwarden, never in source.** JWT private keys and consumer secrets are stored in the Engineering Bitwarden collection with names `<ECAName> — JWT private key` and `<ECAName> — consumer secret`. Per-user distribution is out-of-band. Never commit, never echo to logs, never put in env templates with real values.
 
 ## When This Skill Owns the Task
 
