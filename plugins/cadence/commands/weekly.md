@@ -60,13 +60,19 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
 
 ```
 {
-  "cycle": { "id", "name", "startsAt", "endsAt" },
+  "team":  { "id", "name" },
+  "cycle": {
+    "current":  { "id", "name", "startsAt", "endsAt" },
+    "previous": { "id", "title", "startsAt", "endsAt", "issueCountHistory", "completedIssueCountHistory" }
+  },
   "projects": [ { "id", "name", "audit_card", "scope_decisions", "overrides" } ],
-  "cross_project_stats": { "completion_rate", "unplanned_ratio", "shipped_total", "planned_total", "team_standouts" },
+  "cross_project_stats": { "completion_rate", "shipped_total", "carry_over_total", "dropped_total", "team_standouts" },
   "mutations": [ ... ],
   "narrative_draft": null
 }
 ```
+
+`cycle.current` is populated by Phase 0.2 (the cycle the user is *planning*); `cycle.previous` is populated by Phase 1 § 1.0 (the cycle being *audited*). `team` is populated by Phase 0 (`list_teams` lookup of `"Brite Company"` — currently inlined per the Phase 1 prerequisite note below). `cross_project_stats.unplanned_ratio` and per-assignee planned attribution are computed in Phase 2 once the prior-narrative parser lands (BC-5760 owns the parser per BC-5757 § 2.6).
 
 ## Phase 1: Audit
 
@@ -101,9 +107,13 @@ Parse each subagent's returned JSON block into `state.projects[<index>].audit_ca
 Compute and store under `state.cross_project_stats`:
 
 - `completion_rate` = `sum(p.audit_card.shipped.count) / state.cycle.previous.issueCountHistory[0]` (denominator is day-1 scope per BC-5757 § 2.2 gotcha).
-- `unplanned_ratio` = `(shipped_total - planned_count_from_prior_narrative) / shipped_total`. If no prior narrative file exists, store `null` and surface a footnote in § 1.6 (BC-5757 § 2.6 limitation).
 - `shipped_total`, `dropped_total`, `carry_over_total` (each = sum across projects).
-- `team_standouts` = list of assignees with ≥90% of their planned issues shipped (per AC #4 — derived from `by_assignee` rollups).
+- `team_standouts` = list of assignees with completion ratio ≥90% in this cycle, where ratio = `shipped_count / (shipped_count + carry_over_count + dropped_count)` from the `by_assignee` rollups. Only count assignees with `(shipped + carry_over + dropped) ≥ 3` to avoid noise from one-issue owners.
+
+**Deferred to Phase 2** (BC-5760, requires prior-narrative parser per BC-5757 § 2.6):
+
+- `unplanned_ratio` — needs `planned_count_from_prior_narrative`, which only the Phase 2 narrative parser can extract. Phase 1 leaves the field unset; Phase 2 fills it in once the prior `w<NN-1>-sprint-narrative.md` is parsed for declared planned scope.
+- Per-assignee *planned* attribution — same dependency. AC #4's "≥90% planned completion" framing is approximated by the cycle-completion ratio above until Phase 2 lands.
 
 ### 1.5 Persist audit file
 
@@ -113,7 +123,7 @@ Write `state.cross_project_stats` plus every `audit_card` to `audit.json` at the
 
 Render to the user:
 
-1. **Headline anchors** — one line: `<completion_rate>% completion / <shipped_total> shipped / <unplanned_ratio>% unplanned / standouts: <team_standouts>`.
+1. **Headline anchors** — one line: `<completion_rate>% completion / <shipped_total> shipped / <carry_over_total> carrying over / standouts: <team_standouts>`. (Note: `unplanned_ratio` headline lands in Phase 2 once the narrative parser extracts the planned baseline — see § 1.4 deferred list.)
 2. **Per-project drift bullets** — one line per project: `**<project>** — <shipped> shipped, <carry_over> carrying over, <dropped> dropped. <highest-priority carry-over ID if any>`.
 3. **Audit gaps** subsection — only if any subagent failed: list each failed project + the suggested retry command (`/cadence:weekly --resume-phase 1 --project <name>`).
 4. **Quality flags** subsection — only if any flagged: one line per flag — `<issue_id> — <check>: <message>`.
