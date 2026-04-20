@@ -79,7 +79,24 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
   "checkpoint_path": null,                                        // Phase 2 resolves once at entry
   "_scoped_project_names": [],                                    // Phase 2 resume cache
   "leadership_planning_notes": null,                              // Phase 2 optional input
-  "mutations": [ ... ],
+  "mutations": [ {                                                // Phase 3 linear-housekeeping populates
+      "id", "decision_path", "mutation_type",
+      "target": { "kind", "id", "name", "projectId" },
+      "before": {…}, "after": {…},                                // both carry ID-form + name-form fields
+      "gate_status", "gate_detail": [...], "override_reason",
+      "approved" /* bool, set by Phase 3 § 6 group approval */, "started_at", "executed_at", "result", "error", "source_project"
+  } ],
+  // Phase 3 is authoritative for the mutation row shape — see
+  // plugins/cadence/skills/linear-housekeeping/SKILL.md § 2.1.
+  "_mutation_conflicts": [ {                                      // Phase 3 § 2.5 cross-project dedup
+      "issue_id", "source_projects": [ ... ], "conflicting_targets": [ ... ]
+  } ],
+  "_cq3_parse_errors": [ {                                        // Phase 3 § 2.2 CQ3 free-text parse failures
+      "project_id", "issue_id", "raw_cq3_answer"
+  } ],
+  "_create_preflight_cache": { /* [projectId]: list_issues-response */ },  // Phase 3 § 3 per-project list_issues memoization
+  "housekeeping_log_path": null,                                  // Phase 3 resolves once at § 7 entry
+  "_executed_mutation_ids": [],                                   // Phase 3 resume cache
   "narrative_draft": null
 }
 ```
@@ -164,9 +181,9 @@ The deferred prior-narrative parser (needed for `state.cross_project_stats.unpla
 
 ## Phase 3: Housekeeping
 
-> **Not yet implemented — see BC-5761.**
+Batch mutation preview + atomic execute. Implemented by the `linear-housekeeping` skill (`plugins/cadence/skills/linear-housekeeping/SKILL.md`, BC-5761). Consumes `state.projects[].scope_decisions` + `state.projects[].overrides` populated by Phase 2. Derives `state.mutations[]` tagged by decision path (cycle / backlog / cancel / reassign / leave) and mutation type (cycle-assign / state-change / reassign / cancel / create / milestone-rename / label-change / backlog-return). Re-runs the `cadence:issue-quality-gate` on every cycle-path mutation with block-with-override. Renders the preview grouped first by decision path, then by mutation type. Collects per-group approval via `AskUserQuestion` (count = distinct non-empty groups), followed by a final execute gate. Executes sequentially; each write is pre-flight checked against current Linear state for idempotency (second run = zero writes) and timestamped in a housekeeping log at `weekly-planning/w<NN>-<yyyy-mm-dd>/w<NN>-housekeeping-log.md`.
 
-Batch preview + atomic execute. Renders every mutation (`reassign BC-X`, `cancel BC-Y`, `add BC-Q to cycle`, `rename milestone`). User approves the full batch before any write.
+Inline (not subagent) — interactive approval gates cannot run inside a dispatched agent. Idempotent — re-invoking after a partial session retries only errored rows; successful rows pre-flight as "already applied" and skip.
 
 ## Phase 4: Narrative + Export
 
