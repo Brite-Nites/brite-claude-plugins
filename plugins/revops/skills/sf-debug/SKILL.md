@@ -1,11 +1,7 @@
 ---
 name: sf-debug
-description: >
-  Salesforce debug log analysis and troubleshooting with 100-point scoring.
-  TRIGGER when: user analyzes debug logs, hits governor limits, reads stack traces,
-  or touches .log files from Salesforce orgs.
-  DO NOT TRIGGER when: running Apex tests (use sf-testing), fixing Apex code
-  (use sf-apex), or Agentforce session tracing (use sf-ai-agentforce-observability).
+description: Salesforce debug log analysis and troubleshooting with 100-point scoring. TRIGGER when: user analyzes debug logs, hits governor limits, reads stack traces, or touches .log files from Salesforce orgs. DO NOT TRIGGER when: running Apex tests (use sf-testing), fixing Apex code (use sf-apex), or Agentforce session tracing (use sf-ai-agentforce-observability).
+user-invocable: false
 license: MIT
 metadata:
   version: "1.1.0"

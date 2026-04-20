@@ -1,11 +1,7 @@
 ---
 name: sf-deploy
-description: >
-  Salesforce DevOps automation using sf CLI v2.
-  TRIGGER when: user deploys metadata, creates/manages scratch orgs or sandboxes,
-  sets up CI/CD pipelines, or troubleshoots deployment errors with sf project deploy.
-  DO NOT TRIGGER when: writing Apex/LWC code (use sf-apex/sf-lwc), creating metadata
-  XML (use sf-metadata), or querying org data (use sf-data).
+description: Salesforce DevOps automation using sf CLI v2. TRIGGER when: user deploys metadata, creates/manages scratch orgs or sandboxes, sets up CI/CD pipelines, or troubleshoots deployment errors with sf project deploy. DO NOT TRIGGER when: writing Apex/LWC code (use sf-apex/sf-lwc), creating metadata XML (use sf-metadata), or querying org data (use sf-data).
+user-invocable: false
 license: MIT
 metadata:
   version: "2.3.0"

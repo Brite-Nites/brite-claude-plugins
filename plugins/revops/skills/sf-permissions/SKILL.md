@@ -1,11 +1,7 @@
 ---
 name: sf-permissions
-description: >
-  Permission Set analysis, hierarchy viewer, and access auditing.
-  TRIGGER when: user asks "who has access to X?", analyzes permission sets/groups,
-  or touches .permissionset-meta.xml / .permissionsetgroup-meta.xml files.
-  DO NOT TRIGGER when: creating new metadata (use sf-metadata), deploying
-  permission sets (use sf-deploy), or Apex sharing logic (use sf-apex).
+description: Permission Set analysis, hierarchy viewer, and access auditing. TRIGGER when: user asks "who has access to X?", analyzes permission sets/groups, or touches .permissionset-meta.xml / .permissionsetgroup-meta.xml files. DO NOT TRIGGER when: creating new metadata (use sf-metadata), deploying permission sets (use sf-deploy), or Apex sharing logic (use sf-apex).
+user-invocable: false
 license: MIT
 metadata:
   version: "1.1.0"

@@ -1,11 +1,7 @@
 ---
 name: sf-soql
-description: >
-  SOQL query generation, optimization, and analysis with 100-point scoring.
-  TRIGGER when: user writes, optimizes, or debugs SOQL/SOSL queries, touches .soql
-  files, or asks about relationship queries, aggregates, or query performance.
-  DO NOT TRIGGER when: bulk data operations (use sf-data), Apex DML logic
-  (use sf-apex), or report/dashboard queries.
+description: SOQL query generation, optimization, and analysis with 100-point scoring. TRIGGER when: user writes, optimizes, or debugs SOQL/SOSL queries, touches .soql files, or asks about relationship queries, aggregates, or query performance. DO NOT TRIGGER when: bulk data operations (use sf-data), Apex DML logic (use sf-apex), or report/dashboard queries.
+user-invocable: false
 license: MIT
 metadata:
   version: "1.1.0"

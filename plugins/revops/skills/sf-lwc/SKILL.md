@@ -1,10 +1,7 @@
 ---
 name: sf-lwc
-description: >
-  Lightning Web Components with PICKLES methodology and 165-point scoring.
-  TRIGGER when: user creates/edits LWC components, touches lwc/**/*.js, .html,
-  .css, .js-meta.xml files, or asks about wire service, SLDS, or Jest LWC tests.
-  DO NOT TRIGGER when: Apex classes (use sf-apex), Aura components, or Visualforce.
+description: Lightning Web Components with PICKLES methodology and 165-point scoring. TRIGGER when: user creates/edits LWC components, touches lwc/**/*.js, .html, .css, .js-meta.xml files, or asks about wire service, SLDS, or Jest LWC tests. DO NOT TRIGGER when: Apex classes (use sf-apex), Aura components, or Visualforce.
+user-invocable: false
 license: MIT
 metadata:
   version: "2.1.0"

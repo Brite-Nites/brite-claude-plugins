@@ -1,11 +1,7 @@
 ---
 name: sf-testing
-description: >
-  Apex test execution, coverage analysis, and test-fix loops with 120-point scoring.
-  TRIGGER when: user runs Apex tests, checks code coverage, fixes failing tests,
-  or touches *Test.cls / *_Test.cls files.
-  DO NOT TRIGGER when: writing Apex production code (use sf-apex), Agentforce agent
-  testing (use sf-ai-agentforce-testing), or Jest/LWC tests (use sf-lwc).
+description: Apex test execution, coverage analysis, and test-fix loops with 120-point scoring. TRIGGER when: user runs Apex tests, checks code coverage, fixes failing tests, or touches *Test.cls / *_Test.cls files. DO NOT TRIGGER when: writing Apex production code (use sf-apex), Agentforce agent testing (use sf-ai-agentforce-testing), or Jest/LWC tests (use sf-lwc).
+user-invocable: false
 license: MIT
 metadata:
   version: "1.1.0"

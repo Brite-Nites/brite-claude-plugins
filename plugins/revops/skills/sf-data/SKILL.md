@@ -1,11 +1,7 @@
 ---
 name: sf-data
-description: >
-  Salesforce data operations with 130-point scoring.
-  TRIGGER when: user creates test data, performs bulk import/export, uses sf data CLI
-  commands, or needs data factory patterns for Apex tests.
-  DO NOT TRIGGER when: SOQL query writing only (use sf-soql), Apex test execution
-  (use sf-testing), or metadata deployment (use sf-deploy).
+description: Salesforce data operations with 130-point scoring. TRIGGER when: user creates test data, performs bulk import/export, uses sf data CLI commands, or needs data factory patterns for Apex tests. DO NOT TRIGGER when: SOQL query writing only (use sf-soql), Apex test execution (use sf-testing), or metadata deployment (use sf-deploy).
+user-invocable: false
 license: MIT
 metadata:
   version: "1.2.0"

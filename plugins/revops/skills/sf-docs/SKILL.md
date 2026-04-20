@@ -1,10 +1,7 @@
 ---
 name: sf-docs
-description: >
-  Official Salesforce documentation retrieval guidance. Use when you need
-  authoritative Salesforce docs from developer.salesforce.com or
-  help.salesforce.com, especially when pages are JS-heavy, shell-rendered, or
-  hard to extract with naive fetching.
+description: Official Salesforce documentation retrieval guidance. Use when you need authoritative Salesforce docs from developer.salesforce.com or help.salesforce.com, especially when pages are JS-heavy, shell-rendered, or hard to extract with naive fetching.
+user-invocable: false
 license: MIT
 metadata:
   version: "0.4.0"

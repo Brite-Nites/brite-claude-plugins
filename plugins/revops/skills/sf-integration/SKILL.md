@@ -1,11 +1,7 @@
 ---
 name: sf-integration
-description: >
-  Salesforce integration architecture with 120-point scoring.
-  TRIGGER when: user sets up Named Credentials, External Services, REST/SOAP
-  callouts, Platform Events, CDC, or touches .namedCredential-meta.xml files.
-  DO NOT TRIGGER when: Connected App/OAuth config (use sf-connected-apps),
-  Apex-only logic (use sf-apex), or data import/export (use sf-data).
+description: Salesforce integration architecture with 120-point scoring. TRIGGER when: user sets up Named Credentials, External Services, REST/SOAP callouts, Platform Events, CDC, or touches .namedCredential-meta.xml files. DO NOT TRIGGER when: Connected App/OAuth config (use sf-connected-apps), Apex-only logic (use sf-apex), or data import/export (use sf-data).
+user-invocable: false
 license: MIT
 metadata:
   version: "1.2.0"

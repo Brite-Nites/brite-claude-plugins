@@ -1,11 +1,7 @@
 ---
 name: sf-flow
-description: >
-  Creates and validates Salesforce Flows with 110-point scoring.
-  TRIGGER when: user builds or edits record-triggered, screen, autolaunched, or
-  scheduled flows, or touches .flow-meta.xml files.
-  DO NOT TRIGGER when: Apex automation (use sf-apex), process builder migration
-  questions only, or non-Flow declarative config (use sf-metadata).
+description: Creates and validates Salesforce Flows with 110-point scoring. TRIGGER when: user builds or edits record-triggered, screen, autolaunched, or scheduled flows, or touches .flow-meta.xml files. DO NOT TRIGGER when: Apex automation (use sf-apex), process builder migration questions only, or non-Flow declarative config (use sf-metadata).
+user-invocable: false
 license: MIT
 metadata:
   version: "2.1.0"

@@ -1,11 +1,7 @@
 ---
 name: sf-diagram-mermaid
-description: >
-  Salesforce architecture diagrams using Mermaid with ASCII fallback.
-  TRIGGER when: user says "diagram", "visualize", "ERD", or asks for sequence
-  diagrams, flowcharts, class diagrams, or architecture visualizations in Mermaid.
-  DO NOT TRIGGER when: user wants PNG/SVG image output (use sf-diagram-nanobananapro),
-  or asks about non-Salesforce systems.
+description: Salesforce architecture diagrams using Mermaid with ASCII fallback. TRIGGER when: user says "diagram", "visualize", "ERD", or asks for sequence diagrams, flowcharts, class diagrams, or architecture visualizations in Mermaid. DO NOT TRIGGER when: user wants PNG/SVG image output (use sf-diagram-nanobananapro), or asks about non-Salesforce systems.
+user-invocable: false
 license: MIT
 compatibility: "Requires Mermaid-capable renderer for diagram previews"
 metadata:
