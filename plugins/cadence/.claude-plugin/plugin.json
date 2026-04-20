@@ -1,10 +1,10 @@
 {
   "name": "cadence",
-  "description": "Weekly planning cadence plugin — audit, scope, housekeep, narrate",
+  "description": "Weekly planning cadence plugin — audit, scope, housekeep, narrate, ops",
   "author": {
     "name": "Brite"
   },
-  "version": "0.4.0",
+  "version": "0.5.0",
   "homepage": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "repository": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "license": "MIT",
