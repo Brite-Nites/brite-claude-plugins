@@ -1,0 +1,125 @@
+{
+  "skill_name": "gtm-strategy",
+  "scenarios": [
+    {
+      "id": 1,
+      "name": "happy-path-full-run",
+      "tier": 1,
+      "prompt": "Scope a new GTM motion for Brite Supply in the HOA landscape lighting domain. Run the full 5-phase workflow.",
+      "input": { "client": "brite-supply", "domain": "HOA landscape lighting" },
+      "expected_output": "Should check docs/marketing-context.md first. Should confirm entity = brite-supply. Should run all 5 phases sequentially: Phase 1 research (fallback to WebSearch since account-research not shipped), Phase 2 TAM segments (3-10, weighted scoring with Fit x2), Phase 3 deep dive (3 personas + 5-8 PQS signals per segment, SF-grounded), Phase 4 messaging pillars (2-3 per segment + offer tier + PQS triggers, NO COPY), Phase 5 output. Should write artifact to docs/strategy/supply-hoa-landscape-lighting-gtm-{date}.md and matching .state.json with phases_completed: [1,2,3,4,5]. Should produce a proposed marketing-context.md patch block (not auto-applied).",
+      "assertions": [
+        "Output runs all 5 phases in order",
+        "Phase 2 produces 3-10 ranked segments with scoring breakdown",
+        "Every segment score weights Fit at 2x (formula: Size*1 + Fit*2 + SalesCycle*1 + DealValue*1 + Education*1)",
+        "Phase 3 produces 3 personas per segment and a 5-8 signal PQS rubric",
+        "Phase 4 produces 2-3 pillars + offer tier + PQS triggers per segment",
+        "Phase 4 does NOT contain any subject line, email body, or copy example",
+        "Artifact path is docs/strategy/supply-hoa-landscape-lighting-gtm-{date}.md",
+        "State file .state.json exists with phases_completed covering all 5",
+        "Phase 5 produces a proposed docs/marketing-context.md patch block (not a direct write)"
+      ],
+      "files": ["docs/marketing-context.md"]
+    },
+    {
+      "id": 2,
+      "name": "phase-4-scope-guard",
+      "tier": 1,
+      "prompt": "[Context: mid-Phase-4 of gtm-strategy run for brite-supply HOA landscape lighting] Pillar 1 is 'predictable procurement'. Write me the first email subject line + body for this pillar.",
+      "expected_output": "Must refuse copy generation. Must explicitly name email-copywriting (BC-5825) as the correct skill. Must offer to hand off the pillars + offer tier + PQS triggers so email-copywriting can generate copy downstream. Must NOT include any subject line, email body, opening sentence, or example copy, even as illustration.",
+      "assertions": [
+        "Refuses to generate copy in Phase 4",
+        "Explicitly names email-copywriting (BC-5825) as the correct downstream skill",
+        "Offers to hand off pillars + offer tier + PQS triggers",
+        "Output does NOT contain a subject line",
+        "Output does NOT contain an email body or opening line",
+        "Output does NOT contain example copy even as illustration"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "resume-after-phase-2",
+      "tier": 1,
+      "prompt": "Resume the gtm-strategy run for brite-supply HOA landscape lighting at Phase 3. Prior state file exists with phases_completed: [1, 2].",
+      "input": { "resume": true, "phase": 3 },
+      "expected_output": "Should locate docs/strategy/supply-hoa-landscape-lighting-gtm-{date}.state.json. Should validate phases_completed contains [1, 2]. Should read phase_outputs for phases 1 and 2 as authoritative memory. Should skip re-running research and re-scoring segments. Should begin Phase 3 (deep dive) directly. If the state file is missing or phases_completed is inconsistent, should stop and report, not silently restart.",
+      "assertions": [
+        "Locates state file at expected path",
+        "Validates phases_completed includes every phase < 3",
+        "Reads phase_outputs from state as authoritative memory",
+        "Does NOT re-run Phase 1 research",
+        "Does NOT re-run Phase 2 segment scoring",
+        "Starts execution directly at Phase 3",
+        "If state file missing, stops and reports (does not restart)"
+      ],
+      "files": ["docs/strategy/supply-hoa-landscape-lighting-gtm-{date}.state.json"]
+    },
+    {
+      "id": 4,
+      "name": "entity-cross-sell",
+      "tier": 1,
+      "prompt": "Scope a cross-sell GTM motion across Brite Nites and Brite Supply for HOA common-area lighting. One artifact, per-entity sections.",
+      "input": { "client": "brite-nites,brite-supply", "domain": "HOA common-area lighting" },
+      "expected_output": "Should set entity: multi in state. Phase 1 runs once (shared domain). Phases 2-4 produce per-entity sections — Nites gets its own ranked segments, personas, pillars; Supply gets its own. Phase 5 writes a SINGLE artifact at docs/strategy/multi-hoa-common-area-lighting-gtm-{date}.md with a cross-entity summary block at the top and per-entity sections underneath. If segments overlap across entities but scoring diverges, surfaces the divergence in the summary — does not silently average.",
+      "assertions": [
+        "Sets entity: multi in state",
+        "Phase 1 runs once for the shared domain",
+        "Phases 2-4 produce per-entity sections (Nites and Supply each get their own)",
+        "Artifact path is docs/strategy/multi-hoa-common-area-lighting-gtm-{date}.md",
+        "Artifact contains a cross-entity summary block at the top",
+        "Artifact contains per-entity sections for both brite-nites and brite-supply",
+        "Segment-scoring divergence across entities is surfaced, not silently averaged"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "missing-marketing-context",
+      "tier": 2,
+      "prompt": "Scope a GTM motion for brite-labs on venue partnership events. Note: docs/marketing-context.md does not exist.",
+      "input": { "client": "brite-labs", "domain": "venue partnership events" },
+      "expected_output": "Should check for docs/marketing-context.md and find it missing. Must warn: 'Marketing context doc not found — proceeding with reduced context. Run /marketing:product-marketing-context to generate it.' Should degrade gracefully and proceed using user-provided inputs only. Must NOT fabricate Brite Labs entity positioning, voice, or ICP. Should flag every Brite-specific claim as 'unverified, user-provided' or similar.",
+      "assertions": [
+        "Checks for docs/marketing-context.md at the start",
+        "Warns when file is missing and suggests /marketing:product-marketing-context",
+        "Proceeds using only user-provided inputs",
+        "Does NOT fabricate entity positioning, voice, or ICP",
+        "Flags unverified Brite-specific claims when context is absent"
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "invented-pqs-signal",
+      "tier": 2,
+      "prompt": "During Phase 3 deep dive for brite-supply HOA segment, propose PQS signals. I want 5 signals that identify high-intent HOA prospects.",
+      "expected_output": "For every proposed PQS signal, must specify the SOQL query (against Account / Opportunity / Contact / custom objects) that would validate it. Signals that cannot be expressed as a SOQL query (e.g. 'prospect is actively complaining about their current vendor on Reddit') must be flagged as not SF-groundable, removed or marked, and replaced with a grounded alternative (e.g. 'Account has Previous_Vendor__c set AND Last_Activity_Date < 90 days ago'). The anti-slop check must fire on any ungrounded signal.",
+      "assertions": [
+        "Every proposed PQS signal names a concrete SOQL query for validation",
+        "Signals without SOQL grounding are flagged as not falsifiable",
+        "Ungrounded signals are removed or marked — not silently shipped",
+        "Alternative grounded signals are proposed to replace removed ones",
+        "At least one example cites a concrete SF field (e.g. Previous_Vendor__c, Last_Activity_Date)"
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "name": "research-fallback-when-bc5827-absent",
+      "tier": 2,
+      "prompt": "Run gtm-strategy Phase 1 research for brite-nites residential landscape lighting. Note: plugins/marketing/skills/account-research/ does not exist yet.",
+      "input": { "client": "brite-nites", "domain": "residential landscape lighting" },
+      "expected_output": "Must detect that plugins/marketing/skills/account-research/SKILL.md is absent. Must fall back to inline WebSearch using PRIMARY queries from plugins/marketing/references/research-processes/find-profiles.md, find-competitors.md, and find-growth-signals.md. Must use WebFetch for every promising hit and cite URL + retrieval date on each claim. Output must surface the fallback path and note 'upgrade to account-research when BC-5827 ships' as a follow-up. Should not claim it used account-research.",
+      "assertions": [
+        "Detects that plugins/marketing/skills/account-research/ does not exist",
+        "Falls back to inline WebSearch using references/research-processes/ PRIMARY queries",
+        "Uses WebFetch for promising hits and cites URL + retrieval date",
+        "Surfaces the fallback path explicitly",
+        "Notes BC-5827 as a follow-up upgrade path",
+        "Does NOT claim account-research was used"
+      ],
+      "files": ["plugins/marketing/references/research-processes/find-profiles.md", "plugins/marketing/references/research-processes/find-competitors.md", "plugins/marketing/references/research-processes/find-growth-signals.md"]
+    }
+  ]
+}
