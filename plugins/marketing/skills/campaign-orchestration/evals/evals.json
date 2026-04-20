@@ -1,0 +1,92 @@
+{
+  "skill_name": "campaign-orchestration",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Design a 5-step outbound sequence for our mid-market SaaS ICP. I want A/B variants where it matters. Do not launch — I just want the sequence design for review.",
+      "expected_output": "Should read docs/marketing-context.md first if present (or warn and proceed). Should follow Workflow 2 (methodology-only, no MCP calls). Should produce a numbered list of 5 steps with order, wait_in_days, email_subject, email_body skeleton, variant (A or B), thread_reply (true for follow-ups, false for opener/breakup). Should apply the opener → value add → social proof → breakup → revival structure. Should test ONE variable at a time per step (subject OR opener OR CTA, not all three) with exactly two variants per step. Should cite 10-14 day total duration and 2-4 day wait spacing. Should NOT call any MCP tools. Should NOT reference Smartlead, Instantly, or Apollo.",
+      "assertions": [
+        "Produces numbered list of exactly 5 steps",
+        "Each step has order, wait_in_days, email_subject, email_body, variant, thread_reply",
+        "Does not call any MCP tool (methodology-only workflow)",
+        "A/B variants test one variable at a time with two variants per step",
+        "Step 1 is opener (thread_reply false); later steps are thread_reply true; revival or breakup is thread_reply false",
+        "Total sequence duration is 10-14 days",
+        "Does not reference Smartlead, Instantly, or Apollo"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Launch an outbound campaign. Workspace is b2b, 800 leads, attached to the 'Q3 Mid-Market' schedule template (id 42), 5-step sequence I already have designed. Senders: use whatever connected senders are past warmup day 14 — I have about 15 connected on send.outbase.so.",
+      "expected_output": "Should confirm b2b workspace via get_active_workspace_info first (availability probe). Should follow the 8-call canonical launch order: get_active_workspace_info → bulk_create_leads (chunked at 500: call 1 with 500 leads, call 2 with 300) → create_campaign → import_leads_to_campaign (FIRST GATE — two-call pattern, relay vendor prompt verbatim) → list_sender_emails (filter connected + past day 14) → attach_sender_emails_to_campaign → create_schedule_from_template (schedule_id: 42) → create_sequence_steps (prefer v1.1 path; run search_api_spec if unsure) → resume_campaign (SECOND GATE — two-call pattern). After resume second-call success, calls get_campaign_stats to capture post-launch counters. Reports campaign ID, workspace, lead count, sender pool, schedule, sequence step count, and first-send window.",
+      "assertions": [
+        "Calls get_active_workspace_info FIRST (availability probe)",
+        "Chunks bulk_create_leads at 500 per call (two calls for 800 leads)",
+        "Follows 8-call canonical order without skipping steps",
+        "import_leads_to_campaign uses two-call gate pattern (first call no confirmation, relays prompt, waits for user turn, second call with confirmation)",
+        "resume_campaign uses two-call gate pattern identically",
+        "Prefers v1.1 sequence-steps path (checks search_api_spec or cites email-bison.md §Known gotchas bullet 7)",
+        "Calls get_campaign_stats after resume to capture post-launch counters",
+        "Does not auto-confirm either gate in a single turn"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I'm running import_leads_to_campaign on campaign 891 with 120 leads and the vendor returned: 'allow_parallel_sending: 40 of the 120 leads are already in an active sequence in campaign 803. Enable parallel sending? [true/false]'. What do I do?",
+      "expected_output": "Should surface the vendor prompt verbatim (not paraphrase). Should explicitly state it will NOT auto-enable allow_parallel_sending (deliverability risk per email-bison.md §Known gotchas bullet 6). Should offer to split the list — re-call import_leads_to_campaign with only the 80 non-overlapping leads, and either hold the 40 overlapping leads until campaign 803 finishes or surface the decision to the user. Should not proceed with parallel_sending: true without an explicit user approval of the risk.",
+      "assertions": [
+        "Surfaces the vendor prompt verbatim",
+        "Explicitly declines to auto-enable allow_parallel_sending",
+        "Cites deliverability risk (over-contacting prospects across campaigns)",
+        "Offers split-and-retry with the 80 non-overlapping leads",
+        "Does not call import_leads_to_campaign with parallel_sending: true without explicit user approval"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "We just set up a brand-new sending domain outreach-q3.britenites.com with 4 connected sender inboxes. Enable warmup on all 4 and tell me when I can start using them for real campaigns.",
+      "expected_output": "Should confirm target workspace first via get_active_workspace_info. Should call list_sender_emails to confirm the 4 senders' current warmup_state before enable_warmup. For each sender that is not already warming, should describe enable_warmup as a two-call gated tool (first call surfaces vendor prompt; only on explicit user approval, second call with confirmation parameter). Should cite the 4-6 week warmup timeline for new domains per Methodology §Warmup timelines (not 2 weeks — that's new IP on aged domain). Should schedule check-ins at days 7, 14, 28 via list_warmup_stats + get_warmup_details. Should recommend the user block the campaign calendar — do NOT attach these senders to a real campaign until warmup completes. Should warn against skipping warmup (day-1 bounce spike tanks domain for weeks).",
+      "assertions": [
+        "Calls get_active_workspace_info first",
+        "Calls list_sender_emails to confirm warmup_state before enable_warmup",
+        "enable_warmup uses two-call gate pattern per sender",
+        "Cites 4-6 week warmup duration for new domain (not 2 weeks)",
+        "Schedules check-ins at days 7, 14, 28",
+        "Recommends blocking the campaign calendar until warmup completes",
+        "Warns against skipping warmup (day-1 bounce spike)"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "I want to launch a 2000-lead campaign on the b2b workspace next week, but our bounce rate has climbed from 2% to 5% over the last week. Let's get this launched.",
+      "expected_output": "Should refuse to launch until bounce-rate diagnosis runs. Should recognize the bounce-rate concern as deliverability-audit's scope (domain reputation, SPF/DKIM/DMARC, Google Postmaster). Should name deliverability-audit explicitly as the handoff target. Should carry workspace context (b2b) forward to the sibling. Should NOT proceed with Workflow 3 or Workflow 4 inline. Should explain the risk: launching a 2000-lead campaign on a workspace with a rising bounce rate compounds the reputation damage and may trip spam filters across the entire sender pool. Once deliverability-audit returns clean, offer to run Task 1 with the recommendation to split 2000 leads into batches of 500 on separate days per Methodology §Send cadence.",
+      "assertions": [
+        "Refuses to launch until deliverability diagnosis runs",
+        "Names deliverability-audit as handoff target",
+        "Carries b2b workspace context forward",
+        "Does not proceed with Workflow 3 or 4 inline",
+        "Explains reputation compounding risk",
+        "Recommends splitting 2000 leads into 500-lead batches across separate days (post-audit)"
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Campaign 901 (b2b workspace) launched 2 hours ago and we already have 40 replies in the inbox. What do we do with them?",
+      "expected_output": "Should recognize reply triage as reply-processing's scope (classification, OutboundSync, Master Inbox, CRM writeback). Should name reply-processing explicitly as the handoff target. Should carry campaign ID (901) and workspace (b2b) forward. Should NOT attempt to classify replies inline, should NOT subscribe to webhooks for CRM syncing (that's OutboundSync's canonical path per email-bison.md §Known gotchas bullet 4), and should NOT pause or archive the campaign — a healthy reply volume 2 hours in is a signal to triage, not to stop. Optionally: can call get_campaign_stats to confirm the campaign is running healthy before handing off.",
+      "assertions": [
+        "Names reply-processing as handoff target",
+        "Carries campaign ID 901 and b2b workspace forward",
+        "Does not classify replies inline",
+        "Does not subscribe to webhooks for CRM syncing (OutboundSync owns that path)",
+        "Does not pause or archive the campaign (40 replies in 2 hours is healthy)",
+        "Optionally calls get_campaign_stats to confirm campaign health before handoff"
+      ],
+      "files": []
+    }
+  ]
+}
