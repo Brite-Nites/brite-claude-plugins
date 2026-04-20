@@ -24,6 +24,12 @@
       "source": "./plugins/cadence",
       "description": "Weekly planning cadence plugin — audit, scope, housekeep, narrate",
       "version": "0.2.0"
+    },
+    {
+      "name": "revops",
+      "source": "./plugins/revops",
+      "description": "Revenue operations plugin — Salesforce dev + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
+      "version": "0.1.0"
     }
   ]
 }
