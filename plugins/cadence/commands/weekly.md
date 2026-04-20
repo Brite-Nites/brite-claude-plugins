@@ -6,7 +6,7 @@ description: Run the weekly planning loop — audit, scope, housekeep, narrate
 
 Four-phase weekly planning loop. Replaces the manual W15/W16 checkpoint + narrative flow.
 
-> **Status: scaffold only.** Phase 0 preflight runs; Phase 1–5 are stubbed and owned by downstream issues. Do not rely on this command for a real weekly planning session yet.
+> **Status: in-progress build.** Phase 0 preflight + Phase 1 audit are implemented; Phase 2–4 are stubbed and owned by downstream issues. End-to-end dogfood (BC-5763) is required before this command is production-ready.
 
 ## Phase 0: Preflight
 
@@ -70,9 +70,67 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
 
 ## Phase 1: Audit
 
-> **Not yet implemented — see BC-5759.**
+Batch fan-out — one `project-audit` subagent per active project, parallel, capped at 10 concurrent. Each subagent produces a structured audit card; the main thread merges the cards and computes cross-project stats. Read-only — no Linear mutations in this phase.
 
-Batch fan-out. One subagent per project, parallel. Each subagent produces a structured audit card: shipped, dropped, carry-over, by-assignee rollup, quality-gate flags (via `skills/_shared/issue-quality-gate`). Cross-project stats computed after fan-out completes. Read-only.
+> **Phase 0 prerequisite (out of scope for this issue):** Phase 0 must populate `state.team.id` via a one-time `list_teams` lookup of `"Brite Company"`. Until that lands, dispatchers may resolve it inline. Issue tracked separately as a Phase 0 enhancement.
+
+### 1.0 Resolve prior cycle
+
+Call `mcp__plugin_workflows_linear-server__list_cycles` with `teamId: state.team.id` and `type: "previous"`. Capture `id`, `title`, `startsAt`, `endsAt`, `completedIssueCountHistory`, `issueCountHistory`. Store as `state.cycle.previous`. (`state.cycle.current` was populated in Phase 0.2 — that's the cycle the user is *planning*; this previous cycle is the one being *audited*.)
+
+### 1.1 Idempotency check
+
+Construct the audit file path: `weekly-planning/w<NN>-<startsAt-yyyy-mm-dd>/audit.json` (relative to the user's repo root, where `<NN>` is parsed from `state.cycle.previous.title` and the date is the previous cycle's `startsAt` formatted `YYYY-MM-DD`). If the file exists, parse it as JSON, and `cycle.id == state.cycle.previous.id`, populate `state.projects[].audit_card` + `state.cross_project_stats` from the file and skip to § 1.6 (synthesis). Log: `Phase 1 audit cached — re-using audit.json (0 dispatches).`
+
+### 1.2 Dispatch
+
+For each project in `state.projects[]` (already filtered to `status.type == "started"` and deduped by `id` in Phase 0.3), dispatch the `project-audit` subagent with a prompt body containing:
+
+- `project_id`, `project_name`
+- `cycle_id` (= `state.cycle.previous.id`), `cycle_title`, `cycle_window` (= `{startsAt, endsAt}`)
+- `team_id` (= `state.team.id`)
+
+Send all dispatches in a single `Agent` tool message to run them in parallel. Cap concurrent in-flight subagents at **10**; if `state.projects[].length > 10`, batch sequentially in groups of 10. Reason: Linear MCP throughput observed at ~10 in-flight calls.
+
+### 1.3 Merge
+
+Parse each subagent's returned JSON block into `state.projects[<index>].audit_card`. If a subagent returned an `error` field, record `audit_card = {error, project_id, project_name}` and continue with the rest.
+
+### 1.4 Cross-project synthesis
+
+Compute and store under `state.cross_project_stats`:
+
+- `completion_rate` = `sum(p.audit_card.shipped.count) / state.cycle.previous.issueCountHistory[0]` (denominator is day-1 scope per BC-5757 § 2.2 gotcha).
+- `unplanned_ratio` = `(shipped_total - planned_count_from_prior_narrative) / shipped_total`. If no prior narrative file exists, store `null` and surface a footnote in § 1.6 (BC-5757 § 2.6 limitation).
+- `shipped_total`, `dropped_total`, `carry_over_total` (each = sum across projects).
+- `team_standouts` = list of assignees with ≥90% of their planned issues shipped (per AC #4 — derived from `by_assignee` rollups).
+
+### 1.5 Persist audit file
+
+Write `state.cross_project_stats` plus every `audit_card` to `audit.json` at the path constructed in § 1.1. Pretty-print (2-space indent) for `git diff` legibility.
+
+### 1.6 User-facing synthesis (≤300 words)
+
+Render to the user:
+
+1. **Headline anchors** — one line: `<completion_rate>% completion / <shipped_total> shipped / <unplanned_ratio>% unplanned / standouts: <team_standouts>`.
+2. **Per-project drift bullets** — one line per project: `**<project>** — <shipped> shipped, <carry_over> carrying over, <dropped> dropped. <highest-priority carry-over ID if any>`.
+3. **Audit gaps** subsection — only if any subagent failed: list each failed project + the suggested retry command (`/cadence:weekly --resume-phase 1 --project <name>`).
+4. **Quality flags** subsection — only if any flagged: one line per flag — `<issue_id> — <check>: <message>`.
+
+Do not batch projects into categories. Surface every project, even ones with zero activity, per `memory/feedback_thorough_audits.md`.
+
+### 1.7 Gate #1
+
+Call `AskUserQuestion`:
+
+> *"Audit complete. <N> projects audited, <shipped_total> shipped, <carry_over_total> carrying over. Proceed to Phase 2 scope?"*
+
+Options:
+
+- **"Proceed to Phase 2"** — `(Recommended)` — moves into the per-project scope loop.
+- **"Re-run Phase 1"** — clears the `audit.json` cache and re-dispatches.
+- **"Cancel session"** — exits cleanly, leaves `audit.json` in place for the next invocation.
 
 ## Phase 2: Scope
 
