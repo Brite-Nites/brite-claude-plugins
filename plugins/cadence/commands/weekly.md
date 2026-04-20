@@ -117,7 +117,7 @@ Compute and store under `state.cross_project_stats`:
 
 ### 1.5 Persist audit file
 
-Write `state.cross_project_stats` plus every `audit_card` to `audit.json` at the path constructed in § 1.1. Pretty-print (2-space indent) for `git diff` legibility.
+Write `{cycle: state.cycle.previous, cross_project_stats: state.cross_project_stats, audit_cards: <every state.projects[].audit_card>}` to `audit.json` at the path constructed in § 1.1. The top-level `cycle` field is what § 1.1's idempotency predicate (`parsed.cycle.id == state.cycle.previous.id`) reads. Pretty-print (2-space indent) for `git diff` legibility.
 
 ### 1.6 User-facing synthesis (≤300 words)
 
