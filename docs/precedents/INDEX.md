@@ -21,3 +21,4 @@
 | [BC-5760](BC-5760.md) | Canonical state-object schema lives in entry command; every phase PR updates it alongside skill body | architecture | 2026-04-20 | architecture, multi-phase, state-schema, cross-phase-drift, cadence |
 | [BC-5794](BC-5794.md) | Sibling-one is the inflection point for first-of-N template validation; apply overrides verbatim or amend the precedent | pattern-choice | 2026-04-20 | pattern-choice, sibling-one, template-validation, revops-phase-3, cdr-coverage |
 | [BC-5761](BC-5761.md) | Fix-review loops for markdown-spec PRs converge in 4-5 iterations; budget accordingly, cap at 5 | pattern-choice | 2026-04-20 | pattern-choice, review-loop, iteration-budget, markdown-spec, schema-drift |
+| [BC-5762](BC-5762.md) | BC-5761 iteration precedent confirmed on second PR; Bash-variable-without-producer is distinct bug class | pattern-choice | 2026-04-20 | pattern-choice, review-loop, iteration-budget, bash-variable-spec, cross-cycle-folder |
