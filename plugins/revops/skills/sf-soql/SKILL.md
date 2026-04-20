@@ -18,20 +18,20 @@ Use this skill when the user needs **SOQL/SOSL authoring or optimization**: natu
 
 ## Brite Context
 
-Brite's object model wraps a standard Salesforce core (Account, Contact, Lead, Opportunity, Campaign, Activity) with five custom extensions that drive nearly every non-trivial query: `Territory__c`, `Location` (FSL standard), `Lifecycle_Stage_History__c`, `AccountContactRelation`, `In_App_Checklist_Settings__c`. Know the four business lines (Rule 3), the FSL/Territory distinction (Rules 4-5), and the automation-written audit table (Rule 6) before writing any pipeline or attribution SOQL.
+Brite's object model wraps a standard Salesforce core (Account, Contact, Lead, Opportunity, Campaign, Activity) with five extensions that drive nearly every non-trivial query — three custom (`Territory__c`, `Lifecycle_Stage_History__c`, `In_App_Checklist_Settings__c`) and two standard objects used in Brite-specific ways (`Location` via FSL, `AccountContactRelation`). Know the four business lines (Rule 3), the FSL/Territory distinction (Rules 4-5), and the automation-written audit table (Rule 6) before writing any pipeline or attribution SOQL.
 
 Authoritative landmarks:
 - `brite-salesforce/force-app/main/default/objects/` — canonical schema
 - `brite-salesforce/CLAUDE.md` §Business Context + §Apex & Automation — behavioral gotchas
 - `brite-salesforce/docs/artifacts/data-dictionary.md` — authoritative field reference
 
-SOQL-specific gotchas (Rules 7-16) trace to verified incidents: BC-5021 (before-update cascade), BC-5545 (Task re-parenting, in-flight), BC-5609 (cross-env User + sharing).
+SOQL-specific gotchas in Rules 9, 11-13 trace to verified incidents: Rule 13 (BC-5021 before-update cascade), Rule 9 (BC-5545 Task re-parenting), Rules 11-12 (BC-5609 cross-env User + sharing).
 
 **See also:** [sf-apex](../sf-apex/SKILL.md) for DML context · [sf-data](../sf-data/SKILL.md) for execution · [sf-permissions](../sf-permissions/SKILL.md) for FLS-aware queries · [sf-metadata](../sf-metadata/SKILL.md) for field-shape authoring.
 
 ## Brite SOQL Conventions
 
-18 rules grounded in `brite-salesforce/CLAUDE.md`. Each rule cites a specific source line (verified via `gh api` 2026-04-20).
+18 rules grounded in `brite-salesforce/CLAUDE.md`. Each rule cites a specific source line where possible; a few synthesized patterns (Rules 6, 18) also reference the BC-5798 issue body.
 
 ### Theme A — Source + API context
 
@@ -48,19 +48,19 @@ SOQL-specific gotchas (Rules 7-16) trace to verified incidents: BC-5021 (before-
 ### Theme C — Task & polymorphic relationship gotchas
 
 7. **SOQL semi-join from other objects to Task is not supported.** `Contact WHERE Id IN (SELECT WhoId FROM Task ...)` fails with `Entity 'Task' is not supported for semi join inner selects`. Use two queries: pull `WhoId`s from Task first, then filter Contact by Id. _(§Apex & Automation line 189)_
-8. **Polymorphic `Who`/`What` relationships don't support dot-walking.** `SELECT Who.AccountId FROM Task` fails because `Who` is the polymorphic `Name` entity. Use `TYPEOF Who WHEN Contact THEN AccountId END` or a separate query by `WhoId`. _(§Apex & Automation line 190)_
+8. **Polymorphic `Who`/`What` relationships don't support dot-walking.** `SELECT Who.AccountId FROM Task` fails because `Who` is the polymorphic `Name` entity. **Prefer `TYPEOF Who WHEN Contact THEN AccountId END`** (single query, conditional field selection). Fall back to a separate query by `WhoId` only when the fields needed don't fit `TYPEOF`'s constraints or when multiple polymorphic targets complicate the branch list. _(§Apex & Automation line 190)_
 9. **`Task.AccountId` does NOT cascade when `Contact.AccountId` changes.** It's set at creation from `WhatId` (or derived from the `WhoId` Contact's AccountId at that moment). To re-parent: `UPDATE Task SET WhatId = :newAccountId` — `AccountId` follows `WhatId`. _(§Apex & Automation line 188, verified during BC-5545 contact re-parenting)_
 10. **Activity-object field authoring** — custom fields on Task/Event live in `objects/Activity/fields/`, but SOQL filter references still use `Task.Custom_Field__c` / `Event.Custom_Field__c`, NOT `Activity.Custom_Field__c`. _(§Metadata Authoring line 122)_
 
 ### Theme D — User object cross-env + sharing
 
 11. **Cross-env `User` lookup: query by `Email`, NOT `Username`.** Sandbox refreshes append `.sandbox` / `.full` / `.preview` to every `User.Username`; `User.Email` is NOT rewritten on refresh. Always pair with `IsActive = TRUE` and `LIMIT 1` (Email is not unique). For scratch-org CI, combine with a `@TestVisible` override field set to `UserInfo.getUserId()` so the empty-query doesn't NPE. Pattern: `LeadTriggerHandler.resolveWebFormOwnerId`. _(§Apex & Automation line 194, BC-5609)_
-12. **`with sharing` does NOT restrict `User` object queries.** `User` is always org-wide visible to any authenticated Apex context (including Guest and Integration Users). `public with sharing` on a handler that queries `User` is misleading — add a code comment noting the distinction. Only `User` is special; other standard objects respect sharing. _(§Apex & Automation line 196)_
+12. **`with sharing` does NOT restrict `User` object queries.** `User` is always org-wide visible to any authenticated Apex context (including Guest and Integration Users). `public with sharing` on a handler that queries `User` is misleading — add a code comment noting the distinction. Only `User` is special; other standard objects respect sharing. _(§Apex & Automation line 196, BC-5609)_
 
 ### Theme E — Trigger-context + scheduler SOQL
 
 13. **Before-update triggers querying the same object see pre-update DB state.** When checking "does this Contact have other open Opps?" while closing an Opp, the closing Opp still appears open. Exclude current trigger records: `AND OpportunityId NOT IN :closedLostOpps.keySet()`. _(§Apex & Automation line 183, BC-5021)_
-14. **Schedulable DML row limit = 10,000 per transaction.** `DisqualifiedRecycleScheduler` runs 4 queries (DQ Contacts, DQ Leads, Lost Contacts, Lost Leads) each with `LIMIT 2500`. Do not raise individual query limits without switching to Batchable. _(§Apex & Automation line 184)_
+14. **Schedulable DML row limit = 10,000 per transaction.** Each query's result rows flow into downstream DML, so the DML cap constrains combined query output. `DisqualifiedRecycleScheduler` runs 4 queries (DQ Contacts, DQ Leads, Lost Contacts, Lost Leads) each with `LIMIT 2500` so the total 10,000 rows stay within the Schedulable DML budget. Raising any individual query's LIMIT requires switching to Batchable. _(§Apex & Automation line 184)_
 15. **`LeadSource` is a WHERE-clause dispatcher, not just a label.** `Web_Form` → `webFormAfterInsertServices` registry; `Newsletter_Signup` → `newsletterAfterInsertServices`. Any SOQL-driven Lead analytics grouping by source must use these exact picklist values. _(§Apex & Automation line 177)_
 
 ### Theme F — Lifecycle_Stage picklist semantics
