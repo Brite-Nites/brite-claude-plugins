@@ -81,10 +81,15 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
   "leadership_planning_notes": null,                              // Phase 2 optional input
   "mutations": [ {                                                // Phase 3 linear-housekeeping populates
       "id", "decision_path", "mutation_type",
-      "target": { "kind", "id", "name" },
-      "before": {…}, "after": {…},
+      "target": { "kind", "id", "name", "projectId" },
+      "before": {…}, "after": {…},                                // both carry ID-form + name-form fields
       "gate_status", "gate_detail": [...], "override_reason",
-      "executed_at", "result", "error", "source_project"
+      "approved", "started_at", "executed_at", "result", "error", "source_project"
+  } ],
+  // Phase 3 is authoritative for the mutation row shape — see
+  // plugins/cadence/skills/linear-housekeeping/SKILL.md § 2.1.
+  "_mutation_conflicts": [ {                                      // Phase 3 § 2.5 cross-project dedup
+      "issue_id", "source_projects": [ ... ], "conflicting_targets": [ ... ]
   } ],
   "housekeeping_log_path": null,                                  // Phase 3 resolves once at § 7 entry
   "_executed_mutation_ids": [],                                   // Phase 3 resume cache
