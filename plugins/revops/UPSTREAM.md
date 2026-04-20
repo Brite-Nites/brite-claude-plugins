@@ -51,13 +51,13 @@ This will surface merge conflicts on any Brite-customized files. Keeping upstrea
 
 ## Attribution
 
-Original work © Jaganpro and contributors, MIT-licensed. See `plugins/revops/LICENSE` for the verbatim license text. Each Brite-customized skill carries an attribution header inside its `SKILL.md`:
+Original work © Jaganpro and contributors, MIT-licensed. See `plugins/revops/LICENSE` for the verbatim license text. Each Brite-customized skill carries an attribution comment at the top of its `SKILL.md` (above the H1):
 
 ```
-# Brite-customized from Jaganpro/sf-skills@ff1ab74
-# Original skill: <name> (MIT)
-# This file layers in Brite conventions from brite-salesforce/CLAUDE.md
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md. -->
 ```
+
+This wording is canonical across all Phase 3 customized skills (BC-5793 onward) and matches the `T2` verification grep in each issue body. References-directory files adapted from upstream carry the same comment prefixed with `<!-- Parent: <skill>/SKILL.md -->` on line 1.
 
 ## Re-importing deleted content
 
