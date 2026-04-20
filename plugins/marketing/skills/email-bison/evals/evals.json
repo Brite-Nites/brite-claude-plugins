@@ -1,0 +1,82 @@
+{
+  "skill_name": "email-bison",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Block this email domain: competitorco.com — add it to the blocklist.",
+      "expected_output": "Should confirm the target workspace first (b2b or personal, or both) before any mutating call. Should call get_active_workspace_info as the availability probe per ADR 2c. Should call add_domain_to_blocklist (domain-level tool, not the email-level tool). Should report the workspace(s) where the block was applied and the timestamp. Should NOT auto-apply to both workspaces without asking. Should NOT call Smartlead/Instantly/Apollo.",
+      "assertions": [
+        "Asks which workspace (b2b, personal, or both) before mutating",
+        "Calls get_active_workspace_info as availability check",
+        "Uses add_domain_to_blocklist (not add_email_to_blocklist) for domain-level blocking",
+        "Reports the workspace(s) and timestamp",
+        "Does not reference Smartlead, Instantly, or Apollo"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Help me design a 5-step outbound sequence with A/B content variants for our net-new ICP segment.",
+      "expected_output": "Should recognize this as campaign-orchestration's scope (sequence design depth, content variants) and hand off rather than attempt the work inline. Should name campaign-orchestration as the target sibling skill. Should carry workspace context forward if workspace was already confirmed. Should NOT attempt to write sequence content or call create_sequence_steps directly.",
+      "assertions": [
+        "Identifies request as campaign-orchestration's scope",
+        "Names campaign-orchestration explicitly as the handoff target",
+        "Does not call create_sequence_steps or write sequence content",
+        "Carries workspace context forward if already established"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Un-block contact@acme.com — we blocked them by mistake yesterday.",
+      "expected_output": "Should confirm target workspace first. Should call get_active_workspace_info. Should describe the two-call MCP confirmation gate pattern for remove_email_from_blocklist: first call without confirmation parameter → relay vendor prompt verbatim to user → only on explicit user approval, second call with confirmation parameter. Must NOT auto-confirm. Must NOT paraphrase or summarize the vendor prompt — relay it verbatim.",
+      "assertions": [
+        "Confirms target workspace before proceeding",
+        "Describes the two-call confirmation gate pattern",
+        "States that it will relay the vendor prompt verbatim",
+        "Explicitly does not auto-confirm",
+        "Waits for explicit user approval between calls"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Create a Slack webhook that pings our #outbound channel whenever a campaign finishes. Here's the URL: https://hooks.slack.com/services/T0/B0/XYZ",
+      "expected_output": "Should confirm target workspace first. Should call get_active_workspace_info. Should verify the URL does not pattern-match OutboundSync (the Slack webhook URL is fine — OutboundSync would be a brite-data-platform or brite-salesforce URL). Should list existing webhooks via list_webhooks, then call create_webhook with the target URL and appropriate event filter (campaign_completed or equivalent). Should NOT trigger the OutboundSync double-subscription warning for a Slack URL. Should test the webhook if test_webhook is available.",
+      "assertions": [
+        "Confirms target workspace",
+        "Calls get_active_workspace_info",
+        "Verifies URL is not OutboundSync before proceeding",
+        "Calls list_webhooks and create_webhook (not external tooling)",
+        "Mentions testing the webhook if test_webhook is available"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Our bounce rate on the b2b workspace jumped from 2% to 8% this week. What do we do?",
+      "expected_output": "Should recognize this as deliverability-audit's scope (bounce-rate diagnosis, domain reputation, SPF/DKIM/DMARC). Should name deliverability-audit as the handoff target and carry the workspace context (b2b) forward. Should NOT attempt to diagnose bounce causes inline, and should NOT auto-rotate senders before the audit runs. Should confirm workspace first, then route.",
+      "assertions": [
+        "Identifies request as deliverability-audit's scope",
+        "Names deliverability-audit explicitly as the handoff target",
+        "Carries the b2b workspace context forward to the sibling",
+        "Does not attempt bounce diagnosis or sender rotation inline",
+        "Does not reference Smartlead, Instantly, or Apollo"
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Subscribe our brite-data-platform OutboundSync endpoint to Email Bison reply events so our Salesforce contacts update in real time. URL: https://sync.brite-data-platform.internal/emailbison/events",
+      "expected_output": "Should detect that the URL pattern-matches OutboundSync (brite-data-platform host, /emailbison/events path) and STOP before creating the webhook. Should warn about the double-subscription gotcha — OutboundSync owns the canonical CRM-sync path; having this skill subscribe the same endpoint directly creates dedup headaches. Should point the user at OutboundSync's own webhook configuration rather than create a parallel subscription here. Should cite email-bison.md §Known gotchas bullet 4 as the source of the rule.",
+      "assertions": [
+        "Detects URL matches OutboundSync pattern",
+        "Stops before calling create_webhook",
+        "Warns about the double-subscription gotcha",
+        "References email-bison.md §Known gotchas or §Related skills for OutboundSync ownership",
+        "Points the user at OutboundSync configuration rather than create a parallel subscription"
+      ],
+      "files": []
+    }
+  ]
+}
