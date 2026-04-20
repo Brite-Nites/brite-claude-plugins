@@ -30,7 +30,7 @@ Formalizes architectural decisions from the 2026-04-19 scoping session so future
    - 3.2 Adoption method: `git subtree` with `--squash` (vs fork, vs user-level install)
    - 3.3 Workflow integration: augment, don't replace
    - 3.4 MCP scope: `--toolsets data,metadata,testing --no-telemetry`, GA-only
-   - 3.5 Skill filter: 13 keep, 22 skip, 7 agents skip
+   - 3.5 Skill filter: 13 customized, 1 deferred, 22 skip, 7 agents skip
    - 3.6 Naming convention: **keep upstream skill names** (override of master plan §3.6). Rationale: plugin namespace already signals Brite, attribution header carries provenance, upstream-sync path stays clean.
    - 3.7 Renames deferred to per-skill Phase 3 issues — but after this ADR, the default for each Phase 3 issue is "no rename unless skill-specific reason justifies it."
 
