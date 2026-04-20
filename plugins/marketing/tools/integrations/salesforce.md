@@ -14,8 +14,7 @@ Decisions backing this integration: [`docs/research/salesforce-mcp-findings.md`]
 
 ## Consumed by
 
-_(none yet — the 5 skills below are blocked by this integration landing)_
-
+- `situation-mining` (BC-5824) — existing-account deep dive: `run_soql_query` on Account, Activity history, Opportunity history, `Account_Notes__c`, `Lifecycle_Stage_History__c` to enrich per-prospect worldview inference with internal signals.
 - `list-building` (BC-2717)
 - `reply-processing` (BC-2720)
 - `lead-routing` (BC-2725)
