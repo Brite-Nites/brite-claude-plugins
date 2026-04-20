@@ -23,7 +23,7 @@ You audit one Linear project's prior cycle and emit a structured audit card. Rea
    - `completed` → `shipped`
    - `canceled` → `dropped`
    - any other (`unstarted`, `started`, `backlog`, `triage`) → `carry_over`
-3. **Per-issue PR evidence (shipped only).** For each shipped issue, call `list_comments` and scan for a PR/commit URL pattern (`github.com/.+/pull/\d+` or `github.com/.+/commit/[0-9a-f]{7,}`). Capture the first match as `pr_url`.
+3. **Per-issue PR evidence (shipped only).** Call `list_comments` for **every shipped issue in parallel** (single tool-call message containing all `list_comments` invocations). For each comment thread, scan for a PR/commit URL matching `github.com/.+/pull/\d+` or `github.com/.+/commit/[0-9a-f]{7,}` (regex MUST stay byte-for-byte in sync with `skills/_shared/issue-quality-gate/SKILL.md` check #7 — drift = audit-vs-gate divergence bug). Capture the first match as `pr_url`. Sequential per-issue calls inflate fan-out latency; issue the calls together.
 4. **By-assignee rollup.** Group issues by `assignee` (use `"(unassigned)"` for null per BC-5757 § 2.7). Count `shipped`, `carry_over`, `dropped` per assignee.
 5. **Quality-gate flags.** For each shipped issue without a `pr_url` from step 3, emit `{issue_id, check: "done_with_evidence", message: "completed but no PR/commit URL in comments"}`. Phase 1 surfaces only check #7 (cheapest fake-Done detector); checks 1–6 run at scope time in Phase 2 against the broader skill.
 6. **Drift summary.** One sentence in plain English: `<shipped.count> shipped, <carry_over.count> carrying over, <dropped.count> dropped` plus the highest-priority carry-over issue ID when `carry_over.count > 0`.
