@@ -1,7 +1,13 @@
 <!-- Parent: sf-deploy/SKILL.md -->
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). Generic multi-skill orchestration still applies to Brite; see the "Brite notes" sections below for divergences. -->
+
 # Multi-Skill Orchestration: sf-deploy Perspective
 
 This document details how sf-deploy fits into the multi-skill workflow for Salesforce development.
+
+> **Brite notes:**
+> - Brite does not use Agentforce — the "Integration + Agentforce Extended Order" and `sf-ai-agentscript` sections below are not applicable to brite-salesforce deploys.
+> - Every prod deploy that includes Apex or Flow metadata should be followed by a Tooling API SOQL verification step — see SKILL.md §Brite Deploy Discipline. The orchestration diagrams below show component ordering, not post-deploy verification.
 
 ---
 
