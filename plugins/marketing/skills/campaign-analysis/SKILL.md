@@ -29,7 +29,55 @@ You are the post-campaign diagnostician for Brite's outbound motion — the oper
 
 ## Methodology
 
-TBD — filled by subsequent tasks.
+Three frameworks govern this skill: the **5 Core Variables diagnostic** (Offer / Message / Segment / Infrastructure / Timing), the **4-phase analysis flow** (Hypothesis → Data Collection → Analysis → Recommendations), and **benchmark-based verdict mapping** that converts ranked metrics into decision labels. The 5 Variables are orthogonal by design — every observation the skill surfaces in the §6 report resolves to exactly one of the five, never two. Phase 1 (Hypothesis) MUST precede Phase 3 (Analysis): writing down expectations before touching data is the skill's single load-bearing guard against narrative retrofit, where the operator reads the numbers first and then invents a story that explains them.
+
+### 5 Core Variables
+
+Every campaign performance observation — ranked-row table entries, anomalies, recommendations — attributes to one of these five variables. Treat them as mutually exclusive diagnostic buckets.
+
+### Offer
+
+The value proposition itself — what the prospect gets if they reply, and whether it is worth replying for. Offer sits upstream of every other variable: if the offer is wrong for the audience, no amount of copy polish, list refinement, or send-time optimization saves the campaign. *Key question: is the offer compelling? Does it solve a real pain the prospect would pay to solve?*
+
+### Message
+
+Subject line, body copy, CTA construction, tone, paragraph structure, spintax density. Message problems masquerade as Segment problems when diagnosed shallowly — "nobody is replying" reads as "wrong list" when it is actually "the hook is generic." *Key question: is the message clear? Does the tone match the audience? Does the CTA invite the right next step?*
+
+### Segment
+
+Who the campaign targeted — titles, verticals, company size, geography, ICP fit, list freshness. A perfect offer mismatched to the audience returns silence, or worse, confused-reply noise that wastes BDR triage hours. *Key question: are we reaching the right ICP? Are the titles accurate? Is the list fresh?*
+
+### Infrastructure
+
+The email sending stack itself — Google Workspace vs Microsoft 365 sender domains, sender warmup status, IP reputation, SPF / DKIM / DMARC posture, bounce handling, inbox rotation. Infrastructure problems show up as bounce-rate spikes, sudden reply-rate cliffs mid-campaign, or sharp Google-vs-Microsoft disparities that have nothing to do with the offer or message. *Key question: are we landing in the inbox or in spam? Is sender reputation healthy?*
+
+### Timing
+
+Send day-of-week, time-of-day, sequence step spacing, overall cadence, campaign start date relative to the prospect's seasonality. Timing problems are the subtlest of the five and often only surface in cohort analysis — a Tuesday-Thursday split, a morning-vs-afternoon split, a pre-holiday vs post-holiday split. *Key question: when are opens and replies actually happening? Is the cadence right for this audience?*
+
+**Orthogonality rule.** Every observation in the §6 report must attribute to exactly one of the 5 variables. If an observation appears to span two (e.g., "low replies on Fridays from senior titles"), split it into two observations — one attribution to Timing, one to Segment — and report them on separate ranked rows. Mixed attributions are a slop signal; §8 anti-slop guardrails will call them out and the report will not pass the §7 rubric if they remain.
+
+### 4-phase analysis flow
+
+The four phases run strictly in sequence — each completes before the next begins. Phase 1 ALWAYS precedes Phase 3; this is the narrative-retrofit guard and is enforced as a hard gate, not a soft convention. Phase 2 feeds Phase 3's inputs; Phase 4 consumes Phase 3's findings; no phase reads ahead.
+
+#### Phase 1 — Hypothesis
+
+State what you expect to see BEFORE pulling any data. Example operator phrasing: "I expect Google infrastructure to outperform Microsoft on reply rate by 1.5-2x, based on the campaign-orchestration ADR's deliverability assumptions." The skill prompts the operator via AskUserQuestion to write down 1-3 specific expectations before proceeding — one question per expectation, per the BC-5761 one-question-per-field rule. The purpose is to prevent narrative retrofitting in Phase 3: an operator who has not written down their prior beliefs will read any Phase 3 data as confirming whichever story is most convenient. If the operator skips this, the skill MUST refuse to continue — there is no "degrade gracefully" path for Phase 1. This is the single hardest gate in the skill.
+
+#### Phase 2 — Data Collection
+
+Pull campaign performance from the Gate-2-detected Email Bison workspace. The exact tool calls live in §5 MCP Tool Reference; the outputs Phase 2 produces are per-campaign stats (sends, opens, replies, bounces, interested replies), per-lead delivery status, and reply-by-reply sentiment hints. Phase 2 also applies the statistical-significance floor: a campaign must have sent at least 500 emails AND run for at least 7 days before Phase 3 can produce any verdict stronger than `TEST MORE`. Below either threshold, every verdict in Phases 3-4 auto-maps to `TEST MORE` regardless of what the numbers look like — small samples lie, and the skill will not pretend otherwise.
+
+#### Phase 3 — Analysis
+
+Apply the 5 Variables orthogonally to the Phase 2 data. Rank all campaigns in the analysis window by Interested Rate. Compute per-variable attribution for the top 2 and bottom 2 performers — for each, name which of the 5 Variables most plausibly explains the performance. Do cohort analysis by bucketing on each variable: Infrastructure (Google senders vs Microsoft senders), Timing (Tuesday sends vs Thursday sends, morning vs afternoon), Segment (title seniority, vertical, company size tier), and so on. Flag statistical anomalies: a 2x+ differential between cohorts of comparable volume is a hard signal worth a recommendation; sub-1.5x is noise unless it repeats across multiple campaigns. Do NOT begin Phase 3 before Phase 1 is written down — this is the Hypothesis-before-Analysis rule, and skipping it is a §8 anti-slop violation.
+
+#### Phase 4 — Recommendations
+
+Map every Phase 3 finding to a specific action via the §3.5 verdict table. Prioritize actions in this order: `SCALE` winners first (they produce the next campaign's budget), `UNDERPERFORM` kills second (they stop the bleed on senders, domains, and list spend), `TEST MORE` experiments third (they feed future hypotheses and seed the next Phase 1). End the phase with the mandatory handoff prompt to `campaign-debrief` — the skill does not consider Phase 4 complete until the operator confirms the handoff. Per-campaign analysis artifacts are disposable; the durable learnings belong in the org's compounding knowledge base, and `campaign-debrief` is the skill that promotes them there.
+
+<!-- TASK 4: §3.3 benchmarks + §3.4 report sections + §3.5 verdict mapping go here -->
 
 ---
 
