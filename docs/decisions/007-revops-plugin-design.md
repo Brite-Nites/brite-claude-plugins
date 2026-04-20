@@ -44,7 +44,7 @@ Rationale: subtree is strictly more flexible than wholesale fork. If we never pu
 
 Claude Code project-scope precedence means the three MCP instances (marketing narrow, revops medium, brite-salesforce broad) don't conflict when a session sits inside `brite-salesforce` — the most-local config wins.
 
-### 3.5 Skill filter: 13 keep, 22 skip, 7 agents skip
+### 3.5 Skill filter: 13 customized, 1 deferred, 22 skip, 7 agents skip
 
 **Keep (13):** sf-apex, sf-flow, sf-lwc, sf-soql, sf-testing, sf-debug, sf-metadata, sf-data, sf-docs, sf-permissions, sf-connected-apps, sf-integration, sf-deploy.
 
