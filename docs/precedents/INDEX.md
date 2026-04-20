@@ -15,5 +15,7 @@
 |-------|----------|----------|------|------|
 | [BC-2693](BC-2693.md) | Handbook (Context7) as Tier 1 universal SoR for all context-skills, domain MCP as Tier 2 | architecture | 2026-03-31 | context-skills, handbook, context7, sor-architecture, tiered-fallback |
 | [BC-5758](BC-5758.md) | Later-locked research decision supersedes earlier-issue scope wording; flag at Plan, approve, commit/PR trail | scope-change | 2026-04-19 | scope-change, superseded-scope, mcp-registration, plan-checkpoint, cadence |
+| [BC-2707](BC-2707.md) | Two-call MCP confirmation gate blocks same-turn auto-confirm, not affirmative vocabulary | pattern-choice | 2026-04-20 | confirmation-gate, two-call-pattern, turn-structure, mcp-orchestration, email-bison |
 | [BC-5789](BC-5789.md) | Per-item audit at filter time can rescue items the locked plan would have lost; file follow-up for rescued items | pattern-choice | 2026-04-20 | pattern-choice, plugin-import, subtree, per-item-audit, scope-rescue |
+| [BC-5793](BC-5793.md) | First-of-N session locks the template; update shared convention files (UPSTREAM.md) in same PR, don't defer | pattern-choice | 2026-04-20 | pattern-choice, first-of-n, shared-convention, plan-gate, revops-phase-3 |
 | [BC-5760](BC-5760.md) | Canonical state-object schema lives in entry command; every phase PR updates it alongside skill body | architecture | 2026-04-20 | architecture, multi-phase, state-schema, cross-phase-drift, cadence |

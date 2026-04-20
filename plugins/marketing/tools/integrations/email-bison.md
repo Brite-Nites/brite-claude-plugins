@@ -10,7 +10,10 @@ The official Email Bison MCP Server (Beta) exposes the full sending-layer API su
 
 ## Consumed by
 
-- _(none yet — see BC-2707, BC-2718, BC-2719, BC-2720 for the skills that will reference this)_
+- `email-bison` (`plugins/marketing/skills/email-bison/`) — default entry point; owns the long tail (workspace, senders, tags, blocklist, webhooks, schedule templates, variables, quick stats) and routes to the specialized siblings below when intent matches.
+- `campaign-orchestration` (`plugins/marketing/skills/campaign-orchestration/`) — sequence design, inbox rotation, warmup strategy, end-to-end campaign launch.
+- `reply-processing` (BC-2720 — not yet landed) — reply classification + OutboundSync CRM sync.
+- `deliverability-audit` (BC-2719 — not yet landed) — SPF/DKIM/DMARC, domain reputation, bounce analysis.
 
 ## Auth
 
@@ -249,9 +252,9 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 
 ## Related skills
 
-**Primary consumers** *(not yet landed — tracked in Linear)*:
+**Primary consumers:**
 
-- `campaign-orchestration` (BC-2718) — sequence design, inbox rotation, warmup strategy
+- `campaign-orchestration` (`plugins/marketing/skills/campaign-orchestration/`, BC-2718) — sequence design, inbox rotation, warmup strategy, end-to-end campaign launch
 - `deliverability-audit` (BC-2719) — domain reputation, bounce rate analysis
 - `reply-processing` (BC-2720) — pairs Email Bison blocklist with Master Inbox label actions
 - `list-building` (BC-2717) — pipes enriched leads from `brite-data-platform` into Email Bison campaigns
