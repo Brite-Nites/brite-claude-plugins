@@ -10,7 +10,10 @@ The official Email Bison MCP Server (Beta) exposes the full sending-layer API su
 
 ## Consumed by
 
-- _(none yet — see BC-2707, BC-2718, BC-2719, BC-2720 for the skills that will reference this)_
+- `email-bison` (`plugins/marketing/skills/email-bison/`) — default entry point; owns the long tail (workspace, senders, tags, blocklist, webhooks, schedule templates, variables, quick stats) and routes to the specialized siblings below when intent matches.
+- `campaign-orchestration` (BC-2718 — not yet landed) — sequence design, inbox rotation, warmup strategy.
+- `reply-processing` (BC-2720 — not yet landed) — reply classification + OutboundSync CRM sync.
+- `deliverability-audit` (BC-2719 — not yet landed) — SPF/DKIM/DMARC, domain reputation, bounce analysis.
 
 ## Auth
 
