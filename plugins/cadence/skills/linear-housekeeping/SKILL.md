@@ -53,7 +53,7 @@ Every row in `state.mutations[]` has:
   "gate_detail": [ … ],       // 7-tuple from issue-quality-gate; empty if path != "cycle"
   "override_reason": "<string>" | null,
   "executed_at": "<ISO-8601>" | null,
-  "result": "executed" | "skipped-idempotent" | "errored" | "dropped-by-user" | null,
+  "result": "executed" | "skipped-idempotent" | "errored" | "dropped-by-user" | "no-op" | null,
   "error": "<string>" | null,
   "source_project": "<project_name>"  // "(global)" for milestone renames
 }
@@ -68,7 +68,7 @@ For each carry-over answer tuple keyed by `issue_id`:
 | Answer condition | Decision path | Mutation type(s) emitted |
 |---|---|---|
 | CQ1 answered "Park indefinitely" *(per sprint-scoping § 3: CQ5 is auto-skipped in this case; rule fires before any CQ5 row so the user's explicit park intent is not silently dropped)* | `backlog` | `backlog-return` (`cycleId` → null, `state.type` → `backlog`, `assignee` → null) |
-| CQ3 answered "superseded by <IDs>" | `cancel` | `cancel` (primary supersede ID → `duplicateOf`; rest → `relatedTo`; plain-text comment "Superseded by BC-X, BC-Y per W<NN> planning.") |
+| CQ3 answered "superseded by <IDs>" | `cancel` | `cancel` (parse IDs from CQ3 free-text: split on comma/whitespace, match each token against `^BC-\d+$`; reject non-matching tokens with a § 6 Gate-failures row that loops back to the user; primary valid ID → `duplicateOf`; rest → `relatedTo`; plain-text comment "Superseded by BC-X, BC-Y per W<NN> planning." using only the validated IDs). |
 | CQ5 answered "back to backlog" | `backlog` | `backlog-return` (`cycleId` → null, `state.type` → `backlog`, `assignee` → null) |
 | CQ5 answered "specific future cycle <X>" (not W+1) | `cycle` | `cycle-assign` with target = that cycle |
 | CQ1 answered "move to W+1" AND CQ3 not "superseded" AND CQ5 not "backlog" | `cycle` | `cycle-assign` with target = `state.cycle.current.id` |
@@ -92,6 +92,7 @@ From `state.projects[i].scope_decisions`:
 
 - **Milestone renames** from the planning checkpoint (e.g. W16's `"Pre-Launch Hardening" → "Production Hardening"`): emit one `milestone-rename` row with `source_project: "(global)"`. Preview renders under a separate `## Global mutations` section.
 - **New-issue creation** with cross-project scope: same section.
+- **Label changes** (mutation type `label-change`): enumerated in § 2.1 and supported by § 3 + § 7.3 to satisfy AC #8's "issue label changes" requirement. No derivation rule in the current implementation emits `label-change` rows — the type is reserved for a future Phase 2 extension that strips per-cycle labels (`carrying-over`, `stretch`) on backlog-return / cycle-assign. If BC-5763 dogfood surfaces a concrete label-change need, add an emitter rule here; until then, the dispatch path exists and has been verified against a seeded mutation but is not derived from scope decisions.
 
 ### 2.5 De-duplication
 
@@ -261,7 +262,9 @@ If `state.checkpoint_path` is null (Phase 3 was invoked standalone via `--resume
 # Pre-extracted by the skill from state:
 #   CYCLE_NN   = numeric week from state.cycle.current.name (e.g. "W17" → 17)
 #   CYCLE_DATE = state.cycle.current.startsAt formatted YYYY-MM-DD
-# Then in Bash:
+# Then in Bash, with runtime guards (defense-in-depth — prose rejection above is advisory; these assertions enforce shape at shell level):
+[[ "$CYCLE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "Invalid CYCLE_DATE: $CYCLE_DATE" >&2; exit 1; }
+[[ "$CYCLE_NN" =~ ^[0-9]+$ ]] || { echo "Invalid CYCLE_NN: $CYCLE_NN" >&2; exit 1; }
 WEEK_NN=$(printf "%02d" "$CYCLE_NN")
 ROOT=$(git rev-parse --show-toplevel)
 LOG="$ROOT/../weekly-planning/w${WEEK_NN}-${CYCLE_DATE}/w${WEEK_NN}-housekeeping-log.md"
