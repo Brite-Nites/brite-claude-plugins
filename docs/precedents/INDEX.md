@@ -19,3 +19,4 @@
 | [BC-5789](BC-5789.md) | Per-item audit at filter time can rescue items the locked plan would have lost; file follow-up for rescued items | pattern-choice | 2026-04-20 | pattern-choice, plugin-import, subtree, per-item-audit, scope-rescue |
 | [BC-5793](BC-5793.md) | First-of-N session locks the template; update shared convention files (UPSTREAM.md) in same PR, don't defer | pattern-choice | 2026-04-20 | pattern-choice, first-of-n, shared-convention, plan-gate, revops-phase-3 |
 | [BC-5760](BC-5760.md) | Canonical state-object schema lives in entry command; every phase PR updates it alongside skill body | architecture | 2026-04-20 | architecture, multi-phase, state-schema, cross-phase-drift, cadence |
+| [BC-5794](BC-5794.md) | Sibling-one is the inflection point for first-of-N template validation; apply overrides verbatim or amend the precedent | pattern-choice | 2026-04-20 | pattern-choice, sibling-one, template-validation, revops-phase-3, cdr-coverage |
