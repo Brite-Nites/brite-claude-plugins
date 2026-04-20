@@ -28,7 +28,8 @@ Reads from the session state object populated by Phases 0–2:
 Populates / mutates:
 
 - `state.mutations[]` — the derived mutation list (schema per § 2).
-- `state._mutation_conflicts[]` — cross-project conflicts detected during § 2.5 de-duplication (each entry carries both source projects + both target states). Surfaced in the § 5 preview under `## Conflicts (resolve before execute)` and resolved via a dedicated § 6 group approval before regular groups run.
+- `state._mutation_conflicts[]` — cross-project conflicts detected during § 2.5 de-duplication (each entry carries both source projects + both target states). Surfaced in the § 5 preview under `## Conflicts (resolve before execute)` and resolved via a dedicated § 6.1 group approval before regular groups run.
+- `state._cq3_parse_errors[]` — carry-over rows where CQ3's "superseded by" answer contained zero `^BC-\d+$` tokens. Each entry `{project_id, issue_id, raw_cq3_answer}`. Surfaced in the § 5 preview under `## CQ3 parse errors (resolve before execute)` and resolved via § 6.0 pre-preview re-parse (not through the quality-gate, which only handles the 7-check tuple on live issues).
 - `state.housekeeping_log_path` — resolved once at § 7 entry.
 - `state._executed_mutation_ids[]` — resume cache (populated on successful writes).
 - `state.projects[i].overrides[]` — appended to when the user picks "Override with reason" during the § 6 `Gate failures` group prompt (the gate re-run in § 4 is read-only and stages failures under `gate_status="fail"`).
@@ -68,7 +69,7 @@ For each carry-over answer tuple keyed by `issue_id`:
 | Answer condition | Decision path | Mutation type(s) emitted |
 |---|---|---|
 | CQ1 answered "Park indefinitely" *(per sprint-scoping § 3: CQ5 is auto-skipped in this case; rule fires before any CQ5 row so the user's explicit park intent is not silently dropped)* | `backlog` | `backlog-return` (`cycleId` → null, `state.type` → `backlog`, `assignee` → null) |
-| CQ3 answered "superseded by <IDs>" | `cancel` | `cancel` (parse IDs from CQ3 free-text: split on comma/whitespace, match each token against `^BC-\d+$`; reject non-matching tokens with a § 6 Gate-failures row that loops back to the user; primary valid ID → `duplicateOf`; rest → `relatedTo`; plain-text comment "Superseded by BC-X, BC-Y per W<NN> planning." using only the validated IDs). |
+| CQ3 answered "superseded by <IDs>" | `cancel` | `cancel` (parse IDs from CQ3 free-text: split on comma/whitespace, match each token against `^BC-\d+$`. If ≥1 token matches: primary valid ID → `duplicateOf`; rest → `relatedTo`; plain-text comment `"Superseded by BC-X, BC-Y per W<NN> planning."` using only the validated IDs. If ZERO tokens match: do NOT emit the cancel row — instead append `{project_id, issue_id, raw_cq3_answer}` to `state._cq3_parse_errors[]` and surface in a dedicated § 6.0 pre-preview group for inline re-parse. This avoids overloading the 7-check quality-gate with a non-gate concern.) |
 | CQ5 answered "back to backlog" | `backlog` | `backlog-return` (`cycleId` → null, `state.type` → `backlog`, `assignee` → null) |
 | CQ5 answered "specific future cycle <X>" (not W+1) | `cycle` | `cycle-assign` with target = that cycle |
 | CQ1 answered "move to W+1" AND CQ3 not "superseded" AND CQ5 not "backlog" | `cycle` | `cycle-assign` with target = `state.cycle.current.id` |
@@ -108,7 +109,7 @@ Each `state.mutations[i]` entry runs a pre-flight read to detect already-applied
 | `state-change` | `get_issue(id)` | `issue.state.type == after.stateType` |
 | `reassign` | `get_issue(id)` | `issue.assigneeId == after.assigneeId` |
 | `cancel` | `get_issue(id)` + `list_comments(issueId: id)` | `issue.state.type == "canceled"` AND at least one comment body matches `/^Superseded by .* per W\d+ planning\.$/`. Both conditions required — a partial prior run that canceled the issue but failed on `save_comment` must re-attempt the comment step on the next invocation instead of being silently skipped. |
-| `create` | `list_issues(project: target.projectId, limit: 250)` | any returned row where `normalize(row.title) == normalize(target.name)` — normalize by trimming whitespace and collapsing internal whitespace runs. Fetch the full project issue set rather than using the fuzzy `query` param (which can miss exact-title duplicates ranked below the default pagination cap). Page if `hasNextPage` is true. |
+| `create` | `list_issues(project: target.projectId, limit: 250)` | any returned row where `normalize(row.title) == normalize(target.name)` — normalize by trimming whitespace and collapsing internal whitespace runs. Fetch the full project issue set rather than using the fuzzy `query` param (which can miss exact-title duplicates ranked below the default pagination cap). Page if `hasNextPage` is true. **Memoize the full issue list per `target.projectId` in a Phase-3-scoped cache** (`state._create_preflight_cache[projectId]`) — multiple create rows in the same project reuse the first fetch instead of re-paginating. |
 | `milestone-rename` | `list_milestones(project: target.projectId)` | milestone exists with `name == after.name` |
 | `label-change` | `get_issue(id)` | set of `issue.labels` IDs equal to `after.labelIds` set |
 | `backlog-return` | `get_issue(id)` | `issue.cycleId == null AND issue.state.type == "backlog" AND issue.assigneeId == null` (all three fields must already be cleared — skipping without the assignee check would leave the `assignee: null` write un-applied on first run) |
@@ -154,9 +155,17 @@ Generated: <ISO-8601 now>
 Source: <state.checkpoint_path>
 Target cycle: <state.cycle.current.name> (<state.cycle.current.id>)
 
+## CQ3 parse errors (resolve before execute)
+
+_Rendered only if `state._cq3_parse_errors[]` is non-empty. Each row shows the carry-over issue + the raw CQ3 answer that produced zero `^BC-\d+$` tokens. Resolved FIRST in § 6.0 before any other group._
+
+| Issue | Project | Raw CQ3 answer |
+|---|---|---|
+| BC-XXXX | <project> | `<verbatim free-text>` |
+
 ## Conflicts (resolve before execute)
 
-_Rendered only if `state._mutation_conflicts[]` is non-empty. Each row shows the issue ID + both source projects + both target states. Resolved first in § 6._
+_Rendered only if `state._mutation_conflicts[]` is non-empty. Each row shows the issue ID + both source projects + both target states. Resolved SECOND in § 6.1._
 
 | Issue | Source projects | Target A | Target B |
 |---|---|---|---|
@@ -223,9 +232,18 @@ Render the full preview before any `AskUserQuestion`. The user reads the whole t
 
 ## § 6 Per-group approval via AskUserQuestion
 
-After the preview renders, iterate over the distinct non-empty groups in this order — two pre-groups first so that conflicts + gate failures are resolved before any regular decision-path group is approved:
+After the preview renders, iterate over the distinct non-empty groups in this order — three pre-groups first so that CQ3 parse errors, conflicts, and gate failures are resolved before any regular decision-path group is approved:
 
-1. **Conflicts** (from `state._mutation_conflicts[]`, § 2.5). For each conflict row, `AskUserQuestion` with options to pick one source project's decision, merge manually, or drop the issue from the batch. Resolution updates `state.mutations[]` in place before the next group runs.
+0. **CQ3 parse errors** (from `state._cq3_parse_errors[]`, § 2.2 cancel-row derivation). For each entry, `AskUserQuestion` showing the original carry-over issue + the raw CQ3 free-text answer with three options: **Re-enter IDs** (follow-up free-text `AskUserQuestion`, re-parse with `^BC-\d+$`; on ≥1 valid ID, emit the cancel row and remove from `_cq3_parse_errors[]`), **Drop cancel** (the carry-over issue stays in its prior path — e.g. cycle or leave), **Keep as leave** (explicit no-op for this issue). Handler is inline re-parse — does NOT call the quality-gate.
+1. **Conflicts** (from `state._mutation_conflicts[]`, § 2.5). For each conflict row, `AskUserQuestion` with three options:
+
+   | Option | Effect |
+   |---|---|
+   | **Pick source A/B** | Replace the issue's mutation row(s) with A's (or B's) decision; drop the other source's row. |
+   | **Merge manually** | Open a follow-up free-text `AskUserQuestion` collecting the merged target state (cycle + assignee + state + labels). Replace existing rows with the merged row. |
+   | **Drop the issue** | Remove every mutation row for this `issue_id` across all groups (not just the conflicting pair). |
+
+   Resolution updates `state.mutations[]` in place before the next group runs.
 2. **Gate failures** (rows with `gate_status == "fail"` from § 4). For each failing row, `AskUserQuestion` with three options: Fix now (echo `https://linear.app/brite-nites/issue/<id>`, wait for user confirmation, re-run gate, on pass the row re-enters its primary decision-path group), Override with reason (collect a one-line free-text reason via follow-up `AskUserQuestion`, append `{issue_id, check, reason}` to `state.projects[i].overrides`, set `gate_status = "override"`, re-enter primary group), or Drop from scope (remove the row from `state.mutations[]`).
 3. **Regular decision-path groups** — iterate `cycle`, `cancel`, `reassign`, `backlog`, `global` — skipping any empty group. For each, one `AskUserQuestion` call with the three options defined below.
 
@@ -270,7 +288,7 @@ ROOT=$(git rev-parse --show-toplevel)
 LOG="$ROOT/../weekly-planning/w${WEEK_NN}-${CYCLE_DATE}/w${WEEK_NN}-housekeeping-log.md"
 ```
 
-If `state.weekly_planning_root` is set, use it as the prefix instead of `$ROOT/..`. Cache the resolved path at `state.housekeeping_log_path`.
+If `state.weekly_planning_root` is set, use it as the prefix instead of `$ROOT/..`. Cache the resolved path at `state.housekeeping_log_path`. The Bash `exit 1` on a shape-check failure is intentional fail-fast — upstream Phase 0 must produce a well-formed `state.cycle.current.{name,startsAt}`. On fail-fast, the skill surfaces the stderr message to the user and exits cleanly without partial state mutation.
 
 ### 7.2 Log header (write once before any mutation)
 
@@ -333,8 +351,8 @@ Once every mutation has been attempted, populate the `## Execution summary` sect
 - **Errored:** <X>
 - **No-ops (leave path):** <L>
 - **Duration:** <started>..<ended> (<elapsed>s)
-- **Max writes/sec observed:** <rate> (computed from rows where `result == "executed"` only — skipped/errored/dropped rows excluded)
-- **Rate-limit check:** <pass|fail> (≤10/sec required)
+- **Max writes/sec observed:** <rate> (AC #7 compliance — computed from rows where `result == "executed"` only; skipped/errored/dropped rows excluded because they issued no MCP call)
+- **Rate-limit check:** <pass|fail> (AC #7 requires ≤10/sec)
 ```
 
 ## § 8 Idempotency + resume + failure handling
