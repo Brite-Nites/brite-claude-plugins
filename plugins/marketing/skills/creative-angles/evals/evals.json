@@ -1,0 +1,134 @@
+{
+  "skill": "creative-angles",
+  "version": "0.1.0",
+  "scenarios": [
+    {
+      "id": "quick-mode-happy-path",
+      "tier": 1,
+      "description": "Quick Mode on a dense-signal prospect produces 3-5 angles with verdicts, evidence chains, and 2+ data points per signal cluster.",
+      "input": {
+        "mode": "quick",
+        "company_name": "Denver Parks & Rec",
+        "domain": "denvergov.org",
+        "industry": "municipalities",
+        "operator_selection": "Quick Mode at §2 Gate 2",
+        "mocked_marketing_context": "docs/marketing-context.md present with primary_entity=brite-nites"
+      },
+      "assertions": [
+        "output.section_generated_angles contains between 3 and 5 rows inclusive",
+        "every row in output.section_generated_angles has a verdict in the set {'ALPHA', 'PROMISING', 'INTERESTING', 'COMMODITY'}",
+        "every row in output.section_generated_angles attributes to at least one of the 5 §3 forcing function names",
+        "every cluster in output.section_signal_clusters has at least 2 data points",
+        "every data point in output.section_signal_clusters carries an inline source URL",
+        "every row in output.section_generated_angles with verdict 'ALPHA' or 'PROMISING' has a matching entry in output.section_shelf_life_block with all three sub-fields",
+        "output frontmatter contains mode: quick and omits situation_mining_source"
+      ]
+    },
+    {
+      "id": "deep-mode-missing-prereq-halt",
+      "tier": 1,
+      "description": "Deep Mode picked but no situation-mining artifact less than 14 days old — skill's first response is the verbatim halt message and zero WebSearch calls fire.",
+      "input": {
+        "mode": "deep",
+        "company_name": "Example Municipality",
+        "domain": "example-city.gov",
+        "operator_selection": "Deep Mode at §2 Gate 2",
+        "mocked_filesystem": "no match for docs/research/situations/example-city.gov-*.md less than 14 days old"
+      },
+      "assertions": [
+        "first_response contains the exact string: 'Deep Mode requires situation-mining output less than 14 days old for'",
+        "first_response contains the exact string: 'Run `situation-mining` first, then resume.'",
+        "first_tool_calls does NOT contain any WebSearch call",
+        "no artifact is written to docs/research/angles/",
+        "skill does NOT silently fall back to Quick Mode (no Quick Mode Step 1 queries fire)",
+        "skill response does NOT contain any of the four verdict labels (ALPHA / PROMISING / INTERESTING / COMMODITY)"
+      ]
+    },
+    {
+      "id": "shelf-life-mandate",
+      "tier": 1,
+      "description": "Every ALPHA (and PROMISING) angle must have all three shelf-life sub-fields — estimate citing a shelf-life-patterns.md decay category, decay trigger, and refresh date.",
+      "input": {
+        "mode": "quick",
+        "company_name": "Denver Parks & Rec",
+        "domain": "denvergov.org",
+        "mocked_scored_angles": [
+          {"name": "First-100-Days visibility brief", "score": 8.4, "verdict": "ALPHA"},
+          {"name": "Peer-city photo proof pack", "score": 7.2, "verdict": "PROMISING"},
+          {"name": "Generic vendor pitch", "score": 3.1, "verdict": "COMMODITY"}
+        ]
+      },
+      "assertions": [
+        "every row in output.section_shelf_life_block has a non-empty 'estimate' sub-field",
+        "every 'estimate' sub-field cites exactly one of: 'Regulatory / Deadline', 'Competitive Move', 'Data Insight', 'Industry Pattern', 'Structural'",
+        "every row in output.section_shelf_life_block has a non-empty 'decay_trigger' sub-field with a specific named event (not 'when it becomes common knowledge' or similar generic phrasing)",
+        "every row in output.section_shelf_life_block has a 'refresh_date' sub-field matching ISO date format YYYY-MM-DD",
+        "every ALPHA row in output.section_generated_angles has a matching row in output.section_shelf_life_block",
+        "every PROMISING row in output.section_generated_angles has a matching row in output.section_shelf_life_block",
+        "no COMMODITY or INTERESTING row appears in output.section_shelf_life_block"
+      ]
+    },
+    {
+      "id": "commodity-discard",
+      "tier": 1,
+      "description": "Angle scored below 4.0 gets verdict COMMODITY with action 'Discard entirely' and is NOT carried forward to the Generated Angles output or any downstream handoff.",
+      "input": {
+        "mode": "quick",
+        "mocked_scored_angles": [
+          {"name": "Generic cold pitch about holiday lighting value", "score": 3.4, "forcing_function": "none"}
+        ]
+      },
+      "assertions": [
+        "output.section_generated_angles row for the scored-below-4.0 angle has verdict == 'COMMODITY'",
+        "output.section_handoff_block references the angle name with action 'Discard entirely' OR 'discarded'",
+        "the COMMODITY angle does NOT appear in output.section_shelf_life_block",
+        "the COMMODITY angle does NOT trigger a handoff to email-copywriting",
+        "the COMMODITY angle does NOT produce a file at docs/content/ideas/",
+        "zero COMMODITY rows in output.section_handoff_block are marked 'carry forward' or 'ship'"
+      ]
+    },
+    {
+      "id": "deep-mode-worldview-conflict",
+      "tier": 2,
+      "description": "Deep Mode run with a valid situation-mining artifact in context — output §Worldview Conflicts block contains at least 1 conflict framed as a curiosity opening, not a gotcha.",
+      "input": {
+        "mode": "deep",
+        "company_name": "Example Hospitality Group",
+        "domain": "example-hotels.com",
+        "situation_mining_artifact": "docs/research/situations/example-hotels.com-2026-04-15.md",
+        "mocked_situation_inferences": [
+          "Stated worldview: 'AI-first operations' (per CEO LinkedIn posts)",
+          "Contradicting signal: 50 manual data-entry roles currently listed on careers page"
+        ]
+      },
+      "assertions": [
+        "Read tool call fires on 'docs/research/situations/example-hotels.com-2026-04-15.md' during Deep Mode Step 1",
+        "output.section_worldview_conflicts contains at least 1 row",
+        "every row in output.section_worldview_conflicts contains the substring 'Stated:' AND 'Evidence:' AND 'Curiosity opening:'",
+        "no row in output.section_worldview_conflicts contains gotcha framing substrings ('caught you', 'you claim X but actually', 'exposes', 'contradicts yourself')",
+        "every Curiosity opening sub-field is phrased as a question (ends with '?')",
+        "output frontmatter contains situation_mining_source pointing to the artifact path"
+      ]
+    },
+    {
+      "id": "reference-file-name-anchor",
+      "tier": 2,
+      "description": "All 5 forcing-function names appear in the output artifact exactly as spelled in creative-thinking-models.md §1–§5 headings — invented aliases fail.",
+      "input": {
+        "mode": "quick",
+        "company_name": "Denver Parks & Rec",
+        "domain": "denvergov.org",
+        "reference_file": "plugins/marketing/references/creative-thinking-models.md"
+      },
+      "assertions": [
+        "Read tool call fires on 'plugins/marketing/references/creative-thinking-models.md' to cross-check spelling",
+        "output contains 'Inversion (Munger)' exactly (not 'Munger Inversion')",
+        "output contains 'Adjacent Transfer' exactly",
+        "output contains 'Timing Arbitrage' exactly",
+        "output contains 'Specificity Escalator' exactly",
+        "output contains 'Ecosystem Gap Analysis' exactly",
+        "output does NOT contain invented aliases: 'Munger Inversion', 'Adjacent Industry Transfer', 'Timing Window', 'Specificity Ladder', 'Ecosystem Analysis'"
+      ]
+    }
+  ]
+}

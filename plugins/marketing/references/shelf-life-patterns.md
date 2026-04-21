@@ -140,3 +140,9 @@ Decay trigger: A Clay template for "food service permit monitoring" or a viral L
 Cross-check: Clay templates: N, LinkedIn posts: N, Conference talks: N
 Next refresh: {date + 90 days}
 ```
+
+---
+
+## Consumers
+
+- [creative-angles](../skills/creative-angles/SKILL.md) — every ALPHA and PROMISING angle's shelf-life estimate cites a decay category from this reference (mandatory per §3 Shelf-life requirements).
