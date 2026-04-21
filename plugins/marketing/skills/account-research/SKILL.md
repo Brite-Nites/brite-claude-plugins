@@ -99,19 +99,197 @@ Every data point in the output artifact carries an inline source URL. Facts-only
 
 ## Brite Implementation
 
-TODO(BC-5827)
+This section translates §3 Methodology into Brite's concrete stack, which MCP server, which tool, which rule, which repo. Every rule cites its source (ADR, integration guide, or sibling skill) so a skill reader can trace the claim.
+
+### Tools this skill calls
+
+| What the skill needs to do | MCP / tool | Reaches | Reason (ADR / source) |
+|---|---|---|---|
+| Mode-dispatched per-process research | `WebSearch` | Public web | §3 Methodology, one query per `references/research-processes/find-*.md` PRIMARY pattern; no availability check needed |
+| Deep-read a single page when snippet is insufficient | `WebFetch` | Public web | Backup only; use sparingly to avoid burning context |
+| Existing-SF-account lookup on the prospect domain | Salesforce MCP (`run_soql_query`) | `brite-salesforce` prod org | ADR 2a, SF is CRM SoR; `salesforce.md` §Common workflows |
+| Fetch internal signals for existing accounts | Salesforce MCP (`run_soql_query` on Activity history, Opportunity history, `Account_Notes__c`, `Lifecycle_Stage_History__c`) | `brite-salesforce` prod org | Internal-signal enrichment path; §6 Flow 5 |
+| Read reference process files | `Read` | Local `plugins/marketing/references/research-processes/` | §3 Methodology, every PRIMARY query originates here |
+| Emit output artifact | `Write` | Local `docs/research/accounts/{domain}-{YYYY-MM-DD}.md` | §6 Runbook output artifact shape |
+
+The wildcard form `mcp__plugin_marketing_salesforce__*` in `allowed-tools` is used per ADR 2c because the SF enrichment path reads across multiple SOQL object types (Account, Activity, Opportunity, `Account_Notes__c`, `Lifecycle_Stage_History__c`). Narrower cherry-picking would couple the frontmatter to a SOQL object taxonomy that will evolve. See [`plugins/marketing/tools/integrations/salesforce.md`](../../../tools/integrations/salesforce.md) §MCP Tool Reference for the availability probe pattern, SOQL gotchas, and the canonical `run_soql_query` tool name.
+
+### Architectural rules that apply
+
+- **Every query pattern comes from `references/research-processes/`**, no invented queries. Source: §3 Methodology; enforced by §8 Anti-Slop.
+- **Respect stop conditions + kill lists literally.** Each process file's discipline blocks are load-bearing. Source: §3 Methodology + [BC-5824](https://linear.app/brite-nites/issue/BC-5824) precedent.
+- **Cite source URL inline on every data point.** Facts-only discipline requires the evidence trail. Source: §3 Confidence discipline.
+- **Salesforce is the CRM SoR, never cache SF data in the artifact beyond `generated_at`.** Always re-query on artifact refresh. Source: ADR 2a + `salesforce.md` §Auth.
+- **SF enrichment degrades gracefully, never halts the skill.** On availability failure, mark `sf_enriched: false` and proceed with a public-only artifact. Source: ADR 2c degradation policy.
+
+### Cross-skill boundaries
+
+**Hands off to:**
+
+- **[BC-5824](https://linear.app/brite-nites/issue/BC-5824) `situation-mining`**, consumes the artifact for worldview inference. The facts this skill produces are the raw input to situation-mining's §Situations block.
+- **[BC-5828](https://linear.app/brite-nites/issue/BC-5828) `creative-angles` Deep Mode**, consumes the artifact for signal-cluster extraction. Account-research facts feed the 2+-data-points-per-cluster rule downstream.
+
+**Receives from:**
+
+- **User invocation (primary)** with `{company_name, domain, mode, optional category}`.
+- **`situation-mining` (subroutine case)**, when situation-mining needs fresh fact-gathering mid-run, it calls account-research as a subroutine and consumes the returned artifact path.
+
+**Does not own:**
+
+- Worldview inference (that's `situation-mining`, [BC-5824](https://linear.app/brite-nites/issue/BC-5824)).
+- Angle generation (that's `creative-angles`, [BC-5828](https://linear.app/brite-nites/issue/BC-5828)).
+- Copy generation (that's `email-copywriting`, [BC-5825](https://linear.app/brite-nites/issue/BC-5825)).
+- List assembly (that's `list-building`, [BC-2717](https://linear.app/brite-nites/issue/BC-2717)).
+
+### Output artifact
+
+Every run writes one artifact to `docs/research/accounts/{domain}-{YYYY-MM-DD}.md`. Frontmatter shape:
+
+```yaml
+---
+company: Example Co
+domain: example.com
+category: "coffee roaster"           # optional, omit if unknown
+mode: profiles | competitors | growth | hiring | reviews | news | negativity | founders | c-suite | full | deep | people
+generated_at: 2026-04-21T14:30:00Z
+source_count: 12                     # total usable data points across all queries
+sf_enriched: true | false
+sf_account_id: "0011a00000xyz"       # omit if sf_enriched: false
+process_files_invoked: [find-profiles, find-competitors]   # per mode dispatch
+---
+```
+
+Seven keys are required (`company`, `domain`, `mode`, `generated_at`, `source_count`, `sf_enriched`, `process_files_invoked`) and two are conditional (`category` when the operator supplied or the research surfaced one; `sf_account_id` only when `sf_enriched: true`).
+
+Body sections (in order, conditional on mode):
+
+1. **Company Facts.** One subsection per process file invoked, grouped by dimension (who / what / where / when). Each bullet cites source URL inline.
+2. **Internal Signals (Salesforce).** Only present when `sf_enriched: true`. Lists Activity summary, Opportunity summary, `Account_Notes__c` excerpts, and `Lifecycle_Stage_History__c` entries with SF object IDs.
+3. **Thin-signal flags.** If any invoked process returned fewer than 2 usable data points for a dimension, note which dimensions are thin. Downstream skills use this to calibrate confidence.
+4. **Handoff pointers.** A short note like "Hand off to `situation-mining` for worldview inference, or `creative-angles` Deep Mode for signal-cluster extraction."
 
 ---
 
 ## MCP Tool Reference
 
-TODO(BC-5827)
+§4 declared WHAT tools this skill uses; §5 says WHEN, which workflow, in what order. Grouping is by what the skill actually does, not by server. Connection details live in the Brite integration guides; this section names tools semantically. See [`plugins/marketing/tools/integrations/salesforce.md`](../../../tools/integrations/salesforce.md) §MCP Tool Reference for SF auth, SOQL gotchas, and the canonical availability probe pattern.
+
+### Workflow 1 — Mode-dispatched parallel WebSearch (always runs)
+
+No availability check needed, `WebSearch` is always on. Sequence:
+
+1. **Resolve the mode to a process-file set** per §3 Single-process and Composite tables. For a single-process mode this is one file; for `full` it is 4; for `deep` it is 9; for `people` it is 7.
+2. **Read the PRIMARY query pattern verbatim** from each resolved `plugins/marketing/references/research-processes/find-*.md` file. Do NOT paraphrase; the canonical pattern is load-bearing per §8 Anti-Slop.
+3. **Substitute** `{{company_name}}`, `{{domain}}`, `{{category}}`, `{{current_year}}` as applicable before executing. Any unresolved substitution variable is a configuration error, halt and surface it.
+4. **Emit all N queries as parallel `WebSearch` tool calls in a single assistant turn** (one message, N `tool_use` blocks). Sequential execution multiplies wall-clock by N.
+5. **On rate-limit or transient failure of a single query**, retry once with a 1–2 second delay. If still failing, proceed with remaining queries and mark the missing source in the output artifact. Per §8 Anti-Slop, cite what's missing rather than fabricate the signal.
+
+Cross-link: each process file at `plugins/marketing/references/research-processes/find-{mode}.md` carries the canonical PRIMARY query plus its stop conditions and kill list. Read the file once per mode dispatch; do not re-read on every substitution.
+
+### Workflow 2 — Existing-Salesforce-account enrichment (conditional)
+
+Runs only when §2 Gate 3 SF-account detection matched an existing Account. See [`plugins/marketing/tools/integrations/salesforce.md`](../../../tools/integrations/salesforce.md) §MCP Tool Reference for auth, tool names, and SOQL gotchas.
+
+1. **Availability probe (once per invocation).** Call `run_soql_query` with `SELECT Id FROM User LIMIT 1`. This is the verified liveness check per BC-5534 findings §Q1. `get_username` is NOT a valid probe because it reads the local SFDX auth store without contacting Salesforce. Cache the reachable / unreachable result for the remainder of the run; do NOT re-probe.
+2. **On availability failure.** Skip enrichment silently. Mark `sf_enriched: false` in the artifact frontmatter and continue. Do NOT halt the skill.
+3. **On availability success plus Account match from §2.**
+   1. **Activity history.** `run_soql_query` with `SELECT Id, ActivityDate, Subject, Description FROM ActivityHistory WHERE AccountId = '{accountId}' ORDER BY ActivityDate DESC LIMIT 20`. Before interpolating `{accountId}`, confirm it passed §2 input validation against the SF ID format.
+   2. **Opportunity history.** `run_soql_query` with `SELECT Id, Name, StageName, CloseDate, Amount FROM Opportunity WHERE AccountId = '{accountId}' ORDER BY CloseDate DESC LIMIT 10`.
+   3. **Lifecycle plus notes.** Already pulled in §2 Account lookup via `Account_Notes__c` and `Lifecycle_Stage_History__c` fields on the Account. No extra SOQL call; reuse the cached result.
+
+All SF calls are read-only, no MCP confirmation gates needed. The Activity LIMIT of 20 and Opportunity LIMIT of 10 bound the internal-signal surface to the highest-recency slice; do not raise the caps without an explicit operator request.
+
+### Workflow 3 — WebFetch deep-read (backup, optional)
+
+When a `WebSearch` snippet is insufficient to ground a specific data point, call `WebFetch` on the specific URL. Do NOT use `WebFetch` as a default, snippet analysis is usually enough and `WebFetch` burns context fast. Scope each fetch to one URL with a concrete data point in mind; do not pre-fetch opportunistically.
 
 ---
 
 ## Operational Runbook
 
-TODO(BC-5827)
+This section turns §3 Methodology plus §5 MCP Tool Reference into five concrete flows that a subagent follows end-to-end. Preconditions, steps, expected output, error handling, and handoff are explicit on every flow so a fresh agent can execute any of them without re-reading the rest of the skill.
+
+### Flow 1 — Profiles mode quick-run (default)
+
+**Preconditions:** §2 Gates 1–4 resolved; mode defaulted or explicitly set to `profiles`; no existing-SF-account match required.
+
+**Steps:**
+
+1. Run §5 Workflow 1 with `find-profiles.md` as the sole resolved process file.
+2. Extract company facts per the process file's output template (industry, size, funding, HQ, founded year, third-party platform list), citing source URLs inline.
+3. Write the output artifact to `docs/research/accounts/{domain}-{YYYY-MM-DD}.md` with `mode: profiles` in frontmatter and `process_files_invoked: [find-profiles]`.
+4. Offer handoff to `situation-mining` if the operator wants worldview inference, or to `creative-angles` Deep Mode for signal-cluster extraction.
+
+**Expected output:** a 3–6-query profile sheet with `Company Facts` populated across the 6 canonical dimensions, `sf_enriched: false` (unless §2 Gate 3 matched separately), no `Internal Signals` section.
+
+**Error handling:** per §5 Workflow 1, per-query retry once on rate-limit; proceed with remaining queries on persistent failure and mark the missing source. Never fabricate.
+
+**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828).
+
+### Flow 2 — Full mode for unfamiliar company
+
+**Preconditions:** §2 Gates 1–4 resolved; mode = `full`; company is new to Brite and the operator wants a quick 4-process baseline.
+
+**Steps:**
+
+1. Run §5 Workflow 1 with the 4 `full` composite processes: `find-profiles.md` + `find-competitors.md` + `find-growth-signals.md` + `find-hiring.md`, fired as parallel `WebSearch` calls in a single assistant turn.
+2. Compose a 4-dimension fact sheet (who / what / market-position / hiring-signals).
+3. Write artifact with `mode: full` and `process_files_invoked: [find-profiles, find-competitors, find-growth-signals, find-hiring]`.
+4. Offer handoff to `situation-mining` or `creative-angles` Deep Mode.
+
+**Expected output:** a 10–23-query baseline artifact with four `Company Facts` subsections, each citing source URLs inline.
+
+**Error handling:** per §5 Workflow 1. Partial failure is acceptable, note missing dimensions in `Thin-signal flags`.
+
+**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828).
+
+### Flow 3 — Deep mode for high-value target
+
+**Preconditions:** §2 Gates 1–4 resolved; mode = `deep`; high-ACV account or strategic interest justifies the broader research budget.
+
+**Steps:**
+
+1. Run §5 Workflow 1 with the 9 `deep` composite processes per §3 Composite mode table: `find-profiles` + `find-competitors` + `find-growth-signals` + `find-hiring` + `find-reviews` + `find-news` + `find-negativity` + `find-pr-releases` + `find-founders`.
+2. Write artifact with `mode: deep` and `process_files_invoked` listing all 9 files.
+
+**Expected output:** a 25–50-query comprehensive company dossier; the `Company Facts` body has 9 subsections, one per process file.
+
+**Error handling:** per §5 Workflow 1. When a single process's queries all fail, note the process as thin in `Thin-signal flags` and continue; do not retry the whole composite.
+
+**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828).
+
+### Flow 4 — People mode for org-chart build
+
+**Preconditions:** §2 Gates 1–4 resolved; mode = `people`; ABM or enterprise-motion context where the operator needs an org-chart layer.
+
+**Steps:**
+
+1. Run §5 Workflow 1 with the 7 `people` composite processes per §3 Composite mode table: `find-founders` + `find-c-suite` + `find-vp-leadership` + `find-directors` + `find-department-heads` + `find-specialist-roles` + `find-people-creative`.
+2. Write artifact with `mode: people` and `process_files_invoked` listing all 7 files.
+
+**Expected output:** a 20–40-query people sheet; the `Company Facts` body shows subsections for founders, c-suite, VP leadership, directors, department heads, specialist roles, and people-creative.
+
+**Error handling:** per §5 Workflow 1.
+
+**Role-specific follow-up:** operators wanting role-specific JD intelligence follow up with a direct `find-job-role-insights` invocation passing `role_title` (per §3 Plan-gate scope note). The people mode does NOT dispatch `find-job-role-insights` automatically because the mode surface cannot carry the `role_title` argument.
+
+**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828).
+
+### Flow 5 — Existing-SF-account augmented path
+
+**Preconditions:** §2 Gate 3 SF-account detection matched an existing Brite Account for the prospect `domain`; mode = any (profiles, any single-process, full, deep, or people).
+
+**Steps:**
+
+1. Run §5 Workflow 1 per the chosen mode (dispatch table per §3).
+2. Run §5 Workflow 2 SF enrichment (availability probe, then Activity history SOQL at LIMIT 20, then Opportunity history SOQL at LIMIT 10, then reuse the §2 cached Account lookup for lifecycle and notes).
+3. Compose the artifact with both public facts AND an `## Internal Signals (Salesforce)` body section AND `sf_enriched: true` in frontmatter. Populate `sf_account_id` from the §2 Account lookup result.
+
+**Expected output:** public fact sheet per chosen mode PLUS SF-sourced Activity summary, Opportunity summary, `Account_Notes__c` excerpts, and `Lifecycle_Stage_History__c` entries, each with their SF object ID inline.
+
+**Error handling:** on SF availability failure mid-run, degrade to a public-only artifact with `sf_enriched: false` and emit a one-line warning to the operator ("Salesforce MCP unavailable, proceeding with public-source facts only"). Never halt. Do not fabricate an `Internal Signals` section.
+
+**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828). Downstream skills read `sf_enriched: true` and weight internal signals accordingly.
 
 ---
 
