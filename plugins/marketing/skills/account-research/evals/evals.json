@@ -1,0 +1,133 @@
+{
+  "skill": "account-research",
+  "version": "0.1.0",
+  "scenarios": [
+    {
+      "id": "profiles-mode-happy-path",
+      "tier": 1,
+      "description": "Profiles mode default run on a clean prospect produces 3-6 parallel WebSearch calls, writes an artifact to the canonical path with the expected frontmatter, and omits any Internal Signals section.",
+      "input": {
+        "company_name": "Denver Parks & Rec",
+        "domain": "denvergov.org",
+        "mode": "profiles",
+        "mocked_marketing_context": "docs/marketing-context.md present with primary_entity=brite-nites",
+        "mocked_sf_response": "availability probe succeeds, zero Account matches for %denvergov.org%"
+      },
+      "assertions": [
+        "WebSearch tool calls fired in the first assistant turn number between 3 and 6 inclusive",
+        "all WebSearch tool calls fire in a single assistant turn (one message, N tool_use blocks)",
+        "output artifact path matches 'docs/research/accounts/denvergov.org-{YYYY-MM-DD}.md'",
+        "output frontmatter contains mode: profiles",
+        "output frontmatter contains process_files_invoked: [find-profiles]",
+        "output frontmatter contains sf_enriched: false",
+        "output frontmatter omits sf_account_id",
+        "every bullet in output.section_company_facts carries an inline source URL",
+        "output does NOT contain an '## Internal Signals (Salesforce)' section",
+        "output does NOT contain any of: 'This suggests', 'Test this hypothesis', 'ALPHA', 'PROMISING', 'INTERESTING', 'COMMODITY'"
+      ]
+    },
+    {
+      "id": "mode-dispatch-distinct-for-each-mode",
+      "tier": 1,
+      "description": "Three runs on the same domain with mode=profiles, mode=full, mode=deep each produce distinct process_files_invoked frontmatter values matching the §3 Single-process and Composite tables exactly.",
+      "input": {
+        "company_name": "Example Co",
+        "domain": "example.com",
+        "modes": ["profiles", "full", "deep"],
+        "mocked_marketing_context": "docs/marketing-context.md present",
+        "mocked_sf_response": "availability probe succeeds, zero Account matches"
+      },
+      "assertions": [
+        "profiles-run frontmatter process_files_invoked == ['find-profiles']",
+        "full-run frontmatter process_files_invoked == ['find-profiles', 'find-competitors', 'find-growth-signals', 'find-hiring']",
+        "deep-run frontmatter process_files_invoked == ['find-profiles', 'find-competitors', 'find-growth-signals', 'find-hiring', 'find-reviews', 'find-news', 'find-negativity', 'find-pr-releases', 'find-founders']",
+        "deep-run process_files_invoked does NOT contain 'find-job-role-insights'",
+        "full-run process_files_invoked length == 4",
+        "deep-run process_files_invoked length == 9",
+        "each run writes exactly one artifact under docs/research/accounts/",
+        "no run adds or drops a process file relative to the §3 Composite table"
+      ]
+    },
+    {
+      "id": "kill-list-respect",
+      "tier": 1,
+      "description": "Kill-listed query patterns from any invoked process file (e.g. site:apollo.io in find-profiles.md) are never executed by the WebSearch runner.",
+      "input": {
+        "company_name": "Example Co",
+        "domain": "example.com",
+        "mode": "deep",
+        "mocked_kill_list_patterns": ["site:apollo.io", "{{company_name}} annual report", "site:youtube.com"]
+      },
+      "assertions": [
+        "zero WebSearch tool calls during the run contain the substring 'site:apollo.io'",
+        "zero WebSearch tool calls during the run contain the substring 'annual report'",
+        "zero WebSearch tool calls during the run contain the substring 'site:youtube.com'",
+        "no data point in output.section_company_facts is sourced from a kill-listed URL pattern",
+        "run completes normally (artifact is still written) even when a process file's non-kill-listed queries return thin results"
+      ]
+    },
+    {
+      "id": "thin-signal-flagging",
+      "tier": 1,
+      "description": "A micro-company run with fewer than 2 usable data points in 2+ dimensions emits an explicit Thin-signal flags section naming the weak dimensions; no fabricated data fills the gap.",
+      "input": {
+        "company_name": "Micro Shop LLC",
+        "domain": "microshopllc.example",
+        "mode": "profiles",
+        "mocked_query_returns": "2 of 4 dimensions return 0-1 usable data points; funding and HQ dimensions are thin"
+      },
+      "assertions": [
+        "output contains a '## Thin-signal flags' section (or equivalent named block)",
+        "output.section_thin_signal_flags names at least 2 weak dimensions",
+        "output.section_thin_signal_flags explicitly names 'funding' and 'HQ' (or the thin dimensions that matched the mock)",
+        "output.section_company_facts bullets for the thin dimensions do NOT contain fabricated data",
+        "output.section_handoff_pointers notes the thinness so downstream skills can calibrate confidence",
+        "output frontmatter source_count reflects only the usable data points (not inflated)"
+      ]
+    },
+    {
+      "id": "existing-sf-account-augmented",
+      "tier": 2,
+      "description": "A domain matching an existing Brite SF Account with a lapsed Opportunity produces an augmented artifact with sf_enriched: true and an Internal Signals section grounded in SOQL results.",
+      "input": {
+        "company_name": "Existing Brite Customer",
+        "domain": "existing-customer.example",
+        "mode": "full",
+        "mocked_sf_response": "availability probe succeeds; Account match returns Id=0011a00000xyz; ActivityHistory returns 5 rows; Opportunity returns 1 row with StageName=Closed Lost",
+        "mocked_marketing_context": "docs/marketing-context.md present"
+      },
+      "assertions": [
+        "run_soql_query tool call fires with 'SELECT Id FROM User LIMIT 1' as the availability probe",
+        "run_soql_query tool call fires with a SELECT against Account WHERE Website LIKE '%existing-customer.example%'",
+        "run_soql_query tool call fires with a SELECT against ActivityHistory WHERE AccountId = '0011a00000xyz'",
+        "run_soql_query tool call fires with a SELECT against Opportunity WHERE AccountId = '0011a00000xyz'",
+        "output frontmatter contains sf_enriched: true",
+        "output frontmatter contains sf_account_id: '0011a00000xyz'",
+        "output contains an '## Internal Signals (Salesforce)' section",
+        "output.section_internal_signals lists at least one Activity or Opportunity entry with its SF object ID inline",
+        "output.section_internal_signals sources Account_Notes__c and Lifecycle_Stage_History__c content from the cached §2 Account lookup, not a fresh SOQL call"
+      ]
+    },
+    {
+      "id": "sf-unavailable-graceful-degrade",
+      "tier": 2,
+      "description": "SF MCP unavailable at probe time — skill completes the public-only artifact with sf_enriched: false, emits a one-line operator warning, and does NOT halt.",
+      "input": {
+        "company_name": "Example Prospect",
+        "domain": "example-prospect.com",
+        "mode": "profiles",
+        "mocked_sf_response": "availability probe fails (timeout or auth error)"
+      },
+      "assertions": [
+        "run_soql_query tool call fires with 'SELECT Id FROM User LIMIT 1' as the availability probe and fails",
+        "skill does NOT halt — the artifact is still written",
+        "output frontmatter contains sf_enriched: false",
+        "output frontmatter omits sf_account_id",
+        "output does NOT contain an '## Internal Signals (Salesforce)' section",
+        "skill emits a one-line warning to the operator containing the substring 'Salesforce MCP unavailable'",
+        "no fabricated Activity, Opportunity, Account_Notes__c, or Lifecycle_Stage_History__c content appears in the artifact",
+        "output.section_company_facts contains the public-source fact sheet derived from the chosen mode (profiles)"
+      ]
+    }
+  ]
+}

@@ -295,16 +295,49 @@ This section turns §3 Methodology plus §5 MCP Tool Reference into five concret
 
 ## Health Scoring Rubric
 
-TODO(BC-5827)
+| Score | Criteria |
+|------:|----------|
+| 10 | Mode dispatch is correct — the requested mode resolves to the exact process-file set per §3 Single-process and Composite tables (single-mode → 1 file, `full` → 4, `deep` → 9 company processes, `people` → 7 people processes); all queries fire as parallel `WebSearch` calls in a single assistant turn (one message, N `tool_use` blocks); every PRIMARY query is sourced verbatim from the referenced `find-*.md` process file, with `{{company_name}}`, `{{domain}}`, `{{category}}`, `{{current_year}}` substituted only where applicable; every data point in `Company Facts` carries an inline source URL; each process file's stop conditions and kill lists are respected literally (no kill-listed query executed, no query run past a satisfied stop condition); when `sf_enriched: true`, the `## Internal Signals (Salesforce)` section lists Activity, Opportunity, `Account_Notes__c`, and `Lifecycle_Stage_History__c` entries with the SF object IDs that grounded the claims; the artifact frontmatter carries all 7 required keys (`company`, `domain`, `mode`, `generated_at`, `source_count`, `sf_enriched`, `process_files_invoked`) plus the 2 conditional keys when applicable (`category` when supplied or discovered; `sf_account_id` only when `sf_enriched: true`); the artifact is written to the exact path `docs/research/accounts/{domain}-{YYYY-MM-DD}.md`; for composite modes, `process_files_invoked` matches the §3 tables exactly (4 for `full`, 9 for `deep`, 7 for `people`); the handoff pointer to `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828) is present. |
+| 7-9 | Mostly excellent with one gap — e.g. one process file cited by name but its PRIMARY query slightly paraphrased rather than taken verbatim; one data point missing its inline source URL while the rest carry one; the mode expansion matches §3 but `process_files_invoked` lists the files in a different order than the table; `source_count` frontmatter value is off by 1–2; the handoff pointer names one downstream skill instead of both options; one composite process returned only a single usable data point and the run didn't emit an explicit `Thin-signal flags` entry for it. |
+| 4-6 | Functional but missing structural elements — mode dispatch invoked sequentially rather than in parallel (N× wall-clock penalty); one process file's kill list violated (a "do not search" query executed); `sf_enriched: false` written despite §2 Gate 3 having found an Account match; thin-signal flags missing on dimensions that are clearly thin; artifact written to the wrong path (missing or malformed date stamp, pluralized filename, outside `docs/research/accounts/`); output artifact frontmatter missing one of the 7 required keys; `Internal Signals (Salesforce)` section written with Activity or Opportunity rows but omitting the SF object IDs. |
+| 1-3 | Hard failure — any ONE of these drops the run to 1-3: invented query pattern not present in the referenced `find-*.md` process file; kill-list violation that fabricated a data point (invented SF record, invented URL, or invented Activity entry); a `Company Facts` bullet cited without any inline source URL; mode dispatch executed the wrong process-file set (e.g. `deep` ran 5 processes instead of 9, or `people` pulled in `find-job-role-insights` without an explicit `role_title`); `sf_enriched: true` written when the §5 Workflow 2 availability probe failed; output produced worldview inference, angle generation, or copy (out of scope — that work lives in `situation-mining` and `creative-angles`). |
 
 ---
 
 ## Anti-Slop Guardrails
 
-TODO(BC-5827)
+Base guardrails (shared across marketing plugin) + skill-specific hard failures. Skill-specific rules are phrased as "Do not X" because they are enforced as validation gates, not style preferences — each one drops the run to §7 1-3 band when violated.
+
+**Base guardrails:**
+
+- Do not generate generic marketing jargon ("synergy", "leverage", "best-in-class").
+- Do not fabricate statistics, case studies, or testimonials — always attribute to a source.
+- Do not produce output that ignores `docs/marketing-context.md`.
+- Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
+
+**Skill-specific hard failures (validation-gated — drop the run to §7 1-3 band):**
+
+- **Do not invent a process that is not in `references/research-processes/`.** Every PRIMARY query pattern originates in a `find-*.md` file in that directory. Adding a new process file is out of scope for this skill — raise a separate issue against the references library and land the new process there first, then update §3.
+- **Respect kill lists literally.** Each process file's "do not search" section is load-bearing. Running a kill-listed query (e.g. `site:apollo.io`, `{{company_name}} annual report`, `site:youtube.com` where the process file bans it) drops the run to §7 1-3 regardless of what the query returned.
+- **Cite a source URL for every data point.** Facts-only discipline requires the evidence trail. A `Company Facts` bullet without an inline URL is slop — no "reportedly", no "per industry chatter", no paraphrased synthesis without an anchor. Missing URL → §7 1-3.
+- **Be tier-aware — do not chase data that does not exist for T3 / T4 companies.** Per process-file validation notes (T1 / T2 have high signal, T3 / T4 have low signal), calibrate query count and retry budget to company size. Emitting 10 retry queries against a micro-company that has no public presence wastes budget and produces thin artifacts.
+- **Never emit worldview inference or angle generation.** That is `situation-mining`'s and `creative-angles`' job. Account-research outputs FACTS grouped by dimension — no "This suggests…", no "Test this hypothesis…", no angle scoring, no shelf-life metadata, no verdict labels. Any inference content drops the run to §7 1-3.
+- **Never conflate `sf_enriched: true` with an SF availability probe failure.** If the §5 Workflow 2 probe fails, set `sf_enriched: false` and proceed with the public-only artifact. Fabricating an `## Internal Signals (Salesforce)` section when the probe never reached Salesforce is a hard failure — it invents CRM state.
 
 ---
 
 ## Behavioral Tests
 
-TODO(BC-5827)
+Six scenarios covering the core paths. Structured assertions + fixtures live in `evals/evals.json` alongside this file. Scenario IDs match the `evals.json` entries for 1:1 traceability. Tier 1 scenarios assert on free output — no tool calls required. Tier 2 scenarios require file reads or MCP calls to verify.
+
+### Tier 1 — Free assertions (no tool calls needed)
+
+- **`profiles-mode-happy-path`** — Given `company_name: "Denver Parks & Rec"`, `domain: "denvergov.org"`, `mode: profiles`, the skill runs 3–6 parallel `WebSearch` calls in a single assistant turn, writes the artifact to `docs/research/accounts/denvergov.org-{today}.md` with `mode: profiles` in frontmatter and `process_files_invoked: [find-profiles]`, the `Company Facts` section has bullets that each carry an inline source URL, no `## Internal Signals (Salesforce)` section is present (SF not matched in §2 Gate 3), and no inference or angle content appears anywhere in the artifact.
+- **`mode-dispatch-distinct-for-each-mode`** — Given three runs on the same `{domain}` with `mode=profiles`, `mode=full`, and `mode=deep`, each artifact has a distinct `process_files_invoked` frontmatter value matching §3 tables: `[find-profiles]` for `profiles`; `[find-profiles, find-competitors, find-growth-signals, find-hiring]` for `full`; and all 9 company processes `[find-profiles, find-competitors, find-growth-signals, find-hiring, find-reviews, find-news, find-negativity, find-pr-releases, find-founders]` for `deep`. No composite run drops or adds a process file relative to the §3 Composite table.
+- **`kill-list-respect`** — Given a process file's "do not search" section listing `site:apollo.io` (or equivalent banned patterns), the skill never executes a `WebSearch` with that pattern. A search-history audit of every `WebSearch` call fired during the run finds zero kill-listed queries. A kill-list violation during the run fails the scenario, regardless of whether the violating query returned usable data.
+- **`thin-signal-flagging`** — Given a micro-company with fewer than 2 usable data points in 2 or more dimensions after the chosen mode runs, the artifact contains an explicit `## Thin-signal flags` section that names each weak dimension. No fabricated data fills the gaps, and downstream `Handoff pointers` note the thinness so `situation-mining` and `creative-angles` can calibrate confidence accordingly.
+
+### Tier 2 — Tool-assisted (requires file read or MCP call)
+
+- **`existing-sf-account-augmented`** — Given a `{domain}` that matches an existing Brite Salesforce Account with a lapsed Opportunity, the artifact has `sf_enriched: true` in frontmatter, `sf_account_id` populated from the §2 Gate 3 Account lookup, and an `## Internal Signals (Salesforce)` body section that lists at least one Activity or Opportunity entry with its SF object ID inline. The run fires `run_soql_query` calls against Account, ActivityHistory, and Opportunity per §5 Workflow 2. The `Account_Notes__c` and `Lifecycle_Stage_History__c` content is sourced from the cached §2 Account lookup, not a fresh SOQL call.
+- **`sf-unavailable-graceful-degrade`** — Given the Salesforce MCP unavailable at probe time (the `SELECT Id FROM User LIMIT 1` call fails or times out), the skill completes the artifact with `sf_enriched: false` in frontmatter, emits a one-line warning to the operator ("Salesforce MCP unavailable, proceeding with public-source facts only"), and does NOT halt. The artifact still contains the public-source fact sheet derived from the chosen mode, and no `## Internal Signals (Salesforce)` section is present. The `sf_account_id` frontmatter key is omitted.
