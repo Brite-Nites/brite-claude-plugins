@@ -182,3 +182,10 @@ _Added by Brite. Verticals selected from the Active set in `Brite-Nites/handbook
 | Enrollment / admissions push announced (class size target, open-house season) | Enrollment-management press, admissions-office social, recruitment-event calendars | Campus-visit-experience budget under admissions control; peak admissions season = late-Oct through early-Dec | Frame around "recruitment-campus-visit" offer -- display as a campus-tour photo moment during high-visit traffic | 3-6 months |
 | Athletics post-season / conference championship / stadium event | Athletic department press, conference schedules, TV-coverage announcements | Athletic director has event-specific budget + stadium-ops attention; game-day production is in scope | Lead with "athletics-game-day" offer -- scoped to the specific stadium/game; proof-point via TV broadcast visibility | 1-3 months (event-tied) |
 | Year-end alumni giving / capital campaign announcement | Advancement-office press, alumni-magazine features, campaign microsites | Advancement under Q4 pressure; emotional campus imagery is the asset driving giving clicks | Lead with "alumni-advancement" offer -- display becomes the hero imagery for Q4 giving campaign | 3-6 months |
+
+---
+
+## Consumers
+
+- [creative-angles](../skills/creative-angles/SKILL.md) — Deep Mode Step 4 cross-references industry signal tables (upstream 7 SaaS-heavy industries + Brite-entity Municipalities / HOAs / Universities) when the prospect is Nites or Labs.
+- [situation-mining](../skills/situation-mining/SKILL.md) — §Worldview inference matrix cross-references the Brite-entity signal rows (Municipalities / HOAs / Universities) for additional industry-indexed signals with shelf-life ratings.

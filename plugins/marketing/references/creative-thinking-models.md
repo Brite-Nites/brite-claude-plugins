@@ -188,3 +188,9 @@ Two examples of the forcing functions applied to Brite-active verticals (per `Br
 **Resulting angle:** Outreach lands in the first 10 business days after the state's higher-ed allocation becomes known (tracked via NASBO + the state's higher-ed-commission press). Lead with an under-threshold starter proposal (<$100K for Green-state MD) scoped to a single high-traffic campus quad, plus the `unity-display` angle referencing peer wins at GWU and UMD itself. Position the timing explicitly: "your allocation was published 8 days ago; here's what we can install this November at a single location."
 
 **Why it works:** The handbook procurement-threshold table shows MD at $100K+ (Green). An under-threshold scoped proposal sidesteps competitive bidding. The timing hook ("published 8 days ago") is a signal only a diligent researcher would use. Timing Arbitrage surfaced a window most vendors ignore because they anchor on the academic calendar rather than the legislative one.
+
+---
+
+## Consumers
+
+- [creative-angles](../skills/creative-angles/SKILL.md) — applies all 5 forcing functions in Quick Mode Step 3 and Deep Mode Step 5. Names must match §1–§5 headings exactly (BC-5797 factual-anchor rule).

@@ -340,16 +340,49 @@ This section turns §3 Methodology + §5 MCP Tool Reference into five concrete f
 
 ## Health Scoring Rubric
 
-<!-- TODO(BC-5828): task 9 -->
+| Score | Criteria |
+|------:|----------|
+| 10 | Both modes correct — Quick Mode ran 4 ordered steps with all 5 parallel `WebSearch` queries; Deep Mode ran 6 ordered steps with all 7 additional `WebSearch` queries on top of Quick's 5; all 5 forcing functions named verbatim per `creative-thinking-models.md` §1–§5 (`Inversion (Munger)`, `Adjacent Transfer`, `Timing Arbitrage`, `Specificity Escalator`, `Ecosystem Gap Analysis`); Asymmetry Score formula applied with all 6 dimensions at the correct weights (Novelty 2x, Evidence 2x, Timing 1.5x, Simplicity 1x, ShelfLife 1x, Downside 0.5x, divided by 8); verdict assignment matches the 4 score bounds exactly (ALPHA 8.0+, PROMISING 6.0–7.9, INTERESTING 4.0–5.9, COMMODITY below 4.0); every ALPHA and PROMISING angle has all three shelf-life sub-fields (estimate citing a `shelf-life-patterns.md` decay category, decay trigger, refresh date); every signal cluster has ≥ 2 data points each with a source URL; Deep Mode worldview-conflict analysis ran and names ≥ 1 conflict framed as a curiosity opening; Brite-entity signals from `hidden-signals-library.md` cited when the prospect is Nites/Labs (Entertainment Venues / Landscape-Hardscape / HOAs tables); Flow 4 (ALPHA → `email-copywriting`) or Flow 5 (INTERESTING → content) handoff surfaced per §6. |
+| 7-9 | Mostly excellent with one gap — e.g. one forcing function applied but referenced as "Munger Inversion" instead of the exact "Inversion (Munger)"; one ALPHA angle missing the refresh date but has estimate + decay trigger; shelf-life cites a decay category but not a specific row in `shelf-life-patterns.md`; handoff block names the target skill but not the offer-tier prompt; Deep Mode ran 6 of 7 additional queries and degraded one cluster's Evidence band accordingly; worldview conflict surfaced but framed as a generic observation rather than the three-part "Stated / Evidence / Curiosity opening" pattern. |
+| 4-6 | Functional but missing structural elements — e.g. Quick Mode ran with 4 searches instead of 5; Asymmetry Score computed but one dimension (e.g. Downside Cap) weighted at 1.0 instead of 0.5; INTERESTING angles pitched into cold outbound instead of redirected to content per Flow 5; missing the `situation_mining_source` frontmatter key on a Deep Mode run; worldview-conflict analysis produced a conflict but framed it as a gotcha instead of a curiosity opening; artifact written to the wrong path (missing date stamp, pluralized filename, or outside `docs/research/angles/`); signal cluster documented but sources not inline URLs. |
+| 1-3 | Hard failure — any ONE of these drops the run to 1-3: angle generated from a single data point (violates the 2+ cluster rule); angle score emitted without a cited evidence chain; worldview contradiction weaponized against the prospect (gotcha framing); ALPHA or PROMISING angle missing shelf-life metadata; Deep Mode ran after §2 Gate 3 failed (graceful-degrade violation — §2 is a hard halt with no fall-back to Quick Mode); invented forcing function name not in `creative-thinking-models.md` §1–§5; invented shelf-life decay category not in `shelf-life-patterns.md` (the five are Regulatory / Deadline, Competitive Move, Data Insight, Industry Pattern, Structural); subjective verdict language ("pretty strong", "maybe worth a shot", "looks interesting") in place of the four fixed verdict labels. |
 
 ---
 
 ## Anti-Slop Guardrails
 
-<!-- TODO(BC-5828): task 9 -->
+Base guardrails (shared across marketing plugin) + skill-specific hard failures. Skill-specific rules are phrased as "Do not X" because they are enforced as validation gates, not style preferences — each one drops the run to §7 1-3 band when violated.
+
+**Base guardrails:**
+
+- Do not generate generic marketing jargon ("synergy", "leverage", "best-in-class").
+- Do not fabricate statistics, case studies, or testimonials — always attribute to a source.
+- Do not produce output that ignores `docs/marketing-context.md`.
+- Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
+
+**Skill-specific hard failures (validation-gated — drop the run to §7 1-3 band):**
+
+- **Do not generate angles without signal-cluster evidence.** Single data points are noise, not signals. The 2+ data points per cluster rule is the load-bearing guard against speculative angles; any cluster of size 1 drops the run to §7 1-3. Data points inside a cluster must come from different sources — a blog post and a job posting count as two, two blog posts on the same site count as one.
+- **Do not run Deep Mode without situation-mining less than 14 days old.** §2 Gate 3 is a hard halt — surface the verbatim blocking message ("Deep Mode requires situation-mining output less than 14 days old for `{domain}`. Run `situation-mining` first, then resume.") and wait for the operator. No silent fall-back to Quick Mode.
+- **Do not score an angle without citing the evidence chain.** Every Asymmetry Score is derived from named data points with source URLs. A score without a traceable evidence chain is §7 1-3 — a reviewer must be able to apply the §3 rubric to the same data points and reproduce the score within 1.0.
+- **Do not skip shelf-life metadata on ALPHA or PROMISING angles.** Three sub-fields required: estimate citing a `shelf-life-patterns.md` decay category (one of Regulatory / Deadline, Competitive Move, Data Insight, Industry Pattern, Structural), decay trigger (one-sentence specific event), refresh date (specific ISO date). Missing any of the three → §7 1-3.
+- **Do not weaponize worldview contradictions.** Contradictions are curiosity openings, never gotchas. Required framing pattern: "Noticed you say X while hiring for Y — how are you thinking about that bridge?" — aggressive framing ("caught you", "you claim X but actually Y") is §7 1-3. The operator's job is to extend curiosity, not expose inconsistency.
+- **Do not manufacture fake urgency for Timing Arbitrage.** Urgency must be real — a public deadline, a regulatory cycle, a known competitive move. Fabricated urgency ("act before the window closes" with no named window) is deliverability poison and §7 1-3.
 
 ---
 
 ## Behavioral Tests
 
-<!-- TODO(BC-5828): task 10 -->
+Six scenarios covering the core paths. Structured assertions + fixtures live in `evals/evals.json` alongside this file. Scenario IDs match the `evals.json` entries for 1:1 traceability. Tier 1 scenarios assert on free output — no tool calls required. Tier 2 scenarios require file reads or MCP calls to verify.
+
+### Tier 1 — Free assertions (no tool calls needed)
+
+- **`quick-mode-happy-path`** — Given a dense-signal prospect with `company_name` and `domain` supplied and Quick Mode selected at §2 Gate 2, the output artifact contains 3–5 angles in §Generated Angles; every angle has one of the four §3 verdict labels (`ALPHA` / `PROMISING` / `INTERESTING` / `COMMODITY`); every angle attributes to at least one §3 forcing function; every signal cluster in §Signal Clusters has ≥ 2 data points each with an inline source URL; every ALPHA and PROMISING row carries a §Shelf-Life Block entry with all three sub-fields.
+- **`deep-mode-missing-prereq-halt`** — Given Deep Mode selected at §2 Gate 2 but no `docs/research/situations/{domain}-*.md` file < 14 days old on disk, the skill's first response is the verbatim halt message ("Deep Mode requires situation-mining output less than 14 days old for `{domain}`. Run `situation-mining` first, then resume.") and zero `WebSearch` calls fire. The skill does NOT silently fall back to Quick Mode; no artifact is written.
+- **`shelf-life-mandate`** — Given a completed run producing at least one ALPHA angle, every ALPHA row has all three shelf-life sub-fields: (a) an estimate citing one of the five `shelf-life-patterns.md` decay categories (Regulatory / Deadline, Competitive Move, Data Insight, Industry Pattern, Structural), (b) a one-sentence decay trigger naming a specific event, (c) a specific ISO refresh date. Missing any sub-field on any ALPHA row fails the scenario. Same rule applies to every PROMISING row.
+- **`commodity-discard`** — Given an angle whose Asymmetry Score computes below 4.0, the verdict column in §Generated Angles reads `COMMODITY`; the recommended action is "Discard entirely" (per §3 Verdict mapping); the angle is listed by name in §Handoff Block as "discarded" but is NOT carried forward to any downstream output (no entry in §Shelf-Life Block, no handoff to `email-copywriting`, no save to `docs/content/ideas/`).
+
+### Tier 2 — Tool-assisted (requires file read or MCP call)
+
+- **`deep-mode-worldview-conflict`** — Given Deep Mode invoked with a valid situation-mining artifact < 14 days old in context, the output artifact's §Worldview Conflicts block contains ≥ 1 conflict framed as a curiosity opening, not a gotcha. Required framing pattern per row: "Stated: {worldview}. Evidence: {contradicting signal}. Curiosity opening: {question}." Rows that frame contradictions as gotchas ("caught you saying X while actually doing Y") fail the scenario. Requires a `Read` tool call on the situation-mining artifact path.
+- **`reference-file-name-anchor`** — Given any run (Quick or Deep), all 5 forcing-function names appear in the output artifact exactly as spelled in `creative-thinking-models.md` §1–§5 headings: `Inversion (Munger)`, `Adjacent Transfer`, `Timing Arbitrage`, `Specificity Escalator`, `Ecosystem Gap Analysis`. Invented aliases ("Munger Inversion", "Adjacent Industry Transfer", "Timing Window", "Specificity Ladder", "Ecosystem Analysis") fail the scenario. Requires a `Read` tool call on `plugins/marketing/references/creative-thinking-models.md` to cross-check spelling.
