@@ -29,8 +29,6 @@
 | [BC-5797](BC-5797.md) | Five-sibling streak proves Phase 3 template durable; factual-anchor recipe gains Linear-citation + verify-matrix-regex checks | pattern-choice | 2026-04-20 | pattern-choice, sibling-four, template-durability, factual-anchor-recipe, revops-phase-3 |
 | [BC-5825](BC-5825.md) | Split skeleton from skin when content fan-out dominates task graph; ship skeleton + seed, fan out via blockedBy follow-ups | scope-change | 2026-04-20 | scope-change, issue-split, skeleton-vs-skin, content-fan-out, task-budget |
 | [BC-5798](BC-5798.md) | Six-sibling streak ratifies template; factual-anchor recipe gains entity-canon mislabeling sub-check; parallel-session plan-file-loss flagged | pattern-choice | 2026-04-20 | pattern-choice, sibling-five, template-durability, factual-anchor-recipe, revops-phase-3 |
-<<<<<<< HEAD
 | [BC-5790](BC-5790.md) | First-of-N Phase 2 command locks 6-phase template; mutating-vs-non-mutating gate policy must be explicit in Rules section | pattern-choice | 2026-04-20 | pattern-choice, first-of-n, phase-2-command, revops-plugin, template-establishment |
-=======
+| [BC-2721](BC-2721.md) | Sequential-thinking resolves multi-axis runbook design questions; `discover_tools` at Plan gate prevents tool-name drift | pattern-choice | 2026-04-21 | pattern-choice, sequential-thinking, thin-routing, deterministic-skip, factual-anchor-recipe |
 | [BC-5902](BC-5902.md) | Hybrid subagent dispatch for heavy reads feeding interactive per-item loops over N items | architecture | 2026-04-21 | architecture, subagent-dispatch, context-pressure, interactive-loop, cadence |
->>>>>>> b23a291 (T8(BC-5902): precedent trace + INDEX row)
