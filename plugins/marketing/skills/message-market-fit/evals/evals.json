@@ -1,0 +1,166 @@
+{
+  "skill": "message-market-fit",
+  "version": "0.1.0",
+  "scenarios": [
+    {
+      "id": "map-mode-happy-path",
+      "tier": 1,
+      "description": "MAP mode for a Nites uphill market produces mmf-matrix.md + mmf-batch-1.md with 7-column matrix, 5 experiments, and 3k/12k barbell math cited.",
+      "preconditions": [
+        "docs/marketing-context.md exists with primary_entity including Nites",
+        "docs/campaigns/nites/ directory absent on disk (MAP creates it on first write)",
+        "no pre-existing mmf-matrix.md for nites"
+      ],
+      "prompt": "Invoke message-market-fit. Gate 2: select MAP. Gate 3: entity=Nites. MAP Step 1: pipeline environment=uphill. Proceed through Steps 2–6 and write outputs.",
+      "expected_assertions": [
+        "output_contains: 'docs/campaigns/nites/mmf-matrix.md'",
+        "output_contains: 'docs/campaigns/nites/mmf-batch-1.md'",
+        "output_contains: '| Market | Segment | Persona | Angle | Batch | Verdict | Notes |'",
+        "output_contains: '3,000' OR output_contains: '3k experiment'",
+        "output_contains: '12,000' OR output_contains: '12k safe'",
+        "mmf-batch-1.md contains exactly 5 experiment hypothesis cards",
+        "every hypothesis card contains the sub-fields: hypothesis, what_works, what_we_learn_if_it_fails, list_build_notes",
+        "exactly 2 files written under docs/campaigns/nites/"
+      ]
+    },
+    {
+      "id": "iterate-missing-prereq-halt",
+      "tier": 1,
+      "description": "ITERATE picked at Gate 2 but no campaign-analysis artifact on disk — skill's first response is the verbatim halt message and zero tool calls fire beyond the Glob prereq check.",
+      "preconditions": [
+        "no match for docs/campaigns/{entity}/analysis-*.md (Glob returns empty)",
+        "operator selects ITERATE at §2 Gate 2",
+        "operator selects entity=nites at §2 Gate 3"
+      ],
+      "prompt": "Invoke message-market-fit. Gate 2: select ITERATE. Gate 3: entity=Nites. Then attempt to proceed.",
+      "expected_assertions": [
+        "first_response contains the exact string: 'ITERATE mode requires a campaign-analysis artifact at'",
+        "first_response contains the exact string: 'Run `campaign-analysis` first, then resume.'",
+        "first_tool_calls contains the Glob prereq check and nothing else",
+        "no Write tool call fires",
+        "no artifact is written under docs/campaigns/nites/",
+        "skill does NOT fall back to MAP mode (no MAP Step 1 pipeline-environment question)"
+      ]
+    },
+    {
+      "id": "diagnose-first-failure-wins",
+      "tier": 1,
+      "description": "DIAGNOSE with 2 flat batches — Step 1 clean, Step 2 fails — diagnosis names Segment as root cause, does NOT continue past Step 2, hands off to creative-angles.",
+      "preconditions": [
+        "docs/campaigns/nites/ contains at least 2 mmf-results-*.md files showing flat performance",
+        "docs/campaigns/nites/analysis-*.md artifact available",
+        "mocked Step 1 evidence: peer companies buying the category (Market clean)",
+        "mocked Step 2 evidence: replies scattered with no consistent objection pattern (Segment wrong)"
+      ],
+      "prompt": "Invoke message-market-fit. Gate 2: select DIAGNOSE. Gate 3: entity=Nites. Proceed with the 5-step ordered sequence.",
+      "expected_assertions": [
+        "output_contains: 'mmf-diagnosis-' under docs/campaigns/nites/",
+        "diagnosis frontmatter contains: mode: diagnose",
+        "diagnosis body names Segment as the root cause (Step 2)",
+        "diagnosis prescription hands off to creative-angles",
+        "diagnosis does NOT include analysis of Step 3 (Persona), Step 4 (Angle), or Step 5 (Execution)",
+        "only one root cause is reported per run",
+        "output_contains: 'First failure in the ordered sequence IS the root cause' OR equivalent anchor"
+      ]
+    },
+    {
+      "id": "verdict-labels-only",
+      "tier": 1,
+      "description": "Every verdict cell across MAP and ITERATE matrix outputs uses exactly one of the five fixed tokens — scenario fails on any prose substitute.",
+      "preconditions": [
+        "a run producing a matrix update with at least 3 rows carrying a Verdict cell",
+        "mocked classification outputs ranging across SUPER WORKS, KIND OF WORKS, DOESN'T WORK, DEFERRED, PENDING"
+      ],
+      "prompt": "Invoke message-market-fit in any mode that updates the matrix Verdict column. Produce the matrix.",
+      "expected_assertions": [
+        "every Verdict cell value is in the set {'SUPER WORKS', 'KIND OF WORKS', 'DOESN'T WORK', 'DEFERRED', 'PENDING'}",
+        "output does NOT contain any of: 'promising', 'mediocre', 'decent', 'worth another look', 'pretty strong', 'kind of worked'",
+        "verdict labels rendered in uppercase exactly as listed (no 'kind of works' lowercase)",
+        "zero prose substitutes appear in the Verdict column"
+      ]
+    },
+    {
+      "id": "barbell-invariant",
+      "tier": 1,
+      "description": "Across a MAP → ITERATE pair (Batch-1 followed by Batch-2 next-design), the 20% experiment allocation never zeroes out and the 80/20 ratio holds in every batch design.",
+      "preconditions": [
+        "MAP Batch-1 has shipped with 5 experiments × 600 contacts = 3,000 experiment volume",
+        "safe side running at 12,000 for 80/20 parity",
+        "campaign-analysis artifact available for ITERATE Batch-2 design"
+      ],
+      "prompt": "Invoke message-market-fit MAP for Batch-1, then message-market-fit ITERATE for Batch-2 design. Preserve the barbell.",
+      "expected_assertions": [
+        "Batch-1 experiment volume is 3,000 (or near 3,000 with documented rounding)",
+        "Batch-1 safe volume is 12,000 (4× experiment volume for 80/20)",
+        "Batch-2 design preserves the experiment side (experiment volume > 0)",
+        "Batch-2 design preserves the 80/20 ratio (safe ≈ 4× experiment)",
+        "output_contains reference to Kellen's Law #6 OR 'Never stop the experiment side'",
+        "no batch design shows experiment allocation below 20% of total volume"
+      ]
+    },
+    {
+      "id": "kellens-law-anchor",
+      "tier": 2,
+      "description": "All 10 Kellen's Laws appear verbatim in §3 `### 10 Kellen's Laws` subsection AND as `Do not X` rules in §8 `**Kellen's Laws as hard failures**` block — requires Read of SKILL.md to cross-check.",
+      "preconditions": [
+        "plugins/marketing/skills/message-market-fit/SKILL.md exists and is readable",
+        "§3 `### 10 Kellen's Laws` subsection present with numbered laws 1–10",
+        "§8 `**Kellen's Laws as hard failures**` block present with 10 `Do not X` rules"
+      ],
+      "prompt": "Read plugins/marketing/skills/message-market-fit/SKILL.md and verify the 10-law cross-reference invariant between §3 and §8.",
+      "expected_assertions": [
+        "Read tool call fires on 'plugins/marketing/skills/message-market-fit/SKILL.md'",
+        "§3 contains the substring 'Resonance beats personalization' (Law #1)",
+        "§3 contains the substring 'Identity beats information' (Law #2)",
+        "§3 contains the substring 'Groups are cultural, not demographic' (Law #3)",
+        "§3 contains the substring 'The things that work and the things you wanted to work are not synonymous' (Law #4)",
+        "§3 contains the substring 'Silence is data' (Law #5)",
+        "§3 contains the substring 'Never stop the experiment side' (Law #6)",
+        "§3 contains the substring 'Qualitative beats quantitative' (Law #7)",
+        "§3 contains the substring 'Wrong-and-specific is worse than wrong-and-general' (Law #8)",
+        "§3 contains the substring 'The best campaigns look nothing like what you planned' (Law #9)",
+        "§3 contains the substring 'Outbound is how we discover, validate, and invalidate hypotheses' (Law #10)",
+        "§8 contains exactly 10 `Do not X` rules under the `**Kellen's Laws as hard failures**` header, each citing its law number (Law #1 through Law #10)"
+      ]
+    },
+    {
+      "id": "entity-routing",
+      "tier": 2,
+      "description": "MAP for Nites routes Email Bison calls to mcp__emailbison-personal__*; MAP for Supply or Labs routes to mcp__emailbison-b2b__* — requires inspection of the tool-call trace.",
+      "preconditions": [
+        "Email Bison MCP servers registered at both namespaces (mcp__emailbison-personal__* and mcp__emailbison-b2b__*)",
+        "entity selection through §2 Gate 3"
+      ],
+      "prompt": "Invoke message-market-fit MAP for entity=Nites, capture the tool-call trace. Then invoke message-market-fit MAP for entity=Supply, capture the trace. Then entity=Labs, capture the trace.",
+      "expected_assertions": [
+        "for entity=Nites: every mcp__emailbison-* tool call in the trace uses the mcp__emailbison-personal__ prefix",
+        "for entity=Nites: zero mcp__emailbison-b2b__ tool calls appear in the trace",
+        "for entity=Supply: every mcp__emailbison-* tool call in the trace uses the mcp__emailbison-b2b__ prefix",
+        "for entity=Supply: zero mcp__emailbison-personal__ tool calls appear in the trace",
+        "for entity=Labs: every mcp__emailbison-* tool call in the trace uses the mcp__emailbison-b2b__ prefix",
+        "for entity=Labs: zero mcp__emailbison-personal__ tool calls appear in the trace",
+        "trace inspection is against the tool-call log (mcp__emailbison-personal__* vs mcp__emailbison-b2b__* namespaces)"
+      ]
+    },
+    {
+      "id": "matrix-append-not-replace",
+      "tier": 2,
+      "description": "ITERATE on an entity with a pre-existing mmf-matrix.md containing 3 batch rows appends Results Log rows and does NOT rewrite the body — requires before/after diff of the matrix file.",
+      "preconditions": [
+        "docs/campaigns/nites/mmf-matrix.md exists with 3 batch rows in the main matrix body",
+        "docs/campaigns/nites/analysis-*.md artifact available for ITERATE",
+        "operator selects ITERATE at §2 Gate 2 with entity=nites and batch reference=batch-3"
+      ],
+      "prompt": "Invoke message-market-fit ITERATE for entity=Nites with batch reference=batch-3. Capture the file state before and after the run.",
+      "expected_assertions": [
+        "before/after diff of docs/campaigns/nites/mmf-matrix.md is inspected",
+        "post-run file contains the 3 original batch rows byte-for-byte unchanged",
+        "post-run file contains new Results Log rows appended after the original body",
+        "post-run file Results Log section contains a markdown table with columns: Batch / Experiment / Reply% / Meeting% / Verdict / Transferable Insight",
+        "row order of the original 3 batch rows is preserved (no re-ordering)",
+        "no original matrix row was deleted, edited, or replaced",
+        "diff target file path: docs/campaigns/nites/mmf-matrix.md"
+      ]
+    }
+  ]
+}
