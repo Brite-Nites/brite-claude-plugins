@@ -108,7 +108,7 @@ Every recommendation in §6 must trace back to at least one §5 Attribution row 
 
 ### Verdict mapping
 
-Verdict mapping runs in Phase 4 after all §3.3 benchmark comparisons and §3.4 attributions are complete. Each ranked campaign in §3.4 §2 Segment Performance Ranking gets exactly one verdict; the table below is the authoritative assignment key. The verdict labels are fixed — they are the exact strings the operator sees in the rendered report and the exact tokens §8 anti-slop and §9 behavioral tests match against.
+Verdict mapping runs in Phase 4 after all §3.3 benchmark comparisons and §3.4 attributions are complete. Every campaign that appears in the §3.4 Segment Performance Ranking table gets exactly one verdict; the table below is the authoritative assignment key. The verdict labels are fixed — they are the exact strings the operator sees in the rendered report and the exact tokens §8 anti-slop and §9 behavioral tests match against.
 
 | Verdict | Assignment rule | Priority in §6 |
 |---------|-----------------|----------------|
