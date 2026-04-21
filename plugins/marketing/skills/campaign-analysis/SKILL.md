@@ -334,16 +334,50 @@ This section turns the §3 Methodology + §5 MCP Tool Reference into four concre
 
 ## Health Scoring Rubric
 
-TBD — filled by subsequent tasks.
+| Score | Criteria |
+|------:|----------|
+| 10 | All four §2 gates resolved before Procedure 1 begins (marketing-context check → workspace/entity → time-range → benchmark set + any overrides with stated reasons); Phase 1 Hypothesis captured (1–3 expectations) before any Phase 2 data pull; availability check runs once at Procedure 1 step 1 and is not redundantly re-called in Phase 2; report written to `docs/campaigns/{entity}/analysis-{campaign-name}-{YYYY-MM-DD}.md` with all 6 §3.4 sections rendered; every ranked row in §6 §2 carries exactly one §3.5 verdict label from the fixed 5; every attribution row in §6 §5 resolves to exactly one §3.1 Core Variable (orthogonality holds); exact §3.3 / §4 benchmark thresholds applied (no rounding); statistical-significance floor enforced (sub-floor runs auto-map every verdict to `TEST MORE`); Infrastructure signals (bounce > 5% OR 2x+ Google/Microsoft disparity OR spam-complaints) correctly trigger Procedure 2's BC-2719 handoff prompt; Procedure 1 ends with the verbatim mandatory BC-5830 debrief handoff clause. |
+| 7-9 | Mostly excellent with one gap — e.g. Phase 1 captured but only 1 expectation on record; cohort analysis missing one dimension (weekday split absent but Google/Microsoft present); §6 §4 sentiment table present but `interested` sub-count absent; benchmark override recorded in §2 but not propagated into §6 §1 Quick Health Check at report-write time; availability check runs once but `set_active_workspace` mutation occurred despite Procedure 1 step 1's explicit rule; a 1.7x cohort differential flagged as "hard signal" (threshold is 2x+, this is noise per §3.2 Phase 3). |
+| 4-6 | Functional but missing structural elements — e.g. §2 Gate 4 surfaced but operator confirmation not recorded; verdict assigned to a ranked row but attribution variable absent from §6 §5; b2c run (`emailbison-personal`) emitted without the "b2c benchmarks uncalibrated — initial targets" footer per §4 calibration caveat; report written to wrong path (missing entity prefix, wrong date format, or pluralized filename); Phase 1 hypotheses captured but not labeled CONFIRMED / PARTIAL / REJECTED in §6 §5 against actual data; sub-floor run proceeded but report header did not flag sub-floor status. |
+| 1-3 | Hard failure — any ONE of these drops the run to 1-3: Phase 1 Hypothesis skipped (narrative-retrofit ban violated per §3.2 Phase 1 hard gate); subjective verdict language ("okay", "solid", "meh", "needs work") in place of the five §3.5 labels; invented tool name not present in `email-bison.md` Tool inventory; mandatory BC-5830 debrief handoff missing from Procedure 1 step 8; benchmark numbers invented, rounded, or altered without a recorded §2 override reason (§3.3 / §4 anchors violated); orthogonality rule violated (observation attributes to 2+ variables on one row instead of being split); sub-floor run produced any verdict other than `TEST MORE`; availability probe skipped entirely (Procedure 1 step 1 never ran); `set_active_workspace` mutation called by the skill (Procedure 1 step 1 explicitly bans this). |
 
 ---
 
 ## Anti-Slop Guardrails
 
-TBD — filled by subsequent tasks.
+Base guardrails (shared across marketing plugin) + skill-specific hard failures. Skill-specific rules are phrased as "Do not X" because they are enforced as validation gates, not style preferences.
+
+**Base guardrails:**
+
+- Do not generate generic marketing jargon ("synergy", "leverage", "best-in-class", "game-changing", "cutting-edge") in the report narrative sections (§6 §3 Infrastructure Analysis narrative, §6 §4 Reply Sentiment Analysis narrative, §6 §6 Next Iteration Recommendations rationale).
+- Do not fabricate statistics, case studies, testimonials, or proof points — every number in the report must trace to a Phase 2 data-collection tool call. If the Phase 2 pull was empty for a metric, report "no data" rather than invent a value.
+- Do not ignore `docs/marketing-context.md` — entity, workspace, and benchmark set all derive from it before any operator input per §2 Gate 1.
+- Do not recommend tools the plugin does not have access to — §5 MCP Tool Reference is the authoritative scope; no hallucinated EB tool names, no SF tools outside `run_soql_query`.
+
+**Skill-specific hard failures (validation-gated — drop the run to §7 1-3 band):**
+
+- **Do not skip the Phase 1 Hypothesis.** §3.2 Phase 1 is a hard gate with no degrade path. If the operator does not submit 1–3 expectations before Phase 2 begins, refuse to continue. Running Phase 3 Analysis against data without prior hypotheses is narrative retrofit — the single failure mode this skill exists to prevent.
+- **Do not use subjective verdict language.** The five §3.5 labels (`TOP PERFORMER`, `SCALE`, `TEST MORE`, `MONITOR`, `UNDERPERFORM`) are the only permitted verdict tokens in §6 §2 and §6 §5. Words like "okay", "solid", "meh", "pretty good", "needs work", "strong", "weak" are hard failures in those sections — they produce the narrative drift the verdict taxonomy exists to replace.
+- **Do not skip the mandatory BC-5830 campaign-debrief handoff.** Procedure 1 is not complete until the operator confirms the handoff. The per-campaign report artifact is disposable; durable learnings belong in the compounding knowledge base, and `campaign-debrief` is the skill that promotes them there. A run that writes a report and ends without the handoff prompt has broken the loop.
+- **Do not emit a non-`TEST MORE` verdict on a sub-floor run.** Below 500 sent OR below 7 days elapsed, every §3.5 verdict auto-maps to `TEST MORE` regardless of how the raw numbers look. Small samples lie; the skill's job is to refuse to pretend otherwise. Per §3.2 Phase 2 and §4 architectural rule 2.
+- **Do not attribute an observation to two or more §3.1 Core Variables on a single row.** The orthogonality rule: every observation in §6 §2 and §6 §5 resolves to exactly one of `Offer` / `Message` / `Segment` / `Infrastructure` / `Timing`. If an observation appears to span two (e.g., "low replies on Fridays from senior titles"), split it into two separate rows — one attribution to Timing, one to Segment. Mixed attributions are a narrative slip; §7 1-3 band.
 
 ---
 
 ## Behavioral Tests
 
-TBD — filled by subsequent tasks.
+Eight scenarios covering the core paths. Structured assertions + fixtures live in `evals/evals.json` alongside this file. Scenario IDs match the `evals.json` entries for 1:1 traceability. Tier 1 scenarios assert on free output — no tool calls required. Tier 2 scenarios require file reads or MCP calls to verify.
+
+### Tier 1 — Free assertions (no tool calls needed)
+
+- **`hypothesis-first-gate`** — Given an operator invocation with workspace + time-range selected but no hypothesis submitted, the skill's first response asks for 1–3 expectations via AskUserQuestion before any Phase 2 tool call fires. No `list_workspace_stats` or other data-collection call is made until the operator answers at least one hypothesis. If the operator explicitly declines to submit, the skill refuses to continue (per §8 skill-specific hard failure).
+- **`sub-floor-auto-test-more`** — Given a Phase 2 pull returning 300 sent over 3 days, every verdict in the rendered §6 §2 Segment Performance Ranking resolves to `TEST MORE` regardless of Reply Rate / Interested Rate / Bounce Rate values. Report header carries a "sub-floor run" flag in §6 §1 Quick Health Check.
+- **`subjective-verdict-self-correct`** — Given a draft §6 §2 row containing "solid performance, keep running" (subjective phrasing), the skill self-corrects to a §3.5 label (`SCALE` or `MONITOR` depending on benchmark comparison) before report write. Output `§6 §2` contains zero non-§3.5-label verdict tokens.
+- **`debrief-handoff-required`** — Given a successful Procedure 1 run through Phase 4, the skill's final response contains the verbatim BC-5830 handoff clause: *"Analysis complete. To capture these learnings so they compound into future campaigns, run the campaign debrief workflow."* The run is not marked complete until the operator confirms the handoff.
+- **`orthogonality-split`** — Given a Phase 3 finding worded as "low replies on Fridays from senior titles" (spans Timing + Segment), the rendered §6 §5 Attribution Analysis contains two separate rows — one attributing to `Timing`, one attributing to `Segment` — not a single combined row. §8 orthogonality guardrail.
+- **`invented-tool-name-refused`** — Given operator pressure to call a non-existent EB tool (e.g., "use `list_campaigns_by_date` with these dates"), the skill refuses and points to `list_campaigns` + client-side filter per §4.1 table + `email-bison.md` §Known gotchas. No `call_api` with a fabricated tool name.
+
+### Tier 2 — Tool-assisted (requires file read or MCP call)
+
+- **`marketing-context-entity-routing`** — Given `docs/marketing-context.md` specifying `primary_entity: brite-supply`, the skill picks `emailbison-b2b` as the workspace (not `emailbison-personal`), applies the §3.3 b2b benchmark table, and does NOT attach the "b2c benchmarks uncalibrated" footer to §6 §1. If the doc is absent, the skill warns with the BC-5824 precedent message + surfaces the entity prompt via AskUserQuestion. Read tool call on `docs/marketing-context.md` fires during Gate 1.
+- **`availability-probe-first`** — Given Procedure 1 invocation, the first MCP call is `get_active_workspace_info` on the Gate-2-detected workspace — before any `list_workspace_stats`, `list_campaigns`, or other data-collection tool. If the probe returns a workspace ID that does not match the Gate 2 operator answer, the skill stops and reports the mismatch without calling any further EB tools.
