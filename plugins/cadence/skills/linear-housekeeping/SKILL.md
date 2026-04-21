@@ -124,9 +124,9 @@ On skip: log the row with `result: "skipped-idempotent"`, timestamp the skip dec
 
 Pre-flight reads are cheap relative to writes — the trade-off is acceptable for AC #5 (second run produces zero write calls). Reuse order for every pre-flight:
 
-1. If § 4's gate-fetch populated `state.projects[i]._fetched_issues[id]` during this Phase 3 invocation, pre-flight reads from that cache without a fresh MCP call. Stale-read risk is bounded by the gate #2 approval window (typically seconds).
-2. Else, if Phase 2 populated the same cache earlier in the session, reuse it — same staleness bound.
-3. Else, issue a fresh `get_issue(id)` and populate the cache for subsequent reuse.
+1. If § 4's gate-fetch populated `state.projects[i]._fetched_issues[id]` during this Phase 3 invocation, pre-flight reads from that cache without a fresh MCP call. Stale-read risk is bounded by the gate #2 approval window (typically seconds). Cached entries are already in flat shape (§ 4 step 3 populated from `manifest_entry.issue_snapshot`), so the skip-condition table reads them directly.
+2. Else, if Phase 2 populated the same cache earlier in the session, reuse it — same staleness bound. Phase 2's writes (sprint-scoping § 2 step 2 populating from `_enrichment.carry_over_enriched[].issue_snapshot`) are also flat.
+3. Else, issue a fresh `get_issue(id)`. Normalize the Linear MCP response's nested shape before writing to the cache: `{cycleId: resp.cycle?.id, stateType: resp.state?.type, assigneeId: resp.assignee?.id, labelIds: resp.labels?.map(l => l.id)}`. Write the flat-form object to `state.projects[i]._fetched_issues[id]` for subsequent reuse, then apply the skip-condition table. Without this normalization step, the table's flat-field accessors (`issue.stateType`, `issue.labelIds`, etc.) resolve to `undefined` against the raw Linear shape and skip conditions silently evaluate to false.
 
 This drops a redundant `get_issue` per cycle-path row (§ 4 gate fetch + § 3 pre-flight + § 7 execute is the worst case without reuse; with reuse it's one fetch per row).
 
@@ -167,7 +167,7 @@ Target cycle: <state.cycle.current.name> (<state.cycle.current.id>)
 
 ## CQ3 parse errors (resolve before execute)
 
-_Rendered only if `state._cq3_parse_errors[]` is non-empty. Each row shows the carry-over issue + the raw CQ3 answer that produced zero `^BC-\d+$` tokens. Resolved FIRST in § 6.0 before any other group._
+_Rendered only if `state._cq3_parse_errors[]` is non-empty. Each row shows the carry-over issue + the raw CQ3 answer that produced zero `^BC-\d+$` tokens. Resolved in § 6 pre-group 0 — first of four pre-groups, before Conflicts (pre-group 1), Preflight errors (pre-group 2), Gate failures (pre-group 3), and the regular decision-path groups._
 
 Rendering sanitization for the Raw CQ3 answer column: replace `|` with `\|`, replace newlines / carriage returns with the visible glyph `␤`, truncate to 120 characters with ellipsis, and wrap the entire cell in backticks so markdown/HTML inside the user's text is inert. Raw values are logged to the housekeeping log with the same escaping (§ 7.5).
 
@@ -177,7 +177,7 @@ Rendering sanitization for the Raw CQ3 answer column: replace `|` with `\|`, rep
 
 ## Conflicts (resolve before execute)
 
-_Rendered only if `state._mutation_conflicts[]` is non-empty. Each row shows the issue ID + both source projects + both target states. Resolved SECOND in § 6.1._
+_Rendered only if `state._mutation_conflicts[]` is non-empty. Each row shows the issue ID + both source projects + both target states. Resolved in § 6 pre-group 1 — after pre-group 0 CQ3 parse errors, before pre-group 2 Preflight errors, pre-group 3 Gate failures, and the regular decision-path groups._
 
 | Issue | Source projects | Target A | Target B |
 |---|---|---|---|
@@ -185,7 +185,7 @@ _Rendered only if `state._mutation_conflicts[]` is non-empty. Each row shows the
 
 ## Preflight errors (resolve before execute)
 
-_Rendered only if `state._preflight_manifest.row_errors[]` is non-empty. Each row shows the `mutation_id` + `issue_id` + the fetch error returned by the `housekeeping-preflight` agent. Resolved THIRD in § 6.2 (after CQ3 parse errors + Conflicts) before regular decision-path groups._
+_Rendered only if `state._preflight_manifest.row_errors[]` is non-empty. Each row shows the `mutation_id` + `issue_id` + the fetch error returned by the `housekeeping-preflight` agent. Resolved in § 6 pre-group 2 — after pre-group 0 CQ3 parse errors and pre-group 1 Conflicts, before pre-group 3 Gate failures and the regular decision-path groups._
 
 | Mutation | Issue | Error |
 |---|---|---|
