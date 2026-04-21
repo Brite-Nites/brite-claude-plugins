@@ -11,6 +11,10 @@ Sequential per-project loop. For each active project, surface alternatives via b
 
 This skill is inline (model inherits). Phase 2 is interactive Q&A — it cannot run as a dispatched subagent (per BC-5760 issue Notes).
 
+## Gate-respect
+
+Every multi-option `AskUserQuestion` in this skill is bound by the [gate-respect contract](../_shared/gate-respect.md). Once the planner picks an option — at the enricher-dispatch-error prompt, any CQ/SQ prompt, or the quality-gate failure prompt — execute that exact option. If an internal code path wants to deviate (condense, skip, batch, fast-path under context pressure), re-prompt via a new `AskUserQuestion` instead of silently self-selecting a lighter variant. Writing to a dogfood-notes, checkpoint, or breadcrumb file is not permission to deviate. Origin: BC-5866 (W17 dogfood of this skill).
+
 ## § 1 Inputs (state object)
 
 Reads from the session state object populated by Phases 0–1:
@@ -32,6 +36,8 @@ Populates / mutates:
 
 ## § 2 Per-project loop entry
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to every AskUserQuestion in this § 2 pre-loop. -->
+
 **Pre-loop (once per Phase 2 invocation):**
 
 - **Resume parse.** Read the current-week checkpoint file (path resolved per § 6) once. Parse every `### N. <project_name>` heading and build `state._scoped_project_names: Set<string>`. This is the single source of truth for resume state — § 2 step 1 and § 8 both consult this set. (If the file does not exist, the set is empty.)
@@ -50,6 +56,8 @@ After all projects: **§ 7 cross-project bottleneck pass**.
 
 ## § 3 Carry-over interview (5 questions per issue)
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to every CQ1–CQ5 AskUserQuestion in this section. -->
+
 For **every** issue in `state.projects[i].audit_card.carry_over.issues[]` (not just the highest-priority one — BC-5897), ask the 5 questions from BC-5810 § 2.1 verbatim. Iteration order is `carry_over.issues[]` array order (Phase 1 audit sorts by priority already). No priority-filter / rank-filter on block entry — only question-level adaptive-skip from § 2.3 applies. Each question is a **separate** `AskUserQuestion` tool call — no batching. Hard rule per `memory/feedback_one_question_at_a_time.md`. Skip rules from BC-5810 § 2.3 are evaluated *before* each `AskUserQuestion` call; skipped questions append a one-line entry to `skip_log`.
 
 Every question carries: issue ID + title, one-line audit summary snippet (e.g. *"BC-2690 — MI reply sync. In Progress W15. No PR. Holden. 0 blockers."*), recommended default first with `(Recommended)` suffix, and "Other" as the free-text escape.
@@ -66,6 +74,8 @@ Answers are stored under `state.projects[i].scope_decisions.carry_over_answers[]
 
 ## § 4 Scope interview (5 questions per project)
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to every SQ1–SQ5 AskUserQuestion in this section. No condensed/batched alternatives, ever. -->
+
 Once per project after carry-over completes (or immediately if carry-over was skipped). If `state.projects[i].status.type == "parked"` (from the Linear project shape captured in Phase 0.3, not from the audit card), only SQ1 is asked (for acknowledgement) and SQ2–SQ5 are skipped + logged.
 
 **Scope candidate injection from enricher.** Before SQ2, read `state.projects[i]._enrichment.brainstorming_ranked[]` populated by the § 2 pre-loop `project-enricher` dispatch. The top-ranked candidate (`rank == 1`) becomes SQ2's `(Recommended)` default in the `AskUserQuestion` call; alternatives at ranks 2–3 become options 2–3. No main-thread `workflows:brainstorming` Skill call — the enricher already ran the ranker logic with the same inputs (carry-over count, backlog-high count, shipped-pace, owner-load hint). If `brainstorming_ranked` is empty (e.g. enricher fell back to `Proceed without enrichment`), SQ2's default becomes `"carry-over only — no backlog proposals"` and the user escape-path "Other" carries free-text. **(Closes BC-5867 — brainstorming ranker moves from spec-misfit inline Skill call to dispatched subagent output consumed as data — BC-5902.)**
@@ -81,6 +91,8 @@ The 5 questions from BC-5810 § 2.2 verbatim, each a **separate** `AskUserQuesti
 | SQ5 | Explicitly parked this cycle? | Agent proposes from stale current-cycle items + Low-priority carry-over |
 
 ## § 5 Quality gate + block-with-override
+
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to the 3-option AskUserQuestion per failing check below. -->
 
 For every ID in `q2_ship_ids` (from SQ2), invoke the `cadence:issue-quality-gate` shared skill via the `Skill` tool with the issue object (fetched via `get_issue` if not already enriched). The gate returns 7 `{check, status, message}` tuples. On any `status == "fail"`:
 

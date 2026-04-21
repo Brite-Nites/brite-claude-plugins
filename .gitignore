@@ -26,3 +26,7 @@ tests/evals/behavioral-*.json
 # Local-only provisioning artifacts (certs, keys, consumer keys, etc.)
 # Never committed — secrets live in Bitwarden, this is just a workspace
 .local/
+
+# Python bytecode from scripts/_lib/ linters (lint_hooks.py, lint_cadence_gates.py, …)
+__pycache__/
+*.pyc

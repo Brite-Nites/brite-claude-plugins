@@ -13,6 +13,10 @@ This skill is inline (model inherits). Interactive approval gates cannot run ins
 
 **Namespace note.** Cadence reuses `mcp__plugin_workflows_linear-server__*` — Cadence does not register its own Linear MCP (per `plugins/cadence/CLAUDE.md` § MCP Servers + BC-5810 § 4 + BC-5811 § 4.2). Duplicate registration breaks tool routing. The issue body's `mcp__plugin_cadence_linear-server__*` suggestion is stale.
 
+## Gate-respect
+
+Every multi-option `AskUserQuestion` in this skill is bound by the [gate-respect contract](../_shared/gate-respect.md). Once the planner picks an option at any pre-group gate (CQ3 parse, Conflicts, Preflight errors, Gate failures), at any regular decision-path group approval, or at the final "Execute now" gate, execute that exact option. No silent fallback to a lighter pattern — if an edge case demands deviation, re-prompt via a new `AskUserQuestion` rather than writing the deviation to the housekeeping log and proceeding. Origin: BC-5866 (W17 dogfood class-bug fix).
+
 ## § 1 Inputs (state object)
 
 Reads from the session state object populated by Phases 0–2:
@@ -141,6 +145,8 @@ Every mutation with `decision_path == "cycle"` runs the gate again in Phase 3. T
 
 **Batch dispatch (BC-5902).** After § 2 derivation produces `state.mutations[]`, collect every row where `decision_path == "cycle"` into `preflight_input = [{mutation_id: m.id, issue_id: m.target.id} for m in state.mutations if m.decision_path == "cycle"]`. Flatten `state.projects[].overrides[]` into a single list `flat_overrides = [{issue_id, check, reason}]` across all projects. Dispatch `housekeeping-preflight` once via the `Agent` tool with prompt body: `{cycle.current, team_id, mutation_rows: preflight_input, overrides: flat_overrides}`. Parse the returned JSON into `state._preflight_manifest`.
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to the dispatch-error AskUserQuestion below (Retry / Pause / Execute-without-preflight). Execute-without-preflight is a user-authorized spec-departure only when the user explicitly picks it; never default-fall-through. -->
+
 **Dispatch error handling (fail-loud per BC-5898 AC).** On `_preflight_manifest.dispatch_error` non-null, halt before § 5 and surface `AskUserQuestion` with three options: **Retry** (re-dispatch the agent with the same input), **Pause session** (breadcrumb update `current_phase = "phase-3"`, exit cleanly), **Execute without preflight** (NOT RECOMMENDED — explicit spec-departure override: set `state.phase_3_spec_departure = "preflight-skipped-user-override"`, every cycle-path row gets `gate_status = "n/a"` + `gate_detail = []`, surfacing flag rendered in § 7.5 housekeeping-log Execution summary AND carried into Phase 4 narrative `> **Known gaps this cycle**` callout). No silent "context-pressure-skipped" path anywhere (BC-5898 root-cause fix — attempt-2 regression).
 
 **Row-level error handling.** On `_preflight_manifest.row_errors[]` non-empty (partial fetch failure), surface each errored row as a `## Preflight errors (resolve before execute)` section at the TOP of the § 5 preview and consume a `Preflight errors` group approval in § 6 (pre-group ordering becomes: 0 CQ3 parse → 1 Conflicts → **2 Preflight errors** → 3 Gate failures → 4 regular decision-path groups).
@@ -251,6 +257,8 @@ _Rendered only if any cycle-path row has `gate_status == "fail"` from § 4. Reso
 Render the full preview before any `AskUserQuestion`. The user reads the whole thing before approving the first group.
 
 ## § 6 Per-group approval via AskUserQuestion
+
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to every AskUserQuestion in this § 6 (pre-groups 0–3, regular decision-path groups, and the final Execute-now gate). Per-row Fix-now / Override / Retry-fetch follow-ups are themselves AskUserQuestion prompts; honor their picks identically. -->
 
 After the preview renders, iterate over the distinct non-empty groups in this order — four pre-groups first so that CQ3 parse errors, conflicts, preflight errors, and gate failures are resolved before any regular decision-path group is approved:
 
