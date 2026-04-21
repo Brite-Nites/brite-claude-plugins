@@ -45,7 +45,7 @@ Phase 4 BATCH   narrative draft + PDF export
 
 That opener is the headline of every weekly narrative. Phase 1's batch pass exists to compute it.
 
-**(b) Scope decisions load best one project at a time.** The W16 checkpoint walks 17 project sections sequentially (sections 1–7, 9–18, then a double-back to 8 Brite GTM). Each section contains both the project's carry-over audit and its W+1 scope decisions interleaved. That's not an accident — carry-over context ("BC-2439 is superseded by the BC-2281/82/83/84 chain") must be loaded into working memory before the planner can decide "cancel or keep." A pure batch scope phase would force the planner to hold all 17 projects' carry-over state simultaneously, which breaks the one-question-at-a-time feedback rule and matches how the checkpoint actually flowed.
+**(b) Scope decisions load best one project at a time.** The W16 checkpoint walks 17 project sections sequentially (sections 1–7, 9–18, then a double-back to 8 Brite GTM). Each section contains both the project's carry-over audit and its W+1 scope decisions interleaved. That's not an accident — carry-over context ("BC-2439 is superseded by the BC-2281/82/83/84 chain") must be loaded into working memory before the planner can decide "cancel or keep." A pure batch scope phase would force the planner to hold all 17 projects' carry-over state simultaneously, which breaks the one-question-at-a-time feedback rule and matches how the checkpoint actually flowed. The per-project interactive loop additionally dispatches a read-only enricher subagent per project (see § 2.5) to keep main-thread context lean across 25+ projects.
 
 **(c) Mutations batch at the end so rollback is cheap.** The W16 checkpoint's "Actions Taken During This Planning Session" list at line 365 — 10 mutations executed AFTER all scope decisions were made:
 
@@ -120,7 +120,21 @@ Each question carries:
 * The recommended default as the first option with `(Recommended)` label
 * An "Other" free-text escape path
 
-### 2.5 Pull-quote — edge case the interview set covers
+### 2.5 Hybrid dispatch for heavy reads (BC-5902)
+
+Phase 2's interactive interview and Phase 3's per-mutation gate re-run must run inline in main thread because `AskUserQuestion` cannot fire from dispatched subagents. At 25 projects, accumulated context (audit cards + backlog fetches + per-project scope state + brainstorming outputs + per-mutation gate reads) exceeds main-thread budget and the skills silently drop spec-required steps. This surfaced in BC-5763 W17 dogfood attempt 2 as 4 P1s in a "context-pressure family" (BC-5896/5897/5898/5899).
+
+The fix: **two Sonnet agents absorb every heavy read.** Each Phase 2 project dispatches `project-enricher` (cap-10 parallel, mirrors Phase 1 `project-audit` fan-out) which returns a compact card (~1–2KB) containing backlog candidates + enriched carry-over relations + brainstorming-ranked scope candidates. Phase 3 dispatches `housekeeping-preflight` once with the cycle-path mutation slice and receives a `{mutation_id → gate_detail[7]}` manifest (~300B × ~100 rows).
+
+Main-thread context after Phase 1 reads only compact agent outputs — never raw Linear results. Empirically keeps the main-thread Messages category ≤150K across 25 projects (BC-5902 AC evidence; to be confirmed by BC-5874 third dogfood).
+
+Failure posture is fail-loud: any dispatch error halts the phase and surfaces `AskUserQuestion` with Retry / Pause / explicit user-override-to-proceed options. No silent degradation path exists — a spec departure is always opt-in and logged as such (corrects the BC-5896/5898 attempt-2 regression).
+
+**Absorbed into the enricher:** the main-thread `workflows:brainstorming` Skill call from § 2.2 SQ2 default is gone — the enricher ranks scope candidates internally with the same inputs (carry-over count, backlog-high count, shipped pace, owner-load hint from cross-project stats). Closes BC-5867 (brainstorming invocation spec-misfit) as a by-product.
+
+See `plugins/cadence/agents/project-enricher.md`, `plugins/cadence/agents/housekeeping-preflight.md`, and the Phase 2/3 SKILL files for the concrete interface.
+
+### 2.6 Pull-quote — edge case the interview set covers
 
 From `w16-planning-checkpoint.md` line 266:
 
@@ -188,6 +202,7 @@ No global "skip all gates" escape hatch exists. Per-check override with a reason
 | Hybrid architecture | 4 phases, 3 gates, session state object | parallel per-project fan-out | sequential per-project iter | batched mutation preview+exec | reads state object end-to-end |
 | Adaptive interview | — | emits audit card fields that drive skip rules | reads audit card; calls `AskUserQuestion` per question; one at a time | — | renders skipped-question reasons under project cards |
 | Quality gate | — | calls gate; flags into audit card | calls gate; block-with-override | consumes overrides when rendering mutation preview | renders override reasons under `Known gaps this cycle` callout |
+| Hybrid dispatch (BC-5902) | — | project-audit (existing) | project-enricher per project | housekeeping-preflight once | — |
 
 ## 5. References
 
