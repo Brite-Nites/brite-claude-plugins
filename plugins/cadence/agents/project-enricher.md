@@ -32,12 +32,14 @@ You enrich one Linear project for Phase 2 scope planning and emit a compact JSON
   "project_name": "<name>",
   "enriched_at": "<ISO-8601>",
   "backlog_candidates": [ {"id", "title", "priority", "assignee", "assigneeId", "cycleId", "stateName"} ],
-  "carry_over_enriched": [ {"id", "blocker_count", "auto_superseded_by", "title", "priority", "assignee"} ],
+  "carry_over_enriched": [ {"id", "blocker_count", "auto_superseded_by", "title", "priority", "assignee", "issue_snapshot": {"cycleId", "stateType", "assigneeId", "labelIds"}} ],
   "brainstorming_ranked": [ {"id_or_title", "rationale", "rank"} ]
 }
 ```
 
 Return ONLY the JSON block. No preamble, no explanation. The dispatcher parses it programmatically.
+
+`issue_snapshot` per `carry_over_enriched[]` entry carries the minimal fields Phase 3 § 3 pre-flight reads (`cycleId`, `stateType`, `assigneeId`, `labelIds`). The dispatcher in `sprint-scoping/SKILL.md § 2` populates `state.projects[i]._fetched_issues[issue_id]` from each snapshot so Phase 3's pre-flight hits the cache without re-fetching carry-over issues.
 
 ## Failure handling
 

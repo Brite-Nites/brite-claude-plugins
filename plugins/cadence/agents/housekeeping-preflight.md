@@ -32,12 +32,16 @@ You run the 7-check issue-quality-gate against every cycle-path mutation row and
       "issue_id": "<id>",
       "gate_detail": [
         {"check": "assignee_present", "status": "pass|fail|override", "message": "<>", "matched_reason": null}
-      ]
+      ],
+      "issue_snapshot": {"cycleId": "<uuid|null>", "stateType": "<unstarted|started|completed|canceled|backlog|triage>", "assigneeId": "<uuid|null>", "labelIds": ["<uuid>"]}
     }
   },
-  "row_errors": []
+  "row_errors": [],
+  "dispatch_error": null
 }
 ```
+
+`issue_snapshot` carries the minimal fields Phase 3 § 3 pre-flight reads (`cycleId`, `stateType`, `assigneeId`, `labelIds`) — the dispatcher in `linear-housekeeping/SKILL.md § 4 Manifest consumption` populates `state.projects[i]._fetched_issues[issue_id]` from this snapshot so § 3 pre-flight hits the cache instead of re-fetching. Omit on rows with `row_errors` (no fetch happened).
 
 Return ONLY the JSON block. No preamble, no explanation. The dispatcher parses it programmatically.
 

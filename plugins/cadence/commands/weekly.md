@@ -155,7 +155,7 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
       "audit_card",                          // populated by Phase 1 project-audit agent. NOTE (BC-5902): the prior backlog-high count + candidates fields are removed from audit_card — enricher now owns that data under _enrichment.backlog_candidates[]
       "_enrichment": { /* Phase 2 project-enricher agent output — populated by sprint-scoping § 2 pre-loop (BC-5902) */
         "backlog_candidates": [ { "id", "title", "priority", "assignee", "assigneeId", "cycleId", "stateName" } ],
-        "carry_over_enriched": [ { "id", "blocker_count", "auto_superseded_by", "title", "priority", "assignee" } ],
+        "carry_over_enriched": [ { "id", "blocker_count", "auto_superseded_by", "title", "priority", "assignee", "issue_snapshot": { "cycleId", "stateType", "assigneeId", "labelIds" } } ],
         "brainstorming_ranked": [ { "id_or_title", "rationale", "rank" } ],
         "enriched_at": "<ISO-8601>",
         "dispatch_error": null | "<message>"
@@ -181,7 +181,9 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
   // Phase 3 is authoritative for the mutation row shape — see
   // plugins/cadence/skills/linear-housekeeping/SKILL.md § 2.1.
   "_preflight_manifest": { /* Phase 3 housekeeping-preflight agent output — populated by linear-housekeeping § 4 (BC-5902) */
-    "[mutation_id]": { "gate_detail": [ { "check", "status", "message" } ], "fetched_at": "<ISO-8601>" },
+    "preflight_at": "<ISO-8601>",
+    "manifest": { "[mutation_id]": { "issue_id": "<id>", "gate_detail": [ { "check", "status", "message", "matched_reason" } ], "issue_snapshot": { "cycleId", "stateType", "assigneeId", "labelIds" } } },
+    "row_errors": [ { "mutation_id", "issue_id", "error" } ],
     "dispatch_error": null | "<message>"
   },
   "_mutation_conflicts": [ {                                      // Phase 3 § 2.5 cross-project dedup
