@@ -34,21 +34,7 @@ test -f sfdx-project.json && echo "SFDX_PROJECT_OK" || echo "NOT_SFDX"
 
   Do not continue. Do not prompt further.
 
-### 1.2 Confirm the default target org resolves
-
-Run:
-
-```bash
-sf config get target-org --json 2>&1
-```
-
-Parse the JSON. If `result[0].value` is unset or the command errors, print the raw output and **halt** with:
-
-> No default target-org is configured. Either run `sf config set target-org=brite-sandbox --global` first, or re-run `/revops:deploy-sandbox` after authenticating against the sandbox.
-
-If the default resolves to something other than `brite-sandbox`, warn — this command pins the sandbox alias to `brite-sandbox` regardless of default, so the warning is informational, not a halt.
-
-### 1.3 Confirm sandbox alias with the user
+### 1.2 Confirm sandbox alias with the user
 
 Ask via `AskUserQuestion`:
 
@@ -71,10 +57,10 @@ Run:
 sf project deploy start --source-dir force-app --dry-run --target-org brite-sandbox --json
 ```
 
-Parse the JSON response:
+Parse the JSON response. Treat top-level `status === 0` as success (the stable cross-version exit-code field):
 
-- `status: 0` + `result.success: true` → dry-run passed. Extract `result.numberComponentsTotal`, `result.numberComponentsDeployed`, `result.numberTestsTotal` (if present). Report counts to the user.
-- Any other outcome → dry-run failed. Print `result.details.componentFailures[*].problem` for each failure (or the raw JSON if the shape is unexpected). **Halt** with:
+- `status: 0` → dry-run passed. Extract `result.numberComponentsTotal`, `result.numberComponentsDeployed`, `result.numberTestsTotal` (if present). Report counts to the user.
+- Any other `status` → dry-run failed. Print `result.details.componentFailures[*].problem` for each failure (or the raw JSON if the shape is unexpected). **Halt** with:
 
   > Dry-run failed in `brite-sandbox`. Fix the errors above locally, then re-run `/revops:deploy-sandbox`. No actual deploy was attempted.
 
@@ -102,10 +88,10 @@ Run (same command as Phase 2, without `--dry-run`):
 sf project deploy start --source-dir force-app --target-org brite-sandbox --json
 ```
 
-Parse the JSON:
+Parse the JSON (same `status === 0` check as Phase 2):
 
-- `status: 0` + `result.success: true` → deploy succeeded. Print `result.numberComponentsDeployed` and `result.id` (the AsyncResult Id, useful for Setup > Deployment Status lookups).
-- Otherwise → deploy failed after dry-run passed. This is unusual (dry-run normally catches failures) but can happen with rollbacks or race conditions. Print `result.details.componentFailures[*]` verbatim. **Halt** with:
+- `status: 0` → deploy succeeded. Print `result.numberComponentsDeployed` and `result.id` (the AsyncResult Id, useful for Setup > Deployment Status lookups).
+- Any other `status` → deploy failed after dry-run passed. This is unusual (dry-run normally catches failures) but can happen with rollbacks or race conditions. Print `result.details.componentFailures[*]` verbatim. **Halt** with:
 
   > Deploy failed in `brite-sandbox` despite dry-run passing. Inspect the errors above and check `Setup > Deployment Status` in the sandbox. Apex tests were not attempted.
 
@@ -159,11 +145,9 @@ Ask via `AskUserQuestion`:
 
 - Question: `Did the sandbox verify cleanly?`
 - Options:
-  - `Verified` — all sandbox UI behaves as expected. Proceed to Phase 6.
+  - `Verified` — all sandbox UI behaves as expected. Narrate `Phase 5/6: Manual browser verification... done` and proceed to Phase 6.
   - `Not yet` — user hasn't had a chance to look. Print: *"Sandbox deploy + tests complete. Verification pending. Re-run any sanity checks manually; `/revops:deploy-prod` should wait until verification is done."* Skip Phase 6 finish summary and exit with this advisory.
   - `Failed verification` — something is broken in the sandbox UI. Print: *"Deploy landed in sandbox, but verification failed. Inspect the failing UI, file a rollback issue if needed, and do NOT run `/revops:deploy-prod` on this change."* Exit with this advisory.
-
-Narrate: `Phase 5/6: Manual browser verification... done` (only on "Verified")
 
 ---
 
