@@ -186,6 +186,7 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
     "row_errors": [ { "mutation_id", "issue_id", "error" } ],
     "dispatch_error": null | "<message>"
   },
+  "phase_3_spec_departure": null,                                 // Phase 3 § 4 sets e.g. "preflight-skipped-user-override" on BC-5898 Execute-without-preflight path; read by § 7.5 log + Phase 4 narrative Known gaps callout
   "_mutation_conflicts": [ {                                      // Phase 3 § 2.5 cross-project dedup
       "issue_id", "source_projects": [ ... ], "conflicting_targets": [ ... ]
   } ],

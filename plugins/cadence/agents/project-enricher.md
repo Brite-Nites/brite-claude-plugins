@@ -2,7 +2,7 @@
 name: project-enricher
 description: Phase 2 of /cadence:weekly per-project enrichment — backlog fetch (High/Urgent), carry-over relations, brainstorming-ranked SQ2 candidates. Dispatched per project by sprint-scoping § 2 pre-loop. Read-only.
 model: sonnet
-tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, Read
+tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue
 ---
 
 You enrich one Linear project for Phase 2 scope planning and emit a compact JSON card with backlog candidates, carry-over relations, and brainstorming-ranked SQ2 alternatives. Read-only — never call any mutation tool (no `save_*`, no `delete_*`, no `update_*`).
@@ -20,7 +20,7 @@ You enrich one Linear project for Phase 2 scope planning and emit a compact JSON
 ## Steps
 
 1. **List High/Urgent backlog for this project.** Single `list_issues` call with `project: project_id`, `team: team_id`, `cycle: null`, `state: "backlog"`, priority filter ≤2 (Urgent + High), `limit: 50`. Trim each returned issue to only the fields SQ2 Option 1 needs: `id, title, priority, assignee, assigneeId, cycleId, stateName`. Store as `backlog_candidates[]`.
-2. **Enrich carry-over relations.** For every ID in `audit_card.carry_over.issues[].id`, call `get_issue` **in parallel** — single tool-call message containing all invocations. For each returned issue, derive: `blocker_count = relations.blockedBy.length`, `auto_superseded_by = relations.duplicateOf[0].id || null`. Carry through `title`, `priority`, `assignee`. Store as `carry_over_enriched[]`. Sequential per-issue calls inflate fan-out latency; parallel is mandatory.
+2. **Enrich carry-over relations.** For every ID in `audit_card.carry_over.issues[].id`, call `get_issue` **in parallel** with `includeRelations: true` — single tool-call message containing all invocations. The `includeRelations: true` parameter is required so `get_issue` returns `relations.blockedBy` and `relations.duplicateOf` for the derivations below; without it the fields are absent and `blocker_count`/`auto_superseded_by` degrade silently to `0`/`null` for every issue. For each returned issue, derive: `blocker_count = relations.blockedBy.length`, `auto_superseded_by = relations.duplicateOf[0].id || null`. Carry through `title`, `priority`, `assignee`. Extract `issue_snapshot = {cycleId, stateType, assigneeId, labelIds}` for the Phase 3 cache-reuse path (see `sprint-scoping/SKILL.md § 2 step 2`). Store each entry as `{id, blocker_count, auto_superseded_by, title, priority, assignee, issue_snapshot}` in `carry_over_enriched[]`. Sequential per-issue calls inflate fan-out latency; parallel is mandatory.
 3. **Rank scope candidates.** Build a ranking pool from `audit_card.carry_over.issues[]` (with the enriched blocker/super info from Step 2) + `backlog_candidates[]`. Output 2–3 alternative scope shapes with one-line rationale each. Ordering: composite of priority (lower=higher rank) + carry-over-continuity (carry-over before backlog) + owner-load hint from `cross_project_stats.team_standouts` (down-weight candidates whose assignee is already a standout). Output format per entry: `{id_or_title, rationale, rank}` where `rank` is 1..N ascending. Top-ranked becomes SQ2's (Recommended) default in main thread.
 4. **Freeze `enriched_at`.** Set `enriched_at = <ISO-8601 now>` before emitting output.
 

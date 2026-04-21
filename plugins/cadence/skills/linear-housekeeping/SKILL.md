@@ -99,11 +99,14 @@ From `state.projects[i].scope_decisions`:
 
 ### 2.5 De-duplication
 
-If two projects reference the same issue (e.g. an assignee change on an issue owned by project A but scoped into project B's cycle), merge into a single mutation row with last-write-wins on target state. If the two decisions conflict (different target cycles, different assignees, or one says cancel while the other says cycle-assign), do NOT prompt mid-derivation — instead, append the conflict to `state._mutation_conflicts[]` with both source projects + both target states. The conflict rows render as a dedicated `## Conflicts (resolve before execute)` section at the top of the § 5 preview and consume a `Conflicts` group approval in § 6 alongside the regular decision-path groups. This preserves the "no AskUserQuestion before the preview renders" contract (§ 5 + BC-5810 § 1.1c).
+If two projects reference the same issue (e.g. an assignee change on an issue owned by project A but scoped into project B's cycle), merge into a single mutation row with last-write-wins on target state. If the two decisions conflict (different target cycles, different assignees, or one says cancel while the other says cycle-assign), do NOT prompt mid-derivation — instead, append the conflict to `state._mutation_conflicts[]` with both source projects + both target states. The conflict rows render as a dedicated `## Conflicts (resolve before execute)` section at the top of the § 5 preview and consume a `Conflicts` group approval in § 6 pre-group 1 (before the new `## Preflight errors` pre-group 2, the Gate failures pre-group 3, and the regular decision-path groups). This preserves the "no AskUserQuestion before the preview renders" contract (§ 5 + BC-5810 § 1.1c).
 
 ## § 3 Pre-flight idempotency checks (before every write)
 
-Each `state.mutations[i]` entry runs a pre-flight read to detect already-applied state. **Pre-flight short-circuit**: if a row carries `result == "pending-cq3-reparse"`, skip it entirely (do not issue any MCP call, do not enter the dispatch in § 7.3). The row is an intentional placeholder used to make § 5's preview count match § 6.3's approval count; a placeholder that reaches § 7 means § 6.0 resolution was skipped — treat as user-dropped and log `result: "dropped-by-user"` with message "pending-cq3-reparse placeholder unresolved at execute time".
+Each `state.mutations[i]` entry runs a pre-flight read to detect already-applied state. **Pre-flight short-circuits** (both required):
+
+- If a row carries `result == "pending-cq3-reparse"`, skip it entirely (do not issue any MCP call, do not enter the dispatch in § 7.3). The row is an intentional placeholder used to make § 5's preview count match § 6.3's approval count; a placeholder that reaches § 7 means § 6.0 resolution was skipped — treat as user-dropped and log `result: "dropped-by-user"` with message "pending-cq3-reparse placeholder unresolved at execute time".
+- If a row carries `gate_detail[0].check == "preflight_integrity"` AND `gate_status == "fail"` (synthetic-integrity row from § 4 step 4), skip pre-flight against the cache — force a fresh `get_issue` in main thread before continuing. The preflight agent never delivered a manifest entry for this row, so `_fetched_issues` cannot be trusted here. After the fresh fetch, inline-apply the 7 gate checks from `plugins/cadence/skills/_shared/issue-quality-gate/SKILL.md` and populate `row.gate_detail` with the real result before proceeding to § 7 execute (belt-and-suspenders parallel to § 6 pre-group 2 Retry-fetch path).
 
 | Mutation type | Pre-flight read | Skip condition |
 |---|---|---|
@@ -333,7 +336,7 @@ _Populated at end of run._
 
 ### 7.3 Execute each mutation
 
-For each row in `state.mutations[]` where `approved: true` AND `result != "pending-cq3-reparse"` (belt-and-suspenders guard against a placeholder leaking past § 6.0):
+For each row in `state.mutations[]` where `approved: true` AND `result != "pending-cq3-reparse"` (belt-and-suspenders guard against a placeholder leaking past § 6.0) AND not a synthetic-integrity row still carrying `gate_detail[0].check == "preflight_integrity"` with `gate_status == "fail"` (which would indicate § 6 pre-group 2 Retry/Override resolution was skipped — treat as `"dropped-by-user"` and log `result: "dropped-by-user"` with message "preflight_integrity synthetic failure unresolved at execute time"):
 
 1. Record `started_at = <ISO-8601 now>`.
 2. Run the § 3 pre-flight read. If skip condition met: set `result = "skipped-idempotent"`, `executed_at = started_at`, append row to log, continue.
