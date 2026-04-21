@@ -134,19 +134,207 @@ INTERESTING and COMMODITY verdicts do NOT require shelf-life metadata — they a
 
 ## Brite Implementation
 
-<!-- TODO(BC-5828): task 6 -->
+This section translates §3 Methodology into Brite's concrete stack — which MCP server, which tool, which rule, which repo. Every rule cites its source (ADR, integration guide, or sibling skill) so a skill reader can trace the claim.
+
+### Tools this skill calls
+
+| What the skill needs to do | MCP / tool | Reaches | Reason |
+|---|---|---|---|
+| Signal research (5 Quick + 7 Deep queries) | `WebSearch` | Public web | §3 Quick/Deep query patterns; no availability check — `WebSearch` is always on |
+| Deep-read a single page when the search snippet is insufficient | `WebFetch` | Public web | Backup only; use sparingly to avoid burning context |
+| Optional ALPHA cross-check on an existing Salesforce Account | Salesforce MCP (`run_soql_query`) | `brite-salesforce` production org | ADR 2a — SF is CRM system of record; fires only when a generated ALPHA angle targets a domain that may already exist as an Account. Availability probe first |
+| Load situation-mining artifact (Deep Mode prereq) | `Read` + `Glob` | Local `docs/research/situations/` | §2 Gate 3 verified the artifact exists and is < 14 days old; Deep Mode Step 1 re-reads it for use |
+| Emit output artifact | `Write` | Local `docs/research/angles/{domain}-{YYYY-MM-DD}.md` | §6 runbook output shape |
+
+The wildcard form `mcp__plugin_marketing_salesforce__*` in `allowed-tools` is used because the optional SF cross-check would call `run_soql_query` against multiple SOQL object types (User for the probe, Account for domain lookup, ActivityHistory or Opportunity for evidence enrichment) depending on what the angle targets — narrower cherry-picking would couple the frontmatter to a SOQL object taxonomy that will evolve. See [`plugins/marketing/tools/integrations/salesforce.md`](../../../tools/integrations/salesforce.md) §MCP Tool Reference for the availability probe pattern — the canonical check is `run_soql_query` with `SELECT Id FROM User LIMIT 1` (verified per BC-5534 findings §Q1; `get_username` is NOT a valid liveness check because it reads the local auth store without contacting Salesforce).
+
+### Brite-entity signal-library additions
+
+Per [`plugins/marketing/references/hidden-signals-library.md`](../../../references/hidden-signals-library.md), Brite adds industry tables on top of the 7 upstream SaaS-heavy industries — **Entertainment Venues** (Labs), **Landscape / Hardscape Contractors** (Supply boundary), and **HOAs / Property Management** (Nites) — each keyed to handbook-canon verticals with shelf-life ratings per signal. Deep Mode Step 4 preferentially queries these Brite-entity tables for Nites/Labs prospects rather than leaning on the upstream SaaS rows. The handbook 23-vertical taxonomy (6 Active + 8 Exploring + 9 Future, Nites + Labs only) governs which rows are in scope; Supply verticals are excluded per BC-5823 precedent and the handbook-canon rule that Supply is out of scope for outbound skills.
+
+### Architectural rules that apply
+
+- **Every angle requires a signal cluster (2+ data points).** Single data points are noise, not signals. Source: §3 Quick Mode Step 2; enforced by §8 Anti-Slop.
+- **Every score requires a cited evidence chain.** The Asymmetry Score is derived from named data points with source URLs. Score-without-evidence is a §7 Rubric 1–3 hard failure. Source: §3 Asymmetry Score subsection.
+- **Worldview contradictions are framing tools, not gotchas.** Never weaponize a contradiction against the prospect — the operator's job is to extend curiosity, not expose inconsistency. Source: §3 Deep Mode Step 3; enforced by §8 Anti-Slop.
+- **ALPHA and PROMISING angles carry mandatory shelf-life metadata.** Three sub-fields (estimate, decay trigger, refresh date), each cited against `plugins/marketing/references/shelf-life-patterns.md`. Source: §3 Shelf-life requirements.
+- **Deep Mode halts on stale situation-mining — no graceful degrade.** §2 Gate 3 is the hard halt; this skill never silently falls back to Quick Mode when Deep Mode's prereq fails. Source: §2 Gate 3.
+
+### Cross-skill boundaries
+
+**Hands off to:**
+
+- **[BC-5825](https://linear.app/brite-nites/issue/BC-5825) `email-copywriting`** — fires when the operator selects an ALPHA angle plus an offer tier. `email-copywriting` receives the tuple `{angle, situation-mining-artifact-if-deep, offer-tier}` and emits the Email-Bison-formatted subject + body that `/marketing:launch-campaign` consumes.
+- **[BC-5829](https://linear.app/brite-nites/issue/BC-5829) `message-market-fit` / MSPA** — fires when the operator wants to populate the A (angle) dimension of an MSPA experiment matrix. The verdict-mapped angle list is the input.
+- **Content workflows (no skill yet)** — fires for INTERESTING angles. Brite does not have a content-workflow skill today; save INTERESTING angles to `docs/content/ideas/{domain}-{YYYY-MM-DD}.md` per §6 Flow 5 and hand back to the operator.
+
+**Receives from:**
+
+- **[BC-5824](https://linear.app/brite-nites/issue/BC-5824) `situation-mining`** — hard prereq for Deep Mode. The artifact stays in conversation context so Deep Mode can read it without re-query.
+- **[BC-5831](https://linear.app/brite-nites/issue/BC-5831) `icp-scoring`** (optional future) — segment-level context that informs angle generation when the operator is running against a scored ICP slice.
+- **[BC-2721](https://linear.app/brite-nites/issue/BC-2721) `campaign-analysis` / [BC-5830](https://linear.app/brite-nites/issue/BC-5830) `campaign-debrief`** (optional) — feedback on previously-tested angles so this skill can avoid re-proposing angles that have already been commoditized by a prior run.
+
+**Does not own:**
+
+- Per-prospect research (that's `situation-mining`).
+- Copy generation (that's `email-copywriting`).
+- Launch mechanics (that's `/marketing:launch-campaign`).
+- Test design or next-batch experimentation (that's MSPA).
+
+### Output artifact
+
+Every run writes one artifact to `docs/research/angles/{domain}-{YYYY-MM-DD}.md`. Frontmatter shape:
+
+```yaml
+---
+domain: example.com
+mode: quick | deep
+angles_count: 3
+alpha_count: 0
+promising_count: 1
+generated_at: 2026-04-21T14:30:00Z
+situation_mining_source: docs/research/situations/example.com-2026-04-15.md  # deep mode only; omit for quick
+---
+```
+
+Body sections (in order):
+
+1. **Signal Clusters** — one entry per cluster, each with 2+ data points and source URLs inline.
+2. **Generated Angles** — 3–8 rows. Each row lists the angle (one sentence), the forcing function(s) attributed, the Asymmetry Score (total plus the per-dimension breakdown), and the verdict label.
+3. **Shelf-Life Block** — ALPHA and PROMISING angles only. Three sub-fields per angle: estimate (citing a `shelf-life-patterns.md` decay category), decay trigger, refresh date.
+4. **Worldview Conflicts** — Deep Mode only. Minimum 1 conflict; each framed as a curiosity opening, not a gotcha.
+5. **Handoff Block** — ALPHA angles → pointer to `email-copywriting`; INTERESTING angles → saved to `docs/content/ideas/`; COMMODITY angles → discarded (named only, not carried forward).
 
 ---
 
 ## MCP Tool Reference
 
-<!-- TODO(BC-5828): task 7 -->
+§4 declared WHAT tools this skill uses; §5 says WHEN — which workflow, in what order. Grouping is by what the skill actually does, not by server. Connection details live in the Brite integration guides; this section names tools semantically. See [`plugins/marketing/tools/integrations/salesforce.md`](../../../tools/integrations/salesforce.md) for SF auth, SOQL gotchas, and the canonical availability probe pattern.
+
+### Workflow 1 — Quick Mode parallel search (always runs)
+
+No availability check needed — `WebSearch` is always on. Single turn, five parallel `WebSearch` calls using the five Quick Mode patterns from §3 (blog content, reviews / complaints, competitors, regulation / compliance, hiring). Substitute `{{company_name}}`, `{{domain}}`, and (when known) `{{industry}}` before executing.
+
+On rate-limit or transient failure for any single query, retry once with exponential backoff. If still failing, proceed with the remaining queries and drop the affected cluster's Evidence-dimension score by one band in the §3 Asymmetry Score. Do NOT halt the run on a single-query failure — partial signal is still scorable.
+
+### Workflow 2 — Deep Mode 7-query batch (runs after Workflow 1)
+
+Runs only after §2 Gate 3 has cleared and Workflow 1 has completed. Single turn, seven parallel `WebSearch` calls using the seven Deep Mode patterns from §3 (G2 / Trustpilot, events / conferences, regulation deep, partnerships, senior hiring, financial signals, Reddit / HN sentiment). Same substitution rules as Workflow 1.
+
+Same retry / degrade policy as Workflow 1: one retry with backoff, then proceed on partial signal and drop the affected cluster's Evidence band by one. Deep Mode is supplementary to Quick Mode — the 12-query total is the full signal base, but the skill continues to produce an artifact even when a subset fails.
+
+### Workflow 3 — `WebFetch` deep-read (backup)
+
+When a `WebSearch` snippet is insufficient to ground a specific data point, call `WebFetch` on the specific URL. Do NOT use `WebFetch` as a default — snippet analysis is usually enough, and `WebFetch` burns context fast. Scope each fetch to a single URL with a concrete data point in mind; do not pre-fetch opportunistically.
+
+### Workflow 4 — Salesforce ALPHA cross-check (optional, conditional)
+
+Fires only when a generated ALPHA angle targets a domain that may already exist as a Brite Salesforce Account — the cross-check surfaces lapsed-opportunity or Activity-history evidence that strengthens the angle's Evidence dimension. Sequence:
+
+1. **Availability probe.** Call `run_soql_query` with `SELECT Id FROM User LIMIT 1`. This is the verified liveness check per BC-5534 findings §Q1 — `get_username` is NOT valid because it reads the local auth store without contacting Salesforce. On failure, skip the rest of this workflow silently; do NOT halt the skill.
+2. **Account lookup.** Call `run_soql_query` with `SELECT Id, Name FROM Account WHERE Website LIKE '%{{domain}}%' LIMIT 5`. If zero results, the angle's prospect is not an existing Account — skip the rest of this workflow silently.
+3. **Evidence enrichment.** For the matched Account ID, call `run_soql_query` against ActivityHistory or Opportunity history only if the returned rows would add data points to the angle's Evidence dimension. On any SF error or empty result, note the attempt inline in the output artifact and proceed — this skill does not block on Salesforce.
+
+All SF calls are read-only — no MCP confirmation gates needed. The skill MUST continue producing a complete artifact with or without Workflow 4; SF enrichment is additive, never a blocker.
 
 ---
 
 ## Operational Runbook
 
-<!-- TODO(BC-5828): task 8 -->
+This section turns §3 Methodology + §5 MCP Tool Reference into five concrete flows that a subagent follows end-to-end. Flow 1 is the default path (Quick Mode). Flow 2 is the Deep Mode happy path. Flow 3 is the precondition-halt path when Deep Mode's prereq is unmet. Flows 4 and 5 are conditional handoff paths triggered by what Flows 1 / 2 produced. Preconditions, steps, expected output, error handling, and handoff are explicit on every flow so a fresh agent can execute any of them without re-reading the rest of the skill.
+
+### Flow 1 — Quick Mode standard run (default path)
+
+**Preconditions:** §2 Gates 1, 2, 3 resolved; operator picked Quick Mode at Gate 2.
+
+**Steps:**
+
+1. Run §5 Workflow 1 — five parallel `WebSearch` queries.
+2. Extract signal clusters per §3 Quick Mode Step 2 (2+ data points per cluster, sources diverse).
+3. Apply the 5 forcing functions per §3 Quick Mode Step 3 (Inversion, Adjacent Transfer, Timing Arbitrage, Specificity Escalator, Ecosystem Gap Analysis).
+4. Score each candidate angle per §3 Asymmetry Score; verdict-map per §3 Verdict mapping (ALPHA / PROMISING / INTERESTING / COMMODITY).
+5. Attach shelf-life metadata to every ALPHA and PROMISING angle per §3 Shelf-life requirements (estimate, decay trigger, refresh date).
+6. Write the output artifact to `docs/research/angles/{domain}-{YYYY-MM-DD}.md` per the §4 Output artifact shape.
+7. Offer handoff per Flow 4 (ALPHA → `email-copywriting`) and Flow 5 (INTERESTING → content), conditional on the verdict mix in the artifact.
+
+**Expected output:** artifact with 3–5 angles, verdict-mapped, shelf-life metadata populated on every alpha-tier row, no `situation_mining_source` frontmatter.
+
+**Error handling:** `WebSearch` rate-limit → retry once with backoff, then degrade the affected cluster's Evidence band per §5 Workflow 1. No hard halt on partial query failure — partial signal is still scorable.
+
+**Handoff:** per Flow 4 / Flow 5, conditional on verdict mix.
+
+### Flow 2 — Deep Mode with situation-mining
+
+**Preconditions:** §2 Gate 3 satisfied (situation-mining artifact < 14 days old on disk for the `{domain}`); Quick Mode work is included because Deep Mode is additive, not a replacement.
+
+**Steps:**
+
+1. Load the situation-mining artifact from `docs/research/situations/{domain}-*.md` (newest match that satisfied §2 Gate 3).
+2. Run §5 Workflow 1, then §5 Workflow 2 (12 queries total).
+3. Run the §3 Deep Mode Step 3 worldview-conflict analysis against the stated worldviews in the situation-mining §Situations section. Minimum 1 conflict surfaced, framed as a curiosity opening.
+4. Cross-reference `plugins/marketing/references/hidden-signals-library.md` Brite-entity tables when the prospect is Nites or Labs (Entertainment Venues, Landscape / Hardscape Contractors, HOAs / Property Management).
+5. Apply all 5 forcing functions plus the worldview conflicts to generate 5–8 angles. Angles combining 2+ forcing functions — or a forcing function plus a worldview conflict — are the highest-asymmetry candidates.
+6. Score every angle per §3 Asymmetry Score, verdict-map, and attach shelf-life metadata to every ALPHA and PROMISING row.
+7. Write the output artifact with the `situation_mining_source` frontmatter field populated.
+8. Offer handoff per Flow 4 / Flow 5.
+
+**Expected output:** artifact with 5–8 angles, at least 1 worldview conflict surfaced, shelf-life metadata on every alpha-tier row, `situation_mining_source` populated in frontmatter.
+
+**Error handling:** same as Flow 1 for query-level failures; additionally, if Workflow 2's 7-query batch fully fails, the run degrades to Flow 1 output plus the worldview-conflict content sourced from the situation-mining artifact alone — angle count caps at 5.
+
+**Handoff:** per Flow 4 / Flow 5.
+
+### Flow 3 — Deep Mode missing-prereq halt
+
+**Preconditions:** §2 Gate 2 → operator picked Deep Mode; §2 Gate 3 → no situation-mining artifact < 14 days old for `{domain}`.
+
+**Steps:**
+
+1. Halt before any `WebSearch` call fires.
+2. Surface the blocking message verbatim to the operator:
+
+   > "Deep Mode requires situation-mining output less than 14 days old for `{domain}`. Run `situation-mining` first, then resume."
+
+3. Do NOT silently fall back to Quick Mode. The operator either runs `situation-mining` and re-invokes this skill, or explicitly re-picks Quick Mode at Gate 2 on a fresh invocation.
+
+**Expected output:** the blocking message and zero `WebSearch` calls. No artifact written.
+
+**Error handling:** none — this is a precondition-violation path, not a failure path.
+
+**Handoff:** none; the skill resumes Flow 1 or Flow 2 on a subsequent invocation once the operator has acted.
+
+### Flow 4 — ALPHA-to-email-copywriting handoff
+
+**Preconditions:** Flow 1 or Flow 2 has completed and written an artifact; at least 1 angle in the artifact has verdict = ALPHA.
+
+**Steps:**
+
+1. Present each ALPHA angle to the operator with its Asymmetry Score per-dimension breakdown and its shelf-life metadata.
+2. Use `AskUserQuestion` to ask the operator (a) which ALPHA angle to ship first and (b) which offer tier to pair it with (T1 Knowledge / T2 Free Asset / T3 DFY Trial / T4 Risk Reversal). One question per field per the BC-5761 one-question-per-field rule.
+3. On operator selection, hand off to `email-copywriting` (BC-5825) with the tuple `{angle, situation-mining-artifact-if-deep, offer-tier}`. `email-copywriting` owns copy generation from here.
+4. If the operator declines (wants to sit on the angle before committing), save the artifact and record the declination in the run log.
+
+**Expected output:** one ALPHA angle plus one offer tier selected, and the handoff to `email-copywriting` fires.
+
+**Error handling:** if no ALPHA angle exists in the artifact (only PROMISING or below), skip this flow entirely and offer Flow 5 or no handoff.
+
+**Handoff:** `email-copywriting` (BC-5825).
+
+### Flow 5 — INTERESTING-to-content redirect
+
+**Preconditions:** Flow 1 or Flow 2 has completed and written an artifact; at least 1 angle in the artifact has verdict = INTERESTING.
+
+**Steps:**
+
+1. Collect every INTERESTING angle from the output artifact.
+2. Write to `docs/content/ideas/{domain}-{YYYY-MM-DD}.md`, preserving the angle text, the forcing function attribution, and the Asymmetry Score. INTERESTING angles do NOT carry shelf-life metadata — they will run as content, not cold outbound, and shelf-life is irrelevant to that decision.
+3. Surface to the operator: "Saved N INTERESTING angles to `docs/content/ideas/` for thought-leadership redirect. Too creative for cold outbound — run them as content instead."
+
+**Expected output:** content file written at `docs/content/ideas/{domain}-{YYYY-MM-DD}.md` and the operator is notified.
+
+**Error handling:** none — the write is local and non-blocking.
+
+**Handoff:** no cross-skill handoff. Brite does not have a content-workflow skill yet; the artifact itself is the hand-back to the operator.
 
 ---
 
