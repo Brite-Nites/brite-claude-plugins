@@ -2,7 +2,7 @@
 name: email-bison
 description: Default entry point for Email Bison work. Triggers on Email Bison, cold email, outbound campaign, lead import, sender inbox, warmup, blocklist, unsubscribe, workspace, tag, webhook, template, variable, schedule. Routes to campaign-orchestration (sequence design), reply-processing (inbox classification), or deliverability-audit (SPF/DKIM/DMARC) when the user's intent matches their scope; otherwise handles the long tail inline.
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_emailbison-b2b__*, mcp__plugin_marketing_emailbison-personal__*, Read, Write, Glob, Grep
+allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep
 metadata:
   version: 0.1.0
   category: Outbound Lead Gen
