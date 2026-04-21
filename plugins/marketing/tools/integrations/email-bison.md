@@ -13,6 +13,7 @@ The official Email Bison MCP Server (Beta) exposes the full sending-layer API su
 - `email-bison` (`plugins/marketing/skills/email-bison/`) — default entry point; owns the long tail (workspace, senders, tags, blocklist, webhooks, schedule templates, variables, quick stats) and routes to the specialized siblings below when intent matches.
 - `email-copywriting` (`plugins/marketing/skills/email-copywriting/`) — generates EB-format subject + body step 1 + step 2 as a JSON artifact for `/marketing:launch-campaign` to consume. Does NOT call EB MCP tools — pure content generation.
 - `campaign-orchestration` (`plugins/marketing/skills/campaign-orchestration/`) — sequence design, inbox rotation, warmup strategy, end-to-end campaign launch.
+- `/marketing:launch-campaign` (`plugins/marketing/commands/launch-campaign.md`, BC-5826) — procedural 11-phase command that turns an enriched CSV + email-copywriting JSON artifact into an activated EB campaign. Owns every mutating phase (variables, upload, campaign create, lead+sender attach, schedule, sequence, activate) with two-call confirmation gates at each step. Default-off `--activate` flag; campaigns stop in Draft state unless explicit.
 - `reply-processing` (BC-2720 — not yet landed) — reply classification + OutboundSync CRM sync.
 - `deliverability-audit` (BC-2719 — not yet landed) — SPF/DKIM/DMARC, domain reputation, bounce analysis.
 
