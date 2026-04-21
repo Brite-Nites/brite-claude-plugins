@@ -17,20 +17,30 @@ You are the creative-angle generator for Brite's 10% experiment allocation — t
 
 ## Before Starting
 
+Three gates resolve in order before any `WebSearch` fires. Cross-references elsewhere in this skill (e.g. "§2 Gate 3" in §6 Flow preconditions) point to the numbered gates below.
+
+**Input validation.** Every `{domain}` string the skill receives — whether from the operator or from a handoff — must match `^[a-z0-9.-]+$`. Reject any `{domain}` containing `/`, `\`, `..`, single quotes, semicolons, NUL, or SOQL keywords (`SELECT`, `WHERE`, `OR`, etc.). This validator gates the Gate-3 `Glob`, §4 `Write` destinations, and §5 Workflow 4 SOQL interpolation — a poisoned `{domain}` must not reach any tool call.
+
+### Gate 1 — Marketing context (soft gate)
+
 **Check for product marketing context first.** If `docs/marketing-context.md` exists, read it before asking questions and use that context for Brite entity selection, voice, and ICP. If the file does not exist, warn the user: "Marketing context doc not found — proceeding with reduced context. Run `/marketing:product-marketing-context` to generate it." Then continue using only user-provided information.
 
-**Mode selection.** Use `AskUserQuestion` to ask the operator which mode to run. The two options:
+### Gate 2 — Mode selection
+
+Use `AskUserQuestion` to ask the operator which mode to run. The two options:
 
 - **Quick Mode (default).** Five parallel `WebSearch` queries, four ordered steps, 3–5 angles. Fast and broad — the right pick for initial exploration, for prospects with no existing situation-mining artifact, or when the operator wants a shallow pass before committing research budget.
 - **Deep Mode.** Quick Mode's work plus seven additional `WebSearch` queries, explicit worldview-conflict analysis against a prior situation-mining artifact, 5–8 angles, and mandatory shelf-life metadata on every ALPHA and PROMISING angle. Higher signal but requires a situation-mining output less than 14 days old for this `{domain}`.
 
 See §3 Methodology for the step-by-step for each mode. The trade-off in plain language: Quick is cheap and surfaces the obvious non-obvious; Deep finds the contradictions between what a prospect says publicly and what they actually do, which is where the alpha-bearing angles live.
 
-**Deep Mode prereq (HARD HALT).** If the operator picked Deep Mode, this skill MUST verify a situation-mining artifact exists at `docs/research/situations/{domain}-*.md` and is less than 14 days old before running any search. Use `Glob` to list matches, then check the date stamp in each filename. If no artifact matches, or if every match is older than 14 days, halt with this blocking message and wait for the operator:
+### Gate 3 — Deep Mode prereq (HARD HALT)
+
+If the operator picked Deep Mode at Gate 2, this skill MUST verify a situation-mining artifact exists at `docs/research/situations/{domain}-*.md` and is less than 14 days old before running any search. Use `Glob` to list matches (no `Read` at this gate — just pattern match on the filename date stamp). If no artifact matches, or if every match is older than 14 days, halt with this blocking message and wait for the operator:
 
 > "Deep Mode requires situation-mining output less than 14 days old for `{domain}`. Run `situation-mining` first, then resume."
 
-Do NOT silently fall back to Quick Mode. The operator either runs situation-mining, or explicitly re-picks Quick Mode at the mode-selection gate above. Required inputs for Quick Mode: `company_name`, `domain`. For Deep Mode: the same pair plus the verified situation-mining artifact path.
+Do NOT silently fall back to Quick Mode. The operator either runs situation-mining, or explicitly re-picks Quick Mode at Gate 2. Required inputs for Quick Mode: `company_name`, `domain` (both validated per the Input-validation rule above). For Deep Mode: the same pair plus the verified situation-mining artifact path that Gate 3 resolved via `Glob`.
 
 ---
 
@@ -42,7 +52,7 @@ Three frameworks govern this skill: the **5 forcing functions** (lateral-thinkin
 
 Quick Mode runs four ordered steps, produces 3–5 angles, and takes roughly one research turn plus synthesis. It is the right pick for initial exploration, for prospects without a situation-mining artifact, and for operators who want a shallow pass before committing research budget.
 
-**Step 1 — Five parallel `WebSearch` queries.** Single turn, five tool calls, substitute `{{company_name}}`, `{{domain}}`, and (when known) `{{industry}}` before executing:
+**Step 1 — Five parallel `WebSearch` queries.** Emit all five `WebSearch` calls in a single assistant turn (one message, five `tool_use` blocks). Do NOT await results between calls — sequential execution is 5× the wall-clock. Substitute `{{company_name}}`, `{{domain}}`, and (when known) `{{industry}}` before executing:
 
 1. Blog content — `site:{{domain}} blog`
 2. Reviews / complaints — `{{company_name}} reviews OR complaints OR problems`
@@ -50,7 +60,7 @@ Quick Mode runs four ordered steps, produces 3–5 angles, and takes roughly one
 4. Regulation / compliance — `{{company_name}} {{industry}} regulation OR compliance OR deadline`
 5. Hiring — `{{company_name}} careers OR hiring`
 
-On `WebSearch` rate-limit or transient failure for any single query, retry once with exponential backoff. If still failing, proceed with the remaining queries and mark the missing source in the output artifact — the missing signal degrades Evidence Density scoring in §3 Asymmetry Score.
+On `WebSearch` rate-limit or transient failure for any single query, retry once after a 1–2s delay. If still failing, proceed with the remaining queries and mark the missing source in the output artifact — the missing signal degrades Evidence Density scoring in §3 Asymmetry Score.
 
 **Step 2 — Extract signal clusters.** A signal cluster is 2+ independent data points that together reveal something non-obvious. **Single data points are noise, not signals.** The 2-point minimum is a hard rule — §8 Anti-Slop will flag any cluster containing only one data point, and the Evidence Density dimension bottoms out at Low. Data points inside a cluster must come from different sources (a blog post and a job posting count as two; two blog posts on the same site count as one).
 
@@ -72,7 +82,7 @@ Requires a situation-mining artifact at `docs/research/situations/{domain}-{YYYY
 
 **Step 1 — Load the situation-mining artifact** from `docs/research/situations/{domain}-{YYYY-MM-DD}.md`. Parse the frontmatter (entity, vertical, confidence, `sf_enriched`, `internal_signals`) and the body's §Raw Data, §Situations, and §Diagnostic Messages sections. The worldview inferences in §Situations are the input to Step 3's conflict analysis — do not skip them.
 
-**Step 2 — Run seven additional `WebSearch` queries.** These supplement Quick Mode's five for 12 total. Substitute `{{company_name}}`, `{{domain}}`, `{{industry}}`, and `{{year}}` before executing:
+**Step 2 — Run seven additional `WebSearch` queries.** Emit all seven in a single assistant turn (one message, seven `tool_use` blocks) — same single-turn rule as Quick Mode Step 1. These supplement Quick Mode's five for 12 total. Substitute `{{company_name}}`, `{{domain}}`, `{{industry}}`, and `{{year}}` before executing:
 
 1. G2 / Trustpilot reviews — `{{company_name}} site:g2.com OR site:trustpilot.com`
 2. Events / conferences — `{{company_name}} speaking OR keynote OR conference`
@@ -143,7 +153,7 @@ This section translates §3 Methodology into Brite's concrete stack — which MC
 | Signal research (5 Quick + 7 Deep queries) | `WebSearch` | Public web | §3 Quick/Deep query patterns; no availability check — `WebSearch` is always on |
 | Deep-read a single page when the search snippet is insufficient | `WebFetch` | Public web | Backup only; use sparingly to avoid burning context |
 | Optional ALPHA cross-check on an existing Salesforce Account | Salesforce MCP (`run_soql_query`) | `brite-salesforce` production org | ADR 2a — SF is CRM system of record; fires only when a generated ALPHA angle targets a domain that may already exist as an Account. Availability probe first |
-| Load situation-mining artifact (Deep Mode prereq) | `Read` + `Glob` | Local `docs/research/situations/` | §2 Gate 3 verified the artifact exists and is < 14 days old; Deep Mode Step 1 re-reads it for use |
+| Load situation-mining artifact (Deep Mode) | `Read` (Deep Mode Step 1) | Local `docs/research/situations/` | §2 Gate 3 only `Glob`s to verify existence and age — no `Read` at the gate. Deep Mode Step 1 performs the single `Read` and reuses the parsed artifact in memory for Step 3's worldview-conflict analysis |
 | Emit output artifact | `Write` | Local `docs/research/angles/{domain}-{YYYY-MM-DD}.md` | §6 runbook output shape |
 
 The wildcard form `mcp__plugin_marketing_salesforce__*` in `allowed-tools` is used because the optional SF cross-check would call `run_soql_query` against multiple SOQL object types (User for the probe, Account for domain lookup, ActivityHistory or Opportunity for evidence enrichment) depending on what the angle targets — narrower cherry-picking would couple the frontmatter to a SOQL object taxonomy that will evolve. See [`plugins/marketing/tools/integrations/salesforce.md`](../../../tools/integrations/salesforce.md) §MCP Tool Reference for the availability probe pattern — the canonical check is `run_soql_query` with `SELECT Id FROM User LIMIT 1` (verified per BC-5534 findings §Q1; `get_username` is NOT a valid liveness check because it reads the local auth store without contacting Salesforce).
@@ -213,15 +223,11 @@ Body sections (in order):
 
 ### Workflow 1 — Quick Mode parallel search (always runs)
 
-No availability check needed — `WebSearch` is always on. Single turn, five parallel `WebSearch` calls using the five Quick Mode patterns from §3 (blog content, reviews / complaints, competitors, regulation / compliance, hiring). Substitute `{{company_name}}`, `{{domain}}`, and (when known) `{{industry}}` before executing.
-
-On rate-limit or transient failure for any single query, retry once with exponential backoff. If still failing, proceed with the remaining queries and drop the affected cluster's Evidence-dimension score by one band in the §3 Asymmetry Score. Do NOT halt the run on a single-query failure — partial signal is still scorable.
+No availability check needed — `WebSearch` is always on. Emit all five `WebSearch` calls in a single assistant turn (one message, five `tool_use` blocks) using the five Quick Mode patterns from §3 (blog content, reviews / complaints, competitors, regulation / compliance, hiring). Substitute `{{company_name}}`, `{{domain}}`, and (when known) `{{industry}}` before executing. See §3 Quick Mode Step 1 for the retry / degrade policy; do NOT restate or change it here.
 
 ### Workflow 2 — Deep Mode 7-query batch (runs after Workflow 1)
 
-Runs only after §2 Gate 3 has cleared and Workflow 1 has completed. Single turn, seven parallel `WebSearch` calls using the seven Deep Mode patterns from §3 (G2 / Trustpilot, events / conferences, regulation deep, partnerships, senior hiring, financial signals, Reddit / HN sentiment). Same substitution rules as Workflow 1.
-
-Same retry / degrade policy as Workflow 1: one retry with backoff, then proceed on partial signal and drop the affected cluster's Evidence band by one. Deep Mode is supplementary to Quick Mode — the 12-query total is the full signal base, but the skill continues to produce an artifact even when a subset fails.
+Runs only after §2 Gate 3 has cleared and Workflow 1 has completed. Emit all seven `WebSearch` calls in a single assistant turn (one message, seven `tool_use` blocks) using the seven Deep Mode patterns from §3 (G2 / Trustpilot, events / conferences, regulation deep, partnerships, senior hiring, financial signals, Reddit / HN sentiment). Same substitution rules as Workflow 1; same retry / degrade policy per §3 Quick Mode Step 1 — the 12-query total is the full signal base, but the skill continues to produce an artifact even when a subset fails.
 
 ### Workflow 3 — `WebFetch` deep-read (backup)
 
@@ -231,9 +237,9 @@ When a `WebSearch` snippet is insufficient to ground a specific data point, call
 
 Fires only when a generated ALPHA angle targets a domain that may already exist as a Brite Salesforce Account — the cross-check surfaces lapsed-opportunity or Activity-history evidence that strengthens the angle's Evidence dimension. Sequence:
 
-1. **Availability probe.** Call `run_soql_query` with `SELECT Id FROM User LIMIT 1`. This is the verified liveness check per BC-5534 findings §Q1 — `get_username` is NOT valid because it reads the local auth store without contacting Salesforce. On failure, skip the rest of this workflow silently; do NOT halt the skill.
-2. **Account lookup.** Call `run_soql_query` with `SELECT Id, Name FROM Account WHERE Website LIKE '%{{domain}}%' LIMIT 5`. If zero results, the angle's prospect is not an existing Account — skip the rest of this workflow silently.
-3. **Evidence enrichment.** For the matched Account ID, call `run_soql_query` against ActivityHistory or Opportunity history only if the returned rows would add data points to the angle's Evidence dimension. On any SF error or empty result, note the attempt inline in the output artifact and proceed — this skill does not block on Salesforce.
+1. **Availability probe — once per skill invocation.** On the first ALPHA that triggers this workflow, call `run_soql_query` with `SELECT Id FROM User LIMIT 1` and cache the result (reachable vs unreachable) for the remainder of the run. This is the verified liveness check per BC-5534 findings §Q1 — `get_username` is NOT valid because it reads the local auth store without contacting Salesforce. On failure, skip the rest of this workflow silently for every ALPHA; do NOT halt the skill, and do NOT re-probe.
+2. **Batched Account lookup.** If multiple ALPHA angles target distinct domains, batch them into a single `run_soql_query` using `WHERE Website LIKE '%dom1%' OR Website LIKE '%dom2%' OR ...` up to 5 domains per query. For a single ALPHA, call with `SELECT Id, Name FROM Account WHERE Website LIKE '%{{domain}}%' LIMIT 5`. Before interpolating, confirm `{{domain}}` passed §2's input-validation regex — single quotes, semicolons, or SOQL keywords in a `{{domain}}` token are a hard halt for this workflow. If zero results match, skip evidence enrichment silently.
+3. **Evidence enrichment.** For each matched Account ID, call `run_soql_query` against ActivityHistory or Opportunity history only if the returned rows would add data points to the angle's Evidence dimension. On any SF error or empty result, note the attempt inline in the output artifact and proceed — this skill does not block on Salesforce.
 
 All SF calls are read-only — no MCP confirmation gates needed. The skill MUST continue producing a complete artifact with or without Workflow 4; SF enrichment is additive, never a blocker.
 
