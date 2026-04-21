@@ -16,7 +16,7 @@
       "assertions": [
         "first_response contains one of: 'hypothesis', 'expect', 'expectation'",
         "first_response uses AskUserQuestion or equivalent prompt mechanism",
-        "first_tool_calls does NOT contain any of: list_workspace_stats, list_campaigns, get_campaign_stats, get_leads_analytics, list_sender_emails, get_replies_analytics",
+        "first_tool_calls does NOT contain any of: get_workspace_stats, list_campaigns, get_campaign_stats, get_leads_analytics, list_sender_emails, get_replies_analytics",
         "no Phase 2 data-collection tool fires until operator submits at least one hypothesis",
         "if operator explicitly declines hypothesis, skill refuses to continue (no Phase 2 tool calls ever) per §8 skill-specific hard failure"
       ]
@@ -154,8 +154,8 @@
       },
       "assertions": [
         "first EB MCP call is get_active_workspace_info on the Gate-2-detected workspace",
-        "no call to list_workspace_stats, list_campaigns, get_campaign_stats, get_leads_analytics, list_sender_emails, or get_replies_analytics fires before get_active_workspace_info",
-        "variant[match]: skill proceeds to §5 Phase 2 step 2 (list_workspace_stats)",
+        "no call to get_workspace_stats, list_campaigns, get_campaign_stats, get_leads_analytics, list_sender_emails, or get_replies_analytics fires before get_active_workspace_info",
+        "variant[match]: skill proceeds to §5 Phase 2 step 2 (get_workspace_stats)",
         "variant[mismatch]: skill stops and reports the mismatch to operator",
         "variant[mismatch]: no further EB tool calls fire after the mismatch is detected",
         "variant[mismatch]: skill does NOT call set_active_workspace to fix the mismatch (Procedure 1 step 1 explicitly bans this)"

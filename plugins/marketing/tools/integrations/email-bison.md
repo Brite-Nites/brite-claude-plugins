@@ -151,7 +151,7 @@ Sending schedule configuration — send windows, cadence.
 
 ### Workspace (17 tools)
 
-Workspace-level configuration and metadata. Includes `get_active_workspace_info`, `set_active_workspace`, `reset_to_primary_workspace`, `validate_workspace_key`, `get_account_details` — the tools a skill uses to verify which workspace it's talking to before mutating anything.
+Workspace-level configuration and metadata. The active-workspace meta-tools (`get_active_workspace_info`, `set_active_workspace`, `reset_to_primary_workspace`, `validate_workspace_key`) are the tools a skill uses to verify which workspace it's talking to before mutating anything. The 17 tools returned by `discover_tools(category="workspace")` on 2026-04-20 are: `list_workspaces`, `get_workspace_details`, `create_workspace`, `update_workspace`, `switch_workspace`, **`get_workspace_stats`** (aggregate workspace-level stats — emails sent, opens, replies; this is the tool skills reach for a quick-stats rollup, NOT `list_workspace_stats` which does not exist despite occasional cross-references in sibling skills), `get_workspace_line_area_stats` (by-date breakdown for charts), `invite_team_member`, `accept_workspace_invitation`, `create_workspace_user`, `create_api_token`, `get_master_inbox_settings`, `update_master_inbox_settings`, `get_account_details` (core tier), `update_profile_picture`, `update_password`, `generate_headless_ui_token`.
 
 ### Warmup (5 tools)
 
@@ -284,7 +284,9 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 
 ## Last verified
 
-`2026-04-20` — BC-2721 task 7 closed two tool-name gaps via `discover_tools` on `emailbison-b2b`. Added new §Analytics (4 tools — top-level aggregators) subsection documenting `get_leads_analytics`, `get_replies_analytics`, `get_campaign_analytics`, and `bulk_export` (not in the 14 documented categories — they're a top-level analytics group). Added §Known gotchas bullet: `list_campaigns` has no server-side date-range filter (client-side filter on `created_at` / `started_at` required for date-window queries).
+`2026-04-20` — BC-2721 tasks 7 + 10 via `discover_tools` on `emailbison-b2b`:
+- Task 7: added new §Analytics (4 tools — top-level aggregators) subsection documenting `get_leads_analytics`, `get_replies_analytics`, `get_campaign_analytics`, and `bulk_export` (not in the 14 documented categories — they're a top-level analytics group). Added §Known gotchas bullet: `list_campaigns` has no server-side date-range filter (client-side filter on `created_at` / `started_at` required).
+- Task 10 BC-5797 factual-anchor audit: caught wrong tool name `list_workspace_stats` (does not exist) — actual name is `get_workspace_stats`. Fixed in `campaign-analysis/SKILL.md` + `evals.json`; sibling `email-bison/SKILL.md` has the same wrong name in 3 spots (lines 63/86/173) — tracked as a separate Linear issue alongside the BC-5903 sibling-skill namespace bug. Expanded Workspace (17 tools) section to enumerate all 17 tool names per `discover_tools(category="workspace")`.
 
 Prior: `2026-04-17` — BC-5551 shipped credential centralization (Engineering Bitwarden item "Email Bison MCP — API tokens") + shell-profile onboarding + §Known Claude Code limitation documenting the plugin-scoped MCP blocker. Plugin-scoped MCP registration deferred until upstream Claude Code bugs [#6204](https://github.com/anthropics/claude-code/issues/6204)/[#9427](https://github.com/anthropics/claude-code/issues/9427) are resolved; servers continue to live at user level for now. Prose consistency fix: "API key" → "API token" throughout §Auth (vendor canonical term per `docs.emailbison.com/get-started/authentication`). Tokens rotated fresh during BC-5551 (the prior tokens were in a gitignored repo-root file that got cleared).
 
