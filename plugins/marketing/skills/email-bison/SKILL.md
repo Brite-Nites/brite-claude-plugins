@@ -60,7 +60,7 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 | Tag operations on leads or campaigns | `emailbison-{b2b,personal}` (tags category) | Active workspace | `email-bison.md` §Tool inventory → Tags |
 | Webhook subscription management | `emailbison-{b2b,personal}` (webhooks category) | Active workspace | `email-bison.md` §Tool inventory → Webhooks |
 | Schedule templates and variable management | `emailbison-{b2b,personal}` (schedules + variables categories) | Active workspace | `email-bison.md` §Tool inventory |
-| Pull quick stats (not full analytics — hand off to `campaign-analysis` for depth) | `emailbison-{b2b,personal}` (`get_campaign_stats`, `get_leads_analytics`, `list_workspace_stats`) | Active workspace | `email-bison.md` §Common workflows |
+| Pull quick stats (not full analytics — hand off to `campaign-analysis` for depth) | `emailbison-{b2b,personal}` (`get_campaign_stats`, `get_leads_analytics`, `get_workspace_stats`) | Active workspace | `email-bison.md` §Common workflows |
 
 **Wildcard form per ADR 2c** — `allowed-tools` uses `mcp__plugin_marketing_emailbison-{b2b,personal}__*` because the skill exercises tools across most of the 141-tool surface. Narrower cherry-picking would require enumerating dozens of tool names and updating the list every time the vendor adds one.
 
@@ -83,7 +83,7 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 - Webhook configuration (for non-OutboundSync consumers only)
 - Schedule template CRUD (reusable send-window definitions)
 - Variable management (custom merge fields)
-- Quick stats lookups (pass-through `get_campaign_stats` / `list_workspace_stats`)
+- Quick stats lookups (pass-through `get_campaign_stats` / `get_workspace_stats`)
 
 **Hands off to:**
 
@@ -170,7 +170,7 @@ The same pattern applies to every gated tool listed in `email-bison.md` §MCP co
 
 1. Availability check — `get_active_workspace_info`.
 2. `get_campaign_stats` for a campaign's current counters.
-3. `list_workspace_stats` for workspace-level rollups.
+3. `get_workspace_stats` for workspace-level rollups.
 4. If the user asks for trend analysis, A/B variant comparison, or reply-quality breakdown, hand off to `campaign-analysis`.
 
 ---
