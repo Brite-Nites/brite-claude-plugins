@@ -19,7 +19,10 @@ You are the account researcher for Brite's outbound motion. This skill serves BD
 
 Four gates resolve in order before any `WebSearch` fires. Cross-references elsewhere in this skill (e.g. "§2 mode resolution" in §6 Flow preconditions) point to the numbered subsections below.
 
-**Input validation.** Every `{domain}` string the skill receives — whether from the operator or from a handoff — must match `^[a-z0-9.-]+$`. Reject any `{domain}` containing `/`, `\`, `..`, single quotes, semicolons, NUL, or SOQL keywords (`SELECT`, `WHERE`, `OR`, etc.). This validator gates the §4 `Write` destinations and §5 Workflow 2 SOQL interpolation — a poisoned `{domain}` must not reach any tool call.
+**Input validation.** Two tokens reach tool calls: `{domain}` (from operator or handoff) and `{accountId}` (from the §2 Gate 3 Account lookup result). Both must pass the rules below before any `Write` or `run_soql_query` call — a poisoned token must not reach any tool call.
+
+- **`{domain}`** — must match `^[a-z0-9.-]+$`. Reject any `{domain}` containing `/`, `\`, `..`, single quotes, semicolons, NUL, or SOQL keywords (`SELECT`, `WHERE`, `OR`, etc.). Gates the §4 `Write` destinations and the §2 Gate 3 Account-lookup SOQL.
+- **`{accountId}`** — must match `^[a-zA-Z0-9]{15}$|^[a-zA-Z0-9]{18}$` (Salesforce 15- or 18-char ID). Reject anything else. Gates §5 Workflow 2's Activity + Opportunity SOQL interpolation; never interpolate an `{accountId}` that did not pass this rule.
 
 ### Gate 1 — Marketing context (soft gate)
 
@@ -38,7 +41,7 @@ Account-research has 12 modes, which overflows `AskUserQuestion`'s 4-option cap.
 This gate decides whether §4's output artifact includes an `## Internal Signals (Salesforce)` section. It does NOT halt on failure. Sequence:
 
 1. **Availability probe** — call `run_soql_query` with `SELECT Id FROM User LIMIT 1`. This is the verified liveness check per BC-5534 findings §Q1; `get_username` is NOT a valid probe because it reads the local SFDX auth store without contacting Salesforce. Cache the reachable / unreachable result for the rest of the run.
-2. **Account lookup** — on availability success, call `run_soql_query` with `SELECT Id, Name, Account_Notes__c, Lifecycle_Stage_History__c FROM Account WHERE Website LIKE '%{domain}%' LIMIT 5`. Before interpolation, confirm `{domain}` passed the Input validation rule above — single quotes, semicolons, or SOQL keywords in `{domain}` must not reach SOQL. The `Account_Notes__c` and `Lifecycle_Stage_History__c` fields are fetched here (not in §5 Workflow 2) so the cached row carries every field §5 Workflow 2.3.3 and §6 Flow 5 treat as "already pulled" — avoiding a second SOQL round-trip on the matched Account.
+2. **Account lookup** — on availability success, call `run_soql_query` with `SELECT Id, Name, Website, Account_Notes__c, Lifecycle_Stage_History__c FROM Account WHERE Website LIKE '%://{domain}/%' OR Website LIKE '%://{domain}' OR Website LIKE '%://www.{domain}/%' OR Website LIKE '%://www.{domain}' LIMIT 5`. The anchored `LIKE` patterns prevent over-match — `{domain}=example.com` must not pull `notexample.com` or `example.company.evil.net` rows. Before interpolation, confirm `{domain}` passed the Input validation rule above — single quotes, semicolons, or SOQL keywords in `{domain}` must not reach SOQL. If the 4 anchored patterns still return more than one row, post-filter by exact host equality (parse the `Website` field and compare against `{domain}` and `www.{domain}`) before selecting one `Account.Id` — LIMIT 5 is a safety cap, not a selection rule. The `Account_Notes__c` and `Lifecycle_Stage_History__c` fields are fetched here (not in §5 Workflow 2) so the cached row carries every field §5 Workflow 2.3.3 and §6 Flow 5 treat as "already pulled" — avoiding a second SOQL round-trip on the matched Account.
 3. **Degrade policy** — on availability failure, mark `sf_enriched: false` in the output artifact frontmatter and continue. On zero Account matches, also mark `sf_enriched: false`. On one or more matches, proceed to §6 Flow 5 (existing-SF-account augmented path) and carry the `Account.Id` forward for §5 Workflow 2's Activity and Opportunity enrichment queries.
 
 ### Gate 4 — Disambiguation (soft gate)
@@ -126,8 +129,8 @@ The wildcard form `mcp__plugin_marketing_salesforce__*` in `allowed-tools` is us
 
 **Hands off to:**
 
-- **[BC-5824](https://linear.app/brite-nites/issue/BC-5824) `situation-mining`**, consumes the artifact for worldview inference. The facts this skill produces are the raw input to situation-mining's §Situations block.
-- **[BC-5828](https://linear.app/brite-nites/issue/BC-5828) `creative-angles` Deep Mode**, consumes the artifact for signal-cluster extraction. Account-research facts feed the 2+-data-points-per-cluster rule downstream.
+- **[BC-5824](https://linear.app/brite-nites/issue/BC-5824) `situation-mining`**, consumes the artifact for worldview inference. The facts this skill produces are the raw input to situation-mining's §Situations block. This is also the canonical path to reach `creative-angles` Deep Mode — see next bullet.
+- **[BC-5828](https://linear.app/brite-nites/issue/BC-5828) `creative-angles` Quick Mode (direct) or Deep Mode (transitive via situation-mining)**. Direct handoff to `creative-angles` **Quick Mode** works with only an account-research artifact in context. `creative-angles` **Deep Mode** has a hard prereq on a `docs/research/situations/{domain}-*.md` artifact less than 14 days old (see creative-angles §2 Gate 3) — route through `situation-mining` first, then chain to `creative-angles` Deep Mode. Never offer direct handoff to Deep Mode from account-research; the operator will hit a blocking message.
 
 **Receives from:**
 
@@ -166,7 +169,7 @@ Body sections (in order, conditional on mode):
 1. **Company Facts.** One subsection per process file invoked, grouped by dimension (who / what / where / when). Each bullet cites source URL inline.
 2. **Internal Signals (Salesforce).** Only present when `sf_enriched: true`. Lists Activity summary, Opportunity summary, `Account_Notes__c` excerpts, and `Lifecycle_Stage_History__c` entries with SF object IDs.
 3. **Thin-signal flags.** If any invoked process returned fewer than 2 usable data points for a dimension, note which dimensions are thin. Downstream skills use this to calibrate confidence.
-4. **Handoff pointers.** A short note like "Hand off to `situation-mining` for worldview inference, or `creative-angles` Deep Mode for signal-cluster extraction."
+4. **Handoff pointers.** A short note like "Hand off to `situation-mining` for worldview inference (also the path to `creative-angles` Deep Mode, which requires a situation artifact), or to `creative-angles` Quick Mode for pattern-based angles that need no situation artifact."
 
 ---
 
@@ -218,13 +221,13 @@ This section turns §3 Methodology plus §5 MCP Tool Reference into five concret
 1. Run §5 Workflow 1 with `find-profiles.md` as the sole resolved process file.
 2. Extract company facts per the process file's output template (industry, size, funding, HQ, founded year, third-party platform list), citing source URLs inline.
 3. Write the output artifact to `docs/research/accounts/{domain}-{YYYY-MM-DD}.md` with `mode: profiles` in frontmatter and `process_files_invoked: [find-profiles]`.
-4. Offer handoff to `situation-mining` if the operator wants worldview inference, or to `creative-angles` Deep Mode for signal-cluster extraction.
+4. Offer handoff to `situation-mining` for worldview inference (also the only path to `creative-angles` Deep Mode, which requires a situation artifact), or to `creative-angles` Quick Mode for pattern-based angles without a situation artifact.
 
 **Expected output:** a 3–6-query profile sheet with `Company Facts` populated across the 6 canonical dimensions, `sf_enriched: false` (unless §2 Gate 3 matched separately), no `Internal Signals` section.
 
 **Error handling:** per §5 Workflow 1, per-query retry once on rate-limit; proceed with remaining queries on persistent failure and mark the missing source. Never fabricate.
 
-**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828).
+**Handoff:** `situation-mining` (BC-5824) — canonical path for worldview inference, and the only route to `creative-angles` Deep Mode (BC-5828) which hard-halts without a situation artifact. Direct handoff to `creative-angles` Quick Mode (BC-5828) works with just the account-research artifact in context — use that path when Deep Mode is not needed.
 
 ### Flow 2 — Full mode for unfamiliar company
 
@@ -235,13 +238,13 @@ This section turns §3 Methodology plus §5 MCP Tool Reference into five concret
 1. Run §5 Workflow 1 with the 4 `full` composite processes: `find-profiles.md` + `find-competitors.md` + `find-growth-signals.md` + `find-hiring.md`, fired as parallel `WebSearch` calls in a single assistant turn.
 2. Compose a 4-dimension fact sheet (who / what / market-position / hiring-signals).
 3. Write artifact with `mode: full` and `process_files_invoked: [find-profiles, find-competitors, find-growth-signals, find-hiring]`.
-4. Offer handoff to `situation-mining` or `creative-angles` Deep Mode.
+4. Offer handoff to `situation-mining` (also the path to `creative-angles` Deep Mode) or to `creative-angles` Quick Mode.
 
 **Expected output:** a 10–23-query baseline artifact with four `Company Facts` subsections, each citing source URLs inline.
 
 **Error handling:** per §5 Workflow 1. Partial failure is acceptable, note missing dimensions in `Thin-signal flags`.
 
-**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828).
+**Handoff:** `situation-mining` (BC-5824) — canonical path for worldview inference, and the only route to `creative-angles` Deep Mode (BC-5828) which hard-halts without a situation artifact. Direct handoff to `creative-angles` Quick Mode (BC-5828) works with just the account-research artifact in context — use that path when Deep Mode is not needed.
 
 ### Flow 3 — Deep mode for high-value target
 
@@ -256,7 +259,7 @@ This section turns §3 Methodology plus §5 MCP Tool Reference into five concret
 
 **Error handling:** per §5 Workflow 1. When a single process's queries all fail, note the process as thin in `Thin-signal flags` and continue; do not retry the whole composite.
 
-**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828).
+**Handoff:** `situation-mining` (BC-5824) — canonical path for worldview inference, and the only route to `creative-angles` Deep Mode (BC-5828) which hard-halts without a situation artifact. Direct handoff to `creative-angles` Quick Mode (BC-5828) works with just the account-research artifact in context — use that path when Deep Mode is not needed.
 
 ### Flow 4 — People mode for org-chart build
 
@@ -273,7 +276,7 @@ This section turns §3 Methodology plus §5 MCP Tool Reference into five concret
 
 **Role-specific follow-up:** operators wanting role-specific JD intelligence follow up with a direct `find-job-role-insights` invocation passing `role_title` (per §3 Plan-gate scope note). The people mode does NOT dispatch `find-job-role-insights` automatically because the mode surface cannot carry the `role_title` argument.
 
-**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828).
+**Handoff:** `situation-mining` (BC-5824) — canonical path for worldview inference, and the only route to `creative-angles` Deep Mode (BC-5828) which hard-halts without a situation artifact. Direct handoff to `creative-angles` Quick Mode (BC-5828) works with just the account-research artifact in context — use that path when Deep Mode is not needed.
 
 ### Flow 5 — Existing-SF-account augmented path
 
@@ -289,7 +292,7 @@ This section turns §3 Methodology plus §5 MCP Tool Reference into five concret
 
 **Error handling:** on SF availability failure mid-run, degrade to a public-only artifact with `sf_enriched: false` and emit a one-line warning to the operator ("Salesforce MCP unavailable, proceeding with public-source facts only"). Never halt. Do not fabricate an `Internal Signals` section.
 
-**Handoff:** `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828). Downstream skills read `sf_enriched: true` and weight internal signals accordingly.
+**Handoff:** `situation-mining` (BC-5824) — canonical path for worldview inference, and the only route to `creative-angles` Deep Mode (BC-5828) which hard-halts without a situation artifact. Direct handoff to `creative-angles` Quick Mode (BC-5828) works with just the account-research artifact in context — use that path when Deep Mode is not needed. Downstream skills read `sf_enriched: true` and weight internal signals accordingly.
 
 ---
 
@@ -297,7 +300,7 @@ This section turns §3 Methodology plus §5 MCP Tool Reference into five concret
 
 | Score | Criteria |
 |------:|----------|
-| 10 | Mode dispatch is correct — the requested mode resolves to the exact process-file set per §3 Single-process and Composite tables (single-mode → 1 file, `full` → 4, `deep` → 9 company processes, `people` → 7 people processes); all queries fire as parallel `WebSearch` calls in a single assistant turn (one message, N `tool_use` blocks); every PRIMARY query is sourced verbatim from the referenced `find-*.md` process file, with `{{company_name}}`, `{{domain}}`, `{{category}}`, `{{current_year}}` substituted only where applicable; every data point in `Company Facts` carries an inline source URL; each process file's stop conditions and kill lists are respected literally (no kill-listed query executed, no query run past a satisfied stop condition); when `sf_enriched: true`, the `## Internal Signals (Salesforce)` section lists Activity, Opportunity, `Account_Notes__c`, and `Lifecycle_Stage_History__c` entries with the SF object IDs that grounded the claims; the artifact frontmatter carries all 7 required keys (`company`, `domain`, `mode`, `generated_at`, `source_count`, `sf_enriched`, `process_files_invoked`) plus the 2 conditional keys when applicable (`category` when supplied or discovered; `sf_account_id` only when `sf_enriched: true`); the artifact is written to the exact path `docs/research/accounts/{domain}-{YYYY-MM-DD}.md`; for composite modes, `process_files_invoked` matches the §3 tables exactly (4 for `full`, 9 for `deep`, 7 for `people`); the handoff pointer to `situation-mining` (BC-5824) or `creative-angles` Deep Mode (BC-5828) is present. |
+| 10 | Mode dispatch is correct — the requested mode resolves to the exact process-file set per §3 Single-process and Composite tables (single-mode → 1 file, `full` → 4, `deep` → 9 company processes, `people` → 7 people processes); all queries fire as parallel `WebSearch` calls in a single assistant turn (one message, N `tool_use` blocks); every PRIMARY query is sourced verbatim from the referenced `find-*.md` process file, with `{{company_name}}`, `{{domain}}`, `{{category}}`, `{{current_year}}` substituted only where applicable; every data point in `Company Facts` carries an inline source URL; each process file's stop conditions and kill lists are respected literally (no kill-listed query executed, no query run past a satisfied stop condition); when `sf_enriched: true`, the `## Internal Signals (Salesforce)` section lists Activity, Opportunity, `Account_Notes__c`, and `Lifecycle_Stage_History__c` entries with the SF object IDs that grounded the claims; the artifact frontmatter carries all 7 required keys (`company`, `domain`, `mode`, `generated_at`, `source_count`, `sf_enriched`, `process_files_invoked`) plus the 2 conditional keys when applicable (`category` when supplied or discovered; `sf_account_id` only when `sf_enriched: true`); the artifact is written to the exact path `docs/research/accounts/{domain}-{YYYY-MM-DD}.md`; for composite modes, `process_files_invoked` matches the §3 tables exactly (4 for `full`, 9 for `deep`, 7 for `people`); the handoff pointer to `situation-mining` (BC-5824, canonical path and the only route to Deep Mode) or `creative-angles` Quick Mode (BC-5828, direct) is present, and does not advertise direct handoff to `creative-angles` Deep Mode. |
 | 7-9 | Mostly excellent with one gap — e.g. one process file cited by name but its PRIMARY query slightly paraphrased rather than taken verbatim; one data point missing its inline source URL while the rest carry one; the mode expansion matches §3 but `process_files_invoked` lists the files in a different order than the table; `source_count` frontmatter value is off by 1–2; the handoff pointer names one downstream skill instead of both options; one composite process returned only a single usable data point and the run didn't emit an explicit `Thin-signal flags` entry for it. |
 | 4-6 | Functional but missing structural elements — mode dispatch invoked sequentially rather than in parallel (N× wall-clock penalty); one process file's kill list violated (a "do not search" query executed); `sf_enriched: false` written despite §2 Gate 3 having found an Account match; thin-signal flags missing on dimensions that are clearly thin; artifact written to the wrong path (missing or malformed date stamp, pluralized filename, outside `docs/research/accounts/`); output artifact frontmatter missing one of the 7 required keys; `Internal Signals (Salesforce)` section written with Activity or Opportunity rows but omitting the SF object IDs. |
 | 1-3 | Hard failure — any ONE of these drops the run to 1-3: invented query pattern not present in the referenced `find-*.md` process file; kill-list violation that fabricated a data point (invented SF record, invented URL, or invented Activity entry); a `Company Facts` bullet cited without any inline source URL; mode dispatch executed the wrong process-file set (e.g. `deep` ran 5 processes instead of 9, or `people` pulled in `find-job-role-insights` without an explicit `role_title`); `sf_enriched: true` written when the §5 Workflow 2 availability probe failed; output produced worldview inference, angle generation, or copy (out of scope — that work lives in `situation-mining` and `creative-angles`). |
