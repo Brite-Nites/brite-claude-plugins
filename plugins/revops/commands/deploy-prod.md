@@ -7,17 +7,13 @@ allowed-tools: Bash, AskUserQuestion
 
 Execute the phases below sequentially. Use `AskUserQuestion` at every gate so the user explicitly acknowledges state before any mutating step. If the user answers anything other than the proceed option, halt and surface the blocker — never re-run past phases silently.
 
-**One question at a time.** Never batch gate questions. The Phase 3 double-confirmation is **two distinct `AskUserQuestion` calls** by design, not one multi-option picker.
+**One question at a time.** Never batch gate questions.
 
 Canonical invocation pattern comes from `brite-salesforce/CLAUDE.md` §Development Flow step 4 (Deploy to Production) + §Apex & Automation (Prod deploy verification: always SOQL-verify target components). Production alias is `brite-prod`. Always pass `--target-org brite-prod` explicitly — never rely on a default org. Always use `sf`, never legacy `sfdx`.
 
 Out of scope for this command: sandbox deploy (use `/revops:deploy-sandbox`), manual post-deploy runbook (use `/revops:post-deploy-runbook`), automating browser verification, rollback automation. If deploy fails, user diagnoses manually.
 
-**Mutating phase:** Phase 4 (actual prod deploy) is the sole mutating phase. Phases 1, 2, 5, 6 are read-only; Phase 3 is gate-only; Phase 7 is informational. Every `AskUserQuestion` gate is either before Phase 4 (Phase 1 intent, Phase 3 gate A, Phase 3 gate B) or after Phase 4 as a policy escape (Phase 5 coverage).
-
-**Parse `--json` output, not stdout strings.** For every `sf ... --json` call, treat top-level `status === 0` as success (the stable cross-version exit-code field). Never parse `result.success` — it has changed shape across `sf` CLI 2.x versions.
-
-**Verify CLI fields before trusting them.** If a documented `sf` JSON field is not present in the response at runtime, do not invent a fallback value — halt with the raw JSON shown verbatim and ask the user to inspect.
+See the **Rules** section at the bottom for the enforcement contract (mutating-phase discipline, `--json` parsing, CLI field verification, etc.).
 
 ---
 
@@ -127,7 +123,7 @@ Narrate: `Phase 2/7: Prod dry-run... done`
 
 Narrate: `Phase 3/7: Double-confirmation gate...`
 
-This phase issues **two separate** `AskUserQuestion` calls. The pattern is non-negotiable: a single multi-option picker is not acceptable, because the second confirmation must occur after the user has mentally committed to the first.
+This phase issues **two separate** `AskUserQuestion` calls — never a single multi-option picker. The second confirmation must occur after the user has committed to the first.
 
 ### 3.1 Gate A — intent
 
@@ -183,10 +179,16 @@ Narrate: `Phase 5/7: Coverage check...`
 
 Production deploys that include Apex must meet the Brite bar of ≥90% test coverage per the `brite-salesforce` standard. This phase checks the coverage reported in the Phase 4 deploy response and hard-gates continuation if the bar isn't met.
 
-Read `result.details.runTestResult` from the Phase 4 JSON:
+Read `result.details.runTestResult` from the Phase 4 JSON. Handle the three distinct cases separately — do not conflate "field absent" with "zero tests ran" (BC-5795 precedent):
 
-- **If missing or `runTestResult.numTestsRun` is 0** — the deploy did not include Apex changes that triggered test execution. Report: *"Deploy did not trigger test execution (no Apex in change set). Coverage check N/A — proceeding to Phase 6."* Skip to Phase 6.
-- **If present** — compute aggregate coverage from `runTestResult.codeCoverage[*]`. Sum `numLocations` and `numLocationsNotCovered` across all array entries:
+- **`runTestResult` is entirely absent** — this is unexpected for a successful deploy envelope. **Halt** with the raw Phase 4 JSON printed verbatim and this message:
+
+  > Expected `runTestResult` field missing from the deploy envelope, but Phase 4 reported success. This indicates a `sf` CLI shape drift — do not trust the coverage check or Phase 6 verification. Inspect `Setup > Deployment Status` in `brite-prod` and verify coverage manually in `Setup > Apex Test Execution` before running `/revops:post-deploy-runbook`.
+
+  Do not proceed to Phase 6 automatically.
+
+- **`runTestResult` is present and `numTestsRun === 0`** — the deploy did not include Apex changes that triggered test execution. Report: *"Deploy did not trigger test execution (no Apex in change set). Coverage check N/A — proceeding to Phase 6."* Skip to Phase 6.
+- **`runTestResult` is present and `numTestsRun > 0`** — compute aggregate coverage from `runTestResult.codeCoverage[*]`. Sum `numLocations` and `numLocationsNotCovered` across all array entries:
 
   ```
   total_lines = sum(entry.numLocations for entry in runTestResult.codeCoverage)
@@ -235,22 +237,22 @@ Verify every name in `{names}` appears in `result.records` with `Status = 'Activ
 
 ### 6.2 CustomField
 
-If any successes have `componentType: "CustomField"`, `fullName` values look like `Object__c.Field__c`. Split each on the first `.` into `{object}` and `{field-api-name}`. Batch queries per-object:
+If any successes have `componentType: "CustomField"`, `fullName` values look like `Object__c.Field__c`. Split each on the first `.` into `{object}` and `{field-api-name}`. Both sides must have any trailing `__c` suffix **stripped** before interpolating into SOQL — Tooling API `EntityDefinition.DeveloperName` stores the unsuffixed name for custom objects (e.g., `Account__c` → `Account`), and `CustomField.DeveloperName` likewise stores the unsuffixed field name. Batch queries per-object after stripping:
 
 ```bash
-sf data query --use-tooling-api --query "SELECT Id, DeveloperName FROM CustomField WHERE EntityDefinition.DeveloperName = '{object}' AND DeveloperName IN ({field-names})" --target-org brite-prod --json
+sf data query --use-tooling-api --query "SELECT Id, DeveloperName FROM CustomField WHERE EntityDefinition.DeveloperName = '{object-stripped}' AND DeveloperName IN ({field-names-stripped})" --target-org brite-prod --json
 ```
 
-`{field-names}` is the quoted list of `{field-api-name}` values for that object, with the trailing `__c` stripped (Tooling API `DeveloperName` does not include the `__c` suffix).
+Where `{object-stripped}` is `{object}` with the trailing `__c` removed (if present — standard objects have no suffix), and `{field-names-stripped}` is the quoted list of `{field-api-name}` values, each with its trailing `__c` removed.
 
 Report any field expected in the deploy but missing from the query result.
 
 ### 6.3 Flow
 
-If any successes have `componentType: "Flow"`, collect their `fullName` values into `{names}`:
+If any successes have `componentType: "Flow"`, collect their `fullName` values into `{names}`. The Tooling API `Flow` sObject is per-**version** (one row per version, not per definition) — filter to current states only, excluding historical `Obsolete` versions that would skew Phase 6.4's denominator:
 
 ```bash
-sf data query --use-tooling-api --query "SELECT Id, DeveloperName, Status FROM Flow WHERE DeveloperName IN ({names})" --target-org brite-prod --json
+sf data query --use-tooling-api --query "SELECT Id, DeveloperName, Status FROM Flow WHERE DeveloperName IN ({names}) AND Status IN ('Active','Draft')" --target-org brite-prod --json
 ```
 
 For each returned record: confirm `Status = 'Active'`. **Flag any Flow with `Status = 'Draft'`** — these deployed but require manual activation (this is a known Salesforce platform behavior for Screen Flows via metadata API). Report the full list:
@@ -302,7 +304,7 @@ Narrate: `Phase 7/7: Completion... done`
 ## Rules
 
 - **Never skip a gate.** Every `AskUserQuestion` halt path must halt — no silent continuation.
-- **Phase 3 gates are two separate `AskUserQuestion` calls.** A single multi-option picker is unacceptable. Verify with `grep -c "AskUserQuestion" plugins/revops/commands/deploy-prod.md` ≥ 3 (Phase 1 + Phase 3a + Phase 3b, plus Phase 5 coverage escape when triggered).
+- **Phase 3 gates are two separate `AskUserQuestion` calls.** A single multi-option picker is unacceptable.
 - **Always pass `--target-org brite-prod`.** Never rely on the default org — behavior must be reproducible across machines and safe against a mis-set default.
 - **Parse `--json` output via `status === 0`.** Never parse `result.success` — it has changed shape across `sf` CLI 2.x versions.
 - **Verify CLI fields before using them.** If a documented `sf` JSON field is not present at runtime, halt with the raw JSON and operator instructions — never invent a fallback value or guess.
