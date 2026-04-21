@@ -152,10 +152,17 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
   },
   "projects": [ {
       "id", "name", "status", "owner",       // id/name/status/owner(=lead.name or null) from Phase 0.3 list_projects
-      "audit_card",                          // populated by Phase 1 project-audit agent
+      "audit_card",                          // populated by Phase 1 project-audit agent. NOTE (BC-5902): the prior backlog-high count + candidates fields are removed from audit_card — enricher now owns that data under _enrichment.backlog_candidates[]
+      "_enrichment": { /* Phase 2 project-enricher agent output — populated by sprint-scoping § 2 pre-loop (BC-5902) */
+        "backlog_candidates": [ { "id", "title", "priority", "assignee", "assigneeId", "cycleId", "stateName" } ],
+        "carry_over_enriched": [ { "id", "blocker_count", "auto_superseded_by", "title", "priority", "assignee" } ],
+        "brainstorming_ranked": [ { "id_or_title", "rationale", "rank" } ],
+        "enriched_at": "<ISO-8601>",
+        "dispatch_error": null | "<message>"
+      },
       "scope_decisions", "overrides",        // populated by Phase 2 sprint-scoping skill; scope_decisions shape = {q1_headline, q2_ship_ids, q3_reassignments, q4_dependencies, q5_parked, carry_over_answers[]} per sprint-scoping SKILL.md § 1
       "skip_log", "scope_confirmed",         // populated by Phase 2 sprint-scoping skill
-      "_fetched_issues"                      // Phase 2 carry-over + gate fetch cache
+      "_fetched_issues"                      // Phase 2 carry-over + gate fetch cache — populated on-demand by Phase 3 § 3 pre-flight when not already present; enricher writes _enrichment.carry_over_enriched[] instead of this cache during Phase 2.
   } ],
   "cross_project_stats": { "completion_rate", "shipped_total", "carry_over_total", "dropped_total", "team_standouts", "unplanned_ratio" },
   "bottleneck_warnings": [ { "assignee", "count", "issues" } ],   // Phase 2 sprint-scoping § 7
@@ -173,6 +180,10 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
   } ],
   // Phase 3 is authoritative for the mutation row shape — see
   // plugins/cadence/skills/linear-housekeeping/SKILL.md § 2.1.
+  "_preflight_manifest": { /* Phase 3 housekeeping-preflight agent output — populated by linear-housekeeping § 4 (BC-5902) */
+    "[mutation_id]": { "gate_detail": [ { "check", "status", "message" } ], "fetched_at": "<ISO-8601>" },
+    "dispatch_error": null | "<message>"
+  },
   "_mutation_conflicts": [ {                                      // Phase 3 § 2.5 cross-project dedup
       "issue_id", "source_projects": [ ... ], "conflicting_targets": [ ... ]
   } ],
