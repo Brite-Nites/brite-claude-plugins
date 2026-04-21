@@ -6,7 +6,7 @@ Usage: python3 lint_cadence_gates.py <plugin-dir>
 Emits one line per finding, in traversal order:
   OK:<relpath> — gate-respect header + <N> call-site reminder(s)
   ERROR:<relpath> — missing gate-respect header
-  ERROR:<relpath>:§<section> — AskUserQuestion call without gate-respect reminder
+  ERROR:<relpath>:<section> — AskUserQuestion call without gate-respect reminder (cadence section titles already start with "§ N", so the literal prefix is unnecessary)
 
 Rules enforced (per plugins/cadence/skills/_shared/gate-respect.md):
   1. Every skill/command that calls AskUserQuestion in a structured section
@@ -186,9 +186,14 @@ def _lint_file(path: Path, repo_root: Path) -> list[str]:
             continue
         auq_sections_seen.add(title)
         # Does this section contain at least one gate-respect reminder
-        # above the first AskUserQuestion call site?
-        head = "\n".join(body_lines[: first_auq_idx + 1])
-        if not GATE_RESPECT_COMMENT_RE.search(head):
+        # above the first AskUserQuestion call site? Scope the search to
+        # active lines (outside fences + blockquotes) — symmetric with the
+        # call-site detection above. Otherwise a `gate-respect:` string shown
+        # inside a fenced example would falsely satisfy the contract.
+        head_active = "\n".join(
+            line for i, line in _iter_active_lines(body_lines) if i <= first_auq_idx
+        )
+        if not GATE_RESPECT_COMMENT_RE.search(head_active):
             violations.append((title, start + 1 + first_auq_idx + 1))
 
     # 2. If this file has any AUQ in a structured section, header rule fires.
@@ -196,8 +201,10 @@ def _lint_file(path: Path, repo_root: Path) -> list[str]:
         out.append(f"ERROR:{rel}: missing gate-respect header (## Gate-respect section linking _shared/gate-respect.md)")
 
     for title, line_no in violations:
+        # Titles parsed from `## § N …` headers already include the § glyph;
+        # emit `{title}` directly (not f"§{title}") to avoid the §§ duplication.
         out.append(
-            f"ERROR:{rel}:§{title!s}: AskUserQuestion at line {line_no} without gate-respect reminder in the same section"
+            f"ERROR:{rel}:{title!s}: AskUserQuestion at line {line_no} without gate-respect reminder in the same section"
         )
 
     if not out and auq_sections_seen:

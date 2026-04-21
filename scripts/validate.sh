@@ -777,6 +777,10 @@ else:
   fi
 
   # ── Cadence Gate-Respect (BC-5866) ──────────────────────────────
+  # TODO(BC-5866): generalize when a 2nd plugin opts in — detect any
+  #   $PLUGIN_ROOT/skills/_shared/gate-respect.md and run the linter on it,
+  #   replacing the plugin_name hardcode. Rename lint_cadence_gates.py →
+  #   lint_gate_respect.py at the same time. See docs/precedents/BC-5866.md.
   if [ "$plugin_name" = "cadence" ]; then
     section "12.5 Cadence Gate-Respect ($plugin_name)"
 
