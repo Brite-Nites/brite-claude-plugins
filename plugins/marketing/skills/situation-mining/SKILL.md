@@ -226,8 +226,9 @@ This section translates the three methodology frameworks into Brite's concrete s
 
 - **Hands off to `creative-angles` Deep Mode** when the operator wants pattern-based angles on top of the diagnostic per-prospect angles — the situation artifact stays in the conversation context so `creative-angles` can read it without re-query.
 - **Hands off to `email-copywriting`** when the operator has chosen an offer tier and wants Email-Bison-formatted subject + body — pass the situation artifact plus the tier selection; `email-copywriting` emits the JSON artifact that `/marketing:launch-campaign` consumes.
+- **Hands off to [`message-market-fit`](../message-market-fit/SKILL.md) / MSPA ([BC-5829](https://linear.app/brite-nites/issue/BC-5829))** (optional) when an account-specific MAP run wants per-account worldview anchoring — MSPA §3 MAP Step 2 Lens 1 can read the situation artifact as a customer-worldview source for a single-account matrix fork.
 - **Receives from `list-building`** (optional) — the operator can invoke this skill on one domain from a list output; also invoked directly with `company_name` + `domain`.
-- **Does not own list-level operations** (that's `list-building`), **does not own pattern-based reusable angles** (that's `creative-angles`), **does not own email copy** (that's `email-copywriting`), **does not own launch execution** (that's the `/marketing:launch-campaign` command).
+- **Does not own list-level operations** (that's `list-building`), **does not own pattern-based reusable angles** (that's `creative-angles`), **does not own email copy** (that's `email-copywriting`), **does not own launch execution** (that's the `/marketing:launch-campaign` command), **does not own experiment-matrix design** (that's `message-market-fit`).
 
 ---
 

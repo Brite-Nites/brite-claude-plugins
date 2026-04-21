@@ -163,9 +163,9 @@ Produce a **proposed patch** to `docs/marketing-context.md` — a markdown block
 | `account-research` (BC-5827, not yet shipped) | Phase 1 delegate when available; fallback to inline WebSearch when absent | Input: domain + context. Output: `research.md` per segment candidate. |
 | `outbound-playbook` (BC-2722, not yet shipped) | Downstream consumer — the conductor | Reads segments + pillars + PQS triggers from the gtm-strategy artifact. |
 | `email-copywriting` (BC-5825, not yet shipped) | Downstream consumer — copy generation | Reads pillars + offer tier. Produces Email-Bison-formatted JSON. |
-| `message-market-fit` / MSPA (BC-5829, not yet shipped) | Downstream consumer — experiment matrix (MAP mode) | Reads segments + personas + angles; produces variant matrix. |
+| [`message-market-fit`](../message-market-fit/SKILL.md) / MSPA ([BC-5829](https://linear.app/brite-nites/issue/BC-5829)) | Downstream consumer — experiment matrix (MAP mode) | Reads segments + personas + angles; MSPA §3 MAP Step 2 Lens 1 treats the `gtm-strategy` artifact as the customer-worldview input. Produces the MSPA matrix with gtm-strategy segments/personas populating M and P dimensions. |
 
-**Cross-link note.** None of these consumer skills exist yet. When they ship, each should add `gtm-strategy` to their `§Consumers` block. A follow-up issue will track the hookup (see Task 8 of the BC-5833 plan).
+**Cross-link note.** `message-market-fit` now exists and cross-links back to `gtm-strategy` as a MAP-mode input; the remaining consumer skills (BC-5827 account-research, BC-2722 outbound-playbook) are still pending. A follow-up issue will track the remaining hookups (see Task 8 of the BC-5833 plan).
 
 ### Phase 4 SCOPE GUARD
 
