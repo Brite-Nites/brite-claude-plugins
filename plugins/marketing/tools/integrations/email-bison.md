@@ -151,7 +151,7 @@ Sending schedule configuration — send windows, cadence.
 
 ### Workspace (17 tools)
 
-Workspace-level configuration and metadata. Includes `get_active_workspace_info`, `set_active_workspace`, `reset_to_primary_workspace`, `validate_workspace_key`, `get_account_details` — the tools a skill uses to verify which workspace it's talking to before mutating anything.
+Workspace-level configuration and metadata. The active-workspace meta-tools (`get_active_workspace_info`, `set_active_workspace`, `reset_to_primary_workspace`, `validate_workspace_key`) are the tools a skill uses to verify which workspace it's talking to before mutating anything. The 17 tools returned by `discover_tools(category="workspace")` on 2026-04-20 are: `list_workspaces`, `get_workspace_details`, `create_workspace`, `update_workspace`, `switch_workspace`, **`get_workspace_stats`** (aggregate workspace-level stats — emails sent, opens, replies; this is the tool skills reach for a quick-stats rollup, NOT `list_workspace_stats` which does not exist despite occasional cross-references in sibling skills), `get_workspace_line_area_stats` (by-date breakdown for charts), `invite_team_member`, `accept_workspace_invitation`, `create_workspace_user`, `create_api_token`, `get_master_inbox_settings`, `update_master_inbox_settings`, `get_account_details` (core tier), `update_profile_picture`, `update_password`, `generate_headless_ui_token`.
 
 ### Warmup (5 tools)
 
@@ -172,6 +172,17 @@ Open/click tracking configuration.
 ### Variables (2 tools)
 
 Custom variable management for merge fields.
+
+### Analytics (4 tools — top-level aggregators)
+
+Not part of any of the 14 categories above — these are top-level summary aggregators that `discover_tools(search="analytics")` returns. Each returns pre-aggregated stats without flooding context with raw rows. Reach for these when the skill's goal is aggregate reporting (not per-record mutation).
+
+- `get_leads_analytics` — aggregated stats across all leads (optionally filtered by campaign). Summary stats, engagement rates, top performers.
+- `get_replies_analytics` — aggregated reply analytics. Returns total counts, breakdown by reply status (`interested` / `not interested` / `auto-reply`), top campaigns by engagement, and sample replies. **This is the reply-sentiment distribution tool** — reach for it instead of iterating `list_replies` when the goal is a sentiment breakdown.
+- `get_campaign_analytics` — cross-campaign performance analytics. Aggregated stats across all campaigns, open/reply-rate comparison, top-performer identification.
+- `bulk_export` — dual-mode export. `format="summary"` returns server-side counts + breakdowns + samples; `format="csv"` exports to a file. Supported resources: scheduled_emails, campaign_leads, sender_emails, campaign_sender_emails, blocklist, blocklist_domains, tags, webhooks, lead_replies.
+
+Verified via `discover_tools(search="analytics")` on 2026-04-20.
 
 ### Discoverability (meta-tools)
 
@@ -250,6 +261,7 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 - **Community repos return stale inventories.** If an agent surfaces "25 tools (read-only)" from the old WIP or from `Sirkunle001/email-bison-claude-mcp`, that's pre-2026-04-10 and wrong. The official server has 141 tools with full CRUD.
 - **`import_leads_to_campaign` may fail with `allow_parallel_sending` prompt.** If a lead being attached is already in another campaign's active sequence, the tool refuses the attach and returns a prompt asking whether to enable parallel sending. **Never auto-enable this.** Surface the prompt to the user verbatim — parallel sending can over-contact a prospect across campaigns and is a deliverability risk. If the user declines, split the lead list and re-attach only the leads that aren't in other sequences.
 - **Deprecated sequence endpoints still exist.** The API spec exposes both `/api/campaigns/{campaign_id}/sequence-steps` (marked `deprecated`) and `/api/campaigns/v1.1/{campaign_id}/sequence-steps`. Tool-name aliases on the MCP side may point either way depending on version. Skills should explicitly prefer v1.1 — check the path returned by `search_api_spec` before calling `create_sequence_steps` if tool-name stability matters to the skill.
+- **`list_campaigns` has no server-side date-range filter.** The tool supports `status` and `search` filters only. Skills that need "campaigns in a date window" must pull the full list and filter client-side on `created_at` / `started_at`. The Campaigns category (21 tools) has no cross-campaign date-range enumerator — `get_campaign_stats_by_date` is per-campaign, not cross-campaign. Verified via `discover_tools(category="campaigns")` on 2026-04-20.
 
 ## Related skills
 
@@ -272,7 +284,11 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 
 ## Last verified
 
-`2026-04-17` — BC-5551 shipped credential centralization (Engineering Bitwarden item "Email Bison MCP — API tokens") + shell-profile onboarding + §Known Claude Code limitation documenting the plugin-scoped MCP blocker. Plugin-scoped MCP registration deferred until upstream Claude Code bugs [#6204](https://github.com/anthropics/claude-code/issues/6204)/[#9427](https://github.com/anthropics/claude-code/issues/9427) are resolved; servers continue to live at user level for now. Prose consistency fix: "API key" → "API token" throughout §Auth (vendor canonical term per `docs.emailbison.com/get-started/authentication`). Tokens rotated fresh during BC-5551 (the prior tokens were in a gitignored repo-root file that got cleared).
+`2026-04-20` — BC-2721 tasks 7 + 10 via `discover_tools` on `emailbison-b2b`:
+- Task 7: added new §Analytics (4 tools — top-level aggregators) subsection documenting `get_leads_analytics`, `get_replies_analytics`, `get_campaign_analytics`, and `bulk_export` (not in the 14 documented categories — they're a top-level analytics group). Added §Known gotchas bullet: `list_campaigns` has no server-side date-range filter (client-side filter on `created_at` / `started_at` required).
+- Task 10 BC-5797 factual-anchor audit: caught wrong tool name `list_workspace_stats` (does not exist) — actual name is `get_workspace_stats`. Fixed in `campaign-analysis/SKILL.md` + `evals.json`; sibling `email-bison/SKILL.md` has the same wrong name in 3 spots (lines 63/86/173) — tracked as a separate Linear issue alongside the BC-5903 sibling-skill namespace bug. Expanded Workspace (17 tools) section to enumerate all 17 tool names per `discover_tools(category="workspace")`.
+
+Prior: `2026-04-17` — BC-5551 shipped credential centralization (Engineering Bitwarden item "Email Bison MCP — API tokens") + shell-profile onboarding + §Known Claude Code limitation documenting the plugin-scoped MCP blocker. Plugin-scoped MCP registration deferred until upstream Claude Code bugs [#6204](https://github.com/anthropics/claude-code/issues/6204)/[#9427](https://github.com/anthropics/claude-code/issues/9427) are resolved; servers continue to live at user level for now. Prose consistency fix: "API key" → "API token" throughout §Auth (vendor canonical term per `docs.emailbison.com/get-started/authentication`). Tokens rotated fresh during BC-5551 (the prior tokens were in a gitignored repo-root file that got cleared).
 
 Prior: `2026-04-14` — Common workflows section, MCP confirmation-gate inventory, and new gotchas (parallel_sending, deprecated sequence endpoints) verified live via `discover_tools` on 11 categories + `search_api_spec` on `POST /api/campaigns/{id}/resume`, `POST /api/campaigns/{id}/attach-sender-emails`, `POST /api/campaigns/{id}/create-schedule-from-template`, and the v1.1 vs deprecated sequence-steps pair. Workspace connection re-verified via `get_active_workspace_info` (active workspace ID 52, `send.outbase.so`, primary).
 
