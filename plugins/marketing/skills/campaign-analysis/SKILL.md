@@ -124,7 +124,67 @@ Verdicts are attributed at the campaign level, not the reply level. A single unu
 
 ## Brite Implementation
 
-TBD — filled by subsequent tasks.
+This section translates §3 Methodology into Brite's concrete stack — which MCP server, which tool, which repo, which architectural rule. The skill calls two MCP servers: one Email Bison workspace (`emailbison-b2b` for Brite Supply + Labs, `emailbison-personal` for Brite Nites — only ONE per run, picked via the §2 Gate 2 detection rule) for campaign performance data, and the Salesforce MCP for downstream pipeline attribution. Every run writes exactly one artifact to `docs/campaigns/{entity}/analysis-{campaign-name}-{YYYY-MM-DD}.md` (path per §1). Every recommendation the report surfaces in its §6 Next Iteration block MUST resolve to one of the five §3.5 verdict labels (`TOP PERFORMER`, `SCALE`, `TEST MORE`, `MONITOR`, `UNDERPERFORM`) — no free-form narrative recommendations, no hedged prose substitutes.
+
+### Tools this skill calls
+
+| What the skill needs to do | MCP server | Tool(s) | Reaches | Reason |
+|---|---|---|---|---|
+| Availability check before any EB call | `emailbison-b2b` or `emailbison-personal` (Gate-2 detected) | `get_active_workspace_info` | Email Bison workspace | ADR 2c degradation policy — lightweight read-only liveness probe |
+| Pull workspace-level rollup for the §6 §1 Quick Health Check header | same EB MCP | `list_workspace_stats` | same workspace | Verified in sibling `email-bison` skill (§4 quick-stats row); gives the aggregate Reply / Interested / Bounce rates before per-campaign breakdown |
+| Pull per-campaign performance (sends / opens / replies / bounces / interested count) | same EB MCP | `get_campaign_stats` | same workspace | §3.2 Phase 2 primary per-campaign signal; feeds §6 §2 Segment Performance Ranking |
+| Pull per-lead delivery status for Infrastructure + Timing cohort analysis | same EB MCP | `get_leads_analytics` | same workspace | Verified in sibling `email-bison` skill (§4 quick-stats row); §6 §3 Infrastructure + §6 §4 Reply Sentiment need per-lead delivery rows |
+| Enumerate senders to cohort Infrastructure by Google Workspace vs Microsoft 365 | same EB MCP | `list_sender_emails` | same workspace | §6 §3 Infrastructure Analysis needs the sender-domain split — tool verified in `email-bison.md` §Common workflows |
+| Discover the exact tool names for campaign listing and reply-sentiment distribution | same EB MCP | `discover_tools`, `search_api_spec` | same workspace | Scoped runtime discovery — the campaigns-in-window enumerator and the replies-analytics tool are in the 16 undocumented extended tools per `email-bison.md` §Tool inventory. Do NOT use discover_tools as a substitute for the five verified tools above; use only for these two gaps |
+| Pipeline attribution: did any replies become Opportunities? | Salesforce MCP | `run_soql_query` | `brite-salesforce` production org | §6 §6 Next Iteration needs downstream conversion signal; ADR 2a — SF is CRM system of record |
+
+Do not list tools the skill will not call — this table is the authoritative scope per the skill-tool-integration pattern's anti-pattern #4. Five tool names above (`get_active_workspace_info`, `list_workspace_stats`, `get_campaign_stats`, `get_leads_analytics`, `list_sender_emails`) are verified against `email-bison.md` or the shipped sibling `email-bison` skill; the sixth row uses `discover_tools` + `search_api_spec` only for the two specific gaps the integration doc has not yet enumerated.
+
+### Entity-keyed benchmark sets
+
+The §3.3 benchmark table applies to the b2b workspace (`emailbison-b2b`, Brite Supply + Labs). The b2c workspace (`emailbison-personal`, Brite Nites) has softer thresholds on Reply Rate and Interested Rate — residential outbound runs longer decision cycles and softer response rates than b2b commercial. Thresholds on Bounce Rate are identical across both sets: bounces are an infrastructure signal, not an audience-fit signal, and the underlying threshold doesn't shift with motion type.
+
+**b2c benchmark targets (emailbison-personal workspace — Brite Nites):**
+
+| Metric | Healthy | Attention | Critical |
+|--------|---------|-----------|----------|
+| Reply Rate | above 0.5% | 0.25% – 0.5% | below 0.25% |
+| Interested Rate | above 15% of replies | 10% – 15% of replies | below 10% of replies |
+| Bounce Rate | below 3% | 3% – 5% | above 5% |
+
+> **Calibration caveat.** These b2c thresholds are initial targets, not calibrated. Brite Nites residential outbound is newer than the Supply/Labs b2b motion and the thresholds should be re-derived from real data after 3+ completed b2c campaigns reach the §3.2 Phase 2 statistical-significance floor (500 sent AND 7 days). File the calibration follow-up as a new Linear issue blocking BC-2721 sign-off. Until recalibration, report output must carry a visible "b2c benchmarks uncalibrated — initial targets" footer in §1 Quick Health Check.
+
+No Brite Supply-specific benchmark set exists — Supply uses the b2b table per handbook canon (BC-5823 precedent). Do not bolt on a third set.
+
+### Architectural rules that apply
+
+- **Hypothesis-before-Analysis.** Phase 1 MUST be written down before Phase 3 begins. No degrade path. Source: §3.2 Phase 1.
+- **Statistical-significance floor.** Below 500 sent OR below 7 days elapsed, every verdict auto-maps to `TEST MORE` regardless of how the raw numbers look. Source: §3.2 Phase 2.
+- **Orthogonal attribution.** Every §6 report observation resolves to exactly one of the 5 Core Variables (Offer / Message / Segment / Infrastructure / Timing). Mixed attributions are a §8 slop flag. Source: §3.1 orthogonality rule.
+- **Objective verdict language.** All recommendations use one of the five §3.5 verdict labels (`TOP PERFORMER`, `SCALE`, `TEST MORE`, `MONITOR`, `UNDERPERFORM`). No subjective phrasing ("solid", "okay", "meh"). Source: §3.5.
+- **Availability check before first EB call.** `get_active_workspace_info` runs once at the start of Phase 2; on failure the skill stops and reports — it does not attempt partial analysis against a degraded workspace. Source: ADR 2c degradation policy (referenced in `plugins/marketing/tools/integrations/email-bison.md`).
+- **Mandatory campaign-debrief handoff.** Phase 4 is not complete until the operator confirms the handoff to `campaign-debrief`. Source: issue description §Scope — Handoffs, §3.2 Phase 4.
+
+### Cross-skill boundaries
+
+**Hands off to:**
+
+- **[BC-5830](https://linear.app/brite-nites/issue/BC-5830) campaign-debrief — MANDATORY.** Fires at end of Phase 4, every run. Prompt the operator verbatim: *"Analysis complete. To capture these learnings so they compound into future campaigns, run the campaign debrief workflow."* This is the loop-closer; Phase 4 is not complete until the operator confirms.
+- **[BC-2719](https://linear.app/brite-nites/issue/BC-2719) deliverability-audit — CONDITIONAL.** Fires when Infrastructure variable is the suspected root cause: bounce-rate spike into §3.3 Critical band, OR Google-vs-Microsoft 2x+ cohort disparity on Reply Rate with comparable volume, OR spam-complaint signals surfaced in §6 §3 Infrastructure Analysis. Surface the handoff with the triggering signal named explicitly.
+- **[BC-5829](https://linear.app/brite-nites/issue/BC-5829) message-market-fit MSPA — ON-REQUEST, ITERATE mode.** Fires when the operator asks "what should we test next?" after Phase 4 renders. The §6 §6 Next Iteration Recommendations block becomes MSPA ITERATE's input hypotheses.
+
+**Receives from:**
+
+- The operator directly (post-campaign invocation).
+- [BC-2722](https://linear.app/brite-nites/issue/BC-2722) outbound-playbook during the campaign-monitoring phase of an active playbook run.
+- [BC-5829](https://linear.app/brite-nites/issue/BC-5829) MSPA DIAGNOSE mode when a stuck pipeline needs performance root-causing.
+
+**Does not own:**
+
+- Per-reply sentiment classification at runtime — that's [BC-2720](https://linear.app/brite-nites/issue/BC-2720) reply-processing. This skill reads the sentiment tags EB already produced; it doesn't classify new replies.
+- Test design or next-batch experimentation — that's BC-5829 MSPA.
+- Learning capture, transferable-insight flagging, entity-keyed learnings file — that's BC-5830 campaign-debrief.
+- Launching, pausing, or modifying the campaign itself — that's `campaign-orchestration`. This skill is analytical, not operational.
 
 ---
 
