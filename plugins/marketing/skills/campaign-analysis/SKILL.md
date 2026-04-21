@@ -190,7 +190,44 @@ No Brite Supply-specific benchmark set exists — Supply uses the b2b table per 
 
 ## MCP Tool Reference
 
-TBD — filled by subsequent tasks.
+§4 declared WHAT tools this skill uses; §5 says WHEN — which phase, in what order. Grouping is by phase (Hypothesis → Data Collection → Analysis → Recommendations), not by server, because the skill author thinks in phases. Every mutating workflow starts with the `get_active_workspace_info` availability probe per the ADR 2c degradation policy — on failure the skill stops and reports rather than attempting partial work. See [`plugins/marketing/tools/integrations/email-bison.md`](../../../tools/integrations/email-bison.md) for canonical EB tool-name anchors and the 141-tool category map, and [`plugins/marketing/tools/integrations/salesforce.md`](../../../tools/integrations/salesforce.md) for SF auth, SOQL gotchas, and field-existence preflight patterns.
+
+### Phase 1: Hypothesis
+
+No MCP calls. The skill prompts the operator via AskUserQuestion to write down 1-3 expectations — what they expect to see in the data, grounded in prior campaigns or the `campaign-orchestration` deliverability assumptions (e.g. "Google senders will beat Microsoft on Reply Rate by 1.5-2x"). Ask one expectation per question per the BC-5761 one-question-per-field rule. The phase ends when the operator submits the hypotheses; the skill records them verbatim in the §6 §5 Attribution Analysis block so Phase 3 can check each hypothesis against actual data. If the operator skips Phase 1, the skill refuses to continue — there is no degrade path, per §4.3 Hypothesis-before-Analysis rule.
+
+### Phase 2: Data Collection
+
+Order matters: availability check → workspace rollup → per-campaign breakdown → per-lead drill → sender cohort → discovery for undocumented tools. Run the steps in sequence; do not parallelize — step 3's discovery result feeds step 4's iteration set.
+
+1. **`get_active_workspace_info`** — availability check. Confirms which workspace the EB MCP is currently pointed at (`emailbison-b2b` or `emailbison-personal`). If this call fails, the skill stops and reports the server name plus a pointer to `/marketing:setup-email-bison` — Phase 2 does not attempt partial data collection against a degraded workspace. Compare the returned workspace against the §2 Gate 2 operator answer; if they differ, surface the mismatch to the operator and stop. The skill does NOT mutate workspace state (no `set_active_workspace` call) — the operator fixes the pointer out-of-band and re-runs.
+2. **`list_workspace_stats`** — pull workspace-level rollup for the §2 time window. Populates the header of §6 §1 Quick Health Check (aggregate Reply Rate / Interested Rate / Bounce Rate for the window).
+3. **Campaigns-in-window discovery** — call `discover_tools` once with a filter targeting the Campaigns category (21 tools per `email-bison.md` §Tool inventory), or `search_api_spec` with keywords `campaigns list` plus the time-window dates. Pick the returned tool name that matches "list campaigns filtered by date range" and call it with the §2 start / end dates. Record the exact tool name in the report footer so future runs do not need to re-discover it.
+4. **`get_campaign_stats`** — iterate the campaign IDs from step 3; pull per-campaign sends / opens / replies / bounces / interested counts. Feeds §6 §2 Segment Performance Ranking.
+5. **`get_leads_analytics`** — per-lead delivery status. Feeds §6 §3 Infrastructure Analysis (per-lead rows bucketed by sender domain) and §6 §4 Reply Sentiment Analysis (per-lead reply tags).
+6. **`list_sender_emails`** — enumerate senders in the workspace. Filter by `status == "connected"`. Group by domain provider (Google Workspace vs Microsoft 365 vs other) to build the §6 §3 Infrastructure cohort comparison.
+7. **Reply sentiment discovery** — call `discover_tools` or `search_api_spec` targeting the Inbox / replies category (13 tools per `email-bison.md` §Tool inventory) for the reply-sentiment distribution tool. Likely candidates include `get_reply_analytics`, `list_replies_by_sentiment`, or similar — take the name discovery returns. Feeds §6 §4 Reply Sentiment Analysis.
+
+If Phase 2 completes but sends < 500 OR days < 7, record "sub-floor run" in the report header and auto-map every Phase 4 verdict to `TEST MORE` per §4.3 architectural rule 2 (statistical-significance floor). If Phase 2 fails for any OTHER reason — availability failure at step 1, permission error mid-iteration, empty campaign list from step 3 — the skill stops and reports; it does not attempt Phase 3 analysis against partial data.
+
+### Phase 3: Analysis
+
+No new MCP calls — this phase is pure synthesis against the Phase 2 data. Rank all campaigns in the window by Interested Rate descending. Compute per-variable attribution for the top 2 and bottom 2 using the §3.1 5 Core Variables (Offer / Message / Segment / Infrastructure / Timing) with the orthogonality rule applied — each ranked row attributes to exactly one variable. Build cohort comparisons: Google Workspace vs Microsoft 365 senders (from step 6's grouping), weekday vs weekend sends, b2c vs b2b if the window spans both workspaces (though Gate 2 normally scopes to one). Flag any 2x+ cohort differential with comparable volume as a hard signal worth a §6 §6 recommendation; sub-1.5x is noise unless it repeats across multiple campaigns. Check each operator hypothesis from Phase 1 against the actual data and label each one CONFIRMED / PARTIAL / REJECTED — one-line result per hypothesis, recorded in §6 §5. If no Phase 1 hypotheses are on record, stop and refuse to continue per §4.3 architectural rule 1 (Hypothesis-before-Analysis).
+
+### Phase 4: Recommendations
+
+Map Phase 3 findings to verdicts, then optionally cross-check downstream conversion signal in Salesforce — only when the window produced any interested replies.
+
+1. **For each campaign in the ranked table, assign the §3.5 verdict** (`TOP PERFORMER`, `SCALE`, `TEST MORE`, `MONITOR`, `UNDERPERFORM`) per the assignment rules. Record campaign ID / verdict / attribution variable in §6 §5 Attribution Analysis. No free-form narrative verdicts — use the five fixed labels only.
+2. **`run_soql_query` (optional)** — only if §6 §6 Next Iteration needs downstream conversion signal AND the campaign produced interested replies. SOQL shape:
+
+   ```
+   SELECT Id, StageName, Campaign_Source__c FROM Opportunity WHERE Campaign_Source__c = :campaign_name AND CreatedDate >= :phase2_start
+   ```
+
+   Preflight: before running the attribution SOQL, verify the custom field exists on the Opportunity sObject via a FieldDefinition metadata query. If Campaign_Source__c is absent from the org schema, skip the attribution query and note "attribution skipped — custom field missing" in the report (BC-5797 factual-anchor rule: verify field existence before running a query that assumes it). If the Salesforce MCP is unavailable, skip entirely — Phase 4 does not block on SF.
+3. **Order §6 §6 recommendations by verdict priority**: `SCALE` first, `UNDERPERFORM` second, `TEST MORE` third, `MONITOR` fourth, `TOP PERFORMER` observational last. The priority order is fixed by §3.5 — do NOT reorder.
+4. **End Phase 4 with the mandatory campaign-debrief handoff prompt** (verbatim per §4.4): *"Analysis complete. To capture these learnings so they compound into future campaigns, run the campaign debrief workflow."* Phase 4 is not complete until the operator confirms the handoff.
 
 ---
 
