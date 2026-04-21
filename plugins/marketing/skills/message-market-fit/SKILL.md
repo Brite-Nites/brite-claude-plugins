@@ -404,16 +404,61 @@ All MCP calls this skill makes are **reads**. None match the MCP confirmation-ga
 
 ## Health Scoring Rubric
 
-TODO(BC-5829)
+| Score | Criteria |
+|------:|----------|
+| 10 | All three modes ran correctly when invoked — MAP executed the 6 ordered steps without skipping, ITERATE executed the 4 ordered steps without skipping, DIAGNOSE executed the 5-step root-cause sequence in strict order with no level-skipping; the MSPA matrix rendered with exactly 7 columns in this order: `Market` / `Segment` / `Persona` / `Angle` / `Batch` / `Verdict` / `Notes`; the barbell 80/20 allocation was preserved with the experiment side never dropped and the safe side sized at 4× the experiment volume (3k experiment → 12k safe); all 10 Kellen's Laws appear in §3 AND §8 (in §3 numbered 1–10 with glosses, in §8 re-stated as `Do not X` guardrails); every verdict cell in the matrix uses one of the five fixed tokens — `SUPER WORKS`, `KIND OF WORKS`, `DOESN'T WORK`, `DEFERRED`, `PENDING` — with no prose substitutes; DIAGNOSE never skipped a level (Market → Segment → Persona → Angle → Execution in order, halt at first failure); every output path is under `docs/campaigns/{entity}/` with the correct filename template (`mmf-matrix.md`, `mmf-batch-{N}.md`, `mmf-results-{N}.md`, `mmf-diagnosis-{YYYY-MM-DD}.md`); cross-skill handoffs fired at the right moments (ITERATE transferable-insight field triggers `campaign-debrief` cross-link; DIAGNOSE Step 5 failure triggers `deliverability-audit` cross-link). |
+| 7-9 | Mostly excellent with one gap — e.g. matrix rendered with 6 columns because `Notes` was dropped on one row; a verdict label rendered in wrong case (`kind of works` lowercase) instead of the verbatim `KIND OF WORKS`; one Kellen's Law present in §3 but missing from the §8 `Do not X` list; MAP Step 5 hypothesis card missing one sub-field ("what we'll learn even if it fails") but the other three present; ITERATE Results Log renders five of six columns; DIAGNOSE diagnosis file omits the frontmatter `mode: diagnose` key but body is correct. |
+| 4-6 | Functional but missing structural elements — e.g. DIAGNOSE skipped Step 2 (Segment) and went straight to Step 4 (Angle) without clearing Step 2 first; barbell dropped to 90/10 on one batch without a Notes column entry explaining why; ITERATE output missing the Results Log section entirely; MAP wrote `mmf-matrix.md` but forgot `mmf-batch-1.md`; matrix row added without the sourceable-segment proof from Lens 3; Step 6 enforce-barbell narrative present but math not shown (no 3k/12k citation). |
+| 1-3 | Hard failure — any ONE of these drops the run to 1-3: DIAGNOSE skipped a level in the ordered 5-step sequence (e.g. went to Execution when Market was broken); the experiment side stopped in a batch (Kellen's Law #6 violation); a verdict label fabricated as a prose substitute ("pretty promising", "mediocre", "worth another look") instead of one of the five fixed tokens; a matrix row generated without evidence (a segment, persona, or angle with no sourceable proof from Lens 3 or no citation to a prior batch); a prose narrative retrofit over unwanted results (Kellen's Law #4 violation — "the campaign actually kind of worked if you squint" when reply rate is under 1%); a fabricated MCP tool name or hallucinated workspace routing (e.g. routing Nites to `emailbison-b2b` or inventing a tool like `emailbison-personal__get_batch_results` that does not exist). |
 
 ---
 
 ## Anti-Slop Guardrails
 
-TODO(BC-5829)
+Base guardrails (shared across marketing plugin) + Kellen's Laws re-stated as validation-gated hard failures + skill-specific hard failures. Each `Do not X` rule is a gate, not a preference — a violation drops the run to §7 1-3 band.
+
+**Base guardrails:**
+
+- Do not generate generic marketing jargon ("synergy", "leverage", "best-in-class").
+- Do not fabricate statistics, case studies, or testimonials — always attribute to a source.
+- Do not produce output that ignores `docs/marketing-context.md`.
+- Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
+
+**Kellen's Laws as hard failures** (each drops the run to §7 1-3 band):
+
+1. Do not personalize a generic angle — resonance beats personalization (Law #1). Personalization without a resonant angle lands flat; fix the angle first, add personalization second.
+2. Do not lead with information when identity is available — identity beats information (Law #2). "This is for people like you" lands faster than "here are the facts."
+3. Do not treat a demographic filter as a segment — groups are cultural, not demographic (Law #3). Job title + company size is a filter; worldview + language + aversions is a group.
+4. Do not retrofit a narrative over unwanted results — the things that work and the things you wanted to work are not synonymous (Law #4). The matrix records what happened, not what you hoped would happen.
+5. Do not dismiss silence — silence is data (Law #5). Matrix Notes must record the inference for any 0% reply rate (e.g., "segment wrong" or "angle commodity"), not "campaign failed" with no reasoning.
+6. Do not stop the experiment side (Law #6). Even when the safe side is crushing it, the 20% experiment allocation runs every batch. This is the single most-violated rule.
+7. Do not chase percentages at 600-contact scale — qualitative beats quantitative (Law #7). Read the replies; five on-thesis replies beat 500 opens.
+8. Do not make a wrong-and-specific claim — wrong-and-specific is worse than wrong-and-general (Law #8). A confidently-wrong specific claim burns trust; a generally-wrong claim invites correction and conversation.
+9. Do not plan the yolo slot away — the best campaigns look nothing like what you planned (Law #9). Every batch preserves one wild card; the best angle you'll ever run is not on your current planning surface.
+10. Do not treat outbound as persuasion — outbound is discovery and hypothesis validation (Law #10). "No" is valid data if it invalidates a hypothesis cleanly.
+
+**Skill-specific hard failures** (validation-gated — drop the run to §7 1-3 band):
+
+- **Do not skip levels in the DIAGNOSE 5-step sequence.** First failure IS the root cause — do not continue past the first broken level. Going straight to Execution (Step 5) when Market (Step 1) is broken is a §7 1-3. The ordered sequence (Market → Segment → Persona → Angle → Execution) is load-bearing.
+- **Do not fabricate verdict labels.** Only `SUPER WORKS`, `KIND OF WORKS`, `DOESN'T WORK`, `DEFERRED`, `PENDING` are allowed in the matrix `Verdict` column. Prose substitutes ("promising", "mediocre", "worth another shot", "pretty strong") are refused — §7 1-3.
+- **Do not stop the experiment side.** Echo of Law #6 for emphasis — this is the single most-violated rule in practice. When the safe side crushes, operators want to reallocate 100% to safe; the skill refuses. The 20% experiment allocation runs every batch, forever.
 
 ---
 
 ## Behavioral Tests
 
-TODO(BC-5829)
+Eight scenarios covering the core paths. Structured assertions + fixtures live in `evals/evals.json` alongside this file. Scenario IDs match the `evals.json` entries for 1:1 traceability. Tier 1 scenarios assert on free output — no tool calls required. Tier 2 scenarios require file reads or MCP call-trace inspection to verify.
+
+### Tier 1 — Free assertions (no tool calls needed)
+
+- **`map-mode-happy-path`** — Given MAP selected at §2 Gate 2 for a Nites uphill market (operator answers "uphill" to Step 1 pipeline-environment check) with `docs/marketing-context.md` present, the skill writes exactly 2 files to `docs/campaigns/nites/`: `mmf-matrix.md` + `mmf-batch-1.md`. The matrix contains 7 columns in order: `Market` / `Segment` / `Persona` / `Angle` / `Batch` / `Verdict` / `Notes`. Batch-1 contains exactly 5 experiments, each with a hypothesis card (hypothesis + what-works thresholds + what-we-learn-if-it-fails + list-build notes). The barbell Step 6 narrative cites 3k experiment volume (5 × 600) and 12k safe volume.
+- **`iterate-missing-prereq-halt`** — Given ITERATE selected at §2 Gate 2 but no `docs/campaigns/{entity}/analysis-*.md` artifact exists on disk (Glob returns empty), the skill's first response is the verbatim halt message from §2 Gate 4 ("ITERATE mode requires a campaign-analysis artifact at `docs/campaigns/{entity}/analysis-*.md`. Run `campaign-analysis` first, then resume.") and zero tool calls fire beyond the Glob prerequisite check. No artifact is written. The skill does NOT silently fall back to MAP mode.
+- **`diagnose-first-failure-wins`** — Given DIAGNOSE invoked with ≥ 2 batches flat (2 `mmf-results-*.md` files in `docs/campaigns/{entity}/`), Step 1 (Market) clears clean but Step 2 (Segment) fails (replies scattered, no consistent objection pattern). The diagnosis file names Segment as the root cause and the prescription hands off to `creative-angles` (per the "replace demographic segment with worldview cluster" fix pattern). The diagnosis does NOT continue to Steps 3, 4, or 5 — only one root cause is reported per run.
+- **`verdict-labels-only`** — Given any mode producing a matrix update (MAP first-batch Verdict column, ITERATE Results Log Verdict column), every verdict cell reads exactly one of the five fixed tokens: `SUPER WORKS`, `KIND OF WORKS`, `DOESN'T WORK`, `DEFERRED`, `PENDING`. Scenario fails on any prose substitute ("promising", "mediocre", "decent", "worth another look").
+- **`barbell-invariant`** — Given a MAP → ITERATE pair across batches 1 → 2 for a single entity, the experiment side (20% allocation) is never zeroed out in either batch design. Batch-1 runs 5 experiments × 600 = 3k; Batch-2 ITERATE next-batch design also runs ~3k experiment with ~12k safe. Scenario fails if any batch design shows the experiment allocation dropping below 20% of total volume.
+
+### Tier 2 — Tool-assisted (requires file read or MCP call-trace inspection)
+
+- **`kellens-law-anchor`** — Given the SKILL.md file read, all 10 Kellen's Laws appear verbatim in §3 (the `### 10 Kellen's Laws` subsection, numbered 1–10 with glosses) AND as `Do not X` rules in §8 (the `**Kellen's Laws as hard failures**` block, also numbered 1–10 with law citations). Scenario fails if any of the 10 laws is missing from either section. Requires a `Read` tool call on `plugins/marketing/skills/message-market-fit/SKILL.md` to cross-check.
+- **`entity-routing`** — Given MAP invoked for Nites, every Email Bison MCP call in the tool-call trace uses the `mcp__emailbison-personal__*` namespace (never `mcp__emailbison-b2b__*`). Given MAP invoked for Supply or Labs, every Email Bison MCP call uses the `mcp__emailbison-b2b__*` namespace. Scenario fails on any cross-entity routing violation. Requires inspection of the tool-call trace produced by the run.
+- **`matrix-append-not-replace`** — Given ITERATE invoked on an entity with a pre-existing `docs/campaigns/{entity}/mmf-matrix.md` that contains 3 batch rows, the post-run matrix contains the 3 original batch rows PLUS new Results Log rows appended at the bottom. The body of the original matrix (rows 1–3) is byte-for-byte unchanged. Scenario fails if ITERATE rewrote any original row or re-ordered the matrix. Requires a before/after diff of `docs/campaigns/{entity}/mmf-matrix.md`.
