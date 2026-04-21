@@ -2,7 +2,7 @@
 name: sprint-scoping
 description: Phase 2 of /cadence:weekly. Sequential per-project scope interview (5 carry-over Qs + 5 scope Qs, one at a time) with brainstorming and the issue-quality-gate. Triggers on "sprint planning", "weekly scope", "what ships this week", "scope the next cycle", or "/cadence:weekly phase 2".
 user-invocable: false
-allowed-tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__list_comments, AskUserQuestion, Read, Write, Edit, Bash, Skill
+allowed-tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__list_comments, AskUserQuestion, Read, Write, Edit, Bash, Skill, Agent
 ---
 
 # Phase 2 — Sprint Scoping
@@ -24,6 +24,7 @@ Reads from the session state object populated by Phases 0–1:
 
 Populates / mutates:
 
+- `state.projects[i]._enrichment = { backlog_candidates[], carry_over_enriched[], brainstorming_ranked[], enriched_at, dispatch_error }` (produced per-project by the § 2 pre-loop enricher dispatch — BC-5902; authoritative shape lives in `commands/weekly.md § Session State Object`)
 - `state.projects[i].scope_decisions = {q1_headline, q2_ship_ids, q3_reassignments, q4_dependencies, q5_parked, carry_over_answers[]}`
 - `state.projects[i].overrides = [{issue_id, check, reason}]`
 - `state.projects[i].skip_log = [string, ...]` (one line per skipped question with the audit-card reason)
@@ -34,12 +35,12 @@ Populates / mutates:
 **Pre-loop (once per Phase 2 invocation):**
 
 - **Resume parse.** Read the current-week checkpoint file (path resolved per § 6) once. Parse every `### N. <project_name>` heading and build `state._scoped_project_names: Set<string>`. This is the single source of truth for resume state — § 2 step 1 and § 8 both consult this set. (If the file does not exist, the set is empty.)
-- **Backlog enrichment** *(needed because Phase 1's `project-audit` agent only queries the prior cycle — the backlog candidate count is not in the audit card).* For each project, call `list_issues` filtered by `project: <id>`, `cycle: null`, `priority` ∈ {1 Urgent, 2 High}, `state: backlog`. Store the returned count under `state.projects[i].audit_card.backlog_high_count` and the returned ID list under `...backlog_high_candidates[]`. These feed § 4's brainstorming prompt.
+- **Enricher dispatch fan-out** (BC-5902). In a single `Agent` tool-call message, dispatch `project-enricher` once per project in `state.projects[]` with `status.type == "started"`. Cap 10 concurrent dispatches (mirrors Phase 1 § 1.2 Dispatch per `commands/weekly.md`); batch sequentially in groups of 10 if `state.projects[].length > 10`. Prompt body per dispatch: `project_id`, `project_name`, `audit_card` (full Phase 1 output for this project), `cycle.current`, `cycle.previous`, `team_id`, `cross_project_stats`. Parse each returned JSON block into `state.projects[i]._enrichment` keyed by project id. On any `_enrichment.dispatch_error` (non-null), halt the pre-loop and surface `AskUserQuestion` with three options: **Retry** (re-dispatch only the failed projects with fresh Agent calls), **Pause session** (append `phase-2` to `completed_phases = []` NOT yet — leave state unchanged, write breadcrumb `current_phase = "phase-2"`, exit cleanly), **Proceed without enrichment for failed projects** (explicit spec-departure: set `_enrichment.backlog_candidates = []` + `_enrichment.brainstorming_ranked = []` for that project and free-text-prompt the user for SQ2 IDs when that project's turn comes; log under `state.projects[i].skip_log`). NEVER silent degradation — this is the BC-5896 AC fail-loud contract.
 
 **For each `state.projects[i]` selected in Phase 0.3 (`status.type == "started"`, deduped by id):**
 
 1. **Resume skip.** If `state.projects[i].name ∈ state._scoped_project_names`, set `state.projects[i].scope_confirmed = true` and continue to the next project. Log: `Project <name> already scoped — skipping (resume).` If this is the last project and it was already scoped, exit the loop cleanly.
-2. **Enrich carry-over** — if `audit_card.carry_over.count > 0`, parallel `get_issue` for every ID in `audit_card.carry_over.issues[].id` with `includeRelations: true`. Store the returned issue object under `state.projects[i]._fetched_issues[id]` (authoritative cache — § 5 reads through this). Derive `audit_card.carry_over.issues[i].enriched.blocker_count` from `relations.blockedBy.length` and `enriched.auto_superseded_by` from the first `relations.duplicateOf.id` if any. Bounded cost — carry-over count is small per project.
+2. **Enrich carry-over** — Read `state.projects[i]._enrichment.carry_over_enriched[]` populated by the § 2 pre-loop enricher dispatch. For each entry, hydrate the matching `audit_card.carry_over.issues[i]` with: `enriched.blocker_count = _enrichment.carry_over_enriched[id].blocker_count`, `enriched.auto_superseded_by = _enrichment.carry_over_enriched[id].auto_superseded_by`. No additional MCP reads in Phase 2 — the enricher already did the parallel `get_issue` fan-out with `includeRelations: true`. Bounded cost — work is a dict merge.
 3. **Run § 3 carry-over interview** (skipped entirely if `carry_over.count == 0` per BC-5810 § 2.3).
 4. **Run § 4 scope interview**.
 5. **Run § 5 quality gate** on every issue ID in `q2_ship_ids` (pre-fan-out `get_issue` for any ID not already in `_fetched_issues`).
@@ -49,7 +50,7 @@ After all projects: **§ 7 cross-project bottleneck pass**.
 
 ## § 3 Carry-over interview (5 questions per issue)
 
-For each issue in `audit_card.carry_over.issues[]`, ask the 5 questions from BC-5810 § 2.1 verbatim. Each question is a **separate** `AskUserQuestion` tool call — no batching. Hard rule per `memory/feedback_one_question_at_a_time.md`. Skip rules from BC-5810 § 2.3 are evaluated *before* each `AskUserQuestion` call; skipped questions append a one-line entry to `skip_log`.
+For **every** issue in `state.projects[i].audit_card.carry_over.issues[]` (not just the highest-priority one — BC-5897), ask the 5 questions from BC-5810 § 2.1 verbatim. Iteration order is `carry_over.issues[]` array order (Phase 1 audit sorts by priority already). No priority-filter / rank-filter on block entry — only question-level adaptive-skip from § 2.3 applies. Each question is a **separate** `AskUserQuestion` tool call — no batching. Hard rule per `memory/feedback_one_question_at_a_time.md`. Skip rules from BC-5810 § 2.3 are evaluated *before* each `AskUserQuestion` call; skipped questions append a one-line entry to `skip_log`.
 
 Every question carries: issue ID + title, one-line audit summary snippet (e.g. *"BC-2690 — MI reply sync. In Progress W15. No PR. Holden. 0 blockers."*), recommended default first with `(Recommended)` suffix, and "Other" as the free-text escape.
 
@@ -67,11 +68,7 @@ Answers are stored under `state.projects[i].scope_decisions.carry_over_answers[]
 
 Once per project after carry-over completes (or immediately if carry-over was skipped). If `state.projects[i].status.type == "parked"` (from the Linear project shape captured in Phase 0.3, not from the audit card), only SQ1 is asked (for acknowledgement) and SQ2–SQ5 are skipped + logged.
 
-**Brainstorming invocation.** Before SQ2, invoke `workflows:brainstorming` via the `Skill` tool with this prompt body — exactly once per active project (counted by AC #3). Bind each placeholder from the listed state field:
-
-> *"Propose next-cycle scope for project `<project_name>` (= `state.projects[i].name`). Inputs: carry-over count `<carry_over_count>` (= `audit_card.carry_over.count`), backlog candidates at High-or-Urgent priority `<backlog_high_count>` (= `audit_card.backlog_high_count`, populated by § 2 pre-loop), recent shipped pace `<project_shipped_last_cycle>` issues last cycle (= `audit_card.shipped.count` — the per-project count, not the cross-project total). Surface 2–3 alternative scope shapes and explicit `what-if-we-parked-X` prompts. Output: ranked candidate IDs with one-line rationale each."*
-
-The brainstorming output feeds SQ2's candidate list as the `(Recommended)` default plus 2–3 alternatives. Quality-gate filtering happens in § 5 on the user's confirmed SQ2 picks, not on the candidate list surfaced here.
+**Scope candidate injection from enricher.** Before SQ2, read `state.projects[i]._enrichment.brainstorming_ranked[]` populated by the § 2 pre-loop `project-enricher` dispatch. The top-ranked candidate (`rank == 1`) becomes SQ2's `(Recommended)` default in the `AskUserQuestion` call; alternatives at ranks 2–3 become options 2–3. No main-thread `workflows:brainstorming` Skill call — the enricher already ran the ranker logic with the same inputs (carry-over count, backlog-high count, shipped-pace, owner-load hint). If `brainstorming_ranked` is empty (e.g. enricher fell back to `Proceed without enrichment`), SQ2's default becomes `"carry-over only — no backlog proposals"` and the user escape-path "Other" carries free-text. **(Closes BC-5867 — brainstorming ranker moves from spec-misfit inline Skill call to dispatched subagent output consumed as data — BC-5902.)**
 
 The 5 questions from BC-5810 § 2.2 verbatim, each a **separate** `AskUserQuestion` call:
 
@@ -139,6 +136,8 @@ Note: BC-5760 issue AC #6 references literal sub-sections (`Ship this week`, `St
 
 ## § 7 Cross-project bottleneck detection
 
+**Unconditional emit (BC-5899).** Always emit the § 7 summary at Phase 2 exit — even when `bottleneck_warnings == []`. The checkpoint always gets a `## Cross-project flags` section; the empty case renders `_None this cycle._`. Satisfies BC-5760 AC #7 regardless of whether any owner exceeds the threshold, so the planner sees the check ran and reads the result.
+
 After the per-project loop completes, scan every project's `scope_decisions.q2_ship_ids` and `q3_reassignments`. Group by primary assignee. Emit a warning under `state.bottleneck_warnings[]` for any owner with > N primary assignments (default `N == 4`; configurable via `state.bottleneck_threshold`). Each warning is `{assignee, count, issues: [ids]}`.
 
 Append a `## Cross-project flags` section to the checkpoint file with one bullet per warning:
@@ -165,8 +164,8 @@ If `bottleneck_warnings == []`, append a single line: `## Cross-project flags\n\
 - `weekly-planning/w16-2026-04-13/w16-planning-checkpoint.md` — ground-truth checkpoint format
 - `plugins/cadence/skills/_shared/issue-quality-gate/SKILL.md` — quality gate primitive (BC-5810 § 3)
 - `plugins/cadence/agents/project-audit.md` — audit_card producer (BC-5759)
+- `plugins/cadence/agents/project-enricher.md` — enricher agent this skill dispatches (BC-5902)
 - `plugins/cadence/commands/weekly.md` § Phase 2 — entry command pointer
-- `plugins/workflows/skills/brainstorming/SKILL.md` — Socratic exploration invocation pattern
 - `memory/feedback_one_question_at_a_time.md` — hard rule enforcement
 - `memory/feedback_thorough_audits.md` — per-item rigor (no batching across projects)
 - `memory/feedback_more_checkins_for_infra_issues.md` — each project confirmation is one check-in gate
@@ -176,3 +175,4 @@ If `bottleneck_warnings == []`, append a single line: `## Cross-project flags\n\
 
 - **Prior-narrative parser** for `state.cycle.previous`'s sprint narrative — needed to compute `cross_project_stats.unplanned_ratio` and per-assignee *planned* attribution. Filed as **BC-5821** in the Cadence Plugin milestone. Out of scope for BC-5760 to keep the skill atomic.
 - **Configurable `state.bottleneck_threshold`** beyond the default `N == 4` — currently hard-coded; surface as `--bottleneck-threshold` flag on `/cadence:weekly` if user demand emerges.
+- **Seeded synthetic-25-project fixture test** — deferred to follow-up. BC-5874 third dogfood is the end-to-end verification for the BC-5902 hybrid-dispatch fix. If dogfood surfaces gaps, file a separate issue for a synthetic fixture.
