@@ -49,7 +49,51 @@ If the supplied `company_name` is common (e.g. "Apex", "Summit", "Pinnacle") and
 
 ## Methodology
 
-TODO(BC-5827)
+Three frameworks govern this skill. First, **mode-dispatched per-process invocation**: each of the 12 modes resolves to a specific set of `find-*.md` process files under `plugins/marketing/references/research-processes/`, and the skill invokes each one by reading its PRIMARY query verbatim. Second, **stop-condition plus kill-list discipline**: each process file defines when to stop searching and which query shapes are banned; both are load-bearing. Third, **facts-only output**: every data point cites an inline source URL, grouped by dimension. Worldview inference is out of scope. [BC-5824](https://linear.app/brite-nites/issue/BC-5824) `situation-mining` is the downstream consumer that converts these facts into worldview hypotheses.
+
+### Single-process modes, 9 direct invocations
+
+| Mode | Process file | PRIMARY query | Search-count range | What you're looking for |
+|---|---|---|---|---|
+| `profiles` | `find-profiles.md` | `{{company_name}} {{category}} company overview` | 3–6 | Industry, size, funding, HQ, founded, platform list |
+| `competitors` | `find-competitors.md` | `{{company_name}} competitors` | 2–5 | Market position, alternatives, differentiation |
+| `growth` | `find-growth-signals.md` | `site:{{domain}} blog OR pricing OR newsletter OR demo OR "free trial" OR "book a call"` | 3–8 | Content investment, lead capture, marketing maturity |
+| `hiring` | `find-hiring.md` | `{{company_name}} careers` | 2–4 | Which roles are they hiring? Which are conspicuously absent? |
+| `reviews` | `find-reviews.md` | `{{company_name}} {{category}} review` | 3–6 | G2 / Trustpilot / Capterra sentiment |
+| `news` | `find-news.md` | `{{company_name}} {{category}} recent news` | 2–5 | Recent announcements, product launches |
+| `negativity` | `find-negativity.md` | `{{company_name}} {{category}} complaints OR "negative reviews" OR problems OR issues` | 3–6 | Public pain points, customer friction |
+| `founders` | `find-founders.md` | `{{company_name}} CEO OR founder interview OR podcast` | 2–4 | Posting frequency, narrative, worldview cues |
+| `c-suite` | `find-c-suite.md` | `{{company_name}} "chief technology" OR "chief product" OR "chief security" -jobs -careers` | 3–6 | CFO / CMO / CRO / CTO names, tenure, recent moves |
+
+Take the PRIMARY query verbatim from the process file. Substitute `{{company_name}}`, `{{domain}}`, `{{category}}`, `{{current_year}}` as applicable. Do NOT invent queries; every query pattern comes from the referenced process file per BC-5824 precedent and §8 Anti-Slop.
+
+### Stop conditions + kill lists
+
+Each process file carries two discipline blocks. **Stop conditions** tell the runner when the signal is sufficient and remaining queries should be skipped (e.g. "stop if you found 5+ distinct reviews with clear sentiment"). **Kill lists** mark queries that must never run, usually because validation showed they return zero results or platform-specific spam (e.g. `site:apollo.io`, `{{company_name}} annual report`, `site:youtube.com`, `site:reddit.com` variants in `find-reviews.md`). Both are load-bearing. §8 Anti-Slop drops any run that violates a kill list to §7's 1–3 band.
+
+### WebSearch, not Serper
+
+Every query is executed via `WebSearch`, Brite's built-in surface. Do NOT reference Serper or Apollo, nor any other third-party search API. `WebSearch` needs no availability check; it is always on.
+
+### Composite modes, 3 fan-out invocations
+
+| Mode | Process files fanned out | Search-count range | When to pick |
+|---|---|---|---|
+| `full` | `find-profiles.md` + `find-competitors.md` + `find-growth-signals.md` + `find-hiring.md` | 10–23 | Unfamiliar company, quick 4-process baseline |
+| `deep` | All 9 company processes: `find-profiles.md` + `find-competitors.md` + `find-growth-signals.md` + `find-hiring.md` + `find-reviews.md` + `find-news.md` + `find-negativity.md` + `find-pr-releases.md` + `find-founders.md` | 25–50 | High-value target warranting broad company-level depth |
+| `people` | 7 people processes: `find-founders.md` + `find-c-suite.md` + `find-vp-leadership.md` + `find-directors.md` + `find-department-heads.md` + `find-specialist-roles.md` + `find-people-creative.md` | 20–40 | Org-chart build for ABM or enterprise account planning |
+
+### Plan-gate scope note
+
+`find-pr-releases.md` is included in the `deep` composite (company-level process, no argument dependency). `find-job-role-insights.md` is NOT included in any composite because it requires `{{role_title}}` input that a mode-level dispatch cannot supply; it is addressable only via a direct invocation that passes `role_title` alongside `mode=hiring`. See §6 Operational Runbook Flow 4 for the role-specific follow-up path.
+
+### Parallel execution
+
+All searches within a single mode MUST fire as parallel `WebSearch` tool calls in a single assistant turn (one message, N `tool_use` blocks). Sequential execution multiplies wall-clock by N. On rate-limit or transient failure of a single query, retry once with a 1–2 second delay. If the query still fails, proceed with the remaining queries and mark the missing source in the output artifact per §8 Anti-Slop: cite what's missing, do not fabricate.
+
+### Confidence discipline
+
+Every data point in the output artifact carries an inline source URL. Facts-only discipline: do NOT infer worldview, do NOT generate angles, do NOT write copy. If a process file returns fewer than 2 usable data points for a given dimension, note `thin signal` inline; downstream skills (situation-mining, creative-angles) calibrate confidence from that marker.
 
 ---
 
