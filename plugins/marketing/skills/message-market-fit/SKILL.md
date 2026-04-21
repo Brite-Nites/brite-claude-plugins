@@ -88,7 +88,7 @@ Use MAP when entering a new Brite motion or starting a fresh MSPA matrix for an 
 **Step 5 — Write hypothesis cards.** One card per experiment. Each card has four fields:
 
 1. **Hypothesis** — one sentence, falsifiable. Not "we think this segment cares"; instead "we think municipal parks directors with capital budgets > $500k will reply at > 3% to a financing-first angle."
-2. **What "works" looks like** — concrete thresholds. Reply rate **> 3%** = signal; reply rate **> 5%** = expand; meeting rate **> 1%** = scale to the safe side. Below 3% reply and below 1% meeting is "doesn't work."
+2. **What "works" looks like** — concrete thresholds per campaign-analysis §3.3 benchmarks. `Reply Rate` **> 3%** = signal; `Reply Rate` **> 5%** AND `Interested Rate` **> 25%** = expand; booked-meeting rate (SF-sourced, tracked separately) **> 1% of sent** = scale to the safe side. Below 3% reply and below 15% interested is "doesn't work."
 3. **What we'll learn even if it fails** — the falsification value. Example: "If this fails, we rule out that capital-budget size motivates parks directors at this price point — and we will test whether operating-budget framing lands instead."
 4. **List-build notes** — enrichment columns needed (e.g., annual budget, facilities FTE count), Salesforce dedup rules, and the target workspace for the send (entity-driven per Gate 3).
 
@@ -107,9 +107,11 @@ Use ITERATE after a batch has run and `campaign-analysis` has produced a report.
 
 **Step 1 — Classify each experiment.** Three bands with concrete thresholds:
 
-- **SUPER WORKS (scale).** Meeting rate **> 1%** OR (reply rate **> 5%** AND qualitative replies are on-thesis — i.e., replies reflect the hypothesis you wrote in the MAP Step 5 card, not adjacent interest). Action: **expand volume, don't touch messaging.** Move this experiment to the 80% safe side in the next batch. The worst failure mode at this band is tinkering with copy that is already working.
-- **KIND OF WORKS (iterate).** Reply rate **2–5%** OR some replies show interest but conversion is not landing (e.g., interested replies stall at booking). Action: **split-test segment or angle.** Keep the experiment in the 20% experiment side with exactly one variable swapped — not two. Which variable to swap is a judgment call informed by Step 2's qualitative read.
-- **DOESN'T WORK (kill or channel-switch).** Reply rate **< 1%** OR every reply received is "not interested." Action: **check list quality and deliverability FIRST** — this is an execution check, not a strategy verdict. If list and deliverability are clean, consider a channel switch (LinkedIn, event outreach) before repeating cold email on the same segment-angle pair. A clean execution with a dead reply rate is a DOESN'T WORK on the strategy, not the channel.
+Thresholds read fields from the campaign-analysis artifact per its §3.3 benchmark schema — `Reply Rate` (replies ÷ sent), `Interested Rate` (interested-replies ÷ replies, sourced from EB MCP reply-sentiment classification), and `Bounce Rate` (bounces ÷ sent). See §4 "Expected input schema" for the exact contract. Do not rename fields; use campaign-analysis's names verbatim.
+
+- **SUPER WORKS (scale).** `Interested Rate` **> 25%** AND `Reply Rate` Healthy (per §3.3 benchmarks, `> 1%`) AND qualitative replies are on-thesis — i.e., replies reflect the hypothesis you wrote in the MAP Step 5 card, not adjacent interest. Action: **expand volume, don't touch messaging.** Move this experiment to the 80% safe side in the next batch. The worst failure mode at this band is tinkering with copy that is already working.
+- **KIND OF WORKS (iterate).** `Reply Rate` **in the 0.5–1% Attention band** OR `Interested Rate` **15–25%** OR some replies show interest but conversion is not landing (interested replies stall pre-booking). Action: **split-test segment or angle.** Keep the experiment in the 20% experiment side with exactly one variable swapped — not two. Which variable to swap is a judgment call informed by Step 2's qualitative read.
+- **DOESN'T WORK (kill or channel-switch).** `Reply Rate` **< 0.5%** OR `Interested Rate` **< 15%** OR every reply received is "not interested." Action: **check list quality and deliverability FIRST** — this is an execution check, not a strategy verdict. If list and deliverability are clean, consider a channel switch (LinkedIn, event outreach) before repeating cold email on the same segment-angle pair. A clean execution with a dead reply rate is a DOESN'T WORK on the strategy, not the channel.
 
 **Step 2 — Read replies qualitatively.** At 600-contact scale, statistical significance is a fiction — 5 on-thesis replies carry more information than 5,000 opens. Read the reply bodies. Extract: the language prospects use (not the language you used), the objections raised (these are segment signals, not rejections of the offer), the emotional tone (curious / dismissive / indignant / confused), and the questions asked back ("how does this compare to X?" tells you their reference set). Kellen's Law #7 is the anchor: qualitative beats quantitative for early-stage testing. Capture the two or three quotes that most sharpen the next-batch hypothesis in Step 3.
 
@@ -123,10 +125,10 @@ Use ITERATE after a batch has run and `campaign-analysis` has produced a report.
 
 **Step 4 — Update MSPA matrix with Results Log.** Append a Results Log section to `docs/campaigns/{entity}/mmf-matrix.md` (do not rewrite the body — append only). The Results Log is a markdown table:
 
-| Batch | Experiment | Reply% | Meeting% | Verdict | Transferable Insight |
-|---|---|---|---|---|---|
+| Batch | Experiment | Reply Rate | Interested Rate | Bounce Rate | Verdict | Transferable Insight |
+|---|---|---|---|---|---|---|
 
-The **Verdict column uses the four fixed tokens ONLY**: `SUPER WORKS`, `KIND OF WORKS`, `DOESN'T WORK`, `DEFERRED`. Prose substitutes ("pretty promising," "mediocre," "worth another shot") are refused by §8 Anti-Slop. The Transferable Insight column names what carries to the next batch — a reusable learning about the segment, the angle, or the channel — not a restatement of the experiment setup.
+The **Verdict column uses the five fixed tokens ONLY**: `SUPER WORKS`, `KIND OF WORKS`, `DOESN'T WORK`, `DEFERRED`, `PENDING`. The first four are post-run classifications assigned by this step. `PENDING` applies to Results Log rows for experiments that launched but have not yet accumulated enough data to classify (e.g., sent but statistical-significance floor not reached). Prose substitutes ("pretty promising," "mediocre," "worth another shot") are refused by §8 Anti-Slop. The Transferable Insight column names what carries to the next batch — a reusable learning about the segment, the angle, or the channel — not a restatement of the experiment setup.
 
 **Output for ITERATE mode.** Write three artifacts:
 
@@ -217,6 +219,18 @@ This section translates §3 Methodology into Brite's concrete stack — which MC
 
 The wildcard form `mcp__plugin_marketing_salesforce__*` in `allowed-tools` is used because `run_soql_query` spans multiple SOQL object types across MAP Lens 3 (User for the probe, Account for segment discovery) and DIAGNOSE Step 5 (ActivityHistory for delivery patterns). Narrower cherry-picking would couple the frontmatter to a SOQL object taxonomy that will evolve. Both Email Bison wildcards (`mcp__emailbison-personal__*` and `mcp__emailbison-b2b__*`) are listed because workspace routing is entity-driven per Gate 3 — the skill needs access to both and picks the right one per invocation, never both in one run. See [`plugins/marketing/tools/integrations/salesforce.md`](../../../tools/integrations/salesforce.md) §MCP Tool Reference for SF auth and availability-probe details and [`plugins/marketing/tools/integrations/email-bison.md`](../../../tools/integrations/email-bison.md) for EB workspace-routing mechanics.
 
+### Expected input schema (ITERATE mode)
+
+ITERATE reads `docs/campaigns/{entity}/analysis-*.md` artifacts produced by [`campaign-analysis` (BC-2721)](../campaign-analysis/SKILL.md). The field contract MSPA depends on — cite these exact names, do not paraphrase:
+
+- **`Reply Rate`** — replies ÷ sent. Healthy > 1% / Attention 0.5–1% / Critical < 0.5% per campaign-analysis §3.3.
+- **`Interested Rate`** — interested-replies ÷ replies, sourced from EB MCP reply-sentiment classification (`get_replies_analytics`). Healthy > 25% / Attention 15–25% / Critical < 15%.
+- **`Bounce Rate`** — bounces ÷ sent. Healthy < 3% / Attention 3–5% / Critical > 5%.
+
+These three fields are the sole input to §3 ITERATE Step 1's threshold classification. MSPA does NOT compute booked-meeting rate from the campaign-analysis artifact — booked-meeting data comes from Salesforce (Opportunity + Task records) via a separate SF query and is tracked outside the ITERATE threshold bands.
+
+**Drift protection.** If a future campaign-analysis version renames any of these three fields, ITERATE breaks silently (Read succeeds, parse fails). Keep this block and campaign-analysis §3.3 in lockstep — a schema-change PR to `campaign-analysis` must touch this block in the same PR.
+
 ### Entity-keyed output paths
 
 Four file templates, all under `docs/campaigns/{entity}/` where `{entity}` is the validated value (`nites` / `supply` / `labs`) from §2 Gate 3. The `docs/campaigns/{entity}/` directory is created on first write — the skill must not assume pre-existence and must not probe for the directory before writing.
@@ -280,7 +294,7 @@ Runs in MAP Step 2 Lens 3. Sequence:
 Runs in ITERATE Step 1 (threshold classification) and Step 2 (qualitative read). The target workspace is entity-routed per Gate 3: Nites → `emailbison-personal`, Supply + Labs → `emailbison-b2b`. Sequence:
 
 1. **Availability probe — once per ITERATE invocation.** Call `get_active_workspace_info` on the entity-routed EB MCP namespace. This is the canonical EB liveness check. On failure, halt ITERATE with a blocking error that names the failed workspace and instructs the operator to re-run `/marketing:setup-email-bison`; do NOT silently fall back to the other workspace (cross-workspace fallback would corrupt the matrix).
-2. **On probe success — fetch campaign stats for the batch-N campaign(s).** Call `get_campaign_stats` scoped to the campaign IDs referenced in the input `mmf-batch-{N}.md`. Reply rate, meeting rate, and bounce rate feed Step 1's threshold classification (SUPER WORKS / KIND OF WORKS / DOESN'T WORK).
+2. **On probe success — fetch campaign stats for the batch-N campaign(s).** Call `get_campaign_stats` scoped to the campaign IDs referenced in the input `mmf-batch-{N}.md`. Returns `Reply Rate` and `Bounce Rate` per campaign-analysis §3.3 benchmarks. `Interested Rate` comes from Step 3's `get_replies_analytics` call (EB MCP reply-sentiment classification). All three feed Step 1's threshold classification (SUPER WORKS / KIND OF WORKS / DOESN'T WORK).
 3. **Qualitative reply read.** Call `search_replies` and `get_replies_analytics` on the same campaign IDs to pull reply bodies and reply-sentiment aggregates for Step 2's qualitative read. Capture language prospects use, objection patterns, and emotional tone — not the raw counts, which are already covered by `get_campaign_stats`.
 
 ### Workflow 4 — DIAGNOSE Step 5 execution probe (DIAGNOSE mode)
@@ -328,7 +342,7 @@ All MCP calls this skill makes are **reads**. None match the MCP confirmation-ga
 
 **Steps:**
 
-1. `Read` the campaign-analysis artifact matched by Gate 4's `Glob` — this provides the numeric signal (reply%, meeting%, bounce%) and the campaign-level context for Step 1's classification.
+1. `Read` the campaign-analysis artifact matched by Gate 4's `Glob` — this provides the numeric signal (`Reply Rate`, `Interested Rate`, `Bounce Rate` per campaign-analysis §3.3 benchmark schema) and the campaign-level context for Step 1's classification. See §4 "Expected input schema" for the full contract.
 2. Run §5 Workflow 3 — EB availability probe on the entity-routed workspace, then `get_campaign_stats` for batch-N's campaign IDs, then `search_replies` + `get_replies_analytics` for the qualitative read.
 3. Run §3 ITERATE Step 1 — classify each experiment into `SUPER WORKS` / `KIND OF WORKS` / `DOESN'T WORK` against the concrete thresholds.
 4. Run §3 ITERATE Step 2 — read replies qualitatively; capture language, objections, emotional tone, questions asked back. Capture 2–3 quotes that sharpen the next-batch hypothesis.
