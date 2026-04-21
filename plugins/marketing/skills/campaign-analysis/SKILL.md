@@ -234,7 +234,104 @@ Map Phase 3 findings to verdicts, then optionally cross-check downstream convers
 
 ## Operational Runbook
 
-TBD — filled by subsequent tasks.
+This section turns the §3 Methodology + §5 MCP Tool Reference into four concrete procedures that a subagent follows end-to-end. Procedure 1 is the happy path — every analysis run starts here. Procedures 2 and 3 are conditional side-effects triggered by what Procedure 1 surfaces. Procedure 4 is a mechanical lookup every run performs before Phase 3 resolves verdicts. Preconditions, steps, and error handling are explicit on every procedure so a fresh agent can execute any of them without re-reading the rest of the skill. Report-section cross-references use the established `§6 §N [section name]` style — `§6 §1 Quick Health Check` means the report's first section as defined in §3.4, not a subsection of this Operational Runbook itself.
+
+### Procedure 1: Standard post-campaign analysis run
+
+**When:** operator invokes the skill and the §2 gates (marketing-context check, workspace + entity detection, time-range confirmation, benchmark set confirmation) have all resolved. This is the entry point for every run.
+
+**Preconditions:** all four §2 gates satisfied. `get_active_workspace_info` has not yet been called — Procedure 1 owns that availability probe.
+
+**Steps:**
+
+1. **Availability check.** Call `get_active_workspace_info` on the §2 Gate 2 workspace (per §5 Phase 2 step 1). If the response workspace ID does not match the Gate 2 operator answer, stop and surface the mismatch verbatim — do NOT attempt partial analysis against the wrong workspace, and do NOT mutate workspace state (no `set_active_workspace` call). The operator fixes the pointer out-of-band and re-runs.
+2. **Phase 1 Hypothesis.** Prompt the operator via `AskUserQuestion` for 1–3 expectations, one question per expectation (BC-5761 one-question-per-field rule). Record verbatim so Phase 3 can label each CONFIRMED / PARTIAL / REJECTED against actual data. If the operator skips this step, refuse to continue — §3.2 Phase 1 is a hard gate with no degrade path.
+3. **Run Procedure 4** to lock the benchmark set (b2b vs b2c per workspace) before Phase 3. Procedure 4 must complete before step 5 begins.
+4. **Phase 2 Data Collection.** Execute §5 Phase 2 steps 1–7 in sequence: availability check (already done in step 1 — skip if same workspace) → `list_workspace_stats` → `list_campaigns` + client-side date filter → `get_campaign_stats` per campaign → `get_leads_analytics` → `list_sender_emails` → `get_replies_analytics`. Apply the §3.2 Phase 2 statistical-significance floor: if the window returns < 500 sent OR < 7 days, flag the run as sub-floor and proceed — every Phase 4 verdict will auto-map to `TEST MORE` regardless of raw metric values.
+5. **Phase 3 Analysis.** Rank all Phase-2-returned campaigns by Interested Rate descending. Compute per-variable attribution for the top 2 and bottom 2 using the §3.1 5 Core Variables (orthogonality rule applies — each attribution resolves to exactly one variable). Build the Google-vs-Microsoft, weekday-vs-weekend, and title-seniority cohort comparisons. Flag any 2x+ differential with comparable volume as a hard signal. Label each Phase 1 hypothesis CONFIRMED / PARTIAL / REJECTED against the data. If any Phase 3 finding meets the Procedure 2 trigger criteria, run Procedure 2 before step 6.
+6. **Phase 4 Recommendations.** Assign each campaign a §3.5 verdict (`TOP PERFORMER`, `SCALE`, `TEST MORE`, `MONITOR`, `UNDERPERFORM`) via the assignment key. If the run is sub-floor (per step 4), force all verdicts to `TEST MORE`. Optionally run Salesforce `run_soql_query` for pipeline attribution per §5 Phase 4 step 2 — skip if the Salesforce MCP is unavailable or if `Campaign_Source__c` is missing from the org schema (note "attribution skipped" in the report).
+7. **Write the report artifact.** Render all 6 §3.4 sections to `docs/campaigns/{entity}/analysis-{campaign-name}-{YYYY-MM-DD}.md`. Use `{entity}` = `brite-nites` | `brite-supply` | `brite-labs` per §2 Gate 2. Use today's UTC date for `{YYYY-MM-DD}`. Do not omit any of the 6 sections unless the run was sub-floor (in which case degrade to a `TEST MORE` stub per §3.4).
+8. **Mandatory campaign-debrief handoff.** End the run with the §4 Cross-skill boundaries handoff clause verbatim: *"Analysis complete. To capture these learnings so they compound into future campaigns, run the campaign debrief workflow."* The run is not complete until the operator confirms the handoff.
+
+**Error handling:**
+
+- **Step 1 availability failure** → stop and report the server name + a pointer to `/marketing:setup-email-bison`. Do not attempt partial analysis.
+- **Step 1 workspace mismatch** → stop and surface to operator. Procedure 1 does NOT mutate workspace state; operator fixes the pointer out-of-band and re-runs.
+- **Step 2 hypothesis skip** → refuse to continue. No degrade path per §3.2 Phase 1 hard gate. This is the single hardest gate in the skill.
+- **Step 4 sub-floor (< 500 sent OR < 7 days)** → proceed with the run, flag as sub-floor in the report header, force all Phase 6 verdicts to `TEST MORE`. Do not refuse; small samples are analyzable, just not verdict-definitive.
+- **Step 4 Phase 2 mid-iteration failure** (permission error, empty campaign list) → stop and report; do not attempt Phase 3 on partial data.
+- **Step 6 Salesforce unavailable** → skip pipeline attribution, note "attribution skipped — SF unavailable" in §6 §6 Next Iteration Recommendations.
+- **Step 6 `Campaign_Source__c` missing** → skip pipeline attribution, note "attribution skipped — custom field missing" in the report (BC-5797 factual-anchor rule: verify field existence before running a query that assumes it).
+- **Step 8 operator declines handoff** → note declination in the run log and exit; the report artifact itself is still valid and readable.
+
+**Handoff:** MANDATORY → BC-5830 campaign-debrief (step 8). On operator confirmation, the skill transitions to campaign-debrief with the report path as input. Phase 4 — and Procedure 1 — is not complete until handoff is confirmed.
+
+### Procedure 2: Infrastructure-triggered deliverability-audit handoff
+
+**When:** during Procedure 1 Phase 3 Analysis (step 5), the Infrastructure variable surfaces as the dominant attribution for at least one underperformer. The signal cluster is specific.
+
+**Preconditions:** Procedure 1 has completed at least through step 5. At least one of the following Infrastructure signals must be present:
+
+- Bounce Rate in the §3.3 Critical band (> 5%) for any ranked campaign, OR
+- A 2x+ differential between Google Workspace senders and Microsoft 365 senders on Reply Rate with comparable volume (both cohorts ≥ 100 sent), OR
+- Spam-complaint signals surfaced in §6 §3 Infrastructure Analysis (any non-zero spam-complaint count).
+
+**Steps:**
+
+1. **Surface the Infrastructure attribution** explicitly in the report's §6 §3 Infrastructure Analysis and §6 §5 Attribution Analysis — name the triggering signal verbatim (e.g., "Bounce Rate 7.2% — Critical band" or "Google cohort 2.4x Microsoft on Reply Rate, comparable volume ≥ 100 sent each").
+2. **Prompt the operator** via `AskUserQuestion`: *"Infrastructure signal detected: {triggering signal}. This looks like a deliverability issue. Hand off to deliverability-audit (BC-2719) for SPF/DKIM/DMARC + reputation investigation?"* Offer two options: "Yes, hand off" / "No, continue without".
+3. **On operator confirmation,** hand off to BC-2719 with the triggering signal + affected sender IDs + the bounce/reply cohort data as input.
+4. **On operator decline,** continue Procedure 1 normally from step 6. Note the declination + the signal in the run log so the next analysis run has precedent.
+
+**Error handling:**
+
+- **No Infrastructure signal detected** → Procedure 2 does not fire. This is the correct no-op path, not an error.
+- **Multiple Infrastructure signals simultaneously** → surface all of them in step 1; a single handoff prompt covers all signals.
+- **BC-2719 skill not installed** → note "deliverability-audit skill not installed — manual deliverability review recommended" in the report's §6 §6 Next Iteration Recommendations, continue Procedure 1 normally.
+
+**Handoff:** CONDITIONAL → BC-2719 deliverability-audit (step 3). Fires at most once per analysis run.
+
+### Procedure 3: MSPA ITERATE-mode trigger on request
+
+**When:** after Procedure 1 completes (report artifact written, handoff prompt delivered), the operator asks a follow-up question about what to test next within the same session.
+
+**Preconditions:** Procedure 1 has completed through step 8. The operator asks a variant of "what should we test next?" / "what's the next hypothesis?" / "what should we iterate on?"
+
+**Steps:**
+
+1. **Confirm the report is non-sub-floor.** If the Procedure 1 run was sub-floor (all verdicts forced to `TEST MORE`), tell the operator: *"The analysis window didn't reach the statistical-significance floor (500 sent AND 7 days). Run a longer window before iterating — MSPA needs non-`TEST MORE` verdicts to feed ITERATE mode."* Refuse handoff.
+2. **Extract the §6 §6 Next Iteration Recommendations** from the Procedure 1 report artifact — specifically the `SCALE` and `TEST MORE` rows. The observational `TOP PERFORMER` and `MONITOR` rows are not iteration hypotheses; the `UNDERPERFORM` rows are kill decisions, not iterations.
+3. **Hand off to BC-5829 in ITERATE mode** with the extracted `SCALE` + `TEST MORE` recommendations as input hypotheses. MSPA ITERATE owns test design from here; this skill does NOT design tests.
+
+**Error handling:**
+
+- **Sub-floor run (step 1 refuses)** → tell operator to re-run analysis with a larger window first. Do not proceed to handoff.
+- **No `SCALE` or `TEST MORE` rows** (edge case: all verdicts `TOP PERFORMER` / `MONITOR` / `UNDERPERFORM`) → tell operator: *"Nothing to iterate on — top performers need no change, underperformers need kill decisions via `campaign-orchestration`, not test iteration."*
+- **BC-5829 skill not installed** → surface the extracted recommendations verbatim in chat, tell operator to run MSPA manually when the skill is available.
+
+**Handoff:** ON-REQUEST → BC-5829 message-market-fit (step 3), ITERATE mode only.
+
+### Procedure 4: Per-entity benchmark switch
+
+**When:** before Procedure 1 Phase 3 Analysis runs — the benchmark set must be locked so verdict mapping in Procedure 1 step 6 has a scoreboard to compare against. Procedure 1 step 3 invokes this procedure.
+
+**Preconditions:** §2 Gate 2 has resolved (workspace + entity detected). §2 Gate 4 (benchmark set confirmation) has surfaced to the operator but not yet accepted.
+
+**Steps:**
+
+1. **Mechanical lookup.** If the detected workspace is `emailbison-b2b`, select the §3.3 b2b benchmark table (Reply > 1% Healthy / Interested > 25% of replies Healthy / Bounce < 3% Healthy). If the detected workspace is `emailbison-personal`, select the §4 b2c benchmark table (Reply > 0.5% / Interested > 15% of replies / Bounce < 3%).
+2. **Surface to operator** via §2 Gate 4's confirmation prompt, with the numeric thresholds rendered inline so the operator sees exactly what will be applied.
+3. **Record any override.** If the operator overrides a threshold for a justified reason (seasonal dip, deliverability incident window, freshly-warmed inbox pool), capture threshold name + new value + operator's stated reason. This goes into the report's §6 §1 Quick Health Check so the next analysis run has the precedent.
+4. **Lock the benchmark set** for the rest of Procedure 1. Every §3.3 comparison and every §3.5 verdict assignment in Procedure 1 step 6 reads from this locked set.
+5. **If the workspace is `emailbison-personal`,** attach the "b2c benchmarks uncalibrated — initial targets" footer to the report's §6 §1 Quick Health Check per §4's calibration caveat. Procedure 4 owns attaching this footer; the report template does not add it automatically.
+
+**Error handling:**
+
+- **Workspace not detected (§2 Gate 2 unresolved)** → Procedure 4 does not run. Procedure 1 is blocked at step 3 until §2 Gate 2 resolves.
+- **Operator overrides without a reason** → prompt for reason via `AskUserQuestion`; do not accept blank overrides. Future analysis runs need the reason to calibrate the threshold.
+- **Both workspaces selected (shouldn't happen)** → stop and re-invoke §2 Gate 2 detection. The skill analyzes ONE workspace per run (per §2's "workspace + entity detection" rule).
+
+**Handoff:** internal to Procedure 1. Not a cross-skill handoff.
 
 ---
 
