@@ -776,6 +776,21 @@ else:
     warn "No files with step sequences found"
   fi
 
+  # ── Cadence Gate-Respect (BC-5866) ──────────────────────────────
+  if [ "$plugin_name" = "cadence" ]; then
+    section "12.5 Cadence Gate-Respect ($plugin_name)"
+
+    gate_result=$(python3 "$REPO_ROOT/scripts/_lib/lint_cadence_gates.py" "$PLUGIN_ROOT" 2>&1)
+
+    while IFS= read -r line; do
+      if [[ "$line" == OK:* ]]; then
+        pass "${line#OK:}"
+      elif [[ "$line" == ERROR:* ]]; then
+        fail "${line#ERROR:}"
+      fi
+    done <<< "$gate_result"
+  fi
+
   # ── Trait Definition Validation ────────────────────────────────
   section "13b. Trait Definition Validation ($plugin_name)"
 

@@ -18,6 +18,8 @@ Call `mcp__plugin_workflows_linear-server__list_projects` with `limit: 1`. On su
 
 ### 0.2 Current cycle detection
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change. -->
+
 Call `mcp__plugin_workflows_linear-server__list_cycles` with `type: "current"` scoped to the Brite Company team (`teamId` required per BC-5757 § 2.3 — cycle queries need the UUID, not the team name). Extract the cycle `name`, `startsAt`, `endsAt`. Present via `AskUserQuestion`:
 
 > Current cycle appears to be **W##** (`<startsAt>` to `<endsAt>`). Is this the week you want to plan?
@@ -25,6 +27,9 @@ Call `mcp__plugin_workflows_linear-server__list_cycles` with `type: "current"` s
 Options: (Recommended) "Yes, plan W##"; "Use a different cycle" (free-text); "Cancel".
 
 ### 0.3 Active project count echo
+
+<!-- gate-respect: honor user pick; re-prompt before any behavior change. -->
+
 
 Call `mcp__plugin_workflows_linear-server__list_projects` with pagination (the `state: "started"` + team filter returns empty — list all and filter client-side per BC-5757 § 2.3). Filter to `status.type == "started"`. For each selected project, store `{id, name, status, owner: project.lead.name || null}` in `state.projects[]` — `owner` is the Linear project lead's display name (null if the project has no lead), consumed by Phase 4's narrative-writer Sprint Plans cards. Echo the count and top 5 by `updatedAt`:
 
@@ -95,6 +100,8 @@ Any failing artifact check downgrades that phase and every later phase back to p
 
 ### 0.5.3 Resume prompt
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — the Resume / Restart / Cancel pick is load-bearing for state management. Never self-downgrade to "Restart" when the user picked "Resume" or vice versa. -->
+
 If `completed_phases` is non-empty after validation, `AskUserQuestion`:
 
 > *"Prior /cadence:weekly run for W<NN> found. Completed phases: <list>. Resume at <current_phase>?"*
@@ -138,6 +145,10 @@ Three `AskUserQuestion` gates, per BC-5810 § 1:
 - **Gate #3** — inside Phase 4 narrative (§ 4.4): show draft + voice-check violations, user approves file + PDF write.
 
 Phase 2 has no gate (falls straight into Phase 3 preview). Phase 5 is un-gated — see `plugins/cadence/CLAUDE.md` § Gotchas for rationale. Gates use the `AskUserQuestion` convention — first option wins `(Recommended)`, "Other" is the escape hatch.
+
+## Gate-respect
+
+Every multi-option `AskUserQuestion` in this command — cycle confirmation (§ 0.2), project-count subset prompt (§ 0.3), resume menu (§ 0.5.3), Gate #1 (§ 1.7), Phase 2 enricher dispatch-error prompt (§ 2), Phase 3 preflight dispatch-error prompt (§ 3), Gate #3 narrative approval (§ 4.4), PDF-export fallback prompt (§ 4.5) — is bound by the [gate-respect contract](../skills/_shared/gate-respect.md). Once the planner picks an option, execute exactly that option. If any downstream step wants to deviate, re-prompt via a new `AskUserQuestion`. Mentions in the phase-state breadcrumb, the dogfood-notes, or the housekeeping log do NOT constitute user authorization. Origin: BC-5866 (W17 dogfood class-bug fix).
 
 ## Session State Object
 
@@ -273,6 +284,8 @@ Do not batch projects into categories. Surface every project, even ones with zer
 
 ### 1.7 Gate #1
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change. -->
+
 Call `AskUserQuestion`:
 
 > *"Audit complete. <N> projects audited, <shipped_total> shipped, <carry_over_total> carrying over. Proceed to Phase 2 scope?"*
@@ -285,6 +298,8 @@ Options:
 
 ## Phase 2: Scope
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to the enricher dispatch-error AskUserQuestion (Retry / Pause / Proceed-without-enrichment) and to every CQ/SQ prompt inside the dispatched sprint-scoping skill. Never silent fallback to "Proceed without enrichment" when the user did not pick it. -->
+
 **Pre-loop enricher dispatch (BC-5902).** Before entering the per-project scope loop, the command dispatches `project-enricher` in a single `Agent` tool-call message covering every project with `status.type == "started"` (cap 10 concurrent, batched sequentially in groups of 10 if project count > 10 — mirrors Phase 1 § 1.2 Dispatch). Parsed outputs populate `state.projects[i]._enrichment` keyed by project id before any SQ/CQ question runs. On any `_enrichment.dispatch_error` non-null, the command surfaces `AskUserQuestion` (Retry / Pause / Proceed-without-enrichment per BC-5896 AC) before falling into the skill. The skill reads `_enrichment` as pre-dispatched input and never calls `list_issues` or `workflows:brainstorming` inline (BC-5902 hybrid-dispatch pattern — see `docs/designs/cadence-orchestration.md § 2.5`).
 
 Sequential per-project loop. Implemented by the `sprint-scoping` skill (`plugins/cadence/skills/sprint-scoping/SKILL.md`, BC-5760). For each project, the skill reads the Phase 1 audit card plus the pre-dispatched `state.projects[i]._enrichment` (per the enricher paragraph above — BC-5902), runs the BC-5810 § 2 interview (5 carry-over Qs + 5 scope Qs, one at a time via separate `AskUserQuestion` calls) iterating the carry-over block per issue (BC-5897), enforces the `cadence:issue-quality-gate` with block-with-override (BC-5810 § 3), and appends a project block to the weekly-planning checkpoint as decisions accumulate. SQ2's `(Recommended)` default is drawn from `_enrichment.brainstorming_ranked[rank=1]` (BC-5867 absorbed — no inline `workflows:brainstorming` Skill call). Inline (not subagent) — interactive Q&A cannot run inside a dispatched agent.
@@ -296,6 +311,8 @@ Phase 2 is idempotent — re-invoking after a partial session resumes from the n
 The deferred prior-narrative parser (needed for `state.cross_project_stats.unplanned_ratio`) lands in a sibling Cadence-milestone follow-up tracked as BC-5821.
 
 ## Phase 3: Housekeeping
+
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to the preflight dispatch-error AskUserQuestion (Retry / Pause / Execute-without-preflight) and to every per-group approval prompt inside the dispatched linear-housekeeping skill. Execute-without-preflight is an explicit spec-departure and requires an explicit user pick. -->
 
 **Pre-preview preflight dispatch (BC-5902).** After `linear-housekeeping` derives `state.mutations[]` in § 2, the command dispatches `housekeeping-preflight` once via the `Agent` tool with prompt body `{cycle.current, team_id, mutation_rows: <cycle-path slice>, overrides: <flattened state.projects[].overrides[]>}`. Parsed `state._preflight_manifest` feeds § 4's gate-status derivation before any preview rendering or approval prompt. On `dispatch_error` non-null, `AskUserQuestion` halts before § 5 (Retry / Pause / Execute-without-preflight with explicit spec-departure flag per BC-5898 AC — no silent degradation path exists). On `row_errors[]` non-empty, partial-fetch failures are surfaced as a dedicated `## Preflight errors` group in § 5/§ 6 for per-row resolution.
 
@@ -377,6 +394,9 @@ The temp file is intentional: `state.narrative_draft` is a main-thread in-memory
 
 ### 4.4 Gate #3 — narrative approval
 
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — the Approve / Edit / Regenerate pick is load-bearing. Never silent-Edit after an Approve or silent-Regenerate after an Edit. Follow-up AskUserQuestions (edit guidance, regeneration guidance) are themselves gates; honor their picks identically. -->
+
+
 Render the preview block to the user:
 
 ```markdown
@@ -411,6 +431,9 @@ Output: `<WEEK_DIR>/w<NN>-sprint-narrative.pdf`
 No PDF export, no file write, no Phase 5 fires until Gate #3 returns Approve.
 
 ### 4.5 PDF export
+
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to the fallback AskUserQuestion (Confirmed / Skip / Retry primary). Never silent-Skip the PDF when the user picked Confirmed or Retry. -->
+
 
 **Primary path.** Shell out via Bash. Each Bash tool call runs in a separate subprocess per `memory/MEMORY.md` — re-derive `$WEEK_DIR` and `$WEEK_NN` at the top of every Bash block in Phase 4/5 (same pattern as Phase 3 § 7.1):
 
