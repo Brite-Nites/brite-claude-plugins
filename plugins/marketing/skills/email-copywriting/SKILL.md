@@ -76,6 +76,8 @@ Operator-facing: to make the email feel valuable, maximize the numerator (dream 
 
 Tier 1 (knowledge / helpful resource) skips the proof-point paragraph since the offer IS the proof. Tier 4 (risk reversal) makes the Effort + Sacrifice input the headline rather than the CTA.
 
+Full framework reference: `plugins/marketing/references/offer-design-frameworks.md` — Hormozi value equation origin + Brunson Value Ladder + Abraham strategic layer (Brite-originated synthesis).
+
 ### Offer tiers + entity-aware selection matrix
 
 Four tiers, adapted from Revgrowth 10. Each tier maps to a different CTA architecture, proof-point posture, and value-equation emphasis.
@@ -96,6 +98,8 @@ Four tiers, adapted from Revgrowth 10. Each tier maps to a different CTA archite
 | Labs | MEDIUM for capital-project signals (bond, master plan, capital campaign) | T3 (pilot) default; T4 when multi-year spend / committee-heavy | Experiential, capital, design-production | Municipalities, Universities (capital), Theme Parks, Botanical Gardens |
 
 The skill RECOMMENDS the tier from this matrix then confirms with the operator per D2.
+
+Per-vertical offer guidance: `plugins/marketing/references/vertical-playbooks/{vertical}.md` (produced by Phase 2 roadmap issues R-4 through R-9 — e.g. `zoos.md`, `hotels-resorts.md`, `ski-resorts.md`, `sports-stadiums.md`, `aquariums.md`, `casinos.md`).
 
 ### Recency waterfall (6-level hierarchy)
 
@@ -201,6 +205,7 @@ This section translates §3 Methodology into Brite's concrete stack — which to
 - **Does not own:** prospect research (that's `situation-mining`), sequence mechanics / inbox rotation / warmup (that's `campaign-orchestration`, BC-2718 shipped), launch execution (that's the `/marketing:launch-campaign` command, BC-5826, blocked by this skill), per-vertical preset file drafting beyond the 2 Municipalities seeds (that's BC-5879 / BC-5880 / BC-5881 — the Active / Exploring / Future tier fan-outs).
 - **Receives from:** `situation-mining` (situation artifact with `entity` + `vertical` + worldview rows + adjacent offering), `gtm-strategy` (optional messaging pillars when available).
 - **Hands off to:** `/marketing:launch-campaign` (BC-5826) via the JSON artifact at `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`. Also feeds `creative-angles` when the operator wants pattern-based variant angles on top of the base copy.
+- **Competitive positioning (read-only reference):** when drafting for experiential-lighting prospects (Municipalities / Labs / event-production verticals), consult `plugins/marketing/references/experiential-lighting-vendor-landscape.md` for adjacent-not-competitive framing of named vendors (Illuminate Lights, Vincent Lighting, FAD, AWS Audio Visual, MK Illumination) — the reference's "adjacent, not competitive" guard applies verbatim to body copy.
 
 ### JSON artifact schema
 
