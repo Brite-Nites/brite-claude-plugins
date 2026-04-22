@@ -55,7 +55,71 @@ Use `AskUserQuestion` to identify which campaign the debrief is about, by name. 
 
 ## Methodology
 
-<!-- TODO(BC-5830) §3 — Batch D (largest section). Subsections: §3 intro; 5-question debrief format with templates; 4-verdict rubric with entity-scoped threshold table (b2b vs b2c); tag scheme (4 families, lowercase-hyphenated); transferable-insight flagging (proposal-not-direct-write); append-only invariant (with carve-out for summary stats / what-works / what-doesn't sections that regenerate in place); vocabulary mapping across sibling skills. -->
+Three frameworks govern this skill. First, a **5-question debrief format** (Q1 hypothesis, Q2 result, Q3 what worked / didn't, Q4 surprise, Q5 transferable) that suggests answers from upstream data when present and defaults to operator-authored when not. Second, a **4-verdict objective rubric** (`SCALE` / `ITERATE` / `PAUSE` / `KILL`) assigned against entity-scoped numeric thresholds anchored to `campaign-analysis` §3.3 b2b and §4 b2c benchmarks — every verdict resolves by rule, never by prose. Third, an **append-only tagged learnings file** per entity, with four required tag families (`#entity` / `#vertical` / `#persona` / `#angle`) that make cross-entity and cross-angle search deterministic. Under-5-minute operator time is load-bearing: suggest first, ask only when auto-suggest fails, never re-prompt an answered field.
+
+### 5-question debrief format
+
+The five questions are fixed in order and format. Auto-suggest sources are named; operators confirm or override each suggestion, never compose from scratch when data is available.
+
+**Q1. What hypothesis did we test?** Fixed format: `"We hypothesized that {angle|segment|timing} would {expected outcome} because {reasoning}."` Auto-suggest from `analysis-*.md` §5 Attribution Analysis — the row tagged `Offer` / `Message` / `Segment` / `Infrastructure` / `Timing` for the focal campaign supplies the variable; the operator confirms the reasoning clause. Retroactive path: operator authors.
+
+**Q2. What was the result?** Fixed token plus one-line summary with the key metric. Tokens: `CONFIRMED` (hypothesis held), `PARTIAL` (partial hold with caveat), `REJECTED` (hypothesis did not hold). Auto-suggest from `analysis-*.md` §2 Segment Performance Ranking — the verdict column on the focal campaign row maps to the result token (`TOP PERFORMER` / `SCALE` → `CONFIRMED`; `MONITOR` / `TEST MORE` → `PARTIAL`; `UNDERPERFORM` → `REJECTED`). Retroactive path: operator authors after numeric-threshold check.
+
+**Q3. What worked and what didn't?** Two-bullet-pair structure. Separate signal from noise. Auto-suggest from `analysis-*.md` §5 Attribution Analysis top-2 rows for the `Worked` side; `Didn't` side operator-authored (failure attribution rarely surfaces cleanly in the artifact). Retroactive path: operator authors both sides.
+
+**Q4. What surprised us?** Operator-authored. No auto-suggest — surprise is by definition what the data did not predict. 1–3 bullets, unexpected findings only. This question is often the highest-value output of the debrief.
+
+**Q5. What's transferable?** Entity-specific vs cross-entity pattern. Auto-suggest from `analysis-*.md` §6 Next Iteration Recommendations. Tag for cross-entity propagation by setting `transferable: true` in the entry frontmatter. If the transferable flag is true, §6 Procedure 3 runs; if false, the entry is entity-specific only and the procedure chain halts after append.
+
+### 4-verdict rubric
+
+Verdicts resolve against entity-scoped numeric thresholds. Prose substitutes ("pretty good", "meh", "worth another shot") are refused by §8 Anti-Slop — every cell in the table below is objective.
+
+| Verdict | b2b rule (Supply, Labs) | b2c rule (Nites) | Action |
+|---|---|---|---|
+| `SCALE` | Reply Rate >1% **AND** Interested Rate >25% **AND** sent ≥500 | Reply Rate >0.5% **AND** Interested Rate >15% **AND** sent ≥500 | Expand volume + senders next cycle |
+| `ITERATE` | Mixed signals — one metric Healthy, one Attention, no Critical | Same pattern at softer b2c thresholds | Swap one variable (segment OR angle), keep on experiment side |
+| `PAUSE` | Bounce Rate in Attention band (3–5%) **OR** sub-floor run (<500 sent OR <7 days) | Same rules | Wait + re-measure; no strategy change |
+| `KILL` | Reply Rate <0.5% **AND** sent ≥500 **AND** days ≥7 | Reply Rate <0.25% **AND** sent ≥500 **AND** days ≥7 | Remove from matrix; log failure evidence in the entry's Q3 Didn't bullet |
+
+Entity scoping matches `campaign-analysis` §3.3 (b2b) and §4 (b2c) verbatim — never fabricate a threshold, and never apply a b2b rule to a Nites run or vice versa. The b2b-vs-b2c split is dispatched from the Gate 3 `{entity}` answer: `brite-nites` → b2c column; `brite-supply` / `brite-labs` → b2b column.
+
+**Sub-floor rule.** Any campaign with <500 sent OR <7 days elapsed resolves to `PAUSE` regardless of other metrics — the sample is too small to distinguish signal from noise, and statistical-significance floors match the `campaign-analysis` §1 Quick Health Check sub-floor header convention.
+
+### Tag scheme
+
+Every entry carries four required tag families, all lowercase-hyphenated. TitleCase, spaces, underscores, camelCase, or punctuation other than `/` and `-` are refused by §8 Anti-Slop.
+
+- **`#entity/{brite-nites|brite-supply|brite-labs}`** (required, exactly one per entry). Long-form slugs only, matching the Gate 3 `{entity}` validator. Short-form (`nites`/`supply`/`labs`) is refused.
+- **`#vertical/{v}`** (required, exactly one per entry). Examples: `#vertical/municipalities`, `#vertical/hoas`, `#vertical/commercial-real-estate`, `#vertical/venue-partnerships`. Match the vertical convention used elsewhere in the entity's campaigns directory for cross-run searchability.
+- **`#persona/{p}`** (required, exactly one per entry). Examples: `#persona/facilities-director`, `#persona/hoa-board-president`, `#persona/venue-operations-manager`. Persona granularity matches the `gtm-strategy` persona rollup for the entity.
+- **`#angle/{a}`** (required, exactly one per entry). Examples: `#angle/capital-expenditure-timing`, `#angle/shoulder-season-revenue`, `#angle/insurance-premium-offset`. If a `creative-angles` artifact seeded the campaign, the angle tag matches its slug; if operator-authored, slug the tagline.
+
+### Transferable-insight flagging
+
+The `transferable: true` flag signals that an insight crosses entity boundaries — e.g. an angle that worked on `brite-supply` is worth testing on `brite-labs`, or a segment lens from Nites generalizes to Supply. On transferable, the skill produces two conditional proposals; **neither writes directly**.
+
+1. **Marketing-context proposal** (conditional). `AskUserQuestion` surfaces the transferable insight to the operator: "Propose an update to `docs/marketing-context.md`?" On operator `Yes`, §6 Procedure 3 hands off to `/marketing:product-marketing-context` with the proposal payload; on `No`, the entry notes the skip. The skill does NOT edit `docs/marketing-context.md` directly — all edits route through the context-skill for provenance and review.
+2. **Handbook-drift signal** (conditional, rarer). When the transferable insight contradicts or supersedes documented handbook content, `AskUserQuestion` confirms the contradiction, then §6 Procedure 4 hands off to `/workflows:handbook-drift-check` with the learnings.md entry path plus the offending handbook anchor. On `No`, the entry notes the operator's justification.
+
+### Append-only invariant
+
+`docs/campaigns/{entity}/learnings.md` is append-only, forever. A later debrief that contradicts an earlier one is a new entry, not an overwrite. Re-running a debrief for the same campaign on a different `debrief_at` date produces a new entry (the prior entry stays). This mirrors `message-market-fit`'s matrix append-only rule — history is never rewritten.
+
+**Carve-out for auto-regenerated sections.** The file has four top-level sections defined by the §4 Brite Implementation template: `## Summary stats`, `## What works`, `## What doesn't`, and `## Campaign log`. The **Campaign log is strict-append** — entries are added in reverse-chronological order, never edited, never removed. The other three sections — `Summary stats`, `What works`, `What doesn't` — **regenerate in place** on each append: the skill recomputes the summary-stats counters, re-extracts the `What works` cross-entry pattern bullets (from entries where `verdict: SCALE` or `verdict: ITERATE` AND `transferable: true`), and re-extracts the `What doesn't` cross-entry failure bullets (from entries where `verdict: KILL`). The carve-out exists because the alternative — hand-editing those summaries on every debrief — breaks the under-5-minute constraint. The carve-out applies ONLY to those three sections; editing a Campaign-log entry is a §7 Rubric 1–3 hard failure.
+
+### Vocabulary mapping across sibling skills
+
+Three sibling skills use three verdict vocabularies. Only `SCALE` overlaps intentionally. The table below lets operators translate across skills when carrying a campaign through the lifecycle.
+
+| Concept | `campaign-analysis` (5 tokens) | `message-market-fit` (5 tokens) | `campaign-debrief` (4 tokens) |
+|---|---|---|---|
+| Best performer — expand | `TOP PERFORMER`, `SCALE` | `SUPER WORKS` | `SCALE` |
+| Worth keeping — tweak | `TEST MORE` | `KIND OF WORKS` | `ITERATE` |
+| Deferred — wait and re-measure | `MONITOR` | `DEFERRED`, `PENDING` | `PAUSE` |
+| Dead — remove | `UNDERPERFORM` | `DOESN'T WORK` | `KILL` |
+
+Three vocabularies exist because each skill owns a different decision surface: `campaign-analysis` reports per-segment performance; `message-market-fit` classifies experiments against a 5-category matrix; `campaign-debrief` captures a learning entry with a 4-verdict action rubric. Cross-skill translation is the operator's responsibility — the vocabulary mapping table above is the canonical source.
 
 ---
 
