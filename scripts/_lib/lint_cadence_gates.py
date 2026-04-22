@@ -88,8 +88,12 @@ FORBIDDEN_PHRASE_PATTERNS = [
 # authorization-of-phrase without over-engineering.
 FORBIDDEN_EXEMPT_PATTERNS = [
     re.compile(r'\*"[^"]*"\*'),  # italic-quoted example
+    # Negation cues marking the phrase as discussion, not authorization.
+    # Case-insensitive → no need to list "do NOT" as a separate alternation.
+    # "shortcut" / "W17 dogfood" deliberately omitted — too-loose exemption cues
+    # (see simplify-pass notes on BC-5864/BC-5865 review).
     re.compile(
-        r"\b(?:no|do not|do NOT|never|banned|forbidden|improvisation|shortcut|W17 dogfood)\b",
+        r"\b(?:no|do not|never|banned|forbidden|improvisation)\b",
         re.IGNORECASE,
     ),
 ]
@@ -150,12 +154,14 @@ def _is_call_site(line: str) -> bool:
     return True
 
 
-def _is_forbidden_exempt(line: str) -> bool:
-    """True iff a forbidden-phrase match on this line is a citation, not authorization.
+def _is_forbidden_citation(line: str) -> bool:
+    """True iff a forbidden-phrase hit on this line is a citation, not authorization.
 
-    Mirrors _is_call_site's intent-based filtering: a line that quotes the phrase
-    as an italic example (`*"..."*`) or explicitly negates it ("No ...", "never",
-    "banned", "forbidden", "improvisation") is discussing the phrase, not using it.
+    Per-bullet safety net: italic-quote (`*"..."*`) matches the same line as the
+    phrase inside a STOP bullet. Surrounding-prose safety net: negation cue
+    ("No", "Do not", "never", "banned", "forbidden", "improvisation") anywhere
+    on the line marks the mention as discussion. Both rules do real work — see
+    simplify-pass notes for the rationale against collapsing to one rule.
     """
     for exempt in FORBIDDEN_EXEMPT_PATTERNS:
         if exempt.search(line):
@@ -248,8 +254,9 @@ def _lint_file(path: Path, repo_root: Path) -> list[str]:
 
     # 1b. Scan every structured section for forbidden-phrase authorizations.
     # Fence/blockquote skip is inherited from _iter_active_lines. Per-line
-    # exemption (_is_forbidden_exempt) distinguishes STOP-block citations from
-    # authorizing prose.
+    # exemption (_is_forbidden_citation) distinguishes STOP-block citations from
+    # authorizing prose — evaluated lazily on first match so clean lines pay
+    # zero exempt-pattern regex cost.
     for title, start, end in sections:
         if title == "<preamble>":
             continue
@@ -257,14 +264,18 @@ def _lint_file(path: Path, repo_root: Path) -> list[str]:
             continue
         body_lines = lines[start + 1 : end]
         for i, line in _iter_active_lines(body_lines):
-            if _is_forbidden_exempt(line):
-                continue
+            line_exempt: bool | None = None  # computed on first forbidden-phrase hit
             for pattern, ticket in FORBIDDEN_PHRASE_PATTERNS:
                 m = pattern.search(line)
-                if m:
-                    forbidden_violations.append(
-                        (title, start + 1 + i + 1, m.group(0), ticket)
-                    )
+                if m is None:
+                    continue
+                if line_exempt is None:
+                    line_exempt = _is_forbidden_citation(line)
+                if line_exempt:
+                    break  # whole line is citation; skip remaining patterns
+                forbidden_violations.append(
+                    (title, start + 1 + i + 1, m.group(0), ticket)
+                )
 
     # 2. If this file has any AUQ in a structured section, header rule fires.
     if auq_sections_seen and not _has_top_of_file_gate_respect_header(sections, lines):
