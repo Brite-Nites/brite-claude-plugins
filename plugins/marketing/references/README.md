@@ -7,6 +7,7 @@ Shared reference library consumed by the Brite marketing plugin's skills. These 
 - `research-processes/` — 16 account-research query playbooks (C-suite, competitors, VP leadership, directors, founders, growth signals, hiring, job-role insights, negativity, news, people-creative, PR releases, profiles, reviews, specialist roles). Ported verbatim from the MIT-licensed upstream; search verbs use WebSearch.
 - `creative-thinking-models.md` — Five forcing functions (Inversion, Adjacent Transfer, Timing Arbitrage, Specificity Escalator, Ecosystem Gap Analysis) for generating non-obvious GTM angles. Upstream content + Brite-adapted worked examples for Municipalities and Universities.
 - `hidden-signals-library.md` — Industry-indexed table of asymmetric outbound signals. Upstream 10 industries + 3 Brite-entity tables (Municipalities, HOAs, Universities) tied to handbook-Active verticals.
+- `offer-design-frameworks.md` — Hormozi value equation, Brunson value ladder, Abraham risk-reversal, and B2B-outbound frontend/backend characteristics. Brite-originated; read by vertical playbooks and preset-composition issues to evaluate and design offers.
 - `shelf-life-patterns.md` — Five decay categories (Regulatory/Deadline, Competitive Move, Data Insight, Industry Pattern, Structural) for reasoning about signal timing.
 
 ## Expected consumers
@@ -18,6 +19,7 @@ Future Brite marketing skills will pull from this library:
 - `creative-angles` — creative-thinking-models
 - `tam-mapping` — hidden-signals-library industry tables
 - `campaign-debrief` — shelf-life-patterns for signal-decay attribution
+- `vertical-playbooks/*.md` + `email-copywriting/presets/*` — offer-design-frameworks (apply frontend/backend checklists when proposing or composing offers)
 
 ## Provenance
 
