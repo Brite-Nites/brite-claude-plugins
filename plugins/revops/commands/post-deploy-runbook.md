@@ -42,11 +42,11 @@ Ask via `AskUserQuestion`:
 
 - Question: `Which commit range holds the deploy you want to walk?`
 - Options:
-  - `HEAD~1..HEAD — just-deployed commit` — Phase 1.3 uses `git diff HEAD~1 HEAD --name-only`.
-  - `origin/main~5..origin/main — last 5 commits on main` — Phase 1.3 uses `git diff origin/main~5 origin/main --name-only`.
-  - `Custom range` — pick via Other; the user's input is the full range expression (e.g., `<sha-before-deploy>..<sha-at-deploy>`). Interpolate verbatim into `git diff <range> --name-only`.
+  - `Just-deployed commit (HEAD~1..HEAD)` — Phase 1.3 uses `git diff HEAD~1 HEAD --name-only`.
+  - `Last 5 commits on main (origin/main~5..origin/main)` — Phase 1.3 uses `git diff origin/main~5 origin/main --name-only`.
+  - `Custom range — enter your own git range expression` — user enters the range via the Other free-text field (e.g., `<sha-before-deploy>..<sha-at-deploy>`); interpolate verbatim into `git diff <range> --name-only`.
 
-The default recommendation is `HEAD~1..HEAD`.
+The default recommendation is `Just-deployed commit (HEAD~1..HEAD)`.
 
 ### 1.3 Run diff + classify
 
@@ -63,11 +63,17 @@ If the command exits non-zero, print the raw stderr and **halt** with:
 On success, classify each touched path against four detection regexes (set a boolean flag for each):
 
 - `^force-app/.*/flows/.*\.flow-meta\.xml$` → `needs_flow_activation = true`
-- `^force-app/.*/classes/.*(Scheduler|Scheduled).*\.cls(-meta\.xml)?$` → `needs_scheduled_apex_reschedule = true`
+- `^force-app/.*/classes/.*(Scheduler|Scheduled).*\.cls(-meta\.xml)?$` **and** the filename does NOT end in `Test.cls` or `Test.cls-meta.xml` → `needs_scheduled_apex_reschedule = true`. Test classes (e.g., `UserSchedulerTest.cls`) match the base regex but are never schedulable jobs — exclude them explicitly. This is a surface-heuristic match: true correctness requires checking `implements Schedulable` in the source, which is out of scope.
 - `^force-app/.*/namedCredentials/.*\.namedCredential-meta\.xml$` → `needs_named_credential_update = true`
-- `^force-app/.*/objects/(Account|Contact|Lead|Opportunity|Case|Task|Event|User)/fields/.*\.field-meta\.xml$` **and** the file contains `<type>Picklist</type>` → `needs_kanban_flush = true` *(standard-object picklist only — custom objects don't have the Kanban Group By cache bug per `brite-salesforce/CLAUDE.md` §Metadata Authoring)*.
+- `^force-app/.*/objects/(?<object>[^/]+)/fields/.*\.field-meta\.xml$` where `<object>` does NOT end in `__c` **and** the file contains `<type>Picklist</type>` or `<type>MultiselectPicklist</type>` → `needs_kanban_flush = true` *(the Kanban Group By cache bug only affects standard objects; custom objects ending in `__c` don't have the bug per `brite-salesforce/CLAUDE.md` §Metadata Authoring. MultiselectPicklist has the same cache behavior as Picklist)*.
 
-For the Kanban regex, after the path match, additionally run `grep -l "<type>Picklist</type>" <path>` to confirm the field type before setting the flag. Text / Number / Date fields on standard objects are not affected.
+For the Kanban regex, run one batched grep across all candidate paths at once to confirm the field type — avoid spawning a subprocess per file:
+
+```bash
+grep -lE "<type>(Picklist|MultiselectPicklist)</type>" <path1> <path2> ...
+```
+
+The output is the subset of paths that actually contain a Picklist or MultiselectPicklist field. Text / Number / Date fields on standard objects are not affected and will not appear in the output.
 
 ### 1.4 All-false fast-exit
 
@@ -90,8 +96,6 @@ Narrate: `Phase 1/6: Diff-based detection... done`
 ---
 
 ## Phase 2 — Flow activation *(conditional on `needs_flow_activation`)*
-
-Skip this phase entirely if `needs_flow_activation` is false — narration, listing, and gate all skipped. Phase 6 will report it as `N/A — not detected`.
 
 Narrate: `Phase 2/6: Flow activation...`
 
@@ -122,8 +126,12 @@ Ask via `AskUserQuestion`:
 - Question: `Flow activation — completed all {N} Flows?` (substitute `{N}` with the count from 2.1)
 - Options:
   - `All activated` — mark phase status `completed`. Proceed.
-  - `Skip — will do later` — mark phase status `skipped`. Proceed. Phase 6 will surface this as a follow-up.
-  - `Need help` — print extended guidance: *"If you don't see the Flow in the list, confirm the deploy landed via `Setup → Deployment Status` in the target org. If the Flow shows Draft and you're certain you activated it, refresh the page — the list is cached. The Active/Draft toggle is on the Flow detail page, not in the list view."* Then **repeat this question** until the user selects `All activated` or `Skip`.
+  - `Skip — will do later` — mark phase status `skipped`. Proceed (Phase 6 surfaces as follow-up).
+  - `Need help` — see below.
+
+If the user selects `Need help`, print this guidance verbatim then re-ask the question (do not advance):
+
+> If you don't see the Flow in the list, confirm the deploy landed via `Setup → Deployment Status` in the target org. If the Flow shows Draft and you're certain you activated it, refresh the page — the list is cached. The Active/Draft toggle is on the Flow detail page, not in the list view.
 
 Narrate: `Phase 2/6: Flow activation... done`
 
@@ -131,13 +139,11 @@ Narrate: `Phase 2/6: Flow activation... done`
 
 ## Phase 3 — Scheduled Apex re-schedule *(conditional on `needs_scheduled_apex_reschedule`)*
 
-Skip this phase entirely if `needs_scheduled_apex_reschedule` is false. Phase 6 will report it as `N/A — not detected`.
-
 Narrate: `Phase 3/6: Scheduled Apex re-schedule...`
 
 ### 3.1 List affected Schedulers
 
-From the Phase 1.3 diff output, filter paths matching `classes/.*(Scheduler|Scheduled).*\.cls`. Extract the class name from the filename (strip `.cls` and any `-meta.xml` suffix). De-duplicate. Print:
+From the Phase 1.3 diff output, filter paths matching `classes/.*(Scheduler|Scheduled).*\.cls(-meta\.xml)?$` **and** NOT ending in `Test.cls` or `Test.cls-meta.xml` (apply the same Test-exclusion as Phase 1.3 — test classes match the name pattern but aren't schedulable). Extract the class name from the filename (strip `.cls-meta.xml` or `.cls` suffix). Since each class ships a paired source + metadata file, de-duplicate by base name — and this listing must remain non-empty when `needs_scheduled_apex_reschedule` is true, including the edge case where only the `.cls-meta.xml` is in the diff (metadata-only API-version bump). Print:
 
 > The following Scheduled Apex classes were deployed. Per `brite-salesforce/CLAUDE.md` §Apex & Automation, CronTrigger rows do not survive a deploy that replaces the class, and do not survive sandbox refresh. Re-schedule each one manually.
 >
@@ -175,8 +181,12 @@ Ask via `AskUserQuestion`:
 - Question: `Scheduled Apex re-schedule — completed all {N} classes?` (substitute `{N}` with the count from 3.1)
 - Options:
   - `All scheduled` — mark phase status `completed`. Proceed.
-  - `Skip — will do later` — mark phase status `skipped`. Proceed.
-  - `Need help` — print: *"If you get `System.AsyncException: An instance of the scheduled class has already been scheduled with this name`, the prior job still exists — abort it first via `Setup → Apex Jobs → Scheduled Jobs → <row> → Del`, then re-run `System.schedule`. If you need the prior cron and don't have it, the target org's `CronTrigger` table has it (pre-redeploy)."* Then **repeat this question**.
+  - `Skip — will do later` — mark phase status `skipped`. Proceed (Phase 6 surfaces as follow-up).
+  - `Need help` — see below.
+
+If the user selects `Need help`, print this guidance verbatim then re-ask the question (do not advance):
+
+> If you get `System.AsyncException: An instance of the scheduled class has already been scheduled with this name`, the prior job still exists — abort it first via `Setup → Apex Jobs → Scheduled Jobs → <row> → Del`, then re-run `System.schedule`. If you need the prior cron and don't have it, the target org's `CronTrigger` table has it (pre-redeploy — query `SELECT Id, CronJobDetail.Name, CronExpression, State FROM CronTrigger WHERE State = 'WAITING'`).
 
 Narrate: `Phase 3/6: Scheduled Apex re-schedule... done`
 
@@ -184,19 +194,17 @@ Narrate: `Phase 3/6: Scheduled Apex re-schedule... done`
 
 ## Phase 4 — Named Credential URL update *(conditional on `needs_named_credential_update`)*
 
-Skip this phase entirely if `needs_named_credential_update` is false. Phase 6 will report it as `N/A — not detected`.
-
 Narrate: `Phase 4/6: Named Credential URL update...`
 
 ### 4.1 List affected Named Credentials
 
-From the Phase 1.3 diff output, filter paths matching `namedCredentials/.*\.namedCredential-meta\.xml`. Extract the Named Credential name from the filename. For each, run:
+From the Phase 1.3 diff output, filter paths matching `namedCredentials/.*\.namedCredential-meta\.xml`. Extract the Named Credential name from the filename. Surface the PLACEHOLDER value in each file via one batched grep across all NC paths (not one invocation per NC):
 
 ```bash
-grep -E "<url>|<endpoint>" <path>
+grep -HE "<endpoint>" <path1> <path2> ...
 ```
 
-to surface the PLACEHOLDER value in source (Brite convention per `brite-salesforce/CLAUDE.md` §Deploy & Retrieve — Named Credential XMLs ship with `PLACEHOLDER` or similar sentinel URLs so real URLs stay out of source control).
+The `-H` flag forces filename-prefixing so per-NC attribution is preserved when multiple NCs are in the diff. Classic NamedCredential XML uses `<endpoint>`; if a file returns no match, it's a modern NamedCredential that references an `ExternalCredential` — in that case the endpoint lives in the paired `.externalCredential-meta.xml` instead, and the NamedCredential XML itself carries no URL to update. Surface the PLACEHOLDER value to the user so they know what to replace (Brite convention per `brite-salesforce/CLAUDE.md` §Deploy & Retrieve — Named Credential XMLs ship with `PLACEHOLDER` or similar sentinel URLs so real URLs stay out of source control).
 
 Print the list:
 
@@ -223,16 +231,18 @@ Ask via `AskUserQuestion`:
 - Question: `Named Credential URL update — completed all {N} credentials across all target orgs?` (substitute `{N}` with the count from 4.1)
 - Options:
   - `All URLs updated` — mark phase status `completed`. Proceed.
-  - `Skip — will do later` — mark phase status `skipped`. Proceed.
-  - `Need help` — print: *"If callouts fail with `Invalid URL` or auth errors right after deploy, this is almost always the cause. Check the current URL via the Setup UI or via `SELECT Id, DeveloperName, Endpoint FROM NamedCredential` in Tooling API. If the URL still reads PLACEHOLDER, the update didn't save — retry the Edit flow."* Then **repeat this question**.
+  - `Skip — will do later` — mark phase status `skipped`. Proceed (Phase 6 surfaces as follow-up).
+  - `Need help` — see below.
+
+If the user selects `Need help`, print this guidance verbatim then re-ask the question (do not advance):
+
+> If callouts fail with `Invalid URL` or auth errors right after deploy, this is almost always the cause. Check the current URL via the Setup UI or via `SELECT Id, DeveloperName, Endpoint FROM NamedCredential` in Tooling API. If the URL still reads PLACEHOLDER, the update didn't save — retry the Edit flow.
 
 Narrate: `Phase 4/6: Named Credential URL update... done`
 
 ---
 
 ## Phase 5 — Kanban Group By cache flush *(conditional on `needs_kanban_flush`)*
-
-Skip this phase entirely if `needs_kanban_flush` is false. Phase 6 will report it as `N/A — not detected`.
 
 Narrate: `Phase 5/6: Kanban Group By cache flush...`
 
@@ -263,8 +273,12 @@ Ask via `AskUserQuestion`:
 - Question: `Kanban Group By cache flush — completed for all {N} fields?` (substitute `{N}` with the count from 5.1)
 - Options:
   - `Flushed` — mark phase status `completed`. Proceed.
-  - `Skip — will do later` — mark phase status `skipped`. Proceed.
-  - `Need help` — print: *"Verify the flush worked by opening a Kanban view on the affected object and checking that the new field appears in the Group By dropdown. If it doesn't, the layout redeploy didn't trigger the cache invalidation — try editing a different layout, or save-and-close any page in Lightning App Builder."* Then **repeat this question**.
+  - `Skip — will do later` — mark phase status `skipped`. Proceed (Phase 6 surfaces as follow-up).
+  - `Need help` — see below.
+
+If the user selects `Need help`, print this guidance verbatim then re-ask the question (do not advance):
+
+> Verify the flush worked by opening a Kanban view on the affected object and checking that the new field appears in the Group By dropdown. If it doesn't, the layout redeploy didn't trigger the cache invalidation — try editing a different layout, or save-and-close any page in Lightning App Builder.
 
 Narrate: `Phase 5/6: Kanban Group By cache flush... done`
 
@@ -304,7 +318,7 @@ Narrate: `Phase 6/6: Completion summary... done`
 - **This command issues ZERO `sf` CLI mutations.** It is a read-only walkthrough of user-performed manual steps. Every mutating action is executed by the user in their browser / IDE / Developer Console; the command narrates, detects, and gates.
 - **Never skip a gate silently.** Every `AskUserQuestion` halt path must halt — no silent continuation. `Skip` answers explicitly advance the phase but get surfaced as follow-ups in Phase 6.
 - **`sf`, not `sfdx`.** Any CLI invocations (e.g., the `sf apex run` example in Phase 3.2 guidance) use `sf`. Legacy `sfdx` subcommands are deprecated per `brite-salesforce/CLAUDE.md`.
-- **No auto-retries.** If Phase 1's `git diff` invocation fails, print the raw error and halt — never silently retry with a different range. If a `grep` call in Phase 1.3 (Kanban secondary check) or Phase 4.1 (PLACEHOLDER surface) fails, surface the raw error.
+- **No auto-retries.** If Phase 1's `git diff` invocation fails (non-zero exit), print the raw error and halt — never silently retry with a different range. If a `grep` call in Phase 1.3 (Kanban secondary check) or Phase 4.1 (PLACEHOLDER surface) **errors (exit ≥ 2** — real fault like unreadable file, bad regex, permission denied), surface the raw error and halt. Exit 1 (no match found) is a legitimate outcome at both grep sites — it means the candidate paths had no Picklist/MultiselectPicklist (Phase 1.3) or the NC is a modern ExternalCredential-backed one with no `<endpoint>` (Phase 4.1) — and is handled by body-phase logic, not treated as failure.
 - **Org-agnostic.** Unlike `/revops:deploy-sandbox` and `/revops:deploy-prod`, this command does not pin a target org. The user invokes it after deploying to whichever org the manual steps apply to; the command shows paths for both sandbox and prod where relevant (e.g., Phase 4), but issues no org-specific calls itself.
 - **No Linear mutations.** Skip follow-ups surface as narrated reminders only; the user creates Linear sub-issues manually if tracking is needed. This preserves the Phase 2 template contract (allowed-tools = `Bash, AskUserQuestion`) inherited from `/revops:deploy-sandbox` (BC-5790) and `/revops:deploy-prod` (BC-5791).
 - **Conditional phases compile cleanly.** When Phase 1 detection flags a phase as not-applicable, the entire phase block (narration + listing + gate) is skipped — no "N/A" inline noise. The only place `N/A — not detected` appears is the Phase 6 summary matrix.

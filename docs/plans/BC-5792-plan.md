@@ -154,7 +154,7 @@ The Rules block goes directly after the `# /revops:post-deploy-runbook` heading 
    - T5 — no-op deploy (CSS-only) → Phase 6 fast-exit, no empty-checklist walk.
    - T6 — user answers Skip → Phase 6 surfaces follow-up.
    - T7 — non-SFDX cwd → halts at Phase 1.1.
-   - **T8 — `grep -c "AskUserQuestion" plugins/revops/commands/post-deploy-runbook.md` ≥ 4** — one per Phase 2-5 gate, plus Phase 1.2 commit-range gate. Expected count: **5**.
+   - **T8 — `grep -c "AskUserQuestion" plugins/revops/commands/post-deploy-runbook.md` ≥ 4** — `grep -c` counts matching lines. Expected matches: one per Phase 2-5 gate + Phase 1.2 commit-range gate + the frontmatter `allowed-tools: Bash, AskUserQuestion` declaration. With simplify-pass hoisted `If Need help...` blocks adding further explicit `AskUserQuestion` mentions, the line count runs well above 4.
    - Paste all 8 test results into PR body (per issue body requirement).
 
 10. **`validate.sh` + `check-guardrails.sh`** (~2 min)
