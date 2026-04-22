@@ -161,6 +161,47 @@
         "no original matrix row was deleted, edited, or replaced",
         "diff target file path: docs/campaigns/nites/mmf-matrix.md"
       ]
+    },
+    {
+      "id": "learnings-md-read-populates-notes-column",
+      "tier": 2,
+      "description": "ITERATE on Nites with an existing learnings.md entry — Step 3.5 reads the transferable_note value and populates the matrix Notes column with a [from debrief: ...] provenance marker, preserving any prior operator Notes.",
+      "preconditions": [
+        "docs/campaigns/brite-nites/learnings.md exists on disk (long-form path)",
+        "learnings.md contains one ## Campaign log entry with frontmatter: campaign: spring-promo-2026-04-15, transferable: true, transferable_note: \"tier-2 venue angle outperforms tier-1 by 1.8x at the same spend\", tags: [#entity/brite-nites, #vertical/venue, #persona/gm, #angle/ops-lift]",
+        "docs/campaigns/nites/mmf-matrix.md has a row matching the triplet (vertical=venue, persona=gm, angle=ops-lift) with existing operator Notes 'segment-hold baseline'",
+        "operator selects ITERATE at Gate 2 with entity=Nites and a batch-N reference naming the spring-promo-2026-04-15 campaign",
+        "campaign-analysis artifact docs/campaigns/nites/analysis-spring-promo-2026-04-15.md exists and is picked up by Gate 4"
+      ],
+      "prompt": "Invoke message-market-fit. Gate 2: ITERATE. Gate 3: Nites. Provide batch-N reference for spring-promo-2026-04-15. Proceed through Steps 1-4 and write outputs.",
+      "expected_assertions": [
+        "post-run docs/campaigns/nites/mmf-matrix.md contains the string '[from debrief: tier-2 venue angle outperforms tier-1 by 1.8x at the same spend]' in the Notes column of the spring-promo-2026-04-15 row",
+        "the row's Notes cell equals exactly 'segment-hold baseline; [from debrief: tier-2 venue angle outperforms tier-1 by 1.8x at the same spend]' (operator Notes preserved, pulled text appended after '; ')",
+        "pulled text is byte-identical to the transferable_note value (no paraphrase, no truncation)",
+        "the string '[from debrief:' appears exactly once in the spring-promo-2026-04-15 row's Notes cell",
+        "the prior operator Notes 'segment-hold baseline' is preserved verbatim",
+        "docs/campaigns/brite-nites/learnings.md is NOT modified by this run (byte-for-byte unchanged)"
+      ]
+    },
+    {
+      "id": "learnings-md-absent-degrades-cleanly",
+      "tier": 2,
+      "description": "ITERATE on Nites with no learnings.md on disk — Step 3.5 is skipped silently and Flow 2 completes all 8 steps without halt, warning, or [from debrief: ...] markers anywhere in the matrix.",
+      "preconditions": [
+        "no file at docs/campaigns/brite-nites/learnings.md (Glob returns empty)",
+        "docs/campaigns/nites/mmf-matrix.md exists with at least one row",
+        "campaign-analysis artifact docs/campaigns/nites/analysis-*.md exists and is picked up by Gate 4",
+        "operator selects ITERATE at Gate 2 with entity=Nites and a valid batch-N reference"
+      ],
+      "prompt": "Invoke message-market-fit. Gate 2: ITERATE. Gate 3: Nites. Provide a valid batch-N reference. Proceed through Flow 2.",
+      "expected_assertions": [
+        "Flow 2 completes all 8 numbered steps without halt or error",
+        "no warning message about missing learnings.md is emitted to the operator (e.g., no 'learnings.md not found' or 'campaign-debrief output missing' string appears)",
+        "docs/campaigns/nites/mmf-results-{N}.md is written",
+        "docs/campaigns/nites/mmf-matrix.md Results Log section gains new rows (append succeeded)",
+        "docs/campaigns/nites/mmf-batch-{N+1}.md is written",
+        "the string '[from debrief:' does NOT appear anywhere in the updated docs/campaigns/nites/mmf-matrix.md"
+      ]
     }
   ]
 }
