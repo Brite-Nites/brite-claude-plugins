@@ -56,6 +56,95 @@ Decisions backing this integration: [`docs/research/salesforce-mcp-findings.md`]
 6. `/reload-plugins` in Claude Code.
 7. Smoke-test from any skill that has `mcp__plugin_marketing_salesforce__run_soql_query` allowed. Run `SELECT Id FROM User LIMIT 1` — the canonical availability check. If it returns a row, you're connected. If it fails with a token error, re-run step 4.
 
+## Service User Permissions
+
+**Audit date:** 2026-04-22 (BC-5924). **Status: over-provisioned — tightening tracked in [BC-5925](https://linear.app/brite-nites/issue/BC-5925/).**
+
+`@salesforce/mcp` has no server-side read-only mode, no row limits, and no destructive-tool gates ([findings §Q8](../../../../docs/research/salesforce-mcp-findings.md#q8-mcp-confirmation-gates-inventory)). Blast radius is controlled entirely by the service user's profile + permission set assignments. This section documents the current baseline; the minimum-required matrix below is the target state that Part B (BC-5925) will enforce.
+
+### Identity
+
+| Field | Value |
+|---|---|
+| Username / Email | See Bitwarden item *"Marketing Claude MCP — JWT private key"* Notes field |
+| Profile | `System Administrator` |
+| Active | Yes |
+
+### Permission set assignments (current)
+
+| Permset | Grants | Needed? |
+|---|---|---|
+| (profile-owned permset, auto-generated) | Full admin parity with the profile — cannot be detached | N/A — fix by changing profile |
+| `OutboundSync_Integration` | Legacy sync integration access | No — remove |
+| `StandardEinsteinActivityCapturePsl` | Einstein Activity Capture | No — unrelated to SOQL skills |
+| `Automation_Validation_Bypass` | Bypasses validation rules on DML | **No — actively dangerous on a headless service user** |
+| `Sales_Operations` | Full CRUD + View All on 8 of the 11 marketing-relevant objects | No — too broad |
+| `AirCall_PermissionSet` | Phone-system integration access | No — unrelated |
+
+### Object-level effective access
+
+Because the profile is `System Administrator`, effective access is **full CRUD + View All + Modify All** on every object below. `ObjectPermissions` rows only surface permsets with explicit grants; absence of rows does not imply absence of access when the base profile is SysAdmin.
+
+| Object | Effective access today | Required by planned skills |
+|---|---|---|
+| `Account` | Full CRUD + VA + MA | Read |
+| `Contact` | Full CRUD + VA + MA | Read |
+| `Lead` | Full CRUD + VA + MA | Read |
+| `Campaign` | Full CRUD + VA + MA | Read |
+| `Territory__c` | Full CRUD + VA + MA | Read |
+| `Location` | Full CRUD + VA + MA | Read |
+| `Task` + `Event` (Activity virtual) | Full CRUD + VA + MA | Read |
+| `Lifecycle_Stage_History__c` | Full CRUD + VA + MA | Read |
+| `Opportunity` | Full CRUD + VA + MA | Read |
+| `AccountContactRelation` | Full CRUD + VA + MA | Read |
+| `In_App_Checklist_Settings__c` | Full CRUD + VA + MA | Read |
+
+### Destructive / admin capabilities
+
+| Capability | Granted? | Needed by SOQL skills? |
+|---|---|---|
+| Modify All Data | Yes (profile) | No |
+| View All Data | Yes (profile) | No |
+| Api Enabled | Yes (profile) | **Yes** |
+| Author Apex | Yes (profile) | No |
+| Customize Application | Yes (profile) | No |
+| Manage Users | Yes (profile) | No |
+| Validation rule bypass | Yes (`Automation_Validation_Bypass` permset) | No |
+
+### Minimum required per planned consumer skill
+
+All 5 planned skills are read-only SOQL patterns. Required permissions are **identical** across the set: `Api Enabled` + `Read` on the listed objects.
+
+| Skill | Issue | SOQL objects | Canonical query shape |
+|---|---|---|---|
+| `list-building` | [BC-2717](https://linear.app/brite-nites/issue/BC-2717/) | `Lead` (+ `duplicateRules`) | `SELECT Id, Email, Status FROM Lead WHERE Email IN (:emails)` — see [§Lead suppression read](#lead-suppression-read-1-mcp-call) |
+| `reply-processing` | [BC-2720](https://linear.app/brite-nites/issue/BC-2720/) | `Lead`, `Contact` | Reply-sentiment + lifecycle-stage field reads |
+| `lead-routing` | [BC-2725](https://linear.app/brite-nites/issue/BC-2725/) | `Lead`, `Territory__c` | `Lead.Territory__c` + `Territory__c` assignment reads |
+| `data-enrichment` | [BC-2727](https://linear.app/brite-nites/issue/BC-2727/) | `Account`, `Contact`, `Lead`, `Location` | HubSpot-migration external-key + Location custom-field reads |
+| `crm-hygiene` | [BC-2728](https://linear.app/brite-nites/issue/BC-2728/) | `Lead`, `Contact`, `Account` | Duplicate-rule result reads for dedup |
+
+None require Create / Edit / Delete / Modify-All / Author-Apex / validation bypass.
+
+### Part B — tightening target (BC-5925)
+
+Close the gap between current (`System Administrator` + 6 permsets) and required (`Api Enabled` + Read on 11 objects):
+
+1. **Change profile from `System Administrator` → a least-privilege profile** (Standard User, or a new custom "Integration User" profile) with `Api Enabled` + nothing else.
+2. **Unassign 4 permsets:** `OutboundSync_Integration`, `StandardEinsteinActivityCapturePsl`, `Automation_Validation_Bypass`, `AirCall_PermissionSet`.
+3. **Replace `Sales_Operations` with a narrow permset** that grants Read-only on the 11 marketing-relevant objects. Align with [ADR-004 permission-set strategy](https://github.com/Brite-Nites/brite-salesforce/blob/main/docs/decisions/004-permission-set-strategy.md) in `brite-salesforce`.
+4. **Post-tightening verification** (Part B Verify phase T6 + T7): `PermissionsModifyAllData = false` on every assigned permset; service user still executes `SELECT Id FROM User LIMIT 1` via the MCP without auth error.
+
+See [BC-5925](https://linear.app/brite-nites/issue/BC-5925/) for execution.
+
+### Audit methodology (re-runnable)
+
+Queries run from `brite-salesforce/` via `sf data query --target-org marketing-claude-prod`. Re-run these before Part B opens, and after Part B merges, to confirm the baseline shift:
+
+1. `SELECT Id, Username, Email, Profile.Name, IsActive FROM User WHERE Email = '<service-user-email>'`
+2. `SELECT PermissionSet.Name, PermissionSet.IsOwnedByProfile FROM PermissionSetAssignment WHERE AssigneeId = '<service-user-id>'`
+3. `SELECT Name, PermissionsModifyAllData, PermissionsViewAllData, PermissionsApiEnabled, PermissionsAuthorApex FROM PermissionSet WHERE Id IN (<permset-ids>)`
+4. `SELECT Parent.Name, SobjectType, PermissionsRead, PermissionsCreate, PermissionsEdit, PermissionsDelete FROM ObjectPermissions WHERE Parent.Id IN (<permset-ids>) AND SobjectType IN ('Account','Contact','Lead','Campaign','Territory__c','Location','Task','Event','Lifecycle_Stage_History__c','Opportunity','AccountContactRelation','In_App_Checklist_Settings__c')`
+
 ## Registration
 
 ```json
@@ -175,6 +264,8 @@ Never auto-execute. Never degrade the confirmation to a prose "please confirm" �
 **Rejected alternatives:** reusing the `Outbound Sales Ops` Connected App (couples blast radius); SFDX refresh-token URL (CI-pattern, not runtime); OAuth client-credentials (unnecessary divergence from existing JWT pattern); device flow (interactive — wrong for headless use). Full rationale: [findings §Q3](../../../../docs/research/salesforce-mcp-findings.md#q3-auth-strategy).
 
 ## Last verified
+
+`2026-04-22` — Service user permission baseline audited in BC-5924. Profile = `System Administrator` + 6 permsets (including `Automation_Validation_Bypass`); over-provisioned against the `Api Enabled` + Read-on-11-objects minimum required by planned skills. Tightening tracked in [BC-5925](https://linear.app/brite-nites/issue/BC-5925/) (Part B, blockedBy BC-5924). See §Service User Permissions above for the full matrix and re-runnable audit queries. Re-run the §Service User Permissions queries before BC-5925 opens, after BC-5925 merges, and quarterly thereafter.
 
 `2026-04-16` — End-to-end verified by BC-5579. JWT login as service user succeeded; `run_soql_query` with `SELECT Id FROM User LIMIT 1` returned a row. ECA provisioned as standalone (not classic CA — Spring '26 blocked CA creation). `RefreshToken` scope re-added (required by SFDX CLI auth layer; original BC-5534 guidance to drop it was incorrect). Upstream inventory + per-toolset GA flags + confirmation-gate absence verified at pinned commit `02e99fabe59a5dc189c3c7a7acb6430204e2c024` during BC-5534 research.
 
