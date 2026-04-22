@@ -125,19 +125,239 @@ Three vocabularies exist because each skill owns a different decision surface: `
 
 ## Brite Implementation
 
-<!-- TODO(BC-5830) §4 — Batch E. Tools-this-skill-calls table (5 rows) with EB SHORT-form note; entity-keyed output paths; learnings.md file template (create-on-missing); architectural rules that apply (6 cited rules); cross-skill boundaries (receives from, hands off to, does not own, engineering-side parallel). -->
+### Tools this skill calls
+
+| What the skill needs to do | MCP / tool | Reaches | Reason (ADR / source) |
+|---|---|---|---|
+| Read upstream `analysis-*.md` (primary input) | `Read` + `Glob` | Local `docs/campaigns/{entity}/analysis-*.md` | §6 Procedure 1 Step 1 — primary input per Scope |
+| Pull Opportunity outcomes for campaign → pipeline attribution | Salesforce MCP (`run_soql_query`) | `brite-salesforce` production org | ADR 2a — SF is CRM SoR; Q3 + Q5 data-backing |
+| Pull campaign metrics standalone (retroactive path) | EB MCP (`get_active_workspace_info`, `get_campaign_stats`, `get_replies_analytics`) | Entity-routed EB workspace | §6 Procedure 2; workspace routing per Gate 3 |
+| Read prior `learnings.md` (cross-entity lookup) | `Read` + `Glob` | Local `docs/campaigns/{*}/learnings.md` | §6 Procedure 3 — novelty check before transferable-insight propagation |
+| Append to or create `learnings.md` | `Write` | Local `docs/campaigns/{entity}/learnings.md` | §3 Append-only invariant; §6 Procedure 1/2 final step |
+
+**EB namespace (load-bearing).** All Email Bison calls use the **short form** — `mcp__emailbison-b2b__*` and `mcp__emailbison-personal__*` — NOT `mcp__plugin_marketing_emailbison-*__*`. The EB MCP servers are registered at the repo-root `.mcp.json`, not inside `plugins/marketing/.mcp.json`. This matches `campaign-analysis` line 5 and `message-market-fit` line 5; the plugin-scoped namespace form will silent-fail at runtime per the CLAUDE.md gotcha ("listing a server that isn't registered fails silently").
+
+**EB gotchas.** `list_campaigns` has no server-side date filter — apply a client-side date filter after the call if the retroactive path needs date-scoping. `get_replies_analytics` (not `list_replies`) is the reply-sentiment tool; see `plugins/marketing/tools/integrations/email-bison.md` for the canonical recipe.
+
+### Entity-keyed output paths
+
+Every `Write` targets a path scoped to the validated `{entity}` slug:
+
+- **Output file.** `docs/campaigns/{entity}/learnings.md` — single file per entity, append-only (see §3 Append-only invariant).
+- **Directory creation.** On first write, the `docs/campaigns/` parent and the `{entity}` subdirectory are created via `Write`'s implicit `mkdir -p` semantics. `message-market-fit` is the first sibling to produce under `docs/campaigns/{entity}/`; campaign-debrief writes to the same directory tree.
+
+### learnings.md file template (create-on-missing)
+
+On first-ever debrief for an entity, the file does not exist. The skill creates it from this template, then appends the first entry beneath the `## Campaign log` section:
+
+```markdown
+# Campaign Learnings — {entity}
+
+Append-only knowledge base. Each entry is one debriefed campaign. Entries are strict-append; summary / what-works / what-doesn't sections regenerate in place on each append.
+
+## Summary stats
+
+_Regenerated on each append. Counters: total debriefs, verdicts breakdown, last debrief date._
+
+- Total debriefs: {N}
+- Verdicts: SCALE={s}, ITERATE={i}, PAUSE={p}, KILL={k}
+- Last debrief: {YYYY-MM-DD}
+
+## What works
+
+_Regenerated on each append. Cross-entry patterns from entries where verdict is SCALE or (ITERATE and transferable: true)._
+
+- {cross-entry pattern bullets}
+
+## What doesn't
+
+_Regenerated on each append. Cross-entry failures from entries where verdict is KILL._
+
+- {cross-entry failure bullets}
+
+## Campaign log
+
+_Strict-append. Reverse-chronological. Entries are never edited or removed._
+
+{entry N}
+
+---
+
+{entry N-1}
+
+...
+```
+
+Entry schema (appended beneath `## Campaign log`) matches the YAML-plus-5-question block defined in the issue body — see §3 5-question debrief format for the per-question content rules.
+
+### Architectural rules that apply
+
+Each rule below cites its source so a reader can trace the claim.
+
+- **Append-only learnings.md with carve-out.** Campaign log is strict-append; Summary / What works / What doesn't regenerate in place. Source: §3 Append-only invariant.
+- **Entity-driven workspace routing.** Nites → `emailbison-personal`; Supply + Labs → `emailbison-b2b`. Source: `campaign-analysis` §4 canonical pattern; `message-market-fit` Gate 3.
+- **Verdicts are numeric, not prose.** `SCALE`/`ITERATE`/`PAUSE`/`KILL` only; thresholds from §3 rubric table. Source: §3 4-verdict rubric; enforced by §8.
+- **Under-5-minute operator constraint.** Data suggests first, ask only when auto-suggest fails, never re-prompt. Source: issue Non-Goals; enforced by §8.
+- **EB MCP is short-form.** `mcp__emailbison-b2b__*` and `mcp__emailbison-personal__*` — not the plugin-scoped form. Source: sibling allowed-tools frontmatter; CLAUDE.md gotcha about unregistered-server silent-fail.
+- **Marketing-context and handbook edits go through proposal, not direct write.** Skill calls `AskUserQuestion` and hands off to `/marketing:product-marketing-context` or `/workflows:handbook-drift-check` on confirmation. Source: issue Scope — Transferable insight flow.
+
+### Cross-skill boundaries
+
+**Receives from:**
+
+- **[BC-2721](https://linear.app/brite-nites/issue/BC-2721) `campaign-analysis`** (primary) — `docs/campaigns/{entity}/analysis-*.md` is the §6 Procedure 1 input and the Q1/Q2/Q3 auto-suggest source. Handoff already live at campaign-analysis §4 Cross-skill boundaries (the MANDATORY clause pointing to this skill).
+- **Operator directly** (retroactive path) — §6 Procedure 2 runs when no `analysis-*.md` exists; operator supplies campaign name; metrics pull standalone from Email Bison.
+
+**Hands off to:**
+
+- **[BC-5829](https://linear.app/brite-nites/issue/BC-5829) `message-market-fit`** — transferable-insight `transferable_note` YAML field flows back into the MSPA matrix's Notes column on the next ITERATE run. The read-step implementation in MSPA is tracked at [BC-5953](https://linear.app/brite-nites/issue/BC-5953). Cross-link already live at MSPA §4 line 267 (pending marker).
+- **[BC-1727](https://linear.app/brite-nites/issue/BC-1727) `product-marketing-context`** (conditional, on `transferable: true`) — §6 Procedure 3 hands off with the proposal payload after operator confirmation. This skill never writes `docs/marketing-context.md` directly.
+- **`/workflows:handbook-drift-check`** (conditional, on handbook-contradiction signal) — §6 Procedure 4 hands off with the learnings.md entry path plus the offending handbook anchor. This skill never edits handbook content directly.
+- **[BC-2722](https://linear.app/brite-nites/issue/BC-2722) `outbound-playbook` (BC-2722 pending)** — once shipped, outbound-playbook will invoke this skill as the post-campaign step of its conductor loop.
+
+**Does not own:**
+
+- Campaign analysis itself (`campaign-analysis`).
+- Campaign execution (`outbound-playbook` + `/marketing:launch-campaign`, both pending or separate).
+- Next-experiment design (`message-market-fit` owns the matrix and batch-design).
+- Marketing-context editing (`product-marketing-context` owns the file and its freshness cadence).
+
+**Engineering-side parallel.** `docs/precedents/INDEX.md` is the engineering-side decision-trace pattern; this skill is the marketing-flywheel cognate. Each debrief is a marketing-domain decision trace. The two indexes are structurally analogous: append-only, tag-keyed, cross-run searchable.
 
 ---
 
 ## MCP Tool Reference
 
-<!-- TODO(BC-5830) §5 — Batch E. Four workflows: W1 read upstream analysis artifact; W2 standalone EB metrics fetch (retroactive path) with get_active_workspace_info probe, get_campaign_stats, get_replies_analytics, client-side list_campaigns filter note; W3 Salesforce Opportunity attribution (optional) with FieldDefinition preflight; W4 append-to-learnings.md glob-then-write. Confirmation-gate note: no gates apply. -->
+"When you need to X, call `tool_name`." Grouped by workflow, not by server. All calls are reads except the final learnings.md `Write` — no MCP confirmation gates apply to this skill.
+
+### Workflow 1 — Read upstream analysis artifact (post-analysis path)
+
+1. `Read` the `analysis-*.md` file resolved at Gate 2 / Gate 4. No availability probe — file read only.
+2. Parse §2 Segment Performance Ranking for the verdict token (→ Q2 auto-suggest); §5 Attribution Analysis for the focal row (→ Q1 auto-suggest) and top-2 rows (→ Q3 auto-suggest Worked side); §6 Next Iteration Recommendations (→ Q5 auto-suggest).
+3. Extract numeric metrics from §3 Infrastructure Analysis: `Reply Rate`, `Interested Rate`, `Bounce Rate`, sent count, days elapsed. These feed the §3 4-verdict rubric.
+
+### Workflow 2 — Standalone EB metrics fetch (retroactive path)
+
+See [`plugins/marketing/tools/integrations/email-bison.md` §Common Workflows](../../tools/integrations/email-bison.md#common-workflows) for the canonical recipe.
+
+1. **Availability probe** — call `get_active_workspace_info` on the workspace dispatched from Gate 3 (Nites → `mcp__emailbison-personal__*`; Supply / Labs → `mcp__emailbison-b2b__*`). On failure, halt and point the operator to `/marketing:setup-email-bison` — do NOT fall through to a cross-workspace probe.
+2. **Resolve campaign** — call `list_campaigns`. `list_campaigns` has no server-side date filter, so apply a client-side filter on `created_at` or `updated_at` if the operator's campaign name is ambiguous across time (e.g. "spring-promo" ran in 2025 and 2026). Match `{campaign-name}` against the result list; if multiple matches, re-prompt with dates.
+3. **Fetch stats** — call `get_campaign_stats` on the resolved campaign ID for `sent`, `bounce_rate`, and raw reply count.
+4. **Fetch reply sentiment** — call `get_replies_analytics` (NOT `list_replies`) on the same campaign ID for `interested_rate` / positive-reply count. `get_replies_analytics` is the canonical reply-sentiment tool; `list_replies` returns reply bodies, not sentiment aggregates.
+5. Derive `days` elapsed from campaign `created_at` to `today`. Apply the §3 4-verdict rubric against the entity-scoped threshold column.
+
+### Workflow 3 — Salesforce Opportunity attribution (optional)
+
+Runs when the operator wants to correlate the campaign with downstream pipeline. Soft gate — skips cleanly on SF unavailability.
+
+1. **Availability probe** — call `run_soql_query` with `SELECT Id FROM User LIMIT 1`. This is the verified liveness check per BC-5534 findings §Q1 (`get_username` is NOT a valid probe — it reads the local SFDX auth store without contacting Salesforce). On failure, skip attribution and note the skip in the entry — do NOT fabricate Opportunity data.
+2. **FieldDefinition preflight** — before running the attribution query, confirm the `Campaign_Source__c` custom field exists on Opportunity via `SELECT QualifiedApiName FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = 'Opportunity' AND QualifiedApiName = 'Campaign_Source__c'`. This preflight matches the BC-5797 factual-anchor recipe — fabrication of field names is a common failure mode. If the field is missing, skip attribution.
+3. **Attribution query** — `SELECT Id, Name, StageName, Amount FROM Opportunity WHERE Campaign_Source__c = '{campaign-name}' LIMIT 50`. Interpolate `{campaign-name}` only after it passed the §2 input validator — single quotes, semicolons, or SOQL keywords in `{campaign-name}` must not reach SOQL.
+4. Append the opportunity count and stage distribution to Q3's Worked side if any are `Closed Won` or `Negotiation` — this is attribution evidence, not hypothesis evidence.
+
+### Workflow 4 — Append to learnings.md
+
+The final mutating step of every debrief run. Both create-on-missing and append-to-existing flow through this workflow.
+
+1. **Glob for existing file** — `Glob` on `docs/campaigns/{entity}/learnings.md`. On miss, write from the §4 template plus the first entry. On hit, proceed to step 2.
+2. **Read existing file** — `Read` the full file to capture current state.
+3. **Regenerate summary sections** — rewrite `## Summary stats` counters; re-extract `## What works` bullets from entries where `verdict: SCALE` or `verdict: ITERATE` AND `transferable: true`; re-extract `## What doesn't` bullets from entries where `verdict: KILL`.
+4. **Append new entry** — insert the new entry at the TOP of the `## Campaign log` section (reverse-chronological), with the existing entries below.
+5. **Write full file** — single `Write` call overwrites the file with the regenerated summary sections plus the full Campaign log. The regenerate-in-place carve-out (§3 Append-only invariant) makes this a single-Write operation — no separate mutation call per section.
 
 ---
 
 ## Operational Runbook
 
-<!-- TODO(BC-5830) §6 — Batch F. Four procedures with Preconditions / Steps / Expected output / Error handling / Handoff. P1 post-analysis debrief (happy path); P2 retroactive debrief (no artifact); P3 transferable-insight cross-entity propagation; P4 handbook-drift flag. -->
+### Procedure 1 — Post-analysis debrief (happy path)
+
+**Preconditions:**
+- §2 Gate 2 matched ≥1 `analysis-*.md` for the selected `{entity}`.
+- §2 Gate 3 confirmed `{entity}`; §2 Gate 4 confirmed `{campaign-name}`.
+- `docs/marketing-context.md` read or reduced-context warning emitted (Gate 1).
+
+**Steps:**
+1. Run §5 Workflow 1 to read the analysis artifact and extract auto-suggest material for Q1/Q2/Q3/Q5.
+2. Present Q1 via `AskUserQuestion` with the auto-suggested hypothesis text as the first option and "Edit" as a second option. Operator confirms or edits.
+3. Present Q2 via `AskUserQuestion` with the auto-suggested result token (`CONFIRMED`/`PARTIAL`/`REJECTED`) plus one-line summary pulled from §2 ranked row's metrics. Confirms or edits.
+4. Present Q3 via `AskUserQuestion` with the auto-suggested Worked bullets from §5 top-2 rows; operator authors the Didn't side in free text.
+5. Present Q4 via `AskUserQuestion` with free-text input only (no auto-suggest — surprise is operator-authored).
+6. Present Q5 via `AskUserQuestion` with the auto-suggested transferable insight from §6 Next Iteration Recommendations plus a Yes/No for the `transferable:` flag.
+7. Assemble tags: `#entity/{entity}` from Gate 3; `#vertical/` proposed from the focal campaign's segment dimension (operator confirms); `#persona/` proposed from the gtm-strategy persona rollup (operator confirms); `#angle/` proposed from the creative-angles slug if seeded, else operator slugs.
+8. Compute verdict from §3 rubric table using the Workflow 1 metrics. Echo the computed verdict to the operator for sanity-check (optional `AskUserQuestion` override only if the computed verdict contradicts operator's gut-read).
+9. Run §5 Workflow 4 to append the entry.
+10. On `transferable: true`, dispatch §6 Procedure 3.
+
+**Expected output:** One new entry appended to `docs/campaigns/{entity}/learnings.md` with the `## Campaign log` section starting with this entry and the prior entries below. Summary stats / What works / What doesn't sections regenerated. Debrief completed in under 5 minutes of operator time.
+
+**Error handling:**
+- `analysis-*.md` parse failure (unexpected section headers or missing §2/§5/§6) → fall through to Procedure 2 (retroactive path) and note the artifact-corruption in the entry Q4 bullets.
+- `AskUserQuestion` skipped (operator presses through) → fill with auto-suggested value; never write an entry with an empty question field.
+
+**Handoff:** §6 Procedure 3 (transferable-insight propagation) on `transferable: true`. MSPA Notes-column feedback on next ITERATE (via BC-5953 once implemented).
+
+### Procedure 2 — Retroactive debrief (no analysis artifact)
+
+**Preconditions:**
+- §2 Gate 2 matched zero `analysis-*.md` for `{entity}`.
+- Operator supplied `{campaign-name}` at Gate 4.
+- EB MCP credentials valid for the entity-routed workspace.
+
+**Steps:**
+1. Run §5 Workflow 2 to pull metrics from Email Bison. On availability failure, halt with operator message and route to `/marketing:setup-email-bison`.
+2. Apply §3 rubric against pulled metrics to pre-compute verdict.
+3. Present Q1 via `AskUserQuestion` — operator authors the hypothesis from memory (no auto-suggest for retroactive path's Q1).
+4. Present Q2 via `AskUserQuestion` with auto-suggested result token derived from the pre-computed verdict (`SCALE`/`ITERATE` → `CONFIRMED`; `PAUSE` → `PARTIAL`; `KILL` → `REJECTED`). Operator confirms or overrides.
+5. Present Q3 / Q4 / Q5 via `AskUserQuestion` — all operator-authored (retroactive path has no §5 Attribution rows to seed).
+6. Assemble tags as in Procedure 1 step 7. Operator confirms all four families.
+7. Run §5 Workflow 4 to append the entry.
+8. On `transferable: true`, dispatch §6 Procedure 3.
+
+**Expected output:** Same as Procedure 1 — one appended entry. Retroactive paths typically take longer (5–8 minutes) because Q3–Q5 lack auto-suggest; operator-authored in full.
+
+**Error handling:**
+- EB availability probe failure → halt with setup pointer, do not fall through to a fabricated-metrics path.
+- `list_campaigns` no-match for `{campaign-name}` → re-prompt with Gate 4 and suggest the operator paste a dated name (e.g. `spring-promo-2026-04`) to disambiguate.
+
+**Handoff:** Same as Procedure 1.
+
+### Procedure 3 — Transferable-insight cross-entity propagation
+
+**Preconditions:**
+- Procedure 1 or 2 completed.
+- New entry's `transferable:` flag is `true`.
+
+**Steps:**
+1. `Glob` other entities' `learnings.md` files — `docs/campaigns/{*}/learnings.md` where `{*}` excludes the current `{entity}`.
+2. `Read` each match and search for a matching tag-family pattern (same `#vertical/` + `#persona/` + `#angle/` combination). If a near-match already exists in another entity, the insight is not novel cross-entity — set `transferable: false` retroactively in the new entry's frontmatter and note "pattern already logged in `docs/campaigns/{other-entity}/learnings.md`" in Q5.
+3. On novel insight, `AskUserQuestion`: "This insight may apply cross-entity (e.g. from `{entity}` to `{other-entity}`). Propose an update to `docs/marketing-context.md`?" with options `Yes, propose update` / `No, skip propagation` / `No, keep entity-specific`.
+4. On `Yes`, hand off to `/marketing:product-marketing-context` with the proposal payload: `{ entity_pair: [entity, other-entity], transferable_note: "...", source_entry: "docs/campaigns/{entity}/learnings.md#entry-{N}" }`.
+5. On `No`, skip propagation and note the skip in the entry's Q5 free-text ("operator declined cross-entity propagation").
+
+**Expected output:** Either a `product-marketing-context` invocation or a skip-note in the entry. No write to `docs/marketing-context.md` from this skill.
+
+**Error handling:**
+- `/marketing:product-marketing-context` unavailable → append the proposal payload to `docs/campaigns/proposed-context-updates.md` (append-only) and note the deferral in the entry Q5.
+
+**Handoff:** `/marketing:product-marketing-context` on Yes; self-contained on No.
+
+### Procedure 4 — Handbook-drift flag
+
+**Preconditions:**
+- Procedure 1 or 2 completed.
+- Transferable insight contradicts or supersedes documented handbook content (operator judgment call).
+
+**Steps:**
+1. `AskUserQuestion` confirming the contradiction: "This insight appears to contradict the handbook at `{anchor}`. Raise a handbook-drift issue?" Include the handbook anchor URL in the question body for operator review.
+2. On `Yes`, hand off to `/workflows:handbook-drift-check` with the payload `{ entry_path: "docs/campaigns/{entity}/learnings.md#entry-{N}", handbook_anchor: "{anchor}", contradiction_summary: "..." }`.
+3. On `No`, note the operator's justification in the entry Q4 bullets (surprise is the right question field for a "I thought this would contradict the handbook but actually it doesn't" reasoning trail).
+
+**Expected output:** Either a drift-check invocation or a notation in the entry. No direct handbook edits.
+
+**Error handling:**
+- `/workflows:handbook-drift-check` unavailable → create a Linear issue via `mcp__linear__save_issue` with title "Handbook drift — {anchor}" and body containing the entry path and contradiction summary; link the Linear URL in the entry Q5.
+
+**Handoff:** `/workflows:handbook-drift-check` on Yes; Linear issue on fallback.
 
 ---
 
