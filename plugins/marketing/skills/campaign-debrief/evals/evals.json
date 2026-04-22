@@ -1,0 +1,190 @@
+{
+  "skill": "campaign-debrief",
+  "version": "0.1.0",
+  "scenarios": [
+    {
+      "id": "post-analysis-happy-path",
+      "tier": 1,
+      "description": "Post-analysis debrief on a Nites campaign with a well-formed analysis artifact produces a verdict-SCALE entry appended to learnings.md with all 5 Q-sections, all 4 tag families lowercase-hyphenated, populated metrics frontmatter, and a marketing-context-proposal handoff when transferable is true.",
+      "input": {
+        "entity": "brite-nites",
+        "campaign_name": "spring-promo",
+        "mocked_analysis_artifact": "docs/campaigns/brite-nites/analysis-spring-promo-2026-04-15.md with Reply Rate 1.4%, Interested Rate 28%, Bounce Rate 2%, sent=1200, days=14, §2 top row verdict=SCALE, §5 Attribution row for Segment=hoa-boards, §6 Next Iteration='test capital-expenditure-timing angle on brite-labs'",
+        "mocked_marketing_context": "docs/marketing-context.md absent (degraded mode — warning emitted at Gate 1)",
+        "mocked_transferable_answer": "true"
+      },
+      "assertions": [
+        "output entry appended to docs/campaigns/brite-nites/learnings.md",
+        "entry frontmatter contains verdict: SCALE",
+        "entry frontmatter contains metrics.reply_rate == 0.014",
+        "entry frontmatter contains metrics.interested_rate == 0.28",
+        "entry frontmatter contains metrics.bounce_rate == 0.02",
+        "entry frontmatter contains metrics.sent == 1200",
+        "entry frontmatter contains metrics.days == 14",
+        "entry frontmatter source_analysis points to the consumed analysis-*.md path",
+        "entry body contains all 5 Q-sections (Q1 Hypothesis / Q2 Result / Q3 What worked / Q4 Surprise / Q5 Transferable)",
+        "entry tags array contains exactly one #entity/brite-nites, one #vertical/*, one #persona/*, one #angle/* — all lowercase-hyphenated"
+      ]
+    },
+    {
+      "id": "retroactive-manual-stats",
+      "tier": 1,
+      "description": "Retroactive debrief on a Supply campaign with no analysis artifact pulls metrics standalone from Email Bison and assigns verdict KILL against the b2b threshold column.",
+      "input": {
+        "entity": "brite-supply",
+        "campaign_name": "summer-installer-2026-03",
+        "mocked_analysis_artifact": "absent (Gate 2 Glob returns zero matches)",
+        "mocked_eb_workspace": "emailbison-b2b",
+        "mocked_eb_availability": "succeeds",
+        "mocked_campaign_stats": "{sent: 800, bounce_rate: 0.04}",
+        "mocked_replies_analytics": "{interested_rate: 0.12, reply_rate: 0.003}",
+        "mocked_days_elapsed": 10
+      },
+      "assertions": [
+        "output entry appended to docs/campaigns/brite-supply/learnings.md",
+        "entry frontmatter contains verdict: KILL",
+        "entry frontmatter metrics.reply_rate < 0.005",
+        "entry frontmatter metrics.sent >= 500",
+        "entry frontmatter metrics.days >= 7",
+        "entry frontmatter source_analysis field is absent (retroactive path has no artifact)",
+        "EB tool calls targeted mcp__emailbison-b2b__* namespace only (zero calls to mcp__emailbison-personal__*)",
+        "no auto-suggest source cited in Q1 body (retroactive path authors Q1 from operator memory)"
+      ]
+    },
+    {
+      "id": "subjective-verdict-refused",
+      "tier": 1,
+      "description": "When the operator drafts an entry with a prose verdict ('pretty good', 'meh'), the skill refuses to write and prompts for one of the four permitted tokens with the §3 rubric table.",
+      "input": {
+        "entity": "brite-nites",
+        "campaign_name": "spring-promo",
+        "mocked_operator_draft_verdict": "pretty good"
+      },
+      "assertions": [
+        "no Write tool call to docs/campaigns/brite-nites/learnings.md",
+        "output response cites the four permitted tokens (SCALE, ITERATE, PAUSE, KILL)",
+        "output response includes the §3 rubric threshold table or a reference to it",
+        "§8 anti-slop guardrail 'Do not use subjective verdicts' is invoked in the response",
+        "retry prompt offers the four tokens as AskUserQuestion options",
+        "operator-draft-verdict value 'pretty good' is rejected explicitly"
+      ]
+    },
+    {
+      "id": "append-only-refuses-overwrite",
+      "tier": 1,
+      "description": "A second debrief on a campaign that already has an entry produces a new entry (different debrief_at date) without mutating the prior entry body.",
+      "input": {
+        "entity": "brite-nites",
+        "campaign_name": "spring-promo",
+        "mocked_existing_entry": "learnings.md already contains an entry with campaign: spring-promo, debrief_at: 2026-04-15, verdict: ITERATE",
+        "mocked_new_debrief_at": "2026-04-22",
+        "mocked_new_verdict": "SCALE"
+      },
+      "assertions": [
+        "docs/campaigns/brite-nites/learnings.md contains two entries with campaign: spring-promo after the second debrief",
+        "the 2026-04-15 entry body is byte-for-byte identical before and after the second debrief",
+        "the new entry carries debrief_at: 2026-04-22 and verdict: SCALE",
+        "the ## Campaign log section has the 2026-04-22 entry at the top and the 2026-04-15 entry below",
+        "no entry body in the ## Campaign log section was mutated",
+        "the ## Summary stats section total debriefs count incremented by exactly 1",
+        "the ## What works section regenerated in place (not appended)"
+      ]
+    },
+    {
+      "id": "under-5-minute-autosuggest",
+      "tier": 1,
+      "description": "When analysis-*.md exists, Q1/Q2/Q3/Q5 auto-suggest from the artifact; the skill does not free-text-prompt for these questions.",
+      "input": {
+        "entity": "brite-nites",
+        "campaign_name": "spring-promo",
+        "mocked_analysis_artifact": "docs/campaigns/brite-nites/analysis-spring-promo-2026-04-15.md with §5 Attribution, §2 Segment Ranking, §6 Next Iteration all populated"
+      },
+      "assertions": [
+        "exactly 5 AskUserQuestion tool calls total (one per question)",
+        "Q1 AskUserQuestion first option is the auto-suggested hypothesis text pulled from §5 Attribution",
+        "Q2 AskUserQuestion first option contains one of CONFIRMED, PARTIAL, or REJECTED derived from §2 Segment Ranking verdict",
+        "Q3 AskUserQuestion Worked side first option is pulled from §5 top-2 rows",
+        "Q4 AskUserQuestion is free-text only (no auto-suggest option — surprise is operator-authored)",
+        "Q5 AskUserQuestion first option is pulled from §6 Next Iteration Recommendations"
+      ]
+    },
+    {
+      "id": "tag-format-hyphenated",
+      "tier": 1,
+      "description": "Operator-typed tag values with spaces, TitleCase, or underscores are normalized to lowercase-hyphenated before append.",
+      "input": {
+        "entity": "brite-supply",
+        "operator_tag_inputs": {
+          "vertical": "Commercial Real Estate",
+          "persona": "Facilities Director",
+          "angle": "CapEx_Timing"
+        }
+      },
+      "assertions": [
+        "entry tags contain #vertical/commercial-real-estate (lowercase, spaces-to-hyphens)",
+        "entry tags contain #persona/facilities-director (lowercase, spaces-to-hyphens)",
+        "entry tags contain #angle/capex-timing (lowercase, underscore-to-hyphen)",
+        "no entry tag contains any uppercase letter, space, or underscore",
+        "every entry tag value matches the regex ^[a-z0-9-]+$"
+      ]
+    },
+    {
+      "id": "transferable-cross-entity-flag",
+      "tier": 2,
+      "description": "A transferable Supply insight with no matching pattern in Labs learnings triggers an AskUserQuestion proposing marketing-context update; the payload handoff to product-marketing-context contains the expected fields.",
+      "input": {
+        "entity": "brite-supply",
+        "campaign_name": "capex-push-2026-04",
+        "mocked_new_entry_flag": "transferable: true, #angle/capital-expenditure-timing",
+        "mocked_labs_learnings_glob": "docs/campaigns/brite-labs/learnings.md exists but contains zero entries with #angle/capital-expenditure-timing",
+        "mocked_operator_response": "Yes, propose update"
+      },
+      "assertions": [
+        "Glob executed on docs/campaigns/brite-labs/learnings.md",
+        "Read executed on docs/campaigns/brite-labs/learnings.md",
+        "AskUserQuestion fired with three options (Yes propose / No skip propagation / No keep entity-specific)",
+        "handoff payload names product-marketing-context as target",
+        "handoff payload entity_pair contains [brite-supply, brite-labs]",
+        "handoff payload transferable_note is populated from the entry's transferable_note field",
+        "handoff payload source_entry points to the brite-supply learnings.md entry",
+        "no Write to docs/marketing-context.md from this skill"
+      ]
+    },
+    {
+      "id": "missing-context-degraded-mode",
+      "tier": 2,
+      "description": "When docs/marketing-context.md is absent, the skill emits the verbatim Gate 1 warning and continues without attempting to read the missing file.",
+      "input": {
+        "entity": "brite-nites",
+        "campaign_name": "spring-promo",
+        "mocked_marketing_context_exists": false
+      },
+      "assertions": [
+        "Gate 1 warning emitted verbatim: 'Marketing context doc not found — proceeding with reduced context. Run `/marketing:product-marketing-context` to generate it.'",
+        "zero Read tool calls on docs/marketing-context.md",
+        "entry frontmatter does not contain a marketing_context_version field",
+        "entry body does not cite marketing-context.md as a source",
+        "debrief still completes end-to-end (entry appended to learnings.md)",
+        "Gate 1 warning emitted at most once per invocation"
+      ]
+    },
+    {
+      "id": "eb-short-form-namespace",
+      "tier": 2,
+      "description": "Retroactive path on a Nites campaign uses the SHORT-form EB namespace only; any call to the plugin-scoped form is a failure mode that halts with the setup pointer rather than continuing with fabricated metrics.",
+      "input": {
+        "entity": "brite-nites",
+        "campaign_name": "winter-2026-01",
+        "mocked_analysis_artifact": "absent",
+        "mocked_eb_short_form_calls": "succeed"
+      },
+      "assertions": [
+        "every EB tool call in the trace uses mcp__emailbison-personal__* prefix",
+        "zero tool calls to mcp__plugin_marketing_emailbison-personal__* or mcp__plugin_marketing_emailbison-b2b__*",
+        "zero tool calls to mcp__emailbison-b2b__* (Nites entity routes to personal workspace only)",
+        "if a plugin-scoped call is attempted, the availability probe failure triggers a halt with pointer to /marketing:setup-email-bison",
+        "no fabricated-metrics path on availability probe failure (no entry written without real metrics)"
+      ]
+    }
+  ]
+}
