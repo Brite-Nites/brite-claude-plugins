@@ -175,11 +175,8 @@
       ],
       "prompt": "Invoke message-market-fit. Gate 2: ITERATE. Gate 3: Nites. Provide batch-N reference for spring-promo-2026-04-15. Proceed through Steps 1-4 and write outputs.",
       "expected_assertions": [
-        "post-run docs/campaigns/nites/mmf-matrix.md contains the string '[from debrief: tier-2 venue angle outperforms tier-1 by 1.8x at the same spend]' in the Notes column of the spring-promo-2026-04-15 row",
         "the row's Notes cell equals exactly 'segment-hold baseline; [from debrief: tier-2 venue angle outperforms tier-1 by 1.8x at the same spend]' (operator Notes preserved, pulled text appended after '; ')",
         "pulled text is byte-identical to the transferable_note value (no paraphrase, no truncation)",
-        "the string '[from debrief:' appears exactly once in the spring-promo-2026-04-15 row's Notes cell",
-        "the prior operator Notes 'segment-hold baseline' is preserved verbatim",
         "docs/campaigns/brite-nites/learnings.md is NOT modified by this run (byte-for-byte unchanged)"
       ]
     },
@@ -196,7 +193,7 @@
       "prompt": "Invoke message-market-fit. Gate 2: ITERATE. Gate 3: Nites. Provide a valid batch-N reference. Proceed through Flow 2.",
       "expected_assertions": [
         "Flow 2 completes all 8 numbered steps without halt or error",
-        "no warning message about missing learnings.md is emitted to the operator (e.g., no 'learnings.md not found' or 'campaign-debrief output missing' string appears)",
+        "no operator-visible message references learnings.md or campaign-debrief",
         "docs/campaigns/nites/mmf-results-{N}.md is written",
         "docs/campaigns/nites/mmf-matrix.md Results Log section gains new rows (append succeeded)",
         "docs/campaigns/nites/mmf-batch-{N+1}.md is written",
