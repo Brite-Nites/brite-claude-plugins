@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "entity": "brite-labs",
+  "campaign_name_base": "dogfood-municipalities",
+  "workspace": "emailbison-personal",
+  "workspace_entity_mismatch": {
+    "expected_workspace": "emailbison-b2b",
+    "chosen_workspace": "emailbison-personal",
+    "reason": "BC-5826 dogfood — X17 verification criterion explicitly requires emailbison-personal"
+  },
+  "copy_artifact_path": ".claude/worktrees/bc-5826/dogfood/test-copy.json",
+  "csv_path": ".claude/worktrees/bc-5826/dogfood/test-leads.csv",
+  "lead_count": 6,
+  "segmented": true,
+  "esp_segments": {"Google": 4, "Microsoft": 2},
+  "esp_breakdown_detail": {"gmail.com": "Google (2 leads)", "outlook.com": "Microsoft (2 leads)", "brite.co": "Google — Google Workspace MX (2 leads)"},
+  "esp_lookup_method": "bash dig MX +short (F10 fallback path)",
+  "unique_per_lead": true,
+  "custom_variables_created": [],
+  "lead_ids_uploaded": 0,
+  "campaign_ids": {},
+  "sender_ids_attached": [],
+  "sender_attach_counts": {},
+  "schedule_id": null,
+  "sequence_ids": {},
+  "preview_rendered_at": null,
+  "activated": false,
+  "activated_at": null,
+  "launched_at": "2026-04-20T22:15:00Z",
+  "last_completed_phase": 2,
+  "dogfood_note": "BC-5826 X17 dogfood — draft-only, --activate OFF. Metadata written to dogfood/ dir instead of docs/campaigns/ to avoid polluting production path (friction F6)."
+}
