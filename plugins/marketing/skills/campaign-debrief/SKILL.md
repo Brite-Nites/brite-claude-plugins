@@ -363,13 +363,31 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 
 ## Health Scoring Rubric
 
-<!-- TODO(BC-5830) §7 — Batch G. Four-tier rubric: 10 (excellence), 7-9 (minor gaps), 4-6 (structural gaps), 1-3 (hard failure). Named criteria anchored to observable behaviors. -->
+| Score | Criteria |
+|------:|----------|
+| 10 | All 5 questions asked, answered, and recorded in the entry body verbatim (Q1 in fixed-format sentence, Q2 as token+summary, Q3 as worked/didn't pair, Q4 as 1–3 surprise bullets, Q5 as sentence-or-"entity-specific"). Verdict computed from the §3 4-verdict rubric with exact numeric metrics cited in the entry frontmatter (`metrics.reply_rate`, `metrics.interested_rate`, `metrics.bounce_rate`, `metrics.sent`, `metrics.days` populated). All four tag families present, all lowercase-hyphenated. Entry appended to `docs/campaigns/{entity}/learnings.md` (never overwritten); `## Summary stats`, `## What works`, `## What doesn't` sections regenerated in place; `## Campaign log` strict-append with new entry at top. `transferable:` flag set correctly (true when cross-entity pattern evident; false otherwise). Debrief conversation under 5 minutes of operator time. Q1/Q2/Q3 auto-suggestions drawn verbatim from the `analysis-*.md` artifact when Gate 2 matched. Retroactive path EB availability probe hit the correct entity-routed workspace (never cross-workspace). On `transferable: true`, `product-marketing-context` or `handbook-drift-check` proposal surfaced via `AskUserQuestion` — never auto-written. |
+| 7–9 | One gap from the 10-tier list. Examples: 4 of 5 questions recorded (Q4 skipped); verdict numerically correct but the threshold rule not cited in the entry frontmatter; 3 of 4 tag families present (missing `#angle/`); conversation ran 5–7 minutes (still acceptable, but exceeded target). `transferable:` flag set but the cross-entity novelty check (§6 Procedure 3 Step 1–2) was skipped. |
+| 4–6 | Functional but missing structural elements. Verdict assigned without citing the numeric threshold check (operator read the table but no metrics in `metrics:` frontmatter). Tags written in TitleCase or with spaces ("Commercial Real Estate" instead of `commercial-real-estate`) — entry would fail the §8 lowercase-hyphenated gate on re-check. Entry written without the `source_analysis` frontmatter field on post-analysis path. `## Summary stats` section drifted (last debrief date not updated). `list_campaigns` client-side date filter skipped on an ambiguous retroactive match (operator picked wrong year's campaign). |
+| 1–3 | Hard failure — any ONE drops the run. Subjective verdict ("pretty good" instead of `SCALE`/`ITERATE`/`PAUSE`/`KILL`). Learnings.md entry overwritten rather than appended (a prior entry's body mutated). Auto-wrote to `docs/marketing-context.md` or handbook content without `AskUserQuestion` confirmation. Skipped a §2 gate (e.g. no entity confirmation before the `Write`). Invented a tag family outside the 4-family scheme (e.g. `#channel/`, `#cycle/`). Under-5-minute constraint violated AND operator did not approve a scope extension. Retroactive-path EB call hit the wrong workspace (Supply campaign probed on `emailbison-personal`). Fabricated `Campaign_Source__c` Opportunity data without running the §5 Workflow 3 FieldDefinition preflight. |
 
 ---
 
 ## Anti-Slop Guardrails
 
-<!-- TODO(BC-5830) §8 — Batch G. Four base guardrails (jargon, fabricated stats, marketing-context.md, hallucinated tools) + 5 skill-specific hard failures: under-5-minute, append-only, data-first suggestion, lowercase-hyphenated tags, only-4-verdict-tokens. -->
+Base guardrails (every marketing skill ships these four; do not remove):
+
+- Do not generate generic marketing jargon ("synergy", "leverage", "best-in-class").
+- Do not fabricate statistics, case studies, or testimonials — always attribute to a source.
+- Do not produce output that ignores `docs/marketing-context.md` when it exists.
+- Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
+
+Skill-specific hard failures (each drops to §7 Rubric 1–3 band):
+
+- **Do not exceed 5 minutes of operator time on a single debrief.** Under-5-minute constraint is load-bearing. Suggest answers from `analysis-*.md` §5 / §2 / §6 first; ask one question at a time only when auto-suggest fails; never re-prompt a field the operator already answered. The retroactive path has a 5–8-minute allowance because Q3/Q4/Q5 lack auto-suggest; above 8 minutes is the failure boundary even on retroactive.
+- **Do not overwrite `learnings.md` entries.** Append-only, strict. Re-running a debrief on the same `{campaign-name}` with a new `debrief_at` date produces a new entry — the prior entry's body stays untouched. The three summary sections (`## Summary stats`, `## What works`, `## What doesn't`) regenerate in place; the `## Campaign log` section is strict-append. Mutating a past Campaign-log entry's body is the worst-case failure mode for this skill because it rewrites organizational memory silently.
+- **Do not skip data-first suggestion.** When `analysis-*.md` exists at Gate 2, Q1 must auto-suggest from §5 Attribution, Q2 from §2 Segment Ranking verdict, Q3 Worked side from §5 top-2 rows, Q5 from §6 Next Iteration Recommendations. Hand-cranking questions without suggestion when the artifact exists wastes operator time and violates the under-5-minute constraint. Retroactive path is exempt because no artifact exists.
+- **Do not use non-lowercase-hyphenated tags.** `#Entity/BriteNites`, `#vertical/Commercial Real Estate`, `#angle/CapEx_Timing`, `#persona/facilitiesDirector` are all refused. Tag values are lowercase-hyphenated slugs matching `^[a-z0-9-]+$`. The four tag families are the ONLY permitted keys: `#entity/`, `#vertical/`, `#persona/`, `#angle/`. Inventing a fifth family (e.g. `#channel/`, `#cycle/`, `#cohort/`) is refused.
+- **Do not use subjective verdicts.** The four verdict tokens (`SCALE`, `ITERATE`, `PAUSE`, `KILL`) are the only permitted `verdict:` frontmatter values. Prose substitutes ("pretty good", "meh", "worth another shot", "solid", "looking promising") are refused. Every verdict must trace to the §3 rubric table — if the metrics don't clearly resolve to one cell, the default is `PAUSE` (sub-floor / ambiguous signal) until more data arrives, never a prose token.
 
 ---
 
