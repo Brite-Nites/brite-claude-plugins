@@ -163,20 +163,23 @@
       ]
     },
     {
-      "id": "learnings-md-read-populates-notes-column",
+      "id": "learnings-md-read-populates-transferable-insight",
       "tier": 2,
-      "description": "ITERATE on Nites with an existing learnings.md entry — Step 3.5 reads the transferable_note value and populates the matrix Notes column with a [from debrief: ...] provenance marker, preserving any prior operator Notes.",
+      "description": "ITERATE on Nites with an existing learnings.md entry — Step 3.5 reads the transferable_note value and populates the appended Results Log row's Transferable Insight column with a [from debrief: ...] provenance marker; body matrix stays byte-for-byte unchanged.",
       "preconditions": [
         "docs/campaigns/brite-nites/learnings.md exists on disk (long-form path)",
         "learnings.md contains one ## Campaign log entry with frontmatter: campaign: spring-promo-2026-04-15, transferable: true, transferable_note: \"tier-2 venue angle outperforms tier-1 by 1.8x at the same spend\", tags: [#entity/brite-nites, #vertical/venue, #persona/gm, #angle/ops-lift]",
-        "docs/campaigns/nites/mmf-matrix.md has a row matching the triplet (vertical=venue, persona=gm, angle=ops-lift) with existing operator Notes 'segment-hold baseline'",
+        "docs/campaigns/nites/mmf-matrix.md body matrix has a row matching the triplet (Segment=venue, Persona=gm, Angle=ops-lift) — body row's Notes column is irrelevant to this scenario",
         "operator selects ITERATE at Gate 2 with entity=Nites and a batch-N reference naming the spring-promo-2026-04-15 campaign",
         "campaign-analysis artifact docs/campaigns/nites/analysis-spring-promo-2026-04-15.md exists and is picked up by Gate 4"
       ],
       "prompt": "Invoke message-market-fit. Gate 2: ITERATE. Gate 3: Nites. Provide batch-N reference for spring-promo-2026-04-15. Proceed through Steps 1-4 and write outputs.",
       "expected_assertions": [
-        "the row's Notes cell equals exactly 'segment-hold baseline; [from debrief: tier-2 venue angle outperforms tier-1 by 1.8x at the same spend]' (operator Notes preserved, pulled text appended after '; ')",
+        "post-run docs/campaigns/nites/mmf-matrix.md contains an appended Results Log row whose Experiment cell equals 'spring-promo-2026-04-15'",
+        "that Results Log row's Transferable Insight cell equals exactly '[from debrief: tier-2 venue angle outperforms tier-1 by 1.8x at the same spend]' (when operator drafted no Transferable Insight in Step 3) OR '{operator text}; [from debrief: tier-2 venue angle outperforms tier-1 by 1.8x at the same spend]' (when operator drafted content)",
         "pulled text is byte-identical to the transferable_note value (no paraphrase, no truncation)",
+        "the body matrix (rows above the Results Log) is byte-for-byte unchanged (append-only invariant preserved — satisfies matrix-append-not-replace co-invariant)",
+        "the string '[from debrief:' does NOT appear in the body matrix's Notes column for any row",
         "docs/campaigns/brite-nites/learnings.md is NOT modified by this run (byte-for-byte unchanged)"
       ]
     },
@@ -196,8 +199,9 @@
         "no operator-visible message references learnings.md or campaign-debrief",
         "docs/campaigns/nites/mmf-results-{N}.md is written",
         "docs/campaigns/nites/mmf-matrix.md Results Log section gains new rows (append succeeded)",
+        "each appended Results Log row's Transferable Insight cell contains only operator-drafted content or is empty (no [from debrief: ...] markers)",
         "docs/campaigns/nites/mmf-batch-{N+1}.md is written",
-        "the string '[from debrief:' does NOT appear anywhere in the updated docs/campaigns/nites/mmf-matrix.md"
+        "the string '[from debrief:' does NOT appear anywhere in the updated docs/campaigns/nites/mmf-matrix.md (neither in body Notes nor Results Log Transferable Insight)"
       ]
     }
   ]
