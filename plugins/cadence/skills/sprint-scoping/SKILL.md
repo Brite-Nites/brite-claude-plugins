@@ -113,6 +113,24 @@ SQ1's answer constrains SQ2's option set (SQ1's headline drives SQ2's viable iss
 | SQ4 | Dependencies between picked issues? | Agent infers from descriptions + `relations.blockedBy` |
 | SQ5 | Explicitly parked this cycle? | Agent proposes from stale current-cycle items + Low-priority carry-over |
 
+### § 4.1 SQ3 option lock
+
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — SQ3 option set is locked to the three items below, Other escape always available. -->
+
+SQ3's `AskUserQuestion` MUST render exactly three options (plus the implicit "Other" free-text escape):
+
+1. **Keep existing assignees** `(Recommended)`
+2. **Reassign to `<name>`** — single-assignee change; one target name
+3. **Mark unassigned** — clears `assignee` to `null`
+
+Linear has exactly one `assignee` field per issue. SQ3 maps 1:1 to that field. Specifically banned improvisation patterns (origin: BC-5872 W17 attempt1 dogfood):
+
+- *"Add co-owner"* / *"co-owner on <ID>"* — no such field in Linear; if picked, Phase 3 silently drops the second assignee or silently replaces the first.
+- *"co-watcher"* / *"Add subscriber as co-owner"* — `subscribers` is a watchers list, not an owners list. Reframing ownership as watching persists a different semantic mismatch.
+- *"multi-assignee"* / *"multiple assignees"* / *"Holden + Rainer both on BC-XXXX"* — any phrasing that implies a list-valued assignee.
+
+If co-ownership becomes a legitimate weekly pattern, file a spec amendment to BC-5810 § 2.2 — do not improvise here. The escape path for one-off co-lead intent is the Phase 5 manual-ops checklist (the planner writes a freeform row after the run); SQ3 itself stays locked to the three options above.
+
 ## § 5 Quality gate + block-with-override
 
 <!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to the 3-option AskUserQuestion per failing check below. -->
