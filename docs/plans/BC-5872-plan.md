@@ -155,6 +155,12 @@ Handled by `/workflows:ship` after review. Plan will produce:
 
 **Added gate-respect reminder inside § 4.1** (not in original Task 1 body). The linter walks `##` and `###` headers as independent sections, so § 4.1 needs its own `<!-- gate-respect: ... -->` comment — § 4's comment does not cascade into its ### subsection. First linter run flagged `ERROR:...§ 4.1 SQ3 option lock: AskUserQuestion at line 118 without gate-respect reminder`. Added a one-line comment directly under the § 4.1 header; re-run returned 5 call-site reminders (up from 4). Deliberate-break test then bit two BC-5872 regexes as expected.
 
+**Added "Mark unassigned" as Option 3 in § 4.1.** Plan Summary + Task 1 content described the lock as "Keep existing / Reassign / Other" (2 options + Other escape). Shipped § 4.1 enumerates THREE options + Other, adding **Mark unassigned** (clears `assignee` to `null`). This matches BC-5810 § 2.2 SQ3's ratified escape paths verbatim — *"reassign specific IDs; mark specific IDs unassigned"* — so it is additive spec-fidelity, not spec extension. Plan text was under-spec'd by one option.
+
+**Simplify-pass collapsed `add\s+co-owner` + `\bco-owner(?:s|ship)?\b` into one `\b(?:add\s+)?co-owner(?:s|ship)?\b` pattern** (review commit `c7255dd`). Task 2's code block still reads FIVE regex entries; shipped linter ships FOUR in the BC-5872 tier. Behavior preserved: unauthorized "add co-owner" line now fires exactly one ERROR row (was two — both old regexes hit). Deliberate-break test re-run confirmed. Task 2 rationale "Five regexes because…" remains valid context for the pre-simplify design; the collapse is a post-hoc tightening.
+
+**Tightened `\b` word-boundary anchors on `multi-assignee` + `multiple\s+assignees`** (review tidy-up). Initial shipped regexes were unanchored; style-asymmetric with siblings `\bco-owner...\b` and `\bco-watcher\b`. Post-fix: `\bmulti-assignee(?:s)?\b` (absorbs the plural that `multiple\s+assignees` doesn't cover — no whitespace between tokens) + `\bmultiple\s+assignees\b`. Behavior preserved on the intended inputs; defense against future substring-match false positives like `submulti-assignee`.
+
 ## References
 
 - BC-5872 issue (full description + 3 options + AC)

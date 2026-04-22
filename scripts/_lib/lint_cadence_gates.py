@@ -79,8 +79,8 @@ FORBIDDEN_PHRASE_PATTERNS = [
     # BC-5872: SQ3 co-owner improvisation (Linear single-assignee mismatch)
     (re.compile(r"\b(?:add\s+)?co-owner(?:s|ship)?\b", re.IGNORECASE), "BC-5872"),
     (re.compile(r"\bco-watcher\b", re.IGNORECASE), "BC-5872"),
-    (re.compile(r"multi-assignee", re.IGNORECASE), "BC-5872"),
-    (re.compile(r"multiple\s+assignees", re.IGNORECASE), "BC-5872"),
+    (re.compile(r"\bmulti-assignee(?:s)?\b", re.IGNORECASE), "BC-5872"),
+    (re.compile(r"\bmultiple\s+assignees\b", re.IGNORECASE), "BC-5872"),
 ]
 
 # A line containing a forbidden phrase is exempt (treated as anti-pattern citation,
