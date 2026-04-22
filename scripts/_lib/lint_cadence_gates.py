@@ -59,6 +59,41 @@ PROSE_PATTERNS = [
     re.compile(r"`?AskUserQuestion`?\s+(?:convention|gates|pattern|tool\b)", re.IGNORECASE),
 ]
 
+# Forbidden phrases surfaced as runtime improvisations during the W17 dogfood.
+# (origin: BC-5864 project-level triage gate + BC-5865 condensed-prompt shortcut)
+# The linter flags any occurrence of these in an active body line UNLESS the line
+# also carries a banned-context cue (see FORBIDDEN_EXEMPT_PATTERNS). Skill/command
+# bodies must never AUTHORIZE these patterns — they may only be cited as anti-
+# patterns inside STOP blocks. Extend the list when new improvisation phrases
+# surface in future dogfood cycles.
+FORBIDDEN_PHRASE_PATTERNS = [
+    # BC-5864: project-level triage
+    (re.compile(r"Active projects only", re.IGNORECASE), "BC-5864"),
+    (re.compile(r"Top\s+(?:\d+|N)\s+by ship count", re.IGNORECASE), "BC-5864"),
+    (re.compile(r"\btriage\s+(?:menu|gate|prompt)\b", re.IGNORECASE), "BC-5864"),
+    # BC-5865: condensed-prompt shortcut
+    (re.compile(r"condensed[-\s]prompt", re.IGNORECASE), "BC-5865"),
+    (re.compile(r"consolidated\s+`?AskUserQuestion`?", re.IGNORECASE), "BC-5865"),
+    (re.compile(r"pragmatic\s+condensed", re.IGNORECASE), "BC-5865"),
+    (re.compile(r"batched\s+(?:scope|carry-over)", re.IGNORECASE), "BC-5865"),
+]
+
+# A line containing a forbidden phrase is exempt (treated as anti-pattern citation,
+# not authorization) when any of these signals is present on the same line:
+#   1. The phrase appears as an italic-quoted example `*"..."*` — bullet form
+#      used by STOP blocks to enumerate banned patterns.
+#   2. A negation / banned-context cue ("No", "Do not", "never", "banned",
+#      "forbidden", "improvisation", "do NOT") appears somewhere on the line.
+# Symmetric in intent to PROSE_PATTERNS: detect discussion-of-phrase vs.
+# authorization-of-phrase without over-engineering.
+FORBIDDEN_EXEMPT_PATTERNS = [
+    re.compile(r'\*"[^"]*"\*'),  # italic-quoted example
+    re.compile(
+        r"\b(?:no|do not|do NOT|never|banned|forbidden|improvisation|shortcut|W17 dogfood)\b",
+        re.IGNORECASE,
+    ),
+]
+
 
 def _is_excluded_section(title: str) -> bool:
     t = title.lstrip("§").strip().lower()
@@ -115,6 +150,19 @@ def _is_call_site(line: str) -> bool:
     return True
 
 
+def _is_forbidden_exempt(line: str) -> bool:
+    """True iff a forbidden-phrase match on this line is a citation, not authorization.
+
+    Mirrors _is_call_site's intent-based filtering: a line that quotes the phrase
+    as an italic example (`*"..."*`) or explicitly negates it ("No ...", "never",
+    "banned", "forbidden", "improvisation") is discussing the phrase, not using it.
+    """
+    for exempt in FORBIDDEN_EXEMPT_PATTERNS:
+        if exempt.search(line):
+            return True
+    return False
+
+
 def _iter_active_lines(body_lines: list[str]):
     """Yield (body_idx, line) for body lines that are NOT inside a fenced code
     block or a blockquote. Fences toggle state on every `` ``` `` / `~~~` marker;
@@ -160,11 +208,13 @@ def _lint_file(path: Path, repo_root: Path) -> list[str]:
         return [f"ERROR:{rel}: cannot read file ({e})"]
 
     lines = text.splitlines()
-    # Walk sections once; reused by both the header check and the per-section scan.
+    # Walk sections once; reused by header check, per-section AUQ scan, and
+    # forbidden-phrase scan.
     sections = list(_walk_sections(lines))
 
     # 1. Inventory AskUserQuestion call-sites in structured sections.
     violations: list[tuple[str, int]] = []  # (section_title, line_no)
+    forbidden_violations: list[tuple[str, int, str, str]] = []  # (title, line, phrase, ticket)
     auq_sections_seen: set[str] = set()
     for title, start, end in sections:
         if title == "<preamble>":
@@ -196,6 +246,26 @@ def _lint_file(path: Path, repo_root: Path) -> list[str]:
         if not GATE_RESPECT_COMMENT_RE.search(head_active):
             violations.append((title, start + 1 + first_auq_idx + 1))
 
+    # 1b. Scan every structured section for forbidden-phrase authorizations.
+    # Fence/blockquote skip is inherited from _iter_active_lines. Per-line
+    # exemption (_is_forbidden_exempt) distinguishes STOP-block citations from
+    # authorizing prose.
+    for title, start, end in sections:
+        if title == "<preamble>":
+            continue
+        if _is_excluded_section(title):
+            continue
+        body_lines = lines[start + 1 : end]
+        for i, line in _iter_active_lines(body_lines):
+            if _is_forbidden_exempt(line):
+                continue
+            for pattern, ticket in FORBIDDEN_PHRASE_PATTERNS:
+                m = pattern.search(line)
+                if m:
+                    forbidden_violations.append(
+                        (title, start + 1 + i + 1, m.group(0), ticket)
+                    )
+
     # 2. If this file has any AUQ in a structured section, header rule fires.
     if auq_sections_seen and not _has_top_of_file_gate_respect_header(sections, lines):
         out.append(f"ERROR:{rel}: missing gate-respect header (## Gate-respect section linking _shared/gate-respect.md)")
@@ -205,6 +275,12 @@ def _lint_file(path: Path, repo_root: Path) -> list[str]:
         # emit `{title}` directly (not f"§{title}") to avoid the §§ duplication.
         out.append(
             f"ERROR:{rel}:{title!s}: AskUserQuestion at line {line_no} without gate-respect reminder in the same section"
+        )
+
+    for title, line_no, phrase, ticket in forbidden_violations:
+        out.append(
+            f"ERROR:{rel}:{title!s}: forbidden phrase \"{phrase}\" at line {line_no} "
+            f"(banned by {ticket} — use a STOP citation if intentional)"
         )
 
     if not out and auq_sections_seen:
