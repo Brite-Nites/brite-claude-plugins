@@ -73,7 +73,7 @@ For the Kanban regex, run one batched grep across all candidate paths at once to
 grep -lE "<type>(Picklist|MultiselectPicklist)</type>" <path1> <path2> ...
 ```
 
-The output is the subset of paths that actually contain a Picklist or MultiselectPicklist field. Text / Number / Date fields on standard objects are not affected and will not appear in the output.
+The `-l` flag emits filenames-only (one path per line for each file containing a match) — which is all Phase 5 needs, because the `{Object}.{Field}` listing is re-derived from the path itself, not from the grep output content. This is why Phase 4.1 uses `-HE` instead: there, grep is surfacing the actual PLACEHOLDER URL text, so filename-prefixed matches (`-H`) are needed for per-NC attribution. Text / Number / Date fields on standard objects are not affected and will not appear in the output.
 
 ### 1.4 All-false fast-exit
 
@@ -101,7 +101,7 @@ Narrate: `Phase 2/6: Flow activation...`
 
 ### 2.1 List affected Flows
 
-From the Phase 1.3 diff output, filter paths matching `flows/.*\.flow-meta\.xml`. For each, extract the developer name from the filename (strip `.flow-meta.xml`). Print the list:
+From the Phase 1.3 diff output, filter paths matching `^force-app/.*/flows/.*\.flow-meta\.xml$` — the same regex as Phase 1.3 (one source of truth). For each, extract the developer name from the filename (strip `.flow-meta.xml`). Print the list:
 
 > The following Flows were deployed. Per Salesforce platform behavior, Screen Flows deploy as Draft regardless of `<status>Active</status>` in source metadata — activate each manually before users rely on it.
 >
@@ -143,7 +143,7 @@ Narrate: `Phase 3/6: Scheduled Apex re-schedule...`
 
 ### 3.1 List affected Schedulers
 
-From the Phase 1.3 diff output, filter paths matching `classes/.*(Scheduler|Scheduled).*\.cls(-meta\.xml)?$` **and** NOT ending in `Test.cls` or `Test.cls-meta.xml` (apply the same Test-exclusion as Phase 1.3 — test classes match the name pattern but aren't schedulable). Extract the class name from the filename (strip `.cls-meta.xml` or `.cls` suffix). Since each class ships a paired source + metadata file, de-duplicate by base name — and this listing must remain non-empty when `needs_scheduled_apex_reschedule` is true, including the edge case where only the `.cls-meta.xml` is in the diff (metadata-only API-version bump). Print:
+From the Phase 1.3 diff output, filter paths matching `^force-app/.*/classes/.*(Scheduler|Scheduled).*\.cls(-meta\.xml)?$` **and** NOT ending in `Test.cls` or `Test.cls-meta.xml` — the same regex and Test-exclusion as Phase 1.3 (one source of truth). Extract the class name from each matched path by stripping the `.cls-meta.xml` or `.cls` suffix, then de-duplicate by base name. This handles all three diff shapes: paired `.cls` + `.cls-meta.xml` produce one class name after dedup; a `.cls`-only change produces one class name; a `.cls-meta.xml`-only change (metadata-only API-version bump) produces one class name. The listing must be non-empty whenever `needs_scheduled_apex_reschedule` is true. Print:
 
 > The following Scheduled Apex classes were deployed. Per `brite-salesforce/CLAUDE.md` §Apex & Automation, CronTrigger rows do not survive a deploy that replaces the class, and do not survive sandbox refresh. Re-schedule each one manually.
 >
@@ -161,7 +161,7 @@ System.schedule('<Job Name>', '<cron expression>', new <SchedulerClass>());
 
 Replacement guidance:
 
-- `<Job Name>` — conventionally matches the class name (e.g., `'LeadScoringScheduler'`). The job name is what appears in `Setup → Apex Jobs → Scheduled Jobs`.
+- `<Job Name>` — conventionally matches the class name (e.g., `'LeadScoringScheduler'`). The job name is what appears in `Setup → Environment → Jobs → Scheduled Jobs`.
 - `<cron expression>` — preserve the prior schedule. Standard Brite patterns: hourly = `'0 0 * * * ?'`, daily at 3am UTC = `'0 0 3 * * ?'`, weekly Sunday at midnight = `'0 0 0 ? * SUN'`. If you don't know the prior cron, check the target org: `SELECT Id, CronJobDetailId, CronExpression, State FROM CronTrigger` via SOQL, **before** you deploy next time.
 
 Execute via:
@@ -172,7 +172,7 @@ sf apex run --target-org <alias> --file scratch.apex
 
 where `scratch.apex` contains the `System.schedule(...)` line(s). Alternatively paste into Developer Console → Execute Anonymous.
 
-Verify jobs exist post-schedule via `Setup → Apex Jobs → Scheduled Jobs`.
+Verify jobs exist post-schedule via `Setup → Environment → Jobs → Scheduled Jobs` (not "Apex Jobs" — that's the async execution-history page; "Scheduled Jobs" is the sibling page carrying the active `CronTrigger` rows and the `Del` column).
 
 ### 3.3 Gate
 
@@ -186,7 +186,7 @@ Ask via `AskUserQuestion`:
 
 If the user selects `Need help`, print this guidance verbatim then re-ask the question (do not advance):
 
-> If you get `System.AsyncException: An instance of the scheduled class has already been scheduled with this name`, the prior job still exists — abort it first via `Setup → Apex Jobs → Scheduled Jobs → <row> → Del`, then re-run `System.schedule`. If you need the prior cron and don't have it, the target org's `CronTrigger` table has it (pre-redeploy — query `SELECT Id, CronJobDetail.Name, CronExpression, State FROM CronTrigger WHERE State = 'WAITING'`).
+> If you get `System.AsyncException: An instance of the scheduled class has already been scheduled with this name`, the prior job still exists — abort it first via `Setup → Environment → Jobs → Scheduled Jobs → <row> → Del`, then re-run `System.schedule`. If you need the prior cron and don't have it, the target org's `CronTrigger` table has it (pre-redeploy — query `SELECT Id, CronJobDetail.Name, CronExpression, State FROM CronTrigger WHERE State = 'WAITING'`).
 
 Narrate: `Phase 3/6: Scheduled Apex re-schedule... done`
 
@@ -198,7 +198,7 @@ Narrate: `Phase 4/6: Named Credential URL update...`
 
 ### 4.1 List affected Named Credentials
 
-From the Phase 1.3 diff output, filter paths matching `namedCredentials/.*\.namedCredential-meta\.xml`. Extract the Named Credential name from the filename. Surface the PLACEHOLDER value in each file via one batched grep across all NC paths (not one invocation per NC):
+From the Phase 1.3 diff output, filter paths matching `^force-app/.*/namedCredentials/.*\.namedCredential-meta\.xml$` — the same regex as Phase 1.3 (one source of truth). Extract the Named Credential name from the filename. Surface the PLACEHOLDER value in each file via one batched grep across all NC paths (not one invocation per NC):
 
 ```bash
 grep -HE "<endpoint>" <path1> <path2> ...
@@ -316,9 +316,9 @@ Narrate: `Phase 6/6: Completion summary... done`
 ## Rules
 
 - **This command issues ZERO `sf` CLI mutations.** It is a read-only walkthrough of user-performed manual steps. Every mutating action is executed by the user in their browser / IDE / Developer Console; the command narrates, detects, and gates.
-- **Never skip a gate silently.** Every `AskUserQuestion` halt path must halt — no silent continuation. `Skip` answers explicitly advance the phase but get surfaced as follow-ups in Phase 6.
+- **Never advance past a gate silently.** Every `AskUserQuestion` has a defined advance / halt / repeat disposition for each option: the phase-completed option advances with status `completed`; the `Skip — will do later` option advances with status `skipped` (Phase 6 surfaces it as follow-up); `Need help` repeats the same question (see final rule); any other answer — including halt paths defined per-phase — halts cleanly without continuing to the next phase.
 - **`sf`, not `sfdx`.** Any CLI invocations (e.g., the `sf apex run` example in Phase 3.2 guidance) use `sf`. Legacy `sfdx` subcommands are deprecated per `brite-salesforce/CLAUDE.md`.
-- **No auto-retries.** If Phase 1's `git diff` invocation fails (non-zero exit), print the raw error and halt — never silently retry with a different range. If a `grep` call in Phase 1.3 (Kanban secondary check) or Phase 4.1 (PLACEHOLDER surface) **errors (exit ≥ 2** — real fault like unreadable file, bad regex, permission denied), surface the raw error and halt. Exit 1 (no match found) is a legitimate outcome at both grep sites — it means the candidate paths had no Picklist/MultiselectPicklist (Phase 1.3) or the NC is a modern ExternalCredential-backed one with no `<endpoint>` (Phase 4.1) — and is handled by body-phase logic, not treated as failure.
+- **No auto-retries.** If Phase 1's `git diff` invocation fails (non-zero exit), print the raw error and halt — never silently retry with a different range. If a `grep` call in Phase 1.3 (Kanban secondary check) or Phase 4.1 (PLACEHOLDER surface) **errors** (exit ≥ 2 — real fault like unreadable file, bad regex, permission denied), surface the raw error and halt. Exit 1 (no match found) is a legitimate outcome at both grep sites — it means the candidate paths had no Picklist/MultiselectPicklist (Phase 1.3) or the NC is a modern ExternalCredential-backed one with no `<endpoint>` (Phase 4.1) — and is handled by body-phase logic, not treated as failure.
 - **Org-agnostic.** Unlike `/revops:deploy-sandbox` and `/revops:deploy-prod`, this command does not pin a target org. The user invokes it after deploying to whichever org the manual steps apply to; the command shows paths for both sandbox and prod where relevant (e.g., Phase 4), but issues no org-specific calls itself.
 - **No Linear mutations.** Skip follow-ups surface as narrated reminders only; the user creates Linear sub-issues manually if tracking is needed. This preserves the Phase 2 template contract (allowed-tools = `Bash, AskUserQuestion`) inherited from `/revops:deploy-sandbox` (BC-5790) and `/revops:deploy-prod` (BC-5791).
 - **Conditional phases compile cleanly.** When Phase 1 detection flags a phase as not-applicable, the entire phase block (narration + listing + gate) is skipped — no "N/A" inline noise. The only place `N/A — not detected` appears is the Phase 6 summary matrix.

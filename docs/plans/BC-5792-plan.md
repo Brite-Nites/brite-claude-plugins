@@ -37,19 +37,21 @@ Per `docs/precedents/BC-5790.md` + `docs/precedents/BC-5791.md` and the two ship
 | Diff detection | N/A | N/A | **New mechanic**: Phase 1 runs `git diff HEAD~1 --name-only` (or user-supplied range) and classifies touched files into 4 detection flags |
 | Skip semantics | No skip option (halts or proceeds) | No skip option (halts or proceeds) | **3-way gate** at each phase: Completed / Skip / Need help — Skip surfaces in Phase 6 as a follow-up list |
 | Completion summary | Phase 6 — terminal | Phase 7 — terminal + runbook hint | **Phase 6 — terminal** with per-phase status (ran / skipped / N/A-not-detected) and explicit follow-up recap for any Skip |
+| Detection semantics | N/A | N/A | **Deny-`__c` inversion for Kanban** — any non-custom object, not a fixed 8-object allowlist. **Test-class exclusion for Scheduler** — filenames ending in `Test.cls` / `Test.cls-meta.xml` drop from the flag despite matching the base `(Scheduler|Scheduled)` pattern. |
+| Shell-call economy | Single `sf` call per phase | Single `sf` call per phase | **Batched `grep`** — Phase 1.3 Kanban secondary check and Phase 4.1 NC endpoint surface each spawn one subprocess across all candidate paths, not N subprocesses. |
 
 ## Phase structure (from issue body §Plan, Brite-adapted)
 
 - **Phase 1 — Diff-based detection**
   - 1.1 Confirm cwd is SFDX project → halt if not (matches T7 + BC-5790/5791 pre-flight).
   - 1.2 Prompt for commit range via `AskUserQuestion`: default `HEAD~1..HEAD` (just-deployed commit), or user-supplied range like `origin/main~5..origin/main`. The command is org-agnostic — it uses git diff, not `sf` diff, so any post-merge range works.
-  - 1.3 Run `git diff <range> --name-only` and classify each touched path against four detection regexes:
-    - `force-app/.*/flows/.*\.flow-meta\.xml` → `needs_flow_activation = true`
-    - `force-app/.*/classes/.*(Scheduler|Scheduled).*\.cls(-meta\.xml)?` → `needs_scheduled_apex_reschedule = true`
-    - `force-app/.*/namedCredentials/.*\.namedCredential-meta\.xml` → `needs_named_credential_update = true`
-    - `force-app/.*/objects/(Account|Contact|Lead|Opportunity|Case|Task|Event|User)/fields/.*\.field-meta\.xml` containing `<type>Picklist</type>` → `needs_kanban_flush = true` (standard-object picklist only — custom objects don't have the Kanban cache bug)
+  - 1.3 Run `git diff <range> --name-only` and classify each touched path against four detection regexes. The shipped command file is the source of truth; summary here reflects the shipped shape (including simplify-pass refinements for false-positive/false-negative correctness):
+    - `^force-app/.*/flows/.*\.flow-meta\.xml$` → `needs_flow_activation = true`
+    - `^force-app/.*/classes/.*(Scheduler|Scheduled).*\.cls(-meta\.xml)?$` AND filename does NOT end in `Test.cls` / `Test.cls-meta.xml` → `needs_scheduled_apex_reschedule = true` *(Test-exclusion drops non-schedulable test classes that match the name pattern.)*
+    - `^force-app/.*/namedCredentials/.*\.namedCredential-meta\.xml$` → `needs_named_credential_update = true`
+    - `^force-app/.*/objects/(?<object>[^/]+)/fields/.*\.field-meta\.xml$` where `<object>` does NOT end in `__c` AND file contains `<type>Picklist</type>` or `<type>MultiselectPicklist</type>` → `needs_kanban_flush = true` *(deny-`__c` approach catches all standard objects — not only the 8 most-common ones — since the Kanban Group By cache bug is a platform behavior on any non-custom object. MultiselectPicklist has the same cache semantics as Picklist.)*
   - 1.4 If all four flags are false → Phase 6 fast-exit with "No manual post-deploy steps required for this diff" (T5).
-  - 1.5 Otherwise, narrate the detection summary: "Detected: Flow activation, Scheduled Apex reschedule. Skipped: Named Credential update, Kanban flush." Then proceed to Phase 2.
+  - 1.5 Otherwise, narrate the detection summary: "Detected: Flow activation, Scheduled Apex re-schedule. Skipped: Named Credential update, Kanban flush." Then proceed to Phase 2.
 
 - **Phase 2 — Flow activation** *(conditional on `needs_flow_activation`)*
   - List each `.flow-meta.xml` path touched, extracting the developer name from the filename.
@@ -67,11 +69,10 @@ Per `docs/precedents/BC-5790.md` + `docs/precedents/BC-5791.md` and the two ship
   - **`AskUserQuestion`** — 3-way: `All scheduled` / `Skip` / `Need help`.
 
 - **Phase 4 — Named Credential URL update** *(conditional on `needs_named_credential_update`)*
-  - List each `.namedCredential-meta.xml` touched.
+  - List each `.namedCredential-meta.xml` touched. Surface each file's PLACEHOLDER endpoint via one batched `grep -HE "<endpoint>" <path1> <path2> ...` call (N → 1 subprocess spawns; `-H` forces filename prefix for per-NC attribution). Classic NCs return one line per file; modern ExternalCredential-backed NCs return zero lines (handled as "endpoint lives in paired `.externalCredential-meta.xml`" in the narration).
   - For each, show **per-org** instructions (sandbox + prod separately), because the Named Credential XML in source carries PLACEHOLDER URLs by Brite convention:
     - `brite-sandbox`: `Setup → Named Credentials → {Name} → Edit → set URL to <sandbox-URL>`
     - `brite-prod`: `Setup → Named Credentials → {Name} → Edit → set URL to <prod-URL>`
-  - Surface the source XML's PLACEHOLDER value to make the update obvious.
   - **`AskUserQuestion`** — 3-way: `All URLs updated` / `Skip` / `Need help`.
 
 - **Phase 5 — Kanban Group By cache flush** *(conditional on `needs_kanban_flush`)*
@@ -83,30 +84,32 @@ Per `docs/precedents/BC-5790.md` + `docs/precedents/BC-5791.md` and the two ship
 - **Phase 6 — Completion summary** *(always runs; Phase 1 fast-exit path also terminates here)*
   - Per-phase status matrix:
     - `✓ Flow activation: {completed / skipped / N/A — not detected}`
-    - `✓ Scheduled Apex reschedule: {completed / skipped / N/A — not detected}`
+    - `✓ Scheduled Apex re-schedule: {completed / skipped / N/A — not detected}`
     - `✓ Named Credential URL update: {completed / skipped / N/A — not detected}`
     - `✓ Kanban Group By flush: {completed / skipped / N/A — not detected}`
   - **Skip follow-up list** — if any phase returned Skip:
     > ⚠️ Follow-up required: {list of skipped phases}. These manual steps are still pending — don't consider this deploy done until they're complete. Re-run `/revops:post-deploy-runbook` after completing them, or track as a Linear sub-issue.
   - No automatic Linear mutation (honors allowed-tools contract — user does any Linear follow-up manually).
 
-## Rules block (top of command file)
+## Rules block (bottom of command file)
 
-The Rules block goes directly after the `# /revops:post-deploy-runbook` heading and before Phase 1. Verbatim contents:
+Per BC-5790/5791 precedent, the Rules block lives at the **bottom** of the command file with a forward-reference from the intro. Shipped block content (final — as landed after simplify + review passes):
 
-- **This command issues ZERO `sf` CLI mutations.** It is a read-only walkthrough of user-performed manual steps. Every mutating action is executed by the user in their browser / IDE; the command narrates, detects, and gates.
-- **Never skip a gate.** Every `AskUserQuestion` halt path must halt — no silent continuation. `Skip` answers continue but get surfaced in Phase 6.
-- **`sf`, not `sfdx`.** Legacy `sfdx` subcommands are deprecated per `brite-salesforce/CLAUDE.md`.
-- **No auto-retries.** If Phase 1's `git diff` call fails, print the raw error and halt — don't silently retry with a different range.
-- **Org-agnostic.** Unlike `/revops:deploy-*`, this command does not pin a target org. User invokes it after deploying to whichever org the manual steps apply to.
-- **No Linear mutations.** Skip follow-ups surface as narrated reminders; user creates Linear sub-issues manually if tracking is needed. Command's `allowed-tools` is `Bash, AskUserQuestion` — consistent with BC-5790 + BC-5791 template.
+- **ZERO `sf` CLI mutations** — read-only walkthrough of user-performed manual steps.
+- **Never advance past a gate silently** — explicit per-option disposition: completed advances, Skip advances with skipped status (Phase 6 follow-up), Need help repeats, anything else halts.
+- **`sf`, not `sfdx`** — legacy subcommands deprecated per `brite-salesforce/CLAUDE.md`.
+- **No auto-retries** — `git diff` failure halts with raw error. `grep` errors (exit ≥ 2) halt; exit 1 (no-match) is legitimate at both grep sites.
+- **Org-agnostic** — no `--target-org` pin; user invokes after deploying.
+- **No Linear mutations** — Skip follow-ups are narrated reminders only.
+- **Conditional phases compile cleanly** — a phase skipped by Phase 1's detection flag emits zero narration; `N/A — not detected` appears only in the Phase 6 summary matrix.
+- **Need help is a repeat, not an advance** — print guidance, re-ask the original question.
 
 ## Tasks
 
 1. **Write `plugins/revops/commands/post-deploy-runbook.md` skeleton + frontmatter + Rules block** (~5 min)
    - Frontmatter: `description` (post-deploy runbook — diff-driven walk), `allowed-tools: Bash, AskUserQuestion`.
    - Copy skeleton shape from `plugins/revops/commands/deploy-sandbox.md` (Phase N/M narration style, `---` separators).
-   - Rules block per spec above (6 bullets).
+   - Rules block per spec above (8 bullets, at bottom of file; shipped count reflects simplify + review pass expansions).
 
 2. **Draft Phase 1 — diff-based detection** (~10 min)
    - 1.1 SFDX cwd halt (copy from BC-5790/5791 verbatim).
