@@ -38,6 +38,7 @@ None registered. Linear is consumed via `mcp__plugin_workflows_linear-server__*`
 ## Gotchas
 
 - **Cycle ≠ week number in Linear.** Match on cycle title string or resolve via `type: "current" | "previous"`.
+- **Cycle window is display-inclusive, stored-exclusive.** Every user-facing cycle-window render (`/cadence:weekly` § 0.2 / § 0.3 / § 5.2 + narrative-writer H2) uses `<startsAt> → <endsAt − 1 day>` — Linear's `endsAt` is exclusive (equals next cycle's `startsAt`). `state.cycle.current.endsAt` raw stays as-is for idempotency predicates, `cycle.id` equality, and `CYCLE_DATE`/`WEEK_DIR` math. Origin: BC-5868 (W17 dogfood cosmetic fix).
 - **`list_projects` `state: "started"` + team filter returns empty.** List all projects and filter client-side (BC-5757 § 2.3).
 - **Day-1 cycle scope is not exposed by MCP.** Phase 2 parses the prior week's narrative for the planned-vs-unplanned denominator.
 - **Linear Prosemirror markdown mangling.** Always verify Linear writes via `get_issue` after `save_issue`. See `memory/gotcha_linear_markdown_mangling.md` — 8 known patterns, paragraph form with `**Bold.** sentence.` leads is safest.
