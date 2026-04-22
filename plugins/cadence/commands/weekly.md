@@ -19,10 +19,11 @@ Call `mcp__plugin_workflows_linear-server__list_projects` with `limit: 1`. On su
 ### 0.2 Current cycle detection
 
 <!-- gate-respect: honor user pick; re-prompt before any behavior change. -->
+<!-- cycle-window format: `<startsAt> → <endsAt − 1 day>`. Linear's `endsAt` is exclusive (equals next cycle's `startsAt`); subtract 1 day for the inclusive last day. Applies to every cycle-window render — § 0.2, § 0.3, § 5.2, narrative-writer H2. Raw `state.cycle.current.endsAt` stays as-is for idempotency predicates and `cycle.id` equality. Origin: BC-5868 (W17 dogfood cosmetic fix). -->
 
 Call `mcp__plugin_workflows_linear-server__list_cycles` with `type: "current"` scoped to the Brite Company team (`teamId` required per BC-5757 § 2.3 — cycle queries need the UUID, not the team name). Extract the cycle `name`, `startsAt`, `endsAt`. Present via `AskUserQuestion`:
 
-> Current cycle appears to be **W##** (`<startsAt>` to `<endsAt>`). Is this the week you want to plan?
+> Current cycle appears to be **W##** (`<startsAt>` → `<endsAt − 1 day>`). Is this the week you want to plan?
 
 Options: (Recommended) "Yes, plan W##"; "Use a different cycle" (free-text); "Cancel".
 
@@ -33,7 +34,7 @@ Options: (Recommended) "Yes, plan W##"; "Use a different cycle" (free-text); "Ca
 
 Call `mcp__plugin_workflows_linear-server__list_projects` with pagination (the `state: "started"` + team filter returns empty — list all and filter client-side per BC-5757 § 2.3). Filter to `status.type == "started"`. For each selected project, store `{id, name, status, owner: project.lead.name || null}` in `state.projects[]` — `owner` is the Linear project lead's display name (null if the project has no lead), consumed by Phase 4's narrative-writer Sprint Plans cards. Echo the count and top 5 by `updatedAt`:
 
-> **N active projects** will be audited this session. Top 5 most recent: `<project>`, `<project>`, …
+> **W<NN>** (`<startsAt>` → `<endsAt − 1 day>`) — **N active projects** will be audited this session. Top 5 most recent: `<project>`, `<project>`, …
 
 `AskUserQuestion`: "Proceed with all N, or pick a subset?" Default: "All N (Recommended)". Escape: "Pick a subset" (free-text comma-separated project names).
 
@@ -513,7 +514,7 @@ Write (overwrites any existing file — this is a fresh generation, not a merge)
 ```markdown
 # W<NN> Remaining Operations
 
-_Generated <ISO-8601 now> by /cadence:weekly Phase 5. Target cycle: W<NN> (<startsAt> to <endsAt>)._
+_Generated <ISO-8601 now> by /cadence:weekly Phase 5. Target cycle: W<NN> (<startsAt> → <endsAt − 1 day>)._
 
 Narrative: `<narrative_path>`
 PDF: `<pdf_path or "SKIPPED — see Share section">`

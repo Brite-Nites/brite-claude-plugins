@@ -52,6 +52,8 @@ The draft must have exactly these 6 top-level section headings in this order:
 ## Team Assignments
 ```
 
+The `DD-DD` range in `## <Month DD-DD, YYYY>` uses `cycle.current.startsAt.day` and `(cycle.current.endsAt − 1 day).day` — Linear's `endsAt` is exclusive (equals next cycle's `startsAt`); subtract one day for the inclusive last day. Same convention as `/cadence:weekly` § 0.2 / § 0.3 / § 5.2 renders. Origin: BC-5868 (W17 dogfood cosmetic fix).
+
 Followed by a footer: `*This document was prepared by <planner> on <cycle.current.startsAt formatted as Month DD, YYYY>. All issues referenced are in the current Linear cycle (W<NN>). If your name appears above, your work for this week is defined — check Linear for your assigned issues.*` — `<planner>` is the name passed in the dispatch body (defaults to `Holden` until BC-5763 dogfood wires it from `git config user.name` or a config field).
 
 No extra `## ` top-level headers. No renamed headers. No missing headers. AC #1 is a section-header diff — any drift here fails the issue.
