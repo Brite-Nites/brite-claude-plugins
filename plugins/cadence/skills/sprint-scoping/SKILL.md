@@ -38,6 +38,17 @@ Populates / mutates:
 
 <!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to every AskUserQuestion in this § 2 pre-loop. -->
 
+**No project-level triage gate.** Do not surface any `AskUserQuestion` at Phase 2 entry that asks the user to narrow the project set before the interview begins. Every project in `state.projects[]` (already filtered to `status.type == "started"` by Phase 0.3) is interviewed. Adaptive-skip is per-question (§ 2.3), never per-project. A quiet prior cycle does NOT imply empty W+1 scope — backlog + Todo may still contain items to promote into the cycle.
+
+Specifically banned improvisation patterns (origin: BC-5864 W17 dogfood):
+
+- *"Active projects only (N of M)"* — auto-parks quiet-prior-cycle projects. A quiet prior cycle is not the same as empty W+1 scope.
+- *"Top N by ship count"* — filters by ship volume. Ship volume ≠ scope volume.
+- *"All N, strict spec"* presented as one of several options — legitimizes the other options by including them in the menu.
+- *"Abbreviated form"* / *"condensed form"* / any form that reduces per-project question count as a function of project count.
+
+Do not invent synonyms for the above. If the prompt count feels unsustainable (e.g. 130+ AskUserQuestion calls for 26 projects), that is the planner experience BC-5810 locked in — the right lever is a different spec decision (a new sub-cohort gate amended into BC-5810), not an improvised triage menu here.
+
 **Pre-loop (once per Phase 2 invocation):**
 
 - **Resume parse.** Read the current-week checkpoint file (path resolved per § 6) once. Parse every `### N. <project_name>` heading and build `state._scoped_project_names: Set<string>`. This is the single source of truth for resume state — § 2 step 1 and § 8 both consult this set. (If the file does not exist, the set is empty.)
@@ -58,7 +69,14 @@ After all projects: **§ 7 cross-project bottleneck pass**.
 
 <!-- gate-respect: honor user pick; re-prompt before any behavior change — applies to every CQ1–CQ5 AskUserQuestion in this section. -->
 
-For **every** issue in `state.projects[i].audit_card.carry_over.issues[]` (not just the highest-priority one — BC-5897), ask the 5 questions from BC-5810 § 2.1 verbatim. Iteration order is `carry_over.issues[]` array order (Phase 1 audit sorts by priority already). No priority-filter / rank-filter on block entry — only question-level adaptive-skip from § 2.3 applies. Each question is a **separate** `AskUserQuestion` tool call — no batching. Hard rule per `memory/feedback_one_question_at_a_time.md`. Skip rules from BC-5810 § 2.3 are evaluated *before* each `AskUserQuestion` call; skipped questions append a one-line entry to `skip_log`.
+For **every** issue in `state.projects[i].audit_card.carry_over.issues[]` (not just the highest-priority one — BC-5897), ask the 5 questions from BC-5810 § 2.1 verbatim. Iteration order is `carry_over.issues[]` array order (Phase 1 audit sorts by priority already). No priority-filter / rank-filter on block entry — only question-level adaptive-skip from § 2.3 applies.
+
+Each question is a **separate** `AskUserQuestion` tool call. **No batching, condensing, or consolidation — ever.** This applies regardless of carry-over count, project count, or context pressure. Specifically banned improvisation patterns (origin: BC-5865 W17 dogfood):
+
+- *"condensed-prompt"* / *"consolidated AskUserQuestion"* / *"pragmatic condensed pattern"* — any phrasing that batches 2+ CQs into one call.
+- *"batched carry-over block"* / *"skip the strict interview for projects without carry-over"* — any phrasing that groups CQs by issue or selectively batches across issues.
+
+Adaptive-skip (§ 2.3) may drop a question entirely with a `skip_log` entry — it may **never** merge a question with another. Hard rule per `memory/feedback_one_question_at_a_time.md`. Skip rules from BC-5810 § 2.3 are evaluated *before* each `AskUserQuestion` call; skipped questions append a one-line entry to `skip_log`.
 
 Every question carries: issue ID + title, one-line audit summary snippet (e.g. *"BC-2690 — MI reply sync. In Progress W15. No PR. Holden. 0 blockers."*), recommended default first with `(Recommended)` suffix, and "Other" as the free-text escape.
 
@@ -80,7 +98,12 @@ Once per project after carry-over completes (or immediately if carry-over was sk
 
 **Scope candidate injection from enricher.** Before SQ2, read `state.projects[i]._enrichment.brainstorming_ranked[]` populated by the § 2 pre-loop `project-enricher` dispatch. The top-ranked candidate (`rank == 1`) becomes SQ2's `(Recommended)` default in the `AskUserQuestion` call; alternatives at ranks 2–3 become options 2–3. No main-thread `workflows:brainstorming` Skill call — the enricher already ran the ranker logic with the same inputs (carry-over count, backlog-high count, shipped-pace, owner-load hint). If `brainstorming_ranked` is empty (e.g. enricher fell back to `Proceed without enrichment`), SQ2's default becomes `"carry-over only — no backlog proposals"` and the user escape-path "Other" carries free-text. **(Closes BC-5867 — brainstorming ranker moves from spec-misfit inline Skill call to dispatched subagent output consumed as data — BC-5902.)**
 
-The 5 questions from BC-5810 § 2.2 verbatim, each a **separate** `AskUserQuestion` call:
+The 5 questions from BC-5810 § 2.2 verbatim. **Each a separate `AskUserQuestion` call. No batching, condensing, or consolidation — ever.** This applies regardless of carry-over status, project count, or context pressure. Specifically banned improvisation patterns (origin: BC-5865 W17 dogfood):
+
+- *"one consolidated scope AskUserQuestion per project"* — exactly what the agent improvised during W17 for the 16 no-carry-over projects. Do not do this.
+- *"pragmatic condensed pattern"* / *"condensed-prompt"* / *"consolidated"* / *"batched scope questions"* — any phrasing that collapses 2+ SQs into one call.
+
+SQ1's answer constrains SQ2's option set (SQ1's headline drives SQ2's viable issue IDs); asking them simultaneously breaks the decision tree. If the condensed form ever feels justified, file a spec amendment to BC-5810 — do not improvise here.
 
 | Q-ID | Question | Recommended default |
 |---|---|---|
