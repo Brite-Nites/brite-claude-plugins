@@ -246,6 +246,7 @@ Never auto-execute. Never degrade the confirmation to a prose "please confirm" �
 - **No `.env.example` pattern.** Unlike Email Bison where the token is an env var, Salesforce has no env-var configuration. If you see a Salesforce-related `SALESFORCE_*` / `SFDX_*` / `SF_*` env var in a skill draft, it's almost certainly a leftover from an unrelated pattern — remove it.
 - **Pinned version may go stale quickly.** Upstream is in Developer Preview with multi-release-per-day cadence. Every version bump should go through a PR with explicit review of the release notes + provider CHANGELOGs.
 - **`DEFAULT_TARGET_ORG` must be set per-dev.** A dev who forgets `sf config set target-org <alias>` after logging in will see cryptic "no org found" errors from the MCP. The integration guide's onboarding step 6 is not optional.
+- **`run_soql_query` `usernameOrAlias` requires the literal username, not the alias or the `DEFAULT_TARGET_ORG` sentinel.** The `--orgs DEFAULT_TARGET_ORG` flag in `.mcp.json` (see §Registration) is resolved at MCP server startup via `sf config get target-org`, but the per-call `usernameOrAlias` tool parameter rejects both the sentinel and the alias with `"No org found with the provided username/alias"`. Pass the service user's literal username from the Bitwarden Notes field. Discovered during BC-5924.
 
 ## Related skills
 
