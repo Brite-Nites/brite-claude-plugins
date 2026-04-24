@@ -81,6 +81,8 @@ section "Bash PreToolUse — Should ALLOW"
 
 test_match "$BASH_REGEX" 'rm README.md'                      allow "rm single file (no -rf)"          i
 test_match "$BASH_REGEX" 'git push origin main'              allow "normal git push"                  i
+test_match "$BASH_REGEX" 'git push -u origin holden/feature-branch' allow "git push -u origin <new-branch> (BC-6000 regression)" i
+test_match "$BASH_REGEX" 'git push origin --delete feature'  allow "git push origin --delete (carve-out)" i
 test_match "$BASH_REGEX" 'git push --follow-tags origin main' allow "git push --follow-tags (not force)" i
 test_match "$BASH_REGEX" 'git log --oneline'                 allow "read-only git log"                i
 test_match "$BASH_REGEX" 'chmod 644 file.txt'                allow "safe chmod 644"                   i
