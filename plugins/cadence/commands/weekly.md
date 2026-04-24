@@ -280,7 +280,10 @@ Render to the user:
 2. **Per-project drift bullets** — one line per project *with activity*: `**<project>** — <shipped> shipped, <carry_over> carrying over, <dropped> dropped. <highest-priority carry-over ID if any>`. A project has activity when `audit_card.shipped.count + audit_card.carry_over.count + audit_card.dropped.count > 0`.
 3. **Zero-activity footer** — one line, only if any project had no activity: `Zero-activity this cycle (<N>): <comma-separated project names in the order they appear in state.projects[]>`. Project names are preserved so the planner can still spot idle-project signals; full audit cards remain in `audit.json`.
 4. **Audit gaps** subsection — only if any subagent failed: list each failed project + the suggested retry command (`/cadence:weekly --resume-phase 1 --project <name>`).
-5. **Quality flags** subsection — only if any flagged: one line per flag — `<issue_id> — <check>: <message>`.
+5. **Quality flags** subsection — only if any flagged:
+   - **≤10 flags total**: one line per flag — `<issue_id> — <check>: <message>`.
+   - **>10 flags total**: one aggregation line — `<N> flags total; highest density in <proj-1> (<n1>), <proj-2> (<n2>), <proj-3> (<n3>); by check: <check-1> (<m1>), <check-2> (<m2>), <check-3> (<m3>). Full records in audit.json.`
+   - Top-3 projects are ranked by absolute flag count across `audit_cards[].flags[]`, ties broken alphabetically by project name. Top-3 check types apply the same rule over `flag.check`. If fewer than 3 distinct projects or check types have flags, emit the actual count. `audit.json` always retains the full per-flag record regardless of which render path fires (§ 1.5 persistence is unchanged — the cap is a display decision, not a data-loss decision).
 
 **Scale target.** The rendering holds `≤300 words` when `≤20 projects have activity`. Each additional active project adds `~15 words` (per-bullet cost) and each additional zero-activity project adds `~1 word` (name in the footer). At 26+ projects where `~18` are active, the render lands near `~270 words`. Observed regression point: ~40+ active projects may push the render toward `~600 words` — if that threshold approaches in a future dogfood, file a follow-up for Option C paginated synthesis (BC-5869).
 

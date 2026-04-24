@@ -23,7 +23,7 @@
       "name": "cadence",
       "source": "./plugins/cadence",
       "description": "Weekly planning cadence plugin — audit, scope, housekeep, narrate, ops",
-      "version": "0.5.0"
+      "version": "0.5.1"
     },
     {
       "name": "revops",
