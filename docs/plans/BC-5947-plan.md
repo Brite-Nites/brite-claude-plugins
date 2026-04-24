@@ -97,7 +97,7 @@ Mirror `setup-email-bison.md` shape (frontmatter + 6 phases). Concrete differenc
 - Phase 5 (Verify): three things —
   1. `claude mcp list | grep -E "spider|aiark|discolike"` — all three must show `✓ Connected`.
   2. Smoke MCP tools: call one tool from each server (e.g., `discover_tools` if exposed, else a no-op probe like AI Ark's `aiark_search` with a tiny query).
-  3. Smoke 4 CLI scripts: each accepts `--help` (or `-h`): `icypeas_client.py`, `enrich_waterfall.py`, `verify_smtp.py`, `tier_and_segment.py`. Path: `python3 plugins/marketing/scripts/tam-map/<script>.py --help`.
+  3. Smoke 5 CLI scripts: each accepts `--help` (or `-h`): `icypeas_client.py`, `spider_crawl.py`, `enrich_waterfall.py`, `verify_smtp.py`, `tier_and_segment.py`. `spider_crawl.py` stays in the CLI verify list even though Spider also has an MCP — upstream tam-map runs it as a batch step that produces `crawled.jsonl` consumed by `tier_and_segment.py`. Path: `python3 plugins/marketing/scripts/tam-map/<script>.py --help`.
 - Phase 6 (Completion): summarize + flag known limitations (Pattern A → user must remember to re-source after key rotations).
 
 **Verify**: `./scripts/validate.sh` discovers the new command; `head -3 plugins/marketing/commands/setup-tam-map.md` shows valid frontmatter.

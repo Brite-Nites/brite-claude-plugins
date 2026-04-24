@@ -1,5 +1,5 @@
 ---
-description: Guided setup for the tam-map pipeline (Spider.cloud + AI Ark + Discolike MCPs + IcyPeas/BlitzAPI/Prospeo/MillionVerifier CLI scripts). Detects current state, walks the developer through getting 8 API keys from Bitwarden, exports them in the shell profile, and verifies all 3 MCP servers connect + 5 CLI scripts pass --help. Use when tam-mapping tools are missing, a skill errors with "tool not found" for spider/aiark/discolike/, or on first-time tam-map onboarding.
+description: Guided setup for the tam-map pipeline (Spider.cloud + AI Ark + Discolike MCPs + IcyPeas/BlitzAPI/Prospeo/MillionVerifier CLI scripts). Detects current state, walks the developer through getting 8 API keys from Bitwarden, exports them in the shell profile, installs npm + pip dependencies, and verifies all 3 MCP servers connect + 5 CLI scripts pass --help. Use when tam-mapping tools are missing, a skill errors with "tool not found" for spider/aiark/discolike/, or on first-time tam-map onboarding.
 allowed-tools: Bash, Read, AskUserQuestion
 ---
 
@@ -61,7 +61,35 @@ Ask:
 
 Wait for "Yes" before proceeding.
 
-## Phase 4 — Reload plugins
+## Phase 4 — Install dependencies
+
+The 2 stdio wrappers (`aiark-mcp.js`, `discolike-mcp.js`) import `@modelcontextprotocol/sdk` from `plugins/marketing/scripts/tam-map/package.json`, and the 5 Python CLI scripts import `requests` / `aiohttp` / `python-dotenv` / `anthropic` at module top. Without these installed, Phase 6's MCP-connect and CLI `--help` checks all fail before any auth/key probe runs.
+
+From the repo root, run:
+
+```bash
+# Node deps for the 2 stdio wrappers
+(cd plugins/marketing/scripts/tam-map && npm install)
+
+# Python deps for the 5 CLI scripts (recommended: a venv first)
+python3 -m pip install -r plugins/marketing/scripts/tam-map/requirements.txt
+```
+
+If you prefer an isolated Python environment, create one before pip install:
+
+```bash
+python3 -m venv plugins/marketing/scripts/tam-map/.venv
+source plugins/marketing/scripts/tam-map/.venv/bin/activate
+python3 -m pip install -r plugins/marketing/scripts/tam-map/requirements.txt
+```
+
+Ask:
+- Question: "Both `npm install` and `pip install -r requirements.txt` completed without errors?"
+- Options: "Yes" / "Errors — need help"
+
+If "Errors — need help" → halt and triage. Common causes: outdated `npm` (`npm install -g npm@latest` and retry), outdated `pip` (`python3 -m pip install --upgrade pip`), or a Python version older than 3.10 (the upstream scripts were verified against 3.11+).
+
+## Phase 5 — Reload plugins
 
 Tell the user:
 
@@ -73,11 +101,11 @@ Ask:
 
 Wait for "Yes" before proceeding.
 
-## Phase 5 — Verify end-to-end
+## Phase 6 — Verify end-to-end
 
 After the user confirms reload, run three checks.
 
-### Phase 5a — MCP connection check
+### Phase 6a — MCP connection check
 
 ```bash
 claude mcp list 2>&1 | grep -E "spider|aiark|discolike"
@@ -85,14 +113,14 @@ claude mcp list 2>&1 | grep -E "spider|aiark|discolike"
 
 Branching:
 
-- All three show `✓ Connected` → continue to Phase 5b.
+- All three show `✓ Connected` → continue to Phase 6b.
 - Any show `✗ Failed to connect` → troubleshooting loop:
   1. Ask user to open a fresh terminal and run `for v in SPIDER_API_KEY AIARK_API_KEY DISCOLIKE_API_KEY; do printf "%s=%s\n" "$v" "${!v:+set}"; done` — expect `set` for all three.
-  2. If any prints empty → env var didn't reach the shell that launched Claude Code. Tell user to restart Claude Code fully (not just `/reload-plugins`) from the freshly-sourced shell, then re-run from Phase 5.
+  2. If any prints empty → env var didn't reach the shell that launched Claude Code. Tell user to restart Claude Code fully (not just `/reload-plugins`) from the freshly-sourced shell, then re-run from Phase 6.
   3. If all `set` but Spider still fails → confirm the package is reachable: `npx -y spider-cloud-mcp --help` (network call to npm). If that errors, npm is the issue, not the key.
   4. If all `set` but `aiark` or `discolike` fail → those wrappers live at `plugins/marketing/scripts/tam-map/{aiark,discolike}-mcp.js`. Run the wrapper directly: `node plugins/marketing/scripts/tam-map/aiark-mcp.js` — it should print a stdio handshake or error to stderr if the key is bad. The wrappers were ported from upstream tam-map and carry an `!! VERIFY BEFORE USING !!` warning about endpoint paths; if you hit a 4xx error, the wrapper may need its endpoints updated against `docs.ai-ark.com/reference` (a Brite-known limitation tracked in the wrapper source).
 
-### Phase 5b — MCP tool probe
+### Phase 6b — MCP tool probe
 
 For each connected MCP, call one cheap tool to confirm auth round-trips:
 
@@ -100,9 +128,9 @@ For each connected MCP, call one cheap tool to confirm auth round-trips:
 - `aiark`: call `aiark_search` with a 1-result query (e.g., `{"query": "test", "limit": 1}`).
 - `discolike`: call `discolike_search` with a 1-result seed.
 
-If any errors with `401` / `403` / `Invalid API key`, the corresponding `*_API_KEY` is wrong — back to Bitwarden, double-check the value, update `~/.zshrc`, restart Claude Code, re-run from Phase 5.
+If any errors with `401` / `403` / `Invalid API key`, the corresponding `*_API_KEY` is wrong — back to Bitwarden, double-check the value, update `~/.zshrc`, restart Claude Code, re-run from Phase 6.
 
-### Phase 5c — CLI script check
+### Phase 6c — CLI script check
 
 The other four providers ship as Python scripts. Check they parse `--help`:
 
@@ -118,7 +146,7 @@ All five must print `✓`. If any fails:
 - Missing env var → re-check the export in `~/.zshrc` and restart.
 - Script-level error → open the script, read the error message; the wrappers ship verbatim from upstream tam-map@`9f5c72e74b` so a runtime error likely means an upstream bug.
 
-## Phase 6 — Completion
+## Phase 7 — Completion
 
 Tell the user:
 

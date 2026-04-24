@@ -22,7 +22,7 @@ Spider.cloud is the **web-crawl layer** of the tam-map pipeline. Given a list of
 
 ## Registration
 
-Spider ships a native MCP server. Two transports are available — stdio (recommended) and HTTP. Registration snippets — stdio belongs in `plugins/marketing/.mcp.json` (registered in BC-5947):
+Spider ships a native MCP server. Two transports are available — stdio (recommended) and HTTP. The stdio entry is registered in `plugins/marketing/.mcp.json`:
 
 ```json
 {
@@ -93,4 +93,4 @@ Skill authors: do not call Spider from Brite Nites Supply-vertical workflows wit
 
 ## Last verified
 
-2026-04-25 — Package name corrected (`@spider-cloud/spider-mcp` → `spider-cloud-mcp`) and tool inventory re-verified against [Spider docs](https://spider.cloud/docs/integrations/mcp). The earlier 2026-04-24 entry was authored before the docs were fetched; both upstream tam-map's `.mcp.json` and the prior Brite snippet repeated the same scoped-name typo. Not yet validated against the live MCP server from a Brite install (BC-5947 registration verification step). Bump this date on first live validation.
+2026-04-25 — Package name + 22-tool inventory verified against [Spider docs](https://spider.cloud/docs/integrations/mcp). Live MCP validation pending the first session-restart with `SPIDER_API_KEY` exported. Bump this date on first live validation.

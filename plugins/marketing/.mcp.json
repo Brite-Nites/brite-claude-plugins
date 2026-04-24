@@ -16,7 +16,7 @@
     "spider": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "spider-cloud-mcp"],
+      "args": ["-y", "spider-cloud-mcp@2.1.1"],
       "env": {
         "SPIDER_API_KEY": "${SPIDER_API_KEY}"
       }
@@ -37,5 +37,6 @@
         "DISCOLIKE_API_KEY": "${DISCOLIKE_API_KEY}"
       }
     }
+
   }
 }
