@@ -1,0 +1,24 @@
+# Dependabot configuration
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+
+updates:
+  # plugins/revops/ is a git-subtree import from Jaganpro/sf-skills (MIT, see
+  # plugins/revops/UPSTREAM.md). The Python deps declared in its pyproject.toml
+  # are all under [project.optional-dependencies] (test + dev groups — pytest,
+  # black, isort, mypy, etc.). Brite CI does not invoke uv, pytest, or black
+  # against this tree, and the shipped plugin artifacts are markdown skills,
+  # not Python packages. Keeping uv.lock byte-identical to upstream preserves
+  # subtree-sync fidelity, so we opt out of Dependabot updates here.
+  #
+  # Security alerts that land in GitHub's Security tab still fire for this
+  # path; dismiss them with "tolerable_risk" + the same rationale when they
+  # appear. This block only silences update PRs.
+  - package-ecosystem: pip
+    directory: "/plugins/revops"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
