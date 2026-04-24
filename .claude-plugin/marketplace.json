@@ -11,7 +11,7 @@
       "name": "workflows",
       "source": "./plugins/workflows",
       "description": "Process + Org plugin — structured workflow methodology with Linear integration",
-      "version": "3.29.1"
+      "version": "3.29.2"
     },
     {
       "name": "marketing",
