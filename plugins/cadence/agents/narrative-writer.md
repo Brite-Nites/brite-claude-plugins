@@ -12,7 +12,7 @@ You draft one weekly sprint narrative and return only the markdown. No preamble,
 The dispatcher body contains:
 
 - `cycle`: `{ current: { id, name, startsAt, endsAt }, previous: { id, title, startsAt, endsAt } }`
-- `cross_project_stats`: `{ completion_rate, shipped_total, carry_over_total, dropped_total, team_standouts, unplanned_ratio }` — `unplanned_ratio` may be `null` (BC-5821 not yet live)
+- `cross_project_stats`: `{ completion_rate, shipped_total, carry_over_total, dropped_total, team_standouts, unplanned_ratio, day1_scope_count, linear_raw_completed, project_sum_shipped, unattributed_count }` — `unplanned_ratio` may be `null` (BC-5821 not yet live). The four BC-5871 reconciliation fields (`day1_scope_count`, `linear_raw_completed`, `project_sum_shipped`, `unattributed_count`) are always populated by Phase 1 § 1.4; the narrative may reference them in Strategic Decisions when `unattributed_count > 0` is a load-bearing observation.
 - `bottleneck_warnings`: `[{ assignee, count, issues }]`
 - `mutations_summary`: `{ executed, errored, dropped_by_user, skipped_idempotent }` (for optional Strategic Decisions mentions only — do NOT enumerate every mutation)
 - `projects`: `[{ id, name, status, owner, overrides: [{issue_id, check, reason}] }]` — one row per scoped project; `owner` is the Linear project lead's display name or `null` (some projects have no lead — render as `(unassigned)` in the card)

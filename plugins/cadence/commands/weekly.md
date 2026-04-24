@@ -176,7 +176,8 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
       "skip_log", "scope_confirmed",         // populated by Phase 2 sprint-scoping skill
       "_fetched_issues"                      // Phase 2 carry-over + gate fetch cache — populated on-demand by Phase 3 § 3 pre-flight when not already present; enricher writes _enrichment.carry_over_enriched[] instead of this cache during Phase 2.
   } ],
-  "cross_project_stats": { "completion_rate", "shipped_total", "carry_over_total", "dropped_total", "team_standouts", "unplanned_ratio" },
+  "cross_project_stats": { "completion_rate", "shipped_total", "carry_over_total", "dropped_total", "team_standouts", "unplanned_ratio", "day1_scope_count", "linear_raw_completed", "project_sum_shipped", "unattributed_count" },  // BC-5871 added: day1_scope_count, linear_raw_completed, project_sum_shipped, unattributed_count (Phase 1 § 1.4 reconciliation)
+  "unattributed_issues": [],                                      // Phase 1 § 1.4 — list of IDs completed cycle-wide without attribution to any audited project; persisted at top level of audit.json when unattributed_count > 0; empty [] when every raw-completed issue attributes. Intentionally at top-level (not nested under cross_project_stats): cross_project_stats holds scalars only; the ID list is a sibling consumed by § 1.5 persistence and BC-5821 parser, NOT passed into Phase 2/3/4 agent prompt bodies. BC-5871.
   "bottleneck_warnings": [ { "assignee", "count", "issues" } ],   // Phase 2 sprint-scoping § 7
   "bottleneck_threshold": 4,                                      // Phase 2 config (default 4)
   "weekly_planning_root": null,                                   // Phase 2 optional path override
@@ -257,11 +258,21 @@ Parse each subagent's returned JSON block into `state.projects[<index>].audit_ca
 
 ### 1.4 Cross-project synthesis
 
+**Fetch prior-cycle raw completion list.** Call `mcp__plugin_workflows_linear-server__list_issues` with `cycle: state.cycle.previous.title`, `team: state.team.id`, `state: "completed"`, `limit: 50`, no `project` filter. **Pagination contract:** loop while `pageInfo.hasNextPage == true`, passing `pageInfo.endCursor` as `cursor:` on the next call; stop when `hasNextPage == false`. This is the sole authoritative termination signal — matches the canonical pattern in `skills/linear-housekeeping/SKILL.md`. A non-final page is allowed to return fewer than `limit` nodes with `hasNextPage: true`, so a node-count short-circuit would silently truncate. Per page, reduce to `[node.id for node in page.nodes]` and discard the full payload; the accumulator `linear_raw_completed_ids: [...]` carries IDs only (bounded session memory regardless of per-issue description size; W17 scale ≈ 4 pages at ~180 total). Use the `cycle` title string, not ID, per BC-5757 § 2.3. Unlike the `state: "started"` + team client-side-filter gotcha, `state: "completed"` + team works through the Linear API's state-type filter — no client-side filtering needed. **Parallelization:** the fetch depends only on `state.cycle.previous.title` + `state.team.id` (both populated by Phase 0.5), not on § 1.2 subagent output — implementers SHOULD dispatch the § 1.2 `Agent` fan-out and this paginated fetch's first page in the same turn so they run concurrently, then await both before the § 1.3 merge step.
+
 Compute and store under `state.cross_project_stats`:
 
 - `completion_rate` = `sum(p.audit_card.shipped.count) / state.cycle.previous.issueCountHistory[0]` (denominator is day-1 scope per BC-5757 § 2.2 gotcha).
 - `shipped_total`, `dropped_total`, `carry_over_total` (each = sum across projects).
 - `team_standouts` = list of assignees with completion ratio ≥90% in this cycle, where ratio = `shipped_count / (shipped_count + carry_over_count + dropped_count)` from the `by_assignee` rollups. Only count assignees with `(shipped + carry_over + dropped) ≥ 3` to avoid noise from one-issue owners.
+- `day1_scope_count` = `state.cycle.previous.issueCountHistory[0]` (same source as `completion_rate` denominator, promoted to a first-class field so BC-5821's prior-narrative parser can consume it without re-derivation).
+- `linear_raw_completed` = `linear_raw_completed_ids.length`.
+- `project_sum_shipped` = `sum(state.projects[].audit_card.shipped.count)` (alias of `shipped_total` — kept as a distinct field so the reconciliation semantics are self-documenting). **Invariant:** `project_sum_shipped == shipped_total` by construction; any future edit to either compute site must touch the other in lockstep (prose-level invariant — no runtime assertion can enforce it).
+- `unattributed_count` = `max(0, linear_raw_completed - project_sum_shipped)` (clamp at 0 guards the inverse-direction race where `project_sum_shipped > linear_raw_completed` — e.g. a project-audit subagent observing a later cycle state than the raw-count query. The expected direction, `linear_raw_completed > project_sum_shipped`, is never clamped — that positive delta is the field's reason for existing).
+
+Compute and store at the top level of `state` (list scope, outside `cross_project_stats`):
+
+- `state.unattributed_issues` (list of IDs) = `linear_raw_completed_ids − union(state.projects[].audit_card.shipped.issues[].id)` (set difference by issue ID). **Implementation:** build `attributed_ids = Set(...)` from the union once, then filter `[id for id in linear_raw_completed_ids if id not in attributed_ids]` — O(n+m) via set membership, not O(n·m) via list scan. Empty `[]` when every raw-completed issue attributes to an audited project. **Caveat for downstream consumers:** errored audit cards (`audit_card = {error, ...}`) carry no `shipped.issues` entries, so any IDs that would have attributed to those projects surface in `unattributed_issues` instead of being correctly attributed. BC-5821 should cross-check against `state.projects[].audit_card.error` before classifying as team-level. BC-5871 motivation: W17 observed 179 raw completed cycle-wide but 160 summed across audited projects — the 19-issue delta reflects issues completed mid-cycle without project attribution (team-level or pre-dated project changes). Persisting the IDs lets BC-5821 enumerate without a second Linear round-trip.
 
 **Deferred to a sibling follow-up (BC-5821 — Cadence prior-narrative parser):**
 
@@ -270,7 +281,7 @@ Compute and store under `state.cross_project_stats`:
 
 ### 1.5 Persist audit file
 
-Write `{cycle: state.cycle.previous, cross_project_stats: state.cross_project_stats, audit_cards: <every state.projects[].audit_card>}` to `audit.json` at the path constructed in § 1.1. The top-level `cycle` field is what § 1.1's idempotency predicate (`parsed.cycle.id == state.cycle.previous.id`) reads. Pretty-print (2-space indent) for `git diff` legibility.
+Write `{cycle: state.cycle.previous, cross_project_stats: state.cross_project_stats, audit_cards: <every state.projects[].audit_card>}` to `audit.json` at the path constructed in § 1.1. When `state.cross_project_stats.unattributed_count > 0`, also include a top-level `unattributed_issues: state.unattributed_issues` key; when the count is `0`, omit the key entirely (the clean case produces a clean audit.json). The top-level `cycle` field is what § 1.1's idempotency predicate (`parsed.cycle.id == state.cycle.previous.id`) reads. Pretty-print (2-space indent) for `git diff` legibility.
 
 ### 1.6 User-facing synthesis
 
@@ -279,8 +290,9 @@ Render to the user:
 1. **Headline anchors** — one line: `<completion_rate>% completion / <shipped_total> shipped / <carry_over_total> carrying over / standouts: <team_standouts>`. (Note: `unplanned_ratio` headline lands in Phase 2 once the narrative parser extracts the planned baseline — see § 1.4 deferred list.)
 2. **Per-project drift bullets** — one line per project *with activity*: `**<project>** — <shipped> shipped, <carry_over> carrying over, <dropped> dropped. <highest-priority carry-over ID if any>`. A project has activity when `audit_card.shipped.count + audit_card.carry_over.count + audit_card.dropped.count > 0`.
 3. **Zero-activity footer** — one line, only if any project had no activity: `Zero-activity this cycle (<N>): <comma-separated project names in the order they appear in state.projects[]>`. Project names are preserved so the planner can still spot idle-project signals; full audit cards remain in `audit.json`.
-4. **Audit gaps** subsection — only if any subagent failed: list each failed project + the suggested retry command (`/cadence:weekly --resume-phase 1 --project <name>`).
-5. **Quality flags** subsection — only if any flagged:
+4. **Cycle reconciliation** — one line, only if `state.cross_project_stats.unattributed_count > 0`: `**Cycle reconciliation** — <linear_raw_completed> issues completed cycle-wide; <project_sum_shipped> attributed across audited projects; <unattributed_count> unattributed (team-level or pre-dated project changes). Full IDs in audit.json.` The line is a single rollup regardless of how many IDs are unattributed — the IDs themselves are persisted at the top of `audit.json` (§ 1.5), not rendered inline. Render is a display decision; audit.json is canonical (same invariant as the Quality flags subsection below, mirrors the BC-5870 threshold-aggregation precedent).
+5. **Audit gaps** subsection — only if any subagent failed: list each failed project + the suggested retry command (`/cadence:weekly --resume-phase 1 --project <name>`).
+6. **Quality flags** subsection — only if any flagged:
    - **≤10 flags total**: one line per flag — `<issue_id> — <check>: <message>`.
    - **>10 flags total**: one aggregation line — `<N> flags total; highest density in <proj-1> (<n1>), <proj-2> (<n2>), <proj-3> (<n3>); by check: <check-1> (<m1>), <check-2> (<m2>), <check-3> (<m3>). Full records in audit.json.`
    - Top-3 projects are ranked by absolute flag count across `audit_cards[].flags[]`, ties broken alphabetically by project name. Top-3 check types apply the same rule over `flag.check`. If fewer than 3 distinct projects or check types have flags, emit the actual count. `audit.json` always retains the full per-flag record regardless of which render path fires (§ 1.5 persistence is unchanged — the cap is a display decision, not a data-loss decision).
