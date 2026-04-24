@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Prospeo is the **fallback-enrichment layer** of the tam-map pipeline — LinkedIn URL → email + mobile enrichment. Catches misses from BlitzAPI (the waterfall primary). It is the second stage of step 6 in the 9-step upstream pipeline.
+Prospeo is the **fallback-enrichment layer** of the tam-map pipeline — LinkedIn URL → email + mobile enrichment. Catches misses from BlitzAPI (the waterfall primary, step 5). It is step 6 of the 9-step upstream pipeline. See `plugins/marketing/references/tam/UPSTREAM.md`.
 
 ## Consumed by
 

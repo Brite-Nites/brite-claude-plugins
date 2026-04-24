@@ -18,7 +18,8 @@ MillionVerifier is the **SMTP-verification layer** of the tam-map pipeline. Take
 - **Scopes.** Account-wide verification access.
 - **Env var.** `MILLIONVERIFIER_API_KEY`.
 - **Base URL.** `https://api.millionverifier.com/api/v3/`.
-- **Required header.** `User-Agent: tam-map/1.0` (or any non-empty UA) — MillionVerifier rejects requests with no UA.
+
+A non-empty `User-Agent` header is also required on every request — this is a server-side gate, not a credential; see § Failure modes.
 
 ## Registration
 

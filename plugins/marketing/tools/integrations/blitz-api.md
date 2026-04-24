@@ -4,7 +4,7 @@
 
 ## Purpose
 
-BlitzAPI is the **primary-enrichment layer** of the tam-map pipeline. Given a company domain, it returns an owner / decision-maker email + firmographic context. It is the first stage of the step-6 enrichment waterfall (BlitzAPI → Prospeo fallback) in the 9-step upstream pipeline. Not a replacement for Clay — see below.
+BlitzAPI is the **primary-enrichment layer** of the tam-map pipeline. Given a company domain, it returns an owner / decision-maker email + firmographic context. It is step 5 of the 9-step upstream pipeline — the primary stage of the enrichment waterfall (Prospeo step 6 is the fallback). See `plugins/marketing/references/tam/UPSTREAM.md`.
 
 ## Consumed by
 
