@@ -9,7 +9,8 @@
         "--orgs",
         "DEFAULT_TARGET_ORG",
         "--toolsets",
-        "data"
+        "data",
+        "--no-telemetry"
       ]
     }
   }
