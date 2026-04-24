@@ -22,14 +22,14 @@ Spider.cloud is the **web-crawl layer** of the tam-map pipeline. Given a list of
 
 ## Registration
 
-Spider ships a native MCP server (`@spider-cloud/spider-mcp`, stdio transport over `npx`). Registration snippet — belongs in `plugins/marketing/.mcp.json` (pending BC-5947):
+Spider ships a native MCP server. Two transports are available — stdio (recommended) and HTTP. Registration snippets — stdio belongs in `plugins/marketing/.mcp.json` (registered in BC-5947):
 
 ```json
 {
   "mcpServers": {
     "spider": {
       "command": "npx",
-      "args": ["-y", "@spider-cloud/spider-mcp"],
+      "args": ["-y", "spider-cloud-mcp"],
       "env": {
         "SPIDER_API_KEY": "${SPIDER_API_KEY}"
       }
@@ -37,6 +37,8 @@ Spider ships a native MCP server (`@spider-cloud/spider-mcp`, stdio transport ov
   }
 }
 ```
+
+The npm package is `spider-cloud-mcp` (unscoped). HTTP transport is also documented at `https://mcp.spider.cloud/mcp` with `Authorization: Bearer <key>`, but stdio is preferred here because it sidesteps the `${user_config.*}` substitution bug that affects HTTP-header registrations.
 
 `.env.example` entry:
 
@@ -49,14 +51,15 @@ Because the server reads its key from the process `env` block (stdio, not HTTP h
 
 ## Tool inventory
 
-The vendor MCP server exposes crawl + extract + search tools. Surface captured at upstream commit `9f5c72e74b` via the pipeline consumer pattern in `scripts/spider_crawl.py` — the authoritative inventory is whatever `@spider-cloud/spider-mcp` ships at install time. Skills should call `discover_tools` at runtime to get the live list rather than hardcoding against this guide.
+`spider-cloud-mcp` v2.1.1 exposes **22 tools** in three groups (per [Spider docs](https://spider.cloud/docs/integrations/mcp), 2026-04-25). The authoritative inventory is whatever the installed package version ships — call `ListTools` at runtime if precise tool surface matters.
 
-| Tool (canonical) | Purpose | Notes |
+| Group | Count | Tools |
 |---|---|---|
-| `crawl` | Fetch a URL + N linked sub-pages, return HTML + extracted text | Primary call |
-| `search` | Return top results for a query | Secondary — used for intent keyword lookup |
+| Core (pay-per-use) | 8 | `spider_crawl`, `spider_scrape`, `spider_search`, `spider_links`, `spider_screenshot`, `spider_unblocker`, `spider_transform`, `spider_get_credits` |
+| AI (subscription) | 5 | `spider_ai_crawl`, `spider_ai_scrape`, `spider_ai_search`, `spider_ai_browser`, `spider_ai_links` |
+| Browser (interactive) | 9 | `spider_browser_open`, `spider_browser_navigate`, `spider_browser_click`, `spider_browser_fill`, `spider_browser_screenshot`, `spider_browser_content`, `spider_browser_evaluate`, `spider_browser_wait_for`, `spider_browser_close` |
 
-**Discoverability escape hatch.** Call `discover_tools` (or the server's equivalent meta-tool) for the live inventory before building new skill logic against this guide.
+For tam-mapping the primary calls are `spider_crawl` (multi-page extraction) and `spider_scrape` (single-URL fast path). `spider_get_credits` is useful for pre-flight cost checks before large TAM runs.
 
 ## Rate limits
 
@@ -90,4 +93,4 @@ Skill authors: do not call Spider from Brite Nites Supply-vertical workflows wit
 
 ## Last verified
 
-2026-04-24 — Tool inventory verified from upstream `.mcp.json` + `scripts/spider_crawl.py` at commit `9f5c72e74b`. Not yet validated against live vendor API from a Brite install (blocked on BC-5947 MCP registration). Bump this date on first live validation.
+2026-04-25 — Package name corrected (`@spider-cloud/spider-mcp` → `spider-cloud-mcp`) and tool inventory re-verified against [Spider docs](https://spider.cloud/docs/integrations/mcp). The earlier 2026-04-24 entry was authored before the docs were fetched; both upstream tam-map's `.mcp.json` and the prior Brite snippet repeated the same scoped-name typo. Not yet validated against the live MCP server from a Brite install (BC-5947 registration verification step). Bump this date on first live validation.
