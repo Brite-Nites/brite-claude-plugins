@@ -21,7 +21,13 @@ Integration guides live in `tools/integrations/` — each documents how to conne
 | Integration | Description | Status |
 |-------------|-------------|--------|
 | [email-bison](integrations/email-bison.md) | Cold email sequencer (official MCP server, 141 tools, two workspaces) | Active — dev-scoped .mcp.json |
-| _Populated by individual tool port issues (BC-2580+)_ | | |
+| [spider-cloud](integrations/spider-cloud.md) | Web crawl + content extraction — tam-map step 2 (native vendor MCP) | Ported BC-5946 — MCP wiring pending BC-5947 |
+| [ai-ark](integrations/ai-ark.md) | Company discovery (firmographic search) — tam-map step 1 (stdio wrapper) | Ported BC-5946 — MCP wiring pending BC-5947 |
+| [discolike](integrations/discolike.md) | Lookalike expansion from peer-venue seeds — tam-map step 3 (stdio wrapper) | Ported BC-5946 — MCP wiring pending BC-5947 |
+| [icypeas](integrations/icypeas.md) | Keyword-based company search — tam-map step 4 (Python CLI, no MCP) | Ported BC-5946 |
+| [blitz-api](integrations/blitz-api.md) | Owner discovery + enrichment primary — tam-map step 5, waterfall primary (Python CLI, no MCP) | Ported BC-5946 |
+| [prospeo](integrations/prospeo.md) | LinkedIn → email + mobile — tam-map step 6, waterfall fallback (Python CLI, no MCP) | Ported BC-5946 |
+| [millionverifier](integrations/millionverifier.md) | SMTP verification + catch-all flagging — tam-map step 7 (Python CLI, no MCP) | Ported BC-5946 |
 
 ## Standalone Tools
 

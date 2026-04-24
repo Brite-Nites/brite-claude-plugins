@@ -1,0 +1,17 @@
+{
+  "_source": "Revgrowth1/tam-map@9f5c72e74b",
+  "_license": "MIT",
+  "_ported": "2026-04-24",
+  "name": "tam-map-mcp-wrappers",
+  "version": "0.1.0",
+  "description": "MCP server wrappers for AI Ark and Discolike, used by the /tam-map Claude Code skill.",
+  "type": "module",
+  "scripts": {
+    "mcp:aiark": "node aiark-mcp.js",
+    "mcp:discolike": "node discolike-mcp.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "license": "MIT"
+}
