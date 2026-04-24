@@ -14,10 +14,11 @@ Discolike is the **lookalike-expansion layer** of the tam-map pipeline. Given a 
 
 ## Auth
 
-- **Credential type.** API key, passed as `Authorization: Bearer <DISCOLIKE_API_KEY>` by the upstream stdio wrapper.
+- **Credential type.** API key, passed by the upstream stdio wrapper as a custom header: `x-discolike-key: <DISCOLIKE_API_KEY>` (**not** `Authorization: Bearer`).
 - **Where it comes from.** [discolike.com](https://discolike.com) → account dashboard → API keys.
 - **Scopes.** Account-wide read + search; no sub-scoping documented.
 - **Env var.** `DISCOLIKE_API_KEY`.
+- **Base URL (for direct HTTP, not via MCP).** `https://api.discolike.com/v1/discover` — GET-only.
 
 **Do not commit credentials.** The `.mcp.json` snippet below uses `${DISCOLIKE_API_KEY}` as placeholder.
 
@@ -50,14 +51,14 @@ The stdio transport + `env` block avoids the `${user_config.*}` header-substitut
 
 ## Tool inventory
 
-The wrapper exposes lookalike-search tools. Live inventory via `discover_tools` at runtime; at pinned commit `9f5c72e74b` the wrapper surfaces:
+The wrapper registers two tools (see `plugins/marketing/scripts/tam-map/discolike-mcp.js` lines 62–92 at pinned commit `9f5c72e74b`):
 
-| Tool | Purpose | Notes |
-|---|---|---|
-| `find_lookalikes` | Given seed domain(s), return similar companies | Primary call; default N=20, configurable |
-| `get_similarity` | Pairwise similarity score between two domains | Secondary; used for ICP-expansion audits |
+| Tool | Purpose | Required args | Optional args |
+|---|---|---|---|
+| `discolike_search` | Natural-language ICP search across Discolike's 65M+ domain index | `icp_text` (string) | `country[]` (ISO-2), `category[]` (industry), `employee_range` ("min,max"), `min_digital_footprint` (0–800), `max_records` (default 100, range 5–10000), `offset` (default 0), `phrase_match[]` (up to 20 exact fragments) |
+| `discolike_lookalike` | Find similar domains from a seed list | `domain[]` (up to 10 seeds) | `country[]`, `max_records` (default 100), `offset` (default 0) |
 
-Discolike's matching is trained on web-content + hiring + firmographic signals, not purely industry-code taxonomy — output will include semantic peers that AI Ark misses (and vice versa).
+Discolike's matching is trained on web-content + hiring + firmographic signals, not purely industry-code taxonomy — output will include semantic peers that AI Ark misses (and vice versa). No `get_similarity` or pairwise-score tool exists at the pinned commit.
 
 ## Rate limits
 

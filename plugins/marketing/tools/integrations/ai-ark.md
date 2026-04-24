@@ -6,6 +6,8 @@
 
 AI Ark is the **company-discovery layer** of the tam-map pipeline. Given a firmographic ICP (industry codes, employee band, geography), it returns a list of matching companies with website + LinkedIn + basic firmographics. It is step 1 of the 9-step upstream pipeline (see `plugins/marketing/references/tam/UPSTREAM.md`).
 
+> ⚠ **Unverified upstream endpoint schema.** The upstream stdio wrapper (`plugins/marketing/scripts/tam-map/aiark-mcp.js` lines 14–22) explicitly flags its endpoint paths (`/search`, `/similarity`, `/enrich`), field names, and auth header form as **conventional guesses** — AI Ark's full schema lives at `docs.ai-ark.com/reference` and was not verified at upstream write time. Before shipping any skill against this integration (BC-5947 wiring, BC-5832 tam-mapping skill), validate: (1) `BASE_URL`, (2) endpoint paths, (3) request/response field names, (4) whether auth is `Authorization: Bearer` or `X-API-KEY`. The rest of this guide treats the upstream surface as the working baseline, but every claim below inherits that caveat.
+
 ## Consumed by
 
 - `plugins/marketing/skills/tam-mapping/SKILL.md` — **pending BC-5832**
@@ -50,14 +52,15 @@ The stdio transport + `env` block avoids the `${user_config.*}` header-substitut
 
 ## Tool inventory
 
-The wrapper exposes a focused surface matching the tam-map pipeline need. Live inventory via `discover_tools` at runtime; at pinned commit `9f5c72e74b` the wrapper surfaces:
+The wrapper registers three tools (see `plugins/marketing/scripts/tam-map/aiark-mcp.js` lines 64–97 at pinned commit `9f5c72e74b`). Endpoint paths and field names are subject to the upstream unverified-schema caveat at the top of this guide.
 
-| Tool | Purpose | Notes |
-|---|---|---|
-| `search_companies` | Firmographic search (industries, employee band, geo) → list of companies | Primary call; paginated |
-| `get_company` | Fetch full detail on one company by ID | Secondary; used for deep-dive lookups |
+| Tool | Purpose | Required args | Optional args | Upstream endpoint (unverified) |
+|---|---|---|---|---|
+| `aiark_search` | Firmographic search (industry / geo / size-band) → list of companies | — | `industries[]`, `regions[]`, `employee_min`, `employee_max`, `limit` (default 100) | `POST /v1/search` |
+| `aiark_similarity` | Lookalike expansion from a seed list of domains | `seed_domains[]` | `limit` (default 100) | `POST /v1/similarity` |
+| `aiark_enrich` | Single-company enrichment by domain | `domain` | — | `POST /v1/enrich` |
 
-The wrapper's full surface may change with upstream syncs — re-run `discover_tools` after any pull.
+No `search_companies` or `get_company` tool exists at the pinned commit — earlier drafts of this guide listed those names; they were incorrect. The wrapper's full surface may change with upstream syncs — re-run `discover_tools` after any pull.
 
 ## Rate limits
 

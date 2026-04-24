@@ -158,9 +158,9 @@ ported: 2026-04-24
     done
     ```
 
-### Pass 4 — No-op (REGISTRY.md doesn't exist)
+### Pass 4 — Update `plugins/marketing/tools/REGISTRY.md`
 
-17. Skipped — `plugins/marketing/tools/integrations/REGISTRY.md` does not exist. Issue's Pass 4 was a conditional ("assuming it lists integrations"). Condition false.
+17. `plugins/marketing/tools/REGISTRY.md` does exist (the plan's original "doesn't exist" assumption looked one directory too deep — `tools/integrations/REGISTRY.md` doesn't exist, but `tools/REGISTRY.md` does). Add 7 new rows to the Integration Guides table — one per new guide shipped in Pass 3 — with status strings identifying step number + MCP vs CLI provenance.
 
 ### Final verification
 
