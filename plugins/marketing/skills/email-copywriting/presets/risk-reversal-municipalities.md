@@ -3,7 +3,7 @@ preset: risk-reversal
 vertical: municipalities
 entity: brite-labs
 when: Large budget RFP OR multi-year master plan OR committee-heavy procurement (T4 warranted)
-situation_mining_row: Municipalities — RFP mentions "smart city" or downtown master plan + capital bond (SKILL.md §3 Brite-adaptation, Active tier row 1; T4 variant)
+situation_mining_row: Municipalities - RFP mentions "smart city" or downtown master plan + capital bond (SKILL.md §3 Brite-adaptation, Active tier row 1; T4 variant)
 ---
 
 # risk-reversal | Municipalities | Brite Labs
@@ -14,7 +14,7 @@ Anchor on the procurement-weight signal: RFP publish date, bond authorization da
 
 ## Step 1 skeleton
 
-**Subject:** `{Quick note|Quick question|Thought} on {RFP_NAME}`
+**Subject:** `{Phase-gate terms|Scoped pilot|Phase guarantee}`
 
 **Body:**
 
@@ -24,7 +24,7 @@ Hey {FIRST_NAME_INLINE}, {saw|noticed} {CITY}'s {RFP_NAME} {post|publish} on {DA
 
 ## Step 2 bump
 
-**Subject:** `Re: {Quick note|Quick question|Thought} on {RFP_NAME}`
+**Subject:** `Re: {Phase-gate terms|Scoped pilot|Phase guarantee}`
 
 **Body:**
 
@@ -34,10 +34,10 @@ Hey {FIRST_NAME_INLINE}, {saw|noticed} {CITY}'s {RFP_NAME} {post|publish} on {DA
 
 ## Vertical anti-slop
 
-- Don't over-promise performance metrics beyond Labs' documented case studies — the guarantee is credible only if Labs can defend the specific outcome with real data.
+- Don't over-promise performance metrics beyond Labs' documented case studies - the guarantee is credible only if Labs can defend the specific outcome with real data.
 - Avoid guarantee language that would require municipal legal review (e.g. "refund in full", "zero-cost until delivered"). Use outcome-based framing: "phase 2 not billed until phase 1 delivers X."
-- Don't use urgency tactics — municipal procurement runs on its own clock, and urgency reads as vendor-desperate.
-- Don't cite Nites seasonal case studies — cite Labs permanent or experiential installations (streetscapes, festivals, placemaking). Residential comparisons undercut the commercial T4 tone.
-- Don't reference installers or property management — Supply-excluded per handbook canon.
-- Don't mention competitors by name — T4 is about Labs' own commitment, not a head-to-head pitch.
+- Don't use urgency tactics - municipal procurement runs on its own clock, and urgency reads as vendor-desperate.
+- Don't cite Nites seasonal case studies - cite Labs permanent or experiential installations (streetscapes, festivals, placemaking). Residential comparisons undercut the commercial T4 tone.
+- Don't reference installers or property management - Supply-excluded per handbook canon.
+- Don't mention competitors by name - T4 is about Labs' own commitment, not a head-to-head pitch.
 - Avoid "placemaking" as a buzzword in the body (fine in the `when:` trigger field); use concrete outcome specifics like "pedestrian dwell time" or "downtown evening foot traffic" as the measurable levers.

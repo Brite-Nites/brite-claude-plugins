@@ -3,7 +3,7 @@ preset: list-building
 vertical: municipalities
 entity: brite-labs
 when: RFP mentions smart city OR downtown master plan OR public placemaking bond
-situation_mining_row: Municipalities — RFP mentions "smart city" or downtown master plan (SKILL.md §3 Brite-adaptation, Active tier row 1)
+situation_mining_row: Municipalities - RFP mentions "smart city" or downtown master plan (SKILL.md §3 Brite-adaptation, Active tier row 1)
 ---
 
 # list-building | Municipalities | Brite Labs
@@ -14,7 +14,7 @@ Anchor on the most recent public signal: RFP publish date, council vote date, or
 
 ## Step 1 skeleton
 
-**Subject:** `{Quick thought|Quick note|Thought} on {CITY}`
+**Subject:** `{Quick thought|Quick note|Thought}`
 
 **Body:**
 
@@ -24,7 +24,7 @@ Hey {FIRST_NAME_INLINE}, {saw|noticed|caught} {CITY}'s {DOWNTOWN_INITIATIVE} lan
 
 ## Step 2 bump
 
-**Subject:** `Re: {Quick thought|Quick note|Thought} on {CITY}`
+**Subject:** `Re: {Quick thought|Quick note|Thought}`
 
 **Body:**
 
@@ -34,9 +34,9 @@ Hey {FIRST_NAME_INLINE}, {saw|noticed|caught} {CITY}'s {DOWNTOWN_INITIATIVE} lan
 
 ## Vertical anti-slop
 
-- Don't pitch "outdoor lighting" — pitch placemaking + downtown experience.
-- Don't cite Nites seasonal case studies — cite Labs permanent installations (festivals, streetscape, public placemaking).
+- Don't pitch "outdoor lighting" - pitch placemaking + downtown experience.
+- Don't cite Nites seasonal case studies - cite Labs permanent installations (festivals, streetscape, public placemaking).
 - Avoid "smart city" as a buzzword in the body; use "downtown experience" or "integrated public space" (smart-city language is fine in the `when:` trigger field since it's a keyword match on RFPs).
 - No generic municipal pain points (parking, budget cuts, "tight budgets"); lead with the specific bond, RFP, or master-plan signal.
-- Don't reference installers or property management — Supply-excluded per handbook canon.
-- Don't use urgency tactics — municipal procurement runs on its own clock; urgency reads as vendor-desperate and gets filtered by clerks before the planner sees it.
+- Don't reference installers or property management - Supply-excluded per handbook canon.
+- Don't use urgency tactics - municipal procurement runs on its own clock; urgency reads as vendor-desperate and gets filtered by clerks before the planner sees it.
