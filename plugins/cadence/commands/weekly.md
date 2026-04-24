@@ -272,16 +272,19 @@ Compute and store under `state.cross_project_stats`:
 
 Write `{cycle: state.cycle.previous, cross_project_stats: state.cross_project_stats, audit_cards: <every state.projects[].audit_card>}` to `audit.json` at the path constructed in § 1.1. The top-level `cycle` field is what § 1.1's idempotency predicate (`parsed.cycle.id == state.cycle.previous.id`) reads. Pretty-print (2-space indent) for `git diff` legibility.
 
-### 1.6 User-facing synthesis (≤300 words)
+### 1.6 User-facing synthesis
 
 Render to the user:
 
 1. **Headline anchors** — one line: `<completion_rate>% completion / <shipped_total> shipped / <carry_over_total> carrying over / standouts: <team_standouts>`. (Note: `unplanned_ratio` headline lands in Phase 2 once the narrative parser extracts the planned baseline — see § 1.4 deferred list.)
-2. **Per-project drift bullets** — one line per project: `**<project>** — <shipped> shipped, <carry_over> carrying over, <dropped> dropped. <highest-priority carry-over ID if any>`.
-3. **Audit gaps** subsection — only if any subagent failed: list each failed project + the suggested retry command (`/cadence:weekly --resume-phase 1 --project <name>`).
-4. **Quality flags** subsection — only if any flagged: one line per flag — `<issue_id> — <check>: <message>`.
+2. **Per-project drift bullets** — one line per project *with activity*: `**<project>** — <shipped> shipped, <carry_over> carrying over, <dropped> dropped. <highest-priority carry-over ID if any>`. A project has activity when `audit_card.shipped.count + audit_card.carry_over.count + audit_card.dropped.count > 0`.
+3. **Zero-activity footer** — one line, only if any project had no activity: `Zero-activity this cycle (<N>): <comma-separated project names in the order they appear in state.projects[]>`. Project names are preserved so the planner can still spot idle-project signals; full audit cards remain in `audit.json`.
+4. **Audit gaps** subsection — only if any subagent failed: list each failed project + the suggested retry command (`/cadence:weekly --resume-phase 1 --project <name>`).
+5. **Quality flags** subsection — only if any flagged: one line per flag — `<issue_id> — <check>: <message>`.
 
-Do not batch projects into categories. Surface every project, even ones with zero activity, per `memory/feedback_thorough_audits.md`.
+**Scale target.** The rendering holds `≤300 words` when `≤20 projects have activity`. Each additional active project adds `~15 words` (per-bullet cost) and each additional zero-activity project adds `~1 word` (name in the footer). At 26+ projects where `~18` are active, the render lands near `~270 words`. Observed regression point: ~40+ active projects may push the render toward `~600 words` — if that threshold approaches in a future dogfood, file a follow-up for Option C paginated synthesis (BC-5869).
+
+Do not batch projects with activity into drift categories (e.g. "3 projects improved") — `memory/feedback_thorough_audits.md` prohibits semantic batching. The zero-activity footer is a factual rollup of projects with no data, not a drift category.
 
 ### 1.7 Gate #1
 
