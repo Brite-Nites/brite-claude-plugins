@@ -28,7 +28,7 @@ The skill reads `plugins/marketing/skills/email-copywriting/presets/{preset}-{ve
 | Bars & Restaurants | Labs | Pending BC-5880 | Pending BC-5880 |
 | Event Venues | Labs | Pending BC-5880 | Pending BC-5880 |
 | Auto Dealerships | Labs / Nites | Pending BC-5880 | Pending BC-5880 |
-| Ski Resorts | Labs / Nites | Pending BC-5880 | Pending BC-5880 |
+| Ski Resorts | Labs | `list-building-ski-resorts.md` ✅ (+ `-pilot-zone` variant) | `risk-reversal-ski-resorts.md` ✅ (+ `-pilot-zone` variant) |
 | Country Clubs / Golf Courses | Nites / Labs | Pending BC-5880 | Pending BC-5880 |
 | Corporate Campuses | Nites / Labs | Pending BC-5880 | Pending BC-5880 |
 
