@@ -34,7 +34,7 @@ The skill scores against ONE Brite entity's ICP per invocation (Nites residentia
 | Flag | Default | Notes |
 |---|---|---|
 | `--client <entity>` | (auto-detect) | One of `brite-nites`, `brite-supply`, `brite-labs`. Bypasses entity detection. |
-| `--criteria '<json>'` | (read from marketing-context.md) | Inline JSON criteria (see schema in Methodology §3). |
+| `--criteria '<json>'` | (read from marketing-context.md) | Inline JSON criteria (see schema in §Methodology). |
 | `--criteria-file <path>` | (read from marketing-context.md) | Path to JSON criteria file. Useful for shareable rubrics. |
 | `--rubric <mode>` | `score_0_100` | One of `score_0_100` (Sonnet 4-bucket with reasoning) or `abc` (Haiku letter-only). Tam-mapping passes `abc`. |
 | `--threshold N` | `70` | Score threshold for qualified/disqualified split. **Used only in `score_0_100` mode.** |
@@ -115,7 +115,7 @@ If a record lacks website content (research failed), the model defaults to C per
 Per-record workers — each of `--workers` (max 20) takes one CSV row end-to-end:
 
 1. **Pre-filter optimization.** If the input CSV already has `industry` + `employees` populated AND those values satisfy the criteria's `must_have` / `must_not_have` rules conclusively (no ambiguity), the worker scores from columns alone. No research call. This is the cheap path — most matters when input came from `tam-mapping` enriched output.
-2. **Research (only when pre-filter is inconclusive).** Each worker calls `WebSearch` to fill gaps in the criteria-relevant fields (industry, employees, geography). For records where SF Account exists (per the cached `sf_available` flag from pre-flight), optional `run_soql_query` correlation. **Note:** firmographic enrichment via a dedicated MCP is not part of v0.1.0 — `mcp__plugin_marketing_enrichment__*` is intentionally excluded from `allowed-tools` until BC-5537/5538 ships (see §4 Brite Implementation for the activation procedure). Workers cannot probe an unregistered server, so the runtime branch is "WebSearch + optional SF correlation" only.
+2. **Research (only when pre-filter is inconclusive).** Each worker calls `WebSearch` to fill gaps in the criteria-relevant fields (industry, employees, geography). For records where SF Account exists (per the cached `sf_available` flag from pre-flight), optional `run_soql_query` correlation. **Note:** firmographic enrichment via a dedicated MCP is not part of v0.1.0 — `mcp__plugin_marketing_enrichment__*` is intentionally excluded from `allowed-tools` until BC-5537/5538 ships (see §Brite Implementation for the activation procedure). Workers cannot probe an unregistered server, so the runtime branch is "WebSearch + optional SF correlation" only.
 3. **Score.** Apply the rubric (score_0_100 → 4-bucket Sonnet with reasoning; abc → Haiku letter-only via `fit-scoring.md` prompt).
 4. **Write.** Append the scored row to the appropriate output file.
 
@@ -139,7 +139,7 @@ Per-record workers — each of `--workers` (max 20) takes one CSV row end-to-end
 **Enrichment MCP graceful-degrade.** `mcp__plugin_marketing_enrichment__*` is NOT registered in `plugins/marketing/.mcp.json` today (BC-5537/5538 not yet shipped). The skill therefore does NOT list it in `allowed-tools` (per CLAUDE.md gotcha — listing an unregistered server causes silent runtime failure). Research relies on `WebSearch` + SF Account lookup only. When BC-5537/5538 ships:
 
 1. Add `mcp__plugin_marketing_enrichment__*` to `allowed-tools` frontmatter.
-2. Update §5 MCP Tool Reference to add the enrichment availability probe + firmographic-fill workflow.
+2. Update §MCP Tool Reference to add the enrichment availability probe + firmographic-fill workflow.
 3. Update the parallel-research flow Step 2 to include enrichment in the research toolkit.
 
 Until then, the skill does not invent enrichment calls. Records that need firmographic data not on the public web score conservatively (40 / C).
@@ -171,7 +171,7 @@ When `tam-mapping` Phase 7 invokes this skill with `--rubric abc`, the contract 
 
 - **Input:** CSV from `tam-mapping`'s Phase 6 verified output (one row per enriched, SMTP-verified company), with `catch_all` column populated by `tam-mapping`'s SMTP-verify step.
 - **Reshape responsibility (BC-5832):** `verify_smtp.py` (in `plugins/marketing/scripts/tam-map/`) writes JSONL with `catch_all` nested under `record.smtp.catch_all`. **This skill consumes a flat CSV with a top-level `catch_all` column.** The JSONL→CSV transformation (and the `smtp.catch_all` → top-level `catch_all` flattening) is the responsibility of the **tam-mapping caller (BC-5832)**, not this skill. tam-mapping's Phase 6 closing step or Phase 7 setup step must perform the reshape before invoking icp-scoring with `--rubric abc`. If a caller passes JSONL or a CSV missing `catch_all`, the skill stops with a "missing required column `catch_all` for `--rubric abc`" error.
-- **Pass-through flags:** `--max-records`, `--model`, `--workers`, `--criteria-file` (tam-mapping passes the entity's ICP JSON), `--output-dir` (tam-mapping passes its slug-keyed working directory, typically `docs/campaigns/labs/tam/{slug}/` — see §2 flag table).
+- **Pass-through flags:** `--max-records`, `--model`, `--workers`, `--criteria-file` (tam-mapping passes the entity's ICP JSON), `--output-dir` (tam-mapping passes its slug-keyed working directory, typically `docs/campaigns/labs/tam/{slug}/` — see §Before Starting flag table).
 - **Output:** `tier-a.csv` / `tier-b.csv` / `tier-c.csv` / `catch-all.csv` written to the directory passed via `--output-dir` (defaults to invocation cwd if absent).
 - **Catch-all isolation:** the skill respects the input `catch_all` column. Rows with `catch_all: true` go to `catch-all.csv` regardless of letter score. Rows with `catch_all: false` go to the letter-keyed CSV. **The skill does not SMTP-verify or infer catch-all status on its own.**
 
@@ -189,7 +189,7 @@ When `tam-mapping` Phase 7 invokes this skill with `--rubric abc`, the contract 
 
 ### Rules that apply
 
-The skill-specific rules (reasoning required, tier-aware confidence, worker cap, LLM-timeout default, cost-gate hard-contract, never-inline-abc-prompt) are canonical in **§8 Anti-Slop**. This subsection used to restate them — that duplication has been consolidated to a single source. See §8 Anti-Slop "Skill-specific" rules for the complete list.
+The skill-specific rules (reasoning required, tier-aware confidence, worker cap, LLM-timeout default, cost-gate hard-contract, never-inline-abc-prompt) are canonical in **§Anti-Slop**. This subsection used to restate them — that duplication has been consolidated to a single source. See §Anti-Slop "Skill-specific" rules for the complete list.
 
 ---
 
@@ -200,8 +200,8 @@ Grouped by phase, not by server.
 ### Pre-flight — entity detection
 
 1. Read `docs/marketing-context.md` (via `Read`).
-2. If file is absent, run the missing-file `AskUserQuestion` flow from §2.
-3. If file is present, parse the entity headers (`## Brite Nites ICP`, `## Brite Supply ICP`, `## Brite Labs ICP`). Apply the entity-detection table from §2.
+2. If file is absent, run the missing-file `AskUserQuestion` flow from §Before Starting.
+3. If file is present, parse the entity headers (`## Brite Nites ICP`, `## Brite Supply ICP`, `## Brite Labs ICP`). Apply the entity-detection table from §Before Starting.
 
 ### Pre-flight — CSV schema validation
 
@@ -217,7 +217,7 @@ Grouped by phase, not by server.
 
 ### Pre-flight — criteria load (run ONCE per skill invocation)
 
-1. Resolve criteria source per §2 (auto from marketing-context.md / inline `--criteria` / `--criteria-file`).
+1. Resolve criteria source per §Before Starting (auto from marketing-context.md / inline `--criteria` / `--criteria-file`).
 2. Parse the criteria JSON ONCE in pre-flight; pass the parsed object to workers via in-process closure or argument. **Workers do NOT re-`Read` the criteria source per row.**
 3. The same single-read rule applies to `marketing-context.md` (parsed once) and the abc-mode prompt template at `plugins/marketing/references/tam/fit-scoring.md` (read once, passed to workers).
 
@@ -256,7 +256,7 @@ Grouped by phase, not by server.
 
 ### Workflow B: Inline `--criteria` for one-off
 
-**Preconditions:** user passes `--criteria '<json>'` AND no other criteria source is provided (no `--criteria-file`, no auto-load from `marketing-context.md`). When two criteria sources are passed simultaneously, the §2 mutual-exclusion rule fires (stop and ask which to honor) — Workflow B describes the single-source happy path only.
+**Preconditions:** user passes `--criteria '<json>'` AND no other criteria source is provided (no `--criteria-file`, no auto-load from `marketing-context.md`). When two criteria sources are passed simultaneously, the §Before Starting mutual-exclusion rule fires (stop and ask which to honor) — Workflow B describes the single-source happy path only.
 
 **Steps:**
 
@@ -419,7 +419,7 @@ Given the skill is invoked with `--rubric abc --client brite-labs --criteria-fil
 #### Scenario 8: Cost-cap gate fires (1500 records, score_0_100)
 
 Given input CSV has 1500 rows, default `score_0_100` mode, no `--max-records` flag, output must:
-- Emit cost estimate (≈$0.75).
+- Emit cost estimate (≈$7.50 — matches the §Brite Implementation cost-cap-gate baseline and Workflow E worked example).
 - Call `AskUserQuestion` with options `Approve` / `Switch to abc mode` / `Cancel`.
 - NOT proceed to scoring without an explicit `Approve` response.
 - On `Cancel`: exit with no CSV writes.
@@ -433,7 +433,7 @@ Given `docs/marketing-context.md` does not exist and user invokes the skill with
   1. Run `/marketing:product-marketing-context` to create the file (recommended).
   2. Pick an entity for this run only with inline criteria — skill prompts for criteria JSON next.
   3. Cancel.
-- On (1): exit cleanly with instructions for the user to run `/marketing:product-marketing-context` and then re-invoke icp-scoring once the file lands. (No in-session pause/resume primitive — matches sibling pattern in `email-copywriting/SKILL.md` §2.)
+- On (1): exit cleanly with instructions for the user to run `/marketing:product-marketing-context` and then re-invoke icp-scoring once the file lands. (No in-session pause/resume primitive — matches sibling pattern in `email-copywriting/SKILL.md` Before Starting.)
 - On (2): proceed with the inline-criteria sub-prompt flow — `AskUserQuestion` for entity choice, then a follow-up prompt for the criteria JSON (validated for required `description` field). Reject empty/malformed JSON; do not write CSV until criteria is validated.
 - On (3): exit with no CSV writes.
 - Verify: skill does NOT proceed with inferred entity or invented ICP criteria. Skill does NOT claim to "resume" after an external skill invocation.
