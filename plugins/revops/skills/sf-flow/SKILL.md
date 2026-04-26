@@ -59,11 +59,11 @@ The Draft trap applies to scratch orgs too; CI deploys that run flows must inclu
 
 ### 6. Some Screen Flow settings are UI-only
 
-Like Kanban Group By selection (sf-metadata), certain flow runtime configurations live at the Lightning UI layer and aren't deployable. Document any UI-only setup per-org so sandbox refreshes don't lose it.
+Like the Kanban Group By selection (covered in sf-metadata), some flow runtime configurations live at the Lightning UI layer and aren't deployable. Document any UI-only setup per-org so sandbox refreshes don't lose it.
 
 ### 7. `/revops:post-deploy-runbook` cross-reference
 
-Phase 2 of the post-deploy runbook walks through Screen Flow activation diff-driven (only prompts when the deploy includes new/changed flows). Use it as the canonical post-deploy gate.
+Phase 2 of the post-deploy runbook walks through Screen Flow activation, diff-driven (only prompts when the deploy includes new/changed flows). Use it as the canonical post-deploy gate.
 
 ## When This Skill Owns the Task
 

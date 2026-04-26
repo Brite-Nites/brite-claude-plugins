@@ -61,9 +61,9 @@ For sandbox dev, consider disabling durable caching: Setup → Session Settings 
 
 `none` can cause the field to not render. `readonly` is the standard pattern for auto-populated DateTime fields on flexipages.
 
-### 7. LWC security primitives inherit platform permissions via `@AuraEnabled`
+### 7. LWC security primitives — `@AuraEnabled` runs in user context but does NOT auto-enforce CRUD/FLS
 
-Apex methods exposed with `@AuraEnabled(cacheable=true)` enforce CRUD/FLS through the calling user's profile + permission sets. Don't bypass; use `Security.stripInaccessible` or `Schema.DescribeFieldResult` checks when defending against partial-FLS scenarios.
+Apex methods exposed with `@AuraEnabled(cacheable=true)` execute in the calling user's session, so user-level access checks apply — but the annotation alone does NOT enforce CRUD/FLS on DML or SOQL. Enforce explicitly: declare the class `with sharing`, use `WITH SECURITY_ENFORCED` on SOQL, or run `Security.stripInaccessible` / `Schema.DescribeFieldResult` checks before DML. This pairs with sf-apex's broader Apex security guidance.
 
 ## When This Skill Owns the Task
 
