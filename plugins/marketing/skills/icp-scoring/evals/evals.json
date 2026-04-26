@@ -1,0 +1,175 @@
+{
+  "skill": "icp-scoring",
+  "version": "0.1.0",
+  "rubrics_covered": ["score_0_100", "abc"],
+  "scenarios": [
+    {
+      "id": "entity-auto-single-entity-context",
+      "tier": 1,
+      "rubric": "score_0_100",
+      "description": "Auto-detect entity from marketing-context.md when only one entity is populated. Score 50-row CSV under default threshold; no cost gate fires.",
+      "input": {
+        "csv_rows": 50,
+        "csv_columns": ["domain", "company_name", "industry"],
+        "flags": [],
+        "mocked_marketing_context": "docs/marketing-context.md present with only `## Brite Labs ICP` populated"
+      },
+      "assertions": [
+        "first_response contains exact string: 'Using entity=brite-labs from marketing-context.md (override with --client).'",
+        "no cost gate AskUserQuestion is emitted (50 < 1000)",
+        "output writes <input>_qualified.csv and <input>_disqualified.csv",
+        "every output row has 4 added columns: icp_score, icp_label, icp_reasoning, company_summary",
+        "qualified.csv contains only rows with icp_score >= 70",
+        "disqualified.csv contains only rows with icp_score < 70",
+        "summary report includes distribution by label and top 3 disqualification reasons"
+      ]
+    },
+    {
+      "id": "inline-criteria-one-off",
+      "tier": 1,
+      "rubric": "score_0_100",
+      "description": "Inline --criteria JSON bypasses entity detection.",
+      "input": {
+        "csv_rows": 100,
+        "flags": ["--criteria", "{\"description\":\"US-based SaaS, 50-500 employees\",\"industry\":[\"software\",\"saas\"],\"employee_range\":{\"min\":50,\"max\":500}}"],
+        "mocked_marketing_context": "absent"
+      },
+      "assertions": [
+        "no entity detection occurs",
+        "criteria JSON is validated for required `description` field",
+        "skill runs in score_0_100 mode (default)",
+        "output is qualified/disqualified split per the inline criteria"
+      ]
+    },
+    {
+      "id": "criteria-file-shareable-rubric",
+      "tier": 1,
+      "rubric": "score_0_100",
+      "description": "Read shareable rubric from JSON file via --criteria-file.",
+      "input": {
+        "csv_rows": 200,
+        "flags": ["--criteria-file", "./test-criteria.json"],
+        "mocked_filesystem": "./test-criteria.json present with valid criteria JSON"
+      },
+      "assertions": [
+        "skill reads the file via Read tool",
+        "JSON shape is validated",
+        "scoring proceeds identically to inline-criteria",
+        "if file missing or JSON invalid, skill stops with error citing path + parse error"
+      ]
+    },
+    {
+      "id": "pre-filter-hit-no-research",
+      "tier": 1,
+      "rubric": "score_0_100",
+      "description": "Row's industry + employees columns satisfy criteria conclusively; worker scores from columns alone with no research call.",
+      "input": {
+        "row_industry": "software",
+        "row_employees": 100,
+        "criteria_must_have": "industry in [software]",
+        "criteria_employee_range": {"min": 50, "max": 500}
+      },
+      "assertions": [
+        "no WebSearch tool call fires for this row",
+        "no SF MCP run_soql_query fires for this row",
+        "icp_score is high (typically >= 70)",
+        "icp_reasoning contains exact string: 'score from columns; firmographics complete'"
+      ]
+    },
+    {
+      "id": "research-failure-conservative-default",
+      "tier": 1,
+      "rubric": "both",
+      "description": "Research fails (no industry/employees in row, WebSearch empty, SF Account miss, enrichment MCP unavailable). Skill emits conservative-default row, never rejects.",
+      "input": {
+        "row_industry": null,
+        "row_employees": null,
+        "websearch_result": "no usable hits",
+        "sf_account_match": false,
+        "enrichment_mcp_available": false
+      },
+      "assertions": [
+        "score_0_100 mode: icp_score == 40, icp_reasoning contains 'research failed; conservative default'",
+        "abc mode: tier letter == 'C'",
+        "row is NOT skipped — appears in output CSV",
+        "skill continues processing remaining rows"
+      ]
+    },
+    {
+      "id": "preview-mode-sample-five",
+      "tier": 2,
+      "rubric": "score_0_100",
+      "description": "Preview mode samples 5 rows, runs full pipeline, prints to stdout, writes no CSV files.",
+      "input": {
+        "csv_rows": 500,
+        "flags": ["--preview"]
+      },
+      "assertions": [
+        "exactly 5 rows are processed",
+        "stdout contains per-row score + reasoning + model used",
+        "stdout contains projected cost for full 500-row run",
+        "Glob against output directory finds NO new CSV files after the run",
+        "skill exits cleanly without prompting for full-run continuation"
+      ]
+    },
+    {
+      "id": "tam-mapping-delegated-abc-batch",
+      "tier": 2,
+      "rubric": "abc",
+      "description": "Tam-mapping Phase 7 delegation invocation with --rubric abc and pre-populated catch_all column.",
+      "input": {
+        "csv_rows": 4500,
+        "csv_columns": ["domain", "company_name", "industry", "employees", "catch_all"],
+        "flags": ["--rubric", "abc", "--client", "brite-labs", "--criteria-file", "<path>", "--max-records", "5000"]
+      },
+      "assertions": [
+        "no cost gate AskUserQuestion fires (--max-records 5000 >= row count)",
+        "skill reads prompt template from plugins/marketing/references/tam/fit-scoring.md verbatim",
+        "model used is claude-haiku-4-5",
+        "output writes tier-a.csv, tier-b.csv, tier-c.csv, catch-all.csv to caller's working directory",
+        "every input row with catch_all == true ends up in catch-all.csv regardless of letter",
+        "every input row with catch_all == false ends up in the letter-keyed CSV (tier-a/b/c)",
+        "skill does NOT SMTP-verify or set catch_all on its own"
+      ]
+    },
+    {
+      "id": "cost-gate-fires-1500-records",
+      "tier": 2,
+      "rubric": "score_0_100",
+      "description": "1500-row CSV in score_0_100 default mode triggers cost-gate AskUserQuestion (no hard refuse).",
+      "input": {
+        "csv_rows": 1500,
+        "flags": []
+      },
+      "assertions": [
+        "first_response contains a rough cost estimate sized appropriately for 1500 records in score_0_100 mode (~$7.50 baseline at current Sonnet pricing) AND notes the estimate is order-of-magnitude with explicit input/output token assumptions",
+        "AskUserQuestion is called with options including 'Approve', 'Switch to abc mode', and 'Cancel'",
+        "no scoring occurs before user response",
+        "on user 'Cancel' response: no CSV files written",
+        "on user 'Approve' response: full run proceeds normally",
+        "this is a gate, NOT a hard refuse — Approve must be a valid path"
+      ]
+    },
+    {
+      "id": "missing-marketing-context-three-way-prompt",
+      "tier": 2,
+      "rubric": "score_0_100",
+      "description": "marketing-context.md missing AND no --criteria/--criteria-file/--client passed → skill emits 3-way AskUserQuestion fallback.",
+      "input": {
+        "csv_rows": 100,
+        "flags": [],
+        "mocked_marketing_context": "absent"
+      },
+      "assertions": [
+        "skill detects the missing file",
+        "AskUserQuestion is called with three options: (1) Run /marketing:product-marketing-context, (2) Pick entity inline for this run only, (3) Cancel",
+        "on option (1): skill exits cleanly with instructions for the user to run /marketing:product-marketing-context and then re-invoke icp-scoring (no in-session pause/resume)",
+        "on option (2): skill calls AskUserQuestion (or equivalent) for entity choice (one of brite-nites/brite-supply/brite-labs); follows up with a prompt for inline criteria JSON; rejects empty or malformed JSON; does not write any CSV until the criteria is validated; does not save the entity choice to marketing-context.md",
+        "on option (3): skill exits with no CSV writes",
+        "skill does NOT proceed with inferred entity",
+        "skill does NOT invent ICP criteria",
+        "skill does NOT claim to resume after an external skill invocation"
+      ]
+    }
+  ]
+}
