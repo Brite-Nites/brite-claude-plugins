@@ -92,7 +92,7 @@ Every card MUST include these lines in this order:
 **Team:** <comma-separated named people>
 ```
 
-`**Ship this week:**` and `**Team:**` are mandatory on every card — AC #3 is verified by grep. If a project is self-directed (one owner), write `**Team:** <owner> (self-directed)`. If Phase 2 marked the project parked, do NOT emit a Sprint Plans card — route it to `## Parked This Week` instead.
+`**Ship this week:**` and `**Team:**` are mandatory on every card — AC #3 is verified by grep. If a project is self-directed (one owner), write `**Team:** <owner> (self-directed)`. If Phase 2 marked the project parked, do NOT emit a Sprint Plans card — route it to `## Parked This Week` instead. If `state.projects[i].scope_decisions.ritual == true` AND `scope_decisions.q5_parked` is unset, do NOT emit a Sprint Plans card — route to `## Ritual Cadence` (defined below) instead.
 
 Optional card extras — include only when the checkpoint has matching content:
 
@@ -129,7 +129,7 @@ Source: any project whose Phase 2 `scope_decisions.ritual == true` AND has no `q
 | <name> | <owner or "(unassigned)"> | <one-line reason from checkpoint SQ5 or project status> |
 ```
 
-Source: any project whose checkpoint block carries an explicit parking reason via Phase 2 SQ5. Phase 0.3 filters the project list to `status.type == "started"`, so truly paused projects never reach this agent — all parking decisions here originate in Phase 2.
+Source: any project whose checkpoint block carries an explicit parking reason — either via Phase 2 SQ5, OR via the SQ1 ritual lock option 2 (which writes `scope_decisions.q5_parked` directly when `ritual == true`). Phase 0.3 filters the project list to `status.type == "started"`, so truly paused projects never reach this agent — all parking decisions here originate in Phase 2.
 
 ### Check-in Schedule (Mon–Fri tables)
 
