@@ -23,7 +23,7 @@ You MUST use `Read` to load:
 1. `paths.voice_spec` — binding rules (numeric bands, forbidden/preferred words, skeleton). Treat as law.
 2. `paths.reference_narrative` — the most recent prior week's `w<NN-1>-sprint-narrative.md`. Use as voice anchor — diction, section length, card shape.
 3. `paths.audit_json` — full per-project Phase 1 audit cards. Source of truth for shipped/carry_over/dropped counts, by_assignee rollups, and every quality_gate_flag.
-4. `paths.checkpoint` — per-project Phase 2 scope decisions. Source of truth for Ship this week items, SQ1 headlines, SQ3 reassignments, SQ5 parked.
+4. `paths.checkpoint` — per-project Phase 2 scope decisions. Source of truth for Ship this week items, SQ1 headlines, SQ3 reassignments, SQ5 parked, and the BC-5901 ritual flag (`scope_decisions.ritual`).
 
 Optionally read:
 
@@ -92,7 +92,7 @@ Every card MUST include these lines in this order:
 **Team:** <comma-separated named people>
 ```
 
-`**Ship this week:**` and `**Team:**` are mandatory on every card — AC #3 is verified by grep. If a project is self-directed (one owner), write `**Team:** <owner> (self-directed)`. If Phase 2 marked the project parked, do NOT emit a Sprint Plans card — route it to `## Parked This Week` instead.
+`**Ship this week:**` and `**Team:**` are mandatory on every card — AC #3 is verified by grep. If a project is self-directed (one owner), write `**Team:** <owner> (self-directed)`. If Phase 2 marked the project parked, do NOT emit a Sprint Plans card — route it to `## Parked This Week` instead. If `state.projects[i].scope_decisions.ritual == true` AND `scope_decisions.q5_parked` is unset, do NOT emit a Sprint Plans card — route to `## Ritual Cadence` (defined below) instead.
 
 Optional card extras — include only when the checkpoint has matching content:
 
@@ -102,6 +102,27 @@ Optional card extras — include only when the checkpoint has matching content:
 
 Do not exceed 10 "Ship this week" items per card. If the scope has more, group them hierarchically under bold sub-labels (`**OutboundSync pipeline (main focus)**`) with nested bullets.
 
+### Ritual Cadence (one `### <Project>` card per ritual-flagged project)
+
+When `state.projects[i].scope_decisions.ritual == true`, route the project here instead of Sprint Plans. These are projects where Phase 2 SQ1 picked "Defer to offline touch-base with owner" — single-owner cadence work without a per-cycle scope list (e.g. weekly recurring meetings, training programs, partnership check-ins, communication infrastructure monitoring). § 2.3's ritual close-out row in `docs/designs/cadence-orchestration.md` defines the audit-card signature.
+
+Card format:
+
+```
+### <Project Name>
+
+**Owner:** <single owner name from audit_card.shipped.issues[0].assignee>
+**Cadence note:** <one sentence — pull from SQ1 free-text if user picked Other, otherwise the canned default "Continue cadence — owner picks next track offline.">
+```
+
+No Ship list, no Team line, no Goal line, no Risk flag — these are mandatory on Sprint Plans cards but are explicitly omitted here.
+
+If `state.projects[i].scope_decisions.ritual == true` AND `state.projects[i].scope_decisions.q5_parked` is set (planner picked "Park this cycle" at SQ1 § 4.2 lock option 2), route to `## Parked This Week` instead — explicit park decision overrides the ritual flag.
+
+If `state.projects[i].scope_decisions.ritual == false` (planner picked "Specify scope instead" at SQ1 § 4.2 lock option 3), the project routes to Sprint Plans normally — option 3 is the route-out of ritual handling and runs SQ2–5 the regular way. No Ritual Cadence card emitted.
+
+Source: any project whose Phase 2 `scope_decisions.ritual == true` AND has no `q5_parked` value. Option-3 (`ritual == false`) projects never reach this section.
+
 ### Parked This Week (table)
 
 ```
@@ -110,7 +131,7 @@ Do not exceed 10 "Ship this week" items per card. If the scope has more, group t
 | <name> | <owner or "(unassigned)"> | <one-line reason from checkpoint SQ5 or project status> |
 ```
 
-Source: any project whose checkpoint block carries an explicit parking reason via Phase 2 SQ5. Phase 0.3 filters the project list to `status.type == "started"`, so truly paused projects never reach this agent — all parking decisions here originate in Phase 2.
+Source: any project whose checkpoint block carries an explicit parking reason — either via Phase 2 SQ5, OR via the SQ1 ritual lock option 2 (which writes `scope_decisions.q5_parked` directly when `ritual == true`). Phase 0.3 filters the project list to `status.type == "started"`, so truly paused projects never reach this agent — all parking decisions here originate in Phase 2.
 
 ### Check-in Schedule (Mon–Fri tables)
 
@@ -132,7 +153,7 @@ One `### <Day>` subsection per weekday. Each with a table:
 | **<name>** | <primary track> | <secondary track or —> |
 ```
 
-One row per person who appears in any Sprint Plans card. Derive Primary from the project that owns them in Phase 2; Secondary from any other card they're named in. Use `—` when there's no secondary track.
+One row per person who appears in any Sprint Plans card. Derive Primary from the project that owns them in Phase 2; Secondary from any other card they're named in. Use `—` when there's no secondary track. Ritual Cadence card owners are NOT included by default — ritual cadence is offline-defined work outside the weekly assignment table. To surface a ritual-only owner here, the planner re-runs SQ1 and picks "Specify scope instead" (§ 4.2 option 3), which routes the project to Sprint Plans normally.
 
 ## Voice rules
 

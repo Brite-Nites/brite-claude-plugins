@@ -85,9 +85,9 @@ Asked only if the project has unshipped carry-over issues. If the audit card rep
 
 ### 2.2 Next-cycle scope block — once per project after carry-over
 
-Asked once per project even if carry-over block was skipped. If the audit card reports a parked project (no active work, no W+1 capacity), Q1 is asked with default "parked" and the rest of the block is skipped.
+Asked once per project even if carry-over block was skipped. If the audit card reports a parked project (no active work, no W+1 capacity), Q1 is asked with default "parked" and the rest of the block is skipped. SQ2–SQ5 are also subject to the § 2.3 ritual close-out skip — when the audit card matches the ritual signature, only SQ1 fires for the project and SQ2–SQ5 are logged-skipped.
 
-* **Q1 — Headline outcome sentence?** Default: agent proposes from top-priority carry-over + top-priority backlog candidates *(or "Owner picks next track — free-text" when both are empty — see § 2.3 no-signal row)*. Escape: custom sentence, or mark project parked. Why: W16 Outbound Sales Ops had an explicit headline — *"BDRs and leadership see dashboards with real data by Friday."* — the narrative cards lead with this.
+* **Q1 — Headline outcome sentence?** Default: agent proposes from top-priority carry-over + top-priority backlog candidates *(or "Owner picks next track — free-text" when both are empty — see § 2.3 no-signal row; or "Defer to offline touch-base with owner" when the audit card matches the ritual signature — see § 2.3 ritual close-out row)*. Escape: custom sentence, or mark project parked. Why: W16 Outbound Sales Ops had an explicit headline — *"BDRs and leadership see dashboards with real data by Friday."* — the narrative cards lead with this.
 * **Q2 — Which issue IDs ship this cycle?** Default: agent proposes current-cycle carry-over + High-or-Urgent backlog filtered by the quality gate (see § 3). Escape: exploratory project — no up-front commitments, add issues during the cycle. Why: W16 Salesforce Implementation listed 12 specific IDs with ownership; exploratory projects like Brite Handbook got no list.
 * **Q3 — Owner per issue, if different from existing assignee?** Default: keep existing assignees. Escape: reassign specific IDs; mark specific IDs unassigned. Why: ownership drift is common mid-cycle — Q3 catches it at scope time rather than during execution.
 * **Q4 — Dependencies between the picked issues?** Default: agent infers from issue descriptions + blocker fields. Escape: all parallel (no dependencies), or add explicit edges ("BC-2068 depends on BC-2067"). Why: W16 Salesforce Implementation had a 6-issue dependency chain implicit in the narrative; capturing it at scope time feeds the narrative card's structure.
@@ -95,7 +95,9 @@ Asked once per project even if carry-over block was skipped. If the audit card r
 
 ### 2.3 Adaptivity rules
 
-The skill consults the audit card before each question and skips when the audit already answers:
+The skill consults the audit card before each question and skips when the audit already answers. Condition fields use bare names for `audit_card.*` references (e.g. `carry_over` is `audit_card.carry_over`) and qualified names for `_enrichment.*` references (e.g. `_enrichment.dispatch_error`); SKILL.md § 4 carries the fully-qualified `state.projects[i].*` form for the implementation.
+
+The `_enrichment.backlog_candidates empty (or all Medium/Low priority)` predicate appears in rows 6 (no-signal) and 7 (ritual close-out) — when revising the priority-band semantics (e.g. promoting Low to a different value), update both rows in lockstep AND the matching SKILL.md § 4 fallback paragraphs.
 
 | Condition | Question skipped |
 |---|---|
@@ -105,6 +107,7 @@ The skill consults the audit card before each question and skips when the audit 
 | `audit.auto_superseded_by` set (e.g. via linked-issue field) | Q3 of carry-over block is prefilled but shown for confirmation |
 | `backlog_candidates.length == 0` at Urgent/High priority | Q2 of scope block still asked but default is "carry-over only" |
 | `carry_over == []` AND `backlog_candidates` empty (or all Medium/Low priority) | Q1 of scope block still asked, but default switches to *"Owner picks next track — free-text (Recommended)"* — agent does NOT propose a headline draft (no fake-default invention). Q2–Q5 still asked normally. |
+| `shipped.count >= 3` AND `carry_over == []` AND `dropped == []` AND `len(set(shipped.issues[*].assignee)) == 1` AND `shipped.issues[0].assignee != "(unassigned)"` AND `_enrichment.dispatch_error == null` AND `backlog_candidates` empty (or all Medium/Low priority) | Q1 of scope block still asked, but default switches to *"Defer to offline touch-base with owner (Recommended)"* with a 3-option lock (defer / park-this-cycle / specify-instead — see SKILL § 4.2). Q2–Q5 skipped + logged with reason `"ritual close-out — single owner consistent shipping, no signal for new scope"`; `scope_decisions.ritual = true` set on the project. Takes precedence over the no-signal row above when both fire. |
 
 Every skipped question logs a one-line audit entry in the state object (`skipped: Q3 carry-over because BC-X has superseded_by field set`) so the narrative can explain the resulting decision without needing the skill to re-derive it.
 

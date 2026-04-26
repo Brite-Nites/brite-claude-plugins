@@ -118,7 +118,7 @@ If `completed_phases` is empty (e.g. a prior run failed in Phase 1 before the au
 ### 0.5.4 Rehydrate state from artifacts (on Resume)
 
 - **From `audit.json`:** populate `state.projects[].audit_card` + `state.cross_project_stats`. Files are deterministic JSON so this is a direct parse.
-- **From checkpoint:** parse each `### N. <Project>` block into `state.projects[i].scope_decisions` (headline, ship IDs, reassignments, parked). Parse `## Cross-project flags` bullets into `state.bottleneck_warnings`. Populate `state.projects[i].overrides` from any callouts that cite override reasons.
+- **From checkpoint:** parse each `### N. <Project>` block into `state.projects[i].scope_decisions` (headline, ship IDs, reassignments, parked, ritual flag from BC-5901's `**Ritual close-out:**` line when present — see sprint-scoping SKILL.md § 6 checkpoint format). Parse `## Cross-project flags` bullets into `state.bottleneck_warnings`. Populate `state.projects[i].overrides` from any callouts that cite override reasons.
 - **From housekeeping log:** parse the `## Mutations` table into `state._executed_mutation_ids[]` and the summary counts into `state.mutations[]` summary fields consumed by Phase 4's `mutations_summary` dispatch.
 - **From narrative:** `state.narrative_path = <path>`; `state.narrative_draft = <file contents>` (in case user picks Edit post-resume).
 - **From ops:** `state.ops_path = <path>`.
@@ -172,7 +172,7 @@ Phases flow via a single session-scoped state object. No re-fetching from Linear
         "enriched_at": "<ISO-8601>",
         "dispatch_error": null | "<message>"
       },
-      "scope_decisions", "overrides",        // populated by Phase 2 sprint-scoping skill; scope_decisions shape = {q1_headline, q2_ship_ids, q3_reassignments, q4_dependencies, q5_parked, carry_over_answers[]} per sprint-scoping SKILL.md § 1
+      "scope_decisions", "overrides",        // populated by Phase 2 sprint-scoping skill; scope_decisions shape = {q1_headline, q2_ship_ids, q3_reassignments, q4_dependencies, q5_parked, carry_over_answers[], ritual} per sprint-scoping SKILL.md § 1 (BC-5901 added ritual)
       "skip_log", "scope_confirmed",         // populated by Phase 2 sprint-scoping skill
       "_fetched_issues"                      // Phase 2 carry-over + gate fetch cache — populated on-demand by Phase 3 § 3 pre-flight when not already present; enricher writes _enrichment.carry_over_enriched[] instead of this cache during Phase 2.
   } ],

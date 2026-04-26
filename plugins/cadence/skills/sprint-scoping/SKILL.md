@@ -29,7 +29,7 @@ Reads from the session state object populated by Phases 0–1:
 Populates / mutates:
 
 - `state.projects[i]._enrichment = { backlog_candidates[], carry_over_enriched[], brainstorming_ranked[], enriched_at, dispatch_error }` (produced per-project by the § 2 pre-loop enricher dispatch — BC-5902; authoritative shape lives in `commands/weekly.md § Session State Object`)
-- `state.projects[i].scope_decisions = {q1_headline, q2_ship_ids, q3_reassignments, q4_dependencies, q5_parked, carry_over_answers[]}`
+- `state.projects[i].scope_decisions = {q1_headline, q2_ship_ids, q3_reassignments, q4_dependencies, q5_parked, carry_over_answers[], ritual}` — `ritual: true` set when § 2.3 ritual close-out row fires; SQ2–5 are skipped + logged in `skip_log` and the narrative renders a Ritual Cadence card variant instead of a Sprint Plans card.
 - `state.projects[i].overrides = [{issue_id, check, reason}]`
 - `state.projects[i].skip_log = [string, ...]` (one line per skipped question with the audit-card reason)
 - `state.bottleneck_warnings = [{assignee, count, issues[]}]` (populated after the project loop)
@@ -107,9 +107,13 @@ SQ1's answer constrains SQ2's option set (SQ1's headline drives SQ2's viable iss
 
 **No-signal SQ1 fallback.** When `state.projects[i]._enrichment.carry_over_enriched.length == 0` AND `state.projects[i]._enrichment.backlog_candidates` is empty (or every entry has `priority.value >= 3` Medium/Low), SQ1's `(Recommended)` default switches from an agent-drafted headline to *"Owner picks next track — free-text (Recommended)"* — the agent does NOT invent a fake default. SQ1 is still asked (no `skip_log` entry — this is a default-switch, not a skip); the user's free-text answer becomes the headline verbatim. SQ2–SQ5 still ask normally with the `brainstorming_ranked` empty fallback (see paragraph above) handling SQ2. **(Closes BC-5900 — codifies the W17 attempt-2 honest-abstention path as spec-compliant per `docs/designs/cadence-orchestration.md` § 2.3 no-signal row, rather than rendering a "spec departure noted" annotation.)**
 
+**Ritual close-out fallback.** When `state.projects[i].audit_card.shipped.count >= 3` AND `state.projects[i].audit_card.carry_over.count == 0` AND `state.projects[i].audit_card.dropped.count == 0` AND `len(set(state.projects[i].audit_card.shipped.issues[*].assignee)) == 1` AND `state.projects[i].audit_card.shipped.issues[0].assignee != "(unassigned)"` AND `state.projects[i]._enrichment.dispatch_error == null` AND `state.projects[i]._enrichment.backlog_candidates` is empty (or every entry has `priority.value >= 3` Medium/Low), SQ1's `(Recommended)` default switches from an agent-drafted headline to *"Defer to offline touch-base with owner (Recommended)"* with the 3-option lock from § 4.2 below. SQ1 is still asked (no `skip_log` entry — this is a default-switch, not a skip). SQ2–SQ5 are SKIPPED for this project and logged: `state.projects[i].skip_log` gets one entry per skipped question with reason `"ritual close-out — single owner consistent shipping, no signal for new scope"`, and `state.projects[i].scope_decisions.ritual = true` is set so Phase 4's narrative-writer renders the project as a Ritual Cadence card rather than a Sprint Plans card. **(Closes BC-5901 — codifies the W17 attempt-2 skill-invented ritual-project degradation across Meeting Auto / Brite Training / Partnership Management / Comm Infra as spec-compliant per `docs/designs/cadence-orchestration.md` § 2.3 ritual close-out row, rather than rendering a "spec departure noted" annotation.)**
+
+**Ritual vs no-signal precedence.** Both the BC-5900 no-signal SQ1 fallback (line 108 above) and this BC-5901 ritual close-out fallback can co-fire on the same project — when audit shows zero carry-over AND backlog is empty/Medium-Low, both predicates are true. The ritual rule takes precedence over no-signal: single-owner consistent shipping (3+ shipped, zero dropped, zero enricher error) is a stronger signal than empty-backlog alone, and the ritual path skips SQ2–5 while no-signal still asks them — running both yields contradictory behavior. Evaluation order: check ritual conjuncts first; only if any conjunct fails fall through to the no-signal check.
+
 | Q-ID | Question | Recommended default |
 |---|---|---|
-| SQ1 | Headline outcome sentence for `<project>`? | Agent draft from top-priority carry-over + top backlog *(or free-text "Owner picks next track" if both empty — see no-signal fallback above)* |
+| SQ1 | Headline outcome sentence for `<project>`? | Agent draft from top-priority carry-over + top backlog *(or free-text "Owner picks next track" if both empty — see no-signal fallback above; or 3-option lock when ritual close-out fires — see § 4.2 below)* |
 | SQ2 | Which issue IDs ship this cycle? | Brainstorming output (top-ranked candidates; quality-gate filtering runs in § 5 on the user's picks, not here) |
 | SQ3 | Owner per issue, if different from existing? | Keep existing assignees |
 | SQ4 | Dependencies between picked issues? | Agent infers from descriptions + `relations.blockedBy` |
@@ -118,6 +122,8 @@ SQ1's answer constrains SQ2's option set (SQ1's headline drives SQ2's viable iss
 ### § 4.1 SQ3 option lock
 
 <!-- gate-respect: honor user pick; re-prompt before any behavior change — SQ3 option set is locked to the three items below, Other escape always available. -->
+
+**Origin class:** schema-collision. Linear has one `assignee` field per issue (BC-5872); improvising *"co-ownership"* (banned — see anti-pattern list below) drops or replaces real data. Future locks of this class also have a concrete data-corruption risk.
 
 SQ3's `AskUserQuestion` MUST render exactly three options (plus the implicit "Other" free-text escape):
 
@@ -132,6 +138,23 @@ Linear has exactly one `assignee` field per issue. SQ3 maps 1:1 to that field. S
 - *"multi-assignee"* / *"multiple assignees"* / *"Holden + Rainer both on BC-XXXX"* — any phrasing that implies a list-valued assignee.
 
 If co-ownership becomes a legitimate weekly pattern, file a spec amendment to BC-5810 § 2.2 — do not improvise here. The escape path for one-off co-lead intent is the Phase 5 manual-ops checklist (the planner writes a freeform row after the run); SQ3 itself stays locked to the three options above.
+
+### § 4.2 SQ1 ritual option lock
+
+<!-- gate-respect: honor user pick; re-prompt before any behavior change — SQ1 option set under § 2.3 ritual close-out is locked to the three items below, Other escape always available. -->
+
+**Origin class:** workflow-clarity. Three downstream narrative renders (Ritual Cadence card / Parked This Week table / Sprint Plans card) need three distinct option signals to disambiguate intent (BC-5901). Future locks of this class trade option-set tightness for render-side disambiguation rather than schema-collision protection.
+
+When the § 2.3 ritual close-out row fires (see "Ritual close-out fallback" prose above), SQ1's `AskUserQuestion` MUST render exactly three options (plus the implicit "Other" free-text escape):
+
+1. **Defer to offline touch-base with owner** `(Recommended)` — sets `q1_headline = "Continue cadence — owner picks next track offline"` and proceeds to skip SQ2–5 (logged in `skip_log` per the ritual fallback prose). `scope_decisions.ritual` stays `true` → Ritual Cadence card.
+2. **Park this cycle** — sets `scope_decisions.q5_parked = "<project> — parked this cycle, owner unavailable"` and routes to Parked This Week instead of Ritual Cadence in Phase 4. `scope_decisions.ritual` stays `true` (audit-trail preservation: the ritual signal that fired is recorded; narrative-writer routes via the `q5_parked` override per its precedence rules).
+3. **Specify scope instead** — overrides the ritual flag (`scope_decisions.ritual = false`), unlocks SQ1 free-text, and runs SQ2–5 normally → Sprint Plans card. Use when the audit signal is correct but the planner has unsurfaced backlog or a deliberate stretch goal.
+
+Specifically banned improvisation patterns (origin: BC-5901 W17 attempt-2 dogfood across 4 ritual-pattern projects):
+
+- *"redundant free-text Option N + Other Option N+1 pattern"* — exposing a fake "Option 4: free-text" that duplicates the implicit Other escape. Lock the option set to three; planner uses Other to deviate.
+- *"merge SQ1 and SQ5 into a defer-and-park combo option"* — keep park-this-cycle and specify-instead distinct from defer-offline; they map to different downstream renders (Ritual Cadence card vs Parked This Week table vs Sprint Plans card).
 
 ## § 5 Quality gate + block-with-override
 
@@ -186,6 +209,8 @@ Append a project block to the file. **Atomic** — write only after § 5 complet
 ```
 
 Minimum required headers per AC: `### N. <name>`, `**Owner:**`, `**Headline:**`. Everything else freeform per W16 ground-truth (`weekly-planning/w16-2026-04-13/w16-planning-checkpoint.md`) — voice matches `docs/designs/cadence-plugin.md` § 1.
+
+**Ritual close-out checkpoint render (BC-5901).** When `scope_decisions.ritual == true` (the SQ1 § 4.2 lock fired), append a `**Ritual close-out:** true` line immediately after `**Headline:**` and skip the per-section bullet list (Carry-over, Ship this cycle, etc.) — render the freeform body as a single one-liner: `Ritual cadence — owner picks next track offline.` (or the SQ1 free-text answer when the planner picked Other). Required so § 0.5.4 Resume parse can rehydrate `scope_decisions.ritual` from disk (the parser keys on the `**Ritual close-out:**` line); without it, a resumed Phase 4 silently demotes ritual-flagged projects back to Sprint Plans cards.
 
 Note: BC-5760 issue AC #6 references literal sub-sections (`Ship this week`, `Stretch`, `Parked`, `Risks`). The W16 ground truth uses freeform headers per project (e.g. *"Devops unblock"*, *"OutboundSync pipeline"*, *"BDR pipeline cleanup"*); the plan resolved this in favour of voice-fidelity. Document the departure in the PR description.
 
