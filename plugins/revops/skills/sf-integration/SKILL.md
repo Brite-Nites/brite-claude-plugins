@@ -1,6 +1,6 @@
 ---
 name: sf-integration
-description: Salesforce integration architecture (Brite edition) with 120-point scoring. TRIGGER when user sets up Named Credentials, External Services, REST/SOAP callouts, Platform Events, CDC, touches `.namedCredential-meta.xml` files, works in brite-salesforce, asks about the PLACEHOLDER URL strategy for NCs (manually configured per-org post-deploy), the `.forceignore` exclusion for `namedCredentials/*.namedCredential-meta.xml` (BC-5609 lesson preventing silent re-push of PLACEHOLDER over working URLs), the Queueable silent-retry diagnostic (N consecutive Completed jobs = NC misconfig signature), the Email Bison → OutboundSync canonical sync path, the Brite_Base REST integration (SF as read-only WO/SA status mirror), or the ECA replacement for Connected Apps post-Spring '26 (`ExternalClientApplication` metadata, JWT-from-ECA + scratch-org gotcha). DO NOT TRIGGER when Connected App/OAuth config (use sf-connected-apps), Apex-only logic (use sf-apex), or data import/export (use sf-data).
+description: Salesforce integration architecture (Brite edition) with 120-point scoring. TRIGGER when user sets up Named Credentials, External Services, REST/SOAP callouts, Platform Events, CDC, touches namedCredential-meta.xml files, works in brite-salesforce, asks about NC PLACEHOLDER URL strategy, the namedCredentials .forceignore exclusion (BC-5609 lesson), Queueable silent-retry diagnostic, Email Bison → OutboundSync sync path, Brite_Base REST integration, or ECA replacement for Connected Apps post-Spring '26. DO NOT TRIGGER when Connected App/OAuth config (use sf-connected-apps), Apex-only logic (use sf-apex), or data import/export (use sf-data).
 user-invocable: false
 license: MIT
 metadata:
@@ -18,18 +18,14 @@ Use this skill when the user needs **integration architecture and runtime plumbi
 
 ## Brite Context
 
-Brite's integration stance:
-
-- **Named Credentials for ALL outbound callouts.** No hardcoded endpoints or credentials anywhere in source. Brite Engineering Standard. Source: `brite-salesforce/CLAUDE.md` §Engineering Standards line 45.
-- **NC URLs are PLACEHOLDER in source, manually configured per-org.** Secrets don't belong in source control; metadata deploys carry placeholder values intentionally. Each org (sandbox AND production) needs post-deploy URL configuration. Currently affected: `Slack_Webform_Alerts`.
-- **`namedCredentials/*.namedCredential-meta.xml` is excluded via `.forceignore`.** Prevents `sf project deploy start --source-dir force-app/` from silently re-pushing PLACEHOLDER over a working URL. BC-5609 lesson: pre-`.forceignore`, every deploy clobbered the live Slack webhook URL, producing the classic 1-original + 3-silent-retry Queueable failure pattern.
-- **ECAs replace Connected Apps post-Spring '26.** Connected App creation is deprecated; use `ExternalClientApplication` metadata type. See [sf-connected-apps](../sf-connected-apps/SKILL.md) for the 4-active-ECA inventory and the JWT-from-ECA + scratch-org gotcha.
+- **Named Credentials are mandatory for outbound callouts** — see Rule 1.
+- **NC URLs are PLACEHOLDER per-org** — see Rules 2 and 3 (`Slack_Webform_Alerts` is the canonical example; BC-5609 is the regression).
+- **Queueable silent-retry = NC misconfig signature** — see Rule 4.
+- **ECAs replace Connected Apps post-Spring '26** — see Rule 7 + sibling [sf-connected-apps](../sf-connected-apps/SKILL.md).
 
 **See also:** [sf-connected-apps](../sf-connected-apps/SKILL.md) for ECA OAuth lifecycle; [sf-apex](../sf-apex/SKILL.md) for the Queueable silent-retry diagnostic in code; [sf-data](../sf-data/SKILL.md) for the Email Bison → OutboundSync → Task data shape; [sf-deploy](../sf-deploy/SKILL.md) for safe NC redeploy sequencing (commenting out `.forceignore` exclusions).
 
 ## Brite Integration Discipline
-
-These rules govern outbound integration work on `brite-salesforce` and must surface during NC design, deploy, and post-deploy diagnostic.
 
 ### 1. Named Credentials are mandatory for outbound callouts
 

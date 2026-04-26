@@ -1,6 +1,6 @@
 ---
 name: sf-data
-description: Salesforce data operations (Brite edition) with 130-point scoring. TRIGGER when user creates test data, performs bulk import/export, uses sf data CLI commands, needs data factory patterns for Apex tests, works in brite-salesforce, asks about HubSpot migration ETL (`scripts/migration/` extract → transform → load → validate → fix), email-as-Task migration semantics (HubSpot emails surface as Task records, not EmailMessage), `Messaging.SingleEmailMessage` + `setSaveAsActivity(false)` Email-Logs-only monitoring path, Bulk API session-based permset gotcha (`HubSpot_Migration` `hasActivationRequired:true`), `CreateAuditFields` INSERT-only behavior (capitalized API name; upsert fails to set CreatedDate), `#N/A` sentinel for nulling fields in Bulk CSVs, or `Task.AccountId` follows `Task.WhatId` re-parenting pattern (does not cascade from `Contact.AccountId`). DO NOT TRIGGER when SOQL query writing only (use sf-soql), Apex test execution (use sf-testing), or metadata deployment (use sf-deploy).
+description: Salesforce data operations (Brite edition) with 130-point scoring. TRIGGER when user creates test data, performs bulk import/export, uses sf data CLI commands, needs data factory patterns for Apex tests, works in brite-salesforce, asks about HubSpot migration ETL, email-as-Task migration semantics, setSaveAsActivity Email Logs monitoring, Bulk API session-permset gotchas, CreateAuditFields INSERT-only behavior, #N/A null sentinel in Bulk CSVs, or Task.AccountId re-parenting via WhatId. DO NOT TRIGGER when SOQL query writing only (use sf-soql), Apex test execution (use sf-testing), or metadata deployment (use sf-deploy).
 user-invocable: false
 license: MIT
 metadata:
@@ -18,18 +18,14 @@ Use this skill when the user needs **Salesforce data work**: record CRUD, bulk i
 
 ## Brite Context
 
-Brite's data-ops stance:
-
-- **HubSpot migration is complete.** Phase 1 landed 2026-03-20, Phase 2 landed 2026-03-24. ETL scripts live at `brite-salesforce/scripts/migration/` organized as `extract/` → `transform/` → `load/` → `validate/` → `fix/` → `coverage/`. Per-record-type mapping in `docs/artifacts/data-migration-mapping.md`; activity-specific mapping in `docs/artifacts/data-migration-mapping-activities.md`.
-- **HubSpot emails surface as Task records, not EmailMessage.** Cosmetic difference only — data is identical. Don't expect native email icons or threading. See `docs/artifacts/email-notification-matrix.md` for the full monitoring story.
-- **Bulk API ≠ session-based permsets.** `HubSpot_Migration` permset has `hasActivationRequired:true` and only activates per UI session. The `Bypass_Validation_Rules` custom permission does NOT take effect in Bulk API or `sf` CLI sessions. Verify with `FeatureManagement.checkPermission()` first.
-- **`CreateAuditFields` is INSERT-only.** Records inserted without the permission must be DELETED and re-inserted; upsert takes the UPDATE path and `CreatedDate` remains unchanged. The org-level "Set Audit Fields upon Record Creation" toggle (Setup → User Interface) must be enabled. API name is capitalized — `createAuditFields` is rejected at deploy time.
+- **HubSpot migration is complete** (Phase 1 2026-03-20, Phase 2 2026-03-24) — see Rule 1 for ETL layout.
+- **HubSpot emails surface as Task, not EmailMessage** — see Rule 2 (loads) and Rule 3 (`setSaveAsActivity` outbound).
+- **Bulk API has session-permset and audit-field gotchas** — see Rules 4 and 5.
+- **Task re-parenting follows `WhatId`, not Contact** — see Rule 7.
 
 **See also:** [sf-soql](../sf-soql/SKILL.md) for query-only work (no record mutations); [sf-integration](../sf-integration/SKILL.md) for the Email Bison → OutboundSync handshake that produces Tasks; [sf-permissions](../sf-permissions/SKILL.md) for the 7-permset FLS sync discipline.
 
 ## Brite Data Discipline
-
-These rules govern data work on `brite-salesforce` and must surface during ETL design, bulk operations, and post-load reconciliation.
 
 ### 1. HubSpot migration architecture
 
@@ -57,7 +53,7 @@ Leaving a field empty in `sf data update bulk` CSVs causes Bulk API v1 to NOT UP
 
 ### 7. `Task.AccountId` follows `Task.WhatId`, not `Contact.AccountId`
 
-Task.AccountId is set at creation from `WhatId` (or derived from the `WhoId` Contact's AccountId at that moment) and **does not cascade** when the related Contact's AccountId later changes. To re-parent Tasks, explicitly `UPDATE Task SET WhatId = :newAccountId` — `WhatId` is polymorphic and Account is a valid target. Setting `WhatId = null` ALSO nulls AccountId, orphaning the task. Verified during BC-5545 contact re-parenting + drift audit 2026-04-24. Source: §Apex & Automation lines 191-192.
+Task.AccountId is set at creation from `WhatId` (or derived from the `WhoId` Contact's AccountId at that moment) and **does not cascade** when the related Contact's AccountId later changes. To re-parent Tasks, explicitly `UPDATE Task SET WhatId = :newAccountId` — `WhatId` is polymorphic and Account is a valid target. Setting `WhatId = null` ALSO nulls AccountId, orphaning the task. Verified during BC-5545 contact re-parenting. Source: §Apex & Automation lines 191-192.
 
 ### 8. Salesforce seed sample data may carry real correspondence
 

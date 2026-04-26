@@ -8,7 +8,7 @@ metadata:
   author: "Jag Valaiyapathy"
 ---
 
-<!-- Adopted verbatim from Jaganpro/sf-skills@ff1ab74 (MIT). Web-retrieval concern only (developer.salesforce.com, help.salesforce.com, etc.). Brite-internal SF documentation (artifacts inventory, ADR convention, cross-repo pointers) lives in the sibling sf-internal-docs skill (filed as a follow-up to BC-5931). -->
+<!-- Adopted verbatim from Jaganpro/sf-skills@ff1ab74 (MIT). Web-retrieval concern only (developer.salesforce.com, help.salesforce.com, etc.). Brite-internal SF documentation (artifacts inventory, ADR convention, cross-repo pointers) lives in the sibling sf-internal-docs skill — see BC-6081. -->
 
 # sf-docs
 
