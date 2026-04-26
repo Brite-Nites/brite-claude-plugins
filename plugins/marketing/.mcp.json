@@ -12,6 +12,31 @@
         "data",
         "--no-telemetry"
       ]
+    },
+    "spider": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "spider-cloud-mcp@2.1.1"],
+      "env": {
+        "SPIDER_API_KEY": "${SPIDER_API_KEY}"
+      }
+    },
+    "aiark": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/aiark-mcp.js"],
+      "env": {
+        "AIARK_API_KEY": "${AIARK_API_KEY}"
+      }
+    },
+    "discolike": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js"],
+      "env": {
+        "DISCOLIKE_API_KEY": "${DISCOLIKE_API_KEY}"
+      }
     }
+
   }
 }
