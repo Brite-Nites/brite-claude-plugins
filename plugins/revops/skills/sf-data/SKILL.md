@@ -1,17 +1,63 @@
 ---
 name: sf-data
-description: Salesforce data operations with 130-point scoring. TRIGGER when: user creates test data, performs bulk import/export, uses sf data CLI commands, or needs data factory patterns for Apex tests. DO NOT TRIGGER when: SOQL query writing only (use sf-soql), Apex test execution (use sf-testing), or metadata deployment (use sf-deploy).
+description: Salesforce data operations (Brite edition) with 130-point scoring. TRIGGER when user creates test data, performs bulk import/export, uses sf data CLI commands, needs data factory patterns for Apex tests, works in brite-salesforce, asks about HubSpot migration ETL, email-as-Task migration semantics, setSaveAsActivity Email Logs monitoring, Bulk API session-permset gotchas, CreateAuditFields INSERT-only behavior, #N/A null sentinel in Bulk CSVs, or Task.AccountId re-parenting via WhatId. DO NOT TRIGGER when SOQL query writing only (use sf-soql), Apex test execution (use sf-testing), or metadata deployment (use sf-deploy).
 user-invocable: false
 license: MIT
 metadata:
-  version: "1.2.0"
-  author: "Jag Valaiyapathy"
+  version: "1.2.0-brite.1"
+  author: "Jag Valaiyapathy (upstream); Brite Company (customization)"
+  upstream: "Jaganpro/sf-skills@ff1ab74"
   scoring: "130 points across 7 categories"
 ---
 
-# Salesforce Data Operations Expert (sf-data)
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Metadata Authoring (lines 130, 143-144) + §Permissions & Security (lines 175-176) + §Apex & Automation (lines 182, 191-193) + §Migration Reference + scripts/migration/. -->
+
+# Salesforce Data Operations Expert (sf-data) (Brite edition)
 
 Use this skill when the user needs **Salesforce data work**: record CRUD, bulk import/export, test data generation, cleanup scripts, or data factory patterns for validating Apex, Flow, or integration behavior.
+
+## Brite Context
+
+- **HubSpot migration is complete** (Phase 1 2026-03-20, Phase 2 2026-03-24) — see Rule 1 for ETL layout.
+- **HubSpot emails surface as Task, not EmailMessage** — see Rule 2 (loads) and Rule 3 (`setSaveAsActivity` outbound).
+- **Bulk API has session-permset and audit-field gotchas** — see Rules 4 and 5.
+- **Task re-parenting follows `WhatId`, not Contact** — see Rule 7.
+
+**See also:** [sf-soql](../sf-soql/SKILL.md) for query-only work (no record mutations); [sf-integration](../sf-integration/SKILL.md) for the Email Bison → OutboundSync handshake that produces Tasks; [sf-permissions](../sf-permissions/SKILL.md) for the 7-permset FLS sync discipline.
+
+## Brite Data Discipline
+
+### 1. HubSpot migration architecture
+
+ETL scripts in `brite-salesforce/scripts/migration/` are layered: `extract/` (HubSpot pull), `transform/` (Brite mapping), `load/` (SF push), `validate/` (post-load reconciliation), `fix/` (drift remediation), `coverage/` (Jest mapping coverage). When asked "load 5000 records into Salesforce" or "fix migration drift," reference these scripts as the starting point — do not author one-off load scripts.
+
+### 2. HubSpot emails migrate as Task, not EmailMessage
+
+HubSpot email engagements load as `Task` records with `Type: "Email"`. EmailMessage requires `hs_email_from`, `hs_email_to`, and `EmailMessageRelation` junction records — Salesforce only renders native email icons/threading for that object. The migration's Task-shape choice is intentional. Source: §Metadata Authoring line 143.
+
+### 3. `Messaging.SingleEmailMessage` + `setSaveAsActivity(false)` → no EmailMessage record AND no Task activity
+
+Outbound emails sent this way leave zero rows in both objects. The ONLY monitoring path is Setup → Email Logs (24-hour rolling window). Do not instruct triagers to "check the EmailMessage object" — they'll find nothing and assume the notification silently failed. `NewsletterSignupNotificationService` is the current example. See `docs/artifacts/email-notification-matrix.md`. Source: §Metadata Authoring line 144.
+
+### 4. Bulk API does not honor session-based permsets
+
+`HubSpot_Migration` permset has `hasActivationRequired:true` — activation only happens per UI session via `SessionPermissionSetActivation`, NOT in Bulk API or `sf` CLI sessions. For data loads that need the bypass, verify with `FeatureManagement.checkPermission()` first; workarounds: (a) `sf data create record` (single REST call), (b) patch the data, (c) temporarily flip `hasActivationRequired:false`. Source: §Permissions & Security line 175.
+
+### 5. `CreateAuditFields` is INSERT-only
+
+API name is **capitalized** (`createAuditFields` is rejected at deploy time with "Unknown user permission"). Records inserted without the permission must be DELETED and re-inserted to set `CreatedDate` — upsert takes the UPDATE path for existing records and silently leaves `CreatedDate` unchanged. Requires the org-level **"Set Audit Fields upon Record Creation"** toggle enabled in Setup → User Interface. Verified during BC-2744. Source: §Permissions & Security line 176.
+
+### 6. Bulk API empty CSV cells = "skip", not "set null"; use `#N/A` for null
+
+Leaving a field empty in `sf data update bulk` CSVs causes Bulk API v1 to NOT UPDATE that field. To actually null out a field via bulk update, the cell must be literally `#N/A`. Common trap when writing migration/cleanup scripts that need to null foreign keys (`WhatId`, `AccountId`, `OwnerId`). Verified during drift audit 2026-04-24. Source: §Apex & Automation line 193.
+
+### 7. `Task.AccountId` follows `Task.WhatId`, not `Contact.AccountId`
+
+Task.AccountId is set at creation from `WhatId` (or derived from the `WhoId` Contact's AccountId at that moment) and **does not cascade** when the related Contact's AccountId later changes. To re-parent Tasks, explicitly `UPDATE Task SET WhatId = :newAccountId` — `WhatId` is polymorphic and Account is a valid target. Setting `WhatId = null` ALSO nulls AccountId, orphaning the task. Verified during BC-5545 contact re-parenting. Source: §Apex & Automation lines 191-192.
+
+### 8. Salesforce seed sample data may carry real correspondence
+
+Orgs provisioned with default sample data (`Acme (Sample)`, `salesforce.com (Sample)`, `Global Media (Sample)`) can accumulate real emails via HubSpot / Email Bison domain matching. Before deleting seed Accounts, ALWAYS check: `SELECT COUNT() FROM Task WHERE Account.Name = '...' AND Subject LIKE 'Email:%'`. Preserve by re-parenting Tasks (`UPDATE Task SET WhatId = [AccountId]`) and EmailMessages (`UPDATE EmailMessage SET RelatedToId = [AccountId]`) before the cascade. Verified during drift audit 2026-04-24: `salesforce.com (Sample)` had 58 real Slack/FSL emails mixed with 2 seed tasks. Source: §Metadata Authoring line 130.
 
 ## When This Skill Owns the Task
 
