@@ -8,6 +8,8 @@ metadata:
   author: "Jag Valaiyapathy"
 ---
 
+<!-- Adopted verbatim from Jaganpro/sf-skills@ff1ab74 (MIT). This skill owns the *web-retrieval* concern for official Salesforce-owned documentation (developer.salesforce.com, help.salesforce.com, architect.salesforce.com, admin.salesforce.com, lightningdesignsystem.com). Brite-internal SF documentation references (brite-salesforce/docs/artifacts inventory, ADR convention in docs/decisions, cross-repo pointers to brite-handbook + brite-data-platform) live in the sibling sf-internal-docs skill — see BC-5931 follow-up issue. -->
+
 # sf-docs
 
 Use this skill to retrieve and ground answers in **official Salesforce documentation on the public web**.
