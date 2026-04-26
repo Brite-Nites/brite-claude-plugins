@@ -1,17 +1,67 @@
 ---
 name: sf-data
-description: Salesforce data operations with 130-point scoring. TRIGGER when: user creates test data, performs bulk import/export, uses sf data CLI commands, or needs data factory patterns for Apex tests. DO NOT TRIGGER when: SOQL query writing only (use sf-soql), Apex test execution (use sf-testing), or metadata deployment (use sf-deploy).
+description: Salesforce data operations (Brite edition) with 130-point scoring. TRIGGER when user creates test data, performs bulk import/export, uses sf data CLI commands, needs data factory patterns for Apex tests, works in brite-salesforce, asks about HubSpot migration ETL (`scripts/migration/` extract → transform → load → validate → fix), email-as-Task migration semantics (HubSpot emails surface as Task records, not EmailMessage), `Messaging.SingleEmailMessage` + `setSaveAsActivity(false)` Email-Logs-only monitoring path, Bulk API session-based permset gotcha (`HubSpot_Migration` `hasActivationRequired:true`), `CreateAuditFields` INSERT-only behavior (capitalized API name; upsert fails to set CreatedDate), `#N/A` sentinel for nulling fields in Bulk CSVs, or `Task.AccountId` follows `Task.WhatId` re-parenting pattern (does not cascade from `Contact.AccountId`). DO NOT TRIGGER when SOQL query writing only (use sf-soql), Apex test execution (use sf-testing), or metadata deployment (use sf-deploy).
 user-invocable: false
 license: MIT
 metadata:
-  version: "1.2.0"
-  author: "Jag Valaiyapathy"
+  version: "1.2.0-brite.1"
+  author: "Jag Valaiyapathy (upstream); Brite Company (customization)"
+  upstream: "Jaganpro/sf-skills@ff1ab74"
   scoring: "130 points across 7 categories"
 ---
 
-# Salesforce Data Operations Expert (sf-data)
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Permissions & Security (lines 175-176) + §Apex & Automation (lines 143-144, 191-193) + §Migration Reference + scripts/migration/. -->
+
+# Salesforce Data Operations Expert (sf-data) (Brite edition)
 
 Use this skill when the user needs **Salesforce data work**: record CRUD, bulk import/export, test data generation, cleanup scripts, or data factory patterns for validating Apex, Flow, or integration behavior.
+
+## Brite Context
+
+Brite's data-ops stance:
+
+- **HubSpot migration is complete.** Phase 1 landed 2026-03-20, Phase 2 landed 2026-03-24. ETL scripts live at `brite-salesforce/scripts/migration/` organized as `extract/` → `transform/` → `load/` → `validate/` → `fix/` → `coverage/`. Per-record-type mapping in `docs/artifacts/data-migration-mapping.md`; activity-specific mapping in `docs/artifacts/data-migration-mapping-activities.md`.
+- **HubSpot emails surface as Task records, not EmailMessage.** Cosmetic difference only — data is identical. Don't expect native email icons or threading. See `docs/artifacts/email-notification-matrix.md` for the full monitoring story.
+- **Bulk API ≠ session-based permsets.** `HubSpot_Migration` permset has `hasActivationRequired:true` and only activates per UI session. The `Bypass_Validation_Rules` custom permission does NOT take effect in Bulk API or `sf` CLI sessions. Verify with `FeatureManagement.checkPermission()` first.
+- **`CreateAuditFields` is INSERT-only.** Records inserted without the permission must be DELETED and re-inserted; upsert takes the UPDATE path and `CreatedDate` remains unchanged. The org-level "Set Audit Fields upon Record Creation" toggle (Setup → User Interface) must be enabled. API name is capitalized — `createAuditFields` is rejected at deploy time.
+
+**See also:** [sf-soql](../sf-soql/SKILL.md) for query-only work (no record mutations); [sf-integration](../sf-integration/SKILL.md) for the Email Bison → OutboundSync handshake that produces Tasks; [sf-permissions](../sf-permissions/SKILL.md) for the 7-permset FLS sync discipline.
+
+## Brite Data Discipline
+
+These rules govern data work on `brite-salesforce` and must surface during ETL design, bulk operations, and post-load reconciliation.
+
+### 1. HubSpot migration architecture
+
+ETL scripts in `brite-salesforce/scripts/migration/` are layered: `extract/` (HubSpot pull), `transform/` (Brite mapping), `load/` (SF push), `validate/` (post-load reconciliation), `fix/` (drift remediation), `coverage/` (Jest mapping coverage). When asked "load 5000 records into Salesforce" or "fix migration drift," reference these scripts as the starting point — do not author one-off load scripts.
+
+### 2. HubSpot emails migrate as Task, not EmailMessage
+
+HubSpot email engagements load as `Task` records with `Type: "Email"`. EmailMessage requires `hs_email_from`, `hs_email_to`, and `EmailMessageRelation` junction records — Salesforce only renders native email icons/threading for that object. The migration's Task-shape choice is intentional. Source: §Apex & Automation line 143.
+
+### 3. `Messaging.SingleEmailMessage` + `setSaveAsActivity(false)` → no EmailMessage record AND no Task activity
+
+Outbound emails sent this way leave zero rows in both objects. The ONLY monitoring path is Setup → Email Logs (24-hour rolling window). Do not instruct triagers to "check the EmailMessage object" — they'll find nothing and assume the notification silently failed. `NewsletterSignupNotificationService` is the current example. See `docs/artifacts/email-notification-matrix.md`. Source: §Apex & Automation line 144.
+
+### 4. Bulk API does not honor session-based permsets
+
+`HubSpot_Migration` permset has `hasActivationRequired:true` — activation only happens per UI session via `SessionPermissionSetActivation`, NOT in Bulk API or `sf` CLI sessions. For data loads that need the bypass, verify with `FeatureManagement.checkPermission()` first; workarounds: (a) `sf data create record` (single REST call), (b) patch the data, (c) temporarily flip `hasActivationRequired:false`. Source: §Permissions & Security line 175.
+
+### 5. `CreateAuditFields` is INSERT-only
+
+API name is **capitalized** (`createAuditFields` is rejected at deploy time with "Unknown user permission"). Records inserted without the permission must be DELETED and re-inserted to set `CreatedDate` — upsert takes the UPDATE path for existing records and silently leaves `CreatedDate` unchanged. Requires the org-level **"Set Audit Fields upon Record Creation"** toggle enabled in Setup → User Interface. Verified during BC-2744. Source: §Permissions & Security line 176.
+
+### 6. Bulk API empty CSV cells = "skip", not "set null"; use `#N/A` for null
+
+Leaving a field empty in `sf data update bulk` CSVs causes Bulk API v1 to NOT UPDATE that field. To actually null out a field via bulk update, the cell must be literally `#N/A`. Common trap when writing migration/cleanup scripts that need to null foreign keys (`WhatId`, `AccountId`, `OwnerId`). Verified during drift audit 2026-04-24. Source: §Apex & Automation line 193.
+
+### 7. `Task.AccountId` follows `Task.WhatId`, not `Contact.AccountId`
+
+Task.AccountId is set at creation from `WhatId` (or derived from the `WhoId` Contact's AccountId at that moment) and **does not cascade** when the related Contact's AccountId later changes. To re-parent Tasks, explicitly `UPDATE Task SET WhatId = :newAccountId` — `WhatId` is polymorphic and Account is a valid target. Setting `WhatId = null` ALSO nulls AccountId, orphaning the task. Verified during BC-5545 contact re-parenting + drift audit 2026-04-24. Source: §Apex & Automation lines 191-192.
+
+### 8. Salesforce seed sample data may carry real correspondence
+
+Orgs provisioned with default sample data (`Acme (Sample)`, `salesforce.com (Sample)`, `Global Media (Sample)`) can accumulate real emails via HubSpot / Email Bison domain matching. Before deleting seed Accounts, ALWAYS check: `SELECT COUNT() FROM Task WHERE Account.Name = '...' AND Subject LIKE 'Email:%'`. Preserve by re-parenting Tasks (`UPDATE Task SET WhatId = [AccountId]`) and EmailMessages (`UPDATE EmailMessage SET RelatedToId = [AccountId]`) before the cascade. Verified during drift audit 2026-04-24: `salesforce.com (Sample)` had 58 real Slack/FSL emails mixed with 2 seed tasks. Source: §Metadata Authoring line 130.
 
 ## When This Skill Owns the Task
 
