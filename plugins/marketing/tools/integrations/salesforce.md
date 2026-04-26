@@ -16,6 +16,7 @@ Decisions backing this integration: [`docs/research/salesforce-mcp-findings.md`]
 
 - `situation-mining` (BC-5824) — existing-account deep dive: `run_soql_query` on Account, Activity history, Opportunity history, `Account_Notes__c`, `Lifecycle_Stage_History__c` to enrich per-prospect worldview inference with internal signals.
 - `account-research` (BC-5827) — existing-SF-account enrichment conditional via `run_soql_query` on Account, Activity history, Opportunity history, `Account_Notes__c`, `Lifecycle_Stage_History__c` to augment public-source fact sheets with internal signals.
+- `icp-scoring` (BC-5831) — pre-outreach prospect prioritization: optional `run_soql_query` on Account to flag existing-customer signal (caps `score_0_100` at 40 for already-in-motion accounts; routes to `catch-all.csv` in `abc` mode).
 - `list-building` (BC-2717)
 - `reply-processing` (BC-2720)
 - `lead-routing` (BC-2725)
