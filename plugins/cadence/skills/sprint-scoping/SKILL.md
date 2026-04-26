@@ -105,9 +105,11 @@ The 5 questions from BC-5810 § 2.2 verbatim. **Each a separate `AskUserQuestion
 
 SQ1's answer constrains SQ2's option set (SQ1's headline drives SQ2's viable issue IDs); asking them simultaneously breaks the decision tree. If the condensed form ever feels justified, file a spec amendment to BC-5810 — do not improvise here.
 
+**No-signal SQ1 fallback.** When `state.projects[i]._enrichment.carry_over_enriched.length == 0` AND `state.projects[i]._enrichment.backlog_candidates` is empty (or every entry has `priority.value >= 3` Medium/Low), SQ1's `(Recommended)` default switches from an agent-drafted headline to *"Owner picks next track — free-text (Recommended)"* — the agent does NOT invent a fake default. The user's free-text answer becomes the headline verbatim; SQ2–SQ5 still ask normally with the `brainstorming_ranked` empty fallback (see paragraph above) handling SQ2. Logged under `state.projects[i].skip_log` as `{question: "SQ1", reason: "no-signal — no carry-over AND no Urgent/High backlog"}` so the narrative can explain the resulting decision per § 2.3 audit-entry contract. (Closes BC-5900 — codifies the W17 attempt-2 honest-abstention path as spec-compliant per `docs/designs/cadence-orchestration.md` § 2.3 no-signal row, rather than rendering a "spec departure noted" annotation.)
+
 | Q-ID | Question | Recommended default |
 |---|---|---|
-| SQ1 | Headline outcome sentence for `<project>`? | Agent draft from top-priority carry-over + top backlog |
+| SQ1 | Headline outcome sentence for `<project>`? | Agent draft from top-priority carry-over + top backlog *(or free-text "Owner picks next track" if both empty — see no-signal fallback above)* |
 | SQ2 | Which issue IDs ship this cycle? | Brainstorming output (top-ranked candidates; quality-gate filtering runs in § 5 on the user's picks, not here) |
 | SQ3 | Owner per issue, if different from existing? | Keep existing assignees |
 | SQ4 | Dependencies between picked issues? | Agent infers from descriptions + `relations.blockedBy` |
