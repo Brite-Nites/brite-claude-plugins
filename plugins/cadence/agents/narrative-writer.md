@@ -102,6 +102,25 @@ Optional card extras — include only when the checkpoint has matching content:
 
 Do not exceed 10 "Ship this week" items per card. If the scope has more, group them hierarchically under bold sub-labels (`**OutboundSync pipeline (main focus)**`) with nested bullets.
 
+### Ritual Cadence (one `### <Project>` card per ritual-flagged project)
+
+When `state.projects[i].scope_decisions.ritual == true`, route the project here instead of Sprint Plans. These are projects where Phase 2 SQ1 picked "Defer to offline touch-base with owner" — single-owner cadence work without a per-cycle scope list (e.g. weekly recurring meetings, training programs, partnership check-ins, communication infrastructure monitoring). § 2.3's ritual close-out row in `docs/designs/cadence-orchestration.md` defines the audit-card signature.
+
+Card format:
+
+```
+### <Project Name>
+
+**Owner:** <single owner name from audit_card.shipped[0].assignee>
+**Cadence note:** <one sentence — pull from SQ1 free-text if user picked Other, otherwise the canned default "Continue cadence — owner picks next track offline.">
+```
+
+No Ship list, no Team line, no Goal line, no Risk flag — these are mandatory on Sprint Plans cards but are explicitly omitted here. AC #3's grep that enforces `**Ship this week:**` and `**Team:**` on Sprint Plans cards must be scoped to projects under the `## Sprint Plans` H2, not under Ritual Cadence H3.
+
+If `state.projects[i].scope_decisions.ritual == true` AND `state.projects[i].scope_decisions.q5_parked` is set (planner picked "Park this cycle" at SQ1 § 4.2 lock option 2), route to `## Parked This Week` instead — explicit park decision overrides the ritual flag.
+
+Source: any project whose Phase 2 `scope_decisions.ritual == true` AND has no `q5_parked` value.
+
 ### Parked This Week (table)
 
 ```
