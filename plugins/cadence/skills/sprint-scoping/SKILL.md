@@ -123,6 +123,8 @@ SQ1's answer constrains SQ2's option set (SQ1's headline drives SQ2's viable iss
 
 <!-- gate-respect: honor user pick; re-prompt before any behavior change — SQ3 option set is locked to the three items below, Other escape always available. -->
 
+**Origin class:** schema-collision. Linear has one `assignee` field per issue (BC-5872); improvising *"co-ownership"* (banned — see anti-pattern list below) drops or replaces real data. Future locks of this class also have a concrete data-corruption risk.
+
 SQ3's `AskUserQuestion` MUST render exactly three options (plus the implicit "Other" free-text escape):
 
 1. **Keep existing assignees** `(Recommended)`
@@ -141,11 +143,13 @@ If co-ownership becomes a legitimate weekly pattern, file a spec amendment to BC
 
 <!-- gate-respect: honor user pick; re-prompt before any behavior change — SQ1 option set under § 2.3 ritual close-out is locked to the three items below, Other escape always available. -->
 
+**Origin class:** workflow-clarity. Three downstream narrative renders (Ritual Cadence card / Parked This Week table / Sprint Plans card) need three distinct option signals to disambiguate intent (BC-5901). Future locks of this class trade option-set tightness for render-side disambiguation rather than schema-collision protection.
+
 When the § 2.3 ritual close-out row fires (see "Ritual close-out fallback" prose above), SQ1's `AskUserQuestion` MUST render exactly three options (plus the implicit "Other" free-text escape):
 
-1. **Defer to offline touch-base with owner** `(Recommended)` — sets `q1_headline = "Continue cadence — owner picks next track offline"` and proceeds to skip SQ2–5 (logged in `skip_log` per the ritual fallback prose).
-2. **Park this cycle** — sets `scope_decisions.q5_parked = "<project> — parked this cycle, owner unavailable"` and routes to Parked This Week instead of Ritual Cadence in Phase 4.
-3. **Specify scope instead** — overrides the ritual flag (`scope_decisions.ritual = false`), unlocks SQ1 free-text, and runs SQ2–5 normally. Use when the audit signal is correct but the planner has unsurfaced backlog or a deliberate stretch goal.
+1. **Defer to offline touch-base with owner** `(Recommended)` — sets `q1_headline = "Continue cadence — owner picks next track offline"` and proceeds to skip SQ2–5 (logged in `skip_log` per the ritual fallback prose). `scope_decisions.ritual` stays `true` → Ritual Cadence card.
+2. **Park this cycle** — sets `scope_decisions.q5_parked = "<project> — parked this cycle, owner unavailable"` and routes to Parked This Week instead of Ritual Cadence in Phase 4. `scope_decisions.ritual` stays `true` (audit-trail preservation: the ritual signal that fired is recorded; narrative-writer routes via the `q5_parked` override per its precedence rules).
+3. **Specify scope instead** — overrides the ritual flag (`scope_decisions.ritual = false`), unlocks SQ1 free-text, and runs SQ2–5 normally → Sprint Plans card. Use when the audit signal is correct but the planner has unsurfaced backlog or a deliberate stretch goal.
 
 Specifically banned improvisation patterns (origin: BC-5901 W17 attempt-2 dogfood across 4 ritual-pattern projects):
 

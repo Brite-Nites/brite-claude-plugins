@@ -119,7 +119,9 @@ No Ship list, no Team line, no Goal line, no Risk flag — these are mandatory o
 
 If `state.projects[i].scope_decisions.ritual == true` AND `state.projects[i].scope_decisions.q5_parked` is set (planner picked "Park this cycle" at SQ1 § 4.2 lock option 2), route to `## Parked This Week` instead — explicit park decision overrides the ritual flag.
 
-Source: any project whose Phase 2 `scope_decisions.ritual == true` AND has no `q5_parked` value.
+If `state.projects[i].scope_decisions.ritual == false` (planner picked "Specify scope instead" at SQ1 § 4.2 lock option 3), the project routes to Sprint Plans normally — option 3 is the route-out of ritual handling and runs SQ2–5 the regular way. No Ritual Cadence card emitted.
+
+Source: any project whose Phase 2 `scope_decisions.ritual == true` AND has no `q5_parked` value. Option-3 (`ritual == false`) projects never reach this section.
 
 ### Parked This Week (table)
 
@@ -151,7 +153,7 @@ One `### <Day>` subsection per weekday. Each with a table:
 | **<name>** | <primary track> | <secondary track or —> |
 ```
 
-One row per person who appears in any Sprint Plans card. Derive Primary from the project that owns them in Phase 2; Secondary from any other card they're named in. Use `—` when there's no secondary track.
+One row per person who appears in any Sprint Plans card. Derive Primary from the project that owns them in Phase 2; Secondary from any other card they're named in. Use `—` when there's no secondary track. Ritual Cadence card owners are NOT included by default — ritual cadence is offline-defined work outside the weekly assignment table. To surface a ritual-only owner here, the planner re-runs SQ1 and picks "Specify scope instead" (§ 4.2 option 3), which routes the project to Sprint Plans normally.
 
 ## Voice rules
 
