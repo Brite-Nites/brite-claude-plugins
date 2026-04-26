@@ -1,17 +1,69 @@
 ---
 name: sf-flow
-description: Creates and validates Salesforce Flows with 110-point scoring. TRIGGER when: user builds or edits record-triggered, screen, autolaunched, or scheduled flows, or touches .flow-meta.xml files. DO NOT TRIGGER when: Apex automation (use sf-apex), process builder migration questions only, or non-Flow declarative config (use sf-metadata).
+description: Creates and validates Salesforce Flows (Brite edition) with 110-point scoring. TRIGGER when user builds or edits record-triggered, screen, autolaunched, or scheduled flows, touches .flow-meta.xml files, works in brite-salesforce, asks about the Apex-first flow policy (Flows only for screen flows + simple notifications), the Screen-Flow-deploy-as-Draft trap (regardless of source `<status>Active</status>`), `sf data update record` failing to activate flows, post-deploy Tooling API verification (`SELECT Status FROM Flow WHERE Definition.DeveloperName = '...'`), scratch-org flow activation gaps, or `/revops:post-deploy-runbook` Phase 2 cross-reference. DO NOT TRIGGER when Apex automation (use sf-apex), process builder migration questions only, or non-Flow declarative config (use sf-metadata).
 user-invocable: false
 license: MIT
 metadata:
-  version: "2.1.0"
-  author: "Jag Valaiyapathy"
+  version: "2.1.0-brite.1"
+  author: "Jag Valaiyapathy (upstream); Brite Company (customization)"
+  upstream: "Jaganpro/sf-skills@ff1ab74"
   scoring: "110 points across 6 categories"
 ---
 
-# sf-flow: Salesforce Flow Creation and Validation
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Engineering Standards (line 41, Apex-first flow policy) + §Apex & Automation (line 189, Screen-Flow-deploy-as-Draft trap). -->
+
+# sf-flow: Salesforce Flow Creation and Validation (Brite edition)
 
 Use this skill when the user needs **Flow design or Flow XML work**: record-triggered, screen, autolaunched, scheduled, or platform-event Flows, including validation, architecture choices, and safe deployment sequencing.
+
+## Brite Context
+
+Brite's flow stance:
+
+- **Apex-first by policy.** Brite uses Flows only for (a) Screen Flows (user-facing UI) and (b) simple notifications where Apex would be overkill. Never auto-launched flows for business logic. Source: `brite-salesforce/CLAUDE.md` §Engineering Standards line 41.
+- **Screen Flows deploy as Draft regardless of source `<status>Active</status>`.** `sf data update record` cannot activate flows (fails serializing the complex `Metadata` field). Activation is a manual Setup-UI step that ships in `/revops:post-deploy-runbook` Phase 2.
+- **Post-deploy verification is non-optional.** After every deploy that includes flows, verify via Tooling API SOQL: `SELECT Status FROM Flow WHERE Definition.DeveloperName = '<Flow_Name>'`. Deploy `Status: Succeeded` is necessary but not sufficient.
+- **Scratch orgs share the Draft trap.** Same activation gap applies to scratch-org CI runs after a deploy preprocess.
+
+**See also:** [sf-apex](../sf-apex/SKILL.md) for the Apex-first automation patterns (trigger handler dispatch, Queueable design); [sf-deploy](../sf-deploy/SKILL.md) for safe deployment sequencing; [sf-lwc](../sf-lwc/SKILL.md) when a flow embeds an LWC for richer UI; `/revops:post-deploy-runbook` for the post-deploy activation walk-through.
+
+## Brite Flow Policy
+
+These rules are non-negotiable on `brite-salesforce` and must surface during flow design, deploy, and post-deploy verification.
+
+### 1. Flow policy — Apex-first; Flows only for screen flows + simple notifications
+
+Auto-launched flows for business logic are out — use Apex. Record-triggered flows for trivial branching only. Source: §Engineering Standards line 41.
+
+### 2. Screen Flows deploy as Draft
+
+Even when source XML specifies `<status>Active</status>`, newly-deployed screen flows land in Draft in the target org. Activate via Setup → Flows → find the flow → click Activate on the version row. Verified during BC-5021 prod deploy (2026-04-16).
+
+### 3. `sf data update record` cannot activate flows
+
+It fails serializing the complex `Metadata` field on the Flow object. Use Setup UI; do not script the activation.
+
+### 4. Post-deploy SOQL verification — Tooling API
+
+After a flow deploy:
+
+```sql
+SELECT Status FROM Flow WHERE Definition.DeveloperName = '<Flow_Name>'
+```
+
+Confirm `Status = 'Active'` before treating the deploy as landed.
+
+### 5. Scratch org applicability
+
+The Draft trap applies to scratch orgs too; CI deploys that run flows must include the activation step (or skip flow-dependent assertions).
+
+### 6. Some Screen Flow settings are UI-only
+
+Like the Kanban Group By selection (covered in sf-metadata), some flow runtime configurations live at the Lightning UI layer and aren't deployable. Document any UI-only setup per-org so sandbox refreshes don't lose it.
+
+### 7. `/revops:post-deploy-runbook` cross-reference
+
+Phase 2 of the post-deploy runbook walks through Screen Flow activation, diff-driven (only prompts when the deploy includes new/changed flows). Use it as the canonical post-deploy gate.
 
 ## When This Skill Owns the Task
 
