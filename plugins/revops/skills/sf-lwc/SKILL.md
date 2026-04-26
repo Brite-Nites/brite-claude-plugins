@@ -1,17 +1,69 @@
 ---
 name: sf-lwc
-description: Lightning Web Components with PICKLES methodology and 165-point scoring. TRIGGER when: user creates/edits LWC components, touches lwc/**/*.js, .html, .css, .js-meta.xml files, or asks about wire service, SLDS, or Jest LWC tests. DO NOT TRIGGER when: Apex classes (use sf-apex), Aura components, or Visualforce.
+description: Lightning Web Components (Brite edition) with PICKLES methodology and 165-point scoring. TRIGGER when user creates/edits LWC components, touches lwc/**/*.js, .html, .css, .js-meta.xml files, works in brite-salesforce, asks about wire service, SLDS, Jest LWC tests, the LWC Jest pre-commit hook, Dynamic Forms requiring FLS even for admins (`View All Data` does NOT bypass FLS), Dynamic Forms field-level vs section-level visibility evaluation, Flexipage IndexedDB cache flushing (hard refresh insufficient), the `flexipage:recordHomeTemplateDesktop` two-column template name (NOT `...TwoColTemplateDesktop`), Dynamic Forms DateTime `uiBehavior=readonly` for auto-populated fields, or `@AuraEnabled` security primitives. DO NOT TRIGGER when Apex classes (use sf-apex), Aura components, or Visualforce.
 user-invocable: false
 license: MIT
 metadata:
-  version: "2.1.0"
-  author: "Jag Valaiyapathy"
+  version: "2.1.0-brite.1"
+  author: "Jag Valaiyapathy (upstream); Brite Company (customization)"
+  upstream: "Jaganpro/sf-skills@ff1ab74"
   scoring: "165 points across 8 categories (SLDS 2 + Dark Mode compliant)"
 ---
 
-# sf-lwc: Lightning Web Components Development
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Engineering Standards (line 43, LWC Jest pre-commit) + §Metadata Authoring (Dynamic Forms + Flexipage gotchas, lines 137-142). -->
+
+# sf-lwc: Lightning Web Components Development (Brite edition)
 
 Use this skill when the user needs **Lightning Web Components**: LWC bundles, wire patterns, Apex/GraphQL integration, SLDS 2 styling, accessibility, performance work, or Jest unit tests.
+
+## Brite Context
+
+Brite's LWC stance:
+
+- **Jest required for all LWCs.** The pre-commit hook runs Jest tests on staged LWC files; any new LWC ships with Jest coverage. Source: `brite-salesforce/CLAUDE.md` §Engineering Standards line 43.
+- **Dynamic Forms requires FLS even for admins.** `View All Data` / `Modify All Data` do NOT bypass Field-Level Security. A custom field with no `FieldPermissions` records is invisible in Dynamic Forms — even for System Administrators. Always deploy FLS alongside new fields.
+- **Flexipage caches in IndexedDB for hours.** Hard browser refresh does NOT clear it. Three flush options: log out and back in, run `indexedDB.deleteDatabase("actions")` in Chrome console, or open the page in Lightning App Builder and click Save.
+- **Two-column template name is `flexipage:recordHomeTemplateDesktop`** — NOT `...TwoColTemplateDesktop` (that name does not exist). Regions: `sidebar` (left) + `main` (right).
+
+**See also:** [sf-apex](../sf-apex/SKILL.md) for `@AuraEnabled` controllers and security primitives; [sf-flow](../sf-flow/SKILL.md) when an LWC embeds in a screen flow; [sf-metadata](../sf-metadata/SKILL.md) for the broader Dynamic Forms / Flexipage gotcha set; [sf-deploy](../sf-deploy/SKILL.md) for FLS-alongside-fields deploy discipline.
+
+## Brite LWC Discipline
+
+These rules are non-negotiable on `brite-salesforce` and must surface during LWC authoring, deploy, and post-deploy verification.
+
+### 1. Jest required for all LWCs
+
+The pre-commit hook runs `npm test` against staged LWC files. Any new LWC ships with Jest coverage. Canonical commands: `npm test`, `npm run test:unit:coverage`. Source: §Engineering Standards line 43.
+
+### 2. Dynamic Forms requires FLS even for admins
+
+`View All Data` / `Modify All Data` do NOT bypass Field-Level Security. Deploy FLS alongside any new field used in a Dynamic Form. If `--source-dir` deploys roll back (e.g., ECA failures), deploy fields and FLS individually with `-m` flags. Source: §Metadata Authoring line 138.
+
+### 3. Field-level vs section-level visibility evaluate differently
+
+Field-level rules (`visibilityRule` on `fieldItem`) evaluate **reactively during editing**. Section-level rules (`visibilityRule` on `fieldSection`) evaluate **only on saved record values**. Use field-level when a field should appear/disappear as the user edits a controlling picklist.
+
+### 4. Flexipage cache lives in IndexedDB and persists for hours
+
+Hard refresh (`Cmd+Shift+R`) does NOT clear it. Flush via:
+
+- log out and back in, OR
+- `indexedDB.deleteDatabase("actions")` in Chrome console, OR
+- open the page in Lightning App Builder and click Save.
+
+For sandbox dev, consider disabling durable caching: Setup → Session Settings → uncheck "Enable secure and persistent browser caching."
+
+### 5. Two-column template name
+
+`flexipage:recordHomeTemplateDesktop` — NOT `flexipage:recordHomeTwoColTemplateDesktop` (that name does not exist). Regions: `sidebar` (left) + `main` (right). Three-column equivalent: `flexipage:recordHomeThreeColTemplateDesktop` with regions `leftsidebar`, `main`, `rightsidebar`.
+
+### 6. Dynamic Forms `uiBehavior` for DateTime fields — use `readonly`, not `none`
+
+`none` can cause the field to not render. `readonly` is the standard pattern for auto-populated DateTime fields on flexipages.
+
+### 7. LWC security primitives inherit platform permissions via `@AuraEnabled`
+
+Apex methods exposed with `@AuraEnabled(cacheable=true)` enforce CRUD/FLS through the calling user's profile + permission sets. Don't bypass; use `Security.stripInaccessible` or `Schema.DescribeFieldResult` checks when defending against partial-FLS scenarios.
 
 ## When This Skill Owns the Task
 
