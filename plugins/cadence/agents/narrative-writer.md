@@ -23,7 +23,7 @@ You MUST use `Read` to load:
 1. `paths.voice_spec` — binding rules (numeric bands, forbidden/preferred words, skeleton). Treat as law.
 2. `paths.reference_narrative` — the most recent prior week's `w<NN-1>-sprint-narrative.md`. Use as voice anchor — diction, section length, card shape.
 3. `paths.audit_json` — full per-project Phase 1 audit cards. Source of truth for shipped/carry_over/dropped counts, by_assignee rollups, and every quality_gate_flag.
-4. `paths.checkpoint` — per-project Phase 2 scope decisions. Source of truth for Ship this week items, SQ1 headlines, SQ3 reassignments, SQ5 parked.
+4. `paths.checkpoint` — per-project Phase 2 scope decisions. Source of truth for Ship this week items, SQ1 headlines, SQ3 reassignments, SQ5 parked, and the BC-5901 ritual flag (`scope_decisions.ritual`).
 
 Optionally read:
 
@@ -111,11 +111,11 @@ Card format:
 ```
 ### <Project Name>
 
-**Owner:** <single owner name from audit_card.shipped[0].assignee>
+**Owner:** <single owner name from audit_card.shipped.issues[0].assignee>
 **Cadence note:** <one sentence — pull from SQ1 free-text if user picked Other, otherwise the canned default "Continue cadence — owner picks next track offline.">
 ```
 
-No Ship list, no Team line, no Goal line, no Risk flag — these are mandatory on Sprint Plans cards but are explicitly omitted here. AC #3's grep that enforces `**Ship this week:**` and `**Team:**` on Sprint Plans cards must be scoped to projects under the `## Sprint Plans` H2, not under Ritual Cadence H3.
+No Ship list, no Team line, no Goal line, no Risk flag — these are mandatory on Sprint Plans cards but are explicitly omitted here.
 
 If `state.projects[i].scope_decisions.ritual == true` AND `state.projects[i].scope_decisions.q5_parked` is set (planner picked "Park this cycle" at SQ1 § 4.2 lock option 2), route to `## Parked This Week` instead — explicit park decision overrides the ritual flag.
 
