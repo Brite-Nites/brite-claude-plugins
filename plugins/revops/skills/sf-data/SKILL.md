@@ -10,7 +10,7 @@ metadata:
   scoring: "130 points across 7 categories"
 ---
 
-<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Permissions & Security (lines 175-176) + §Apex & Automation (lines 143-144, 191-193) + §Migration Reference + scripts/migration/. -->
+<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Metadata Authoring (lines 130, 143-144) + §Permissions & Security (lines 175-176) + §Apex & Automation (lines 182, 191-193) + §Migration Reference + scripts/migration/. -->
 
 # Salesforce Data Operations Expert (sf-data) (Brite edition)
 
@@ -37,11 +37,11 @@ ETL scripts in `brite-salesforce/scripts/migration/` are layered: `extract/` (Hu
 
 ### 2. HubSpot emails migrate as Task, not EmailMessage
 
-HubSpot email engagements load as `Task` records with `Type: "Email"`. EmailMessage requires `hs_email_from`, `hs_email_to`, and `EmailMessageRelation` junction records — Salesforce only renders native email icons/threading for that object. The migration's Task-shape choice is intentional. Source: §Apex & Automation line 143.
+HubSpot email engagements load as `Task` records with `Type: "Email"`. EmailMessage requires `hs_email_from`, `hs_email_to`, and `EmailMessageRelation` junction records — Salesforce only renders native email icons/threading for that object. The migration's Task-shape choice is intentional. Source: §Metadata Authoring line 143.
 
 ### 3. `Messaging.SingleEmailMessage` + `setSaveAsActivity(false)` → no EmailMessage record AND no Task activity
 
-Outbound emails sent this way leave zero rows in both objects. The ONLY monitoring path is Setup → Email Logs (24-hour rolling window). Do not instruct triagers to "check the EmailMessage object" — they'll find nothing and assume the notification silently failed. `NewsletterSignupNotificationService` is the current example. See `docs/artifacts/email-notification-matrix.md`. Source: §Apex & Automation line 144.
+Outbound emails sent this way leave zero rows in both objects. The ONLY monitoring path is Setup → Email Logs (24-hour rolling window). Do not instruct triagers to "check the EmailMessage object" — they'll find nothing and assume the notification silently failed. `NewsletterSignupNotificationService` is the current example. See `docs/artifacts/email-notification-matrix.md`. Source: §Metadata Authoring line 144.
 
 ### 4. Bulk API does not honor session-based permsets
 
