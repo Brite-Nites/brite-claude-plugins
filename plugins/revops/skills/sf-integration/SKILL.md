@@ -49,7 +49,7 @@ N consecutive `Completed` Apex jobs for the same class = 1 original + (N-1) sile
 
 ### 5. OutboundSync is the canonical Email Bison → Salesforce sync path
 
-Email Bison sends webhook events to OutboundSync, which writes Contact updates and reply events into Salesforce. Skills do **not** subscribe Email Bison webhooks directly. When asked "how do I sync sequence replies into SF?", route to OutboundSync — not direct webhook handlers in Apex. (Architectural decision; OutboundSync deployment lives in brite-data-platform.)
+Email Bison sends webhook events to OutboundSync, which writes Contact updates and reply events into Salesforce. Skills do **not** subscribe Email Bison webhooks directly. When asked "how do I sync sequence replies into SF?", route to OutboundSync — not direct webhook handlers in Apex. (Architectural decision; OutboundSync is a separate Brite service, deployed outside `brite-salesforce`.)
 
 ### 6. Brite_Base REST integration: SF is read-only status mirror
 

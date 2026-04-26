@@ -8,7 +8,7 @@ metadata:
   author: "Jag Valaiyapathy"
 ---
 
-<!-- Adopted verbatim from Jaganpro/sf-skills@ff1ab74 (MIT). This skill owns the *web-retrieval* concern for official Salesforce-owned documentation (developer.salesforce.com, help.salesforce.com, architect.salesforce.com, admin.salesforce.com, lightningdesignsystem.com). Brite-internal SF documentation references (brite-salesforce/docs/artifacts inventory, ADR convention in docs/decisions, cross-repo pointers to brite-handbook + brite-data-platform) live in the sibling sf-internal-docs skill — see BC-5931 follow-up issue. -->
+<!-- Adopted verbatim from Jaganpro/sf-skills@ff1ab74 (MIT). Web-retrieval concern only (developer.salesforce.com, help.salesforce.com, etc.). Brite-internal SF documentation (artifacts inventory, ADR convention, cross-repo pointers) lives in the sibling sf-internal-docs skill (filed as a follow-up to BC-5931). -->
 
 # sf-docs
 

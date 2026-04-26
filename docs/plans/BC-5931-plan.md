@@ -210,10 +210,10 @@ Do not block this PR on follow-up issue creation — file it as part of the ship
 |---|---|---|
 | sf-data | 7 (T1-T7) | Unchanged from issue spec |
 | sf-integration | 8 (T1-T8) | Unchanged from issue spec |
-| sf-docs | 4 (T1, T2, T2b, T6, T7) | T3-T5 deferred to sf-internal-docs follow-up; T2b new (sibling pointer grep) |
-| **Total** | **19** | (down from issue's 22 = 3 sf-docs tests deferred) |
+| sf-docs | 5 (T1, T2, T2b, T6, T7) | T3-T5 deferred to sf-internal-docs follow-up; T2b new (sibling pointer grep) |
+| **Total** | **20** | (down from issue's 22 = 3 sf-docs tests deferred + T2b added) |
 
-Paste all 19 test results into PR body alongside the deferral note.
+Paste all 20 test results into PR body alongside the deferral note.
 
 ---
 
