@@ -4,7 +4,7 @@
   "author": {
     "name": "Brite"
   },
-  "version": "0.3.4",
+  "version": "0.3.5",
   "homepage": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "repository": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "license": "MIT",
@@ -19,5 +19,13 @@
     "social-media"
   ],
   "commands": "./commands/",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "userConfig": {
+    "enrichment_provider": {
+      "type": "string",
+      "enum": ["blitz_waterfall", "brite_cli", "brite_mcp", "skip"],
+      "default": "blitz_waterfall",
+      "description": "Phase 5 enrichment provider for tam-mapping. See ADR-008 (docs/decisions/008-tam-mapping-enrichment-pluggability.md). blitz_waterfall = BlitzAPI → Prospeo via scripts/tam-map/enrich_waterfall.py (default, production-ready). brite_cli = brite-data-platform services/enrichment/cli.py (pending repo wiring; falls through to blitz_waterfall if repo missing). brite_mcp = mcp__plugin_marketing_enrichment__* (pending BC-5537/5538 GA — falls through to blitz_waterfall if MCP unavailable). skip = pass through unenriched (testing only)."
+    }
+  }
 }

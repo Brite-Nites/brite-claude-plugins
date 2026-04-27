@@ -8,7 +8,7 @@ BlitzAPI is the **primary-enrichment layer** of the tam-map pipeline. Given a co
 
 ## Consumed by
 
-- `plugins/marketing/skills/tam-mapping/SKILL.md` — **pending BC-5832**
+- `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 5 enrichment (default `blitz_waterfall` provider per ADR-008)
 - `plugins/marketing/scripts/tam-map/enrich_waterfall.py` — ported Python wrapper (handles BlitzAPI primary + Prospeo fallback in one pass); not wrapped as an MCP server
 
 ## Auth
@@ -87,7 +87,7 @@ Per the Clay-deprecated amendment in `memory/project_clay_deprecated.md` (2026-0
 
 ## Related skills
 
-- **Primary consumers:** `tam-mapping` (pending BC-5832).
+- **Primary consumers:** `tam-mapping` (BC-5832, Phase 5 default provider).
 - **Upstream / downstream:** BlitzAPI consumes domains from AI Ark / Discolike / IcyPeas; fallback into Prospeo (see `prospeo.md`).
 - **Alternatives:** Prospeo (documented as fallback, not alternative), Apollo.io (rejected — per-record credit model breaks waterfall economics), Clay (deprecated, broader rule supersedes).
 

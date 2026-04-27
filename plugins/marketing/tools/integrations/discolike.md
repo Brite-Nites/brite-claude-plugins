@@ -8,7 +8,7 @@ Discolike is the **lookalike-expansion layer** of the tam-map pipeline. Given a 
 
 ## Consumed by
 
-- `plugins/marketing/skills/tam-mapping/SKILL.md` — **pending BC-5832**
+- `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 3c Labs collection (lookalike expansion)
 - `plugins/marketing/scripts/tam-map/discolike_client.py` — ported Python wrapper
 - `plugins/marketing/scripts/tam-map/discolike-mcp.js` — ported stdio MCP wrapper
 
@@ -80,14 +80,14 @@ Treat 429 and 5xx as retryable with exponential backoff: base 2s, double per att
 
 ## Brite usage
 
-Invoked as **step 3** of `/marketing:tam-map <vertical>`. Brite seeds Discolike from the per-vertical ICP file (`{vertical}-icp.md` § Peer-venue seeds — pending BC-5832), which contains 5–10 canonical venue domains curated from the vertical playbook peer-venue lists. The response merges with AI Ark (step 1) output, deduplicated by domain.
+Invoked as **step 3** of `tam-mapping` Phase 3c (Labs path). Brite seeds Discolike from the per-vertical playbook file (`{vertical}.md` § Peer-venue seeds), which contains 5–10 canonical venue domains curated from the vertical playbook peer-venue lists. The response merges with AI Ark (step 1) output, deduplicated by domain.
 
 For Brite Labs Active-tier verticals (zoos, aquariums), 5–10 flagship venue seeds (e.g., Woodland Park Zoo, Georgia Aquarium) produce dense lookalike output covering 80%+ of the sub-vertical TAM. For Exploring-tier (casinos, hotels-resorts), seed diversity matters more — single-brand seeds (one Vegas casino) under-return; multi-brand seeds (Vegas + regional + tribal casinos) cover the vertical.
 
 ## Related skills
 
-- **Primary consumers:** `tam-mapping` (pending BC-5832).
-- **Upstream / downstream:** Discolike consumes peer-venue seeds from `{vertical}-icp.md`; output merges with AI Ark at the step-4 enrichment stage.
+- **Primary consumers:** `tam-mapping` (BC-5832, Phase 3c lookalike expansion).
+- **Upstream / downstream:** Discolike consumes peer-venue seeds from `{vertical}.md`; output merges with AI Ark at the step-4 enrichment stage.
 - **Alternatives:** 6sense (rejected — enterprise pricing tier, not tam-map-scale), Similarweb API (rejected — traffic-signal overlap, weaker firmographic output), Clay (deprecated per `memory/project_clay_deprecated.md`).
 
 ## Last verified
