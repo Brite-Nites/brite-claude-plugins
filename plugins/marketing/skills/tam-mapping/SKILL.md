@@ -2,7 +2,7 @@
 name: tam-mapping
 description: Build TAM databases from scratch using a 7-phase methodology (Source Discovery → Keyword Expansion → Config → Collection → Dedup → Exclusion → Enrichment hand-off). Triggers "tam map", "build tam", "total addressable market", "scrape industry", "map the market", "build a lead database", "venue partnerships tam", "labs tam", "residential tam", "installer tam". Entity-routed — Nites residential (Google Maps ZIP), Supply installer (SAM.gov + Houzz + state license dbs), Labs venue partnerships (Spider.cloud + AI Ark + Discolike + IcyPeas + BlitzAPI + Prospeo + MillionVerifier). Phase 4.5 cross-workspace EB exclusion is MANDATORY (HARD-FAIL on either workspace unreachable). Phase 5 enrichment is pluggable per ADR-008. Distinct from `list-building` (BC-2717 — assumes a TAM already exists via dbt audience views).
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__plugin_marketing_spider__*, mcp__plugin_marketing_aiark__*, mcp__plugin_marketing_discolike__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, WebSearch, WebFetch, Read, Write, Glob, Bash
+allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__plugin_marketing_spider__*, mcp__plugin_marketing_aiark__*, mcp__plugin_marketing_discolike__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, WebSearch, WebFetch, Read, Write, Bash
 metadata:
   version: 0.1.0
   upstream: Revgrowth1/ai-gtm-workflows + Revgrowth1/tam-map@9f5c72e74b
@@ -69,18 +69,17 @@ The skill writes; downstream consumers read.
 
 ### Enrichment-provider selection
 
-Read in priority order:
+Read in priority order (per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pluggability.md) §Unset resolution order):
 
 1. `--enrichment-provider <id>` flag if passed.
-2. `${user_config.enrichment_provider}` from plugin.json `userConfig`. Default `blitz_waterfall`.
-3. Fallback: `blitz_waterfall` (only reached if userConfig misconfigured).
+2. `${user_config.enrichment_provider}` from plugin.json `userConfig` if explicitly set.
+3. **Auto-detect** (when both above are unset):
+   1. Check for brite-enrichment MCP registration in the active session → use `brite_mcp`.
+   2. Else check for brite-enrichment CLI at `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` → use `brite_cli`.
+   3. Else fall through to `blitz_waterfall`.
+4. `skip` is never auto-selected; it must be passed explicitly.
 
-Resolution behavior at invocation:
-
-- `blitz_waterfall` → shells to `python plugins/marketing/scripts/tam-map/enrich_waterfall.py` via `Bash`. Production-ready.
-- `brite_cli` → shells to `services/enrichment/cli.py` in brite-data-platform. Requires the repo to be present locally; if not, skill emits "brite-data-platform repo not found locally — falling through to blitz_waterfall" and proceeds.
-- `brite_mcp` → would call `mcp__plugin_marketing_enrichment__*`. **Currently NOT in `allowed-tools` (BC-5537/5538 pending).** Skill emits "pending BC-5537/5538 GA — falling through to blitz_waterfall" and proceeds.
-- `skip` → no enrichment; pass through unenriched. Downstream consumers handle.
+The resolved provider is logged at skill invocation so the user sees which path ran (e.g., `[tam-mapping] enrichment_provider=blitz_waterfall (auto-detected; brite-enrichment MCP not registered, $BRITE_DATA_PLATFORM unset)`). See the canonical 4-row enum table in [§3 Phase 5](#phase-5--enrichment-hand-off-pluggable) for per-value implementation and fallback messages.
 
 ### Resume detection
 
@@ -91,12 +90,13 @@ Per Operational rule 2 (below), if `--output-dir` already exists with partial ou
 3. Per-source `businesses.csv` (Nites/Supply) OR `companies.jsonl` (Labs) (Phase 3)
 4. `crawled.jsonl` (Labs only — Phase 3 spider sub-step)
 5. `all_sources_deduped.csv` (Phase 4)
-6. `net_new_leads.csv` (Nites/Supply) OR `excluded.jsonl` (Labs) (Phase 4.5)
+6. `net_new_leads.csv` (Nites/Supply) OR both `excluded.jsonl` AND `companies-net-new.jsonl` (Labs — both files required for Phase 4.5 to be considered complete) (Phase 4.5)
 7. `enriched.jsonl` (Phase 5)
 8. `verified.jsonl` (Labs only — Phase 6)
-9. `tier-{a,b,c}.csv` + `catch-all.csv` (Labs only — Phase 7)
+9. `verified-flat.csv` (Labs only — Phase 7 reshape; required by icp-scoring `abc` contract)
+10. `tier-{a,b,c}.csv` + `catch-all.csv` (Labs only — Phase 7)
 
-The skill NEVER restarts from Phase 1 when resume state exists.
+The skill NEVER restarts from Phase 1 when resume state exists. Stop the file-existence loop at the first missing file; do not check subsequent entries.
 
 ---
 
@@ -135,7 +135,7 @@ Research every data source across **16 categories** (literal taxonomy, in order)
 **Open-tracking-OFF reminder.** Emit this verbatim string in Phase 1 output (sender-reputation rule):
 
 ```
-OPEN-TRACKING DISABLED — sender-reputation rule, see Operational rules §guardrails
+OPEN-TRACKING DISABLED — sender-reputation rule, see §Brite Implementation → Architectural rules
 ```
 
 ### Phase 1.5 — Keyword Expansion
@@ -250,7 +250,7 @@ Output:
 
 Steps:
 
-1. **Availability checks (BOTH MUST PASS — HARD-FAIL):**
+1. **Availability checks (issue all 3 in parallel as a single tool-batch — ALL THREE MUST PASS — HARD-FAIL):**
    - `mcp__emailbison-b2b__get_active_workspace_info`.
    - `mcp__emailbison-personal__get_active_workspace_info`.
    - `mcp__plugin_marketing_salesforce__run_soql_query` with `SELECT Id FROM User LIMIT 1` (per `plugins/marketing/tools/integrations/salesforce.md` — `get_username` is NOT a valid liveness check).
@@ -314,8 +314,10 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 
 **Post-enrichment verification:**
 
-- Keep records with verification status `valid` or `catch_all` (with explicit `catch_all=true` flag preserved). Drop `unknown`, `error`, `disposable`, `invalid`.
+- Keep records with verification status `valid`. Drop `unknown`, `error`, `disposable`, `invalid`.
 - Output: `enriched.jsonl`.
+
+> **Labs path note.** The `catch_all` boolean flag is produced downstream in Phase 6 (SMTP verify), not here — Phase 5 has no source of catch-all signal. Nites/Supply paths terminate after Phase 5 without the catch-all distinction; their downstream consumers (BC-2717 / BC-5826) handle SMTP verify on their own schedule.
 
 **Pattern-based recovery anti-rule.** Do NOT try `info@<domain>`, `contact@<domain>`, `hello@<domain>` for single-location businesses. Upstream tested 10 patterns × 15,934 domains = 0 hits. Single-location TAMs (Nites Google Maps, many Supply local installers, many Labs venues) almost never use generic mailboxes.
 
@@ -344,6 +346,8 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 
 **Pre-tier filter — Operational rule 1 (No free-email providers in B2B output).** BEFORE delegation, filter `verified.jsonl` rows whose email domain is one of `gmail.com` / `yahoo.com` / `hotmail.com` / `outlook.com` / `icloud.com`. Route them to `personal-contacts.csv` for manual outreach. NEVER include them in tier-A/B/C CSVs.
 
+**Reshape — JSONL → flat CSV with top-level `catch_all` (REQUIRED before delegation).** Per icp-scoring's `abc` delegation contract (BC-5831 SKILL.md § "Tam-mapping delegation contract"), the caller (this skill) owns the JSONL→CSV reshape. `verified.jsonl` from Phase 6 nests the catch-all flag under `record.smtp.catch_all`; icp-scoring `abc` requires a flat CSV with a top-level `catch_all` column and stops with `missing required column 'catch_all' for --rubric abc` if absent. Before invoking the delegation call below, write `verified-flat.csv` with these columns: `domain`, `company_name` (if present), `industry` (if present), `employees` (if present), `geography` (if present), `catch_all` (boolean, flattened from `smtp.catch_all`). Free-email rows already routed to `personal-contacts.csv` in the prior step are excluded from `verified-flat.csv`.
+
 **Delegation call:**
 
 ```
@@ -354,7 +358,7 @@ icp-scoring \
   --criteria-file docs/campaigns/labs/tam/{slug}/icp.json
 ```
 
-icp-scoring reads `verified.jsonl` (minus the free-email rows) as input. Per icp-scoring's `abc` mode contract, the prompt template is read verbatim from `plugins/marketing/references/tam/fit-scoring.md` — not inlined here. When upstream tam-map updates the prompt, we re-port to `fit-scoring.md` and both skills inherit.
+icp-scoring reads `verified-flat.csv` from `--output-dir` as input. Per icp-scoring's `abc` mode contract, the prompt template is read verbatim from `plugins/marketing/references/tam/fit-scoring.md` — not inlined here. When upstream tam-map updates the prompt, we re-port to `fit-scoring.md` and both skills inherit.
 
 **Returns:**
 
@@ -421,34 +425,23 @@ Workflows grouped by phase, not by server. See [`plugins/marketing/tools/integra
 
 ### Workflow 1 — Phase 3 Labs collection (parallel discovery)
 
-1. **Availability checks (in parallel):**
+1. **Availability checks (issue all 4 in parallel as a single tool-batch):**
    - `mcp__plugin_marketing_spider__spider_get_credits` — confirms auth + balance.
    - AI Ark MCP liveness (lightest tool — see `plugins/marketing/tools/integrations/ai-ark.md` for the canonical liveness call).
    - Discolike MCP liveness (see `plugins/marketing/tools/integrations/discolike.md`).
-   - `Bash` → `python plugins/marketing/scripts/tam-map/icypeas_client.py --healthcheck`.
+   - IcyPeas: a free `count` query against a stub keyword (the script `icypeas_client.py` does not currently expose a dedicated healthcheck flag — see `plugins/marketing/tools/integrations/icypeas.md` for the canonical free-count probe shape; if missing, file a follow-up to add `--healthcheck` to the script).
 2. On any failure, stop and report which provider failed.
 3. Run all 4 providers in parallel against the keyword set from Phase 1.5.
 4. Merge JSONL outputs; dedup by domain inline (Tier 1 only — full 3-tier dedup happens in Phase 4).
 
 ### Workflow 2 — Phase 4.5 cross-workspace + SF exclusion
 
-1. **Availability checks (BOTH MUST PASS — HARD-FAIL):**
-   - `mcp__emailbison-b2b__get_active_workspace_info`.
-   - `mcp__emailbison-personal__get_active_workspace_info`.
-   - `mcp__plugin_marketing_salesforce__run_soql_query` with `SELECT Id FROM User LIMIT 1`.
-2. Bulk pagination via `list_leads` on both workspaces. Stream into a domain set.
-3. SF SOQL union query against `Contact` + `Lead` filtered on `Domain__c`.
-4. Merge → exclusion domain set → filter the deduped TAM.
-5. Write `net_new_leads.csv` (Nites/Supply) or `excluded.jsonl` + surviving `companies-net-new.jsonl` (Labs) plus `exclusion_stats.json`.
+See [§3 Phase 4.5](#phase-45--exclusion-mandatory--never-skipped) for the full step list (5 steps: 3-probe availability check, dual-workspace `list_leads` pagination, SF Contact + Lead union SOQL, merge + filter, write `net_new_leads.csv` or `excluded.jsonl` + `exclusion_stats.json`). This Workflow entry exists to confirm tool routing — the canonical procedure is in §3 Phase 4.5.
 
 ### Workflow 3 — Phase 5 enrichment (provider-routed via Bash)
 
 1. Resolve `enrichment_provider` per §Before Starting (priority: `--enrichment-provider` flag → `${user_config.enrichment_provider}` → `blitz_waterfall`).
-2. Switch on enum:
-   - `blitz_waterfall` → `python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input> --out enriched.jsonl`.
-   - `brite_cli` → `python services/enrichment/cli.py` (cross-repo). If brite-data-platform repo missing locally, emit fallback message and run `blitz_waterfall`.
-   - `brite_mcp` → would call `mcp__plugin_marketing_enrichment__*`. Currently NOT registered; emit `pending BC-5537/5538 GA — falling through to blitz_waterfall` and run the default.
-   - `skip` → pass through; downstream handles enrichment.
+2. Switch on enum per [§3 Phase 5 enum table](#phase-5--enrichment-hand-off-pluggable). The table is the canonical source for each provider's invocation, fallback message, and status.
 3. **Cost gate** before invocation (see §3 Phase 5 — verbatim string + `AskUserQuestion` if > $20).
 
 ### Workflow 4 — Phase 6 SMTP verify (Labs)
@@ -459,9 +452,10 @@ Workflows grouped by phase, not by server. See [`plugins/marketing/tools/integra
 ### Workflow 5 — Phase 7 tier delegation (Labs)
 
 1. **Pre-filter** `verified.jsonl` for free-email domains → `personal-contacts.csv` (Operational rule 1).
-2. Invoke `icp-scoring` skill with `--rubric abc --max-records <N> --output-dir <slug-dir> --criteria-file <icp.json>`.
-3. icp-scoring reads `plugins/marketing/references/tam/fit-scoring.md` for the prompt template (single source of truth).
-4. Returns 4 CSVs + `report.md`.
+2. **Reshape** remaining `verified.jsonl` rows to `verified-flat.csv` with a top-level `catch_all` column (flattened from `smtp.catch_all`). icp-scoring `abc` requires flat CSV with `catch_all` as a top-level column per its delegation contract (BC-5831).
+3. Invoke `icp-scoring` skill with `--rubric abc --max-records <N> --output-dir <slug-dir> --criteria-file <icp.json>`.
+4. icp-scoring reads `verified-flat.csv` and the prompt template at `plugins/marketing/references/tam/fit-scoring.md` (single source of truth).
+5. Returns 4 CSVs + `report.md`.
 
 **MCP confirmation gates (out-of-scope reminders):**
 
@@ -542,8 +536,9 @@ docs/research/tam/{vertical}-{YYYY-MM-DD}/
 7. **Cost gate** + Phase 5 enrichment → `enriched.jsonl`.
 8. Phase 6 SMTP verify → `verified.jsonl`.
 9. **Free-email filter** (Operational rule 1) → `personal-contacts.csv` separated.
-10. Phase 7 tier delegation to `icp-scoring --rubric abc` → `tier-a.csv`, `tier-b.csv`, `tier-c.csv`, `catch-all.csv`, `report.md`.
-11. **Hand off** to `launch-campaign` (BC-5826) or `list-building` (BC-2717).
+10. **JSONL→CSV reshape** → `verified-flat.csv` with top-level `catch_all` column (per icp-scoring `abc` contract).
+11. Phase 7 tier delegation to `icp-scoring --rubric abc` → `tier-a.csv`, `tier-b.csv`, `tier-c.csv`, `catch-all.csv`, `report.md`.
+12. **Hand off** to `launch-campaign` (BC-5826) or `list-building` (BC-2717).
 
 **Expected output dir contents:**
 
@@ -559,6 +554,7 @@ docs/campaigns/labs/tam/{slug}/
 ├── enriched.jsonl
 ├── verified.jsonl
 ├── personal-contacts.csv
+├── verified-flat.csv
 ├── tier-a.csv
 ├── tier-b.csv
 ├── tier-c.csv
