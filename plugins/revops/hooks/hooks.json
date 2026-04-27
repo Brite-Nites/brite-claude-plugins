@@ -1,0 +1,18 @@
+{
+  "description": "RevOps plugin hooks — cwd-aware SessionStart banner when an SFDX project is reachable from the user's pwd",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sfdx-banner.sh\"",
+            "timeout": 3,
+            "statusMessage": "Probing for SFDX project..."
+          }
+        ]
+      }
+    ]
+  }
+}
