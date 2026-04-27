@@ -99,6 +99,9 @@ Original names like `sf-apex` become `brite-apex` after customization. Clear sig
 ### 3.7 Documented in an ADR
 Architecture Decision Record lives in `docs/decisions/007-revops-plugin-design.md`. Captures: subtree over fork, augment over replace, skill filter, MCP strategy. Prevents re-litigation.
 
+### 3.8 Upstream agents — see ADR-007 §3.8
+Agent port decision for 3 candidates (`fde-release-engineer`, `ps-solution-architect`, `ps-technical-architect`) locked 2026-04-27 (BC-5820): don't port; preserve as prior art for a future implementation-actor agent shape decision. Per-candidate rationale and recoverability path live there.
+
 ---
 
 ## 4. Issue Chain (Dependency View)

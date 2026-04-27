@@ -66,6 +66,20 @@ Rationale:
 
 With §3.6 resolved to "keep upstream names by default," each Phase 3 skill customization issue ships as a content-customization (SKILL.md content + attribution header + references/ updates) without directory rename. If a specific skill develops a Brite-specific reason to rename, that rename lives inside its per-skill issue with its own justification — not inherited from a global convention.
 
+### 3.8 Upstream agents: don't port; preserve as prior art
+
+**Locked 2026-04-27 via BC-5820 evaluation.** §3.5 above marks all 7 upstream consulting agents as skip. BC-5789's per-item audit-at-filter-time pattern (see [BC-5789 precedent](../precedents/BC-5789.md)) surfaced 3 candidates whose skill dependencies are entirely or mostly KEEP — `fde-release-engineer` (2 of 3 skills KEEP; `sf-ai-agentscript` is in the skipped Agentforce family), `ps-solution-architect` (5 of 5 KEEP), `ps-technical-architect` (8 of 8 KEEP). All 3: don't port.
+
+Per-candidate rationale:
+
+- **fde-release-engineer** — duplicated by `/revops:deploy-sandbox`, `/revops:deploy-prod`, `/revops:post-deploy-runbook` (shipped via BC-5790 / BC-5791 / BC-5792). Slash commands orchestrate the deploy and gate on user confirmation; an agent persona over the same skills adds no execution value those commands don't already provide.
+- **ps-solution-architect** — 4 KEEP + 1 Defer skill per §3.5 (`sf-metadata`, `sf-flow`, `sf-permissions`, `sf-testing`, plus the deferred `sf-diagram-mermaid` shipped unmodified) — all 5 auto-activate via description-matching during `workflows:executing-plans`; `workflows:architecture-reviewer` covers the design-review angle.
+- **ps-technical-architect** — 8 KEEP skills (`sf-apex`, `sf-integration`, `sf-connected-apps`, `sf-data`, `sf-soql`, `sf-debug`, `sf-deploy`, `sf-lwc`) all auto-activate; same coverage as `ps-solution-architect`.
+
+**Cross-cutting reason.** Brite plugins' *review-family* agents use a narrow read-only specialist shape: minimal frontmatter (`name + description + model + tools`) with read-only tooling (`Glob, Grep, Read, Bash`), single-purpose `description`, no `skills` / `memory` / `maxTurns`. (Brite also ships task-specific orchestrator/drafter/auditor agents like `issue-creator`, `post-plan-orchestrator`, `narrative-writer`, `project-audit` — those have wider tool surfaces but are not review-family agents.) Upstream Jaganpro consulting agents are *implementation actors* with `permissionMode: acceptEdits`, `tools: Read, Edit, Write, Bash, Grep, Glob` (plus `WebFetch, WebSearch` on the two `ps-*` agents), `disallowedTools`, declared `skills:` lists, `memory: project|user`, `maxTurns: 25`, and persona-driven workflows. Porting any of the 3 would establish a new agent shape in Brite plugins — an architectural commitment larger than BC-5820's scope. The decision to introduce implementation-actor agents (or not) belongs in a future ADR.
+
+**Recoverability.** All 3 agent files remain accessible via `git show ff1ab74:agents/<file>` (pinned subtree commit, recoverable per BC-5789's audit log) if a future ADR changes this position.
+
 ## Rejected Alternatives
 
 ### Pure fork (vs subtree)
@@ -102,6 +116,7 @@ Each decision is individually reversible:
 - **§3.1 Plugin name**: rename via `git mv plugins/revops plugins/<new>`. Marketplace.json + CLAUDE.md update. ~10 min.
 - **§3.2 Adoption method**: if subtree proves wrong, convert to fork by extracting `plugins/revops/` to its own repo and updating `marketplace.json` source type. No consumer-facing change.
 - **§3.6 Naming convention**: if we later decide `brite-*` renames add real value, each Phase 3 issue can re-enable the rename as a per-skill decision. The ADR override is a default, not a prohibition.
+- **§3.8 Upstream agents**: if a future ADR adopts the implementation-actor agent shape, the 3 candidate files are recoverable via `git show ff1ab74:agents/<file>` (see §3.8 Recoverability). ~5 min per agent.
 
 ## Related
 
