@@ -68,6 +68,14 @@ These four findings emerged from `search_api_spec` recon BEFORE any creates fire
 
 **Sx-4. NO DELETE endpoint for `/api/custom-variables`.** `search_api_spec` with method=DELETE returns "no matching endpoints". Custom variables created during this dogfood persist in the workspace forever (only deletable via EB UI). The launch-campaign spec's cleanup wording "delete custom variables (or document why they can stay)" implies the option to delete via the dogfood flow — which is impossible. T11 cleanup is variables-can't-be-deleted by default.
 
+**Sx-5. EB API spec lies about required fields.** `/api/leads` POST schema marks `last_name` (and `first_name`, `email`) as `"required": [...]`, but the API silently accepts a body without `last_name` and stores `null`. `search_api_spec` results cannot be trusted to determine optional-vs-required; ground-truthing requires actual API call. Cross-cuts every Phase that builds request bodies from the spec. Also implicates F17 — the spec's claim was wrong, the actual launch-campaign spec was right.
+
+**Sx-6. Launch-campaign spec Phase 4 step 2 lead-body field names are wrong.** Spec builds `{job_title, company_name, company_domain}`; EB API uses `{title, company}` and has no `company_domain` field. Fields like `job_title` are silently ignored on POST (verified — leads created with `title: null` if `title` is not sent). The current command file at `plugins/marketing/commands/launch-campaign.md:332-347` will produce leads with NULL `title`/`company` if executed as written. Hard fail for production — data loss disguised as success.
+
+**Sx-7. Personal-domain skip warning is workspace-conditional.** API spec for `/api/leads/multiple` says "Personal domains will be skipped unless enabled on your instance." For `emailbison-personal` workspace 13, the warning did NOT fire — all 4 gmail/outlook leads were created. Spec consumer cannot rely on the warning text alone; instance-level config dictates behavior. Mitigation: the launch-campaign spec should ground-truth via a single test-lead POST to a personal-domain address before assuming the skip-or-create behavior.
+
+**Sx-8. Bulk-POST is all-or-nothing on validation failure.** A duplicate-email entry in a bulk batch fails the WHOLE batch with 422; valid entries in the same batch are NOT created. The `call_api` wrapper exposes only `{"error": "HTTP 422 Error"}` — no per-lead detail. Launch-campaign Phase 4 step 8's "surface the rejected rows for operator review" can't be implemented as written. Recovery requires inspecting EB UI to determine actual state, not API response.
+
 ---
 
 ## Phase 3 VARIABLES — live-walk
@@ -110,19 +118,35 @@ Spec implication: Phase 3 step 3's classification of variables as "conflicting (
 
 ## Phase 4 UPLOAD — live-walk
 
-*(populated during execution)*
+**Tools used:** `discover_tools(category="leads", search="bulk")` revealed `bulk_create_leads` extended-tier. `search_api_spec(endpoint="/api/leads", method=POST)` returned 6 endpoints; the canonical bulk path is **`POST /api/leads/multiple`** (NOT `/api/leads/bulk` as the launch-campaign spec implies). Body shape: `{leads: [{first_name, last_name, email, title, company, notes, custom_variables[]}]}`.
+
+**Path mechanics — used `call_api` directly.** Bypasses the `bulk_create_leads` MCP-tool wrapper. Per the wrapper's `discover_tools` description, `bulk_create_leads` does NOT advertise a `confirmation` parameter (unlike `import_leads_to_campaign`, which explicitly does). The launch-campaign spec's "two-call vendor gate" claim for Phase 4 was hedged ("may or may not be vendor-gated — treat it as gated regardless"); reality via `call_api` is **no vendor gate at all**.
+
+**F17 side-test.** Single `POST /api/leads` body `{first_name: "F17Test", email: "bc5906-f17-no-lastname@brite.co"}` (no `last_name`) → `success: true`, lead id **14705** created with `last_name: null`. **F17 refuted** (the launch-campaign spec correctly treats CSV `last_name` as optional; the EB API spec lies about it being required).
+
+**Main bulk POST.** Single call to `/api/leads/multiple` with all 6 leads from `test-leads.csv`, fully-populated `custom_variables` array (8 entries each, lowercase variable names matching what EB stored in Phase 3). Time: <1s. Result: **all 6 leads created, IDs 14706–14711**. Notable surprises:
+
+- **All 4 gmail/outlook leads accepted** — the spec warning "Personal domains will be skipped unless enabled on your instance" did NOT fire. This workspace either has personal-domain mode enabled or the warning is conditional/inaccurate. Either way, F12 skip-empty's expected Other=0 distribution holds; Google=4 / Microsoft=2 still correct.
+- **All custom_variables persisted per-lead** — verified in the response payload. Lowercase names from Phase 3 round-trip cleanly.
+- **No vendor confirmation prompt** — the call returned the lead array directly, no two-call dance.
+
+**F18 side-test.** `POST /api/leads/multiple` body `{leads: [{...dup of dogfood-test-01@gmail.com}, {...new lead bc5906-f18-newlead@brite.co}]}` → **HTTP 422 Error** for the whole batch. The new lead did NOT get created despite being valid; the duplicate caused the entire request to fail. **F18 confirmed (all-or-nothing failure).** The launch-campaign spec's recovery path "delta the unsuccessful leads and re-run" is infeasible because (a) the API returns no per-lead detail in the 422 response (the `call_api` wrapper exposes only `{"error": "HTTP 422 Error", "hint": "..."}`), and (b) NONE of the leads in a partial-failure batch get created.
+
+**Post-Phase-4 state.** Workspace now has 7 new leads (1 F17 test + 6 main bulk). The F18 retry created zero new leads. Total state for cleanup:
+- Lead 14705: F17Test (no last_name) — to delete in T11
+- Leads 14706–14711: 6 main dogfood leads — to delete in T11
 
 ### F17 — `last_name` requirement
 
-*(populated during execution — side-test with synthetic `dogfood-test-99@brite.co` missing `last_name`)*
+**REFUTED.** Single POST `/api/leads` with no `last_name` field → `success: true`, lead 14705 stored with `last_name: null`. The API spec at `search_api_spec(/api/leads, POST)` shows `"required": ["first_name", "last_name", "email"]`, but reality is that `last_name` is genuinely optional. The launch-campaign spec correctly treats CSV `last_name` as optional. F17's premise is moot: there is no enforced last_name requirement; the spec already aligns with reality. **Tangentially exposes a class-level finding** (Sx-5 below): the EB API spec's `required` markings cannot be trusted.
 
 ### F18 — Mid-chunk failure recovery
 
-*(populated during execution — side-test with duplicate-email re-submit)*
+**CONFIRMED — all-or-nothing.** Bulk POST containing 1 duplicate (existing email) + 1 new email → HTTP 422 for the entire batch. The new lead was NOT created. The 422 response from the `call_api` wrapper exposes only the error code, not per-lead detail. Spec implication: launch-campaign Phase 4 step 8's "verify lead count, surface the rejected rows for operator review" can't be implemented as written — the API doesn't surface which leads failed. Operator must inspect EB UI to determine state and manually delta the CSV before retry.
 
 ### F19 — Vendor prompt wording
 
-*(populated during execution — verbatim transcription of first-call confirmation prompt)*
+**REFUTED — no vendor prompt at the `call_api` layer.** The first `POST /api/leads/multiple` returned the created leads directly with no confirmation gate. The spec's "two-call MCP confirmation gate required per BC-2707 precedent" wording in Phase 4 over-applies — that pattern fires for `import_leads_to_campaign` (per its `discover_tools` description) but NOT for `bulk_create_leads` (which has no confirmation parameter advertised). The agent-side AskUserQuestion gate (semantic operator-intent) is the only gate that actually fires for Phase 4 via `call_api`. The MCP-tool-wrapper layer (`bulk_create_leads` invoked directly, not via `call_api`) was not exercised in this dogfood; if invoked, the wrapper might add its own gate, but the API itself doesn't.
 
 ---
 
@@ -215,9 +239,9 @@ Spec implication: Phase 3 step 3's classification of variables as "conflicting (
 | F14 | `list_custom_variables` pagination | **confirmed** | `?page=N` query-param + Laravel meta (`current_page`, `last_page`, `per_page=15`, `total`, `links[]`); NOT cursor-based | Mixed pagination model (vs cursor-based `list_sender_emails` per spec) — flag for spec-authoring follow-up |
 | F15 | Conflicting-variable resolution | **confirmed (hard-fail)** | `POST {"name":"company website"}` (existing) → HTTP 422; no silent dup, no gate. Sx-2 invalidates the "default differs" sub-question. | Spec collapse 3-way (new/existing/conflicting) → 2-way (new/existing) |
 | F16 | Workspace-scoped variable collision | **confirmed** | Pre-existing 6 vars from Nov 2025 prove cross-session persistence; combined with Sx-4 (no DELETE endpoint) → permanent workspace state | Spec note + cleanup AC update — see follow-ups for Sx-4 |
-| F17 | `bulk_create_leads` `last_name` requirement | *pending* | | |
-| F18 | Mid-chunk failure recovery | *pending* | | |
-| F19 | Vendor prompt wording (Phase 4) | *pending* | | |
+| F17 | `bulk_create_leads` `last_name` requirement | **refuted** | Single POST `/api/leads` with no `last_name` → `success: true`, lead 14705 stored `last_name: null`. API spec marks required, reality is optional (Sx-5). | Spec is correct as-is; remove F17 paper-walk note. |
+| F18 | Mid-chunk failure recovery | **confirmed (all-or-nothing)** | Bulk POST `[dup, new]` → 422, NEITHER created. No per-lead detail in 422 response. | Spec needs Phase 4 step 8 rewrite — recovery via EB UI, not API. |
+| F19 | Vendor prompt wording (Phase 4) | **refuted (no vendor gate via call_api)** | First call returned data directly; no confirmation parameter on `bulk_create_leads` MCP wrapper either (vs `import_leads_to_campaign` which has one). | Spec's "two-call vendor gate" claim for Phase 4 over-applies; remove or qualify. |
 | F20 | Campaign name collision | *pending* | | |
 | F21 | Lead-ID-to-bucket mapping persistence | *pending* | | |
 | F22 | `allow_parallel_sending` gate | **deferred** | Brainstorm 2026-04-27 — requires pre-poisoning, not in scope | None this run |
