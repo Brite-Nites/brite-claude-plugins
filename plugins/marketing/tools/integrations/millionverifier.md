@@ -8,7 +8,7 @@ MillionVerifier is the **SMTP-verification layer** of the tam-map pipeline. Take
 
 ## Consumed by
 
-- `plugins/marketing/skills/tam-mapping/SKILL.md` — **pending BC-5832**
+- `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 6 SMTP verify (Labs path only)
 - `plugins/marketing/scripts/tam-map/verify_smtp.py` — ported Python wrapper; not wrapped as an MCP server
 
 ## Auth
@@ -99,7 +99,7 @@ For Brite Labs verticals, catch-all rates vary sharply: Active-tier venues (zoos
 
 ## Related skills
 
-- **Primary consumers:** `tam-mapping` (pending BC-5832).
+- **Primary consumers:** `tam-mapping` (BC-5832, Phase 6 SMTP verify).
 - **Upstream / downstream:** MillionVerifier consumes the enriched output from the BlitzAPI → Prospeo waterfall; emits to `tier_and_segment.py` for final routing.
 - **Alternatives:** Kickbox (rejected — 3× cost at Brite volumes), ZeroBounce (rejected — weaker catch-all detection), NeverBounce (reasonable alternative, parity pricing — retained as a hot swap if vendor quality drifts).
 

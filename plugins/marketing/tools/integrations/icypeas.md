@@ -8,7 +8,7 @@ IcyPeas is the **keyword-search layer** of the tam-map pipeline — a complement
 
 ## Consumed by
 
-- `plugins/marketing/skills/tam-mapping/SKILL.md` — **pending BC-5832**
+- `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 1.5 free-count keyword expansion + Phase 3c keyword search
 - `plugins/marketing/scripts/tam-map/icypeas_client.py` — ported Python wrapper; not wrapped as an MCP server
 
 ## Auth
@@ -78,13 +78,13 @@ Treat 429 and 5xx as retryable with exponential backoff: base 2s, double per att
 
 ## Brite usage
 
-Invoked as **step 4** of `/marketing:tam-map <vertical>`. Brite seeds IcyPeas from the per-vertical ICP file's `## Firmographics` and `## Geography` sections (`{vertical}-icp.md`, pending BC-5832). For Brite Labs verticals, IcyPeas is a **coverage complement** to AI Ark — it catches companies that AI Ark missed due to taxonomy gaps, particularly for sub-verticals like "themed entertainment installers" or "boutique landscape-architecture firms" that don't map cleanly to any single firmographic code.
+Invoked as **step 4** of `tam-mapping` Phase 3c (Labs path). Brite seeds IcyPeas from the per-vertical playbook file's `## Firmographics` and `## Geography` sections (`{vertical}.md`). For Brite Labs verticals, IcyPeas is a **coverage complement** to AI Ark — it catches companies that AI Ark missed due to taxonomy gaps, particularly for sub-verticals like "themed entertainment installers" or "boutique landscape-architecture firms" that don't map cleanly to any single firmographic code.
 
 For the 6 Labs verticals, IcyPeas is most useful for Exploring-tier (casinos, hotels-resorts, ski-resorts, sports-stadiums) where the vendor's keyword database has meaningful coverage. Active-tier (zoos, aquariums) tend to be well-covered by AI Ark alone; IcyPeas adds little.
 
 ## Related skills
 
-- **Primary consumers:** `tam-mapping` (pending BC-5832).
+- **Primary consumers:** `tam-mapping` (BC-5832, Phase 1.5 keyword expansion + Phase 3c keyword search).
 - **Upstream / downstream:** IcyPeas output merges with AI Ark and Discolike output at step-5 enrichment; deduplication by `domain` field.
 - **Alternatives:** Clearbit Discovery (deprecated on vendor side), Crunchbase Data (rejected — weaker keyword matching, strong firmographic which AI Ark already covers), Clay (deprecated per `memory/project_clay_deprecated.md`).
 

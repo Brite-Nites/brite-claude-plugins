@@ -181,7 +181,7 @@ When `tam-mapping` Phase 7 invokes this skill with `--rubric abc`, the contract 
 |---|---|---|
 | `lead-routing` (BC-2725, not yet shipped) | DISTINCT — post-reply MQL assignment in SF | This skill is pre-outreach prioritization of raw prospects; `lead-routing` runs after replies come back. Different lifecycle stage. |
 | `list-building` (BC-2717, not yet shipped) | Upstream — assembles raw prospect lists | Hands raw CSV to this skill for scoring. Skill pre-filter optimization expects list-building's output to have `industry` + `employees` populated where possible. |
-| `tam-mapping` (BC-5832, not yet shipped) | Upstream delegate caller — Phase 7 | Invokes with `--rubric abc`. See "Tam-mapping delegation contract" above. |
+| `tam-mapping` (BC-5832) | Upstream delegate caller — Phase 7 | Invokes with `--rubric abc`. See "Tam-mapping delegation contract" above. |
 | `data-enrichment` (BC-2727, not yet shipped) | Upstream / sibling — firmographic fill | Once BC-5537/5538 ships the enrichment MCP, `data-enrichment` becomes the canonical pre-step that populates CSV columns this skill reads. |
 | `email-copywriting` (BC-5825, shipped) | Downstream — copy generation | Reads the qualified output (`*_qualified.csv` from score_0_100, or `tier-a.csv` / `tier-b.csv` from abc) as its prospect input. |
 | `situation-mining` (BC-5824, shipped) | Downstream — per-prospect deeper research | High-score prospects get hand-off for diagnostic outbound angles. |

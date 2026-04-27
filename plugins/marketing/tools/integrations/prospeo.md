@@ -8,7 +8,7 @@ Prospeo is the **fallback-enrichment layer** of the tam-map pipeline — LinkedI
 
 ## Consumed by
 
-- `plugins/marketing/skills/tam-mapping/SKILL.md` — **pending BC-5832**
+- `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 5 enrichment (Prospeo fallback in `blitz_waterfall` provider)
 - `plugins/marketing/scripts/tam-map/enrich_waterfall.py` — ported Python wrapper (same waterfall script that handles BlitzAPI primary)
 
 ## Auth
@@ -86,7 +86,7 @@ SMTP verification (step 7, `MillionVerifier`) still runs on Prospeo-sourced emai
 
 ## Related skills
 
-- **Primary consumers:** `tam-mapping` (pending BC-5832).
+- **Primary consumers:** `tam-mapping` (BC-5832, Phase 5 Prospeo fallback in `blitz_waterfall`).
 - **Upstream / downstream:** Prospeo consumes companies with `linkedin_url` where BlitzAPI missed; emits to MillionVerifier for SMTP verification.
 - **Alternatives:** Apollo.io (rejected — credit economics), Lusha (rejected — weaker international coverage), Clay (deprecated per `memory/project_clay_deprecated.md`).
 

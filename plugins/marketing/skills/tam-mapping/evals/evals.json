@@ -1,0 +1,167 @@
+{
+  "skill": "tam-mapping",
+  "description": "Behavioral evals for tam-mapping. Mirrors §9 Behavioral Tests in SKILL.md. 12 scenarios (5 Tier 1 free assertions + 7 Tier 2 tool-assisted).",
+  "scenarios": [
+    {
+      "id": "nites-residential-7-phase-walk",
+      "tier": 1,
+      "input": {
+        "user_message": "Build a TAM for Brite Nites residential in the Austin metro."
+      },
+      "assertions": [
+        { "type": "contains", "value": "Phase 1" },
+        { "type": "contains", "value": "Phase 1.5" },
+        { "type": "contains", "value": "Phase 2" },
+        { "type": "contains", "value": "Phase 3" },
+        { "type": "contains", "value": "Phase 4" },
+        { "type": "contains", "value": "Phase 4.5" },
+        { "type": "contains", "value": "Phase 5" },
+        { "type": "not_contains", "value": "Phase 6" },
+        { "type": "not_contains", "value": "Phase 7" }
+      ]
+    },
+    {
+      "id": "labs-zoos-vertical-playbook-load",
+      "tier": 1,
+      "input": {
+        "user_message": "Build a Labs zoos TAM for the eastern US."
+      },
+      "assertions": [
+        { "type": "contains", "value": "Phase 1" },
+        { "type": "contains", "value": "Phase 7" },
+        { "type": "contains", "value": "vertical-playbooks/zoos.md" }
+      ]
+    },
+    {
+      "id": "free-email-filter-applied",
+      "tier": 1,
+      "input": {
+        "user_message": "Show me a sample tier-A row from a Labs venue partnerships TAM run."
+      },
+      "assertions": [
+        { "type": "not_contains", "value": "@gmail.com" },
+        { "type": "not_contains", "value": "@yahoo.com" },
+        { "type": "not_contains", "value": "@hotmail.com" },
+        { "type": "not_contains", "value": "@outlook.com" },
+        { "type": "not_contains", "value": "@icloud.com" }
+      ]
+    },
+    {
+      "id": "custom-vertical-fallback",
+      "tier": 1,
+      "input": {
+        "user_message": "Build a Labs TAM for breweries (no playbook exists for this vertical)."
+      },
+      "assertions": [
+        { "type": "contains_any", "values": ["--criteria-file", "interactive", "AskUserQuestion", "ICP entry"] },
+        { "type": "not_contains", "value": "silently default" }
+      ]
+    },
+    {
+      "id": "resume-from-phase-5",
+      "tier": 1,
+      "input": {
+        "user_message": "I'm resuming a tam-mapping run that died at Phase 5. The output dir already has manifest.json, tam-config.json, companies.jsonl, crawled.jsonl, all_sources_deduped.csv, and excluded.jsonl."
+      },
+      "assertions": [
+        { "type": "contains_any", "values": ["resume from Phase 5", "resume Phase 5", "resumes from Phase 5", "starting from Phase 5"] },
+        { "type": "not_contains", "value": "restart from Phase 1" }
+      ]
+    },
+    {
+      "id": "marketing-context-reference",
+      "tier": 2,
+      "preconditions": {
+        "files_exist": ["docs/marketing-context.md"]
+      },
+      "input": {
+        "user_message": "Build a TAM. Use the entity from marketing-context."
+      },
+      "assertions": [
+        { "type": "reads_file", "path": "docs/marketing-context.md" },
+        { "type": "contains_entity_from_marketing_context", "value": true }
+      ]
+    },
+    {
+      "id": "phase-4.5-hard-fail-b2b",
+      "tier": 2,
+      "preconditions": {
+        "mock_mcp_failures": ["mcp__emailbison-b2b__get_active_workspace_info"]
+      },
+      "input": {
+        "user_message": "Build a Nites TAM for landscape lighting in Texas."
+      },
+      "assertions": [
+        { "type": "halts_at_phase", "value": "4.5" },
+        { "type": "contains", "value": "HARD-FAIL" },
+        { "type": "not_calls", "phase": "5" }
+      ]
+    },
+    {
+      "id": "phase-4.5-hard-fail-personal",
+      "tier": 2,
+      "preconditions": {
+        "mock_mcp_failures": ["mcp__emailbison-personal__get_active_workspace_info"]
+      },
+      "input": {
+        "user_message": "Build a Labs casinos TAM."
+      },
+      "assertions": [
+        { "type": "halts_at_phase", "value": "4.5" },
+        { "type": "contains", "value": "HARD-FAIL" },
+        { "type": "not_calls", "phase": "5" }
+      ]
+    },
+    {
+      "id": "brite-mcp-pending-fallback",
+      "tier": 2,
+      "preconditions": {
+        "user_config": { "enrichment_provider": "brite_mcp" },
+        "mock_mcp_failures": ["mcp__plugin_marketing_enrichment__*"]
+      },
+      "input": {
+        "user_message": "Build a Labs ski-resorts TAM."
+      },
+      "assertions": [
+        { "type": "contains", "value": "pending BC-5537/5538 GA" },
+        { "type": "falls_through_to_provider", "value": "blitz_waterfall" }
+      ]
+    },
+    {
+      "id": "skip-provider-short-circuit",
+      "tier": 2,
+      "preconditions": {
+        "user_config": { "enrichment_provider": "skip" }
+      },
+      "input": {
+        "user_message": "Build a Labs aquariums TAM."
+      },
+      "assertions": [
+        { "type": "phase_5_short_circuits", "value": true },
+        { "type": "phase_runs", "value": "6" },
+        { "type": "phase_runs", "value": "7" }
+      ]
+    },
+    {
+      "id": "open-tracking-off-reminder",
+      "tier": 2,
+      "input": {
+        "user_message": "Build a TAM (any entity, any vertical)."
+      },
+      "assertions": [
+        { "type": "contains_verbatim", "value": "OPEN-TRACKING DISABLED" }
+      ]
+    },
+    {
+      "id": "cost-estimate-emitted",
+      "tier": 2,
+      "input": {
+        "user_message": "Build a Labs hotels-resorts TAM and run Phase 5 enrichment."
+      },
+      "assertions": [
+        { "type": "contains_verbatim", "value": "estimated enrichment cost:" },
+        { "type": "appears_before_phase", "phase": "5", "string": "estimated enrichment cost:" }
+      ]
+    }
+  ]
+}
