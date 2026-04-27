@@ -416,7 +416,31 @@ The Phase 11 loop reads `activated_per_campaign[bucket]` to skip already-activat
 
 ## Workspace cleanup
 
-*(filled during T11 — list of campaigns archived/deleted, leads deleted, custom variables deleted/retained-with-justification)*
+**Deleted (background-queued via async API):**
+- `DELETE /api/campaigns/bulk` body `{"campaign_ids": [22, 23, 24]}` → success. Response: "The selected campaigns have been queued for deletion."
+- `DELETE /api/leads/bulk` body `{"lead_ids": [14705, 14706, 14707, 14708, 14709, 14710, 14711]}` → success. Response: "Lead deletion process started. This might take some time depending on how much data you have."
+
+Both delete operations are **asynchronous**. The API queues them and processes in the background. Verification was via subsequent `list_campaigns(search="BC-5906")` and `list_leads(search="dogfood-test" / "no-lastname" / "F17Test")` — all returned 0 matches, confirming the queue processed within the verification window (~seconds).
+
+Spec implication: launch-campaign command's cleanup wording assumes synchronous deletes; reality is async + eventual consistency. T11 verification needs a "wait and re-query" pattern, not an immediate-after-call check. (Round-2 was lucky — the queue cleared before the verify window. Production may not be.)
+
+**Schedules + sequences cascaded.** No separate delete calls were issued for schedules (id 4, 5) or sequences (id 3, 4). When the parent campaigns delete, EB cascades the per-campaign schedule + sequence cleanup. Verification: `list_campaigns(search="BC-5906")` returned 0 results, including no orphan schedule/sequence references. (No standalone "list schedules" or "list sequences" endpoints discoverable via `search_api_spec` to verify standalone — implicit cascade is the assumed behavior.)
+
+**Sender attaches removed implicitly.** Senders themselves (IDs 981–995) are workspace resources, not campaign resources — they remain in the workspace's 772-sender pool. Their ATTACHMENTS to the deleted campaigns are removed automatically when the parent campaigns delete. No separate detach call needed.
+
+**Retained: 8 custom variables (IDs 7–14, lowercased).** Per Sx-4 (no `DELETE /api/custom-variables/{id}` endpoint), these cannot be deleted via API. They remain workspace-scoped indefinitely. Future runs against `emailbison-personal` workspace 13 will inherit these:
+- `recency_anchor` (id 7)
+- `vertical_descriptor` (id 8)
+- `specific_friction` (id 9)
+- `proof_point_company` (id 10)
+- `proof_point_number` (id 11)
+- `proof_point_timeframe` (id 12)
+- `free_asset_noun` (id 13)
+- `sender_first_name` (id 14)
+
+**Justification for retention:** these names are workspace-shared (per F16), and the next BC-5906-style dogfood OR any future production launch using the email-copywriting skill's standard variable set will reuse them. Deleting via EB UI would be a manual operator step; the spec's "delete custom variables" cleanup language should reframe to "vars persist; document the retained set."
+
+**Workspace state at end of T11.** Net additions to `personal.outbase.so` workspace 13: +8 custom variables (permanent). Everything else (leads, campaigns, schedules, sequences, sender-attaches) reverted.
 
 ## Follow-up Linear issues filed
 
