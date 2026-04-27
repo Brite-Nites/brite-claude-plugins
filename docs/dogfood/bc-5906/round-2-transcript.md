@@ -76,6 +76,8 @@ These four findings emerged from `search_api_spec` recon BEFORE any creates fire
 
 **Sx-8. Bulk-POST is all-or-nothing on validation failure.** A duplicate-email entry in a bulk batch fails the WHOLE batch with 422; valid entries in the same batch are NOT created. The `call_api` wrapper exposes only `{"error": "HTTP 422 Error"}` — no per-lead detail. Launch-campaign Phase 4 step 8's "surface the rejected rows for operator review" can't be implemented as written. Recovery requires inspecting EB UI to determine actual state, not API response.
 
+**Sx-9. Extended-tier MCP "tools" are not callable in-session — only via `call_api`.** `discover_tools` advertises tools like `import_leads_to_campaign`, `bulk_create_leads`, `attach_sender_emails_to_campaign` with rich descriptions including two-call vendor-gate semantics. None of these are exposed as direct callables in the conversation's tool registry; we can only invoke their underlying API endpoints via `call_api`. The vendor-gate two-call dance described in the discover_tools description is enforced by the wrapper layer, NOT by the API. Spec implication: the launch-campaign command's reliance on "two-call MCP confirmation gate per BC-2707" for Phases 4, 6, 11 is only realizable if the wrapper is somehow surfaced as a callable. Via `call_api` (the spec's documented invocation pattern), the gate is purely operator-side via `AskUserQuestion`. The launch-campaign spec's wording should clarify "agent-side semantic gate via AskUserQuestion is the load-bearing safeguard; vendor-side gate is advisory and not enforced through `call_api`."
+
 ---
 
 ## Phase 3 VARIABLES — live-walk
@@ -172,15 +174,45 @@ Response shape: `{success, message, campaign: {id, name, status, type}}`. Notabl
 
 ## Phase 6 ATTACH LEADS — live-walk
 
-*(populated during execution)*
+**Endpoint:** `POST /api/campaigns/{campaign_id}/leads/attach-leads`. Body: `{lead_ids: [int], allow_parallel_sending: bool (optional)}`. Required: `lead_ids`. The launch-campaign spec's reference to `import_leads_to_campaign` corresponds to this endpoint.
+
+**Architecture finding — Sx-9.** The `import_leads_to_campaign` MCP-tool wrapper that the spec expects to enforce the BC-2707 two-call gate is NOT exposed as a directly callable function in the session's tool registry — only `call_api` is. Extended-tier tools per `discover_tools` are advertised but not invocable as named functions; their `confirmation`-parameter / two-call gate is enforced only by the wrapper layer that we cannot reach from `call_api`. Spec implication: the BC-2707 vendor-side gate for Phase 6 is not actually achievable via the documented "ground-truth via search_api_spec, then call via call_api" pattern. The agent-side `AskUserQuestion` semantic gate (User gate 6) is the only enforceable gate.
+
+**Bucket map.** Built in-session from CSV→MX→bucket assignments captured during Phase 2:
+- Google bucket: leads 14706 (gmail), 14707 (gmail), 14710 (brite.co/Google Workspace), 14711 (brite.co/Google Workspace) — 4 leads
+- Microsoft bucket: leads 14708 (outlook), 14709 (outlook) — 2 leads
+
+**Two parallel attach calls.** Both succeeded:
+- Campaign 22 ← `lead_ids: [14706, 14707, 14710, 14711]` → response "Leads successfully added to BC-5906 Round 2 | Google. Existing leads were not added."
+- Campaign 23 ← `lead_ids: [14708, 14709]` → response "Leads successfully added to BC-5906 Round 2 | Microsoft. Existing leads were not added."
+
+The "Existing leads were not added" suffix in the response message is **idempotency signal** — re-attaching already-attached leads is a no-op rather than a 422. Useful for resume safety. Worth flagging in the spec's resume rules.
+
+**Verification via `list_campaigns(search="BC-5906 Round 2")`:**
+```
+id, name,                              status, leads
+22, BC-5906 Round 2 | Google,          draft,  4
+23, BC-5906 Round 2 | Microsoft,       draft,  2
+24, BC-5906 Round 2 | Google (F20-dup), draft,  0
+```
+
+Per-campaign attach counts match the bucket map. F20 collision-test campaign 24 has 0 leads (untouched).
 
 ### F21 — Lead-ID-to-bucket mapping (Phase 4 → Phase 6)
 
-*(populated during execution — confirm whether full ID list needs metadata persistence or session-memory suffices)*
+**CONFIRMED as gap.** The launch-campaign metadata schema (spec § Launch metadata schema) persists `lead_ids_uploaded` (count) and `esp_segments: {bucket: count}` (per-bucket counts), but NOT `lead_ids_by_bucket: {bucket: [ids]}` (the actual mapping). To resume Phase 6 from metadata alone after a session crash, you'd need to re-derive bucket assignments by:
+1. Re-running Phase 2 Bash `dig` MX lookups against the CSV
+2. Cross-referencing CSV-row order to lead IDs (which Phase 4 returns in submit-order, but the order is implicit, not persisted in metadata)
+
+Round-2 worked because the bucket map was held in agent session memory; if that's lost, recovery is manual. **Spec fix recommendation**: extend the metadata schema with either (a) `lead_ids_by_bucket: {Google: [...], Microsoft: [...], Other: [...]}`, or (b) `lead_id_to_email_map: {<lead_id>: <email>}` so the bucket map can be rebuilt from emails alone.
 
 ### F22 — `allow_parallel_sending` gate
 
-**Status: deferred per brainstorm decision 3 (2026-04-27).** Validating F22 requires pre-poisoning a lead into another campaign before this walk, which adds setup-and-cleanup load not justified by F22's load-bearing-ness for the MVP launch path. If F22 confirmation becomes high-value later, file as a separate scoped follow-up issue.
+**Status: deferred per brainstorm decision 3 (2026-04-27).** Validating F22 requires pre-poisoning a lead into another campaign before this walk, which adds setup-and-cleanup load not justified by F22's load-bearing-ness for the MVP launch path.
+
+**Confirmed via spec recon though**: the API body schema for `/api/campaigns/{id}/leads/attach-leads` does include `allow_parallel_sending: boolean`. The launch-campaign spec's referencing this field name is correct. The gate behavior (vendor returns prompt when leads already in another campaign's sequence) is only enforced via the MCP-tool wrapper (per the `discover_tools` description) — and per Sx-9 the wrapper isn't reachable in this session anyway. So even if F22 were tested, the operator-side gate would be the only real safeguard.
+
+If F22 live confirmation becomes high-value, file a separate follow-up issue with a 2-step setup: (a) attach lead 14706 to campaign 24 (the F20 dup) first, (b) re-run Phase 6's attach for campaign 22 — observe whether attaching lead 14706 to a 2nd campaign without `allow_parallel_sending: true` triggers the gate path.
 
 ---
 
@@ -253,7 +285,7 @@ Response shape: `{success, message, campaign: {id, name, status, type}}`. Notabl
 | F18 | Mid-chunk failure recovery | **confirmed (all-or-nothing)** | Bulk POST `[dup, new]` → 422, NEITHER created. No per-lead detail in 422 response. | Spec needs Phase 4 step 8 rewrite — recovery via EB UI, not API. |
 | F19 | Vendor prompt wording (Phase 4) | **refuted (no vendor gate via call_api)** | First call returned data directly; no confirmation parameter on `bulk_create_leads` MCP wrapper either (vs `import_leads_to_campaign` which has one). | Spec's "two-call vendor gate" claim for Phase 4 over-applies; remove or qualify. |
 | F20 | Campaign name collision | **confirmed (silent duplicate)** | Same-name `create_campaign` call → new campaign id 24 with identical name as id 22; no error, no gate. Spec offers no guard against this. | Spec fix: Phase 5 step 1 pre-list existing campaigns and surface to user gate. |
-| F21 | Lead-ID-to-bucket mapping persistence | *pending* | | |
+| F21 | Lead-ID-to-bucket mapping persistence | **confirmed (gap)** | Metadata schema persists counts only, not bucket→ID map. Round-2 used in-session memory; resume after crash would require re-running Phase 2 + cross-referencing CSV order to lead IDs (latter not persisted). | Spec fix: add `lead_ids_by_bucket` OR `lead_id_to_email_map` to metadata schema. |
 | F22 | `allow_parallel_sending` gate | **deferred** | Brainstorm 2026-04-27 — requires pre-poisoning, not in scope | None this run |
 | F23 | `list_sender_emails` pagination mechanism | *pending* | | |
 | F24 | `attach_sender_emails_to_campaign` payload size | *pending* | | |
