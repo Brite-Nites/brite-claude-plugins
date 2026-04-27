@@ -10,7 +10,7 @@ AI Ark is the **company-discovery layer** of the tam-map pipeline. Given a firmo
 
 ## Consumed by
 
-- `plugins/marketing/skills/tam-mapping/SKILL.md` — **pending BC-5832**
+- `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 3c Labs collection (firmographic discovery)
 - `plugins/marketing/scripts/tam-map/aiark_client.py` — ported Python wrapper
 - `plugins/marketing/scripts/tam-map/aiark-mcp.js` — ported stdio MCP wrapper over the same API
 
@@ -82,13 +82,13 @@ Treat 429 and 5xx as retryable with exponential backoff: base 2s, double per att
 
 ## Brite usage
 
-Invoked as **step 1** of `/marketing:tam-map <vertical>`. Brite passes firmographic filters sourced from the per-vertical ICP file (`plugins/marketing/references/vertical-playbooks/{vertical}-icp.md` — pending BC-5832), which contains industry codes + employee band + geography + persona seed titles. The response feeds step 2 (Spider.cloud crawl) and step 3 (Discolike lookalike expansion).
+Invoked as **step 1** of `tam-mapping` Phase 3c (Labs path). Brite passes firmographic filters sourced from the per-vertical playbook file (`plugins/marketing/references/vertical-playbooks/{vertical}.md`), which contains industry codes + employee band + geography + persona seed titles. The response feeds step 2 (Spider.cloud crawl) and step 3 (Discolike lookalike expansion).
 
 For Brite Labs verticals, Active-tier ones (zoos, aquariums) typically return 50–300 companies per ICP; Exploring-tier (casinos, hotels-resorts, ski-resorts, sports-stadiums) return 200–800. Expect pagination in all cases.
 
 ## Related skills
 
-- **Primary consumers:** `tam-mapping` (pending BC-5832), `list-building` (pending BC-2717; would compose over tam-mapping).
+- **Primary consumers:** `tam-mapping` (BC-5832), `list-building` (pending BC-2717; would compose over tam-mapping).
 - **Upstream / downstream:** AI Ark output feeds Spider.cloud (crawl), Discolike (lookalike expansion), IcyPeas (keyword search for overlapping coverage).
 - **Alternatives:** Apollo.io (rejected — heavier, more expensive at discovery-phase volumes), Crunchbase Data (rejected — weaker firmographic filters), Clay (deprecated per `memory/project_clay_deprecated.md`).
 

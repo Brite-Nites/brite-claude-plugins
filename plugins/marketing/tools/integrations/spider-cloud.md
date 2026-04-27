@@ -8,7 +8,7 @@ Spider.cloud is the **web-crawl layer** of the tam-map pipeline. Given a list of
 
 ## Consumed by
 
-- `plugins/marketing/skills/tam-mapping/SKILL.md` — **pending BC-5832**
+- `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 3c Labs collection (web crawl + tech-signal extraction)
 - `plugins/marketing/scripts/tam-map/spider_crawl.py` — ported wrapper, calls the vendor API directly for non-MCP contexts
 
 ## Auth
@@ -87,7 +87,7 @@ Skill authors: do not call Spider from Brite Nites Supply-vertical workflows wit
 
 ## Related skills
 
-- **Primary consumers:** `tam-mapping` (pending BC-5832), `icp-scoring` (pending BC-5831).
+- **Primary consumers:** `tam-mapping` (BC-5832, Phase 3c web crawl), `icp-scoring` (BC-5831, optional research-time tech-signal lookup).
 - **Upstream / downstream:** Spider consumes domain lists from AI Ark / IcyPeas / Discolike; emits crawl output to the fit-scoring prompt via `tier_and_segment.py`.
 - **Alternatives:** Apify (considered, heavier footprint), Firecrawl (comparable, rejected pre-tam-map due to earlier Brite experience). Spider is the standing choice.
 
