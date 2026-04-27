@@ -1,0 +1,283 @@
+{
+  "skill": "list-building",
+  "version": "0.1.0",
+  "scenarios": [
+    {
+      "name": "happy-path-source-1-tam-output",
+      "description": "Source 1: tam-mapping Labs output dir; skill skips Workflow 2 (EB-exclusion already ran upstream).",
+      "input": {
+        "flags": {
+          "input-dir": "docs/campaigns/labs/tam/zoos/"
+        },
+        "marketing_context_present": true,
+        "marketing_context_entity": "brite-labs",
+        "fixtures": {
+          "docs/campaigns/labs/tam/zoos/tier-a.csv": "domain,company_name,linkedin_url,industry\nexample-zoo.com,Example Zoo,https://linkedin.com/company/example-zoo,Zoo"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output mentions 'Source 1' or 'tam-mapping output' detection" },
+        { "type": "prose", "value": "output explicitly skips Workflow 2 with a 'tam-mapping Phase 4.5 already ran exclusion' note" },
+        { "type": "contains_verbatim", "value": "estimated enrichment cost:" },
+        { "type": "appears_before_phase", "phase": "Workflow 3", "string": "estimated enrichment cost:" },
+        { "type": "prose", "value": "output runs Workflow 4 (verify_smtp.py) and Workflow 5 (free-email filter + emission)" }
+      ],
+      "expected_output_files": [
+        "<output-dir>/source.json",
+        "<output-dir>/enriched.jsonl",
+        "<output-dir>/verified.jsonl",
+        "<output-dir>/personal-contacts.csv",
+        "<output-dir>/enriched_leads.csv",
+        "<output-dir>/list_stats.json"
+      ],
+      "expected_output_files_NOT": [
+        "<output-dir>/suppression_set.json"
+      ]
+    },
+    {
+      "name": "happy-path-source-2-dbt-csv",
+      "description": "Source 2: pre-exported dbt audience CSV; skill audit-reads model via gh api + runs Workflow 2.",
+      "input": {
+        "flags": {
+          "audience-csv": "audiences/active-municipalities.csv",
+          "audience-view-name": "audience_active_municipalities"
+        },
+        "marketing_context_present": true,
+        "marketing_context_entity": "brite-nites",
+        "fixtures": {
+          "audiences/active-municipalities.csv": "domain,company_name\naustin-tx.gov,City of Austin\nphoenix-az.gov,City of Phoenix"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output mentions 'Source 2' or 'dbt audience CSV' detection" },
+        { "type": "prose", "value": "output validates --audience-view-name against ^[a-z0-9_]+$ before Bash interpolation" },
+        { "type": "prose", "value": "output runs Bash → gh api repos/Brite-Nites/brite-data-platform/contents/models/marts/audience_active_municipalities.sql for audit (no 2>/dev/null suffix)" },
+        { "type": "prose", "value": "output runs Workflow 2 (3-probe availability check + dual-workspace list_leads + SF Lead suppression SOQL)" },
+        { "type": "contains_verbatim", "value": "estimated enrichment cost:" },
+        { "type": "appears_before_phase", "phase": "Workflow 3", "string": "estimated enrichment cost:" }
+      ],
+      "expected_output_files": [
+        "<output-dir>/source.json",
+        "<output-dir>/suppression_set.json",
+        "<output-dir>/enriched.jsonl",
+        "<output-dir>/verified.jsonl",
+        "<output-dir>/personal-contacts.csv",
+        "<output-dir>/enriched_leads.csv",
+        "<output-dir>/list_stats.json"
+      ]
+    },
+    {
+      "name": "happy-path-source-3-manual-csv",
+      "description": "Source 3: manual CSV with required columns; skill validates + runs Workflow 2.",
+      "input": {
+        "flags": {
+          "input-csv": "lists/cold-prospects.csv"
+        },
+        "marketing_context_present": true,
+        "fixtures": {
+          "lists/cold-prospects.csv": "domain,company_name\nacme.com,Acme Corp\nbeta.com,Beta Inc"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output mentions 'Source 3' or 'manual CSV' detection" },
+        { "type": "prose", "value": "output validates required columns (domain, company_name)" },
+        { "type": "prose", "value": "output runs Workflow 2 → 3 → 4 → 5" },
+        { "type": "contains_verbatim", "value": "estimated enrichment cost:" }
+      ],
+      "expected_output_files": [
+        "<output-dir>/source.json",
+        "<output-dir>/suppression_set.json",
+        "<output-dir>/enriched_leads.csv"
+      ]
+    },
+    {
+      "name": "ambiguous-icp-asks-clarifying-question",
+      "description": "Entity not in marketing-context.md; skill calls AskUserQuestion before applying ICP title cascade.",
+      "input": {
+        "flags": {
+          "input-csv": "lists/mixed.csv"
+        },
+        "marketing_context_present": true,
+        "marketing_context_entity": null,
+        "fixtures": {
+          "lists/mixed.csv": "domain,company_name\nfoo.com,Foo Corp"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output calls AskUserQuestion to resolve entity selection before invoking the ICP title cascade" },
+        { "type": "prose", "value": "output does NOT silently default to brite-nites/brite-supply/brite-labs" }
+      ]
+    },
+    {
+      "name": "missing-marketing-context",
+      "description": "marketing-context.md absent; skill warns and degrades.",
+      "input": {
+        "flags": {
+          "input-csv": "lists/cold.csv"
+        },
+        "marketing_context_present": false,
+        "fixtures": {
+          "lists/cold.csv": "domain,company_name\nfoo.com,Foo Corp"
+        }
+      },
+      "assertions": [
+        { "type": "contains_verbatim", "value": "Marketing context doc not found" },
+        { "type": "prose", "value": "output does NOT halt; degrades to user-provided context only" }
+      ]
+    },
+    {
+      "name": "mcp-unavailability-halts",
+      "description": "EB workspace unreachable in Workflow 2 with source=manual-CSV → HARD-FAIL.",
+      "input": {
+        "flags": {
+          "input-csv": "lists/cold.csv"
+        },
+        "marketing_context_present": true,
+        "fixtures": {
+          "lists/cold.csv": "domain,company_name\nfoo.com,Foo Corp"
+        },
+        "mocked_mcp_failures": [
+          "mcp__emailbison-b2b__get_active_workspace_info"
+        ]
+      },
+      "assertions": [
+        { "type": "prose", "value": "output HARD-FAILS at Workflow 2 with which workspace failed" },
+        { "type": "prose", "value": "output does NOT proceed to Workflow 3 (enrichment)" },
+        { "type": "prose", "value": "output does NOT silent-skip Workflow 2" }
+      ],
+      "expected_output_files_NOT": [
+        "<output-dir>/enriched.jsonl",
+        "<output-dir>/enriched_leads.csv"
+      ]
+    },
+    {
+      "name": "tam-mapping-upstream-skip-eb-exclusion",
+      "description": "Source 1 (tam-mapping output) — Workflow 2 explicitly skipped even when EB workspace would fail; skill proceeds to enrichment.",
+      "input": {
+        "flags": {
+          "input-dir": "docs/research/tam/austin-municipalities-2026-04-26/"
+        },
+        "marketing_context_present": true,
+        "marketing_context_entity": "brite-nites",
+        "mocked_mcp_failures": [
+          "mcp__emailbison-b2b__get_active_workspace_info"
+        ],
+        "fixtures": {
+          "docs/research/tam/austin-municipalities-2026-04-26/net_new_leads.csv": "domain,company_name\naustin-tx.gov,City of Austin"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output skips Workflow 2 entirely (Source 1 routing)" },
+        { "type": "prose", "value": "output proceeds to Workflow 3 despite mocked EB workspace failure" },
+        { "type": "prose", "value": "output emits 'tam-mapping Phase 4.5 already ran exclusion' note" },
+        { "type": "contains_verbatim", "value": "estimated enrichment cost:" }
+      ],
+      "expected_output_files": [
+        "<output-dir>/source.json",
+        "<output-dir>/enriched.jsonl"
+      ],
+      "expected_output_files_NOT": [
+        "<output-dir>/suppression_set.json"
+      ]
+    },
+    {
+      "name": "manual-csv-missing-required-column",
+      "description": "Source 3 manual CSV has only company_name (missing domain) → halt with column-validation message. Backs Behavioral Test Tier 1 #4.",
+      "input": {
+        "flags": {
+          "input-csv": "lists/missing-domain.csv"
+        },
+        "marketing_context_present": true,
+        "fixtures": {
+          "lists/missing-domain.csv": "company_name\nAcme Corp\nBeta Inc"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output halts at Workflow 1 step 3 with a column-validation message naming 'domain' as the missing required column" },
+        { "type": "prose", "value": "output does NOT proceed to Workflow 2 or any later workflow" }
+      ],
+      "expected_output_files_NOT": [
+        "<output-dir>/source.json",
+        "<output-dir>/suppression_set.json",
+        "<output-dir>/enriched.jsonl",
+        "<output-dir>/enriched_leads.csv"
+      ]
+    },
+    {
+      "name": "resume-detection-from-existing-enriched-jsonl",
+      "description": "Previous Source 3 run died at Workflow 4. source.json + suppression_set.json + enriched.jsonl exist. Skill detects resume from enriched.jsonl existence and resumes at Workflow 4 — does NOT restart from Workflow 1. Backs Behavioral Test Tier 1 #5.",
+      "input": {
+        "flags": {
+          "input-csv": "lists/cold.csv"
+        },
+        "marketing_context_present": true,
+        "fixtures": {
+          "lists/cold.csv": "domain,company_name\nfoo.com,Foo Corp",
+          "<output-dir>/source.json": "{\"source\":\"manual-csv\",\"input_csv\":\"lists/cold.csv\",\"columns_present\":[\"domain\",\"company_name\"]}",
+          "<output-dir>/suppression_set.json": "{\"input_rows\":1,\"output_rows\":1,\"exclusion_rate_pct\":0}",
+          "<output-dir>/enriched.jsonl": "{\"domain\":\"foo.com\",\"contact_email\":\"jane@foo.com\"}"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output reads source.json first, identifies source as manual-csv" },
+        { "type": "prose", "value": "output detects enriched.jsonl exists, verified.jsonl missing → resumes at Workflow 4 (SMTP verify)" },
+        { "type": "prose", "value": "output does NOT re-invoke Workflow 1, Workflow 2, or Workflow 3" },
+        { "type": "prose", "value": "output does NOT restart from Workflow 1 despite resume state" }
+      ],
+      "expected_output_files": [
+        "<output-dir>/verified.jsonl",
+        "<output-dir>/enriched_leads.csv"
+      ]
+    },
+    {
+      "name": "source-1-stale-input-dir-fires-staleness-gate",
+      "description": "Source 1 with input-dir mtime > 7 days old → skill fires AskUserQuestion staleness gate (Skip vs Override). Default = Skip (preserves routing rule). Override path runs Workflow 2 explicitly per user choice.",
+      "input": {
+        "flags": {
+          "input-dir": "docs/research/tam/austin-municipalities-2024-01-01/"
+        },
+        "marketing_context_present": true,
+        "marketing_context_entity": "brite-nites",
+        "fixtures": {
+          "docs/research/tam/austin-municipalities-2024-01-01/net_new_leads.csv": "domain,company_name\naustin-tx.gov,City of Austin"
+        },
+        "fixture_metadata": {
+          "docs/research/tam/austin-municipalities-2024-01-01/": {
+            "mtime_days_ago": 365
+          }
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output reads input-dir mtime via python3 (argv-passed; no shell interpolation)" },
+        { "type": "prose", "value": "output detects mtime > 7 days → fires AskUserQuestion with TWO options" },
+        { "type": "prose", "value": "AskUserQuestion default option = 'Skip Workflow 2 (preserves routing rule)'" },
+        { "type": "prose", "value": "AskUserQuestion override option = 'Override and re-run Workflow 2'" },
+        { "type": "prose", "value": "output never silently re-runs Workflow 2 against tam-output without explicit user choice" }
+      ]
+    },
+    {
+      "name": "resume-source-1-tam-output-skips-suppression-slot",
+      "description": "Source 1 run died at Workflow 1. source.json exists with source=tam-output. Resume algorithm reads source.json first, skips suppression_set.json slot (Source 1 routing), checks enriched.jsonl (missing) → resumes at Workflow 3. Without source-aware branching, this would incorrectly resume at Workflow 2.",
+      "input": {
+        "flags": {
+          "input-dir": "docs/campaigns/labs/tam/zoos/"
+        },
+        "marketing_context_present": true,
+        "marketing_context_entity": "brite-labs",
+        "fixtures": {
+          "docs/campaigns/labs/tam/zoos/tier-a.csv": "domain,company_name,linkedin_url,industry\nexample-zoo.com,Example Zoo,https://linkedin.com/company/example-zoo,Zoo",
+          "<output-dir>/source.json": "{\"source\":\"tam-output\",\"input_dir\":\"docs/campaigns/labs/tam/zoos/\",\"files_found\":[\"tier-a.csv\"]}"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output reads source.json first, identifies source as tam-output" },
+        { "type": "prose", "value": "output SKIPS suppression_set.json slot in resume loop (Source 1 routing)" },
+        { "type": "prose", "value": "output detects enriched.jsonl missing → resumes at Workflow 3 (enrichment)" },
+        { "type": "prose", "value": "output does NOT incorrectly resume at Workflow 2" }
+      ],
+      "expected_output_files_NOT": [
+        "<output-dir>/suppression_set.json"
+      ]
+    }
+  ]
+}

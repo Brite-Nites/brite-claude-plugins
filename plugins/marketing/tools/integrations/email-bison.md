@@ -15,6 +15,7 @@ The official Email Bison MCP Server (Beta) exposes the full sending-layer API su
 - `campaign-orchestration` (`plugins/marketing/skills/campaign-orchestration/`) — sequence design, inbox rotation, warmup strategy, end-to-end campaign launch.
 - `/marketing:launch-campaign` (`plugins/marketing/commands/launch-campaign.md`, BC-5826) — procedural 11-phase command that turns an enriched CSV + email-copywriting JSON artifact into an activated EB campaign. Owns every mutating phase (variables, upload, campaign create, lead+sender attach, schedule, sequence, activate) with two-call confirmation gates at each step. Default-off `--activate` flag; campaigns stop in Draft state unless explicit.
 - `tam-mapping` (`plugins/marketing/skills/tam-mapping/`, BC-5832) — Phase 4.5 cross-workspace exclusion query. Read-only `list_leads` against BOTH `emailbison-b2b` AND `emailbison-personal` to filter already-contacted domains out of a freshly-built TAM before Phase 5 enrichment. HARD-FAILS if either workspace is unreachable.
+- `list-building` (`plugins/marketing/skills/list-building/`, BC-2717) — Workflow 2 cross-workspace exclusion query for Sources 2 + 3 (dbt audience CSV, manual CSV). Read-only `list_leads` against BOTH `emailbison-b2b` AND `emailbison-personal` mirroring tam-mapping § 3 Phase 4.5 (kept in sync via cross-reference note in both files). Source 1 (tam-mapping output) SKIPS this — tam-mapping Phase 4.5 already ran the EB exclusion. HARD-FAILS if either workspace is unreachable when run.
 - `reply-processing` (BC-2720 — not yet landed) — reply classification + OutboundSync CRM sync.
 - `deliverability-audit` (BC-2719 — not yet landed) — SPF/DKIM/DMARC, domain reputation, bounce analysis.
 
@@ -273,7 +274,7 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 - `deliverability-audit` (BC-2719) — domain reputation, bounce rate analysis
 - `email-copywriting` (`plugins/marketing/skills/email-copywriting/`, BC-5825) — content generation for campaign sequences; feeds `/marketing:launch-campaign` command
 - `reply-processing` (BC-2720) — pairs Email Bison blocklist with Master Inbox label actions
-- `list-building` (BC-2717) — pipes enriched leads from `brite-data-platform` into Email Bison campaigns
+- `list-building` (`plugins/marketing/skills/list-building/`, BC-2717) — Workflow 2 cross-workspace exclusion (dual `list_leads` against both b2b + personal workspaces) for Sources 2 + 3; emits `enriched_leads.csv` for `launch-campaign` / `campaign-orchestration` to consume
 - `campaign-analysis` (BC-2721) — pulls reply / open / bounce analytics
 
 **Upstream integration (feeds into Email Bison):** Brite enrichment engine (`brite-data-platform`, custom Python CLI — see [WIP §1 Layer 1](../../../../docs/research/outbound-pipeline-findings.md#layer-1-list-building--enrichment)). No MCP server exists for the enrichment engine.

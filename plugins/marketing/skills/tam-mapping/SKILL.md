@@ -246,6 +246,8 @@ Output:
 
 ### Phase 4.5 — Exclusion (**MANDATORY — never skipped**)
 
+> **Procedure mirrored by [list-building § Workflow 2](../list-building/SKILL.md) (BC-2717) for its Sources 2 + 3 (dbt audience CSV, manual CSV) paths. Keep in sync — when one changes, audit the other.**
+
 > **HARD-FAIL rule.** If either Email Bison workspace is unreachable (auth failure, network timeout after 3 retries, missing token), the skill HALTS and reports which workspace failed. Does NOT silent-skip and DOES NOT proceed to Phase 5. Reason: Phase 5 enrichment costs real money (BlitzAPI + Prospeo + MillionVerifier per-record); running it on already-contacted leads wastes credits.
 
 Steps:
@@ -347,6 +349,8 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 **Pre-tier filter — Operational rule 1 (No free-email providers in B2B output).** BEFORE delegation, filter `verified.jsonl` rows whose email domain is one of `gmail.com` / `yahoo.com` / `hotmail.com` / `outlook.com` / `icloud.com`. Route them to `personal-contacts.csv` for manual outreach. NEVER include them in tier-A/B/C CSVs.
 
 **Reshape — JSONL → flat CSV with top-level `catch_all` (REQUIRED before delegation).** Per icp-scoring's `abc` delegation contract (BC-5831 SKILL.md § "Tam-mapping delegation contract"), the caller (this skill) owns the JSONL→CSV reshape. `verified.jsonl` from Phase 6 nests the catch-all flag under `record.smtp.catch_all`; icp-scoring `abc` requires a flat CSV with a top-level `catch_all` column and stops with `missing required column 'catch_all' for --rubric abc` if absent. Before invoking the delegation call below, write `verified-flat.csv` with these columns: `domain`, `company_name` (if present), `industry` (if present), `employees` (if present), `geography` (if present), `catch_all` (boolean, flattened from `smtp.catch_all`). Free-email rows already routed to `personal-contacts.csv` in the prior step are excluded from `verified-flat.csv`.
+
+> **Note on the two icp-scoring upstream feeders.** `verified-flat.csv` (6 cols, this file) and list-building's `enriched_leads.csv` (16 cols, BC-2717) are deliberately different shapes. tam-mapping emits the *tier-classification-only* feeder (just what icp-scoring `abc` needs to score); list-building emits the *fully-enriched* feeder (also includes contact-level columns). Both satisfy icp-scoring's required column set; downstream consumers needing contact-level fields (e.g., `launch-campaign`'s post-icp-scoring step) MUST consume from list-building's `enriched_leads.csv`, not from this `verified-flat.csv`.
 
 **Delegation call:**
 
