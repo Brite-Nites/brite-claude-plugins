@@ -42,29 +42,69 @@ Default segmentation ON. No `--activate`, `--no-segment`, `--no-host-lookup`, `-
 
 ## Phase 1 PRE-FLIGHT — pre-walk summary
 
-*(read-only — re-runs round-1's pre-flight steps; expected: cross-mapping flag fires per F2, all 13 sanity checks pass, lead spot-check renders deterministically with first-option spintax)*
+Skipped formal walk (read-only; round-1 validated). Verified inputs in place at `.claude/worktrees/bc-5906/dogfood/`: 6 leads (1 header + 6 rows in CSV), copy artifact `schema_version: "1.0"`. The `--entity brite-labs --workspace emailbison-personal` cross-mapping is expected per F2 (dogfood) — metadata write path will route under `.claude/worktrees/bc-5906/dogfood/` per IV-3.
 
 ## Phase 2 HOST LOOKUP — pre-walk summary
 
-*(read-only — Bash `dig` per F10; expected ESP distribution: Google 4 / Microsoft 2 / Other 0 → F12 skip-empty drops Other; 2 segments survive)*
+Bash `dig` MX resolution against the 3 unique domains in the CSV (gmail.com, outlook.com, brite.co):
+
+- `gmail.com` → MX `gmail-smtp-in.l.google.com` family → **Google bucket**
+- `outlook.com` → MX `outlook-com.olc.protection.outlook.com` → **Microsoft bucket**
+- `brite.co` → MX `aspmx.l.google.com` (Google Workspace) → **Google bucket** (matches round-1's non-obvious finding)
+
+Distribution: **Google 4 / Microsoft 2 / Other 0**. F12 skip-empty drops Other → 2 segments survive (Google + Microsoft).
+
+---
+
+## Spec-vs-reality findings — pre-execution recon (worth flagging up front)
+
+These four findings emerged from `search_api_spec` recon BEFORE any creates fired. They cross-cut the F14–F31 hypotheses and warrant separate follow-up issues:
+
+**Sx-1. `search_api_spec` matches URL paths + summary, not descriptive phrases.** Searching for `"custom variable list"` and `"custom variable create"` returned no matches; `"/api/custom-variables"`, `"custom-variables"`, and `"variables"` all matched. Operators following the spec's "ground-truth via `search_api_spec`" instruction will hit dead-ends if they search by descriptive operation name. Spec wording should suggest URL-path-style queries or known partial keywords. Cross-cuts every Phase 3–11 ground-truth step.
+
+**Sx-2. Custom variables have NO `default` field at the API level.** `POST /api/custom-variables` accepts only `{name}` (required). `GET /api/custom-variables` returns `{id, name, created_at, updated_at}`. The launch-campaign.md spec's framing of "create variables with defaults" and Phase 3 step 4's "default in workspace: '<value>'" rendering are spec fictions. Defaults exist only at the lead level (per `bulk_create_leads`'s `custom_variables: [{name, value}]` per-lead array). This invalidates Phase 3's conflict-resolution gate (the "keep existing default vs overwrite with artifact default" choice has no real referent).
+
+**Sx-3. EB lowercases variable names on create.** Sent `RECENCY_ANCHOR` (uppercase, per the copy artifact); EB stored `recency_anchor` (lowercase). Same for all 8 of our SCREAMING_SNAKE_CASE names. Render-engine case-sensitivity is unknown; Phase 4 + Phase 10 lead spot-check will reveal whether `{RECENCY_ANCHOR}` in body resolves to the lowercase-stored value. If render is case-sensitive, every existing copy artifact in the codebase that uses uppercase merge tokens silently fails to render.
+
+**Sx-4. NO DELETE endpoint for `/api/custom-variables`.** `search_api_spec` with method=DELETE returns "no matching endpoints". Custom variables created during this dogfood persist in the workspace forever (only deletable via EB UI). The launch-campaign spec's cleanup wording "delete custom variables (or document why they can stay)" implies the option to delete via the dogfood flow — which is impossible. T11 cleanup is variables-can't-be-deleted by default.
 
 ---
 
 ## Phase 3 VARIABLES — live-walk
 
-*(populated during execution)*
+**Tools used:** `discover_tools(category="variables")` → confirmed `list_custom_variables` + `create_custom_variable` are both extended-tier. `search_api_spec(search_term="custom-variables")` → revealed the URL paths `GET /api/custom-variables` and `POST /api/custom-variables`. (Descriptive search failed — see Sx-1 above.)
+
+**Pre-create state.** `GET /api/custom-variables` returned 6 pre-existing variables (IDs 1–6, all created 2025-11-14): `company address`, `company linkedin url`, `company phone`, `company website`, `person job title`, `person linkedin url`. Pagination meta showed `current_page: 1, last_page: 1, per_page: 15, total: 6` — Laravel-style page-based pagination, not cursor-based. ZERO collisions with our 8 SCREAMING_SNAKE_CASE names.
+
+**F15 side-test.** `POST /api/custom-variables` with `{"name": "company website"}` (existing) → **HTTP 422 Error**. Clean refusal. No silent dup. No gate prompt. F15 confirmed as hard-fail-on-duplicate.
+
+**Main creates.** 8 parallel POSTs for our 8 names. All returned `success: true` with auto-incremented IDs 7–14. **Notable:** EB silently lowercased every name on store (Sx-3). Spec assumption "create with `{name, default}`" is wrong — only `{name}` works (Sx-2).
+
+**Post-create state.** Workspace now has 14 custom variables total (6 pre-existing + 8 new). All persist permanently (Sx-4 — no DELETE endpoint).
+
+**Time-to-complete.** ~7 seconds for 9 parallel POSTs (1 F15 test + 8 main creates).
 
 ### F14 — `list_custom_variables` pagination
 
-*(populated during execution)*
+**CONFIRMED.** Pagination is `?page=N` query param with Laravel-style metadata:
+```json
+"meta": {
+  "current_page": 1, "from": 1, "last_page": 1, "per_page": 15, "to": 6, "total": 6,
+  "links": [...prev/numbered/next URLs...],
+  "path": "https://personal.outbase.so/api/custom-variables"
+}
+```
+Default `per_page` is 15. NOT cursor-based as the launch-campaign spec describes for `list_sender_emails`'s `while True` loop. Two distinct pagination styles co-exist in EB — Phase 7 will test the sender variant. Mixed pagination model is itself worth flagging for Phase 7.
 
 ### F15 — Conflicting-variable resolution
 
-*(populated during execution)*
+**CONFIRMED (hard-fail variant).** Duplicate-name POST returns HTTP 422 with no body details exposed via `call_api` (just `{"error": "HTTP 422 Error", "hint": "..."}`). Behavior: clean refusal, no silent overwrite, no gate prompt, no state change. Combined with Sx-2 (no `default` field exists), F15's original framing "creating with same name + different default" is moot — defaults aren't a variable-level concept. The actual F15 question is just "what happens on duplicate name?" and the answer is **422**.
+
+Spec implication: Phase 3 step 3's classification of variables as "conflicting (name matches but default differs)" should reduce to "existing (will reuse) — duplicate POST would 422, so we skip the create". The 3-way classification (new / existing / conflicting) collapses to 2-way (new / existing).
 
 ### F16 — Workspace-scoped collision
 
-*(populated during execution)*
+**CONFIRMED.** Pre-existing 6 variables (Nov 2025 timestamps) prove variables persist beyond any single session/campaign. Combined with Sx-4 (no DELETE endpoint), variables are workspace-scoped + permanent. Future runs against `emailbison-personal` will inherit the 14 vars. Test campaigns across the workspace share the same variable namespace.
 
 ---
 
@@ -172,9 +212,9 @@ Default segmentation ON. No `--activate`, `--no-segment`, `--no-host-lookup`, `-
 
 | # | Hypothesis | Status | Evidence (verbatim) | Follow-up |
 |---|---|---|---|---|
-| F14 | `list_custom_variables` pagination | *pending* | | |
-| F15 | Conflicting-variable resolution | *pending* | | |
-| F16 | Workspace-scoped variable collision | *pending* | | |
+| F14 | `list_custom_variables` pagination | **confirmed** | `?page=N` query-param + Laravel meta (`current_page`, `last_page`, `per_page=15`, `total`, `links[]`); NOT cursor-based | Mixed pagination model (vs cursor-based `list_sender_emails` per spec) — flag for spec-authoring follow-up |
+| F15 | Conflicting-variable resolution | **confirmed (hard-fail)** | `POST {"name":"company website"}` (existing) → HTTP 422; no silent dup, no gate. Sx-2 invalidates the "default differs" sub-question. | Spec collapse 3-way (new/existing/conflicting) → 2-way (new/existing) |
+| F16 | Workspace-scoped variable collision | **confirmed** | Pre-existing 6 vars from Nov 2025 prove cross-session persistence; combined with Sx-4 (no DELETE endpoint) → permanent workspace state | Spec note + cleanup AC update — see follow-ups for Sx-4 |
 | F17 | `bulk_create_leads` `last_name` requirement | *pending* | | |
 | F18 | Mid-chunk failure recovery | *pending* | | |
 | F19 | Vendor prompt wording (Phase 4) | *pending* | | |
