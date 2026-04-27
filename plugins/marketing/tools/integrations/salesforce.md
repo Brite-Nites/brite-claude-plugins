@@ -198,6 +198,10 @@ To browse tools outside the current scope (e.g. while designing a future skill),
 
 **Full upstream inventory, per-toolset GA flags, and release-state enum:** [findings §A.3](../../../../docs/research/salesforce-mcp-findings.md#a3-tool-inventory-complete).
 
+## Capability Adoption Framework
+
+When Salesforce announces a new capability (Headless 360, Data 360, agentic skills, new toolsets), evaluate adoption via the 6-check framework in [ADR-009](../../../../docs/decisions/009-sf-capability-adoption.md).
+
 ## Common workflows
 
 Canonical recipes that combine Salesforce tools. Skills should follow these sequences verbatim unless they have a reason to deviate documented in their own `## Operational Runbook`.

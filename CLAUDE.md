@@ -37,7 +37,7 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-003: Plugin distribution architecture](docs/decisions/003-plugin-distribution-architecture.md)
 - [ADR-007: RevOps plugin design decisions](docs/decisions/007-revops-plugin-design.md) — naming, subtree, augment-not-replace, skill filter, MCP scope
 - [ADR-008: tam-mapping enrichment pluggability](docs/decisions/008-tam-mapping-enrichment-pluggability.md) — provider selection via userConfig, shared input/output schema, swap path
-- [Context-Skill Standard](docs/designs/BC-1966-context-skill-standard.md)
+- [ADR-009: SF capability adoption framework](docs/decisions/009-sf-capability-adoption.md) — 6-check framework (runtime model, license, plugin slot, toolset breadth, GA gate, domain fit) with worked examples
 
 ## Company Context
 

@@ -320,7 +320,7 @@ Before marking Done:
 
 **Plan (check-in gate):**
 - Draft new §SF Capability Adoption Decision Framework section (~40 lines)
-- Decide: in-line in salesforce.md or a separate ADR `docs/decisions/008-sf-capability-adoption.md` with @import
+- ~~Decide: in-line in salesforce.md or a separate ADR `docs/decisions/008-sf-capability-adoption.md` with @import~~ — **resolved** as separate ADR-009 (slot 008 was taken by `tam-mapping-enrichment-pluggability`); see "Resolved by" line below
 - Present to user for approval
 
 **Execute:**
@@ -337,6 +337,8 @@ Before marking Done:
 | T4 | `./scripts/check-guardrails.sh` | No anti-slop violations |
 
 **Related:** This plan §2.1, BC-5534 findings.
+
+**Resolved by:** [ADR-009](../decisions/009-sf-capability-adoption.md) (BC-5786, 2026-04-26).
 
 ---
 
