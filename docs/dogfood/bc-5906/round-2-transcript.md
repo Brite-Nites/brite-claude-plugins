@@ -82,6 +82,12 @@ These four findings emerged from `search_api_spec` recon BEFORE any creates fire
 
 **Sx-11. Status filter is case-sensitive in a non-obvious way.** `?status=connected` (lowercase) succeeds and returns senders. `?status=Connected` (capitalized — matching the response data's `status: "Connected"` field exactly) returns 422. Other values like `?status=warmup` also 422. The launch-campaign spec writes `filter={"status": "connected"}` — which works — but a developer looking at API response examples (which all show capitalized `"Connected"`) would naturally try the capitalized form and hit 422 with no useful diagnostic. Document the case-sensitivity expectation in the spec.
 
+**Sx-12. Schedule templates have NO `name` field.** Templates have only `id`, `type` ("Schedule template"), per-day boolean flags, `start_time`, `end_time`, `timezone`, timestamps. The launch-campaign spec at Phase 8 step 2 says "Identify the template matching the Brite default" — implying name-based selection. Reality: must match by structural field comparison. Spec should be explicit about field-based matching.
+
+**Sx-13. Launch-campaign spec uses `"variant": "A"` for sequence steps; EB expects boolean.** Spec line 600/608 sends `"variant": "A"` (a string A/B label borrowed from another platform's terminology). EB API expects `boolean`. Round-2 used `false` (boolean) and the create succeeded. Sending `"A"` would either silently coerce or 422 — but the spec's value type is wrong on its face. Spec fix required.
+
+**Sx-14. EB auto-prepends "Re: " to step_2 subjects when `thread_reply: true`, even if subject already starts with "Re:".** Round-2 sent step 2 subject `"Re: {Quick|Fast|30s} {question|check|idea}"` (per spec rule); EB stored `"Re: Re: {Quick|Fast|30s} {question|check|idea}"` — double prefix. Spec fix: copy artifact's step_2.subject should NOT include "Re:" prefix; EB prepends automatically when `thread_reply: true`. The spec at launch-campaign.md line 569 contains the wrong rule: `"step_2.subject` starts with `Re:` (per EB format rule)" — should reverse to "step_2.subject does NOT start with `Re:` (EB auto-prepends when thread_reply: true)". Concrete sweep needed across the email-copywriting skill + every existing copy artifact.
+
 ---
 
 ## Phase 3 VARIABLES — live-walk
@@ -290,15 +296,33 @@ The spec's Phase 8 step 2 currently says "If no matching template exists, surfac
 
 ## Phase 9 SEQUENCE — live-walk
 
-*(populated during execution)*
+**Endpoint (v1.1):** `POST /api/campaigns/v1.1/{campaign_id}/sequence-steps`. Body: `{title, sequence_steps: [{email_subject, email_body, wait_in_days, order, variant (boolean), variant_from_step, thread_reply}]}`. Required: `email_subject`, `email_body`, `wait_in_days`. Legacy `/api/campaigns/{id}/sequence-steps` exists but is deprecated.
+
+**F29 evidence (test).** First attempt for campaign 22 used `wait_in_days: 0` for step 1 (the copy artifact's verbatim value) → **HTTP 422 Error**. Retried with `wait_in_days: 1` → success (sequence id 4, steps id 6 + 7). The launch-campaign spec's `max(1, artifact.step_1.wait_in_days)` override IS load-bearing — without it, EB rejects creation. **F29 confirmed (override necessary).**
+
+**Campaign 23 happy path.** Submitted with `wait_in_days: 1` from the start → success on first call (sequence id 3, steps id 4 + 5).
+
+**Sequence creation results:**
+- Campaign 22 → sequence id 4, steps id 6 (step 1, wait=1) + id 7 (step 2, wait=4)
+- Campaign 23 → sequence id 3, steps id 4 (step 1, wait=1) + id 5 (step 2, wait=4)
+
+(Note: sequence ids are non-sequential because campaign 23's sequence was created first while campaign 22's first attempt was rejected. Sequence-step ids 6+7 came after step ids 4+5.)
+
+**Sx-13 (NEW finding — `variant` field is BOOLEAN not STRING).** The launch-campaign spec at line 600/608 uses `"variant": "A"` (a string A/B label). EB API spec marks `variant` as `boolean` with example `false`/`true`. Sending `"A"` (string) to EB would either silently coerce or 422 — we sent `false` (boolean) which worked. The spec's `"variant": "A"` is wrong; should be `"variant": false` for non-variant steps. The string-A label appears to be borrowed from a different platform's A/B-test concept, not EB's.
+
+**Sx-14 (NEW finding — auto-Re: prepend on `thread_reply: true`).** Step 2 was sent with subject `"Re: {Quick|Fast|30s} {question|check|idea}"` (per the launch-campaign spec rule that step_2 subjects start with "Re:"). EB stored the subject as `"Re: Re: {Quick|Fast|30s} {question|check|idea}"` — **double Re: prefix**. EB auto-prepends "Re: " when `thread_reply: true`, regardless of whether the subject already starts with "Re:". Spec fix: send the BARE subject (without "Re:") for step 2 and let EB prepend automatically.
+
+**Sequence-step `active: true` field.** Response showed `active: true` for both steps, but this field isn't in the API spec request body — read-only. Spec doesn't reference it.
+
+**Other notes.** The `variant_from_step` field is `null` in the response when `variant: false` (as expected). `attachments` is `null`. The `email_body` and `email_subject` are stored verbatim with spintax intact — render happens at send-time, not store-time.
 
 ### F29 — `max(1, artifact.step_1.wait_in_days)` silent override
 
-*(populated during execution — side-test submitting `wait_in_days: 0` directly via `call_api` to determine if the override is necessary)*
+**CONFIRMED (override necessary).** `wait_in_days: 0` for step 1 → 422 from EB. Spec's `max(1, …)` clamp is load-bearing — without it, the API rejects the create. The original X17 paper-walk hypothesis "verify whether EB accepts wait_in_days: 0 on step 1; if yes, override may be unnecessary" is answered: **no, EB does not accept it; the override is required**. Spec stays as-is on this point.
 
 ### F30 — `thread_reply: true` field name
 
-*(populated during execution — verbatim API spec field name from `search_api_spec` for sequence-steps body shape)*
+**CONFIRMED (field name correct).** EB API spec at both v1.1 (`POST /api/campaigns/v1.1/{id}/sequence-steps`) and legacy paths use the field name `thread_reply` exactly. Type: `boolean`, nullable: true. Description: "Whether the step should be a reply from the previous step." Spec is correct on this. **Spec is also correct** on the v1.1 endpoint preference — the legacy `/api/campaigns/{campaign_id}/sequence-steps` is explicitly marked "(deprecated)" in EB's spec.
 
 ---
 
@@ -329,8 +353,8 @@ The spec's Phase 8 step 2 currently says "If no matching template exists, surfac
 | F26 | Post-attach eventual-consistency delay | **confirmed (fast)** | Δ ≈ 15.5s end-to-end (incl. Claude reasoning + 6 round-trip calls); verification list reflected 15 senders fully. True consistency delay is likely sub-second. | Spec relax "wait 30 seconds" → "wait 5 seconds" for this workspace. |
 | F27 | Schedule templates on `emailbison-personal` | **confirmed (1 template, doesn't match spec default)** | id 3 only — Mon-Fri 08:00-20:00 America/Denver. Spec's "default Mon-Fri 08:00-17:00" not present. | Spec drop hardcoded default; field-based match + closest-fit heuristic. |
 | F28 | Schedule templates on `emailbison-b2b` | **confirmed (2 templates; only b2b has spec default)** | id 7 (NY 8-5 — matches spec), id 8 (Denver 8-8 — matches personal id 3). Cross-workspace inventories diverge. | Spec acknowledge per-workspace template divergence. |
-| F29 | `wait_in_days: 0` override necessity | *pending* | | |
-| F30 | `thread_reply` field name | *pending* | | |
+| F29 | `wait_in_days: 0` override necessity | **confirmed (override necessary)** | First call with `wait_in_days: 0` → 422. Retry with `wait_in_days: 1` → success. EB rejects 0-day waits on step 1. | Spec correct on this point — keep `max(1, …)` clamp. |
+| F30 | `thread_reply` field name | **confirmed (correct)** | API spec at both v1.1 and legacy paths uses `thread_reply` exactly. v1.1 endpoint is preferred (legacy marked deprecated). | Spec correct on this point. |
 | F31 | Phase 11 partial-success schema | *pending (spec-only)* | | |
 
 ---
