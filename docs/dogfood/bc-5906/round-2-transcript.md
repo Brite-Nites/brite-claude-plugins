@@ -11,7 +11,19 @@
 
 ## Outcome
 
-*(filled at end of walk)*
+**Pass — full-walk dogfood completed against the live `emailbison-personal` workspace.** All scoped phases (3–9) ran end-to-end; Phase 10 + 11 paper-checked per scope (no `--activate`, no real sends). Workspace cleanup verified.
+
+**Hypothesis tally:** 17 of 18 F-rows resolved + 1 deferred per brainstorm. 14 cross-cutting Sx findings surfaced.
+
+**Round-2 produced FAR more spec/reality signal than round-1** because round-1 paper-walked Phases 3–11 after Phase 10's F13 endpoint gap surfaced. Round-2 actually exercised the mutation paths and surfaced concrete spec drifts (Sx-6 field-name mismatches, Sx-13 variant type, Sx-14 auto-Re: prepend) that the paper-walk could not have caught.
+
+**Spec health verdict:** The launch-campaign command spec is **broadly correct in shape but wrong in 9 specifics** (5 cross-cutting EB API quirks + 4 Phase-specific spec drifts). None are unfixable; all are documented in 7 batched follow-up issues. Production-impact severity:
+- **High (data integrity)**: Sx-6 (lead-body field-name drift would create leads with NULL title/company), Sx-13 (variant: "A" string vs boolean), Sx-14 (double-Re: subjects)
+- **High (process integrity)**: Sx-2/3/4 (custom-variables spec is fictional in 3 ways); F15 collapse
+- **Medium (operability)**: Sx-1 (search format), F20 (silent dup campaigns), F21 (resume gap), F31 (schema gap), Sx-9 (vendor-gate clarity)
+- **Low**: Sx-7 (one-time personal-domain warning), Sx-10/Sx-11 (pagination + filter quirks)
+
+The MVP launch path is feasible after the 7 follow-ups land (3 High, 4 Medium). No structural rewrite of the spec needed.
 
 ## Inputs used
 
@@ -444,4 +456,24 @@ Spec implication: launch-campaign command's cleanup wording assumes synchronous 
 
 ## Follow-up Linear issues filed
 
-*(filled during T12 — issue IDs for every refuted / needs-more-work row above)*
+7 batched follow-ups covering 6 of 18 F-rows (refuted/gap variants) + 14 cross-cutting Sx findings. Filed per brainstorm decision 4 + user preference (~5–7 focused issues):
+
+| Issue | Scope | F-rows / Sx covered | Priority |
+|---|---|---|---|
+| [BC-6298](https://linear.app/brite-nites/issue/BC-6298) | EB API quirks gotchas bundle | Sx-1, Sx-5, Sx-8, Sx-10, Sx-11 | Medium |
+| [BC-6299](https://linear.app/brite-nites/issue/BC-6299) | Phase 3 VARIABLES — custom-variables reality gaps | Sx-2, Sx-3, Sx-4, F15 | High |
+| [BC-6300](https://linear.app/brite-nites/issue/BC-6300) | Phase 4 — lead-body field names wrong | Sx-6 | High |
+| [BC-6301](https://linear.app/brite-nites/issue/BC-6301) | Phase 9 SEQUENCE — variant boolean + auto-Re: prepend | Sx-13, Sx-14 | High |
+| [BC-6302](https://linear.app/brite-nites/issue/BC-6302) | Phase 5 — guard against silent duplicate campaigns | F20 | Medium |
+| [BC-6303](https://linear.app/brite-nites/issue/BC-6303) | Metadata schema — F21 + F31 + Phase 8 schedule_id rename | F21, F31, Sx-12 (partial) | Medium |
+| [BC-6304](https://linear.app/brite-nites/issue/BC-6304) | Clarify two-call vendor gate reality | Sx-9 | Medium |
+
+**Findings NOT individually filed** (covered by transcript only — small / contextual):
+- F17 refuted (spec was already correct; no change needed beyond noting in transcript)
+- F19 refuted (vendor-side gate doesn't fire via call_api; covered by Sx-9 / BC-6304)
+- F22 deferred per brainstorm (not high-value enough to test in isolation)
+- F25/F27/F28 confirmations (spec accurate; transcript captures workspace-state nuances)
+- Sx-7 (personal-domain skip warning didn't fire) — single-data-point observation
+- Sx-12 (no `name` field on schedule templates) — folded into BC-6303 metadata work
+
+**Comment posted to BC-5906** with the same 7-issue table + AC checklist + workspace impact summary.
