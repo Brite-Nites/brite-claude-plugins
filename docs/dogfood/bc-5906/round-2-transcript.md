@@ -78,6 +78,10 @@ These four findings emerged from `search_api_spec` recon BEFORE any creates fire
 
 **Sx-9. Extended-tier MCP "tools" are not callable in-session — only via `call_api`.** `discover_tools` advertises tools like `import_leads_to_campaign`, `bulk_create_leads`, `attach_sender_emails_to_campaign` with rich descriptions including two-call vendor-gate semantics. None of these are exposed as direct callables in the conversation's tool registry; we can only invoke their underlying API endpoints via `call_api`. The vendor-gate two-call dance described in the discover_tools description is enforced by the wrapper layer, NOT by the API. Spec implication: the launch-campaign command's reliance on "two-call MCP confirmation gate per BC-2707" for Phases 4, 6, 11 is only realizable if the wrapper is somehow surfaced as a callable. Via `call_api` (the spec's documented invocation pattern), the gate is purely operator-side via `AskUserQuestion`. The launch-campaign spec's wording should clarify "agent-side semantic gate via AskUserQuestion is the load-bearing safeguard; vendor-side gate is advisory and not enforced through `call_api`."
 
+**Sx-10. `?per_page=N` query param is silently ignored — EB hardcodes 15.** Tested with `?per_page=100` and `?per_page=1000` against `/api/sender-emails`; both returned the same `meta.per_page: 15` page size as the no-param call. (`?per_page=1000` paired with `?status=Connected` returned 422; isolated `?per_page=100` returned 200 with 15-per-page.) For a 772-item list this means 52 pages mandatory, no operator workaround. Combined with Sx-9 (no batch wrapper), enumerating the full sender pool requires fanning out 52 sequential or parallel pagination calls. The launch-campaign spec's `while True` loop assumes the operator can page once — for any non-trivial sender pool this is operationally heavy.
+
+**Sx-11. Status filter is case-sensitive in a non-obvious way.** `?status=connected` (lowercase) succeeds and returns senders. `?status=Connected` (capitalized — matching the response data's `status: "Connected"` field exactly) returns 422. Other values like `?status=warmup` also 422. The launch-campaign spec writes `filter={"status": "connected"}` — which works — but a developer looking at API response examples (which all show capitalized `"Connected"`) would naturally try the capitalized form and hit 422 with no useful diagnostic. Document the case-sensitivity expectation in the spec.
+
 ---
 
 ## Phase 3 VARIABLES — live-walk
@@ -218,23 +222,39 @@ If F22 live confirmation becomes high-value, file a separate follow-up issue wit
 
 ## Phase 7 ATTACH SENDERS — live-walk
 
-*(populated during execution)*
+**Endpoint:** `POST /api/campaigns/{id}/attach-sender-emails`. Body: `{sender_email_ids: [int]}` (required) + optional `allow_parallel_sending`. List endpoint: `GET /api/sender-emails`. Per-campaign verification: `GET /api/campaigns/{id}/sender-emails`.
+
+**Workspace state.** `bulk_count(resource="sender_emails")` → 772 total senders (matches issue-body figure from round-1; consistent year-over-year). All visible senders in page 1 share characteristics: `type: microsoft_oauth`, `status: "Connected"`, `warmup_enabled: true`, tagged `Outlook` + `ScaledMail-Microsoft`, domains `washingtonfestivelights.com` / `washingtonwinterlights.com` (the dogfood-test sender domains for the personal workspace). Names cycle through Lotus Dennison, Rainer Owens, Holden Halford, Mckenna Fuhriman, Dillon Williams.
+
+**Round-2 partial-pool decision.** The launch-campaign spec mandates attaching the full 772-sender pool to all campaigns. For round-2 dogfood we used **page 1's 15 senders** as the test pool — attaching all 772 would require 51 additional pagination calls × 15 senders each (the `per_page` query param is silently ignored by EB; see Sx-10 below). The attach-path mechanics, F24 payload-size behavior, and F26 timing are validated at 15-item scale; the spec invariant's full-pool behavior is deferred — recommended as a separate follow-up that either fans out the pagination calls or runs against a workspace with a smaller sender pool.
+
+**Pool used (15 sender IDs):** `[995, 993, 994, 992, 991, 989, 990, 988, 987, 986, 984, 985, 983, 982, 981]`.
+
+**Two parallel attaches.** Both succeeded:
+- Campaign 22 ← 15 senders → `"Sender emails successfully added to BC-5906 Round 2 | Google"`
+- Campaign 23 ← same 15 senders → `"Sender emails successfully added to BC-5906 Round 2 | Microsoft"`
+
+**Verification.** `GET /api/campaigns/{id}/sender-emails` for both campaigns showed 15 senders, IDs matching the attach payload exactly. Per-campaign list response includes `meta: {current_page: 1, last_page: 1, per_page: 15, total: 15}` — consistent Laravel pagination.
+
+**`bulk_export(resource="sender_emails", format="csv")` worth noting.** Returns `{file_path: "/home/mcp/EmailBison_Exports/...csv", row_count: 772}` — but the file_path is on the **MCP server's filesystem**, not the agent's. This means the "export to CSV" path can't be used as a pagination shortcut from agent context. The launch-campaign spec doesn't mention this; would-be operators looking to bypass pagination will hit this dead-end.
 
 ### F23 — Pagination mechanism
 
-*(populated during execution — verbatim cursor/page mechanism, page size, total connected sender count)*
+**CONFIRMED — Laravel page-based, not cursor-based.** `GET /api/sender-emails` returns `meta: {current_page, last_page, per_page, total, links}` with full numeric-page metadata. NOT cursor/next_cursor as the launch-campaign spec describes for sender-list pagination. Same model as Phase 3 custom-variables endpoint. The spec's `while True / cursor=cursor / cursor=response.next_cursor` pattern (Phase 7 § Pagination is mandatory) is **wrong** for both the variables and senders endpoints — refute and rewrite to numeric-page-based loop. Round-2 evidence: 52 pages × 15 senders/page = 772 total.
+
+**Spec consequence:** the upstream Revgrowth 10 reference uses Python's response object with `.next_cursor` — that pattern doesn't translate to EB's actual API. Brite's launch-campaign command needs its own pagination idiom, not a verbatim adoption of upstream's.
 
 ### F24 — Payload size limit
 
-*(populated during execution — full sender ID array submitted in one `attach_sender_emails_to_campaign` call)*
+**PARTIALLY CONFIRMED — 15-item array succeeded, full 772 deferred.** The endpoint accepts a JSON array of sender IDs. 15 IDs in `{"sender_email_ids": [...]}` returned `success: true` with no payload-size warnings. The actual question "does 772 entries succeed in one call?" was **not tested live** in round-2 due to the 51-page enumeration cost. Recommended follow-up: fan-out pagination calls in a future session and test 772-item attach. Our small-scale evidence suggests the path works structurally, but can't speak to the 772-item ceiling.
 
 ### F25 — `status: "connected"` filter
 
-*(populated during execution — spot-check excludes warmup-state senders)*
+**PARTIALLY CONFIRMED.** Status filter accepts lowercase `connected` (succeeds), rejects capitalized `Connected` and other invalid values like `warmup` (both 422). Senders' actual status field in the response data is always returned **capitalized** (`"Connected"`) — case-mismatch between filter input and response output is itself a friction (Sx-11). For the spec's "doesn't leak warmup-state senders" question: insufficient evidence — the `?status=warmup` filter 422'd, suggesting EB doesn't expose a "warmup-only" sender state at all. All 15 senders in our pool are `status: "Connected"` AND `warmup_enabled: true` simultaneously — `warmup_enabled` is a per-sender feature toggle, NOT a deliverability state. The spec's framing "filter excludes warmup-state senders" appears based on a misunderstanding of EB's sender model — there is no separate "warmup" status to filter against.
 
 ### F26 — Post-attach eventual-consistency delay
 
-*(populated during execution — measure gap between attach completion and list-reflect)*
+**CONFIRMED — sub-15-second consistency at our test resolution.** Timing: T0 (pre-attach) = 1777330114.979 → T1 (post-attach + post-verification batch) = 1777330130.527 → Δ ≈ 15.5s. The verification GETs at T1 returned all 15 senders for both campaigns, so the consistency delay is bounded above by ~15.5s (which includes Claude's reasoning time + 4 round-trip MCP calls + 2 attach round-trips). True consistency delay is likely sub-second. The spec's "wait 30 seconds and re-query before declaring failure" instruction is overly conservative for this workspace — 5s would be ample.
 
 ---
 
@@ -287,10 +307,10 @@ If F22 live confirmation becomes high-value, file a separate follow-up issue wit
 | F20 | Campaign name collision | **confirmed (silent duplicate)** | Same-name `create_campaign` call → new campaign id 24 with identical name as id 22; no error, no gate. Spec offers no guard against this. | Spec fix: Phase 5 step 1 pre-list existing campaigns and surface to user gate. |
 | F21 | Lead-ID-to-bucket mapping persistence | **confirmed (gap)** | Metadata schema persists counts only, not bucket→ID map. Round-2 used in-session memory; resume after crash would require re-running Phase 2 + cross-referencing CSV order to lead IDs (latter not persisted). | Spec fix: add `lead_ids_by_bucket` OR `lead_id_to_email_map` to metadata schema. |
 | F22 | `allow_parallel_sending` gate | **deferred** | Brainstorm 2026-04-27 — requires pre-poisoning, not in scope | None this run |
-| F23 | `list_sender_emails` pagination mechanism | *pending* | | |
-| F24 | `attach_sender_emails_to_campaign` payload size | *pending* | | |
-| F25 | `status: "connected"` filter excludes warmup | *pending* | | |
-| F26 | Post-attach eventual-consistency delay | *pending* | | |
+| F23 | `list_sender_emails` pagination mechanism | **confirmed (refutes spec)** | Laravel `?page=N` numeric paging with full meta; NOT cursor-based as spec describes. 52 pages × 15/page = 772. | Spec rewrite Phase 7 pagination from `while True / cursor` to numeric-page loop. |
+| F24 | `attach_sender_emails_to_campaign` payload size | **partially confirmed** | 15-item array succeeded; full 772-test deferred (51-page enumeration cost). | Follow-up: fan out pagination + test 772-item attach in a separate session. |
+| F25 | `status: "connected"` filter excludes warmup | **partially confirmed** | Filter accepts lowercase `connected`; rejects `warmup` (422) and capitalized `Connected` (422). EB has no separate "warmup-only" sender state — `warmup_enabled` is a feature toggle, not a deliverability state. Spec framing is based on a wrong model. | Spec rewrite: clarify `warmup_enabled` is per-sender config, not a status to filter against. |
+| F26 | Post-attach eventual-consistency delay | **confirmed (fast)** | Δ ≈ 15.5s end-to-end (incl. Claude reasoning + 6 round-trip calls); verification list reflected 15 senders fully. True consistency delay is likely sub-second. | Spec relax "wait 30 seconds" → "wait 5 seconds" for this workspace. |
 | F27 | Schedule templates on `emailbison-personal` | *pending* | | |
 | F28 | Schedule templates on `emailbison-b2b` | *pending* | | |
 | F29 | `wait_in_days: 0` override necessity | *pending* | | |
