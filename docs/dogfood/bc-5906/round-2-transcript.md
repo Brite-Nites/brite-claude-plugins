@@ -13,17 +13,18 @@
 
 **Pass — full-walk dogfood completed against the live `emailbison-personal` workspace.** All scoped phases (3–9) ran end-to-end; Phase 10 + 11 paper-checked per scope (no `--activate`, no real sends). Workspace cleanup verified.
 
-**Hypothesis tally:** 17 of 18 F-rows resolved + 1 deferred per brainstorm. 14 cross-cutting Sx findings surfaced.
+**Hypothesis tally:** 17 of 18 F-rows resolved + 1 deferred per brainstorm. **16 cross-cutting Sx findings surfaced** (Sx-1 through Sx-14 during the live walk + Sx-15 + Sx-16 from post-walk operator review).
 
 **Round-2 produced FAR more spec/reality signal than round-1** because round-1 paper-walked Phases 3–11 after Phase 10's F13 endpoint gap surfaced. Round-2 actually exercised the mutation paths and surfaced concrete spec drifts (Sx-6 field-name mismatches, Sx-13 variant type, Sx-14 auto-Re: prepend) that the paper-walk could not have caught.
 
-**Spec health verdict:** The launch-campaign command spec is **broadly correct in shape but wrong in 9 specifics** (5 cross-cutting EB API quirks + 4 Phase-specific spec drifts). None are unfixable; all are documented in 7 batched follow-up issues. Production-impact severity:
+**Spec health verdict:** The launch-campaign command spec is **broadly correct in shape but wrong in 11 specifics**. None are unfixable; all are documented in **9 batched follow-up issues**. Production-impact severity:
+- **Urgent (production blocker)**: Sx-15 (Phase 5 ships every campaign with plain_text: false, can_unsubscribe: false, reputation_building: false — recipients see literal HTML, no spam protection, CAN-SPAM exposure)
 - **High (data integrity)**: Sx-6 (lead-body field-name drift would create leads with NULL title/company), Sx-13 (variant: "A" string vs boolean), Sx-14 (double-Re: subjects)
 - **High (process integrity)**: Sx-2/3/4 (custom-variables spec is fictional in 3 ways); F15 collapse
-- **Medium (operability)**: Sx-1 (search format), F20 (silent dup campaigns), F21 (resume gap), F31 (schema gap), Sx-9 (vendor-gate clarity)
-- **Low**: Sx-7 (one-time personal-domain warning), Sx-10/Sx-11 (pagination + filter quirks)
+- **Medium (operability + extension)**: Sx-1 (search format), F20 (silent dup campaigns), F21 (resume gap), F31 (schema gap), Sx-9 (vendor-gate clarity), Sx-16 (email-type segmentation extension)
+- **Low**: Sx-7 (one-time personal-domain warning), Sx-10/Sx-11 (pagination + filter quirks), Sx-12 (template name field)
 
-The MVP launch path is feasible after the 7 follow-ups land (3 High, 4 Medium). No structural rewrite of the spec needed.
+The MVP launch path is feasible after the 9 follow-ups land — **BC-6306 (plain_text) is the SINGLE production-blocker** and should ship before the first real campaign launch. No structural rewrite of the spec needed.
 
 ## Inputs used
 
@@ -99,6 +100,10 @@ These four findings emerged from `search_api_spec` recon BEFORE any creates fire
 **Sx-13. Launch-campaign spec uses `"variant": "A"` for sequence steps; EB expects boolean.** Spec line 600/608 sends `"variant": "A"` (a string A/B label borrowed from another platform's terminology). EB API expects `boolean`. Round-2 used `false` (boolean) and the create succeeded. Sending `"A"` would either silently coerce or 422 — but the spec's value type is wrong on its face. Spec fix required.
 
 **Sx-14. EB auto-prepends "Re: " to step_2 subjects when `thread_reply: true`, even if subject already starts with "Re:".** Round-2 sent step 2 subject `"Re: {Quick|Fast|30s} {question|check|idea}"` (per spec rule); EB stored `"Re: Re: {Quick|Fast|30s} {question|check|idea}"` — double prefix. Spec fix: copy artifact's step_2.subject should NOT include "Re:" prefix; EB prepends automatically when `thread_reply: true`. The spec at launch-campaign.md line 569 contains the wrong rule: `"step_2.subject` starts with `Re:` (per EB format rule)" — should reverse to "step_2.subject does NOT start with `Re:` (EB auto-prepends when thread_reply: true)". Concrete sweep needed across the email-copywriting skill + every existing copy artifact.
+
+**Sx-15. Phase 5 silent on deliverability-critical campaign settings (post-walk operator finding).** `mcp__emailbison-personal__create_campaign` accepts only `{name, type}`. The campaign's deliverability-critical flags (`plain_text`, `reputation_building`, `can_unsubscribe`, `open_tracking`) are configured via a SEPARATE call: `PATCH /api/campaigns/{id}/update`. **All four default to `false` if not sent.** Spec implication: every campaign created by the launch-campaign command currently ships with `plain_text: false` (HTML mode — `<br><br>` in body would render as literal HTML to recipients), `reputation_building: false` (no spam protection), `can_unsubscribe: false` (CAN-SPAM exposure), `open_tracking: false` (only one that's correctly defaulted). The campaign create response message even hints at this: "Use update_campaign to configure settings like max_emails_per_day, open_tracking, etc." Spec MUST add a Phase 5 step 6 that PATCHes deliverability defaults for every created campaign. **Filed as BC-6306 (Urgent priority — production blocker).**
+
+**Sx-16. Phase 2 segmentation axis missing email-type dimension (post-walk operator finding).** Current Phase 2 segments only by ESP (Google / Microsoft / Other). Real-world lead lists contain three meaningfully-different email types — **role-based** (`info@`, `sales@`, `contact@`, etc.), **personal-domain** (`@gmail.com`, `@yahoo.com`, free providers), and **professional/business-domain** — each with different deliverability + engagement profiles. Round-2's 6-lead test set was thin on this axis (4 personal + 2 professional-self-domain, 0 role-based) so the dogfood couldn't surface this directly. But TAM-mapping output for production launches will mix all three types. Decision shape: replace ESP, augment ESP, or operator-toggle. **Filed as BC-6307 (Medium — design + spec extension).**
 
 ---
 
@@ -467,6 +472,8 @@ Spec implication: launch-campaign command's cleanup wording assumes synchronous 
 | [BC-6302](https://linear.app/brite-nites/issue/BC-6302) | Phase 5 — guard against silent duplicate campaigns | F20 | Medium |
 | [BC-6303](https://linear.app/brite-nites/issue/BC-6303) | Metadata schema — F21 + F31 + Phase 8 schedule_id rename | F21, F31, Sx-12 (partial) | Medium |
 | [BC-6304](https://linear.app/brite-nites/issue/BC-6304) | Clarify two-call vendor gate reality | Sx-9 | Medium |
+| [BC-6306](https://linear.app/brite-nites/issue/BC-6306) | Phase 5 — set plain_text + deliverability defaults on create | Sx-15 | **Urgent** |
+| [BC-6307](https://linear.app/brite-nites/issue/BC-6307) | Phase 2 — extend segmentation by email-type axis (role/personal/professional) | Sx-16 | Medium |
 
 **Findings NOT individually filed** (covered by transcript only — small / contextual):
 - F17 refuted (spec was already correct; no change needed beyond noting in transcript)
