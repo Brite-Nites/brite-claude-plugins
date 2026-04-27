@@ -1,0 +1,68 @@
+# ============================================================================
+# Cadence Plugin — Durable Gate Waivers
+# ============================================================================
+#
+# Source: https://github.com/Brite-Nites/handbook/blob/main/how-we-work/operating-standards/enforcement.md § Override flow
+# Audited monthly by the Integrator (or delegate).
+#
+# ----------------------------------------------------------------------------
+# Purpose
+# ----------------------------------------------------------------------------
+#
+# Durable overrides for any gate listed in enforcement.md § The full
+# enforcement inventory. Per-session overrides go in Linear comments
+# (e.g., `label-gate-override: <reason>`); only persistent waivers belong
+# here.
+#
+# Gates read this file at invocation. A waiver matching the current scope
+# bypasses the named check (or full gate) until `expiry`. Past-expiry
+# entries are ignored at read time and surfaced for cleanup at the next
+# monthly audit.
+#
+# ----------------------------------------------------------------------------
+# Schema (per entry)
+# ----------------------------------------------------------------------------
+#
+#   - gate: <gate-name>           # required. e.g., issue-quality-gate,
+#                                 #   milestone-quality-gate, label-catalogue-gate,
+#                                 #   appetite-conformance-gate, triage-stale-gate.
+#                                 #   Match the names in enforcement.md inventory.
+#     check: <check-id>           # optional. Omit to waive the entire gate.
+#                                 #   For issue-quality-gate, use the check #
+#                                 #   from CDR-016 / CDR-018 / CDR-019 / CDR-021
+#                                 #   (e.g., "#10" for done_with_evidence).
+#     scope:                      # required. Pick exactly one shape.
+#       issue_id: BC-XXXX         #   single-issue waiver, OR
+#       project_id: <linear-id>   #   project-wide waiver, OR
+#       label: <label-string>     #   waive for any primitive carrying label, OR
+#       filter:                   #   structured filter (key/value pairs)
+#         <key>: <value>
+#     reason: |                   # required. Why this waiver exists. Multi-line OK.
+#       <free text>
+#     opened: YYYY-MM-DD          # required. Date waiver was added.
+#     expiry: YYYY-MM-DD          # required. Date waiver auto-expires.
+#                                 #   Default cap: 1 cycle (1 week) for tactical,
+#                                 #   1 quarter for structural. Renewal requires
+#                                 #   a new entry, not an in-place edit.
+#     owner: <canonical-id>       # required. Person accountable. Use the
+#                                 #   handbook canonical-id from team/_index.md
+#                                 #   (e.g., holden-halford, jaime-lyons).
+#     ticket: BC-XXXX             # optional. Linear issue tracking the cleanup
+#                                 #   work that retires this waiver.
+#
+# ----------------------------------------------------------------------------
+# Source CDRs
+# ----------------------------------------------------------------------------
+#
+#   - CDR-014 § Override flow (canonical 3-tier escalation pattern)
+#   - CDR-016 § no-delete rule + warn-then-enforce migration
+#   - CDR-018 § Override flow (label-gate-override, label-catalogue-gate)
+#   - CDR-021 § Type-aware variation (per-Executor / per-State waiver scope)
+#
+# ----------------------------------------------------------------------------
+# Initial state
+# ----------------------------------------------------------------------------
+#
+# Empty. Add entries as durable overrides accumulate.
+
+waivers: []
