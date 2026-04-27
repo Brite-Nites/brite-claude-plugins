@@ -14,7 +14,7 @@ dir="$PWD"
 while :; do
   if [ -f "$dir/sfdx-project.json" ]; then
     printf '%s\n' \
-      "🔧 RevOps Active" \
+      "RevOps Active" \
       "" \
       "You're in an SFDX project. SF intelligence loaded." \
       "" \

@@ -54,7 +54,7 @@ Hook entry calls `bash "${CLAUDE_PLUGIN_ROOT}/hooks/sfdx-banner.sh"`.
 ### D3 — Banner text (final, with sf-* reconciliation applied)
 
 ```
-🔧 RevOps Active
+RevOps Active
 
 You're in an SFDX project. SF intelligence loaded.
 
@@ -133,4 +133,9 @@ Cross-repo verification checkboxes (paste into PR body):
 
 ## Post-review amendments
 
-(Reserved per BC-5931 task-3 precedent — populated if review surfaces fixes after first plan draft.)
+| # | Source | Change | Reason |
+|---|---|---|---|
+| A1 | simplify-pass (efficiency) | Replace `dirname` subshell with `${dir%/*}` parameter expansion | Eliminates fork-per-iteration; non-SF cwd perf 7ms → 3ms. |
+| A2 | simplify-pass (efficiency) | Consolidate 7 `printf` calls into single `printf '%s\n'` with multi-arg | Cleaner, fewer printf-builtin invocations. |
+| A3 | simplify-pass (quality) | Drop `set -eu` | No failure paths benefit (no pipelines, no optional vars). Per simplify-agent rationale. |
+| A4 | review (user feedback at gate) | Remove `🔧` emoji from banner heading | User preference: no emojis in generated content. Also resolves the workflows-banner `🔧` collision flagged by code-reviewer. |
