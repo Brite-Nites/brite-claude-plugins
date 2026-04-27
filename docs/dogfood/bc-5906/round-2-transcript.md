@@ -328,9 +328,64 @@ The spec's Phase 8 step 2 currently says "If no matching template exists, surfac
 
 ## Phase 11 ACTIVATE — spec check (no live execution)
 
+**No live execution per BC-5906 scope** (`--activate` off, no real emails sent). This section is paper-exercise only: re-read of `plugins/marketing/commands/launch-campaign.md` § Phase 11 + § Launch metadata schema, with F31's partial-success-tracking question answered structurally.
+
 ### F31 — Partial-success tracking schema
 
-*(populated during T10 — re-read of `plugins/marketing/commands/launch-campaign.md` § Phase 11 metadata-update logic; propose schema change if per-campaign granularity is missing)*
+**CONFIRMED (gap).** Spec section relevant: launch-campaign.md § Launch metadata schema (lines 109–154) + § Phase 11 step 6 + § Error recovery overview row for Phase 11.
+
+**Current schema:**
+```
+"activated": true | false,
+"activated_at": "<ISO-8601>" | null
+```
+
+These are **global** flags — one boolean for the entire run, one timestamp for when the FINAL `resume_campaign` call returned. No per-campaign granularity.
+
+**Spec's stated semantics** (line 781): "Set `activated: true`, `activated_at: <ISO-8601-of-final-resume-call>`, `last_completed_phase: 11`."
+**Spec's stated resume rule** (line 825): "The command's Phase 11 loop skips campaigns whose metadata shows they're already activated."
+
+**Conflict.** The resume rule says "skips campaigns whose metadata shows they're already activated" — implying per-campaign tracking. But the actual fields written (`activated`, `activated_at`) are global, not per-campaign. If a Phase 11 partial failure activates 1-of-2 campaigns and aborts on the second, the operator re-runs and the spec says skip the already-activated. But the metadata has no per-campaign data to drive that skip — only the global `activated: false` (because not all activated).
+
+**F31 confirmed: schema needs per-campaign granularity to make the resume rule actually implementable.**
+
+**Proposed schema fix (recommend in T12 follow-up issue):**
+```json
+{
+  ...
+  "activated": false,         // Global — true iff ALL campaigns activated
+  "activated_at": null,        // Global — final-success timestamp
+  "activated_per_campaign": {  // NEW — populated as each campaign succeeds
+    "Google": "<ISO-8601>",
+    "Microsoft": null
+  },
+  "last_completed_phase": 11
+}
+```
+
+The Phase 11 loop reads `activated_per_campaign[bucket]` to skip already-activated campaigns; the global `activated` flips to true only when every entry is non-null.
+
+**Round-2 didn't live-test Phase 11.** This is a spec-only finding; no EB state change. Sequence creates in T9 left both campaigns at `status: "draft"`, which is the expected non-activated terminal state for this dogfood.
+
+---
+
+## Live-walk completion summary (T9 → T10 boundary)
+
+**State at end of T10 (BEFORE T11 cleanup):**
+- **14 custom variables** in workspace 13 (6 pre-existing + 8 new — IDs 7-14, lowercased per Sx-3)
+- **7 leads in workspace** — id 14705 (F17 test, no last_name) + ids 14706–14711 (6 main dogfood leads)
+- **3 campaigns** all in `draft` status:
+  - id 22 `BC-5906 Round 2 | Google` — 4 leads + 15 senders + schedule id 4 + sequence id 4 (steps 6, 7)
+  - id 23 `BC-5906 Round 2 | Microsoft` — 2 leads + 15 senders + schedule id 5 + sequence id 3 (steps 4, 5)
+  - id 24 `BC-5906 Round 2 | Google` — F20 collision-test campaign, 0 leads, no senders, no schedule, no sequence
+
+**F-hypothesis status:** 17 of 18 resolved (F22 deferred per brainstorm).
+
+**Sx findings:** 14 cross-cutting spec/reality gaps surfaced (Sx-1 through Sx-14).
+
+**No real emails sent.** All campaigns terminal at `draft` — Phase 11 not exercised.
+
+**Inspectable state.** All 3 campaigns + their leads + their sender attaches + their schedules + their sequences are visible in `personal.outbase.so` workspace 13 (`BriteNites Team`). Operator can manually inspect via the EB UI before T11 cleanup if desired.
 
 ---
 
@@ -355,7 +410,7 @@ The spec's Phase 8 step 2 currently says "If no matching template exists, surfac
 | F28 | Schedule templates on `emailbison-b2b` | **confirmed (2 templates; only b2b has spec default)** | id 7 (NY 8-5 — matches spec), id 8 (Denver 8-8 — matches personal id 3). Cross-workspace inventories diverge. | Spec acknowledge per-workspace template divergence. |
 | F29 | `wait_in_days: 0` override necessity | **confirmed (override necessary)** | First call with `wait_in_days: 0` → 422. Retry with `wait_in_days: 1` → success. EB rejects 0-day waits on step 1. | Spec correct on this point — keep `max(1, …)` clamp. |
 | F30 | `thread_reply` field name | **confirmed (correct)** | API spec at both v1.1 and legacy paths uses `thread_reply` exactly. v1.1 endpoint is preferred (legacy marked deprecated). | Spec correct on this point. |
-| F31 | Phase 11 partial-success schema | *pending (spec-only)* | | |
+| F31 | Phase 11 partial-success schema | **confirmed (gap)** | Spec's `activated` + `activated_at` are global; no per-campaign granularity. Resume rule "skips campaigns whose metadata shows they're already activated" can't be implemented because the metadata lacks per-campaign data. | Spec fix: add `activated_per_campaign: {bucket: ISO-8601 \| null}`. |
 
 ---
 
