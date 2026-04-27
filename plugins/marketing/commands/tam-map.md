@@ -123,12 +123,15 @@ Run this block before Phase 0. Every input that flows into `Bash`, the skill's `
    Then verify CLI scripts on PATH (Labs only):
 
    ```bash
-   for script in icypeas_client.py blitz_waterfall.py prospeo_client.py verify_smtp.py tier_and_segment.py; do
-     test -x "plugins/marketing/scripts/tam-map/${script}" || echo "MISSING: ${script}"
+   REPO=$(git rev-parse --show-toplevel) && \
+   for script in icypeas_client.py spider_crawl.py enrich_waterfall.py verify_smtp.py tier_and_segment.py; do
+     python3 "$REPO/plugins/marketing/scripts/tam-map/${script}" --help >/dev/null 2>&1 \
+       && echo "OK: ${script}" \
+       || echo "MISSING: ${script}"
    done
    ```
 
-   Halt with a clear list if any are missing — operator runs `/marketing:setup-tam-map` Phase 4.
+   The 5 scripts here mirror `setup-tam-map.md` Phase 6c verbatim — `enrich_waterfall.py` is the BlitzAPI→Prospeo waterfall (Prospeo is invoked from inside, not a standalone client); `spider_crawl.py` is the Spider.cloud entry point. `--help` doubles as an importability check (catches missing Python deps that `test -x` would miss). Halt with a clear list if any print `MISSING:` — operator runs `/marketing:setup-tam-map` Phase 4.
 
 3. **Cost-aware `--max-records` validation.** If `--max-records` is set AND `< 100`, warn the operator that Phase 1 SCOPE source-discovery typically needs ≥100 records to produce a representative TAM (skill rule per BC-5832 §Behavioral Tests). Render the warning but do NOT halt — the cap applies to per-phase processing, not absolute scope. The operator's gate 1 acknowledges.
 
@@ -556,7 +559,7 @@ Plus a 3-line summary of total spend, total surviving rows, and tier-A count.
 
 ### Nites path
 
-The output of Phase 5 is `enriched.jsonl`. Nites does NOT have a tier-A/B/C split (Phase 6 is Labs-only). Downstream `/marketing:launch-campaign` requires CSV input — operator runs a JSONL→CSV reshape using the existing `tier_and_segment.py` reshape primitive.
+The output of Phase 5 is `enriched.jsonl`. Nites does NOT have a tier-A/B/C split (Phase 6 is Labs-only). Downstream `/marketing:launch-campaign` requires CSV input — operator runs a JSONL→CSV reshape inline. There is no dedicated reshape primitive script today (`tier_and_segment.py` is the LLM-scoring step used in Labs Phase 7 — its required args are `--in / --icp / --out-dir`, it needs `ANTHROPIC_API_KEY`, and it filters on `record.smtp.keep` which Nites's enriched.jsonl never populates because Phase 6 SMTP verify is Labs-only). The reshape printed below is a stdlib `python -c` one-liner that works against any `enriched.jsonl` shape without external dependencies.
 
 **User gate 8 (Nites).** Ask via `AskUserQuestion`:
 
@@ -568,13 +571,25 @@ The output of Phase 5 is `enriched.jsonl`. Nites does NOT have a tier-A/B/C spli
 
 **On Option 1 (Nites):** print verbatim:
 
+```bash
+# JSONL → CSV reshape (Nites — no tier split, no external deps)
+python3 -c '
+import json, csv, sys
+in_path = "{output-dir}/enriched.jsonl"
+out_path = "{output-dir}/leads.csv"
+rows = [json.loads(line) for line in open(in_path) if line.strip()]
+if not rows:
+    sys.exit("no enriched rows; aborting")
+fields = ["email", "first_name", "last_name", "company_name", "company_domain", "job_title"]
+with open(out_path, "w", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+    w.writeheader()
+    w.writerows(rows)
+print(f"wrote {len(rows)} rows to {out_path}")
+'
 ```
-# JSONL → CSV reshape (Nites — no tier split)
-python plugins/marketing/scripts/tam-map/tier_and_segment.py \
-  --in {output-dir}/enriched.jsonl \
-  --out {output-dir}/leads.csv \
-  --mode flat
 
+```
 # Then invoke launch-campaign
 /marketing:launch-campaign \
   --csv {output-dir}/leads.csv \
@@ -584,13 +599,15 @@ python plugins/marketing/scripts/tam-map/tier_and_segment.py \
   --entity brite-nites
 ```
 
+The reshape one-liner pulls the canonical `email + first_name + last_name + company_name + company_domain + job_title` columns required by `/marketing:launch-campaign` Phase 1 step 1 CSV schema validation. Adapt the `fields` list if the enrichment provider produced a different shape — the JSONL→CSV transform stays the same.
+
 **On Option 2 (Nites):** same as Labs Option 2 with vertical-slug context.
 
 **On Option 3 (Nites):** print output dir tree (no `crawled.jsonl`, no `verified.jsonl`, no `tier-*.csv`, no `catch-all.csv`, no `personal-contacts.csv` — Nites path is shorter).
 
 ### Supply path
 
-Mirrors Nites verbatim — same 3 options, same reshape one-liner, same launch-campaign invocation with `--entity brite-supply`. The `--workspace` defaults to `emailbison-b2b` (Supply does not run on `emailbison-personal`).
+Mirrors the Nites path on every option — same 3-option menu, same JSONL→CSV reshape one-liner shape, same `/marketing:launch-campaign` invocation with `--entity brite-supply`. The `--workspace` defaults to `emailbison-b2b` (Supply does not run on `emailbison-personal`).
 
 ### General
 
