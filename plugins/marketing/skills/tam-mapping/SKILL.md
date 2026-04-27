@@ -57,6 +57,8 @@ The skill builds a TAM for ONE Brite entity per invocation (Nites / Supply / Lab
 | `--enrichment-provider <id>` | (read from `${user_config.enrichment_provider}`) | Override per-run. Enum: `blitz_waterfall | brite_cli | brite_mcp | skip` per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pluggability.md). |
 | `--max-records N` | (unset → cost gate fires) | When set and `N >= record count`, gate is skipped (caller pre-approved cost). When `N < record count`, skill stops and reports overflow — does NOT silently truncate. |
 | `--resume` | (off) | Force resume from last completed phase based on output-dir file existence. Default behavior (no flag) auto-detects via Operational rule 2 file-existence check. |
+| `--stop-at-phase <N>` | (unset → run to end) | Halt cleanly after writing Phase `N`'s output but BEFORE invoking Phase `N+1`'s first tool call. Subsequent re-invocations resume from Phase `N+1` per the file-existence Resume detection ladder. Accepts integer phase numbers (`1`, `1.5`, `2`, `3`, `4`, `4.5`, `5`, `6`, `7`) plus two Labs sub-step values: `3-discover` (halts after Phase 3c parallel discovery merges to `companies.jsonl`, BEFORE Spider crawl) and `3-crawl` (halts after `crawled.jsonl` completes). On halt, emits `[tam-mapping] halted at end of Phase {N} per --stop-at-phase`. Used by `/marketing:tam-map` (BC-5950) to insert per-phase confirmation gates. |
+| `--no-cost-gate` | (off) | Suppress the Phase 5 internal `AskUserQuestion` cost-gate. Used when a caller (typically `/marketing:tam-map`, BC-5950) owns the operator-intent surface and has already confirmed the spend. The verbatim cost-estimate string `estimated enrichment cost: $X.XX` is STILL emitted (grep tests still pass); only the prompt is suppressed. Skill behavior is otherwise identical: `--max-records` overflow checks still halt, post-enrichment verification still drops invalid records. |
 
 ### Source manifest + TAMConfig location
 
@@ -97,6 +99,8 @@ Per Operational rule 2 (below), if `--output-dir` already exists with partial ou
 10. `tier-{a,b,c}.csv` + `catch-all.csv` (Labs only — Phase 7)
 
 The skill NEVER restarts from Phase 1 when resume state exists. Stop the file-existence loop at the first missing file; do not check subsequent entries.
+
+**Interaction with `--stop-at-phase <N>`.** When `--stop-at-phase` is set, the skill runs from the resume point detected above up through Phase `N` inclusive, then halts after Phase `N`'s output file lands on disk and BEFORE invoking Phase `N+1`'s first tool call. A subsequent re-invocation (with or without `--stop-at-phase`) re-runs the resume-detection ladder and continues from Phase `N+1`. The Labs sub-step values `3-discover` and `3-crawl` halt at the corresponding intermediate file (`companies.jsonl` or `crawled.jsonl` respectively) — pairing `--stop-at-phase 3-discover` then `--stop-at-phase 3-crawl` lets a caller insert a confirmation gate between the discovery merge and the crawl pass. When `--stop-at-phase` is unset, the skill runs all applicable phases for the entity to completion.
 
 ---
 
@@ -305,7 +309,7 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
    estimated enrichment cost: $X.XX for N records (BlitzAPI: $A, Prospeo: $B, MillionVerifier: $C)
    ```
    This verbatim string MUST appear in output before any enrichment call (grep test in evals).
-3. **Cost gate.** Use `AskUserQuestion` to confirm BEFORE invocation if cost > $20 (configurable threshold per `--max-records` interaction; see §Before Starting).
+3. **Cost gate.** Use `AskUserQuestion` to confirm BEFORE invocation if cost > $20 (configurable threshold per `--max-records` interaction; see §Before Starting). **Suppressed when `--no-cost-gate` is set** — the verbatim cost-estimate string in step 2 is still emitted; only the prompt is skipped. Caller is then responsible for surfacing the operator-intent gate (`/marketing:tam-map` BC-5950 owns this for its Phase 5 ENRICH gate).
 4. **API availability** — read-only ping to each provider's auth endpoint.
 
 **Adaptive email waterfall (within `blitz_waterfall`):**
@@ -620,7 +624,7 @@ docs/campaigns/labs/tam/{slug}/
 4. Given a vertical with no playbook (e.g., "build a Labs TAM for breweries"), output must accept `--criteria-file` or interactive ICP entry as fallback — NOT silently fail.
 5. Given a resume scenario ("the last run died at Phase 5"), output must detect the resume point from file-existence and NOT restart from Phase 1.
 
-### Tier 2 — Tool-assisted (7)
+### Tier 2 — Tool-assisted (9)
 
 6. If `docs/marketing-context.md` exists, output must reference Brite entity from that file in the Phase 1 manifest.
 7. If `mcp__emailbison-b2b__get_active_workspace_info` returns auth failure, skill HARD-FAILS at Phase 4.5 — does NOT proceed to Phase 5.
@@ -629,3 +633,5 @@ docs/campaigns/labs/tam/{slug}/
 10. If `${user_config.enrichment_provider}` is `skip`, Phase 5 short-circuits; downstream Phases 6+7 still run for Labs.
 11. Open-tracking-OFF reminder appears as verbatim string `OPEN-TRACKING DISABLED` in Phase 1 output (grep test in evals).
 12. Cost-estimate string `estimated enrichment cost:` appears in output before any Phase 5 enrichment call (grep test in evals).
+13. Given `--stop-at-phase 3` (Labs path), skill writes Phase 3's output (`companies.jsonl` + `crawled.jsonl`) and halts cleanly with `[tam-mapping] halted at end of Phase 3 per --stop-at-phase`. A subsequent re-invocation without the flag continues from Phase 4. Sub-step variants `3-discover` (halts after `companies.jsonl`) and `3-crawl` (halts after `crawled.jsonl`) behave equivalently for their respective intermediates.
+14. Given `--no-cost-gate`, the verbatim cost-estimate string `estimated enrichment cost:` STILL appears in output (grep test passes), but no `AskUserQuestion` call fires for cost approval. Caller (e.g., `/marketing:tam-map`) is responsible for the operator-intent gate.
