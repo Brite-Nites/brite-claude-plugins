@@ -152,11 +152,21 @@ Spec implication: Phase 3 step 3's classification of variables as "conflicting (
 
 ## Phase 5 CAMPAIGN CREATE — live-walk
 
-*(populated during execution)*
+**Tools used:** `create_campaign` (core tier — directly callable, no `call_api`+`search_api_spec` dance). Body: `{name, type}`. `type: "outbound"` is the default per spec.
+
+**Main creates.** 2 parallel calls in <1s. Both succeeded:
+- **id 22** — `BC-5906 Round 2 | Google`, status `draft`
+- **id 23** — `BC-5906 Round 2 | Microsoft`, status `draft`
+
+Response shape: `{success, message, campaign: {id, name, status, type}}`. Notable — the response message includes a hint: `"Use update_campaign to configure settings like max_emails_per_day, open_tracking, etc."` The launch-campaign spec doesn't reference `update_campaign` for Phase 5 (settings are deferred to Phase 8 Schedule + downstream phases via separate endpoints). The hint is not actionable for the round-2 walk; flag as noise that may confuse a less-experienced operator.
+
+**F20 side-test.** Same-name create with `BC-5906 Round 2 | Google` (already exists as id 22) → `success: true`, **new id 24** with the same name. EB allows duplicate names silently. No 422, no gate, no warning text in the response.
+
+**Post-Phase-5 state.** 3 new campaigns in workspace: id 22 (Google main), id 23 (Microsoft main), id 24 (F20 collision test — to clean up in T11). All in `draft` status.
 
 ### F20 — Name collision
 
-*(populated during execution — side-test creating two campaigns with identical names)*
+**CONFIRMED (silent duplicate allowed).** Two campaigns with identical name `BC-5906 Round 2 | Google` co-exist in the workspace (id 22 + id 24). No deduplication, no warning. The launch-campaign spec's Phase 5 step 5 "Execute creates" assumes successful returns implies unique campaigns — false. Operator-side risk: re-running the command on a partial-failure resume could spawn duplicate campaign sets if the metadata JSON is missing the `campaign_ids` map. **Recommended spec fix**: Phase 5 step 1 should pre-call `list_campaigns(search=base_name)` and either skip existing matches or fire an explicit gate ("3 campaigns already exist with prefix 'BC-5906 Round 2 |' — proceed and create more, abort, or reuse existing IDs?"). The user-side gate (User gate 5) should surface "0 existing matches; will create N new" or "M existing matches found — surface IDs" to make the duplication risk visible.
 
 ---
 
@@ -242,7 +252,7 @@ Spec implication: Phase 3 step 3's classification of variables as "conflicting (
 | F17 | `bulk_create_leads` `last_name` requirement | **refuted** | Single POST `/api/leads` with no `last_name` → `success: true`, lead 14705 stored `last_name: null`. API spec marks required, reality is optional (Sx-5). | Spec is correct as-is; remove F17 paper-walk note. |
 | F18 | Mid-chunk failure recovery | **confirmed (all-or-nothing)** | Bulk POST `[dup, new]` → 422, NEITHER created. No per-lead detail in 422 response. | Spec needs Phase 4 step 8 rewrite — recovery via EB UI, not API. |
 | F19 | Vendor prompt wording (Phase 4) | **refuted (no vendor gate via call_api)** | First call returned data directly; no confirmation parameter on `bulk_create_leads` MCP wrapper either (vs `import_leads_to_campaign` which has one). | Spec's "two-call vendor gate" claim for Phase 4 over-applies; remove or qualify. |
-| F20 | Campaign name collision | *pending* | | |
+| F20 | Campaign name collision | **confirmed (silent duplicate)** | Same-name `create_campaign` call → new campaign id 24 with identical name as id 22; no error, no gate. Spec offers no guard against this. | Spec fix: Phase 5 step 1 pre-list existing campaigns and surface to user gate. |
 | F21 | Lead-ID-to-bucket mapping persistence | *pending* | | |
 | F22 | `allow_parallel_sending` gate | **deferred** | Brainstorm 2026-04-27 — requires pre-poisoning, not in scope | None this run |
 | F23 | `list_sender_emails` pagination mechanism | *pending* | | |
