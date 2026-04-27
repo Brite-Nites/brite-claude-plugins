@@ -152,10 +152,10 @@ Run this block before Phase 0. Every input that flows into `Bash`, the skill's `
 
 3. **Cost-aware `--max-records` validation.** If `--max-records` is set AND `< 100`, warn the operator that Phase 1 SCOPE source-discovery typically needs ≥100 records to produce a representative TAM (skill rule per BC-5832 §Behavioral Tests). Render the warning but do NOT halt — the cap applies to per-phase processing, not absolute scope. The operator's gate 1 acknowledges.
 
-4. **Dry-run preview of Phase 1 discovery queries (only when `--preview` is set).** When the operator passes `--preview`, construct (but do NOT invoke) the Phase 1 manifest queries and render an enumerated query list. The query strings the LLM produces are rendered text shown to the operator, not Bash commands the LLM runs — variable substitution happens in the LLM's prose-rendering step, not in a shell. Use `${VERTICAL}` / `${ICP}` placeholders verbatim and substitute the resolved values when displaying. Examples (with placeholders, the LLM substitutes when rendering):
-   - Labs: `WebSearch "<vertical> venue partnership 2024"`, IcyPeas `free-count` for the top 5 keyword candidates, AI Ark + Discolike anchor-domain probes (substitute `<vertical>` with the resolved value).
-   - Nites: `WebSearch` Google-Maps-ZIP queries by metro from the ICP geo signal.
-   - Supply: `WebFetch` SAM.gov + Houzz + state-license-db URL list.
+4. **Dry-run preview of Phase 1 discovery queries (only when `--preview` is set).** When the operator passes `--preview`, construct (but do NOT invoke) the Phase 1 manifest queries and render an enumerated query list. The query strings the LLM produces are rendered text shown to the operator, not Bash commands the LLM runs — variable substitution happens in the LLM's prose-rendering step, not in a shell. Use the `${VERTICAL}` / `${ICP}` placeholder convention consistently with §Single-quoting rule (Bash-style placeholders), and substitute the resolved values when displaying. Examples (the LLM substitutes `${VERTICAL}` and `${ICP}` with their resolved values at render time):
+   - Labs: `WebSearch "${VERTICAL} venue partnership 2024"`, IcyPeas `free-count` for the top 5 keyword candidates, AI Ark + Discolike anchor-domain probes.
+   - Nites: `WebSearch` Google-Maps-ZIP queries by metro from `${ICP}`'s geo signal.
+   - Supply: `WebFetch` SAM.gov + Houzz + state-license-db URL list seeded by `${ICP}` keyword set.
 
    IV-6 governs `--vertical` validity at the input boundary; the rendered query strings inherit that safety. When `--preview` is unset, skip step 4 entirely — Phase 1 SCOPE will surface the same manifest after the gate, so the dry-run is duplicative outside preview mode.
 
@@ -507,15 +507,17 @@ Operator option-pick mapping: "Yes" → invoke skill in step 4 (per BC-2707, the
 
 **Purpose.** Final phase. Routes operator to the next command based on entity. **Does NOT auto-chain** — prints the next-command invocation string for the operator to copy/run. Auto-invocation would defeat the operator-intent contract that separates TAM construction from campaign activation (per BC-5950 brainstorm decision).
 
-**Single 3-option menu, parameterized by entity.** Phase 7 renders exactly 3 options via `AskUserQuestion`. The menu shape is identical across entities; the per-entity parameters table below substitutes `{entity}`, `{handoff-input-csv}`, `{campaign-name-suffix}`, `{phase-just-completed}`, `{handoff-leads-summary}`, `{reshape-suffix}`, `{launch-campaign-supported}`, and `{ws}`. The Labs path's input is `tier-a.csv` (no reshape needed); the Nites/Supply paths' input is `leads.csv` produced by a stdlib JSONL→CSV reshape (no external deps, no `ANTHROPIC_API_KEY`, no `smtp.keep` filter trap — `tier_and_segment.py` is the Labs Phase 7 LLM-scoring step and explicitly cannot be reused for the Nites/Supply reshape).
+**Single 3-option menu, parameterized by entity.** Phase 7 renders exactly 3 options via `AskUserQuestion`. The menu shape is identical across entities; the per-entity parameters table below substitutes `{entity}`, `{handoff-input-csv}`, `{campaign-name-suffix}`, `{phase-just-completed}`, `{handoff-leads-summary}`, `{option-1-suffix}`, `{launch-campaign-supported}`, and `{ws}`. The Labs path's input is `tier-a.csv` (no reshape needed); the Nites path's input is `leads.csv` produced by a stdlib JSONL→CSV reshape; the Supply path's Option 1 is currently deferred per handbook canon (see Supply note below) — the recovery path is Option 2 BC-2717 list-building. The reshape one-liner uses no external deps, no `ANTHROPIC_API_KEY`, no `smtp.keep` filter trap (`tier_and_segment.py` is the Labs Phase 7 LLM-scoring step and explicitly cannot be reused for the Nites reshape).
 
 ### Per-entity parameters
 
-| Entity | `{handoff-input-csv}` | `{campaign-name-suffix}` | `{phase-just-completed}` | `{handoff-leads-summary}` | `{reshape-suffix}` | `{launch-campaign-supported}` | `{ws}` default |
+| Entity | `{handoff-input-csv}` | `{campaign-name-suffix}` | `{phase-just-completed}` | `{handoff-leads-summary}` | `{option-1-suffix}` | `{launch-campaign-supported}` | `{ws}` default |
 |---|---|---|---|---|---|---|---|
-| Labs | `{output-dir}/tier-a.csv` | `{slug}-tier-a` | `6 VERIFY+TIER` | `{a-count} tier-A leads ready` | (empty) | yes | `emailbison-b2b` |
+| Labs | `{output-dir}/tier-a.csv` | `{slug}-tier-a` | `6 VERIFY+TIER` | `{a-count} tier-A leads ready` | (empty — invocation string only) | yes | `emailbison-b2b` |
 | Nites | `{output-dir}/leads.csv` | `{slug}` | `5 ENRICH` | `{N-success} enriched leads ready` | ` + JSONL→CSV reshape one-liner` | yes | `emailbison-b2b` |
-| Supply | `{output-dir}/leads.csv` | `{slug}` | `5 ENRICH` | `{N-success} enriched leads ready` | ` + JSONL→CSV reshape one-liner` | **no — see Supply note below** | `emailbison-b2b` |
+| Supply | (n/a — see Supply note) | (n/a) | `5 ENRICH` | `{N-success} enriched leads ready` | ` — currently deferred, see note below` | **no — see Supply note below** | (n/a) |
+
+Note: Supply's `{handoff-input-csv}`, `{campaign-name-suffix}`, and `{ws}` are intentionally `n/a` because Option 1 for Supply does NOT print a launch-campaign invocation (the deferral notice runs instead). Gate 8's question text uses `{option-1-suffix}` (renamed from `{reshape-suffix}` to disambiguate Labs/Nites "+reshape" vs Supply "deferred") so the operator-facing prompt accurately previews the action.
 
 **Supply note (load-bearing):** `/marketing:launch-campaign` currently rejects `--entity brite-supply` per the deferral documented at `plugins/marketing/commands/launch-campaign.md:87` ("Brite Supply is intentionally absent: Supply's marketing verticals are deferred per handbook `marketing/go-to-market/verticals/README.md` ... Do not re-add without coordinating with the handbook canon update"). For Supply, Option 1 prints a clear "deferred" notice + the operator's recovery path (Option 2 BC-2717 list-building, which DOES support Supply via dbt audience views) instead of a broken invocation. Removing this contract gap requires coordinating the handbook canon update + extending launch-campaign's enum — tracked in §Follow-ups.
 
@@ -525,8 +527,8 @@ Ask via `AskUserQuestion`. The LLM substitutes `{phase-just-completed}` and `{ha
 
 > Phase {phase-just-completed} complete. {handoff-leads-summary}. Where do you want to go next?
 >
-> - Pass `{handoff-input-csv}` to `/marketing:launch-campaign` — print the invocation string{reshape-suffix} below for copy/run
-> - Send to BC-2717 list-building — for audience-view-style enrichment via `brite-data-platform` dbt views (if one exists for this vertical)
+> - Pass to `/marketing:launch-campaign`{option-1-suffix} — see Option 1 details below
+> - Send to BC-2717 list-building — for audience-view-style enrichment via `brite-data-platform` dbt views (if one exists for this vertical; the canonical Supply path today)
 > - Stop here — print final output dir tree + summary; no downstream invocation
 
 ### On Option 1 — entity-conditional print
@@ -574,7 +576,7 @@ Print verbatim:
 > `/marketing:launch-campaign` currently does not accept `--entity brite-supply` per the handbook-canon deferral at `plugins/marketing/commands/launch-campaign.md:87`. The Supply TAM at `{output-dir}` is fully built and verified — it does NOT route to launch-campaign today. Recovery paths:
 >
 > 1. **Pick Option 2 (BC-2717 list-building)** in this gate — list-building consumes Supply enriched outputs via the audience-view contract (`--audience-view-name <vertical-slug>`).
-> 2. **Wait for handbook canon update + launch-campaign enum extension** (tracked in §Follow-ups). Once landed, re-run `/marketing:tam-map --resume` and Option 1 will be wired.
+> 2. **Wait for handbook canon update + launch-campaign enum extension** (tracked in §Follow-ups). Once landed, re-run `/marketing:tam-map` against the same `--output-dir` (the skill's file-existence resume detects the prior phases and picks up at Phase 7) and Option 1 will be wired.
 >
 > Operator should re-run gate 8 and pick Option 2.
 
@@ -636,7 +638,7 @@ The following invariants are load-bearing. Violations are hard failures; the com
 
 - **2026-04-27** — Created per <issue id="BC-5950">BC-5950</issue>. 8-phase orchestrator over the BC-5832 tam-mapping skill. Mirrors the BC-5826 11-phase `/marketing:launch-campaign` per-phase-gate pattern; entity-routes (Labs full 8 phases, Nites/Supply 6 phases skipping CRAWL + VERIFY+TIER); enforces 3 circuit breakers (discovery=0, EB-exclusion=0, enrichment <10%); renders the cost-estimate verbatim string before Phase 5; prints (does not chain) the next-command invocation string at HANDOFF. Plugin version bumped `marketing` 0.3.7 → 0.3.8 in the same commit per CLAUDE.md gotcha "bump plugin version in the SAME commit as any edit under `plugins/<plugin>/{commands,...}/**`".
 
-- **2026-04-27** — Review-fix pass per `/workflows:review` thorough mode. Two confirmed P1s applied (Phase 0 step 2 script enumeration corrected per `setup-tam-map.md` Phase 6c canon; Phase 7 Nites/Supply HANDOFF reshape replaced from broken `tier_and_segment.py --mode flat` invocation to a stdlib `python -c` JSONL→CSV one-liner). User-requested second-pass loop addressed P2/P3 concerns: gate-respect prose deduplication, Phase entity routing universal-silence rule + table symmetry + Phase 6 stop-at-7 footnote, IV-6/7/8 added (`--vertical`/`--max-records`/`--entity`), single-quoting rule for skill-invocation interpolation, Phase 0 entity auto-detect mirrors skill's `AskUserQuestion` contract instead of silent-default-Labs, Phase 4 circuit breakers consolidated to §Invariants with `dedup_stats.output_rows` as the unambiguous trigger field, Phase 5 reads provider from `tam-config.json` instead of re-walking ADR-008 chain, Phase 5 gate 6 BC-2707-compliant (turn structure not vocabulary), Phase 7 entity-conditional consolidated to a parameterized template with `find` for the truth-rendered tree.
+- **2026-04-27** — Review-fix pass per `/workflows:review` thorough mode (multiple loops). Loop 1 P1 fixes: Phase 0 step 2 script enumeration corrected per `setup-tam-map.md` Phase 6c canon; Phase 7 Nites/Supply HANDOFF reshape replaced from broken `tier_and_segment.py --mode flat` invocation to a stdlib `python -c` JSONL→CSV one-liner. Loop 1 P2/P3 sweep: gate-respect prose deduplication, Phase entity routing universal-silence rule + table symmetry + Phase 6 stop-at-7 footnote, IV-6/7/8 added (`--vertical`/`--max-records`/`--entity`), single-quoting rule for skill-invocation interpolation, Phase 0 entity auto-detect mirrors skill's `AskUserQuestion` contract instead of silent-default-Labs, Phase 4 circuit breakers consolidated to §Invariants with `dedup_stats.output_rows` as the unambiguous trigger field, Phase 5 reads provider from `tam-config.json` instead of re-walking ADR-008 chain, Phase 5 gate 6 BC-2707-compliant (turn structure not vocabulary), Phase 7 entity-conditional consolidated to a parameterized template. Loop 2 regression sweep (per BC-2717 fix-pass-regression-check precedent): aligned silent-default-Labs surfaces (frontmatter description + Inputs + arg table) with new Phase 0 contract; Phase 7 Supply launch-campaign rejection (handbook deferral) now prints a deferred notice + recovery path; `find -printf` (GNU) → portable `ls -la`; gate 6 prose self-contradiction fix; Phase 5 `{source}` template var substituted; entity-source `"flag"` value declared; Invariant 7 entity-disambiguation prompt clarification; gate 5 nesting → heading; gate 8 ternary → `{phase-just-completed}` table column; IV-1 char-class shield extended to `--output-dir`. Loop 3 regression sweep: Supply `{reshape-suffix}` UX defect at gate 8 (option-text mis-advertised reshape) renamed to `{option-1-suffix}` and disambiguated; Supply `--resume` flag reference (non-existent) replaced with file-existence resume guidance; this entry updated to reflect `ls -la` not `find`; Phase 0 step 4 placeholder convention standardized to `${VAR}` style for consistency with §Single-quoting rule.
 
 ---
 
