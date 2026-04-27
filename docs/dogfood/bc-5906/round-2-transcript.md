@@ -260,15 +260,31 @@ If F22 live confirmation becomes high-value, file a separate follow-up issue wit
 
 ## Phase 8 SCHEDULE — live-walk
 
-*(populated during execution)*
+**Endpoint:** List templates `GET /api/campaigns/schedule/templates`. Apply template `POST /api/campaigns/{id}/create-schedule-from-template` body `{schedule_id: int}`.
+
+**Personal templates (workspace 13):** 1 template, id 3 — Mon-Fri 08:00-20:00 America/Denver.
+**B2B templates (workspace 55):** 2 templates — id 7 (Mon-Fri 08:00-17:00 America/New_York), id 8 (Mon-Fri 08:00-20:00 America/Denver).
+
+Applied template id 3 to both campaigns:
+- Campaign 22 → schedule id 4 (Mon-Fri 08:00-20:00 Denver)
+- Campaign 23 → schedule id 5 (Mon-Fri 08:00-20:00 Denver)
+
+**Important — template-application is clone, not reference.** The POST returns a NEW schedule entity (id 4 for campaign 22, id 5 for campaign 23), each independently editable thereafter. Template id 3 is the source; per-campaign schedule id is the artifact. The launch-campaign metadata schema's single `schedule_id: N` field is wrong — there are N campaign-specific schedule IDs (cloned from a single template id). Spec fix: rename to `schedule_template_id` + add `campaign_schedule_ids: {bucket: id}`.
 
 ### F27 — Schedule template availability (`emailbison-personal`)
 
-*(populated during execution — `get_schedule_templates` count + names + default-match status)*
+**CONFIRMED — 1 template available.** Workspace 13 has exactly one schedule template (id 3, Mon-Fri 08:00-20:00 America/Denver). The launch-campaign spec's "Brite default Mon-Fri 08:00-17:00 local" assumption does NOT match what's available on personal — neither the end time (08:00-20:00 vs 08:00-17:00) nor the timezone (Denver vs unspecified-local). Operator running `--workspace emailbison-personal` against the spec would either:
+- Accept whatever's available (Denver 8-8) and document the deviation in pre-flight gate (current behavior — what we did)
+- Halt and ask the operator to create a matching template via the EB UI
+- Halt and ask the operator to switch workspace
+
+The spec's Phase 8 step 2 currently says "If no matching template exists, surface the full list and ask the operator to pick one — do NOT create a new template inline." That instruction is correct in spirit, but the spec then assumes a Mon-Fri 08:00-17:00 default exists; for the personal workspace it doesn't. Spec should drop the hardcoded default and surface what's available with a recommend-best-fit heuristic (e.g., closest start_time + end_time match in the operator's likely timezone).
 
 ### F28 — Schedule template availability (`emailbison-b2b`)
 
-*(populated during execution — read-only side-call; comparison across workspaces)*
+**CONFIRMED — 2 templates available.** Workspace 55 has id 7 (Mon-Fri 08:00-17:00 America/New_York — exactly matches spec default) and id 8 (Mon-Fri 08:00-20:00 America/Denver — matches personal's id 3). Cross-workspace comparison: **template inventories diverge between workspaces**. Operator can't assume a template exists across workspaces just because they tested in one. The spec needs to ground-truth template availability per-workspace at Phase 8 step 2 (which it does), but should also surface this divergence as expected behavior, not a workspace-config oversight.
+
+**Sx-12 candidate** — schedule templates have NO `name` or `description` field. Identification is purely by field values (start_time, end_time, days array, timezone). The spec's "Identify the template matching the Brite default" instruction is implicit-field-match — operator must compare structurally, not by string. Spec should be explicit about field-based matching to avoid agent attempts at name-based search.
 
 ---
 
@@ -311,8 +327,8 @@ If F22 live confirmation becomes high-value, file a separate follow-up issue wit
 | F24 | `attach_sender_emails_to_campaign` payload size | **partially confirmed** | 15-item array succeeded; full 772-test deferred (51-page enumeration cost). | Follow-up: fan out pagination + test 772-item attach in a separate session. |
 | F25 | `status: "connected"` filter excludes warmup | **partially confirmed** | Filter accepts lowercase `connected`; rejects `warmup` (422) and capitalized `Connected` (422). EB has no separate "warmup-only" sender state — `warmup_enabled` is a feature toggle, not a deliverability state. Spec framing is based on a wrong model. | Spec rewrite: clarify `warmup_enabled` is per-sender config, not a status to filter against. |
 | F26 | Post-attach eventual-consistency delay | **confirmed (fast)** | Δ ≈ 15.5s end-to-end (incl. Claude reasoning + 6 round-trip calls); verification list reflected 15 senders fully. True consistency delay is likely sub-second. | Spec relax "wait 30 seconds" → "wait 5 seconds" for this workspace. |
-| F27 | Schedule templates on `emailbison-personal` | *pending* | | |
-| F28 | Schedule templates on `emailbison-b2b` | *pending* | | |
+| F27 | Schedule templates on `emailbison-personal` | **confirmed (1 template, doesn't match spec default)** | id 3 only — Mon-Fri 08:00-20:00 America/Denver. Spec's "default Mon-Fri 08:00-17:00" not present. | Spec drop hardcoded default; field-based match + closest-fit heuristic. |
+| F28 | Schedule templates on `emailbison-b2b` | **confirmed (2 templates; only b2b has spec default)** | id 7 (NY 8-5 — matches spec), id 8 (Denver 8-8 — matches personal id 3). Cross-workspace inventories diverge. | Spec acknowledge per-workspace template divergence. |
 | F29 | `wait_in_days: 0` override necessity | *pending* | | |
 | F30 | `thread_reply` field name | *pending* | | |
 | F31 | Phase 11 partial-success schema | *pending (spec-only)* | | |
