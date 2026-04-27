@@ -134,7 +134,7 @@ Organized by phase + reason. Every row cites an ADR or a source file.
 | Read dbt audience CSV (Source 2) | `Read` | local filesystem | user-provided path |
 | Read dbt model definition for audit (Source 2) | `Bash` → `gh api repos/Brite-Nites/brite-data-platform/contents/models/marts/<view>.sql` | brite-data-platform (cross-repo) | ADR 2d (no local clones); `reference_handbook_access.md` pattern |
 | Validate manual CSV columns (Source 3) | `Read` | local filesystem | user-provided path |
-| EB-exclusion availability check (Sources 2/3) | `mcp__emailbison-b2b__get_active_workspace_info` + `mcp__emailbison-personal__get_active_workspace_info` + `mcp__plugin_marketing_salesforce__run_soql_query` (`SELECT Id FROM User LIMIT 1`) | EB workspaces 52/11 + brite-salesforce prod | ADR 2a (Salesforce CRM SoR; EB sole sequencer); 3-probe parallel batch mirrors tam-mapping § 3 Phase 4.5 |
+| EB-exclusion availability check (Sources 2/3) | `mcp__emailbison-b2b__get_active_workspace_info` + `mcp__emailbison-personal__get_active_workspace_info` + `mcp__plugin_marketing_salesforce__run_soql_query` (`SELECT Id FROM User LIMIT 1`) | EB workspaces 55/13 + brite-salesforce prod | ADR 2a (Salesforce CRM SoR; EB sole sequencer); 3-probe parallel batch mirrors tam-mapping § 3 Phase 4.5 |
 | EB-exclusion bulk pagination (Sources 2/3) | `mcp__emailbison-b2b__list_leads` + `mcp__emailbison-personal__list_leads` | both EB workspaces | ADR 2a (two-workspace requirement) |
 | SF Lead suppression read (Sources 2/3) | `mcp__plugin_marketing_salesforce__run_soql_query` with `SELECT Id, Email, Status FROM Lead WHERE Email IN (:emails) LIMIT 2000` | brite-salesforce prod | `salesforce.md` § Common workflows → Lead suppression read |
 | Contact-discovery enrichment (provider-routed) | `Bash` → `enrich_waterfall.py` (default) OR `mcp__plugin_marketing_enrichment__*` (when GA via BC-5538 + BC-6170) | BlitzAPI + Prospeo (default) OR brite-enrichment (future) | [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pluggability.md) enrichment pluggability |
@@ -149,7 +149,7 @@ Organized by phase + reason. Every row cites an ADR or a source file.
 - **SF MCP `directory` parameter trap.** Skill MUST pass `directory` pointing at a local `brite-salesforce/` checkout OR the skill MUST assert `pwd` contains an `sfdx-project.json` before calling. Calls from `britenites-claude-plugins/` cwd reject with path-not-found. (`salesforce.md` § Known gotchas → directory parameter trap.)
 - **`run_soql_query` `usernameOrAlias` must be the literal username**, not the alias or the `DEFAULT_TARGET_ORG` sentinel. Pass the service user's literal username (Bitwarden Notes field). (`salesforce.md` § Known gotchas; `gotcha_sf_mcp_username_not_alias.md`.)
 - **Contact-discovery Step 1 is conditional.** Skip when input row already has `linkedin_url`. Most input sources (tam-mapping output, many dbt audience CSVs) include it; unconditional Step-1 calls waste credits.
-- **SMTP-verify pattern matches tam-mapping Phase 6 verbatim.** Use the same `verify_smtp.py` script (single source of truth). Filter result codes 1 + 2 (`catch_all` flagged); drop 3–6.
+- **SMTP-verify pattern matches tam-mapping Phase 6 verbatim.** Use the same `verify_smtp.py` script (single source of truth). Filter result codes 1 + 2 (`catch_all` flagged); drop 3+ (forward-compatible against future MillionVerifier code additions).
 - **No free-email providers in B2B output.** Filter `gmail.com`/`yahoo.com`/`hotmail.com`/`outlook.com`/`icloud.com` rows to `personal-contacts.csv` before final `enriched_leads.csv` write. (Same rule as tam-mapping Operational rule 1.)
 
 ### Cross-skill boundaries
@@ -235,7 +235,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 ### Workflow 4 — SMTP verify
 
 1. `Bash` → `python plugins/marketing/scripts/tam-map/verify_smtp.py --in enriched.jsonl --out verified.jsonl` (same script tam-mapping Phase 6 uses — single source of truth).
-2. Keep result codes 1 + 2 (with `catch_all` flag preserved); drop 3–6 (`unknown`, `error`, `disposable`, `invalid`).
+2. Keep result codes 1 + 2 (with `catch_all` flag preserved); drop 3+ (`unknown`, `error`, `disposable`, `invalid`, and any future codes — forward-compatible).
 
 ### Workflow 5 — Free-email filter + final emission
 
