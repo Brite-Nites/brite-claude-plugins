@@ -18,7 +18,7 @@ Decisions backing this integration: [`docs/research/salesforce-mcp-findings.md`]
 - `account-research` (BC-5827) — existing-SF-account enrichment conditional via `run_soql_query` on Account, Activity history, Opportunity history, `Account_Notes__c`, `Lifecycle_Stage_History__c` to augment public-source fact sheets with internal signals.
 - `icp-scoring` (BC-5831) — pre-outreach prospect prioritization: optional `run_soql_query` on Account to flag existing-customer signal (caps `score_0_100` at 40 for already-in-motion accounts; routes to `catch-all.csv` in `abc` mode).
 - `tam-mapping` (BC-5832) — Phase 4.5 cross-source exclusion: `run_soql_query` union against `Contact` + `Lead` filtered on `Domain__c` to filter already-contacted domains out of a freshly-built TAM before Phase 5 enrichment. HARD-FAILS if SF unreachable (paired with both EB workspace checks).
-- `list-building` (BC-2717)
+- `list-building` (BC-2717) — Sources 2 + 3 EB-exclusion path: Lead suppression read via `run_soql_query` with `SELECT Id, Email, Status FROM Lead WHERE Email IN (:emails) LIMIT 2000` (per § Common workflows → Lead suppression read). Source 1 (tam-mapping output) skips this — tam-mapping Phase 4.5 already ran the SF exclusion.
 - `reply-processing` (BC-2720)
 - `lead-routing` (BC-2725)
 - `data-enrichment` (BC-2727)
