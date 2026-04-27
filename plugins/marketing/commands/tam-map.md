@@ -1,5 +1,5 @@
 ---
-description: Orchestrate the tam-mapping skill (BC-5832) through 8 phases with explicit two-call confirmation gates between each. Reads ICP arg, resolves entity (default labs), invokes the skill scoped to one phase per gate, surfaces cost estimates before Phase 5 enrichment, and routes to /marketing:launch-campaign or BC-2717 list-building at HANDOFF. Mirrors BC-5826 /marketing:launch-campaign pattern.
+description: Orchestrate the tam-mapping skill (BC-5832) through 8 phases with explicit two-call confirmation gates between each. Reads ICP arg, resolves entity per the same contract as the skill (AskUserQuestion when marketing-context.md is missing or has multiple entities; no silent default), invokes the skill scoped to one phase per gate, surfaces cost estimates before Phase 5 enrichment, and routes to /marketing:launch-campaign or BC-2717 list-building at HANDOFF. Mirrors BC-5826 /marketing:launch-campaign pattern.
 argument-hint: <icp-string> [--entity <brite-nites|brite-supply|brite-labs>] [--vertical <slug>] [--criteria-file <path>] [--output-dir <path>] [--enrichment-provider <id>] [--max-records N] [--preview]
 allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__plugin_marketing_spider__*, mcp__plugin_marketing_aiark__*, mcp__plugin_marketing_discolike__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, WebSearch, WebFetch, Read, Write, Glob, Grep, Bash, AskUserQuestion
 ---
@@ -11,7 +11,7 @@ Execute the 8 phases below sequentially. Use `AskUserQuestion` at every numbered
 **Inputs:**
 
 - **ICP string** — positional argument. Free-form short phrase (e.g., `"Denver downtown lighting installers 50-200 emp"`). Phase 0 sanitizes; Phase 1 SCOPE feeds it to the skill's manifest pass.
-- **Entity** — `--entity <id>`. One of `brite-nites`, `brite-supply`, `brite-labs`. Defaults to auto-detect via `docs/marketing-context.md`; falls through to `brite-labs` when no signal. Routing differs by entity (see §Phase entity routing below).
+- **Entity** — `--entity <id>`. One of `brite-nites`, `brite-supply`, `brite-labs`. Auto-detects via `docs/marketing-context.md` when unset; renders an `AskUserQuestion` when the file is missing or has multiple populated entities (mirrors the tam-mapping skill's SKILL.md:36-40 entity-detection contract). **No silent default.** Routing differs by entity — see §Phase entity routing.
 - **Vertical** — `--vertical <slug>` (optional). Constrains source taxonomy to a specific vertical from `Brite-Nites/handbook@main:marketing/go-to-market/verticals/README.md` (23-vertical taxonomy; 6 Active including Municipalities, HOAs, Landscape Lighting, Landscape Architects, Builders, Universities).
 - **Criteria file** — `--criteria-file <path>` (optional). Path to a prior TAMConfig JSON or ICP-criteria YAML. Phase 1 SCOPE reads and feeds verbatim to the skill so the operator does not re-author keyword/geo lists.
 - **Output dir** — `--output-dir <path>` (optional). Defaults per skill convention (`docs/campaigns/<entity>/tam/<slug>/`). The skill's file-existence resume mechanism reads from this dir; the command does NOT write a separate progress file.
@@ -68,7 +68,7 @@ The tam-mapping skill is entity-routed (Nites Phase 3a Google Maps, Supply Phase
 | Arg / flag | Required | Default | What it does |
 |---|---|---|---|
 | `<icp-string>` | yes | — | Positional. Free-form short phrase describing the TAM target. Phase 0 IV-4 sanitizes; Phase 1 feeds verbatim to the skill manifest. |
-| `--entity <id>` | no | auto-detect | `brite-nites`, `brite-supply`, or `brite-labs`. Auto-detect reads `docs/marketing-context.md` § entity; falls through to `brite-labs` when absent. Brite Supply maps to the Supply skill route (Phase 3b SAM.gov + Houzz; Phase 3 CRAWL + Phase 6 VERIFY+TIER deliberately skipped today — see §Phase entity routing). |
+| `--entity <id>` | no | auto-detect | `brite-nites`, `brite-supply`, or `brite-labs`. Auto-detect reads `docs/marketing-context.md` § entity; renders an `AskUserQuestion` when the file is missing or has multiple populated entities (mirrors skill SKILL.md:36-40 — **no silent default**). Brite Supply maps to the Supply skill route (Phase 3b SAM.gov + Houzz; Phase 3 CRAWL + Phase 6 VERIFY+TIER deliberately skipped today — see §Phase entity routing). HANDOFF Option 1 for Supply notes that `/marketing:launch-campaign` currently rejects `--entity brite-supply` per handbook canon — see §Phase 7. |
 | `--vertical <slug>` | no | — | Constrains source taxonomy to a vertical slug. Pass-through to skill Phase 1. |
 | `--criteria-file <path>` | no | — | Path to prior TAMConfig JSON / ICP-criteria YAML. Pass-through to skill Phase 1. (Rationale for the absence of a `--reference-tam` flag is in §Non-goals.) |
 | `--output-dir <path>` | no | `docs/campaigns/<entity>/tam/<slug>/` | Skill output directory. Skill's file-existence resume reads from this; command piggybacks (no separate progress file). |
@@ -91,7 +91,7 @@ The tam-mapping skill is entity-routed (Nites Phase 3a Google Maps, Supply Phase
 
 Run this block before Phase 0. Every input that flows into `Bash`, the skill's `--criteria-file` reader, or any MCP call must pass the checks below. Halt with a clear error on any failure. No operator gate — these are mechanical safety invariants that fail closed.
 
-**IV-1. `--criteria-file` path — reject unsafe characters.** Before any `Bash` invocation that reads or hashes the criteria file, validate the path is composed of `[A-Za-z0-9._/-]` only. Reject anything containing shell-metacharacters, quotes, whitespace, or backslashes. Path-traversal containment (`../../etc/passwd` style) is owned by IV-2's `realpath` + `git rev-parse --show-toplevel` containment check, not IV-1; the IV-1 character class deliberately permits `.` and `/` because legitimate repo paths require them. Subsequent Bash calls single-quote the path; this is defense-in-depth against interpolation escape. No auto-sanitization — if the path fails the check, the operator resubmits.
+**IV-1. `--criteria-file` AND `--output-dir` paths — reject unsafe characters.** Before any `Bash` invocation that reads, hashes, or templates either path (including the Phase 7 Option 1 `python3 -c` reshape one-liner and the Phase 7 Option 3 `ls -la` tree render), validate the path is composed of `[A-Za-z0-9._/-]` only. Reject anything containing shell-metacharacters, quotes, whitespace, or backslashes. Path-traversal containment (`../../etc/passwd` style) is owned by IV-2's `realpath` + `git rev-parse --show-toplevel` containment check, not IV-1; the IV-1 character class deliberately permits `.` and `/` because legitimate repo paths require them. Subsequent Bash calls single-quote the path per Invariant 9; this is defense-in-depth against interpolation escape. The character-class shield extends to **both path-bearing flags** because both are interpolated into rendered code blocks (Bash for `find`/`ls`, Python string literals for the reshape one-liner) — narrowing IV-1 to only `--criteria-file` would leave `--output-dir` exposed to metacharacter injection in those template-substitution surfaces. No auto-sanitization — if the path fails the check, the operator resubmits.
 
 **IV-2. `--criteria-file` and `--output-dir` paths — normalize and confine to repo root.** Resolve each path via `realpath` (or `readlink -f`). The resolved path MUST begin with the output of `git rev-parse --show-toplevel`. This rejects any path that resolves outside the current repository via relative segments. Halt on any resolution mismatch.
 
@@ -119,7 +119,7 @@ Run this block before Phase 0. Every input that flows into `Bash`, the skill's `
 
 **Steps:**
 
-1. **Resolve entity (mirror skill's contract).** If `--entity` is set (and passed IV-8 enum validation), use it. Else read `docs/marketing-context.md` and extract the entity declaration (typically under `## Entity` or `entity:` frontmatter):
+1. **Resolve entity (mirror skill's contract).** If `--entity` is set (and passed IV-8 enum validation), use it (record `entity-source: "flag"`). Else read `docs/marketing-context.md` and extract the entity declaration (typically under `## Entity` or `entity:` frontmatter):
    - **Single populated entity** → use it (record `entity-source: "marketing-context"`).
    - **Multiple populated entities** → render an entity-pick gate via `AskUserQuestion`; operator picks from the populated entities (record `entity-source: "marketing-context-prompted"`).
    - **`marketing-context.md` missing** → render a 3-option `AskUserQuestion` mirroring SKILL.md §Before Starting → Entity detection: (a) "Exit and run `/marketing:product-marketing-context`, then re-invoke `/marketing:tam-map`" (Recommended — no in-session pause/resume), (b) "Pick an entity for this run only via `--entity <X>` and `--criteria-file <path>` (does not save context)", (c) "Cancel". On (a)/(c), exit Phase 0 cleanly. On (b), prompt for the inline entity + criteria-file; record `entity-source: "operator-prompted"`. **Do NOT silently default to `brite-labs`.** This contract intentionally mirrors the skill's SKILL.md:36-40 routing — they must agree end-to-end (the BC-5950 review surfaced an earlier divergence; this is the canonical fix).
@@ -152,7 +152,12 @@ Run this block before Phase 0. Every input that flows into `Bash`, the skill's `
 
 3. **Cost-aware `--max-records` validation.** If `--max-records` is set AND `< 100`, warn the operator that Phase 1 SCOPE source-discovery typically needs ≥100 records to produce a representative TAM (skill rule per BC-5832 §Behavioral Tests). Render the warning but do NOT halt — the cap applies to per-phase processing, not absolute scope. The operator's gate 1 acknowledges.
 
-4. **Dry-run preview of Phase 1 discovery queries (only when `--preview` is set).** When the operator passes `--preview`, construct (but do NOT invoke) the Phase 1 manifest queries and render an enumerated query list. Labs: `WebSearch '${VERTICAL} venue partnership 2024'`, IcyPeas `free-count` for the top 5 keyword candidates, AI Ark + Discolike anchor-domain probes. Nites: `WebSearch` Google-Maps-ZIP queries by metro from the ICP geo signal. Supply: `WebFetch` SAM.gov + Houzz + state-license-db URL list. The vertical interpolation single-quotes per IV-6 + the §Single-quoting rule. When `--preview` is unset, skip step 4 entirely — Phase 1 SCOPE will surface the same manifest after the gate, so the dry-run is duplicative outside preview mode.
+4. **Dry-run preview of Phase 1 discovery queries (only when `--preview` is set).** When the operator passes `--preview`, construct (but do NOT invoke) the Phase 1 manifest queries and render an enumerated query list. The query strings the LLM produces are rendered text shown to the operator, not Bash commands the LLM runs — variable substitution happens in the LLM's prose-rendering step, not in a shell. Use `${VERTICAL}` / `${ICP}` placeholders verbatim and substitute the resolved values when displaying. Examples (with placeholders, the LLM substitutes when rendering):
+   - Labs: `WebSearch "<vertical> venue partnership 2024"`, IcyPeas `free-count` for the top 5 keyword candidates, AI Ark + Discolike anchor-domain probes (substitute `<vertical>` with the resolved value).
+   - Nites: `WebSearch` Google-Maps-ZIP queries by metro from the ICP geo signal.
+   - Supply: `WebFetch` SAM.gov + Houzz + state-license-db URL list.
+
+   IV-6 governs `--vertical` validity at the input boundary; the rendered query strings inherit that safety. When `--preview` is unset, skip step 4 entirely — Phase 1 SCOPE will surface the same manifest after the gate, so the dry-run is duplicative outside preview mode.
 
 5. **Workspace cross-mapping flag.** Labs entity normally routes Phase 4.5 EXCLUDE through `emailbison-b2b` AND `emailbison-personal` (skill enforces both — HARD-FAIL on either unreachable). Nites is `emailbison-b2b` only. Supply is `emailbison-b2b` only. The command itself does not pass a `--workspace` flag (the skill auto-routes), but if the operator's terminal `EMAILBISON_*` env mirrors a different default, surface the difference here for acknowledgment. This is the BC-5826 F2 cross-mapping pattern adapted.
 
@@ -360,7 +365,7 @@ Where `{next-phase-name}` = `Phase 3 CRAWL` (Labs) / `Phase 4 EXCLUDE` (Nites/Su
 
 5. **Circuit breakers A + B (per Invariant 4 — see §Invariants for the canonical definitions).** Branch on the step 3 captures. Both breakers HALT before user gate 5; the breaker overrides the gate. Render the exact diagnostic messages defined in §Invariants. Do NOT advance to user gate 5 if either fires.
 
-6. **User gate 5 (HARD STOP framing).** Ask via `AskUserQuestion`:
+**User gate 5 (HARD STOP framing).** Ask via `AskUserQuestion`:
 
 > Approve excluded set above? **This is the final stop before enrichment spend** — proceeding will invoke Phase 5 ENRICH, which costs real money at $0.05/record. {N-net-new} companies will be enriched at ~${enrichment-cost-estimate}. Cost-savings already realized by exclusion: ${cost-savings}.
 >
@@ -405,7 +410,7 @@ Where `{next-phase-name}` = `Phase 3 CRAWL` (Labs) / `Phase 4 EXCLUDE` (Nites/Su
    > Phase 5 ENRICH spend summary:
    >
    > - Records to enrich: {N-net-new}
-   > - Resolved provider: `{RESOLVED}` (source: `{source}`)
+   > - Resolved provider: `{RESOLVED}` (source: `tam-config.json` from Phase 1)
    > - Estimated cost: ${X.XX}
    > - Per-provider breakdown: BlitzAPI ${A}, Prospeo ${B}, MillionVerifier ${C}
    > - This is the **command-layer cost gate**. The skill is invoked with `--no-cost-gate` so its internal prompt is suppressed. The verbatim cost-estimate string (above) is still emitted by the skill on invocation per `--no-cost-gate` semantics.
@@ -417,7 +422,7 @@ Where `{next-phase-name}` = `Phase 3 CRAWL` (Labs) / `Phase 4 EXCLUDE` (Nites/Su
 > - Yes, proceed with enrichment spend (Recommended)
 > - Abort — no enrichment fires; metadata reflects Phase 4 as last completed
 
-Per BC-2707 turn-structure semantics: accept any clear affirmative scoped to this spend (`yes`, `approved`, `go ahead`, `proceed`, `do it`) when the operator picks the "Yes" option. The contract is the user turn structure (a real operator response between this gate and the skill invocation in step 4 below), not the affirmative vocabulary. Re-prompt only on the "Abort" option (which halts cleanly with no spend) or on ambiguous out-of-band responses (`maybe`, silence, off-topic counter-question).
+Operator option-pick mapping: "Yes" → invoke skill in step 4 (per BC-2707, the gate's contract is the user turn structure between this `AskUserQuestion` and the skill invocation, not affirmative vocabulary). "Abort" → halt cleanly with no spend; do NOT re-prompt. Out-of-band responses (an unrelated counter-question, silence, off-topic content that does not pick either option) → re-prompt with the same gate.
 
 4. **Construct skill invocation.** Same flag set as prior phases, with `--stop-at-phase 5 --no-cost-gate`. The `--no-cost-gate` flag suppresses the skill's internal `AskUserQuestion` cost-gate (the verbatim cost-estimate string is still emitted by the skill — grep tests still pass per BC-5832 SKILL.md §Phase 5 step 3 + scenario 14).
 
@@ -502,52 +507,56 @@ Per BC-2707 turn-structure semantics: accept any clear affirmative scoped to thi
 
 **Purpose.** Final phase. Routes operator to the next command based on entity. **Does NOT auto-chain** — prints the next-command invocation string for the operator to copy/run. Auto-invocation would defeat the operator-intent contract that separates TAM construction from campaign activation (per BC-5950 brainstorm decision).
 
-**Single 3-option menu, parameterized by entity.** Phase 7 renders exactly 3 options via `AskUserQuestion`. The menu shape is identical across entities; only `{entity}`, `{handoff-input-csv}`, `{campaign-name-suffix}`, and the optional reshape one-liner vary. The Labs path's input is `tier-a.csv` (no reshape needed); the Nites/Supply paths' input is `leads.csv` produced by a stdlib JSONL→CSV reshape (no external deps, no `ANTHROPIC_API_KEY`, no `smtp.keep` filter trap — `tier_and_segment.py` is the Labs Phase 7 LLM-scoring step and explicitly cannot be reused for the Nites/Supply reshape).
+**Single 3-option menu, parameterized by entity.** Phase 7 renders exactly 3 options via `AskUserQuestion`. The menu shape is identical across entities; the per-entity parameters table below substitutes `{entity}`, `{handoff-input-csv}`, `{campaign-name-suffix}`, `{phase-just-completed}`, `{handoff-leads-summary}`, `{reshape-suffix}`, `{launch-campaign-supported}`, and `{ws}`. The Labs path's input is `tier-a.csv` (no reshape needed); the Nites/Supply paths' input is `leads.csv` produced by a stdlib JSONL→CSV reshape (no external deps, no `ANTHROPIC_API_KEY`, no `smtp.keep` filter trap — `tier_and_segment.py` is the Labs Phase 7 LLM-scoring step and explicitly cannot be reused for the Nites/Supply reshape).
 
 ### Per-entity parameters
 
-| Entity | `{handoff-input-csv}` | `{campaign-name-suffix}` | Reshape needed? | `{ws}` default |
-|---|---|---|---|---|
-| Labs | `{output-dir}/tier-a.csv` | `{slug}-tier-a` | no — Phase 6 wrote tier-a.csv | `emailbison-b2b` |
-| Nites | `{output-dir}/leads.csv` | `{slug}` | yes — Phase 5 produced `enriched.jsonl` | `emailbison-b2b` |
-| Supply | `{output-dir}/leads.csv` | `{slug}` | yes — Phase 5 produced `enriched.jsonl` | `emailbison-b2b` |
+| Entity | `{handoff-input-csv}` | `{campaign-name-suffix}` | `{phase-just-completed}` | `{handoff-leads-summary}` | `{reshape-suffix}` | `{launch-campaign-supported}` | `{ws}` default |
+|---|---|---|---|---|---|---|---|
+| Labs | `{output-dir}/tier-a.csv` | `{slug}-tier-a` | `6 VERIFY+TIER` | `{a-count} tier-A leads ready` | (empty) | yes | `emailbison-b2b` |
+| Nites | `{output-dir}/leads.csv` | `{slug}` | `5 ENRICH` | `{N-success} enriched leads ready` | ` + JSONL→CSV reshape one-liner` | yes | `emailbison-b2b` |
+| Supply | `{output-dir}/leads.csv` | `{slug}` | `5 ENRICH` | `{N-success} enriched leads ready` | ` + JSONL→CSV reshape one-liner` | **no — see Supply note below** | `emailbison-b2b` |
+
+**Supply note (load-bearing):** `/marketing:launch-campaign` currently rejects `--entity brite-supply` per the deferral documented at `plugins/marketing/commands/launch-campaign.md:87` ("Brite Supply is intentionally absent: Supply's marketing verticals are deferred per handbook `marketing/go-to-market/verticals/README.md` ... Do not re-add without coordinating with the handbook canon update"). For Supply, Option 1 prints a clear "deferred" notice + the operator's recovery path (Option 2 BC-2717 list-building, which DOES support Supply via dbt audience views) instead of a broken invocation. Removing this contract gap requires coordinating the handbook canon update + extending launch-campaign's enum — tracked in §Follow-ups.
 
 ### User gate 8 (entity-parameterized)
 
-Ask via `AskUserQuestion`:
+Ask via `AskUserQuestion`. The LLM substitutes `{phase-just-completed}` and `{handoff-leads-summary}` from the per-entity table:
 
-> Phase {entity == "brite-labs" ? "6 VERIFY+TIER" : "5 ENRICH"} complete. {handoff-leads-summary}. Where do you want to go next?
+> Phase {phase-just-completed} complete. {handoff-leads-summary}. Where do you want to go next?
 >
 > - Pass `{handoff-input-csv}` to `/marketing:launch-campaign` — print the invocation string{reshape-suffix} below for copy/run
 > - Send to BC-2717 list-building — for audience-view-style enrichment via `brite-data-platform` dbt views (if one exists for this vertical)
 > - Stop here — print final output dir tree + summary; no downstream invocation
 
-Where `{handoff-leads-summary}` = "{a-count} tier-A leads ready" (Labs) / "{N-success} enriched leads ready" (Nites/Supply); `{reshape-suffix}` = "" (Labs) / " + JSONL→CSV reshape one-liner" (Nites/Supply).
+### On Option 1 — entity-conditional print
 
-### On Option 1 — print invocation (entity-parameterized)
+**Labs / Nites paths (`{launch-campaign-supported}` = yes):**
 
-For Nites/Supply, render the reshape one-liner FIRST (operator runs it before the launch-campaign invocation). For Labs, skip directly to the launch-campaign invocation.
+For Nites, render the reshape one-liner FIRST (operator runs it before the launch-campaign invocation). For Labs, skip directly to the launch-campaign invocation.
 
 ```bash
-# JSONL → CSV reshape — Nites/Supply only; skip on Labs
-python3 -c '
+# JSONL → CSV reshape — Nites only; skip on Labs (tier-a.csv already CSV)
+# OUTPUT_DIR is the operator-supplied --output-dir, validated by IV-2 + IV-1's
+# extended char-class shield (see §Input validation).
+python3 -c "
 import json, csv, sys
-in_path = "{output-dir}/enriched.jsonl"
-out_path = "{output-dir}/leads.csv"
+in_path = '${OUTPUT_DIR}/enriched.jsonl'
+out_path = '${OUTPUT_DIR}/leads.csv'
 rows = [json.loads(line) for line in open(in_path) if line.strip()]
 if not rows:
-    sys.exit("no enriched rows; aborting")
-fields = ["email", "first_name", "last_name", "company_name", "company_domain", "job_title"]
-with open(out_path, "w", newline="") as f:
-    w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+    sys.exit('no enriched rows; aborting')
+fields = ['email', 'first_name', 'last_name', 'company_name', 'company_domain', 'job_title']
+with open(out_path, 'w', newline='') as f:
+    w = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
     w.writeheader()
     w.writerows(rows)
-print(f"wrote {len(rows)} rows to {out_path}")
-'
+print(f'wrote {len(rows)} rows to {out_path}')
+"
 ```
 
 ```
-# Then invoke /marketing:launch-campaign — same shape for all 3 entities
+# Then invoke /marketing:launch-campaign
 /marketing:launch-campaign \
   --csv {handoff-input-csv} \
   --workspace {ws} \
@@ -556,20 +565,33 @@ print(f"wrote {len(rows)} rows to {out_path}")
   --entity {entity}
 ```
 
-The reshape one-liner pulls the canonical `email + first_name + last_name + company_name + company_domain + job_title` columns required by `/marketing:launch-campaign` Phase 1 step 1 CSV schema validation. Adapt the `fields` list if the enrichment provider produced a different shape — the JSONL→CSV transform stays the same. Operator copies, replaces `<path-to-bc5825-copy-artifact>` with the actual copy artifact path, and runs in a fresh prompt. Refer them to `plugins/marketing/commands/launch-campaign.md` § Argument parsing for the full flag list.
+The reshape one-liner pulls the canonical `email + first_name + last_name + company_name + company_domain + job_title` columns required by `/marketing:launch-campaign` Phase 1 step 1 CSV schema validation. The `${OUTPUT_DIR}` interpolation uses double-quoted string with single-quoted Python-string-literals inside (the inverse of the `--criteria-file` Bash convention — Python rejects unescaped `'`, so we double-quote the outer `python3 -c` and single-quote the path literals). IV-1's extended char-class (covers `--output-dir`) prevents `'` / `"` / `\` / `$` from reaching this template. Adapt the `fields` list if the enrichment provider produced a different shape. Operator copies, replaces `<path-to-bc5825-copy-artifact>` with the actual copy artifact path, and runs in a fresh prompt.
+
+**Supply path (`{launch-campaign-supported}` = no):**
+
+Print verbatim:
+
+> `/marketing:launch-campaign` currently does not accept `--entity brite-supply` per the handbook-canon deferral at `plugins/marketing/commands/launch-campaign.md:87`. The Supply TAM at `{output-dir}` is fully built and verified — it does NOT route to launch-campaign today. Recovery paths:
+>
+> 1. **Pick Option 2 (BC-2717 list-building)** in this gate — list-building consumes Supply enriched outputs via the audience-view contract (`--audience-view-name <vertical-slug>`).
+> 2. **Wait for handbook canon update + launch-campaign enum extension** (tracked in §Follow-ups). Once landed, re-run `/marketing:tam-map --resume` and Option 1 will be wired.
+>
+> Operator should re-run gate 8 and pick Option 2.
 
 ### On Option 2 — print
 
-> Send to BC-2717 list-building. Invoke the `list-building` skill with `--audience-view-name <vertical-slug>` (assumes a `brite-data-platform` dbt view exists for this vertical). See `plugins/marketing/skills/list-building/SKILL.md` for the full audience-view contract.
+> Send to BC-2717 list-building. Invoke the `list-building` skill with `--audience-view-name <vertical-slug>` (assumes a `brite-data-platform` dbt view exists for this vertical). See `plugins/marketing/skills/list-building/SKILL.md` for the full audience-view contract. For Supply, this is the canonical handoff path until launch-campaign extends to support `--entity brite-supply`.
 
-### On Option 3 — print final output dir tree (entity-parameterized via `find`)
+### On Option 3 — print final output dir tree (portable)
 
 ```bash
-# Render the actual on-disk tree (truth, not a hardcoded enumeration that drifts)
-find {output-dir} -maxdepth 1 -type f -printf '%f\t%s\n' | sort
+# Render the actual on-disk tree (truth, not a hardcoded enumeration that drifts).
+# Uses `ls -la` for portability — `find -printf` is GNU-specific (rejected on macOS BSD find).
+# `--output-dir` is single-quoted per Invariant 9 + IV-1 extended char-class shield.
+ls -la '${OUTPUT_DIR}' | tail -n +2
 ```
 
-The output is the actual artifacts that exist on disk plus their sizes — Nites/Supply paths legitimately have fewer files (no `crawled.jsonl`, no `verified.jsonl`, no `tier-*.csv`, no `catch-all.csv`, no `personal-contacts.csv`); using `find` reflects that automatically rather than maintaining 3 hardcoded trees that can silently drift from reality. After the tree, render a 3-line summary: total spend (from Phase 5 actual-spend capture), total surviving rows (from Phase 4 net-new + Phase 5 success rate), and tier-A count (Labs only — for Nites/Supply, render `N/A — Phase 6 VERIFY+TIER skipped`).
+The output is the actual artifacts that exist on disk plus their sizes (and timestamps) — Nites/Supply paths legitimately have fewer files (no `crawled.jsonl`, no `verified.jsonl`, no `tier-*.csv`, no `catch-all.csv`, no `personal-contacts.csv`); using `ls -la` reflects that automatically rather than maintaining 3 hardcoded trees that can silently drift from reality. After the tree, render a 3-line summary: total spend (from Phase 5 actual-spend capture), total surviving rows (from Phase 4 net-new + Phase 5 success rate), and tier-A count (Labs only — for Nites/Supply, render `N/A — Phase 6 VERIFY+TIER skipped`).
 
 ### General
 
@@ -602,7 +624,7 @@ The following invariants are load-bearing. Violations are hard failures; the com
 
 6. **Gate-respect contract per <issue id="BC-5866">BC-5866</issue>: option selected = option executed.** Once the operator picks an option at any of the user gates, the command runs exactly that behavior. Mid-execution deviation requires a new `AskUserQuestion`. Logging to a notes file or skill output dir is NOT permission to deviate. The call-site reminder comment appears at the top of every phase that renders an `AskUserQuestion`. Tripwires from `plugins/cadence/skills/_shared/gate-respect.md` § Tripwires apply.
 
-7. **Entity-conditional gate count.** One numbered `User gate N` per phase: Labs runs 8 gates (one per phase 0–7), Nites/Supply run 6 gates (gates 4 and 7 omitted because Phase 3 CRAWL + Phase 6 VERIFY+TIER are skipped — see §Phase entity routing universal-silence rule). The numbered headings are the load-bearing operator-intent surface; the per-phase `<!-- gate-respect: ... -->` HTML comments do not count as `AskUserQuestion` calls.
+7. **Entity-conditional gate count.** One numbered `User gate N` per phase: Labs runs 8 gates (one per phase 0–7), Nites/Supply run 6 gates (gates 4 and 7 omitted because Phase 3 CRAWL + Phase 6 VERIFY+TIER are skipped — see §Phase entity routing universal-silence rule). The numbered headings are the load-bearing operator-intent surface; the per-phase `<!-- gate-respect: ... -->` HTML comments do not count as `AskUserQuestion` calls. **Phase 0 step 1 may also render a situational `AskUserQuestion`** for entity disambiguation when `marketing-context.md` is missing or has multiple populated entities — this is a contract-required prompt (mirrors skill SKILL.md:36-40), distinct from the numbered phase gates, and not counted in the 8/6 gate budget.
 
 8. **HANDOFF prints, does not chain.** Phase 7 renders the next-command invocation string for the operator to copy/run. Auto-invocation of `/marketing:launch-campaign` or list-building would defeat the operator-intent contract. Per BC-5950 brainstorm Q7: print, don't chain.
 
@@ -627,6 +649,8 @@ Filed post-merge (not blocking BC-5950 ship):
 - **Skill efficiency: emit `phase-N-summary.json` at `--stop-at-phase` halt.** Performance reviewer finding (P2, downgraded). Today the command re-reads 2–6 skill output files per phase to render the operator-summary block. If the skill emits a small JSON sidecar (`phase-N-summary.json`) at halt time with the stats the command renders, each phase reads exactly one file. Behavior-preserving optimization; not load-bearing for correctness. Defer until the per-Labs-run filesystem-syscall cost surfaces in real operator feedback.
 
 - **Skill efficiency: `--start-at-phase <N>` flag for explicit resume entry.** Performance reviewer finding (P2, downgraded). Today the skill re-walks its 10-step file-existence resume ladder on every `--stop-at-phase` re-entry. The command already knows the next phase; passing `--start-at-phase` would skip the ladder. Behavior-preserving optimization. Defer for the same reason as the phase-N-summary.json sidecar — bounded cost vs the multi-hour TAM build.
+
+- **Coordinate handbook canon update + extend `/marketing:launch-campaign` enum to accept `--entity brite-supply`.** Currently launch-campaign deliberately rejects Supply per the deferral at `plugins/marketing/commands/launch-campaign.md:87` (handbook canon: Supply marketing verticals are deferred). Until that lands, this command's Phase 7 Option 1 prints a "deferred" notice for Supply and routes the operator to Option 2 (BC-2717 list-building, which DOES support Supply via dbt audience views). Tracked separately because the contract gap is launch-campaign-side, not tam-map-side. Pairs with the "Extend tam-mapping Phase 3 CRAWL + Phase 6 VERIFY+TIER to Brite Supply" follow-up above — the two together would unlock a uniform 8-phase Labs-grade flow for Supply.
 
 ---
 
