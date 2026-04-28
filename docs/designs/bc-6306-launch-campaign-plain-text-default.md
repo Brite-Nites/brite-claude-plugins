@@ -16,7 +16,7 @@ After each `create_campaign` call in Phase 5, fire a follow-up `PATCH /api/campa
 1. **Scope narrowed to `plain_text` only** — original issue scope included `reputation_building` and `can_unsubscribe`. Both dropped from BC-6306; deferred (no successor issue filed yet — operator wants to think about them separately). BC-6306's Linear title + body must be narrowed before merge so the issue accurately reflects what shipped.
 2. **No `--no-plain-text` opt-out flag** — `/marketing:launch-campaign` is exclusively for cold B2B outreach (per the existing § Non-goals + the email-copywriting upstream). HTML mode for cold has no legitimate operator preference; it's a true invariant. An escape hatch would invite drift, not protect a real use case.
 3. **Single bool `plain_text_applied` in metadata, not per-campaign object** — PATCH is idempotent (re-asserting `plain_text: true` is a no-op against an already-plain-text campaign). On resume, the spec re-runs the PATCH loop on all campaigns blindly if the flag is not `true`. Per-campaign tracking would add schema shape for no operational benefit.
-4. **PATCH ordering: serial inside the existing per-campaign loop** — Phase 5's existing step 5 already iterates over the bucket→ID map. The new PATCH step lives inside that same loop (PATCH right after each create returns its ID), not as a second pass after all creates finish. Keeps create+configure paired per campaign, consistent with how Phase 6 ATTACH LEADS structures its per-campaign work.
+4. **PATCH ordering: separate step 7 after verify-IDs (revised from initial design)** — initial design preferred PATCH inside the existing per-campaign create loop (step 5). During execution, this was reversed: Phase 5 now flows step 5 (create-all) → step 6 (verify-all-IDs) → step 7 (PATCH-all). Reason for the reversal: the verify-IDs gate at step 6 lets a partial create-failure short-circuit Phase 5 before any PATCH state is written, simplifying the partial-failure state space (you either have a partial-create OR a partial-PATCH, never both interleaved). Phase 6 ATTACH LEADS uses the same shape — confirmation-loop AFTER all creates verified. Idempotency of the PATCH means the cost of the second pass is zero on resume. Original "per-campaign loop" alternative is captured in § Alternatives Considered as the intentionally-rejected variant.
 5. **No new MCP gate required** — `update_campaign` is NOT on the email-bison.md two-call confirmation gate list (verified at email-bison.md:239–248). Single MCP call per PATCH; no two-call cycle to add.
 
 ### Alternatives Considered
@@ -24,7 +24,7 @@ After each `create_campaign` call in Phase 5, fire a follow-up `PATCH /api/campa
 - **Per-campaign metadata tracking** (`plain_text_applied: {Google: true, Microsoft: false, Other: true}`) — rejected because PATCH idempotency removes the operational need; the precision adds schema cost without buying anything resume can use.
 - **Add `--no-plain-text` opt-out flag** — rejected because no real use case in the cold-outreach context this command serves. Power users wanting HTML campaigns are already in the EB UI.
 - **PATCH all 6 deliverability fields explicitly (defensive lock)** — rejected with the scope narrowing; if EB ever changes a default for `open_tracking` or others, that's a separate question to handle when it happens, not pre-emptively.
-- **Split PATCH into a second pass after all creates** — rejected because the per-campaign loop is already the right granularity; pairing create+PATCH per campaign keeps partial-failure state easier to reason about.
+- **PATCH inside the per-campaign create loop (initial design)** — initially preferred (Key Decision #4 v1) but reversed during execution. The per-campaign loop pairing creates two interleaved partial-failure modes (create-fail-mid-loop, where some campaigns exist + were PATCHed and others don't exist; or create-success-but-PATCH-fail) that are harder to reason about than the as-built two-pass shape (creates verified before PATCH starts → either partial-create OR partial-PATCH, never interleaved). Idempotency makes the second-pass cost zero. The initial design's claim that pairing made partial-failure easier to reason about turned out to be wrong on closer look.
 
 ### Risks & Mitigations
 
@@ -35,7 +35,7 @@ After each `create_campaign` call in Phase 5, fire a follow-up `PATCH /api/campa
 ### Scope Boundaries
 
 **In scope (BC-6306, this PR)**:
-- Edit `plugins/marketing/commands/launch-campaign.md` Phase 5 — insert new step 6 (PATCH `plain_text: true`) between current step 5 (Execute creates) and current step 7 (Append to metadata).
+- Edit `plugins/marketing/commands/launch-campaign.md` Phase 5 — insert new step 7 (PATCH `plain_text: true`) AFTER step 6 (Verify IDs), renumbering the existing metadata-write step to step 8. (Initial scope said "insert new step 6 between current step 5 and current step 7" — revised during execution per Key Decision #4 to land PATCH after verify-IDs as a second pass.)
 - Edit Phase 5 user gate 5 wording — surface that campaigns will be created in plain-text mode.
 - Edit § Launch metadata schema — add `plain_text_applied: bool` field; document Phase 5 step 6 as the writer.
 - Edit Phase 5 § "If Phase 5 fails mid-loop" — note partial PATCH state + idempotent resume behavior.
