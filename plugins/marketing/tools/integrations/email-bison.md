@@ -200,15 +200,16 @@ If `discover_tools` returns a category or count that contradicts this document, 
 
 Canonical recipes that combine multiple tools in a required order. Skills should follow these sequences verbatim unless they have a reason to deviate documented in their own `## Operational Runbook`.
 
-### Launch a campaign end-to-end (8 MCP calls)
+### Launch a campaign end-to-end (9 MCP calls)
 
-Verified against the live API spec via `search_api_spec` on 2026-04-14. Order matters — several steps depend on IDs returned by prior steps, and some are gated by `draft` vs `queued` campaign state.
+Verified against the live API spec via `search_api_spec` on 2026-04-14 (step 2a added 2026-04-28 per BC-6306). Order matters — several steps depend on IDs returned by prior steps, and some are gated by `draft` vs `queued` campaign state.
 
 | # | Tool | Category | API path | What it does |
 |---|---|---|---|---|
 | 0 | `get_active_workspace_info` | workspace | `GET /api/workspaces/active` | Availability probe per ADR 2c — never skip |
 | 1 | `bulk_create_leads` *(or `upsert_multiple_leads`, `bulk_create_leads_csv`)* | leads | `POST /api/leads` *(variants)* | Create lead records **before** the campaign exists. Max 500 per call — chunk larger lists. Response returns the lead IDs used in step 3. |
 | 2 | `create_campaign` | campaigns | `POST /api/campaigns` | Create an empty campaign shell. No leads / senders / schedule / sequence yet. Returns a campaign ID. |
+| 2a | `update_campaign` | campaigns | `PATCH /api/campaigns/{id}/update` | Apply deliverability defaults for cold outreach — set `plain_text: true`. EB defaults `plain_text: false` (HTML mode), which carries tracking pixels + link rewrites that signal "automated marketing" to spam filters. Single PATCH per campaign — not on the two-call confirmation gate list. Idempotent. |
 | 3 | `import_leads_to_campaign` | campaigns | `POST /api/campaigns/{id}/leads/attach-leads` | Attach the lead IDs from step 1 to the campaign from step 2. **Confirmation-gated** (see below). May fail with `allow_parallel_sending` prompt — see gotchas. |
 | 4a | `list_sender_emails` | senders | `GET /api/sender-emails` | Enumerate connected sender accounts. Filter for `status == "connected"`. |
 | 4b | `attach_sender_emails_to_campaign` | campaigns | `POST /api/campaigns/{id}/attach-sender-emails` | Attach the sender email IDs. Request body: `{"sender_email_ids": [1, 2, 3]}`. |
@@ -265,6 +266,7 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 - **`import_leads_to_campaign` may fail with `allow_parallel_sending` prompt.** If a lead being attached is already in another campaign's active sequence, the tool refuses the attach and returns a prompt asking whether to enable parallel sending. **Never auto-enable this.** Surface the prompt to the user verbatim — parallel sending can over-contact a prospect across campaigns and is a deliverability risk. If the user declines, split the lead list and re-attach only the leads that aren't in other sequences.
 - **Deprecated sequence endpoints still exist.** The API spec exposes both `/api/campaigns/{campaign_id}/sequence-steps` (marked `deprecated`) and `/api/campaigns/v1.1/{campaign_id}/sequence-steps`. Tool-name aliases on the MCP side may point either way depending on version. Skills should explicitly prefer v1.1 — check the path returned by `search_api_spec` before calling `create_sequence_steps` if tool-name stability matters to the skill.
 - **`list_campaigns` has no server-side date-range filter.** The tool supports `status` and `search` filters only. Skills that need "campaigns in a date window" must pull the full list and filter client-side on `created_at` / `started_at`. The Campaigns category (21 tools) has no cross-campaign date-range enumerator — `get_campaign_stats_by_date` is per-campaign, not cross-campaign. Verified via `discover_tools(category="campaigns")` on 2026-04-20.
+- **`plain_text` defaults to `false` on `create_campaign`.** EB sends in HTML mode by default; for cold outreach the spec follow-up is `update_campaign` with `plain_text: true` (single PATCH, idempotent — `update_campaign` is NOT on the two-call confirmation gate list). The `/marketing:launch-campaign` command's Phase 5 applies this automatically (see § Common workflows step 2a above); any net-new spec doing cold outreach should mirror that pattern. HTML mode for cold-B2B carries tracking pixels + link rewrites that signal "automated marketing" to spam filters and degrade deliverability. Surfaced by BC-5906 round-2 dogfood (Sx-15); spec fix shipped in BC-6306.
 
 ## Related skills
 
