@@ -124,6 +124,7 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
   "custom_variables_created": ["RECENCY_ANCHOR", "PROOF_POINT_COMPANY"],
   "lead_ids_uploaded": 127,
   "campaign_ids": {"Google": 5551, "Microsoft": 5552, "Other": 5553},
+  "plain_text_applied": true,
   "sender_ids_attached": [101, 102, 103],
   "sender_attach_counts": {"Google": 3, "Microsoft": 3, "Other": 3},
   "schedule_id": 42,
@@ -145,6 +146,7 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 - Phase 1 step 9 / step 10: `unique_per_lead_enabled: <bool>`
 - Phase 2 step 3 (F12 skip-empty): `skipped_buckets: [<bucket-label>, ...]`
 - Phase 2 IV-4 (Input validation): `invalid_domain_rows: [<row-number>, ...]`
+- Phase 5 step 7 / step 8: `plain_text_applied: <bool>` (true only if step 7 PATCH loop completed for ALL campaigns; false if partial)
 - Phase 6 step 7: `lead_attach_counts: {<bucket>: <count>, ...}`
 - Phase 10 Mode 1 step 8: `preview_method: "local-render" | "local-render + test-send"`, `preview_lead_email: "<email>"`
 - Phase 10 Mode 2 step 6: `test_send_recipient: "<email>"`, `test_send_at: "<ISO-8601>"`
