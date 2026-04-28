@@ -174,7 +174,7 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
    Dogfood + staging runs legitimately cross-map (e.g., `--entity brite-labs --workspace emailbison-personal` for a dogfood against the personal workspace). The cross-mapping gate is **expected** in those cases, not a warning. Write path for metadata JSON also changes — see § Launch metadata schema "Dogfood write path" note.
 4. **Copy artifact JSON schema validation.** Confirm the loaded JSON has `schema_version == "1.0"`, required fields `entity`, `offer_tier`, `step_1.subject`, `step_1.body`, `step_2.subject`, `step_2.body`, `custom_variables` (array). Halt on any missing field. See `plugins/marketing/skills/email-copywriting/SKILL.md` § JSON artifact schema for the full contract.
 5. **Variable-presence check (F7).** Extract every `{VARIABLE}` from `step_1.subject`, `step_1.body`, `step_2.subject`, `step_2.body` via `Grep` (regex `\{[A-Z_]+\}`). For each variable, verify one of these resolution paths in priority order:
-   - **EB-standard-variable allowlist (highest priority).** The variable is one of `FIRST_NAME`, `LAST_NAME`, `COMPANY`, `COMPANY_DOMAIN`, `JOB_TITLE`, `EMAIL` — these resolve server-side via EB's render engine from the canonical lead fields (`first_name`, `last_name`, `company_name`, `company_domain`, `job_title`, `email`) that Phase 4 UPLOAD populates. No CSV-column string match is required — the render is field-based, not column-based. A lead object created via `bulk_create_leads` with `company_name: "Acme Corp"` will render `{COMPANY}` as `Acme Corp` even though the CSV column was `company_name`, not `company`. OR
+   - **EB-standard-variable allowlist (highest priority).** The variable is one of `FIRST_NAME`, `LAST_NAME`, `COMPANY`, `JOB_TITLE`, `EMAIL` — these resolve server-side via EB's render engine from EB's lead-body field names (`first_name`, `last_name`, `company`, `title`, `email`) that Phase 4 UPLOAD populates. No CSV-column string match is required — the render is field-based, not column-based. A lead object created via `bulk_create_leads` with `company: "Acme Corp"` will render `{COMPANY}` as `Acme Corp` even when the CSV column was named `company_name` — Phase 4 step 2 maps `csv.company_name → eb.company` (Sx-6, BC-5906). Note: `{COMPANY_DOMAIN}` is NOT EB-standard — EB has no native `company_domain` field. If a copy artifact references `{COMPANY_DOMAIN}`, the lead-body must stash it via `custom_variables` (per Phase 4 step 2). OR
    - The variable matches a CSV column (case-insensitive) populated for ≥95% of rows — for non-standard, per-lead variables that get written into `custom_variables[].value` at UPLOAD, OR
    - The variable appears in `custom_variables[]` with a non-empty default, OR
    - The variable is a `{SENDER_*}` variable (filled via the priority chain in step 7).
@@ -330,23 +330,36 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 **Steps:**
 
-1. **Ground-truth the tool name.** `search_api_spec` with query `bulk create leads`. Per `email-bison.md` § Rate limits the current name is `bulk_create_leads` (not `bulk_create`). Variant tools: `upsert_multiple_leads` (for merging against existing leads), `bulk_create_leads_csv` (CSV-upload variant). Default to `bulk_create_leads` unless the artifact or operator instructs otherwise.
-2. **Prepare lead batches.** Read the CSV. For each row, build the lead object:
+1. **Ground-truth the tool name.** `search_api_spec` with query `bulk create leads`. Per `email-bison.md` § Common workflows the verified endpoint path is `POST /api/leads/multiple` (NOT `/api/leads/bulk` — that's the CSV-upload variant). The conceptual label `bulk_create_leads` in this spec maps to that endpoint via `call_api`. Variant endpoints: `upsert_multiple_leads` (for merging against existing leads), `bulk_create_leads_csv` (CSV-upload variant, `POST /api/leads/bulk`). Default to `/api/leads/multiple` unless the artifact or operator instructs otherwise.
+2. **Prepare lead batches.** Read the CSV. For each row, build the lead object using EB's lead-body field names (NOT the CSV column names — Sx-6, BC-5906):
 
    ```json
    {
      "email": "<csv email>",
      "first_name": "<csv first_name>",
-     "company_domain": "<csv company_domain>",
      "last_name": "<csv last_name — if column present>",
-     "job_title": "<csv job_title — if column present>",
-     "company_name": "<csv company_name — if column present>",
+     "title": "<csv job_title — if column present>",
+     "company": "<csv company_name — if column present>",
      "custom_variables": [
        {"name": "RECENCY_ANCHOR", "value": "<row-specific value>"},
-       {"name": "PROOF_POINT_COMPANY", "value": "<row-specific value>"}
+       {"name": "PROOF_POINT_COMPANY", "value": "<row-specific value>"},
+       {"name": "COMPANY_DOMAIN", "value": "<csv company_domain>"}
      ]
    }
    ```
+
+   **CSV → EB lead-body mapping:**
+
+   | CSV column | EB lead-body field |
+   |---|---|
+   | `email` | `email` |
+   | `first_name` | `first_name` |
+   | `last_name` | `last_name` |
+   | `job_title` | `title` *(renamed)* |
+   | `company_name` | `company` *(renamed)* |
+   | `company_domain` | (no native EB field — stash as a `custom_variable` named `COMPANY_DOMAIN`, or drop if unused by copy artifact) |
+
+   `company_domain` is required in the CSV for Phase 2 HOST LOOKUP (Bash `dig` resolves ESP from the domain) — it does NOT have a native EB lead-body field. Stash as a custom variable if the copy artifact references `{COMPANY_DOMAIN}`; drop otherwise.
 
    The per-row custom_variables values come from CSV columns matching each variable name (case-insensitive), plus fallbacks from the copy artifact's `custom_variables[].default` for any variable the CSV doesn't cover.
 3. **Chunk to the 500-lead limit.** `bulk_create_leads` and `upsert_multiple_leads` both accept 500 leads per call (verified in `email-bison.md` § Rate limits). If `lead_count > 500`, split into chunks of 500. Per the "Gate cadence for chunked uploads" note above, User gate 4 fires ONCE for the full batch; each chunk subsequently fires only a minimal turn-structure prompt.
