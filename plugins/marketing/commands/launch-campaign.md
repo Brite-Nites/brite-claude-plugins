@@ -26,7 +26,7 @@ Execute the 11 phases below sequentially. Use `AskUserQuestion` at every numbere
 - `plugins/marketing/skills/email-copywriting/SKILL.md` — source of the copy artifact this command consumes.
 - [Revgrowth1/ai-gtm-workflows workflow 10](https://github.com/Revgrowth1/ai-gtm-workflows/tree/main/workflows/10-campaign-launch) (MIT) — upstream 9-step launch flow; this command extends it with workspace disambiguation, Brite entity awareness, and BC-2707's two-call MCP gate precedent.
 
-**Ground-truthing rule.** Before every mutating MCP call to an **extended-tier** tool in phases 3–11, run `search_api_spec` on the target endpoint to confirm the live tool name and request body shape. **Core-tier tools (enumerated below) may be called directly without per-session re-verification** — their names are stable and part of the official EB MCP contract. The ground-truth `email-bison.md` is the authoritative session reference; the vendor MCP is in Beta and extended-tier tool surface may drift. Never call an extended-tier tool whose endpoint you haven't confirmed this session.
+**Ground-truthing rule.** Before every mutating MCP call to an **extended-tier** tool in phases 3–11, run `search_api_spec` on the target endpoint to confirm the live tool name and request body shape. **Core-tier tools (enumerated below) may be called directly without per-session re-verification** — their names are stable and part of the official EB MCP contract. The ground-truth `email-bison.md` is the authoritative session reference; the vendor MCP is in Beta and extended-tier tool surface may drift. Never call an extended-tier tool whose endpoint you haven't confirmed this session. When running `search_api_spec`, prefer URL-path queries (`/api/custom-variables`) or short keywords (`custom-variables`, `schedule template`) over natural-language phrases — phrases like "custom variable list" return `not found` (Sx-1, BC-5906). The spec's "required" vs "optional" field markings are advisory only — EB silently accepts requests with documented-required fields omitted (verified for `last_name` on `/api/leads`); never gate logic on "the API will reject missing fields" (Sx-5, BC-5906).
 
 ---
 
@@ -375,7 +375,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
       Operator rapid-fire affirmatives are expected. The prompt exists solely to create the user turn required by the two-call gate.
    c. **Second vendor call — execute.** On "Continue", invoke `bulk_create_leads` again with `confirmation: true`. Capture the returned lead IDs. Loop to the next chunk.
 7. **Abort handling.** On any chunk's "Abort remaining chunks" response, HALT — do not start the next chunk. Chunks 1..{i-1} remain committed (their leads exist in EB); `lead_ids_uploaded` in metadata reflects only committed chunks. Operator re-runs with a delta CSV if they want to resume.
-8. **Verify lead count.** Sum the lead IDs across all chunks. Confirm `sum == lead_count` from Phase 1. If mismatch, halt and surface the discrepancy — the vendor may have rejected specific leads (duplicate email, invalid format). List the rejected rows for operator review.
+8. **Verify lead count.** Sum the lead IDs across all chunks. Confirm `sum == lead_count` from Phase 1. If a chunk returned HTTP 422 the **whole chunk** rejected — bulk-POST is all-or-nothing on validation failure (Sx-8, BC-5906). The `call_api` wrapper surfaces only `{"error": "HTTP 422 Error"}` with no per-lead detail; per-row diagnostics require inspecting the EB UI for which rows tripped the batch. HALT with the body summary and the chunk's lead-row range; operator inspects EB UI, removes the offending row(s) from the CSV, and re-runs from Phase 4.
 9. **Append to metadata JSON.** Set `lead_ids_uploaded: <total>`, `last_completed_phase: 4`.
 
 **If Phase 4 fails mid-chunk:** some chunks have succeeded, others haven't. `lead_ids_uploaded` in the metadata is authoritative. Re-run reads the metadata, identifies that not all leads uploaded, and operator chooses to (a) delete the partial set via EB UI and re-upload from scratch, or (b) delta the CSV to only the unuploaded leads and re-run. The command does NOT auto-delta.
@@ -474,6 +474,8 @@ Why: sender warmup and reputation are per-inbox, not per-campaign. Splitting the
 
 ### Pagination is mandatory
 
+**Note: `?per_page=N` is silently ignored** — EB hardcodes `per_page: 15` regardless of the parameter (Sx-10, BC-5906). For 500 connected senders that's ~34 pages; for 772 senders it's 52. Pagination is N/15 pages and not operator-configurable. Plan loop iteration counts accordingly.
+
 Workspaces can have 500+ connected senders. `list_sender_emails` is cursor-paginated. The `while True` / cursor-loop pattern from Revgrowth 10:
 
 ```
@@ -492,7 +494,7 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
 ### Steps
 
 1. **Ground-truth the tool names.** `search_api_spec` with queries `list sender emails`, `attach sender emails`. Per `email-bison.md` § Common workflows the names are `list_sender_emails` (GET) and `attach_sender_emails_to_campaign` (POST `/api/campaigns/{id}/attach-sender-emails`). Request body: `{"sender_email_ids": [1, 2, 3]}`.
-2. **Enumerate connected senders.** Run the `while True` pagination loop against `list_sender_emails` with filter `status == "connected"`. Exhaust the cursor. Record the full list. If the workspace returns zero connected senders, HALT — no campaign can send without a sender, and silently proceeding would create campaigns that queue forever.
+2. **Enumerate connected senders.** Run the `while True` pagination loop against `list_sender_emails` with filter `?status=connected` (lowercase). EB's status filter is case-sensitive in a non-obvious way: `?status=Connected` (matching the response `status: "Connected"` data field) returns 422 (Sx-11, BC-5906) — operators copying from response payloads will hit a 422 with no diagnostic. Always pass the lowercase form. Exhaust the cursor. Record the full list. If the workspace returns zero connected senders, HALT — no campaign can send without a sender, and silently proceeding would create campaigns that queue forever.
 3. **With `--reference <campaign-id>` set:** call the reference campaign's `get_campaign` (or equivalent sender-list endpoint) to fetch its attached sender IDs. Pre-fill the gate to show "reference campaign had these senders attached — they are a subset of the current connected list." The invariant still applies — we still attach ALL connected senders from this workspace, not just the reference's subset. `--reference` pre-fills the display, not the attach payload.
 4. **Render the attach plan.** Show the operator:
 
