@@ -401,16 +401,17 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    > 3. `Denver Downtown Lighting | Other` — 12 leads
 4. **User gate 5.** Ask via `AskUserQuestion`:
 
-   > Create {N} empty campaigns with the names above? Campaigns start in `Draft` state — no sends until Phase 11.
+   > Create {N} empty campaigns with the names above? Campaigns start in `Draft` state — no sends until Phase 11. After create, each campaign will be PATCHed with `plain_text: true` (cold-outreach deliverability default — no opt-out).
    >
    > - Yes, create these campaigns (Recommended)
    > - Rename — I'll supply a different suffix convention
    > - Abort
 5. **Execute creates.** For each name in the plan, call `create_campaign`. Capture the returned campaign ID. Map bucket → ID.
 6. **Verify IDs.** Confirm every bucket has a returned ID. If any campaign create fails, halt and surface the specific bucket + error. Do NOT retry automatically — a partial campaign set is easier to audit than a silently-retried one.
-7. **Append to metadata JSON.** Set `campaign_ids: {"Google": 5551, "Microsoft": 5552, "Other": 5553}` (adjust keys per actual segmentation), `last_completed_phase: 5`.
+7. **Apply plain_text deliverability default.** For each campaign ID confirmed in step 6, call `update_campaign` (path `PATCH /api/campaigns/{id}/update` per `email-bison.md` § Tool inventory + verified via `search_api_spec`) with `plain_text: true`. This PATCH is **always** applied — it is a deliverability invariant for cold outreach (the only use case `/marketing:launch-campaign` serves) and has no operator opt-out. EB defaults `plain_text` to `false` on create, which sends emails as HTML; HTML mode for cold B2B carries tracking pixels, link rewrites, and image references that signal "automated marketing" to spam filters. The copy artifacts produced by `email-copywriting` use `<br><br>` for paragraph breaks and contain spintax — both assume plain-text rendering. Note: `update_campaign` is NOT on `email-bison.md` § MCP confirmation gates list; this is a single MCP call per campaign, no two-call cycle. PATCH is idempotent (re-asserting `plain_text: true` against an already-plain-text campaign is a no-op), so resume can re-run this loop blindly without harm. Track per-campaign PATCH success in scratch state for step 8's metadata write.
+8. **Append to metadata JSON.** Set `campaign_ids: {"Google": 5551, "Microsoft": 5552, "Other": 5553}` (adjust keys per actual segmentation), `plain_text_applied: true` (only if step 7 PATCH succeeded for ALL campaigns; else `false`), `last_completed_phase: 5`.
 
-**If Phase 5 fails mid-loop:** partial campaigns exist in the workspace. Metadata JSON lists the ones that succeeded. Operator inspects EB UI, decides whether to delete the partial campaigns or resume by running a reduced version of Phase 5 that creates only the missing ones. No automatic partial-resume.
+**If Phase 5 fails mid-loop:** partial campaigns exist in the workspace. Metadata JSON lists the ones that succeeded and records `plain_text_applied: true` only if the step 7 PATCH loop completed for ALL campaigns. If `last_completed_phase: 5` was written but `plain_text_applied: false`, partial-PATCH state may exist (some campaigns plain-text, others HTML). Operator inspects EB UI, decides whether to delete the partial campaigns or resume by running a reduced version of Phase 5 that creates only the missing ones. On resume after partial-PATCH, the spec re-runs the step 7 PATCH loop on every campaign in `campaign_ids` regardless of prior state — PATCH is idempotent, so already-plain-text campaigns are no-ops. No automatic partial-resume.
 
 ---
 
