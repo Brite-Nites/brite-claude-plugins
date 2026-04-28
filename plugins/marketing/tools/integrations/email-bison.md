@@ -272,6 +272,7 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 - **Bulk POST is all-or-nothing on validation failure.** A single bad row (duplicate email, invalid format) in a `bulk_create_leads` batch fails the whole batch with HTTP 422; valid rows are NOT created. The `call_api` wrapper exposes only `{"error": "HTTP 422 Error"}` — no per-lead detail. Recovery requires inspecting EB UI for the offending row(s). Skills cannot offer per-row diagnostics from the response alone. Surfaced by BC-5906 round-2 (Sx-8); spec fix shipped in BC-6298.
 - **`?per_page=N` query param is silently ignored.** EB hardcodes `per_page: 15` regardless of the parameter. Pagination loops are N/15 pages and not operator-configurable — plan iteration counts accordingly (e.g., 500 senders ≈ 34 pages; 772 senders = 52 pages). Surfaced by BC-5906 round-2 (Sx-10); spec fix shipped in BC-6298.
 - **Status filter is case-sensitive in a non-obvious direction.** `?status=connected` (lowercase) succeeds; `?status=Connected` (capitalized — matching the response `status: "Connected"` data field) returns 422. Operators reading the response payload and copying the value into a filter will hit 422 with no useful diagnostic. Always lowercase the filter value. Surfaced by BC-5906 round-2 (Sx-11); spec fix shipped in BC-6298.
+- **Lead-body field names diverge from common-CSV-column names.** EB's `/api/leads/multiple` endpoint expects `title` (not `job_title`), `company` (not `company_name`), and has NO `company_domain` field at all. CSV columns named `job_title`/`company_name`/`company_domain` must be remapped at lead-body construction time: `csv.job_title → eb.title`, `csv.company_name → eb.company`, `csv.company_domain → custom_variable` (or drop). Sending the CSV-column names verbatim silently creates leads with `title: null` / `company: null` — data loss disguised as success. Surfaced by BC-5906 round-2 (Sx-6); spec fix shipped in BC-6300.
 
 ## Related skills
 
@@ -294,7 +295,9 @@ This pattern is **stronger** than a skill-level "ask the user" step — the MCP 
 
 ## Last verified
 
-`2026-04-28` — BC-6298: appended 5 §Known gotchas bullets (Sx-1 search-format, Sx-5 advisory required-fields, Sx-8 bulk-POST all-or-nothing, Sx-10 hardcoded `per_page=15`, Sx-11 lowercase status filter) sourced from BC-5906 round-2 dogfood transcript. No live API re-verification — gotchas documented from round-2 evidence; round-3 (BC-6308) will re-walk and confirm.
+`2026-04-28` — BC-6300: appended §Known gotchas bullet (Sx-6 lead-body field-name divergence — `title`/`company`/no-`company_domain`) sourced from BC-5906 round-2 dogfood transcript + `search_api_spec` verification of `/api/leads/multiple` schema. Same-day stack with the BC-6298 entry below.
+
+Prior: `2026-04-28` — BC-6298: appended 5 §Known gotchas bullets (Sx-1 search-format, Sx-5 advisory required-fields, Sx-8 bulk-POST all-or-nothing, Sx-10 hardcoded `per_page=15`, Sx-11 lowercase status filter) sourced from BC-5906 round-2 dogfood transcript. No live API re-verification — gotchas documented from round-2 evidence; round-3 (BC-6308) will re-walk and confirm.
 
 Prior: `2026-04-20` — BC-2721 tasks 7 + 10 via `discover_tools` on `emailbison-b2b`:
 - Task 7: added new §Analytics (4 tools — top-level aggregators) subsection documenting `get_leads_analytics`, `get_replies_analytics`, `get_campaign_analytics`, and `bulk_export` (not in the 14 documented categories — they're a top-level analytics group). Added §Known gotchas bullet: `list_campaigns` has no server-side date-range filter (client-side filter on `created_at` / `started_at` required).
