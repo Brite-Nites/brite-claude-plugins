@@ -52,7 +52,7 @@ Every artifact the skill emits MUST satisfy all of these rules before Write. Ada
 - No `{FIRST_NAME}` (or any merge variable) in the subject line. Subjects are the highest-impact spam signal; merge personalization in subjects under-performs generic subjects across every deliverability benchmark.
 - Subject line length 1-3 words, with 3-option spintax. Example: `{Quick|Fast|30s} {question|check|idea}`.
 - Spintax at the word level, not the sentence level: `{option1|option2|option3}`. Apply every 3-5 words where grammar permits — too little and EB sees identical sends; too much and the sentence loses meaning.
-- Step 2 subject uses `Re: {subject}` — prefix, lowercase `re:` also acceptable per vendor; the skill defaults to `Re:`.
+- Step 2 subject does NOT include a `Re:` prefix. Email Bison auto-prepends `Re: ` at delivery whenever `thread_reply: true` (which step 2 always carries). Including `Re:` in the artifact produces a double-prefix (`"Re: Re: ..."`) in the recipient's inbox — verified BC-5906 round-2 Sx-14.
 - Step 2 body references step 1 without summarizing it. One paragraph typical. Reinforces the offer without repeating the pitch.
 - Sign-off is `<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}` — spintax on the sign-off, no em-dash before the name.
 - `{SENDER_*}` variables (`{SENDER_FIRST_NAME}`, `{SENDER_EMAIL}`, `{SENDER_ROLE}`) are filled from `docs/marketing-context.md` first; Salesforce `User` object only if the marketing-context.md value is missing (see §5 Workflow 1).
@@ -132,7 +132,7 @@ Saw the {RECENCY_ANCHOR} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked 
 **Step 2 bump:**
 
 ```
-Subject: Re: {subject}
+Subject: {subject}   (EB auto-prepends "Re: " at delivery — do NOT include "Re:" in the artifact)
 
 Body:
 {Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. {Still happy|Glad still} to send the {FREE_ASSET_NOUN} whenever it's {useful|helpful|timely}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
@@ -152,7 +152,7 @@ With the {RECENCY_ANCHOR} at {COMPANY} {FIRST_NAME}, the {scope|spend|commitment
 **Step 2 bump:**
 
 ```
-Subject: Re: {subject}
+Subject: {subject}   (EB auto-prepends "Re: " at delivery — do NOT include "Re:" in the artifact)
 
 Body:
 {Know|Aware|Understand} this kind of {commitment|pilot|scope} takes {a beat|time|real review}. The guarantee terms are {flexible on|negotiable around} {TIMELINE} or {DELIVERABLE_SCOPE}, so if either needs to shift, {happy to|glad to} adjust.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
@@ -234,7 +234,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
     "wait_in_days": 0
   },
   "step_2": {
-    "subject": "Re: {Quick|Fast|30s} {question|check|idea}",
+    "subject": "{Quick|Fast|30s} {question|check|idea}",
     "body": "{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. ...",
     "wait_in_days": 4
   },

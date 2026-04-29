@@ -21,7 +21,7 @@
     "wait_in_days": 0
   },
   "step_2": {
-    "subject": "Re: {Quick|Fast|30s} {question|check|idea}",
+    "subject": "{Quick|Fast|30s} {question|check|idea}",
     "body": "{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. {Still happy|Glad still} to send the {FREE_ASSET_NOUN} whenever it's {useful|helpful|timely}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}",
     "wait_in_days": 4
   },
