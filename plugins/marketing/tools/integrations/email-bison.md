@@ -248,7 +248,9 @@ The vendor MCP enforces a two-call confirmation pattern on consequential tools. 
 | `remove_email_from_blocklist` | blocklist | Un-blocks an email that was explicitly suppressed |
 | `remove_domain_from_blocklist` | blocklist | Un-blocks an entire domain |
 
-This pattern is **stronger** than a skill-level "ask the user" step — the MCP itself gates the action, so bypassing it requires an explicit confirmation parameter. Skills should mirror the MCP's two-call shape in their Operational Runbook rather than introducing a parallel confirmation layer.
+This pattern is **stronger** than a skill-level "ask the user" step — when invoked through the MCP-tool-wrapper layer, the wrapper itself gates the action, so bypassing it requires an explicit `confirmation` parameter on call-2. Skills should mirror the MCP's two-call shape in their Operational Runbook rather than introducing a parallel confirmation layer.
+
+**Caveat — `call_api` invocation bypasses the wrapper gate** (Sx-9, BC-5906). The `confirmation` enforcement above lives in the MCP-tool-wrapper layer, not in the REST API. Skills that invoke these endpoints via `call_api` (the documented pattern for extended-tier tools — see `/marketing:launch-campaign § Tool tier map`) are sending raw API requests; the gated tools have NO `confirmation` field at the API level. Verified for `/api/leads/multiple` (POST), `/api/campaigns/{id}/leads/attach-leads` (POST), and `/api/campaigns/{id}/resume` (PATCH) during BC-5906 round-2. For `call_api`-based skills, the load-bearing safeguard is the agent-side `AskUserQuestion` turn between call-1 and call-2; BC-2707's turn-structure rationale still applies, just at the agent layer instead of the wrapper layer. Restoring vendor-side enforcement requires switching to direct wrapper-tool invocation where the gated tool is wrapper-callable — tracked as a follow-up investigation to BC-6304.
 
 ## Rate limits and quotas
 

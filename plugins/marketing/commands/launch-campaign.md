@@ -52,6 +52,8 @@ Every tool named in phases 3–11 that isn't in the core tier list above — e.g
 
 Tool names in phase narratives are conceptual labels for the operation, not directly-callable function names. When a phase says "call `bulk_create_leads`," read that as "invoke the ground-truthed bulk-create-leads endpoint via `call_api` following the pattern above."
 
+**Vendor confirmation gates via `call_api` (Sx-9, BC-5906).** Extended-tier tools advertised by `discover_tools` may describe `confirmation` parameters and two-call vendor gates in their tool prose. Those gates are enforced by the **MCP-tool-wrapper layer**, NOT by the underlying REST API. Round-2 dogfood verified: `/api/leads/multiple` POST and `/api/campaigns/{id}/leads/attach-leads` POST have no `confirmation` field at the API level; `/api/campaigns/{id}/resume` follows the same pattern. Via `call_api` (this command's documented invocation pattern), no vendor-side confirmation prompt fires — the agent-side `AskUserQuestion` semantic gate is **the only load-bearing safeguard** for every `call_api`-routed mutation. BC-2707's turn-structure rationale still applies to the operator-side gate (model must yield to the user between any two consequential calls); it just lives at the agent layer, not the vendor layer. Restoring vendor-side enforcement would require switching to direct wrapper-tool invocation for the gated tools — tracked as a future follow-up to BC-6304, not in scope for this command's current shape.
+
 **Allowed-tools breadth.** The frontmatter uses wildcards (`mcp__emailbison-b2b__*`, `mcp__emailbison-personal__*`) rather than an explicit tool list because every extended-tier operation flows through `call_api`, so narrowing the allowlist below `call_api` + `search_api_spec` + the ~10 core-tier tools this command reads from would still authorize every extended-tier operation via `call_api`. Explicit narrowing therefore buys no security — the real authorization boundary is `call_api`'s endpoint path + the operator gate. The workspace plugin has ~141 EB tools total; this command deliberately ignores the vast majority and relies on the phase-level user gates + `call_api`-only extended-tier contract for blast-radius control, not frontmatter narrowing.
 
 ---
@@ -311,12 +313,12 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 
 **Purpose.** Create lead records in the EB workspace with per-lead `custom_variables` values. Leads exist as workspace-level records first; Phase 6 attaches them to specific campaigns. This is the first destructive phase in the flow — leads in EB carry tracking history and touch quota, so creating them is not free.
 
-**Two-call MCP confirmation gate required** per BC-2707 precedent. `bulk_create_leads` may or may not be vendor-gated — treat it as gated regardless. Pattern:
+**Two-call gate required — agent-side, not vendor-side** (Sx-9, BC-5906; turn-structure rationale per BC-2707). Per § Tool tier map, `bulk_create_leads` is invoked via `call_api` against `/api/leads/multiple`, which has NO `confirmation` field at the API level. The two-call gate this phase enforces is the **agent-side `AskUserQuestion`** turn — call-1 issues the API request, the operator sees the proposed action via the gate, and call-2 (or in this phase the chunked equivalent) only fires after a real operator turn. BC-2707's turn-structure guarantee (model must yield between calls) applies verbatim to the operator-side gate. Pattern:
 
 1. First call with no `confirmation` parameter — returns a prompt describing what will happen.
 2. Relay the prompt verbatim to the operator via `AskUserQuestion`.
 3. Wait for the operator's response. If clear affirmative scoped to the operation ("yes", "approved", "go ahead", "proceed", "do it"), make the second call with `confirmation: true`. If ambiguous ("maybe", silence, off-topic), stop and re-ask.
-4. **Never** issue both calls in the same turn. The anti-pattern this gate blocks is the skill issuing both calls without a real user turn between them — not the wording of the affirmative (see `docs/precedents/BC-2707.md` for the turn-structure rationale).
+4. **Never** issue both calls in the same turn. The anti-pattern this gate blocks is the skill issuing both API requests without a real operator turn between them — not the wording of the affirmative (see `docs/precedents/BC-2707.md` for the turn-structure rationale). Note: there is no vendor `confirmation` parameter to send on call-2 — the second call is just the actual API request after operator approval (see § Tool tier map for the wrapper-vs-API distinction).
 
 **Gate cadence for chunked uploads.** At >500 leads the upload runs in N chunks of ≤500. Re-prompting a semantic "Are you sure?" per chunk trains gate-fatigue: the operator reflexively approves chunks 2..N and the gate stops being a real safety check. Separate the two concerns:
 
@@ -431,7 +433,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 **Purpose.** Attach the lead IDs created in Phase 4 to the campaign IDs created in Phase 5, bucketed by ESP segment. This is the join step between the lead pool and per-segment campaigns.
 
-**Two-call MCP gate applies** per `email-bison.md` § MCP confirmation gates + `docs/precedents/BC-2707.md` (turn structure, not vocabulary) — `import_leads_to_campaign` is listed as vendor-gated.
+**Two-call gate applies — agent-side** (Sx-9, BC-5906; turn-structure per BC-2707). `import_leads_to_campaign` is listed as vendor-gated in `email-bison.md § MCP confirmation gates`, but per § Tool tier map this command invokes it via `call_api` against `/api/campaigns/{id}/leads/attach-leads`, which has NO `confirmation` field at the API level. The load-bearing safeguard is the agent-side `AskUserQuestion` turn between call-1 and call-2 — same shape as Phase 4. The `allow_parallel_sending` branch below IS a real semantic vendor gate (the API does return a parallel-sending prompt body), so it stays as-written.
 
 **Gate cadence for multi-campaign attach (same pattern as Phase 4).** User gate 6 is the **semantic operator-intent gate** and fires ONCE for the full per-campaign batch. Per-campaign vendor gates fire a **minimal turn-structure prompt** — not a semantic re-approval. Rapid-fire affirmatives per campaign are expected; the prompt's only job is to create the user turn required by BC-2707's two-call contract.
 
@@ -758,9 +760,9 @@ After Phase 10 completes, surface the final summary message and exit:
 Phase 11 requires two distinct user confirmations per campaign:
 
 1. **Operator-intent gate** (this phase, skill-level). An `AskUserQuestion` before any vendor call, surfacing the scope of what's about to happen and requiring explicit approval.
-2. **Vendor MCP two-call gate** (per BC-2707). First call to `resume_campaign` returns a vendor prompt; the skill relays it verbatim; on operator affirmative turn, second call with `confirmation: true`.
+2. **Agent-side per-campaign turn-structure gate** (Sx-9, BC-5906; turn-structure per BC-2707). Per § Tool tier map, `resume_campaign` is invoked via `call_api` against `PATCH /api/campaigns/{id}/resume`, which has NO `confirmation` field at the API level. The "second gate" is the operator's affirmative turn between two `call_api` requests against the resume endpoint — call-1 surfaces the per-campaign vendor description (which the spec relays verbatim), call-2 actually fires the resume after the operator turn.
 
-The two gates are layered — the operator says "yes" twice per campaign, in two different contexts, with both gates' prompts rendered separately. The anti-pattern this layering blocks: the skill issuing both the intent gate and the vendor gate's second call in the same turn without real user turns between them. Per `docs/precedents/BC-2707.md` the guarantee being enforced is turn structure, not vocabulary — accept any clear affirmative ("yes", "approved", "go ahead", "proceed", "do it"); ambiguous or silent responses still halt.
+The two gates are layered — the operator says "yes" twice per campaign, in two different contexts, with both prompts rendered separately. The anti-pattern this layering blocks: the skill issuing both the intent gate and the per-campaign call-2 in the same turn without real user turns between them. Per `docs/precedents/BC-2707.md` the guarantee being enforced is turn structure, not vocabulary — accept any clear affirmative ("yes", "approved", "go ahead", "proceed", "do it"); ambiguous or silent responses still halt.
 
 ### Steps
 
@@ -783,14 +785,14 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
    > - Yes, proceed to vendor gates
    > - Abort
 4. **Per-campaign vendor gate loop.** For each campaign in the bucket map:
-   - First call to `resume_campaign` with campaign ID, no `confirmation`. Vendor returns the prompt (typically: "This will transition campaign {id} from Draft to Queued and begin sending emails. Proceed?").
+   - First call to `resume_campaign` (`call_api` against `PATCH /api/campaigns/{id}/resume`). Per Sx-9 the API has no `confirmation` parameter; the call returns the standard resume response. The "prompt" the spec relays comes from the wrapper-tool's `discover_tools` description, which describes the resume-campaign action in operator-facing language (typically: "This will transition campaign {id} from Draft to Queued and begin sending emails."). Render that description verbatim before call-2 to preserve BC-2707 turn structure.
    - **User gate 11b — vendor confirmation.** Relay the vendor prompt verbatim via `AskUserQuestion`:
 
      > Vendor prompt for campaign `{campaign-name} | Google`: "{vendor-prompt-text}"
      >
      > - Yes, activate this campaign
      > - Abort the entire Phase 11 (already-activated campaigns stay activated)
-   - On operator affirmative, second call with `confirmation: true`. Record the returned campaign state (should be `Queued`).
+   - On operator affirmative, second `call_api` request against the resume endpoint (no `confirmation` field — see § Tool tier map). Record the returned campaign state (should be `Queued`).
    - On operator abort, HALT the loop — do not continue to other campaigns. Already-activated campaigns in this loop remain activated; record them in metadata.
 5. **Post-activate verification.** For each activated campaign, call `get_campaign_stats` (or equivalent) and confirm `status: "Queued"` as directed in `email-bison.md` § Common workflows. Capture the initial counters for the final report.
 6. **Finalize metadata JSON.** Set `activated: true`, `activated_at: "<ISO-8601-of-final-resume-call>"`, `last_completed_phase: 11`.
@@ -807,7 +809,7 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
 
 ### Forbidden patterns in Phase 11 (hard failures)
 
-- Issuing both `resume_campaign` calls in the same turn without a real operator turn between them. Defense-in-depth against same-turn auto-confirm per BC-2707.
+- Issuing both `resume_campaign` `call_api` requests in the same turn without a real operator turn between them. Defense-in-depth against same-turn auto-confirm per BC-2707 — the gate is operator turn structure, not a vendor `confirmation` parameter (see § Tool tier map).
 - Skipping the operator-intent gate (11a) even when "yes" was implicit from the `--activate` flag being passed. The flag authorizes the phase to run; it does not authorize skipping the intent gate.
 - Continuing the loop after an operator abort. The phase halts on the first abort — other campaigns wait for a future run.
 - Auto-confirming the vendor gate because the vendor prompt text is predictable. The gate is the *structure*, not the text.
