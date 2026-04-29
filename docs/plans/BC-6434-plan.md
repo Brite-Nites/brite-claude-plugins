@@ -148,6 +148,44 @@ User reruns Task 4's repro to confirm both banners now fire.
 - Promotion-track entry on BC-5806 task-3 reconciliation-table pattern (this is the **3rd surface** — promote pattern-application 7/10 → 8/10)
 - Memory entry under Gotchas if the routing/registration is platform-side and we now know its workaround
 
+## Diagnosis
+
+Repro run 2026-04-29 17:10 in `cwd=~/Projects/work/brite-nites/brite-salesforce/`. Two fresh `claude` invocations produced four log entries (each session fires the `SessionStart:startup` hook twice, ~22s apart — `17:10:30` and `17:10:52`).
+
+### Evidence collected
+
+| Layer | Status | Evidence |
+|---|---|---|
+| Hook fires when cwd ≠ plugin home | ✅ | `/tmp/revops-banner.log` and `/tmp/workflows-banner.log` populated with timestamp + cwd lines after fresh session in `brite-salesforce/` |
+| Script execution + stdout | ✅ | Both logs contain full banner content (`RevOps Active` + `🔧 Brite Session Context`) |
+| Hook stdout reaches model context | ✅ | Fresh session reproduced both reminders verbatim when asked: `SessionStart:startup hook success: RevOps Active …` and `SessionStart:startup hook success: 🔧 Brite Session Context …` |
+| Skill activation downstream | ✅ | BC-6315 Phase 1 already proved 5 fixtures activated correct skills in same cwd |
+| **Visible terminal block above first prompt** | ❌ | Splash → `❯ hello` with no banner block in between, in v2.1.123 |
+
+### Root cause
+
+Claude Code v2.1.0+ no longer renders `SessionStart` `command`-type hook stdout as a visible terminal block. Hook stdout is routed only to the model's `<system-reminder>` channel. Tracked upstream as [anthropics/claude-code#24425](https://github.com/anthropics/claude-code/issues/24425).
+
+This is a **platform behavior**, not a config issue. Documented (post-research, agent-confirmed via Anthropic docs) as the intentional designed channel: hooks → model context. Anthropic's recommended channel for **user-visible** session context in v2.1.0+ is the **statusline** (`statusLine` setting in `settings.json`) or a user-invoked **slash command** — neither of which is what the original BC-6434 issue asked for.
+
+### Hypothesis disposition
+
+| # | Hypothesis (per BC-6434 issue body) | Verdict |
+|---|---|---|
+| 1 | 3-second timeout on cold session | **Rejected.** revops `timeout: 3` AND workflows `timeout: 5` both fire successfully and produce full banner stdout (logs prove it). |
+| 2 | Claude Code v2.1.123 routing regression | **Confirmed (with refinement).** Routing still reaches the model — only the user-visible terminal block is gone. Confirmed by upstream issue #24425. |
+| 3 | Hook registration when cwd ≠ plugin root | **Rejected.** `/reload-plugins` reports 14 hooks; logs prove invocation in non-plugin cwd. |
+
+### Severity reclassification
+
+Original issue priority: **High** (advertised UX entry point degrades to "user has to know command exists"). Post-diagnosis: **Low–Medium**. The agentic UX is fully intact — Claude has the banner content via system-reminder, skills activate, commands are discoverable to the model. The only loss is human-visible signaling, which has documented alternative channels (statusline, slash commands) for plugin authors who want to invest.
+
+### Resolution path chosen
+
+Path A from the brainstorm gate: revert instrumentation, accept the diagnosis, file upstream. Bump versions per BC-6000 same-commit rule. Update Linear BC-6434 with diagnosis + downgrade priority. Add CLAUDE.md gotcha. Add comment to upstream issue #24425 with our repro evidence.
+
+Path B (instruction-injection workaround) and Path C (statusline-based discovery) both deferred — the platform's recommended channel is statusline, but it is a larger investment that should be a separate Linear issue if/when humans-don't-see-banner becomes a real friction. For now, the model's continued ability to surface SF context preserves the validated agentic UX from BC-6315.
+
 ## Out of scope
 
 - Fixing other revops-validation issues (BC-6436, BC-6437, BC-6438) — separate work

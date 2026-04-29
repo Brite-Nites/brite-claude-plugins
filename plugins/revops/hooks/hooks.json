@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{ printf '[%s] revops hook fired in cwd=%s\\n' \"$(date '+%Y-%m-%dT%H:%M:%S%z')\" \"$PWD\" >> /tmp/revops-banner.log; bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sfdx-banner.sh\" | tee -a /tmp/revops-banner.log; }",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sfdx-banner.sh\"",
             "timeout": 3,
             "statusMessage": "Probing for SFDX project..."
           }
