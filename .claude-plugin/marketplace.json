@@ -11,7 +11,7 @@
       "name": "workflows",
       "source": "./plugins/workflows",
       "description": "Process + Org plugin — structured workflow methodology with Linear integration",
-      "version": "3.29.2"
+      "version": "3.29.3"
     },
     {
       "name": "marketing",
@@ -29,7 +29,7 @@
       "name": "revops",
       "source": "./plugins/revops",
       "description": "Revenue operations plugin — Salesforce dev + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
-      "version": "0.2.3"
+      "version": "0.2.4"
     }
   ]
 }
