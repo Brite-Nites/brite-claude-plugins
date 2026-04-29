@@ -11,6 +11,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Social media strategy skill stub
 - Content strategy skill stub
 
+## [0.3.13] - 2026-04-29
+
+BC-6301 — 5th BC-5906 round-2 follow-up. Two distinct sequence-step spec drifts in `/marketing:launch-campaign` Phase 9.
+
+### Fixed
+- **Sx-13** — `variant` field on sequence steps is BOOLEAN (`false`/`true`), not the string `"A"`. Updated `launch-campaign.md` Phase 9 request body example (lines 615 + 623). EB API spec marks the field boolean; sending `"A"` would silently coerce or 422.
+- **Sx-14** — EB auto-prepends `Re: ` to subjects when `thread_reply: true`. Reversed the spec rule in `launch-campaign.md` Phase 9 step-2 validation (line 600), updated the explanatory text below the JSON body (line 630), and corrected the Phase 10 preview example (line 689) to show the auto-prepend explicitly. Step 2 subjects must NOT include `Re:` in the artifact — EB inserts it at delivery, otherwise the recipient sees `"Re: Re: ..."`.
+- Swept `email-copywriting/SKILL.md` for the same `Re:` prefix rule (4 instances: rule statement at line 55, skeleton step-2 bump examples at lines 135 + 155, and JSON artifact schema example at line 237). All corrected.
+- Updated production-template artifact `docs/dogfood/bc-5826/test-copy.json` step_2.subject to drop the `Re:` prefix. (Round-2 evidence file `docs/dogfood/bc-5906/test-copy.json` kept verbatim as historical input that surfaced Sx-14.)
+- Co-updated `tools/integrations/email-bison.md` § Known gotchas with both findings — variant-boolean and auto-Re: prepend now documented at the canonical EB integration-doc layer.
+
 ## [0.3.0] - 2026-04-19
 
 Guided onboarding for user-level EB registration + updated investigation of plugin-scoped alternatives.

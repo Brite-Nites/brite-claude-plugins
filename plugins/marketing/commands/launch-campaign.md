@@ -597,7 +597,7 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
 2. **Validate copy artifact step fields.** Reload the copy artifact (already in memory from Phase 1). Confirm:
    - `step_1.subject` present, no `{FIRST_NAME}` or merge variables in it.
    - `step_1.body` present, `<br><br>` paragraph breaks, no `<p>` tags, no em-dashes, no `{{` double-brace.
-   - `step_2.subject` starts with `Re:` (per EB format rule).
+   - `step_2.subject` does NOT start with `Re:` — EB auto-prepends `Re: ` when `thread_reply: true`. HARD FAIL if the artifact's step_2.subject starts with `Re:` (would produce double-prefix `"Re: Re: ..."` in delivery — verified BC-5906 round-2 Sx-14).
    - `step_2.body` follows same format constraints.
    - `step_1.wait_in_days >= 0` (step 1 is typically 0 — sends immediately once the campaign resumes), but per production rule apply `max(1, artifact.step_1.wait_in_days)` for the actual API call. Document the override if the artifact had 0.
    - `step_2.wait_in_days >= 3` — HARD FAIL if the artifact has <3. Operator patches the artifact and re-runs.
@@ -612,7 +612,7 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
          "email_body": "<copy artifact step_1.body>",
          "wait_in_days": <max(1, artifact.step_1.wait_in_days)>,
          "order": 1,
-         "variant": "A",
+         "variant": false,
          "thread_reply": false
        },
        {
@@ -620,14 +620,14 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
          "email_body": "<copy artifact step_2.body>",
          "wait_in_days": <artifact.step_2.wait_in_days>,
          "order": 2,
-         "variant": "A",
+         "variant": false,
          "thread_reply": true
        }
      ]
    }
    ```
 
-   `thread_reply: true` on step 2 ensures it threads under step 1 in the recipient's inbox — required for the `Re:` subject pattern to render correctly.
+   `thread_reply: true` on step 2 ensures it threads under step 1 in the recipient's inbox AND triggers EB to auto-prepend `Re: ` to `email_subject` at delivery. The artifact's bare step_2.subject becomes `"Re: <subject>"` in the recipient's inbox — do NOT include `Re:` in the artifact value.
 4. **Show sequence plan.** Render the step 1 + step 2 subjects + body first-line-snippets for operator review.
 5. **User gate 9.** Ask via `AskUserQuestion`:
 
@@ -686,7 +686,7 @@ Phase 10 therefore has two modes:
    > …
    >
    > **STEP 2** (wait 4 days)
-   > Subject: Re: Quick question
+   > Subject: Quick question  *(EB auto-prepends `Re: ` at delivery — recipient sees `"Re: Quick question"`)*
    >
    > Circling back in case it got buried. Still happy to send the architectural lighting preview whenever it's useful.
    >
