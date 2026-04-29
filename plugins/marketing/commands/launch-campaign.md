@@ -284,29 +284,26 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 **Steps:**
 
 1. **Ground-truth the tool name.** `search_api_spec` with query `custom variable create` — locate the exact tool (likely `create_custom_variable`). Also identify the `list_custom_variables` tool to check for pre-existing variables with the same name.
-2. **Load variables from copy artifact.** From the parsed artifact (Phase 1 step 4), read `custom_variables[]`. Each entry has `{name, default}`. Example: `[{"name": "RECENCY_ANCHOR", "default": ""}, {"name": "PROOF_POINT_COMPANY", "default": ""}]`.
+2. **Load variables from copy artifact.** From the parsed artifact (Phase 1 step 4), read `custom_variables[]`. Each entry has `{name, default}`. Example: `[{"name": "RECENCY_ANCHOR", "default": ""}, {"name": "PROOF_POINT_COMPANY", "default": ""}]`. The `default` is consumed in Phase 4 as the per-lead fill-in value when the CSV row lacks a column for this variable (see Phase 4 step 2 line 364) — it is NOT a workspace-scoped property of the variable in EB (per Sx-2, BC-6299 — EB's `POST /api/custom-variables` accepts only `{name}`).
 3. **Check for existing variables.** Call `list_custom_variables` in the target workspace. For each artifact variable, classify:
    - **New** — not present in the workspace. Will create.
-   - **Existing** — name matches; will NOT re-create (EB rejects duplicate names).
-   - **Conflicting** — name matches but default differs. Flag to operator — don't silently overwrite.
+   - **Existing** — name matches; will NOT re-create (EB returns 422 on duplicate `POST /api/custom-variables`). Reuse as-is.
 4. **Render the create plan.** Show the operator:
 
    > Variables to create in workspace `{workspace}`:
-   > - `{RECENCY_ANCHOR}` (new) — default: empty
-   > - `{PROOF_POINT_COMPANY}` (new) — default: empty
-   > - `{FREE_ASSET_NOUN}` (existing — will reuse) — default in workspace: "architectural preview"
-   > - `{SENDER_FIRST_NAME}` (conflicting) — workspace default: "Amanuel"; artifact default: "". Resolve?
+   > - `{RECENCY_ANCHOR}` (new) — will register name only; per-lead values applied at Phase 4
+   > - `{PROOF_POINT_COMPANY}` (new)
+   > - `{FREE_ASSET_NOUN}` (existing — will reuse name registration)
 5. **User gate 3.** Ask via `AskUserQuestion`:
 
-   > Create {N-new} new variables in `{workspace}`? {M-conflicting} conflicts to resolve above.
+   > Create {N-new} new variables in `{workspace}`? Existing ones will be reused as-is (EB rejects duplicate POSTs).
    >
-   > - Yes, create new + keep existing defaults on conflicts (Recommended)
-   > - Yes, create new + overwrite conflicts with artifact defaults
+   > - Yes, create new + reuse existing (Recommended)
    > - Abort — fix the artifact or workspace state
-6. **Execute creates.** For each new variable, call `create_custom_variable` with `{name, default}`. Collect the variable IDs returned by the API. If the tool returns a confirmation-gated response (unlikely for variable creation, but verify), follow the two-call pattern per BC-2707.
-7. **Append to metadata JSON.** Set `custom_variables_created: [<list-of-names>]`, `last_completed_phase: 3`.
+6. **Execute creates.** For each new variable, call `create_custom_variable` with `{name}` only (per Sx-2, BC-6299 — EB's `POST /api/custom-variables` accepts only `name`; sending `default` is silently ignored). Collect the variable IDs returned by the API. If the tool returns a confirmation-gated response (unlikely for variable creation, but verify), follow the two-call pattern per BC-2707.
+7. **Append to metadata JSON.** Persist `custom_variables_created: [{id, name}]` from each create response (response body is `{id, name, created_at, updated_at}` — no `default` field). Set `last_completed_phase: 3`. **Note (Sx-3, BC-6299):** EB silently lowercases names on store (`RECENCY_ANCHOR` → `recency_anchor`). Render-engine case-sensitivity is unverified — flagged for verification at BC-6308 round-3 Phase 4 lead spot-check.
 
-**If Phase 3 fails:** the workspace has some, none, or all of the variables created depending on where in the loop the failure happened. The metadata JSON's `custom_variables_created` list is authoritative for what's on the vendor side. Operator inspects the workspace, deletes the partial set if desired via the EB UI, and re-runs the phase from scratch or patches the artifact to skip already-created names.
+**If Phase 3 fails:** the workspace has some, none, or all of the variables created depending on where in the loop the failure happened. The metadata JSON's `custom_variables_created` list is authoritative for what's on the vendor side. **Note (Sx-4, BC-6299):** there is no `DELETE /api/custom-variables/{id}` endpoint. Custom variables persist workspace-scoped indefinitely; only the EB UI can remove them. Operator inspects the workspace and either retains the partial set (recommended for next re-run, since duplicate POSTs return 422) or manually removes via the UI; then re-runs the phase from scratch or patches the artifact to skip already-created names.
 
 ---
 
