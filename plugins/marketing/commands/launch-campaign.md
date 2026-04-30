@@ -76,6 +76,26 @@ Run this block before Phase 1. Every input that flows into `Bash`, the metadata 
 
 **IV-7. Metadata JSON — no credential values.** The metadata write path documented in § Launch metadata schema writes only workspace labels, campaign IDs, lead counts, timestamps, and resolution-method tags. It **never writes** tokens, keys, session IDs, or any value sourced from a credential env var. When a phase needs to record the **source** of a credential (e.g., "sender auth came from the b2b workspace token"), log the source **name** (e.g., `"sender_auth_source": "workspace-token-env"`), not the value. Enforcement is by construction — the schema enumerates permitted fields; any phase that would write a credential value is a bug.
 
+**IV-8. `--campaign-name` validation + write-path confinement.** `--campaign-name` flows into two on-disk paths: the metadata JSON path (`docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`, written at Phase 1 step 10) and the Phase 2 sidecar CSV path (`docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}-skipped.csv`, written at Phase 2 step 4c). Both paths interpolate `{campaign-name}` directly. Without validation, a poisoned value like `../../../tmp/exfil` or `foo/../../etc/x` lets metadata + lead PII (sidecar) land outside the expected directory.
+
+Two-step enforcement, applied once at Phase 1 pre-flight (before any path is interpolated):
+
+1. **Regex validation.** `--campaign-name` MUST match `^[A-Za-z0-9][A-Za-z0-9 _.-]{0,79}$`. Allows letters, digits, space, underscore, period, hyphen; first char must be alphanumeric (no leading dot to prevent hidden-file paths); cap at 80 chars. Reject `/`, `\`, `..`, quotes, shell metacharacters, control chars. No auto-sanitization — operator resubmits.
+
+2. **Realpath confinement of the resolved write path.** After constructing the metadata JSON path or sidecar CSV path, resolve via `realpath` (or `readlink -f`) and confirm the resolved absolute path begins with the resolved absolute path of the chosen write directory:
+   - Default path: must begin with `<repo-root>/docs/campaigns/{entity}/`
+   - Dogfood path: must begin with `<repo-root>/.claude/worktrees/<worktree>/dogfood/` (with `<worktree>` already validated by IV-3)
+
+   On mismatch, halt with a clear error; do NOT auto-correct. This is defense-in-depth against the regex missing an edge case (e.g., Unicode lookalikes, NFC-vs-NFD normalization differences).
+
+The two-step pattern mirrors IV-1 + IV-2 for `--csv`. Pre-existing exposure: prior to BC-6307 the metadata JSON path also interpolated `{campaign-name}` without validation; IV-8 closes that gap retroactively.
+
+**IV-9. Sidecar CSV formula-injection neutralization (Phase 2 step 4c).** The sidecar CSV preserves "original CSV columns verbatim (preserve order)" — meaning whatever the upstream lead source put into a field like `first_name` or `company_name` lands in the sidecar verbatim. Hostile content from third-party enrichment vendors or operator-curated lists can include Excel/Sheets formula-injection payloads (`=cmd|'/c calc'!A0`, `@SUM(...)`, `+HYPERLINK(...)`, `-2+3`). When the operator opens the sidecar to spot-check skipped leads, those formulas execute in their spreadsheet client.
+
+Before writing each cell value to the sidecar, neutralize formula-injection: if the cell's first character is `=`, `+`, `-`, `@`, tab (`\t`), or carriage return (`\r`), prepend a single quote (`'`) to the cell value. The single-quote prefix is a well-known Excel/Sheets convention: it signals "treat this as text, not a formula." The original cell value is preserved (the `'` is not stored as data; it's a display directive). For multi-line cells, neutralize each line that starts with one of the trigger characters.
+
+Applies only to the sidecar CSV write at Phase 2 step 4c. The source CSV (`--csv`) is not mutated — IV-9 is a write-path mitigation, not an input filter, because the sidecar is a fresh artifact whose explicit purpose is operator review in a spreadsheet client. The trigger character set matches the OWASP CSV-injection guidance.
+
 ---
 
 ## Argument parsing and defaults
@@ -123,6 +143,7 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
   "lead_count": 127,
   "segmented": true,
   "esp_segments": {"Google": 84, "Microsoft": 31, "Other": 12},
+  "email_type_segments": {"professional": 84, "role": 3, "personal": 9},
   "custom_variables_created": ["RECENCY_ANCHOR", "PROOF_POINT_COMPANY"],
   "lead_ids_uploaded": 127,
   "campaign_ids": {"Google": 5551, "Microsoft": 5552, "Other": 5553},
@@ -141,13 +162,18 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 
 `last_completed_phase` advances monotonically from 1 to 11. `activated` flips to `true` only on Phase 11 success; `activated_at` is the ISO-8601 timestamp of the second `resume_campaign` call (the post-confirmation one).
 
+`email_type_segments` records the per-email-type bucket counts BEFORE the gate-2 filter is applied — captures the operator's full input, not just the surviving subset. Empty buckets are absent from the object (matches `esp_segments` convention). The operator's chosen filter is recorded separately in `email_type_filter_applied` (see optional fields below).
+
 **Optional fields written by specific phases.** The example above shows the minimal shape. Individual phases also write these fields when applicable — consumers MUST accept their presence and SHOULD gracefully handle their absence:
 
 - Phase 1 step 3 / step 10: `workspace_mismatch: {expected: "<id>", actual: "<id>"} | null`
 - Phase 1 step 7 / step 10: `sender_resolution_method: "artifact-default" | "marketing-context" | "salesforce" | "operator-prompt"`
 - Phase 1 step 9 / step 10: `unique_per_lead_enabled: <bool>`
-- Phase 2 step 3 (F12 skip-empty): `skipped_buckets: [<bucket-label>, ...]`
+- Phase 2 step 4b (F12 skip-empty, post-gate): `skipped_buckets: [<bucket-label>, ...]`
 - Phase 2 IV-4 (Input validation): `invalid_domain_rows: [<row-number>, ...]`
+- Phase 2 step 1 (malformed-email handling): `invalid_email_rows: [<row-number>, ...]`
+- Phase 2 step 4d (post-gate metadata write): `email_type_filter_applied: "default" | "include_role" | "include_personal" | "include_all" | "disabled_segmentation"` (records which option the operator picked at gate 2; `default` means skip role + personal). Set to `null` when `--no-host-lookup` skipped Phase 2 entirely.
+- Phase 2 step 4c (post-gate sidecar write): `skipped_leads_csv_path: <path> | null` (path to sidecar CSV of skipped leads; `null` if no leads skipped or `--no-host-lookup` skipped Phase 2)
 - Phase 5 step 3: `existing_campaign_matches: [<id>, ...]` (campaign IDs returned by `list_campaigns(search="{base}")` before User gate 5; empty list is the happy path)
 - Phase 5 step 5: `reused_existing_ids: <bool>` (true if operator selected "Reuse existing IDs" at User gate 5; false on fresh creates)
 - Phase 5 step 8 / step 9: `plain_text_applied: <bool>` (true only if step 8 PATCH loop completed for ALL campaigns; false if partial)
@@ -199,7 +225,7 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
    Record which priority level resolved each `{SENDER_*}` variable in the metadata JSON (`sender_resolution_method: "artifact-default" | "marketing-context" | "salesforce" | "operator-prompt"`) for the Phase 10 preview and downstream audit.
 8. **Lead spot check.** Pick 3 rows from the CSV (rows 2, middle, last). For each, render the step_1 body using the same local-render algorithm Phase 10 uses: substitute variables from CSV fields + `custom_variables[].default` + `{SENDER_*}` resolutions from step 7, then resolve spintax deterministically by picking the **first** option per `{opt1|opt2|…}` group, then replace `<br><br>` with paragraph breaks for display. Show rendered text to the operator. This catches spintax-rendering problems, missing CSV columns, and unbalanced `{` / `}` before any lead gets created. Call this out explicitly when rendering: "Spintax rendered with first-option pick for deterministic preview; actual sends will rotate options."
 9. **Unique-per-lead auto-toggle.** If `lead_count < 500`, enable per-lead variable uniqueness (Josh Braun framework from Revgrowth 10 — each lead gets a slightly different variable value rendering). If `lead_count >= 500`, skip per-lead uniqueness for deliverability / sender-volume reasons. Log the decision.
-10. **Write initial metadata JSON.** Determine write path per § Launch metadata schema "Dogfood write path" note:
+10. **Write initial metadata JSON.** Validate `--campaign-name` per IV-8 (regex + write-path realpath confinement) before constructing the path. Determine write path per § Launch metadata schema "Dogfood write path" note:
     - Default: `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`
     - Dogfood override (CSV path under `.claude/worktrees/`): `.claude/worktrees/<detected-worktree>/dogfood/{campaign-name}-{YYYY-MM-DD}.json`
     Populate `schema_version`, `entity`, `campaign_name_base`, `workspace`, `copy_artifact_path`, `csv_path`, `lead_count`, `launched_at`. Also record the scratch-state flags from steps 3–7: `workspace_mismatch` (if any), `sender_resolution_method`, `unique_per_lead_enabled`. Set `last_completed_phase: 1`. This is the first progressive write.
@@ -223,13 +249,45 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 
 ## Phase 2 — HOST LOOKUP
 
-**Purpose.** Tag each lead by email service provider (ESP) so campaigns can be segmented by sending infrastructure. Segmentation reduces cross-provider deliverability interference — a sender warmed on Google may perform differently into Microsoft inboxes, and mixing providers in one campaign can pollute the stats. This phase is read-only; no leads are mutated.
+**Purpose.** Phase 2 has two detection passes. **Email-type detection** (step 1) classifies each lead as `professional` / `role` / `personal` and lets the operator drop role + personal addresses by default. **ESP detection** (steps 2–3) resolves who hosts each lead's domain so professional leads can be split into Google / Microsoft / Other campaigns. The operator's gate-2 choice is applied in step 4 (post-gate). ESP segmentation reduces cross-provider deliverability interference — a sender warmed on Google may perform differently into Microsoft inboxes, and mixing providers in one campaign can pollute the stats. This phase is read-only; no leads are mutated.
 
-**Skip if** `--no-host-lookup` OR `--no-segment` is passed. If skipping, set `segmented: false` in metadata, record `esp_segments: null`, and proceed to Phase 3.
+**Two skip flags with different scopes:**
+
+- **`--no-host-lookup`** — skip Phase 2 entirely. Step 1 (email-type detection) does NOT run. Set `segmented: false`, `esp_segments: null`, `email_type_segments: null`, `email_type_filter_applied: null`, `skipped_leads_csv_path: null`, `invalid_email_rows: []` in metadata. No gate 2. Proceed to Phase 3.
+- **`--no-segment`** — skip ESP segmentation only. Step 1 (email-type detection) DOES run; gate 2 renders without the ESP breakdown table; the operator picks an email-type filter only. Resulting plan is one combined campaign on the chosen email-type subset. Set `segmented: false`, `esp_segments: null`, populate `email_type_segments`, `email_type_filter_applied`, `skipped_leads_csv_path` per the operator's gate-2 choice. Proceed to Phase 3.
+
+The flag table at line 90/91 is the contract: `--no-host-lookup` is the broader skip; `--no-segment` is the narrower ESP-only skip.
 
 **Steps:**
 
-1. **Resolve ESP per domain via Bash `dig` (F10 — primary path).** Email Bison has no lead-side ESP detection tool today (BC-5826 X17 dogfood confirmed: `search_api_spec` on `host lookup`, `ESP`, `domain detection`, `check-mx-records` returns only sender-side tools). Bash `dig` is the primary — and currently only — path. Extract domains, filter invalid ones (per Input validation § IV-4), resolve MX records in **parallel in one Bash invocation**, bucket client-side:
+1. **Email-type detection (per-lead pre-filter).** Before resolving ESP per domain, tag each lead by email-type. Two static lists are baked into the spec — no DNS lookup, no API call. Predicate output names (`is_role`, `is_free`) match the BounceBan response shape so the future brite-enrichment-MCP swap (BC-5538) is an internals-only change.
+
+   - **Role-prefix list (19 entries).** List verbatim: `info`, `sales`, `contact`, `support`, `hello`, `team`, `office`, `admin`, `help`, `service`, `general`, `feedback`, `enquiries`, `inquiry`, `inquiries`, `pr`, `press`, `partnerships`, `partners`. Match: case-insensitive exact on local-part. No normalization (no hyphen-stripping, no underscore-collapsing) — variant forms like `customer-service@` and `info-team@` are intentionally NOT caught at this level; that's the BC-5538 BounceBan-swap's job. Scope rationale: list focuses on generic shared inboxes that genuinely show up in B2B CSVs and aren't a fit as cold-outreach targets. Intentionally excluded: back-office department names (`accounting`, `billing`, `legal`, `accounts`, `accountspayable`, `ap`), HR/talent (`hr`, `recruiting`, `recruiter`, `jobs`, `careers`), IT (`it`), customer-service-team queues (`cs`, `customerservice`), media/marketing/events (`media`, `marketing`, `events`), operations (`operations`, `ops`), and system addresses (`noreply`, `postmaster`, `webmaster`, `mail`, `email`). The exclusions reflect Brite's TAM (back-office departments aren't decision-makers for lighting; system addresses shouldn't appear in clean CSVs from list-building) plus the operator-override safety valve at gate 2 for the rare slip-through. False-positive cost is bounded — operator review at gate 2, not silent deletion.
+
+   - **Free-mail-domain list (12 entries).** List verbatim: `gmail.com`, `yahoo.com`, `hotmail.com`, `outlook.com`, `icloud.com`, `aol.com`, `protonmail.com`, `googlemail.com`, `live.com`, `me.com`, `mac.com`, `mail.com`. Match: case-insensitive exact on domain. First 7 cover the canonical free providers (the original 5 from `tam-mapping` Operational rule 1 plus `aol.com` + `protonmail.com`). Last 5 are US-relevant aliases that legitimately appear in US-based prospect lists: `googlemail.com` (Google's older alias), `live.com` (Microsoft consumer), `me.com` + `mac.com` (Apple legacy), `mail.com` (generic free provider). Intentionally excluded: country-localized variants (`yahoo.co.uk`, `outlook.de`), Russian/Chinese providers (`mail.ru`, `yandex.*`, `163.com`, `qq.com`) — out of Brite's TAM. US ISP-attached email (`comcast.net`, `verizon.net`, `att.net`) — high false-positive risk on home-based micro-businesses (sole-proprietor installers giving out `tom@comcast.net` as the business contact) in Brite Nites' contractor-targeted campaigns.
+
+     **Keep in sync.** This list mirrors `plugins/marketing/skills/tam-mapping/SKILL.md` § Operational rule 1 (free-email-provider pre-tier filter). The upstream rule routes free-mail rows to `personal-contacts.csv` BEFORE tier-A/B/C delegation; the runtime rule here is a safety net for CSVs that bypassed tam-mapping. **If you change this list (add/drop a free-mail domain), update both sides.** Annotation pair: `plugins/marketing/commands/launch-campaign.md` § Phase 2 step 1 free-mail-domain list ↔ `plugins/marketing/skills/tam-mapping/SKILL.md` § Operational rule 1.
+
+   - **Per-lead predicate.**
+
+     ```
+     is_role(email):  local-part ∈ role-prefix list (case-insensitive exact match)
+     is_free(email):  domain ∈ free-mail-domain list (case-insensitive exact match)
+     bucket(email):
+       if is_free(email):       → "personal"   (tiebreak: personal beats role)
+       elif is_role(email):     → "role"
+       else:                    → "professional"
+     ```
+
+   - **Tiebreak rule.** If a lead matches both `is_role` AND `is_free` (e.g., `sales@gmail.com`), report as `personal`, not `role`. Reasoning: dominant signal is the free-mail domain; aligns with operator-override semantics — if the operator opts to "include role but skip personal," this lead correctly follows the personal rule.
+
+   - **Output.** Per-lead tag plus aggregated counts: `email_type_segments: {professional: N, role: N, personal: N}`. Empty buckets absent from the object (matches existing `esp_segments` shape).
+
+   - **Malformed-email handling.** If a lead's email is missing `@`, has multiple `@`, or fails Phase 1's email-format check, record the row number in `invalid_email_rows` (sibling of `invalid_domain_rows` populated in step 2) and skip the lead from BOTH email-type and ESP buckets. Operator sees the count at gate 2.
+
+   Steps 2–3 below operate on the lead set as a preview pass — they classify ESP for ALL leads (regardless of email-type tag) so gate 2 can show the post-filter ESP breakdown for any of the 5 filter choices the operator might pick. Step 4 (post-gate) is where the chosen filter is actually applied to produce the final per-bucket lead lists, including the F12 skip-empty-buckets prune (now step 4b) which only runs after the filter is known. If gate 2's chosen action drops all leads, halt with a clear message: "Email-type filter dropped all leads. Adjust filter at gate 2 or re-source the CSV."
+
+2. **Resolve ESP per domain via Bash `dig` (F10 — primary path).** Email Bison has no lead-side ESP detection tool today (BC-5826 X17 dogfood confirmed: `search_api_spec` on `host lookup`, `ESP`, `domain detection`, `check-mx-records` returns only sender-side tools). Bash `dig` is the primary — and currently only — path. Extract domains from ALL leads (not yet filtered — gate 2 needs ESP counts under any filter choice the operator might preview), filter invalid ones (per Input validation § IV-4), resolve MX records in **parallel in one Bash invocation**, bucket client-side:
    - **Extract + filter + resolve in a single Bash call.** Do NOT loop the Bash tool per domain — that turns a 5k-unique-domain 10k-lead CSV into hours of round-trip latency. One invocation pipeline:
 
      ```
@@ -251,31 +309,61 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
      - `Unknown` — `dig` returned nothing (NXDOMAIN or no MX record)
 
    **Future MCP-native path (F11, not yet unlocked).** If EB ever adds a server-side ESP inference tool callable via `get_lead` or a bulk-ESP-classify endpoint, this command's current phase ordering blocks it — leads don't exist in EB yet at Phase 2 timing (UPLOAD is Phase 4). Unlocking the MCP-native path would require moving Phase 2 HOST LOOKUP after Phase 4 UPLOAD. Keep current ordering for now (Bash `dig` works; reordering is a larger structural change with downstream campaign-create implications). Re-evaluate when an ESP inference tool lands in a vendor release.
-2. **Count leads per bucket.** Aggregate the CSV rows by their domain's bucket. The three-bucket simplification for segmentation is: `Google`, `Microsoft`, and `Other` (everything else collapsed). Surface the full 8-bucket detail in the user gate but use the 3-bucket plan for actual campaign segmentation — deliverability infra considers Google and Microsoft separately; the long tail stays one bucket.
-3. **Skip empty buckets (F12).** If any bucket in the 3-bucket plan ends up with **0 leads**, drop it from the segmentation plan — do NOT create an empty campaign. Example: CSV resolves to `Google: 84, Microsoft: 0, Other: 12` → create 2 campaigns (`| Google`, `| Other`), skip Microsoft entirely. Record the skipped buckets in scratch state so the user gate + metadata JSON reflect the actual (pruned) plan. If ALL buckets are empty, halt — the CSV has zero resolvable domains and Phase 3 cannot proceed.
-4. **Render the segmentation plan.** Show the operator:
+3. **Count leads per (ESP × email-type) cell.** Join scratch state from steps 1 and 2: for each lead, look up its (email-type tag, domain → ESP bucket) tuple and increment the appropriate cell of a 3×3 grid `{Google, Microsoft, Other} × {professional, role, personal}`. Single pass over the per-lead tag table from step 1; no additional CSV walks. Gate 2's preview ESP table for any of the 5 filter choices is computed by summing the email-type columns that choice would keep. Surface the full 8-bucket ESP detail in the user gate (post-filter under the default choice) but use the 3-bucket plan for actual campaign segmentation — deliverability infra considers Google and Microsoft separately; the long tail stays one bucket.
 
-   > Segmentation plan for campaign `{base}`:
-   > - `{base} | Google` — N leads ({% of total}%)
-   > - `{base} | Microsoft` — N leads ({% of total}%)
-   > - `{base} | Other` — N leads ({% of total}%)
-   >
-   > {IF any bucket skipped:}
-   > Skipped (0 leads): {skipped-bucket-list}. No campaign will be created for these.
-   > {END IF}
-   >
-   > Detailed ESP breakdown: Google N, Microsoft N, Proofpoint N, Mimecast N, Barracuda N, Cisco N, Custom N, Unknown N.
-5. **Append to metadata JSON.** Set `segmented: true`, `esp_segments: {<only non-empty buckets>}`, `last_completed_phase: 2`. Empty buckets are absent from the object entirely (not `0` values) — downstream phases iterate over the keys and the absence means "skip".
+**User gate 2 fires here** (rendered below — physically separated for readability; logically inserts between step 3 and step 4).
+
+4. **Apply gate-2 decision (post-gate).** This step runs AFTER User gate 2 returns. Branch on the operator's choice in this exact order:
+   - **(4a) Compute the skipped-lead set** based on the chosen filter:
+     - `Apply default` → skip leads tagged `role` OR `personal` (enum: `default`)
+     - `Include role addresses too` → skip leads tagged `personal` only (enum: `include_role`)
+     - `Include personal addresses too` → skip leads tagged `role` only (enum: `include_personal`)
+     - `Include all` → skip nothing (enum: `include_all`)
+     - `Disable ESP segmentation` → apply the default email-type filter (skip role + personal), and treat ESP as `--no-segment` (one combined campaign on the surviving professional leads); enum: `disabled_segmentation`
+   - **(4b) Skip empty buckets (F12).** With the surviving (post-filter) lead set, if any bucket in the 3-bucket ESP plan has **0 leads**, drop it from the segmentation plan — do NOT create an empty campaign. Example: post-filter resolves to `Google: 84, Microsoft: 0, Other: 12` → create 2 campaigns (`| Google`, `| Other`), skip Microsoft entirely. Record the skipped buckets in scratch state so the metadata JSON reflects the actual (pruned) plan. If ALL buckets are empty (either no leads survived the email-type filter, or every surviving lead's domain failed DNS), halt — the campaign has zero deliverable leads and Phase 3 cannot proceed.
+   - **(4c) Sidecar CSV write for skipped leads (only if non-empty).** If the skipped-lead set is non-empty, write it to a sidecar CSV. Apply IV-8 (re-validate `--campaign-name` regex + realpath-confine the resolved path to the chosen write directory) and IV-9 (formula-injection neutralization on each cell value) before writing. Path convention mirrors the metadata JSON's dual-path rule from § Launch metadata schema "Dogfood write path" note:
+     - **Production path:** `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
+     - **Dogfood path:** `.claude/worktrees/<detected-worktree>/dogfood/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
+
+     CSV columns: original CSV columns verbatim (preserve order, then apply IV-9 per-cell) + one new trailing column `skip_reason` with values `role_address` or `personal_domain`. If a lead matches both lists (tiebreak case), `skip_reason` is `personal_domain` per the personal-beats-role rule. If the skipped set is empty, no file is created; `skipped_leads_csv_path` is `null`.
+   - **(4d) Append to metadata JSON.** Set `segmented: true` (or `false` if `disabled_segmentation`), `esp_segments: {<only non-empty post-filter buckets>}` (or `null` if `disabled_segmentation`), `email_type_segments: {<only non-empty pre-filter buckets>}` (NOTE: pre-filter — captures the operator's full input, see § Launch metadata schema description), `email_type_filter_applied: "<enum>"` (use the enum value from 4a, NOT the prose label), `skipped_leads_csv_path: <path>|null`, `last_completed_phase: 2`.
 
 **User gate 2.** Ask via `AskUserQuestion`:
 
-> Approve the 3-bucket segmentation above? Or disable ESP segmentation for this run?
+> Phase 2 detection summary for campaign `{base}`:
 >
-> - Approve — proceed with the {bucket-list} split (dynamically rendered from the non-empty buckets after F12 skip-empty filtering; e.g., "Google / Microsoft / Other" or "Google / Other" if Microsoft is empty)
-> - Disable — run as a single `{base}` campaign (treats the run as `--no-segment`)
+> **Email-type breakdown** (lead-level, before filter):
+> - Professional — N leads
+> - Personal     — N leads (free-mail domains)
+> - Role         — N leads ({role-list-summary} addresses)
+>
+> {IF invalid_email_rows non-empty:}
+> Skipped due to malformed email format: N rows.
+> {END IF}
+>
+> **ESP breakdown** (after applying the chosen email-type filter — preview reflects current radio selection):
+> - `{base} | Google`     — N leads ({% of post-filter}%)
+> - `{base} | Microsoft`  — N leads ({% of post-filter}%)
+> - `{base} | Other`      — N leads ({% of post-filter}%)
+>
+> {IF any ESP bucket skipped:}
+> Skipped (0 leads after filter): {skipped-bucket-list}. No campaign will be created for these.
+> {END IF}
+>
+> Detailed 8-bucket ESP breakdown (post-filter): Google N, Microsoft N, Proofpoint N, Mimecast N, Barracuda N, Cisco N, Custom N, Unknown N.
+>
+> **Default action: skip role + skip personal.** Only the {N-professional} professional leads will be segmented into ESP campaigns.
+>
+> - Apply default — skip role + personal, segment professionals by ESP (Recommended)
+> - Include role addresses too — segment role + professional by ESP, skip personal only
+> - Include personal addresses too — segment personal + professional by ESP, skip role only
+> - Include all — segment every lead by ESP, no email-type filter
+> - Disable ESP segmentation — single combined campaign on the chosen email-type subset
 > - Abort
 
-**If Phase 2 fails:** the failure is almost always a DNS lookup error on a stale or typo'd domain. Halt and surface the failing domain. Operator fixes the CSV or accepts "Unknown" bucket leaks and re-runs. No EB state has changed.
+If the operator's chosen action leaves zero leads in any ESP bucket after filtering, the F12 skip-empty-buckets logic (step 4b) handles it.
+
+**If Phase 2 fails:** the failure is almost always a DNS lookup error on a stale or typo'd domain. Halt and surface the failing domain. Operator fixes the CSV or accepts "Unknown" bucket leaks and re-runs. No EB state has changed. Malformed-email handling is documented in step 1's "Malformed-email handling" sub-bullet.
 
 ---
 
@@ -886,7 +974,7 @@ Before marking this command shipped, confirm:
 - [ ] Phase 9 SEQUENCE enforces: step 1 `wait_in_days >= 1`, step 2 `wait_in_days >= 3`, field name `wait_in_days` (not `wait_days`), field name `email_subject` (not `subject`), 2-step max.
 - [ ] Phase 1 PRE-FLIGHT validation checklist includes variable check, messaging sanity, lead spot check, workspace guard, unique-per-lead auto-toggle at <500.
 - [ ] All 4 required args + 9 flags documented (`--no-segment`, `--no-host-lookup`, `--no-sequence`, `--activate`, `--preview`, `--reference`, `--entity`, `--test-send`, `--test-send-sender`); `argument-hint` frontmatter lists all 9.
-- [ ] § Input validation section present with IV-1..IV-7 covering CSV-path safety, path confinement, dogfood path detection, domain regex filter, --test-send validation, SOQL email regex, metadata-no-credentials.
+- [ ] § Input validation section present with IV-1..IV-9 covering CSV-path safety (IV-1), path confinement (IV-2), dogfood path detection (IV-3), domain regex filter (IV-4), --test-send validation (IV-5), SOQL email regex (IV-6), metadata-no-credentials (IV-7), --campaign-name validation + write-path confinement (IV-8), and sidecar CSV formula-injection neutralization (IV-9).
 - [ ] Error recovery documented per phase (partial state + resume procedure).
 - [ ] Launch metadata write path `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` documented.
 - [ ] Dogfood transcript (test campaign on `emailbison-personal`, 5–10 leads) attached to BC-5826 as a comment — activated or draft-only. Phase 10 Mode 1 (local render) MUST succeed with all 5 sanity checks passing. Phase 10 Mode 2 (`--test-send`) is optional and only validated if the flag was passed.
