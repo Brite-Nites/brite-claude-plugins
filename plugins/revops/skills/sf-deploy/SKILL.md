@@ -30,7 +30,7 @@ Delegate elsewhere when the user is:
 - building Flows → [sf-flow](../sf-flow/SKILL.md)
 - doing org data operations → [sf-data](../sf-data/SKILL.md)
 
-> **Default recommendation for brite-salesforce deploys**: route to [`/revops:deploy-sandbox`](../../commands/deploy-sandbox.md) (sandbox) or [`/revops:deploy-prod`](../../commands/deploy-prod.md) (production), not raw `sf project deploy start`. The orchestration commands gate dry-run + Apex tests + Tooling API verification + manual browser checks. Use raw CLI only for non-orchestrable cases (see [Orchestration Commands](#orchestration-commands-recommended-path-for-brite-salesforce) below). Raw-CLI guidance below documents the underlying steps each command sequences.
+> **Default recommendation for brite-salesforce deploys**: prefer [`/revops:deploy-sandbox`](../../commands/deploy-sandbox.md) (sandbox) or [`/revops:deploy-prod`](../../commands/deploy-prod.md) (production) over raw `sf project deploy start`. See [Orchestration Commands](#orchestration-commands-recommended-path-for-brite-salesforce) below for the gate sequence and the non-orchestrable-cases fallback.
 
 ---
 
