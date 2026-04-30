@@ -60,17 +60,106 @@ No `--activate`. No `--test-send`. No `--no-segment`. No `--no-host-lookup`. No 
 
 ## Phase 1 PRE-FLIGHT — live-walk
 
-*(populated at T2 — placeholder)*
+**Active workspace verification.** `get_active_workspace_info` returned: instance `https://personal.outbase.so`, workspace `id: 13` ("BriteNites Team"), `is_primary: true`. Matches expected `--workspace emailbison-personal`. No `set_active_workspace` switch needed.
 
-**R-5 trigger detection:** *(leftover BC-6308 / BC-5906 campaign matches — count + IDs; trigger-source decision)*
+**Inputs verified.** `.claude/worktrees/bc-6308/dogfood/test-leads.csv` has 10 rows (1 header + 6 round-2 + 3 augmented role-based). `test-copy.json` has `schema_version: "1.0"`, `vertical: "municipalities"`, 8 custom variables.
+
+**Cross-mapping check.** `--entity brite-labs` ↔ `--workspace emailbison-personal` is the expected dogfood cross-mapping (per F2 round-1 finding — IV-3 routes runtime metadata under `.claude/worktrees/bc-6308/dogfood/`). Round-3 inherits same routing.
+
+**R-5 trigger detection.** Two pre-list calls fired:
+- `list_campaigns(search="BC-6308")` → **0 campaigns** (clean)
+- `list_campaigns(search="BC-5906")` → **0 campaigns** (round-2 cleanup fully drained; async-delete from 2026-04-27 has converged ~3 days later)
+
+**Lead-state pre-check (optional, defensive against any async-delete straggle).**
+- `list_leads(search="dogfood-test")` → **0 leads**
+- `list_leads(search="bc6308")` → **0 leads**
+
+**R-5 trigger decision:** workspace clean → R-5 verification REQUIRES a manually pre-created collision-trigger campaign at T6 step 1 (between Phase 5 step 2 plan render and step 3 pre-list call). Pre-create one campaign named `BC-6308 Round 3 | Google` via direct `call_api` so the pre-list naturally surfaces it at user gate 5, exercising the BC-6302 fix path. Track placeholder ID for cleanup at T14.
+
+**Time-to-complete Phase 1 walk:** ~3 seconds (3 list calls + workspace info, all read-only, run in parallel).
 
 ---
 
 ## Phase 2 HOST LOOKUP — live-walk
 
-*(populated at T3 — placeholder)*
+**Step 1 — Email-type detection (BC-6307 per-lead pre-filter).** 19-entry role-prefix list + 12-entry free-mail-domain list applied to all 9 leads:
 
-**R-9 (BC-6307 — email-type segmentation):** *(verbatim `email_type_segments` populated from per-lead detection; ESP bucketing post-filter)*
+| Email | local-part | domain | is_role? | is_free? | Tag |
+|---|---|---|---|---|---|
+| dogfood-test-01@gmail.com | dogfood-test-01 | gmail.com | no | YES | personal |
+| dogfood-test-02@gmail.com | dogfood-test-02 | gmail.com | no | YES | personal |
+| dogfood-test-03@outlook.com | dogfood-test-03 | outlook.com | no | YES | personal |
+| dogfood-test-04@outlook.com | dogfood-test-04 | outlook.com | no | YES | personal |
+| dogfood-test-05@brite.co | dogfood-test-05 | brite.co | no | no | professional |
+| dogfood-test-06@brite.co | dogfood-test-06 | brite.co | no | no | professional |
+| info@dogfoodtest.com | info | dogfoodtest.com | YES | no | role |
+| sales@dogfoodtest.com | sales | dogfoodtest.com | YES | no | role |
+| contact@dogfoodtest.com | contact | dogfoodtest.com | YES | no | role |
+
+Tiebreak rule (personal beats role) didn't fire in this dataset — no role address at a free-mail domain.
+
+**Pre-filter email_type_segments: `{professional: 2, role: 3, personal: 4}`** ✓ matches plan expectation.
+
+**Step 2 — ESP MX resolution (Bash dig pipeline per spec line 297-303).** Ran spec's exact one-invocation pipeline; results sequentially re-verified:
+
+| Domain | MX record (sample) | ESP bucket (8-detail) | 3-bucket plan |
+|---|---|---|---|
+| gmail.com | `5 gmail-smtp-in.l.google.com.` (+4 alt) | Google | Google |
+| outlook.com | `5 outlook-com.olc.protection.outlook.com.` | Microsoft | Microsoft |
+| brite.co | `1 aspmx.l.google.com.` (+4 google) | Google | Google |
+| dogfoodtest.com | (empty — no MX records) | **Unknown** | **Other** |
+
+Per spec line 315: "Unknown — `dig` returned nothing (NXDOMAIN or no MX record)" — `dogfoodtest.com` correctly classifies as Unknown, which rolls into the 3-bucket `Other`.
+
+**Step 3 — 3×3 ESP × email-type cell counts (under "Include all" preview):**
+
+| ESP bucket | Professional | Role | Personal | Total |
+|---|---|---|---|---|
+| Google | 2 (brite.co) | 0 | 2 (gmail) | 4 |
+| Microsoft | 0 | 0 | 2 (outlook) | 2 |
+| Other (Unknown→Other) | 0 | 3 (dogfoodtest) | 0 | 3 |
+| **Total** | 2 | 3 | 4 | 9 |
+
+**8-bucket ESP detail under "Include all":** Google: 4, Microsoft: 2, Proofpoint: 0, Mimecast: 0, Barracuda: 0, Cisco: 0, Custom: 0, Unknown: 3.
+
+**R-9 (classification verdict — confirmed):** Spec correctly tagged 3 role addresses (`info`, `sales`, `contact` all match 19-entry list); 4 personal-domain (gmail/outlook in 12-entry free-mail list); 2 professional (brite.co — neither list). Tiebreak path untested in this dataset (no role@free-mail) — already validated semantically in BC-6307. Filter application + metadata write verifies post-gate.
+
+**Time-to-complete Phase 2 walk:** ~2 seconds (parallel dig pipeline; BC-6307 static lists are zero-latency in-memory predicates).
+
+### Structural finding at gate 2 — segmentation-axis architectural mismatch (BC-6514 filed)
+
+**During gate 2 framing**, operator surfaced live screenshots of Brite's actual production campaign topology in workspace 13. Production campaigns use **email-type as the segmentation axis** (Professional Emails / Role Emails as separate campaigns) and combine ESPs into single campaigns ("All ESPs" suffix universal). The current `/marketing:launch-campaign` spec uses the inverse model: ESP as axis, email-type as filter. Spec drift from production reality.
+
+**Web research summary** (full detail in BC-6514):
+- EB official position (verbatim from `docs.emailbison.com/campaigns/overview`): "EmailBison takes an unopinionated approach to ESP matching. It is left to the user to decide if ESP matching or mis-matching is better for their deliverability."
+- The spec's ESP-axis rule comes from upstream Revgrowth-10 methodology, not from EB's own guidance
+- Industry positioning is contested — vendor-marketing-driven on the pro-ESP-matching side; limited independent research
+
+**Operator preference (recorded for BC-6514):** "in a perfect world we would want to be able to do all of the above of like yes we want to segment each campaign by both ESP and email type. so it'd be casino | microsoft | professional, casino | microsoft | role, and casino | microsoft | personal" — multiplicative ideal.
+
+**Decision (per operator delegation-scope):** out-of-scope for this dogfood walk; needs Holden review. **Filed as BC-6514** (priority Medium, assigned to Holden Halford). Round-3 walk RESUMES against current spec (ESP-axis) with R-9 marked **partially validated**:
+- ✅ Classification logic confirmed (per-lead email-type tagging is correct per BC-6307)
+- ⚠️ Segmentation-axis design deferred to BC-6514 architectural review
+
+**Round-3 unblocked for R-1, R-2, R-2a, R-2b, R-3 through R-8, R-10 through R-15** — all independent of segmentation-axis question.
+
+### Step 4 — post-gate filter application
+
+**User gate 2 choice:** "Include all" (max R-9 signal — all 9 leads survive into ESP segmentation per brainstorm decision 2 + plan recommendation).
+
+**Step 4a — skipped-lead set:** empty (filter `include_all` → no leads dropped).
+
+**Step 4b — F12 skip-empty buckets:** all 3 ESP buckets non-empty (Google: 4, Microsoft: 2, Other: 3) → no buckets pruned.
+
+**Step 4c — sidecar CSV:** not written (skipped-lead set is empty per `include_all`).
+
+**Step 4d — metadata writes:**
+- `segmented: true`
+- `esp_segments: {Google: 4, Microsoft: 2, Other: 3}`
+- `email_type_segments: {professional: 2, role: 3, personal: 4}` (pre-filter — captures full input)
+- `email_type_filter_applied: "include_all"`
+- `skipped_leads_csv_path: null`
+- `last_completed_phase: 2`
 
 ---
 
@@ -198,7 +287,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-6 | BC-6303 — metadata schema (4 new fields) | *pending* | | |
 | R-7 | BC-6304 — Tool tier map clarifies wrapper-vs-API gate | *pending* | | |
 | R-8 ★ | BC-6306 — Phase 5 deliverability PATCH | *pending* | | |
-| R-9 | BC-6307 — Phase 2 email-type segmentation | *pending* | | |
+| R-9 | BC-6307 — Phase 2 email-type segmentation | **partially validated** | Classification logic ✅ confirmed (per-lead `is_role`/`is_free` tagging matches expected on all 9 leads). Segmentation-axis design ⚠️ flagged: spec uses ESP-axis, production uses email-type-axis. Operator-stated ideal is multiplicative. | **BC-6514** (architectural redesign issue, assigned Holden Halford) |
 | R-10 | New flags introduced by round-2 fixes | *pending* | | |
 | R-11 | New metadata schema fields populate | *pending* | | |
 | R-12 | F22 `allow_parallel_sending` (deferred again) | *deferred* | Brainstorm decision 4 — same rationale as round-2 brainstorm decision 3 | |
