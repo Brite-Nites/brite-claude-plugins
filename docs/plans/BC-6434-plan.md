@@ -6,7 +6,9 @@
 
 ## Goal
 
-Classify the root cause of SessionStart `command` hooks failing to fire in fresh Claude Code sessions when cwd is outside the plugin's home directory. Apply a targeted fix once classification is in. Validation: a fresh session opened in `~/Projects/work/brite-nites/brite-salesforce/` shows both the workflows `Brite Session Context` banner and the revops `RevOps Active` banner.
+Classify the root cause of SessionStart `command` hooks failing to fire in fresh Claude Code sessions when cwd is outside the plugin's home directory. Apply a targeted fix once classification is in. Validation (original): a fresh session opened in `~/Projects/work/brite-nites/brite-salesforce/` shows both the workflows `Brite Session Context` banner and the revops `RevOps Active` banner.
+
+**Outcome (post-diagnosis):** Goal redefined. The original "show banner" criterion is unreachable from `hooks.json` alone — see `## Diagnosis` for the upstream UI regression (Claude Code [#24425](https://github.com/anthropics/claude-code/issues/24425)). Achievable goal becomes: classification + upstream issue cite + CLAUDE.md gotcha + Linear update.
 
 ## Issue-vs-ground-truth reconciliation
 
@@ -38,6 +40,8 @@ After the user runs the repro and pastes log contents, classify based on what `/
 | Has output but truncated mid-banner | (same) | Hook ran but timed out → bump timeout 3→10s | Apply timeout fix; ship |
 
 ## Tasks
+
+> **Note:** Tasks 1–7 below describe the instrumentation→repro→classify→fix loop that ran on 2026-04-29. Path A revert was selected after Task 5 — see `## Diagnosis`. This section is reference-only history of the executed loop.
 
 ### Task 1 — Instrument revops SessionStart hook
 
@@ -145,7 +149,7 @@ User reruns Task 4's repro to confirm both banners now fire.
 
 `compound-learnings` skill activates during ship. Likely candidates:
 - New gotcha: hook execution behavior when cwd is outside plugin home directory
-- Promotion-track entry on BC-5806 task-3 reconciliation-table pattern (this is the **3rd surface** — promote pattern-application 7/10 → 8/10)
+- Reconciliation-table pattern: BC-6434 is an additional surface for the issue-vs-ground-truth amendments-table track that reached architecture-9 at BC-2717 (chain BC-5947 → BC-5806 → BC-5832 → BC-2717, with BC-5906 reaffirming). Treat as durability evidence at architecture-9, not a promotion candidate. BC-6434's specific shape — hypothesis-vs-evidence diagnosis — is a subtle variant of spec-vs-ground-truth and may warrant a separate sub-pattern note if a 2nd instance of the diagnosis-table shape appears.
 - Memory entry under Gotchas if the routing/registration is platform-side and we now know its workaround
 
 ## Diagnosis
@@ -158,15 +162,14 @@ Repro run 2026-04-29 17:10 in `cwd=~/Projects/work/brite-nites/brite-salesforce/
 |---|---|---|
 | Hook fires when cwd ≠ plugin home | ✅ | `/tmp/revops-banner.log` and `/tmp/workflows-banner.log` populated with timestamp + cwd lines after fresh session in `brite-salesforce/` |
 | Script execution + stdout | ✅ | Both logs contain full banner content (`RevOps Active` + `🔧 Brite Session Context`) |
-| Hook stdout reaches model context | ✅ | Fresh session reproduced both reminders verbatim when asked: `SessionStart:startup hook success: RevOps Active …` and `SessionStart:startup hook success: 🔧 Brite Session Context …` |
-| Skill activation downstream | ✅ | BC-6315 Phase 1 already proved 5 fixtures activated correct skills in same cwd |
+| Hook stdout reaches model context (skill activation works) | ✅ | Fresh session reproduced both reminders verbatim when asked: `SessionStart:startup hook success: RevOps Active …` and `SessionStart:startup hook success: 🔧 Brite Session Context …`. Skill activation independently proven in [BC-6315](https://linear.app/brite-nites/issue/BC-6315) Phase 1 (5/5 fixtures activated correct skills in same cwd). |
 | **Visible terminal block above first prompt** | ❌ | Splash → `❯ hello` with no banner block in between, in v2.1.123 |
 
 ### Root cause
 
-Claude Code v2.1.0+ no longer renders `SessionStart` `command`-type hook stdout as a visible terminal block. Hook stdout is routed only to the model's `<system-reminder>` channel. Tracked upstream as [anthropics/claude-code#24425](https://github.com/anthropics/claude-code/issues/24425).
+Claude Code v2.1.123 (and likely earlier in the v2.1.x line; precise window pinned by upstream issue) no longer renders `SessionStart` `command`-type hook stdout as a visible terminal block. Hook stdout is routed only to the model's `<system-reminder>` channel. Tracked upstream as [anthropics/claude-code#24425](https://github.com/anthropics/claude-code/issues/24425).
 
-This is a **platform behavior**, not a config issue. Documented (post-research, agent-confirmed via Anthropic docs) as the intentional designed channel: hooks → model context. Anthropic's recommended channel for **user-visible** session context in v2.1.0+ is the **statusline** (`statusLine` setting in `settings.json`) or a user-invoked **slash command** — neither of which is what the original BC-6434 issue asked for.
+This is a **platform behavior**, not a config issue. Documented (post-research, agent-confirmed via Anthropic docs) as the intentional designed channel: hooks → model context. Anthropic's recommended channel for **user-visible** session context in current v2.1.x is the **statusline** (`statusLine` setting in `settings.json`) or a user-invoked **slash command** — neither of which is what the original BC-6434 issue asked for.
 
 ### Hypothesis disposition
 
@@ -188,21 +191,16 @@ Path B (instruction-injection workaround) and Path C (statusline-based discovery
 
 ## Out of scope
 
-- Fixing other revops-validation issues (BC-6436, BC-6437, BC-6438) — separate work
-- BC-6435 brite-salesforce CLAUDE.md §170 drift — different repo
-- BC-6316 eval harness — parallel work stream
-- Removing the workflows banner emoji 🔧 (covered by feedback memory `feedback_no_emojis_in_generated_content.md` but not a BC-6434 concern; if Task 2 instrumentation incidentally lands a strip, fine; if not, leave for a separate small PR)
+- Removing the workflows banner emoji 🔧 — separate PR (covered by feedback memory `feedback_no_emojis_in_generated_content.md`)
 
 ## Verification — objective criteria
 
 | # | Test | Pass criteria |
 |---|---|---|
-| T1 | Instrumentation lands | `git log --oneline holden/bc-6434...main \| head -3` shows instrumentation commit; `./scripts/validate.sh` exit 0 |
-| T2 | Cache-bump discipline | `grep '"version"' plugins/revops/.claude-plugin/plugin.json` returns `0.2.4` AND marketplace.json mirrors AND same-commit per `git log -1 --stat` |
-| T3 | Repro produces signal | At least one of `/tmp/revops-banner.log` or `/tmp/workflows-banner.log` is populated OR explicitly empty after fresh-session run; classification matrix applies |
-| T4 | Diagnosis section written | `grep '## Diagnosis' docs/plans/BC-6434-plan.md` matches before any fix commits |
-| T5 | Fix verified by user re-repro | Fresh session in `brite-salesforce/` shows `RevOps Active` banner AND `Brite Session Context` banner |
-| T6 | Validate + guardrails clean post-fix | `./scripts/validate.sh && ./scripts/check-guardrails.sh --claude-md CLAUDE.md` exit 0 |
+| T1 | Bump discipline (revert state) | revops `0.2.5` AND workflows `3.29.4` in plugin.json + marketplace.json mirrors, both bumps in revert commit (`git log -1 --stat 206fa48`). Intermediate `0.2.4`/`3.29.3` instrumentation bumps in `fc0df30` are part of the audit trail, not the shipped state. |
+| T2 | Diagnosis section written | `grep '## Diagnosis' docs/plans/BC-6434-plan.md` matches |
+| T3 | CLAUDE.md gotcha lands | `grep '24425' CLAUDE.md` matches |
+| T4 | Validate + guardrails clean | `./scripts/validate.sh && ./scripts/check-guardrails.sh --claude-md CLAUDE.md` exit 0 |
 
 ## Related
 
