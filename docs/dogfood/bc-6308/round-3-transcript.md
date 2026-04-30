@@ -221,11 +221,49 @@ All 8 → "existing → reuse" classification. **Zero new creates required for P
 
 ## Phase 4 UPLOAD — live-walk
 
-*(populated at T5 — placeholder)*
+**Step 1 — ground-truth.** `search_api_spec(POST /api/leads/multiple)` returned the canonical bulk endpoint with summary "Bulk create leads (limit 500 per request)." Body schema confirms BC-6300 fix:
+- ✅ `title` (NOT `job_title`)
+- ✅ `company` (NOT `company_name`)
+- No `company_domain` field at lead level — confirms BC-6300 spec note that COMPANY_DOMAIN must be stashed in custom_variables OR dropped (in this artifact, no `{COMPANY_DOMAIN}` references → dropped is fine)
+- `custom_variables` is per-lead array of `{name, value}`
 
-**R-3 (BC-6300 — lead-body field names):** *(post-create lead `title` / `company` values verbatim from GET response)*
+**Step 4 — bulk POST.** Single `POST /api/leads/multiple` with all 9 leads. Body matches BC-6300 field names + 8 custom variables per lead (artifact defaults). Time: <1s.
 
-**R-1 partial (Sx-1/5/8 — API quirks):** *(spec-coverage cross-references)*
+**Result.** All 9 leads created successfully. IDs **14712–14720** (sequential, picking up after round-2's 14706–14711):
+
+| Lead ID | Email | first_name | title | company | ESP bucket |
+|---|---|---|---|---|---|
+| 14712 | dogfood-test-01@gmail.com | Alex | Mayor | Test Denver City | Google |
+| 14713 | dogfood-test-02@gmail.com | Sam | Parks Director | Test Aurora City | Google |
+| 14714 | dogfood-test-03@outlook.com | Jordan | CFO | Test Boulder City | Microsoft |
+| 14715 | dogfood-test-04@outlook.com | Taylor | Downtown Coord | Test Lakewood City | Microsoft |
+| 14716 | dogfood-test-05@brite.co | Casey | Master Planner | Test Fort Collins | Google |
+| 14717 | dogfood-test-06@brite.co | Morgan | Cultural Officer | Test Colorado Springs | Google |
+| 14718 | info@dogfoodtest.com | Info | Operations Manager | Test Dogfood Aquarium | Other |
+| 14719 | sales@dogfoodtest.com | Sales | Sales Director | Test Dogfood Stadium | Other |
+| 14720 | contact@dogfoodtest.com | Contact | General Manager | Test Dogfood Zoo | Other |
+
+**Bucket map for Phase 6 attach:**
+- Google: [14712, 14713, 14716, 14717] — 4 leads
+- Microsoft: [14714, 14715] — 2 leads
+- Other: [14718, 14719, 14720] — 3 leads
+
+**R-3 verdict (BC-6300 lead-body field names — confirmed ✅).** All 9 created leads' POST response shows `title` and `company` populated with verbatim CSV input values. No null-fields. Spec's BC-6300 fix (renamed from `job_title`/`company_name`) matches API reality. The pre-fix spec would have produced 9 leads with `title: null, company: null` — this PR-validated correction prevents the data-loss bug round-2 surfaced.
+
+**R-1 partial verdicts (BC-6298 spec coverage — confirmed ✅ via spec read):**
+- **Sx-1** (search_api_spec query forms): URL-path query `/api/leads/multiple` matched (1 result) cleanly. Per-spec rewrite at line 29 documents URL-path-preferred + keyword fallback. Round-3 implicitly confirmed by working ground-truthing in T4 + T5.
+- **Sx-5** (`last_name` API spec lies): Spec post-fix at line 29 documents `last_name` is silently optional despite required-marking. Already known refuted from round-2. No regression — round-3 sent all leads with `last_name` populated; would have worked even if omitted.
+- **Sx-8** (all-or-nothing bulk failure): No regression test fired since round-3's batch had no duplicates; round-2's evidence stands. Spec coverage in BC-6298 prose verified.
+
+**Notable observations:**
+1. **All 4 personal-domain leads accepted** (gmail x2 + outlook x2). The API spec's "Personal domains will be skipped unless enabled on your instance" warning did NOT fire for workspace 13 — same as round-2 (Sx-7).
+2. **All 3 dogfoodtest.com role-based leads accepted.** Non-resolving domain did NOT trigger any rejection at the API level (EB doesn't validate MX before lead create — it only validates the email format).
+3. **Per-lead custom_variables persisted correctly.** All 8 variables for each of the 9 leads round-trip in the response payload, names lowercased exactly as Sx-3 documented.
+4. **Lead UUIDs returned** (newer than round-2's response shape — round-2 didn't surface UUIDs). EB added this field in the ~3-day window between round-2 (2026-04-27) and round-3 (2026-04-30). Forward-compatible additive change; existing integer-ID code still works. **Filed as BC-6515** (priority Low) — recommends spec stays on integer IDs + add a brief note to email-bison.md § Tool inventory + watch for additional UUID-on-other-resources signal in future rounds.
+
+**Workspace state delta:** +9 leads (IDs 14712–14720). 0 new variables. Workspace customer-variable count unchanged at 14.
+
+**Time-to-complete Phase 4:** ~2 seconds (1 search_api_spec + 1 bulk POST).
 
 ---
 
@@ -323,11 +361,11 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 
 | # | Hypothesis | Status | Evidence (verbatim) | Follow-up if any |
 |---|---|---|---|---|
-| R-1 | BC-6298 — EB API quirks bundle (Sx-1/5/8/10/11) | *pending* | | |
+| R-1 | BC-6298 — EB API quirks bundle (Sx-1/5/8/10/11) | ✅ **partial — Sx-1/5/8 confirmed** | Sx-1: URL-path queries succeed in T4+T5; Sx-5: spec correctly treats last_name as optional; Sx-8: round-2 evidence stands (no regression test in round-3). Sx-10/11 pending T8 (Phase 7 senders walk). | None |
 | R-2 | BC-6299 — Phase 3 variable reuse classification | ✅ **confirmed** | All 8 artifact variables (uppercase) match workspace stored vars (lowercase per Sx-3) → "existing → reuse" classification fires for all 8. Zero new creates required. | None |
 | R-2a ★ | BC-6299 carryover — case-sensitivity | *pending* | | |
 | R-2b ★ | BC-6299 carryover — empty-value rendering | *pending* | | |
-| R-3 | BC-6300 — Phase 4 lead-body field names | *pending* | | |
+| R-3 | BC-6300 — Phase 4 lead-body field names | ✅ **confirmed** | All 9 created leads (IDs 14712-14720) returned with `title` and `company` populated with verbatim CSV values. API schema confirms `title`+`company` (not job_title/company_name). BC-6300 fix prevents the round-2 data-loss bug. | None |
 | R-4 | BC-6301 — variant boolean + no double Re: | *pending* | | |
 | R-5 | BC-6302 — Phase 5 pre-list duplicate guard | *pending* | | |
 | R-6 | BC-6303 — metadata schema (4 new fields) | *pending* | | |
