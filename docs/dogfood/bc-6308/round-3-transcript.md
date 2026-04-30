@@ -165,11 +165,57 @@ Per spec line 315: "Unknown — `dig` returned nothing (NXDOMAIN or no MX record
 
 ## Phase 3 VARIABLES — live-walk
 
-*(populated at T4 — placeholder)*
+**Step 1 — ground-truth.** `search_api_spec(GET /api/custom-variables)` returned 1 endpoint matching, summary "Get all custom variables." Confirms round-2's URL path + descriptive query forms (Sx-1 spec rewrite — both shape pass).
 
-**R-2 (BC-6299 — variable reuse classification):** *(verbatim user gate 3 render; classification of 8 leftover round-2 vars)*
+**Step 3 — list_custom_variables (via `call_api GET /api/custom-variables`).** Workspace 13 returns **14 total variables**, exactly as predicted by the round-3 plan:
 
-**R-13 (F14 pagination regression):** *(Laravel `?page=N` meta still present)*
+| id | name | created_at | provenance |
+|---|---|---|---|
+| 1 | company address | 2025-11-14 | pre-existing (round-1 era) |
+| 2 | company linkedin url | 2025-11-14 | pre-existing |
+| 3 | company phone | 2025-11-14 | pre-existing |
+| 4 | company website | 2025-11-14 | pre-existing |
+| 5 | person job title | 2025-11-14 | pre-existing |
+| 6 | person linkedin url | 2025-11-14 | pre-existing |
+| 7 | recency_anchor | 2026-04-27 | round-2 (BC-5906) |
+| 8 | vertical_descriptor | 2026-04-27 | round-2 |
+| 9 | specific_friction | 2026-04-27 | round-2 |
+| 10 | proof_point_company | 2026-04-27 | round-2 |
+| 11 | proof_point_number | 2026-04-27 | round-2 |
+| 12 | proof_point_timeframe | 2026-04-27 | round-2 |
+| 13 | free_asset_noun | 2026-04-27 | round-2 |
+| 14 | sender_first_name | 2026-04-27 | round-2 |
+
+**R-13 verdict (F14 pagination regression — confirmed ✅).** Pagination meta is still Laravel-style page-based exactly as round-2 captured:
+
+```
+"meta": {
+  "current_page": 1, "from": 1, "last_page": 1, "per_page": 15, "to": 14, "total": 14,
+  "links": [{prev}, {numbered "1"}, {next}],
+  "path": "https://personal.outbase.so/api/custom-variables"
+}
+```
+
+NOT cursor-based. No regression. Spec's pagination model documentation matches reality.
+
+**R-2 verdict (BC-6299 variable reuse classification — confirmed ✅).** The artifact's 8 custom variables (uppercase in JSON) all map to existing workspace variables (lowercase per Sx-3 EB silent lowercase):
+
+| Artifact name (uppercase) | EB stored name (lowercase) | Match? | Variable ID |
+|---|---|---|---|
+| RECENCY_ANCHOR | recency_anchor | ✅ | id 7 |
+| VERTICAL_DESCRIPTOR | vertical_descriptor | ✅ | id 8 |
+| SPECIFIC_FRICTION | specific_friction | ✅ | id 9 |
+| PROOF_POINT_COMPANY | proof_point_company | ✅ | id 10 |
+| PROOF_POINT_NUMBER | proof_point_number | ✅ | id 11 |
+| PROOF_POINT_TIMEFRAME | proof_point_timeframe | ✅ | id 12 |
+| FREE_ASSET_NOUN | free_asset_noun | ✅ | id 13 |
+| SENDER_FIRST_NAME | sender_first_name | ✅ | id 14 |
+
+All 8 → "existing → reuse" classification. **Zero new creates required for Phase 3.** Per BC-6299 fix-validation, this is exactly the expected behavior — the spec's 2-way classification (new / existing) collapsed correctly, no F15 hard-fail-on-duplicate path is needed.
+
+**Note re: `empty_test_var` (R-2b prep).** Not created here — deferred to T11 (R-2a/R-2b dedicated render-test side-flow). Will join workspace as the **9th permanent variable** at T11.
+
+**R-2a / R-2b prep status.** Deferred to T11 per plan. Spec re-confirms: EB has no DELETE endpoint for custom variables (Sx-4) — `empty_test_var` will persist forever. Documented in T1 transcript header + final BC-6308 comment.
 
 ---
 
@@ -278,7 +324,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | # | Hypothesis | Status | Evidence (verbatim) | Follow-up if any |
 |---|---|---|---|---|
 | R-1 | BC-6298 — EB API quirks bundle (Sx-1/5/8/10/11) | *pending* | | |
-| R-2 | BC-6299 — Phase 3 variable reuse classification | *pending* | | |
+| R-2 | BC-6299 — Phase 3 variable reuse classification | ✅ **confirmed** | All 8 artifact variables (uppercase) match workspace stored vars (lowercase per Sx-3) → "existing → reuse" classification fires for all 8. Zero new creates required. | None |
 | R-2a ★ | BC-6299 carryover — case-sensitivity | *pending* | | |
 | R-2b ★ | BC-6299 carryover — empty-value rendering | *pending* | | |
 | R-3 | BC-6300 — Phase 4 lead-body field names | *pending* | | |
@@ -291,7 +337,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-10 | New flags introduced by round-2 fixes | *pending* | | |
 | R-11 | New metadata schema fields populate | *pending* | | |
 | R-12 | F22 `allow_parallel_sending` (deferred again) | *deferred* | Brainstorm decision 4 — same rationale as round-2 brainstorm decision 3 | |
-| R-13 | F14 pagination regression | *pending* | | |
+| R-13 | F14 pagination regression | ✅ **confirmed** | `?page=N` Laravel-style meta with `per_page: 15` unchanged from round-2. NOT cursor-based. No regression. | None |
 | R-14 | F16 workspace-scoped variable persistence regression | *pending* | | |
 | R-15 | F26 sub-second eventual consistency regression | *pending* | | |
 
