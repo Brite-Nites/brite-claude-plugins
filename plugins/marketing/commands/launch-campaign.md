@@ -146,21 +146,24 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
   "email_type_segments": {"professional": 84, "role": 3, "personal": 9},
   "custom_variables_created": ["RECENCY_ANCHOR", "PROOF_POINT_COMPANY"],
   "lead_ids_uploaded": 127,
+  "lead_ids_by_bucket": {"Google": [14706, 14707, 14708], "Microsoft": [14709], "Other": [14710, 14711]},
   "campaign_ids": {"Google": 5551, "Microsoft": 5552, "Other": 5553},
   "plain_text_applied": true,
   "sender_ids_attached": [101, 102, 103],
   "sender_attach_counts": {"Google": 3, "Microsoft": 3, "Other": 3},
-  "schedule_id": 42,
+  "schedule_template_id": 3,
+  "campaign_schedule_ids": {"Google": 4, "Microsoft": 5, "Other": 6},
   "sequence_ids": {"Google": 8801, "Microsoft": 8802, "Other": 8803},
   "preview_rendered_at": "2026-04-20T14:32:00Z",
   "activated": false,
   "activated_at": null,
+  "activated_per_campaign": {"Google": null, "Microsoft": null, "Other": null},
   "launched_at": "2026-04-20T14:30:00Z",
   "last_completed_phase": 10
 }
 ```
 
-`last_completed_phase` advances monotonically from 1 to 11. `activated` flips to `true` only on Phase 11 success; `activated_at` is the ISO-8601 timestamp of the second `resume_campaign` call (the post-confirmation one).
+`last_completed_phase` advances monotonically from 1 to 11. `activated` flips to `true` only when every entry in `activated_per_campaign` is non-null (Phase 11 finalization). `activated_at` is the ISO-8601 timestamp of the LAST successful per-campaign resume call.
 
 `email_type_segments` records the per-email-type bucket counts BEFORE the gate-2 filter is applied — captures the operator's full input, not just the surviving subset. Empty buckets are absent from the object (matches `esp_segments` convention). The operator's chosen filter is recorded separately in `email_type_filter_applied` (see optional fields below).
 
@@ -177,7 +180,10 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 - Phase 5 step 3: `existing_campaign_matches: [<id>, ...]` (campaign IDs returned by `list_campaigns(search="{base}")` before User gate 5; empty list is the happy path)
 - Phase 5 step 5: `reused_existing_ids: <bool>` (true if operator selected "Reuse existing IDs" at User gate 5; false on fresh creates)
 - Phase 5 step 8 / step 9: `plain_text_applied: <bool>` (true only if step 8 PATCH loop completed for ALL campaigns; false if partial)
+- Phase 5 step 9 + Phase 11 step 4: `activated_per_campaign: {<bucket>: <ISO-8601> | null, ...}` — keys initialized at Phase 5 (one per bucket in `campaign_ids`); values flip from `null` to ISO-8601 timestamp at the moment each campaign's resume call returns. Global `activated` flips to `true` only when every entry is non-null.
 - Phase 6 step 7: `lead_attach_counts: {<bucket>: <count>, ...}`
+- Phase 6 step 7: `lead_ids_by_bucket: {<bucket>: [<lead_id>, ...], ...}` — per-bucket lead IDs from the bucket map built in Phase 6 step 2; the resume primitive for re-running Phase 6 from metadata alone (without re-doing Phase 2 MX lookups + CSV-row joins).
+- Phase 8 step 7: `schedule_template_id: <id>` (renamed from `schedule_id`) + `campaign_schedule_ids: {<bucket>: <cloned_schedule_id>, ...}` — the source template ID applied plus the per-campaign cloned schedule entity IDs returned by `create_schedule_from_template`. Round-2 of BC-5906 confirmed each apply creates a NEW schedule entity (clone), not a reference to the template.
 - Phase 10 Mode 1 step 8: `preview_method: "local-render" | "local-render + test-send"`, `preview_lead_email: "<email>"`
 - Phase 10 Mode 2 step 6: `test_send_recipient: "<email>"`, `test_send_at: "<ISO-8601>"`
 
@@ -537,7 +543,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    - **"Abort":** halt; do not advance `last_completed_phase`.
 7. **Verify IDs.** Confirm every bucket has a campaign ID (created or reused). If any campaign create fails, halt and surface the specific bucket + error. Do NOT retry automatically — a partial campaign set is easier to audit than a silently-retried one.
 8. **Apply plain_text deliverability default.** For each campaign ID confirmed in step 7, call `update_campaign` (path `PATCH /api/campaigns/{id}/update` per `email-bison.md` § Tool inventory + verified via `search_api_spec`) with `plain_text: true`. This PATCH is **always** applied — it is a deliverability invariant for cold outreach (the only use case `/marketing:launch-campaign` serves) and has no operator opt-out. EB defaults `plain_text` to `false` on create, which sends emails as HTML; HTML mode for cold B2B carries tracking pixels, link rewrites, and image references that signal "automated marketing" to spam filters. The copy artifacts produced by `email-copywriting` use `<br><br>` for paragraph breaks and contain spintax — both assume plain-text rendering. Note: `update_campaign` is NOT on `email-bison.md` § MCP confirmation gates list; this is a single MCP call per campaign, no two-call cycle. PATCH is idempotent (re-asserting `plain_text: true` against an already-plain-text campaign is a no-op), so reused campaigns and resume runs are both safe. Track per-campaign PATCH success in scratch state for step 9's metadata write.
-9. **Append to metadata JSON.** Set `campaign_ids: {"Google": 5551, "Microsoft": 5552, "Other": 5553}` (adjust keys per actual segmentation), `existing_campaign_matches: [<id>, ...]` (matches captured at step 3), `reused_existing_ids: <bool>` (true if User gate 5 chose "Reuse existing IDs"; false otherwise), `plain_text_applied: true` (only if step 8 PATCH succeeded for ALL campaigns; else `false`), `last_completed_phase: 5`.
+9. **Append to metadata JSON.** Set `campaign_ids: {"Google": 5551, "Microsoft": 5552, "Other": 5553}` (adjust keys per actual segmentation), `existing_campaign_matches: [<id>, ...]` (matches captured at step 3), `reused_existing_ids: <bool>` (true if User gate 5 chose "Reuse existing IDs"; false otherwise), `plain_text_applied: true` (only if step 8 PATCH succeeded for ALL campaigns; else `false`), `last_completed_phase: 5`. Also seed `activated_per_campaign: {<bucket>: null, ...}` with one key per bucket in `campaign_ids` — pre-populated to null so Phase 11 step 4 can flip them per iteration without first probing for object presence (and so the global `activated` flag has a deterministic AND-of-non-null check at finalization).
 
 **If Phase 5 fails mid-loop:** partial campaigns exist in the workspace. Metadata JSON lists the ones that succeeded and records `plain_text_applied: true` only if the step 8 PATCH loop completed for ALL campaigns. If `last_completed_phase: 5` was written but `plain_text_applied: false`, partial-PATCH state may exist (some campaigns plain-text, others HTML). Operator inspects EB UI, decides whether to delete the partial campaigns or resume by running a reduced version of Phase 5 that creates only the missing ones. On resume, the step 3 pre-list will surface the partial-set as duplicates; the operator selects "Reuse existing IDs" for buckets already created and "Create … anyway" only for buckets that didn't get an ID on the prior run. After partial-PATCH, the spec re-runs the step 8 PATCH loop on every campaign in `campaign_ids` regardless of prior state — PATCH is idempotent, so already-plain-text campaigns are no-ops. No automatic partial-resume.
 
@@ -582,7 +588,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    c. **Second vendor call — execute.** On "Continue", invoke again with `confirmation: true`.
    d. **`allow_parallel_sending` branch** (semantic, not turn-structure): if the vendor returns this prompt instead of the normal confirmation, treat it as a real semantic gate. Relay verbatim and ask the operator to either (a) decline (default) — delta the leads already in other campaigns, attach only the delta, list the skipped leads at the end, or (b) approve parallel sending — explicitly documented as a deliverability risk. Never auto-approve.
 6. **Verify per-campaign counts.** After each attach, re-query the campaign's lead count (via `get_campaign` or equivalent) and confirm it matches the attached count. If mismatch, halt and surface the discrepancy.
-7. **Append to metadata JSON.** The `campaign_ids` already list the per-campaign mapping. Add a sibling `lead_attach_counts` object mirroring `esp_segments`. Set `last_completed_phase: 6`.
+7. **Append to metadata JSON.** The `campaign_ids` already list the per-campaign mapping. Add `lead_attach_counts: {<bucket>: <count>, ...}` mirroring `esp_segments`. Add `lead_ids_by_bucket: {<bucket>: [<lead_id>, ...], ...}` from the bucket map built in step 2 — this is the resume primitive that lets a Phase 6 re-run reconstruct the bucket→IDs mapping without re-running Phase 2 MX lookups + CSV-row joins. Set `last_completed_phase: 6`.
 
 **If Phase 6 fails mid-campaign:** some campaigns have attached leads, others don't. Metadata indicates which ran (`last_completed_phase`). Operator inspects EB UI per campaign and re-runs Phase 6 scoped to the unattached campaigns.
 
@@ -672,7 +678,7 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
 2. **List available schedule templates.** Call `get_schedule_templates`. Identify the template matching the Brite default (Mon–Fri 08:00–17:00). If no matching template exists, surface the full list and ask the operator to pick one — do NOT create a new template inline (that's a separate concern outside this command).
 3. **Show schedule plan.** Render:
 
-   > Schedule template selected: `{template-name}` (ID {schedule_id})
+   > Schedule template selected: `{template-name}` (ID {schedule_template_id})
    > - Monday–Friday
    > - 08:00–17:00 (local timezone: {tz})
    > - Applies to all {N} campaigns.
@@ -683,11 +689,11 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
    > - Yes, apply (Recommended)
    > - Pick a different template — I'll show the full list
    > - Abort
-5. **Execute apply per campaign.** For each campaign ID, call `create_schedule_from_template` with `{"schedule_id": N}`.
+5. **Execute apply per campaign.** For each campaign ID, call `create_schedule_from_template` with `{"schedule_id": N}` (the request-body field name is EB's parameter; do not confuse with the metadata field name in step 7). Capture each call's response — each apply returns a NEW cloned schedule entity (not a reference to the template), so record the cloned schedule ID per call into a scratch `campaign_schedule_ids` map keyed by bucket for the metadata write at step 7.
 6. **Verify per campaign.** Re-read the campaign via `get_campaign` and confirm the schedule is attached. Halt on first mismatch.
-7. **Append to metadata JSON.** Set `schedule_id: N`, `last_completed_phase: 8`.
+7. **Append to metadata JSON.** Set `schedule_template_id: N` (the source template ID — same value the operator picked in step 4; renamed from the prior `schedule_id` field). For each campaign in `campaign_ids`, write `campaign_schedule_ids: {<bucket>: <cloned_id>, ...}` from the scratch map captured in step 5 — round-2 of BC-5906 confirmed each apply creates a new schedule entity, so per-campaign IDs are required to re-locate the schedule for resume / debug. Set `last_completed_phase: 8`.
 
-**If Phase 8 fails mid-loop:** partial schedule application. Metadata records `last_completed_phase: 7`. Operator inspects the unscheduled campaigns via EB UI and re-runs Phase 8 scoped to those.
+**If Phase 8 fails mid-loop:** partial schedule application. Metadata records `last_completed_phase: 7` and `campaign_schedule_ids` reflects whichever campaigns received clones before the failure. Operator inspects the unscheduled campaigns via EB UI and re-runs Phase 8 scoped to those.
 
 ---
 
@@ -891,7 +897,7 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
    > Sender pool: {N-senders} inboxes per campaign.
    > Schedule: Mon–Fri 08:00–17:00 {tz}.
    >
-   > Metadata will update `activated: true` and `activated_at` on success.
+   > Metadata will update `activated_per_campaign[<bucket>]` per campaign as each resume call succeeds. Global `activated: true` flips only when every campaign activates; partial success leaves it `false` with per-campaign timestamps recording exactly which ones ran.
 3. **User gate 11a — operator intent.** Ask via `AskUserQuestion`:
 
    > Activate all {N} campaigns now? Each campaign gates separately at the vendor level too.
@@ -907,9 +913,10 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
      > - Yes, activate this campaign
      > - Abort the entire Phase 11 (already-activated campaigns stay activated)
    - On operator affirmative, second `call_api` request against the resume endpoint (no `confirmation` field — see § Tool tier map). Record the returned campaign state (should be `Queued`).
-   - On operator abort, HALT the loop — do not continue to other campaigns. Already-activated campaigns in this loop remain activated; record them in metadata.
+   - **Per-iteration metadata write.** Immediately after the second `call_api` returns success, set `activated_per_campaign[<bucket>] = "<ISO-8601-of-the-second-call-response>"` in the metadata JSON. This is the resume primitive: if Phase 11 fails or aborts mid-loop, the metadata authoritatively records exactly which campaigns activated. The global `activated: true` does NOT flip yet — that's step 6's finalization, gated on every bucket key being non-null.
+   - On operator abort, HALT the loop — do not continue to other campaigns. Already-activated campaigns in this loop remain activated and their `activated_per_campaign[<bucket>]` timestamps remain authoritative.
 5. **Post-activate verification.** For each activated campaign, call `get_campaign_stats` (or equivalent) and confirm `status: "Queued"` as directed in `email-bison.md` § Common workflows. Capture the initial counters for the final report.
-6. **Finalize metadata JSON.** Set `activated: true`, `activated_at: "<ISO-8601-of-final-resume-call>"`, `last_completed_phase: 11`.
+6. **Finalize metadata JSON.** Confirm every entry in `activated_per_campaign` is non-null. Set `activated: true` only when that holds; otherwise leave `activated: false` (a partial-success state — phase ran, some campaigns activated, the operator aborted before the rest). Set `activated_at: "<ISO-8601-of-final-resume-call>"` (the timestamp of the LAST successful per-iteration call, not a wall-clock now()). Set `last_completed_phase: 11` regardless — `last_completed_phase` tracks "phase ran", not "phase fully succeeded"; partial-success state is encoded in `activated_per_campaign`.
 7. **Final report to operator:**
 
    > Launch complete. {N} campaigns activated in workspace `{workspace}`:
@@ -945,10 +952,10 @@ Each phase documents its own failure mode inline. This section is the meta-view:
 | 5 CAMPAIGN CREATE | Some campaigns exist, others don't | `campaign_ids` map populated with succeeded buckets | Delete partial campaigns OR manually create missing ones and patch metadata, re-run |
 | 6 ATTACH LEADS | Some campaigns have leads attached | Nothing phase-6-specific in metadata — `last_completed_phase` is the check | Re-run scoped to unattached campaigns |
 | 7 ATTACH SENDERS | Count mismatch on one or more campaigns (invariant violation) | `sender_ids_attached`, `sender_attach_counts` | Manual attach via EB UI + re-run from Phase 8, OR HALT and surface to operator |
-| 8 SCHEDULE | Some campaigns have schedules, others don't | `schedule_id` set if Phase 8 ran at all | Re-run scoped to unscheduled campaigns |
+| 8 SCHEDULE | Some campaigns have schedules, others don't | `schedule_template_id` set if Phase 8 ran at all; `campaign_schedule_ids` reflects whichever campaigns received clones before the failure | Re-run scoped to unscheduled campaigns (those missing from `campaign_schedule_ids`) |
 | 9 SEQUENCE | Some campaigns have sequences, others don't | `sequence_ids` populated with succeeded buckets | Delete partial sequences OR manually patch missing ones, re-run scoped |
 | 10 PREVIEW | Unchanged (read-only) | `preview_rendered_at` set if rendered | Skip preview and proceed, OR investigate render tool error |
-| 11 ACTIVATE | Some campaigns Queued, others still Draft | `activated: true` only if ALL campaigns completed | Re-run with `--activate`; Phases 1–10 re-execute as no-ops; Phase 11 picks up at first un-activated campaign |
+| 11 ACTIVATE | Some campaigns Queued, others still Draft | `activated_per_campaign` records per-bucket ISO-8601 timestamps for activated campaigns (still `null` for un-activated); `activated: true` only when every entry is non-null | Re-run with `--activate`; Phases 1–10 re-execute as no-ops; Phase 11 reads `activated_per_campaign` and picks up at the first bucket whose value is still `null` |
 
 ### General resume rules
 
