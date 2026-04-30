@@ -149,11 +149,11 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 - Phase 1 step 3 / step 10: `workspace_mismatch: {expected: "<id>", actual: "<id>"} | null`
 - Phase 1 step 7 / step 10: `sender_resolution_method: "artifact-default" | "marketing-context" | "salesforce" | "operator-prompt"`
 - Phase 1 step 9 / step 10: `unique_per_lead_enabled: <bool>`
-- Phase 2 step 4 (F12 skip-empty): `skipped_buckets: [<bucket-label>, ...]`
+- Phase 2 step 4b (F12 skip-empty, post-gate): `skipped_buckets: [<bucket-label>, ...]`
 - Phase 2 IV-4 (Input validation): `invalid_domain_rows: [<row-number>, ...]`
 - Phase 2 step 1 (malformed-email handling): `invalid_email_rows: [<row-number>, ...]`
-- Phase 2 step 5 (post-gate, gate-2 decision): `email_type_filter_applied: "default" | "include_role" | "include_personal" | "include_all" | "disabled_segmentation"` (which override the operator picked at gate 2; `default` means skip role + personal)
-- Phase 2 step 5 (post-gate, sidecar): `skipped_leads_csv_path: <path> | null` (path to sidecar CSV of skipped leads; `null` if no leads skipped)
+- Phase 2 step 4d (post-gate metadata write): `email_type_filter_applied: "default" | "include_role" | "include_personal" | "include_all" | "disabled_segmentation"` (records which option the operator picked at gate 2; `default` means skip role + personal). Set to `null` when `--no-host-lookup` skipped Phase 2 entirely.
+- Phase 2 step 4c (post-gate sidecar write): `skipped_leads_csv_path: <path> | null` (path to sidecar CSV of skipped leads; `null` if no leads skipped or `--no-host-lookup` skipped Phase 2)
 - Phase 5 step 3: `existing_campaign_matches: [<id>, ...]` (campaign IDs returned by `list_campaigns(search="{base}")` before User gate 5; empty list is the happy path)
 - Phase 5 step 5: `reused_existing_ids: <bool>` (true if operator selected "Reuse existing IDs" at User gate 5; false on fresh creates)
 - Phase 5 step 8 / step 9: `plain_text_applied: <bool>` (true only if step 8 PATCH loop completed for ALL campaigns; false if partial)
@@ -229,9 +229,14 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 
 ## Phase 2 — HOST LOOKUP
 
-**Purpose.** Phase 2 has two detection passes. **Email-type detection** (step 1) classifies each lead as `professional` / `role` / `personal` and lets the operator drop role + personal addresses by default. **ESP detection** (steps 2–6) resolves who hosts each surviving lead's domain so professional leads can be split into Google / Microsoft / Other campaigns. ESP segmentation reduces cross-provider deliverability interference — a sender warmed on Google may perform differently into Microsoft inboxes, and mixing providers in one campaign can pollute the stats. This phase is read-only; no leads are mutated.
+**Purpose.** Phase 2 has two detection passes. **Email-type detection** (step 1) classifies each lead as `professional` / `role` / `personal` and lets the operator drop role + personal addresses by default. **ESP detection** (steps 2–3) resolves who hosts each lead's domain so professional leads can be split into Google / Microsoft / Other campaigns. The operator's gate-2 choice is applied in step 4 (post-gate). ESP segmentation reduces cross-provider deliverability interference — a sender warmed on Google may perform differently into Microsoft inboxes, and mixing providers in one campaign can pollute the stats. This phase is read-only; no leads are mutated.
 
-**Skip if** `--no-host-lookup` OR `--no-segment` is passed. If skipping, set `segmented: false` in metadata, record `esp_segments: null`, and proceed to Phase 3. Email-type detection (step 1) still runs even when ESP is skipped — choose "Include all" at gate 2 to bypass the email-type filter.
+**Two skip flags with different scopes:**
+
+- **`--no-host-lookup`** — skip Phase 2 entirely. Step 1 (email-type detection) does NOT run. Set `segmented: false`, `esp_segments: null`, `email_type_segments: null`, `email_type_filter_applied: null`, `skipped_leads_csv_path: null`, `invalid_email_rows: []` in metadata. No gate 2. Proceed to Phase 3.
+- **`--no-segment`** — skip ESP segmentation only. Step 1 (email-type detection) DOES run; gate 2 renders without the ESP breakdown table; the operator picks an email-type filter only. Resulting plan is one combined campaign on the chosen email-type subset. Set `segmented: false`, `esp_segments: null`, populate `email_type_segments`, `email_type_filter_applied`, `skipped_leads_csv_path` per the operator's gate-2 choice. Proceed to Phase 3.
+
+The flag table at line 90/91 is the contract: `--no-host-lookup` is the broader skip; `--no-segment` is the narrower ESP-only skip.
 
 **Steps:**
 
@@ -260,7 +265,7 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 
    - **Malformed-email handling.** If a lead's email is missing `@`, has multiple `@`, or fails Phase 1's email-format check, record the row number in `invalid_email_rows` (sibling of `invalid_domain_rows` populated in step 2) and skip the lead from BOTH email-type and ESP buckets. Operator sees the count at gate 2.
 
-   Steps 2–4 below operate on the lead set as a preview pass — they classify ESP for ALL leads (regardless of email-type tag) so gate 2 can show the post-filter ESP breakdown for any of the 6 filter choices the operator might pick. Step 5 (post-gate) is where the chosen filter is actually applied to produce the final per-bucket lead lists. If gate 2's chosen action drops all leads, halt with a clear message: "Email-type filter dropped all leads. Adjust filter at gate 2 or re-source the CSV."
+   Steps 2–3 below operate on the lead set as a preview pass — they classify ESP for ALL leads (regardless of email-type tag) so gate 2 can show the post-filter ESP breakdown for any of the 5 filter choices the operator might pick. Step 4 (post-gate) is where the chosen filter is actually applied to produce the final per-bucket lead lists, including the F12 skip-empty-buckets prune (now step 4b) which only runs after the filter is known. If gate 2's chosen action drops all leads, halt with a clear message: "Email-type filter dropped all leads. Adjust filter at gate 2 or re-source the CSV."
 
 2. **Resolve ESP per domain via Bash `dig` (F10 — primary path).** Email Bison has no lead-side ESP detection tool today (BC-5826 X17 dogfood confirmed: `search_api_spec` on `host lookup`, `ESP`, `domain detection`, `check-mx-records` returns only sender-side tools). Bash `dig` is the primary — and currently only — path. Extract domains from ALL leads (not yet filtered — gate 2 needs ESP counts under any filter choice the operator might preview), filter invalid ones (per Input validation § IV-4), resolve MX records in **parallel in one Bash invocation**, bucket client-side:
    - **Extract + filter + resolve in a single Bash call.** Do NOT loop the Bash tool per domain — that turns a 5k-unique-domain 10k-lead CSV into hours of round-trip latency. One invocation pipeline:
@@ -284,21 +289,24 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
      - `Unknown` — `dig` returned nothing (NXDOMAIN or no MX record)
 
    **Future MCP-native path (F11, not yet unlocked).** If EB ever adds a server-side ESP inference tool callable via `get_lead` or a bulk-ESP-classify endpoint, this command's current phase ordering blocks it — leads don't exist in EB yet at Phase 2 timing (UPLOAD is Phase 4). Unlocking the MCP-native path would require moving Phase 2 HOST LOOKUP after Phase 4 UPLOAD. Keep current ordering for now (Bash `dig` works; reordering is a larger structural change with downstream campaign-create implications). Re-evaluate when an ESP inference tool lands in a vendor release.
-3. **Count leads per ESP bucket (per email-type bucket).** Aggregate the CSV rows by their domain's bucket AND their email-type tag. Maintain a 3×3 grid in scratch state: `{Google, Microsoft, Other} × {professional, role, personal}`. The three-bucket simplification for ESP segmentation is: `Google`, `Microsoft`, and `Other` (everything else collapsed). Gate 2's post-filter ESP preview is computed by summing across the email-type columns the operator's chosen filter would keep. Surface the full 8-bucket ESP detail in the user gate but use the 3-bucket plan for actual campaign segmentation — deliverability infra considers Google and Microsoft separately; the long tail stays one bucket.
-4. **Skip empty buckets (F12).** AFTER step 5 applies the operator's chosen filter, if any bucket in the 3-bucket plan ends up with **0 leads**, drop it from the segmentation plan — do NOT create an empty campaign. Example: post-filter resolves to `Google: 84, Microsoft: 0, Other: 12` → create 2 campaigns (`| Google`, `| Other`), skip Microsoft entirely. Record the skipped buckets in scratch state so the metadata JSON reflects the actual (pruned) plan. If ALL buckets are empty (either no leads survived the email-type filter, or every surviving lead's domain failed DNS), halt — the campaign has zero deliverable leads and Phase 3 cannot proceed. Note: this step is logically part of post-gate processing, but kept here in step order for continuity with the existing F12 reference.
-5. **Apply gate-2 decision (post-gate).** This step runs AFTER User gate 2 below returns. Branch on the operator's choice:
-   - **Compute the skipped-lead set** based on the chosen filter:
-     - `Apply default` → skip leads tagged `role` OR `personal`
-     - `Include role addresses too` → skip leads tagged `personal` only
-     - `Include personal addresses too` → skip leads tagged `role` only
-     - `Include all` → skip nothing
-     - `Disable ESP segmentation` → preserve the chosen email-type filter, but treat as `--no-segment` for ESP (one combined campaign)
-   - **Sidecar CSV write for skipped leads (only if non-empty).** If the skipped-lead set is non-empty, write it to a sidecar CSV. Path convention mirrors the metadata JSON's dual-path rule from § Launch metadata schema "Dogfood write path" note:
+3. **Count leads per (ESP × email-type) cell.** Join scratch state from steps 1 and 2: for each lead, look up its (email-type tag, domain → ESP bucket) tuple and increment the appropriate cell of a 3×3 grid `{Google, Microsoft, Other} × {professional, role, personal}`. Single pass over the per-lead tag table from step 1; no additional CSV walks. Gate 2's preview ESP table for any of the 5 filter choices is computed by summing the email-type columns that choice would keep. Surface the full 8-bucket ESP detail in the user gate (post-filter under the default choice) but use the 3-bucket plan for actual campaign segmentation — deliverability infra considers Google and Microsoft separately; the long tail stays one bucket.
+
+**User gate 2 fires here** (rendered below — physically separated for readability; logically inserts between step 3 and step 4).
+
+4. **Apply gate-2 decision (post-gate).** This step runs AFTER User gate 2 returns. Branch on the operator's choice in this exact order:
+   - **(4a) Compute the skipped-lead set** based on the chosen filter:
+     - `Apply default` → skip leads tagged `role` OR `personal` (enum: `default`)
+     - `Include role addresses too` → skip leads tagged `personal` only (enum: `include_role`)
+     - `Include personal addresses too` → skip leads tagged `role` only (enum: `include_personal`)
+     - `Include all` → skip nothing (enum: `include_all`)
+     - `Disable ESP segmentation` → apply the default email-type filter (skip role + personal), and treat ESP as `--no-segment` (one combined campaign on the surviving professional leads); enum: `disabled_segmentation`
+   - **(4b) Skip empty buckets (F12).** With the surviving (post-filter) lead set, if any bucket in the 3-bucket ESP plan has **0 leads**, drop it from the segmentation plan — do NOT create an empty campaign. Example: post-filter resolves to `Google: 84, Microsoft: 0, Other: 12` → create 2 campaigns (`| Google`, `| Other`), skip Microsoft entirely. Record the skipped buckets in scratch state so the metadata JSON reflects the actual (pruned) plan. If ALL buckets are empty (either no leads survived the email-type filter, or every surviving lead's domain failed DNS), halt — the campaign has zero deliverable leads and Phase 3 cannot proceed.
+   - **(4c) Sidecar CSV write for skipped leads (only if non-empty).** If the skipped-lead set is non-empty, write it to a sidecar CSV. Path convention mirrors the metadata JSON's dual-path rule from § Launch metadata schema "Dogfood write path" note:
      - **Production path:** `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
      - **Dogfood path:** `.claude/worktrees/<detected-worktree>/dogfood/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
 
      CSV columns: original CSV columns verbatim (preserve order) + one new trailing column `skip_reason` with values `role_address` or `personal_domain`. If a lead matches both lists (tiebreak case), `skip_reason` is `personal_domain` per the personal-beats-role rule. If the skipped set is empty, no file is created; `skipped_leads_csv_path` is `null`.
-   - **Append to metadata JSON.** Set `segmented: true`, `esp_segments: {<only non-empty buckets>}`, `email_type_segments: {<only non-empty buckets>}`, `email_type_filter_applied: "<gate-2-choice-label>"`, `skipped_leads_csv_path: <path>|null`, `last_completed_phase: 2`. Empty buckets are absent from both objects entirely (not `0` values) — downstream phases iterate over the keys and the absence means "skip".
+   - **(4d) Append to metadata JSON.** Set `segmented: true` (or `false` if `disabled_segmentation`), `esp_segments: {<only non-empty post-filter buckets>}` (or `null` if `disabled_segmentation`), `email_type_segments: {<only non-empty pre-filter buckets>}` (NOTE: pre-filter — captures the operator's full input, see § Launch metadata schema description), `email_type_filter_applied: "<enum>"` (use the enum value from 4a, NOT the prose label), `skipped_leads_csv_path: <path>|null`, `last_completed_phase: 2`.
 
 **User gate 2.** Ask via `AskUserQuestion`:
 
@@ -333,9 +341,9 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 > - Disable ESP segmentation — single combined campaign on the chosen email-type subset
 > - Abort
 
-If the operator's chosen action leaves zero leads in any ESP bucket after filtering, the existing F12 skip-empty-buckets logic (step 4) handles it. If ALL surviving leads end up in a single bucket, gate-2-disable behavior applies.
+If the operator's chosen action leaves zero leads in any ESP bucket after filtering, the F12 skip-empty-buckets logic (step 4b) handles it.
 
-**If Phase 2 fails:** the failure is almost always a DNS lookup error on a stale or typo'd domain. Halt and surface the failing domain. Operator fixes the CSV or accepts "Unknown" bucket leaks and re-runs. No EB state has changed. If email-type detection encounters a malformed lead (missing `@`, multiple `@`, etc.), record the row number in `invalid_email_rows` (sibling of `invalid_domain_rows`) and skip the lead from BOTH email-type and ESP buckets. Operator sees the count at gate 2.
+**If Phase 2 fails:** the failure is almost always a DNS lookup error on a stale or typo'd domain. Halt and surface the failing domain. Operator fixes the CSV or accepts "Unknown" bucket leaks and re-runs. No EB state has changed. Malformed-email handling is documented in step 1's "Malformed-email handling" sub-bullet.
 
 ---
 

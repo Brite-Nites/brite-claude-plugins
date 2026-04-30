@@ -22,13 +22,13 @@ The detection block is structured as two predicates — `is_role(email)` and `is
 | 3. Classify | `dig MX` → pattern-match against ESP patterns | Match local-part against role list, match domain against free-mail list |
 | 4. Bucket label | `Google` / `Microsoft` / `Other` | `professional` / `role` / `personal` |
 | 5. Aggregate counts | `esp_segments: {Google: 84, Other: 12}` | `email_type_segments: {professional: 88, role: 3, personal: 9}` |
-| 6. Operator gate | "Approve / Disable / Abort" | "Apply default skip / Include all / Abort" |
+| 6. Operator gate | "Approve / Disable / Abort" | 6 options: "Apply default / Include role / Include personal / Include all / Disable ESP segmentation / Abort" (scope grew from initial 3-option sketch during plan refinement) |
 | 7. Metadata write | `esp_segments` + `last_completed_phase` | `email_type_segments` + sidecar log path |
 
 ## Key Decisions
 
 1. **Heuristics now, BounceBan-shaped swap point.** Static lists ship in this PR; predicate signature returns `is_role` / `is_free` booleans matching what BounceBan would return. *Why:* BC-5536/5537/5538 (production enrichment MCP) hasn't started; can't block BC-6307 on it. Future swap touches only the predicate bodies — every consumer of the booleans keeps working.
-2. **Email-type runs BEFORE ESP detection.** Filter first; ESP-detect on the smaller surviving set. *Why:* avoids DNS lookups on dropped leads; combined gate-2 summary; existing skip-empty-buckets logic naturally handles the no-survivors case.
+2. **Email-type runs as step 1; ESP detection runs against ALL leads (revised at execution time).** Initial design said "filter first, ESP-detect on the smaller surviving set." During execution the operator chose to keep ESP detection unfiltered so gate 2 can show ESP counts under any of the 5 filter choices. Cost is bounded — 12 extra DNS lookups regardless of CSV size (`sort -u` dedupes domains). Trade: small DNS waste for a richer gate-2 preview. The skip-empty-buckets logic moved from a numbered step to step 4b (post-gate sub-bullet) since it depends on the filter outcome. *Why:* combined gate-2 summary justifies the bounded extra cost; F12 referenced from optional-fields list as `step 4b` accordingly.
 3. **Default action: skip role + skip personal.** Operator override at gate 2. *Why:* matches tam-mapping's Operational rule 1 policy.
 4. **Personal beats role on tiebreak** (`sales@gmail.com` → `personal`). *Why:* dominant signal is the free-mail domain; aligns with operator-override semantics — if the operator ever opts to "include role but skip personal," this lead correctly follows the personal rule.
 5. **Skipped leads → sidecar CSV** named `{campaign-name}-{date}-skipped.csv` with original CSV columns plus a `skip_reason` column (`role_address` / `personal_domain`). *Why:* no silent data loss; auditable post-run.
