@@ -30,6 +30,8 @@ Delegate elsewhere when the user is:
 - building Flows → [sf-flow](../sf-flow/SKILL.md)
 - doing org data operations → [sf-data](../sf-data/SKILL.md)
 
+> **Default recommendation for brite-salesforce deploys**: route to [`/revops:deploy-sandbox`](../../commands/deploy-sandbox.md) (sandbox) or [`/revops:deploy-prod`](../../commands/deploy-prod.md) (production), not raw `sf project deploy start`. The orchestration commands gate dry-run + Apex tests + Tooling API verification + manual browser checks. Use raw CLI only for non-orchestrable cases (see [Orchestration Commands](#orchestration-commands-recommended-path-for-brite-salesforce) below). Raw-CLI guidance below documents the underlying steps each command sequences.
+
 ---
 
 ## Brite Context
@@ -241,15 +243,15 @@ Output template: [references/deployment-report-template.md](references/deploymen
 
 ---
 
-## Orchestration Commands (planned)
+## Orchestration Commands (recommended path for brite-salesforce)
 
-For sandbox and production deploys with full Brite discipline baked in, two dedicated orchestration commands are **planned**:
+For any deploy from the **brite-salesforce** repo, prefer these orchestration commands over raw `sf project deploy start`. They bake the dry-run + Apex tests + Tooling API verification + manual browser checks into a sequenced gate flow; raw CLI skips all of that.
 
-- `/revops:deploy-sandbox` (planned — BC-5790) — orchestrates dry-run → deploy → Apex tests → manual UI verification prompt.
-- `/revops:deploy-prod` (planned — BC-5791) — orchestrates explicit double-confirmation → prod dry-run → deploy → Tooling API SOQL verification.
-- `/revops:post-deploy-runbook` (planned — BC-5792) — walks the user through Screen Flow activation, Scheduled Apex re-setup, Named Credential URL updates, Kanban layout refresh.
+- [`/revops:deploy-sandbox`](../../commands/deploy-sandbox.md) — sandbox deploy: pre-flight, dry-run, deploy, Apex tests, manual browser verification. Use after metadata changes are review-clean and you want to validate in `brite-sandbox` before opening a PR.
+- [`/revops:deploy-prod`](../../commands/deploy-prod.md) — production deploy: pre-flight (cwd + branch + clean tree + intent), prod dry-run, double-confirmation gate, deploy, coverage check, Tooling API post-deploy verification. Use after `/revops:deploy-sandbox` is clean and the PR is merged to `main`.
+- [`/revops:post-deploy-runbook`](../../commands/post-deploy-runbook.md) — post-deploy manual steps: diff-driven walk through Screen Flow activation, Scheduled Apex re-schedule, Named Credential URL updates, Kanban Group By cache flush.
 
-Until those land, invoke the steps manually as described above.
+Raw `sf project deploy start` (documented in **Recommended Workflow** above) remains the fallback for non-orchestrable cases: one-off targeted deploys outside the brite-salesforce dev flow, scratch-org work, or debugging a specific component in isolation.
 
 ---
 
