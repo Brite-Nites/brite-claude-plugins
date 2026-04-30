@@ -148,7 +148,9 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
 - Phase 1 step 9 / step 10: `unique_per_lead_enabled: <bool>`
 - Phase 2 step 3 (F12 skip-empty): `skipped_buckets: [<bucket-label>, ...]`
 - Phase 2 IV-4 (Input validation): `invalid_domain_rows: [<row-number>, ...]`
-- Phase 5 step 7 / step 8: `plain_text_applied: <bool>` (true only if step 7 PATCH loop completed for ALL campaigns; false if partial)
+- Phase 5 step 3: `existing_campaign_matches: [<id>, ...]` (campaign IDs returned by `list_campaigns(search="{base}")` before User gate 5; empty list is the happy path)
+- Phase 5 step 5: `reused_existing_ids: <bool>` (true if operator selected "Reuse existing IDs" at User gate 5; false on fresh creates)
+- Phase 5 step 8 / step 9: `plain_text_applied: <bool>` (true only if step 8 PATCH loop completed for ALL campaigns; false if partial)
 - Phase 6 step 7: `lead_attach_counts: {<bucket>: <count>, ...}`
 - Phase 10 Mode 1 step 8: `preview_method: "local-render" | "local-render + test-send"`, `preview_lead_email: "<email>"`
 - Phase 10 Mode 2 step 6: `test_send_recipient: "<email>"`, `test_send_at: "<ISO-8601>"`
@@ -407,25 +409,49 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    - `{Niche} | {Target} | {Source} | {Region} | {Size} | {Offer}` — full convention per issue spec
    - Short form (default): `{campaign-name-base} | {ESP}` — e.g., `Denver Downtown Lighting | Google`
    Operator can override the suffix format in the user gate.
-3. **Render the create plan.** Show the operator each proposed campaign:
+3. **Pre-list existing campaigns by base name (silent-duplicate guard, F20 / BC-6302).** Call `list_campaigns(search="{campaign-name-base}")` (core-tier, directly callable per § Tool tier map). EB's `search` is substring-matched and has no API-side dedup — calling `create_campaign` twice with identical names returns two distinct IDs with `success: true` and no warning. This pre-list is the only place the operator sees pre-existing matches before User gate 5. Capture campaigns whose `name` starts with `{campaign-name-base}`. Empty match set is the happy path; non-empty triggers the duplicate-guard render in step 5. Record the matched IDs in scratch state for step 6's reuse path.
+4. **Render the create plan.** Show the operator each proposed campaign:
 
    > Campaigns to create in workspace `{workspace}`:
    > 1. `Denver Downtown Lighting | Google` — 84 leads
    > 2. `Denver Downtown Lighting | Microsoft` — 31 leads
    > 3. `Denver Downtown Lighting | Other` — 12 leads
-4. **User gate 5.** Ask via `AskUserQuestion`:
+5. **User gate 5.** Ask via `AskUserQuestion`. The render branches on step 3's pre-list:
+
+   **If step 3's pre-list is empty (no duplicates):**
 
    > Create {N} empty campaigns with the names above? Campaigns start in `Draft` state — no sends until Phase 11. After create, each campaign will be PATCHed with `plain_text: true` (cold-outreach deliverability default — no opt-out).
    >
    > - Yes, create these campaigns (Recommended)
    > - Rename — I'll supply a different suffix convention
    > - Abort
-5. **Execute creates.** For each name in the plan, call `create_campaign`. Capture the returned campaign ID. Map bucket → ID.
-6. **Verify IDs.** Confirm every bucket has a returned ID. If any campaign create fails, halt and surface the specific bucket + error. Do NOT retry automatically — a partial campaign set is easier to audit than a silently-retried one.
-7. **Apply plain_text deliverability default.** For each campaign ID confirmed in step 6, call `update_campaign` (path `PATCH /api/campaigns/{id}/update` per `email-bison.md` § Tool inventory + verified via `search_api_spec`) with `plain_text: true`. This PATCH is **always** applied — it is a deliverability invariant for cold outreach (the only use case `/marketing:launch-campaign` serves) and has no operator opt-out. EB defaults `plain_text` to `false` on create, which sends emails as HTML; HTML mode for cold B2B carries tracking pixels, link rewrites, and image references that signal "automated marketing" to spam filters. The copy artifacts produced by `email-copywriting` use `<br><br>` for paragraph breaks and contain spintax — both assume plain-text rendering. Note: `update_campaign` is NOT on `email-bison.md` § MCP confirmation gates list; this is a single MCP call per campaign, no two-call cycle. PATCH is idempotent (re-asserting `plain_text: true` against an already-plain-text campaign is a no-op), so resume can re-run this loop blindly without harm. Track per-campaign PATCH success in scratch state for step 8's metadata write.
-8. **Append to metadata JSON.** Set `campaign_ids: {"Google": 5551, "Microsoft": 5552, "Other": 5553}` (adjust keys per actual segmentation), `plain_text_applied: true` (only if step 7 PATCH succeeded for ALL campaigns; else `false`), `last_completed_phase: 5`.
 
-**If Phase 5 fails mid-loop:** partial campaigns exist in the workspace. Metadata JSON lists the ones that succeeded and records `plain_text_applied: true` only if the step 7 PATCH loop completed for ALL campaigns. If `last_completed_phase: 5` was written but `plain_text_applied: false`, partial-PATCH state may exist (some campaigns plain-text, others HTML). Operator inspects EB UI, decides whether to delete the partial campaigns or resume by running a reduced version of Phase 5 that creates only the missing ones. On resume after partial-PATCH, the spec re-runs the step 7 PATCH loop on every campaign in `campaign_ids` regardless of prior state — PATCH is idempotent, so already-plain-text campaigns are no-ops. No automatic partial-resume.
+   **If step 3's pre-list returned `M` matches:** prepend a duplicate warning and add a fourth "Reuse" option. Render up to 10 matches inline; if more, append `and {K} more` to the list:
+
+   > ⚠️ {M} campaigns already exist matching `{campaign-name-base}` in workspace `{workspace}`:
+   >   - id 22 — `BC-5906 Round 2 | Google` (draft)
+   >   - id 24 — `BC-5906 Round 2 | Google` (draft)
+   >   - … (and {K} more)
+   >
+   > Create {N} new campaigns anyway, or reuse existing IDs?
+   >
+   > - Reuse existing IDs (Recommended if names match exactly per bucket)
+   > - Create {N} new campaigns anyway
+   > - Rename — I'll supply a different suffix convention
+   > - Abort
+
+   The "Recommended" annotation flips between paths because the safer default differs: when nothing matches, create; when matches exist, reuse.
+6. **Execute creates or reuse existing IDs.** Branch on User gate 5 decision:
+
+   - **"Reuse existing IDs":** For each bucket from step 2, find the matching campaign ID in step 3's pre-list using exact `name` equality. Map bucket → ID. Skip the `create_campaign` calls entirely. If any bucket has zero exact matches in the pre-list, halt and surface which bucket has no match — operator must restart Phase 5, choosing Rename or Create at User gate 5.
+   - **"Create {N} new campaigns anyway" or empty pre-list:** For each name in the plan, call `create_campaign`. Capture the returned campaign ID. Map bucket → ID.
+   - **"Rename":** restart from step 2 with the operator-supplied suffix convention.
+   - **"Abort":** halt; do not advance `last_completed_phase`.
+7. **Verify IDs.** Confirm every bucket has a campaign ID (created or reused). If any campaign create fails, halt and surface the specific bucket + error. Do NOT retry automatically — a partial campaign set is easier to audit than a silently-retried one.
+8. **Apply plain_text deliverability default.** For each campaign ID confirmed in step 7, call `update_campaign` (path `PATCH /api/campaigns/{id}/update` per `email-bison.md` § Tool inventory + verified via `search_api_spec`) with `plain_text: true`. This PATCH is **always** applied — it is a deliverability invariant for cold outreach (the only use case `/marketing:launch-campaign` serves) and has no operator opt-out. EB defaults `plain_text` to `false` on create, which sends emails as HTML; HTML mode for cold B2B carries tracking pixels, link rewrites, and image references that signal "automated marketing" to spam filters. The copy artifacts produced by `email-copywriting` use `<br><br>` for paragraph breaks and contain spintax — both assume plain-text rendering. Note: `update_campaign` is NOT on `email-bison.md` § MCP confirmation gates list; this is a single MCP call per campaign, no two-call cycle. PATCH is idempotent (re-asserting `plain_text: true` against an already-plain-text campaign is a no-op), so reused campaigns and resume runs are both safe. Track per-campaign PATCH success in scratch state for step 9's metadata write.
+9. **Append to metadata JSON.** Set `campaign_ids: {"Google": 5551, "Microsoft": 5552, "Other": 5553}` (adjust keys per actual segmentation), `existing_campaign_matches: [<id>, ...]` (matches captured at step 3), `reused_existing_ids: <bool>` (true if User gate 5 chose "Reuse existing IDs"; false otherwise), `plain_text_applied: true` (only if step 8 PATCH succeeded for ALL campaigns; else `false`), `last_completed_phase: 5`.
+
+**If Phase 5 fails mid-loop:** partial campaigns exist in the workspace. Metadata JSON lists the ones that succeeded and records `plain_text_applied: true` only if the step 8 PATCH loop completed for ALL campaigns. If `last_completed_phase: 5` was written but `plain_text_applied: false`, partial-PATCH state may exist (some campaigns plain-text, others HTML). Operator inspects EB UI, decides whether to delete the partial campaigns or resume by running a reduced version of Phase 5 that creates only the missing ones. On resume, the step 3 pre-list will surface the partial-set as duplicates; the operator selects "Reuse existing IDs" for buckets already created and "Create … anyway" only for buckets that didn't get an ID on the prior run. After partial-PATCH, the spec re-runs the step 8 PATCH loop on every campaign in `campaign_ids` regardless of prior state — PATCH is idempotent, so already-plain-text campaigns are no-ops. No automatic partial-resume.
 
 ---
 
