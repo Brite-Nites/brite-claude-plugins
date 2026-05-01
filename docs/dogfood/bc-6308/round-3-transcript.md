@@ -666,19 +666,53 @@ Per round-3 scope, Phase 11 not exercised (no `--activate`; no real customer ema
 
 ## Workspace cleanup (T14)
 
-*(populated at T14 — placeholder)*
+**Pre-cleanup state at end of T11:**
+- Custom variables: **15 total** (6 pre-existing from round-1 era + 8 round-2 leftover + 1 new `empty_test_var` from T11)
+- Leads: **11 total** (9 main: ids 14712–14720; 2 render-test: ids 14721 + 14722)
+- Campaigns: **6 total** (1 decoy: id 25; 3 main: ids 26/27/28; 2 render-test: ids 29/30)
+- Schedules: **5 cloned** (ids 6/7/8 main; 9/10 render-test)
+- Sequences: **5 created** (ids 5/6/7 main; 8/9 render-test)
 
-**Pre-cleanup state:**
-- Custom variables: 14 pre-existing + 1 new (`empty_test_var`) = 15 total in workspace 13
-- Leads: 9 main + 2 R-2a/R-2b test (Lead A + Lead B) + any R-5 trigger lead (none expected)
-- Campaigns: 3 main + 2 RENDER TEST + 0–1 R-5 placeholder = 5–6 total
+**Bulk-delete operations:**
 
-**Post-cleanup verification:**
-- `list_campaigns(search="BC-6308")` returns 0
-- `list_leads(search="bc6308")` returns 0
-- 8 round-2 leftover variables + 1 new `empty_test_var` = **9 permanent variables** in workspace 13 (Sx-4 — no DELETE endpoint)
+`DELETE /api/campaigns/bulk` body `{"campaign_ids": [25, 26, 27, 28, 29, 30]}` → success: "The selected campaigns have been queued for deletion."
 
-**Async-drain timing:** *(measured Δ; round-2 baseline ~seconds)*
+`DELETE /api/leads/bulk` body `{"lead_ids": [14712, 14713, 14714, 14715, 14716, 14717, 14718, 14719, 14720, 14721, 14722]}` → success: "Lead deletion process started. This might take some time depending on how much data you have."
+
+**Post-cleanup verification (immediate, no wait):**
+- `list_campaigns(search="BC-6308")` → **0 campaigns** ✅
+- `list_leads(search="bc6308")` → **0 leads** ✅
+- `list_leads(search="dogfood-test")` → **0 leads** ✅
+
+**Async-drain timing.** Sub-second — verification list calls returned 0 immediately after the bulk-delete responses. Same behavior as round-2 (Sx-8 async-queue clears nearly instantaneously for small workloads). No regression.
+
+**Schedules + sequences cascaded with parent campaign deletes.** No standalone delete calls needed (no public endpoint exists for these resources independently).
+
+**Sender attaches removed implicitly.** Senders themselves (IDs 981–995) remain in workspace's 772-sender pool — they're workspace resources, not campaign resources.
+
+**Retained: 9 permanent custom variables (Sx-4 — no DELETE endpoint).**
+
+| Variable ID | Name | Provenance |
+|---|---|---|
+| 1 | company address | round-1 era (Nov 2025) |
+| 2 | company linkedin url | round-1 era |
+| 3 | company phone | round-1 era |
+| 4 | company website | round-1 era |
+| 5 | person job title | round-1 era |
+| 6 | person linkedin url | round-1 era |
+| 7 | recency_anchor | round-2 (BC-5906) |
+| 8 | vertical_descriptor | round-2 |
+| 9 | specific_friction | round-2 |
+| 10 | proof_point_company | round-2 |
+| 11 | proof_point_number | round-2 |
+| 12 | proof_point_timeframe | round-2 |
+| 13 | free_asset_noun | round-2 |
+| 14 | sender_first_name | round-2 |
+| **15** | **empty_test_var** | **round-3 (T11 R-2b setup)** |
+
+**Workspace state delta from round-3:** +1 net new permanent variable (`empty_test_var`). Everything else (campaigns, leads, schedules, sequences, sender-attaches) reverted via async cleanup.
+
+**Future rounds:** workspace 13 starts with 15 permanent custom variables. R-2 reuse-classification logic should classify all 15 (including `empty_test_var`) as "existing → reuse" if a future artifact references any of them. New round-4+ artifacts should not include `empty_test_var` unless the test scenario specifically requires it.
 
 ---
 
