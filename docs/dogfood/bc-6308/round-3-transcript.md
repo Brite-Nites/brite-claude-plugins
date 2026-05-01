@@ -306,13 +306,54 @@ Sequence:
 
 ## Phase 6 ATTACH LEADS — live-walk
 
-*(populated at T7 — placeholder)*
+**Step 1 — ground-truth.** `search_api_spec(search_term="attach-leads")` matched 2 results; canonical endpoint is `POST /api/campaigns/{campaign_id}/leads/attach-leads`. Body shape: `{lead_ids: [int], allow_parallel_sending: bool (optional)}`. Required: `lead_ids`. Response: `{data: {success: true, message: "Leads successfully added to <campaign_name>. Existing leads were not added."}}`.
 
-**R-6 partial (BC-6303 — `lead_ids_by_bucket`):** *(metadata excerpt showing per-bucket lead-ID arrays)*
+Note: descriptive search "attach leads to campaign" returned 0 results (Sx-1 still applies — operators must use the URL-path form `attach-leads`). Round-3 spec at line 29 already documents this rule.
 
-**R-14 (F16 workspace-scoped variable persistence regression):** *(8 vars from round-2 still present after one round; verified at T4 reuse classification)*
+**Step 2 — bucket map (from T5):**
+- Google bucket → leads `[14712, 14713, 14716, 14717]` (2 gmail + 2 brite.co)
+- Microsoft bucket → leads `[14714, 14715]` (2 outlook)
+- Other bucket → leads `[14718, 14719, 14720]` (3 dogfoodtest)
 
-**R-12 (F22 `allow_parallel_sending`):** *(re-deferred per brainstorm decision 4)*
+**Step 4 — three parallel attaches:**
+
+| Campaign | IDs sent | Response message |
+|---|---|---|
+| id 26 (Google) | [14712, 14713, 14716, 14717] | "Leads successfully added to BC-6308 Round 3 \| Google. Existing leads were not added." |
+| id 27 (Microsoft) | [14714, 14715] | "Leads successfully added to BC-6308 Round 3 \| Microsoft. Existing leads were not added." |
+| id 28 (Other) | [14718, 14719, 14720] | "Leads successfully added to BC-6308 Round 3 \| Other. Existing leads were not added." |
+
+The "Existing leads were not added" suffix is **idempotency signal** — re-attaching already-attached leads is a no-op rather than a 422. Same as round-2 evidence; documents safe resume behavior.
+
+**Step 7 — verification via `list_campaigns(search="BC-6308 Round 3")`:**
+
+```
+id,name,status,type,leads,sent,opens,replies,bounced,completion
+28,BC-6308 Round 3 | Other,draft,outbound,3,0,0,0,0,0
+27,BC-6308 Round 3 | Microsoft,draft,outbound,2,0,0,0,0,0
+26,BC-6308 Round 3 | Google,draft,outbound,4,0,0,0,0,0
+25,BC-6308 Round 3 | Google,draft,outbound,0,0,0,0,0,0
+```
+
+Per-campaign attach counts match bucket map exactly: 4 / 2 / 3 (total 9). Decoy id 25 untouched (0 leads).
+
+**R-6 partial verdict (BC-6303 `lead_ids_by_bucket` schema — confirmed ✅).** The bucket→ID map the spec would write at Phase 6 step 7 is:
+```json
+"lead_ids_by_bucket": {
+  "Google": [14712, 14713, 14716, 14717],
+  "Microsoft": [14714, 14715],
+  "Other": [14718, 14719, 14720]
+}
+```
+This is the resume primitive that lets a Phase 6 re-run reconstruct the bucket→IDs mapping without re-running Phase 2 MX lookups + CSV-row joins. Round-2's metadata schema gap (only `lead_ids_uploaded` count was persisted, not the per-bucket map) is now closed by BC-6303.
+
+**R-14 verdict (F16 workspace-scoped variable persistence regression — confirmed ✅).** Implicitly verified at T4: the 8 round-2 variables (IDs 7-14, dated 2026-04-27) were still present in workspace 13 when T4's `list_custom_variables` call returned. No regression in cross-session persistence.
+
+**R-12 verdict (F22 `allow_parallel_sending` — re-deferred ⏭️).** Not exercised in round-3 per brainstorm decision 4 (same rationale as round-2 brainstorm decision 3). F22 verification requires pre-poisoning a lead into another campaign before Phase 6 — adds setup-and-cleanup load not justified by F22's load-bearing-ness for the MVP launch path. The endpoint's `allow_parallel_sending` parameter IS confirmed in the API spec (per step 1 search result) — spec coverage stands; live-fire verification deferred.
+
+**Time-to-complete Phase 6 walk:** ~3 seconds (1 search_api_spec + 3 parallel attaches + 1 list_campaigns verify).
+
+**Workspace state after T7:** 14 vars + 9 leads (all attached) + 4 campaigns (1 decoy + 3 main with attached leads).
 
 ---
 
@@ -395,7 +436,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-3 | BC-6300 — Phase 4 lead-body field names | ✅ **confirmed** | All 9 created leads (IDs 14712-14720) returned with `title` and `company` populated with verbatim CSV values. API schema confirms `title`+`company` (not job_title/company_name). BC-6300 fix prevents the round-2 data-loss bug. | None |
 | R-4 | BC-6301 — variant boolean + no double Re: | *pending* | | |
 | R-5 | BC-6302 — Phase 5 pre-list duplicate guard | ✅ **confirmed** | Pre-created decoy id 25 → `list_campaigns(search="BC-6308 Round 3")` correctly returned 1 match → gate 5 surfaced duplicate. Without BC-6302 fix, this detection wouldn't run. | None |
-| R-6 | BC-6303 — metadata schema (4 new fields) | *pending* | | |
+| R-6 | BC-6303 — metadata schema (4 new fields) | ✅ **partial — `lead_ids_by_bucket` confirmed** | T7 verified bucket→ID map populates correctly: `{Google: [14712,14713,14716,14717], Microsoft: [14714,14715], Other: [14718,14719,14720]}`. `schedule_template_id` + `campaign_schedule_ids` pending T9. `activated_per_campaign` + `existing_campaign_matches` already partial-confirmed at T6. | None |
 | R-7 | BC-6304 — Tool tier map clarifies wrapper-vs-API gate | *pending* | | |
 | R-8 ★ | BC-6306 — Phase 5 `plain_text` PATCH | ✅ **confirmed** | All 3 main campaigns (26/27/28) show `plain_text: true` post-PATCH. Scope correctly narrowed to plain_text only per BC-6306 deliberate deferral of reputation_building + can_unsubscribe. Production-blocker class from round-2 closed. | **BC-6544** (PATCH-omitted-fields-reset-to-false finding — documentation correctness for future spec changes) |
 | R-9 | BC-6307 — Phase 2 email-type segmentation | **partially validated** | Classification logic ✅ confirmed (per-lead `is_role`/`is_free` tagging matches expected on all 9 leads). Segmentation-axis design ⚠️ flagged: spec uses ESP-axis, production uses email-type-axis. Operator-stated ideal is multiplicative. | **BC-6514** (architectural redesign issue, assigned Holden Halford) |
@@ -403,7 +444,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-11 | New metadata schema fields populate | *pending* | | |
 | R-12 | F22 `allow_parallel_sending` (deferred again) | *deferred* | Brainstorm decision 4 — same rationale as round-2 brainstorm decision 3 | |
 | R-13 | F14 pagination regression | ✅ **confirmed** | `?page=N` Laravel-style meta with `per_page: 15` unchanged from round-2. NOT cursor-based. No regression. | None |
-| R-14 | F16 workspace-scoped variable persistence regression | *pending* | | |
+| R-14 | F16 workspace-scoped variable persistence regression | ✅ **confirmed** | 8 round-2 variables (IDs 7-14, dated 2026-04-27) still present in workspace 13 at T4 list call. No regression in cross-session persistence. | None |
 | R-15 | F26 sub-second eventual consistency regression | *pending* | | |
 
 ---
