@@ -439,9 +439,39 @@ This is the BC-6303 rename from round-2's old `schedule_id: <single-id>` (which 
 
 ## Phase 9 SEQUENCE — live-walk
 
-*(populated at T10 — placeholder)*
+**Step 1 — ground-truth.** Per round-3 plan, the v1.1 endpoint is `POST /api/campaigns/v1.1/{campaign_id}/sequence-steps`. Body shape: `{title, sequence_steps: [{email_subject, email_body, wait_in_days, order, variant (boolean), thread_reply, ...}]}`. Per BC-6301 fix at line 722, `step_2.subject` must NOT start with "Re:" — EB auto-prepends.
 
-**R-4 (BC-6301 — variant boolean + no double Re:):** *(request payload showing `"variant": false`; post-create response showing single "Re: " prefix on step 2)*
+**Pre-walk artifact validation finding.** The test artifact at `dogfood/test-copy.json` (verbatim copy from round-2's `docs/dogfood/bc-5906/test-copy.json`) STILL has `step_2.subject: "Re: {Quick|Fast|30s} {question|check|idea}"`. Per BC-6301 spec line 722, this would HARD FAIL Phase 9's artifact validation in the actual `/marketing:launch-campaign` flow.
+
+**Why the artifact is stale:** round-2's artifact pre-dates BC-6301's fix (which shipped 2026-04-29). BC-6301 updated both `launch-campaign.md` (validate artifact input) AND `email-copywriting/SKILL.md` (don't author "Re:" prefix on step_2 subject). But the preserved test fixture at `docs/dogfood/bc-5906/test-copy.json` wasn't regenerated. Future rounds reusing this fixture as input would hit the same artifact-validation hard-fail.
+
+**Round-3 path (per Path A decision in T10 walk):** strip "Re:" client-side and submit bare subject — mimics what an operator would do after the spec hard-fails. Tests R-4 success path. The corrected artifact will be preserved at T16 (write `docs/dogfood/bc-6308/test-copy.json` with bare step_2.subject so round-4 can copy from this cleanly).
+
+**Step 2-4 — three parallel sequence creates.** All 3 succeeded:
+
+| Campaign | Sequence ID | Step 1 ID (wait=1) | Step 2 ID (wait=4) |
+|---|---|---|---|
+| 26 (Google) | 5 | 8 | 9 |
+| 27 (Microsoft) | 6 | 10 | 11 |
+| 28 (Other) | 7 | 12 | 13 |
+
+**R-4 verdict (BC-6301 — variant boolean + no double Re: — confirmed ✅).** Two sub-claims, both confirmed:
+
+**Sub-claim 1 (variant boolean):** Sent `"variant": false` in request body for all 6 sequence steps. Post-create response shows `"variant": false` (boolean) for each step. **NOT** the round-2 spec's wrong `"variant": "A"` (string). BC-6301 fix verified.
+
+**Sub-claim 2 (no double Re: prefix):** Sent step_2 with bare subject `"{Quick|Fast|30s} {question|check|idea}"` (no "Re:"). Post-create response stores `"email_subject": "Re: {Quick|Fast|30s} {question|check|idea}"` — **single "Re: " prefix**, auto-prepended by EB because `thread_reply: true`. Round-2's Sx-14 double-prefix bug class is closed.
+
+For comparison — round-2 sent step_2 WITH "Re:" prefix and EB stored `"Re: Re: ..."` (double). Round-3's bare-subject approach correctly produces single prefix. The fix-validation requires the operator/spec to send bare subjects; the spec's HARD FAIL guard at line 722 ensures this contract is enforced for actual `/marketing:launch-campaign` runs.
+
+**F29 (wait_in_days override) — sub-test.** Sent step 1 with `wait_in_days: 1` (per spec's `max(1, artifact.step_1.wait_in_days)` clamp; artifact had 0). All 3 creates succeeded — confirms F29's override is necessary AND idempotent on subsequent runs. Round-2 confirmed via 422 retry; round-3 didn't repro the 422 path since we sent 1 directly.
+
+**F30 (thread_reply field name) — sub-confirmed.** API response confirms `thread_reply` is the correct field name. No regression.
+
+**Time-to-complete Phase 9 walk:** ~15 seconds (1 search + 3 sequence creates).
+
+**Workspace state after T10:** 14 vars + 9 leads + 4 campaigns (1 decoy + 3 main fully formed: senders + leads + schedule + sequence) + 3 sequence IDs (5, 6, 7).
+
+**→ PAUSE FOR REVIEW** per plan T10 boundary. Live state of all 3 main campaigns fully formed and inspectable in EB UI before T11 dedicated render-test side-flow begins.
 
 ---
 
@@ -494,7 +524,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-2a ★ | BC-6299 carryover — case-sensitivity | *pending* | | |
 | R-2b ★ | BC-6299 carryover — empty-value rendering | *pending* | | |
 | R-3 | BC-6300 — Phase 4 lead-body field names | ✅ **confirmed** | All 9 created leads (IDs 14712-14720) returned with `title` and `company` populated with verbatim CSV values. API schema confirms `title`+`company` (not job_title/company_name). BC-6300 fix prevents the round-2 data-loss bug. | None |
-| R-4 | BC-6301 — variant boolean + no double Re: | *pending* | | |
+| R-4 | BC-6301 — variant boolean + no double Re: | ✅ **confirmed** | All 3 sequences (ids 5/6/7) created successfully. variant: false (boolean) accepted; post-create shows variant=false. Bare step_2 subject submitted; EB auto-prepended single "Re:" prefix (no double). Round-2's Sx-13 + Sx-14 bug class closed. | None (artifact-fixture stale-convention handled at T16) |
 | R-5 | BC-6302 — Phase 5 pre-list duplicate guard | ✅ **confirmed** | Pre-created decoy id 25 → `list_campaigns(search="BC-6308 Round 3")` correctly returned 1 match → gate 5 surfaced duplicate. Without BC-6302 fix, this detection wouldn't run. | None |
 | R-6 | BC-6303 — metadata schema (4 new fields) | ✅ **confirmed** | T7: `lead_ids_by_bucket` populated `{Google: [14712,14713,14716,14717], Microsoft: [14714,14715], Other: [14718,14719,14720]}`. T9: `schedule_template_id: 3` + `campaign_schedule_ids: {Google: 6, Microsoft: 7, Other: 8}` populated correctly. T6: `activated_per_campaign` seeded with null; `existing_campaign_matches: [25]` captured. All 4 BC-6303 fields verified. | None |
 | R-7 | BC-6304 — Tool tier map clarifies wrapper-vs-API gate | *pending* | | |
