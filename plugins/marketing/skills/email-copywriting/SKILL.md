@@ -222,9 +222,9 @@ Every invocation that completes writes exactly one JSON file. Full shape:
   "custom_variables": [
     {"name": "COMPANY", "default": ""},
     {"name": "FIRST_NAME", "default": ""},
-    {"name": "RECENCY_ANCHOR", "default": ""},
-    {"name": "PROOF_POINT_COMPANY", "default": ""},
-    {"name": "PROOF_POINT_NUMBER", "default": ""},
+    {"name": "RECENCY_ANCHOR", "default": "downtown master-plan announcement"},
+    {"name": "PROOF_POINT_COMPANY", "default": "Boulder's Pearl Street"},
+    {"name": "PROOF_POINT_NUMBER", "default": "ran 38% higher evening visits"},
     {"name": "FREE_ASSET_NOUN", "default": "architectural preview"},
     {"name": "SENDER_FIRST_NAME", "default": ""}
   ],
@@ -265,6 +265,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
 - **Preset files are lazy-loaded.** One preset file read per invocation, not the whole library. Use `Glob` + `Grep` to check existence before `Read`; on missing, fall back to base inline skeleton without halting (D3).
 - **Supply vertical triggers are out of scope.** The handbook 23-vertical taxonomy excludes professional installers + property management (see `Brite-Nites/handbook@main:marketing/go-to-market/verticals/README.md`). If an operator supplies a Supply-framed prospect, pause and clarify — do not produce a Supply-tone email. Inherited from BC-5824 precedent.
 - **Hypothesis framing is non-negotiable.** Inherited from situation-mining §3 — body copy never states worldview as fact. When incorporating inferred signals from the situation artifact, the copy must read as "we noticed X and thought {HYPOTHESIS}" — never "you are X."
+- **Content-variable defaults must be non-empty (BC-6556 fail-closed gate).** Email Bison's render engine substitutes any unresolved `{TOKEN}` with empty string — silent, no error (verified BC-6308 round-3 R-2b: `{RECENCY_ANCHOR}` with null value rendered as `""`, producing `"Saw the  at Acme Bob..."` with double-space). To prevent this in production: every content variable referenced in `step_1` / `step_2` subject + body MUST have a non-empty `custom_variables[].default` in the artifact. Per-lead variables (`{COMPANY}`, `{FIRST_NAME}`) and sender variables (`{SENDER_*}`) are exceptions — they're resolved via per-lead CSV values and the §5 Workflow 1 priority chain respectively, not via campaign-level defaults. Enforced fail-closed by `launch-campaign.md` Phase 1 step 5. Defaults are a **safety net** for prospects with thin per-lead data, not a substitute for good per-lead values — for high-personalization campaigns, populate the per-lead value via the CSV. Long-term direction: smart-merge formula layer with context-aware fallback (BC-6557).
 
 ---
 
