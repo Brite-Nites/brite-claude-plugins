@@ -269,11 +269,38 @@ All 8 → "existing → reuse" classification. **Zero new creates required for P
 
 ## Phase 5 CAMPAIGN CREATE — live-walk
 
-*(populated at T6 — placeholder)*
+**Step 1 — R-5 trigger setup.** Workspace was clean of leftover BC-6308/BC-5906 campaigns at T2, so per plan we pre-created a decoy campaign via `create_campaign(name="BC-6308 Round 3 | Google", type="outbound")` to force the duplicate-detection path. **Decoy: id 25, status draft, 0 leads.** Tracked for T14 cleanup.
 
-**R-5 (BC-6302 — pre-list duplicate guard):** *(verbatim user gate 5 render with matched campaigns surfaced; gate-5 4th option "Reuse existing IDs")*
+**Step 3 — pre-list call (BC-6302 fix in action).** `list_campaigns(search="BC-6308 Round 3")` → returned **1 match** (id 25 decoy). Without BC-6302's fix, this detection wouldn't run and the spec would have silently created the duplicate. **R-5 verified at this step.**
 
-**R-8 ★ (BC-6306 — deliverability PATCH):** *(post-create campaign GET showing `plain_text: true`, `reputation_building: true`, `can_unsubscribe: true` for all 3 main campaigns)*
+**Step 5 — gate 5 + main creates.** Operator picked "Create 3 new anyway" per plan recommendation. Per spec line 540, "Reuse existing IDs" was unavailable here because only 1 of 3 buckets had a matching decoy — the spec correctly halts that path when not all buckets match. Spec rationale in line 540 verified by direct constraint encounter.
+
+3 main campaigns created in parallel (~1s):
+- **id 26** — `BC-6308 Round 3 | Google`
+- **id 27** — `BC-6308 Round 3 | Microsoft`
+- **id 28** — `BC-6308 Round 3 | Other`
+
+**Step 6 — R-8 PATCH (off-spec then corrected).** First attempt PATCHed all 3 with `{plain_text: true, reputation_building: true, can_unsubscribe: true}` — over-spec on the agent's part. BC-6306's actual scope is `plain_text` only; `reputation_building` + `can_unsubscribe` were deliberately deferred during BC-6306 brainstorm (operator preference: keep them OFF). Agent corrected after operator flagged.
+
+Sequence:
+1. PATCH `{plain_text: true, reputation_building: true, can_unsubscribe: true}` → response confirms `plain_text: true, can_unsubscribe: true` in GET (`reputation_building` not surfaced in GET response — write-only field)
+2. PATCH `{can_unsubscribe: false, reputation_building: false}` (omitting `plain_text` to revert) → response shows **`plain_text: false`**. EB silently reset it. **MAJOR FINDING**: EB's PATCH endpoint treats omitted boolean fields as `false` (documented in EB API spec: *"If nothing sent, false is assumed."*). Brite spec line 545's "PATCH is idempotent" claim is misleading — only true if you re-send the exact same body each time, NOT true that PATCH preserves omitted fields. **Filed as BC-6544** (Medium priority — documentation correctness; current spec works because it does ONE PATCH per campaign on a fresh-default state, but creates a foot-gun for future spec changes).
+3. PATCH `{plain_text: true, can_unsubscribe: false, reputation_building: false}` → response shows `plain_text: true, can_unsubscribe: false` ✅ desired end state restored on all 3 main campaigns.
+
+**Final state per main campaign (verified via PATCH response which echoes GET):**
+- `plain_text: true` ✅ (BC-6306 fix verified across all 3)
+- `can_unsubscribe: false` ✅ (matches BC-6306 deliberate deferral)
+- `reputation_building: <unknown — write-only>` ⚠️ (sent `false` in body; can't verify via GET; confidence comes from PATCH input correctness)
+
+**R-5 verdict (BC-6302 — pre-list duplicate guard) — confirmed ✅.** Pre-list correctly surfaced decoy id 25 at gate render; BC-6302 fix path verified.
+
+**R-8 verdict (BC-6306 — `plain_text` deliverability PATCH) — confirmed ✅.** All 3 main campaigns end at `plain_text: true` per the BC-6306 fix. Scope correctly narrowed to `plain_text` only — earlier plan over-claim ("PATCH all 3 deliverability flags") was based on the original Sx-15 round-2 finding, not on what BC-6306 actually shipped (per BC-6306 session memory: scope narrowed to plain_text-only during brainstorm).
+
+**Off-spec disclosure recorded.** Agent's first PATCH attempt included `reputation_building: true` + `can_unsubscribe: true` against operator's deliberate scope. Reverted via second + third PATCH. Final state matches deliberate scope. Documented in transcript per pacing-rhythm transparency requirement.
+
+**Time-to-complete Phase 5:** ~3 minutes (4 creates + 9 PATCH + 3 GET, including the off-spec correction loop).
+
+**Workspace state after T6:** 14 vars + 9 leads + 4 campaigns (1 decoy + 3 main).
 
 ---
 
@@ -367,10 +394,10 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-2b ★ | BC-6299 carryover — empty-value rendering | *pending* | | |
 | R-3 | BC-6300 — Phase 4 lead-body field names | ✅ **confirmed** | All 9 created leads (IDs 14712-14720) returned with `title` and `company` populated with verbatim CSV values. API schema confirms `title`+`company` (not job_title/company_name). BC-6300 fix prevents the round-2 data-loss bug. | None |
 | R-4 | BC-6301 — variant boolean + no double Re: | *pending* | | |
-| R-5 | BC-6302 — Phase 5 pre-list duplicate guard | *pending* | | |
+| R-5 | BC-6302 — Phase 5 pre-list duplicate guard | ✅ **confirmed** | Pre-created decoy id 25 → `list_campaigns(search="BC-6308 Round 3")` correctly returned 1 match → gate 5 surfaced duplicate. Without BC-6302 fix, this detection wouldn't run. | None |
 | R-6 | BC-6303 — metadata schema (4 new fields) | *pending* | | |
 | R-7 | BC-6304 — Tool tier map clarifies wrapper-vs-API gate | *pending* | | |
-| R-8 ★ | BC-6306 — Phase 5 deliverability PATCH | *pending* | | |
+| R-8 ★ | BC-6306 — Phase 5 `plain_text` PATCH | ✅ **confirmed** | All 3 main campaigns (26/27/28) show `plain_text: true` post-PATCH. Scope correctly narrowed to plain_text only per BC-6306 deliberate deferral of reputation_building + can_unsubscribe. Production-blocker class from round-2 closed. | **BC-6544** (PATCH-omitted-fields-reset-to-false finding — documentation correctness for future spec changes) |
 | R-9 | BC-6307 — Phase 2 email-type segmentation | **partially validated** | Classification logic ✅ confirmed (per-lead `is_role`/`is_free` tagging matches expected on all 9 leads). Segmentation-axis design ⚠️ flagged: spec uses ESP-axis, production uses email-type-axis. Operator-stated ideal is multiplicative. | **BC-6514** (architectural redesign issue, assigned Holden Halford) |
 | R-10 | New flags introduced by round-2 fixes | *pending* | | |
 | R-11 | New metadata schema fields populate | *pending* | | |
