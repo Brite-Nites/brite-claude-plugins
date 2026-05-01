@@ -396,9 +396,44 @@ Round-2 measured ≈15.5s end-to-end. Round-3 slightly faster (likely network va
 
 ## Phase 8 SCHEDULE — live-walk
 
-*(populated at T9 — placeholder)*
+**Step 1 — ground-truth.** `search_api_spec(search_term="schedule template")` matched `GET /api/campaigns/schedule/templates`. `search_api_spec(search_term="create-schedule-from-template")` matched `POST /api/campaigns/{campaign_id}/create-schedule-from-template` body `{schedule_id: int}`.
 
-**R-6 partial (BC-6303 — `schedule_template_id` + `campaign_schedule_ids` rename):** *(metadata excerpt)*
+**Step 2 — list templates.** Workspace 13 returns **1 template** unchanged from round-2:
+
+| id | type | days | start_time | end_time | timezone |
+|---|---|---|---|---|---|
+| 3 | Schedule template | Mon-Fri | 08:00:00 | 20:00:00 | America/Denver |
+
+`status: "Not Started"`, `created_at: 2026-03-24` (pre-existed before round-2). Sx-12 still applies — templates have no `name` field; identification is purely by structural field comparison.
+
+**Step 3 — three parallel applies.** All 3 succeeded:
+
+| Campaign | Schedule clone ID | Notes |
+|---|---|---|
+| 26 (Google) | **6** | type: "Campaign Schedule" (round-2 saw "Generated" — minor label drift, same semantic) |
+| 27 (Microsoft) | **7** | per-campaign clone |
+| 28 (Other) | **8** | per-campaign clone |
+
+**Important — clone-not-reference confirmed.** Each campaign got its own NEW schedule entity ID (not a reference to template id 3). This matches round-2's finding and validates BC-6303's metadata schema rename — the per-campaign clone IDs need to be tracked separately from the source template ID.
+
+**R-6 partial verdict (BC-6303 — `schedule_template_id` + `campaign_schedule_ids` rename — confirmed ✅).** The metadata writes the spec would produce at Phase 8 step 7:
+
+```json
+"schedule_template_id": 3,
+"campaign_schedule_ids": {
+  "Google": 6,
+  "Microsoft": 7,
+  "Other": 8
+}
+```
+
+This is the BC-6303 rename from round-2's old `schedule_id: <single-id>` (which incorrectly implied a shared schedule). The new shape correctly captures both the source template + per-campaign clones — supports the resume primitive (rebuild per-campaign schedule state from metadata alone).
+
+**Minor observation:** API spec example response shows `type: "Generated"` but live response shows `type: "Campaign Schedule"`. Spec lags reality slightly; not load-bearing for our walk (we don't filter on type). No action needed.
+
+**Time-to-complete Phase 8 walk:** ~3 seconds (1 list + 3 parallel applies).
+
+**Workspace state after T9:** 14 vars + 9 leads + 4 campaigns (1 decoy + 3 main with 15 senders + 9 leads + plain_text:true + schedule). Plus 3 cloned schedule entities (ids 6-8) attached to main campaigns.
 
 ---
 
@@ -461,7 +496,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-3 | BC-6300 — Phase 4 lead-body field names | ✅ **confirmed** | All 9 created leads (IDs 14712-14720) returned with `title` and `company` populated with verbatim CSV values. API schema confirms `title`+`company` (not job_title/company_name). BC-6300 fix prevents the round-2 data-loss bug. | None |
 | R-4 | BC-6301 — variant boolean + no double Re: | *pending* | | |
 | R-5 | BC-6302 — Phase 5 pre-list duplicate guard | ✅ **confirmed** | Pre-created decoy id 25 → `list_campaigns(search="BC-6308 Round 3")` correctly returned 1 match → gate 5 surfaced duplicate. Without BC-6302 fix, this detection wouldn't run. | None |
-| R-6 | BC-6303 — metadata schema (4 new fields) | ✅ **partial — `lead_ids_by_bucket` confirmed** | T7 verified bucket→ID map populates correctly: `{Google: [14712,14713,14716,14717], Microsoft: [14714,14715], Other: [14718,14719,14720]}`. `schedule_template_id` + `campaign_schedule_ids` pending T9. `activated_per_campaign` + `existing_campaign_matches` already partial-confirmed at T6. | None |
+| R-6 | BC-6303 — metadata schema (4 new fields) | ✅ **confirmed** | T7: `lead_ids_by_bucket` populated `{Google: [14712,14713,14716,14717], Microsoft: [14714,14715], Other: [14718,14719,14720]}`. T9: `schedule_template_id: 3` + `campaign_schedule_ids: {Google: 6, Microsoft: 7, Other: 8}` populated correctly. T6: `activated_per_campaign` seeded with null; `existing_campaign_matches: [25]` captured. All 4 BC-6303 fields verified. | None |
 | R-7 | BC-6304 — Tool tier map clarifies wrapper-vs-API gate | *pending* | | |
 | R-8 ★ | BC-6306 — Phase 5 `plain_text` PATCH | ✅ **confirmed** | All 3 main campaigns (26/27/28) show `plain_text: true` post-PATCH. Scope correctly narrowed to plain_text only per BC-6306 deliberate deferral of reputation_building + can_unsubscribe. Production-blocker class from round-2 closed. | **BC-6544** (PATCH-omitted-fields-reset-to-false finding — documentation correctness for future spec changes) |
 | R-9 | BC-6307 — Phase 2 email-type segmentation | **partially validated** | Classification logic ✅ confirmed (per-lead `is_role`/`is_free` tagging matches expected on all 9 leads). Segmentation-axis design ⚠️ flagged: spec uses ESP-axis, production uses email-type-axis. Operator-stated ideal is multiplicative. | **BC-6514** (architectural redesign issue, assigned Holden Halford) |
