@@ -99,14 +99,14 @@
       "id": "R04-TN",
       "description": "sf-debug does NOT activate for SOQL writing; sf-soql fires instead",
       "tier": 2,
-      "prompt": "Write a SOQL query: `SELECT Status FROM Flow WHERE Definition.DeveloperName = 'LeadRouting'`.",
+      "prompt": "Write a SOQL query: `SELECT Id, Name FROM Account WHERE Type = 'Customer' ORDER BY CreatedDate DESC LIMIT 50`.",
       "expected_skill": "sf-soql",
       "expected_markers": [],
       "not_expected_markers": [],
       "not_expected_skills": ["sf-debug"],
       "judge_rubric": null,
       "estimated_cost": "$0.10",
-      "notes": "Collision boundary — Tooling API SOQL is sf-soql, not sf-debug (even though sf-flow's verify section uses similar query)"
+      "notes": "Collision boundary — plain SOQL is sf-soql, not sf-debug. Avoids the Tooling-API Flow query shape that overlaps sf-flow's TRIGGER (post-deploy verification)."
     },
     {
       "id": "R05-TP",
@@ -266,16 +266,16 @@
     },
     {
       "id": "R11-TP",
-      "description": "sf-metadata activates for picklist field authoring with FLS sync reminder",
+      "description": "sf-metadata activates for picklist field authoring",
       "tier": 2,
-      "prompt": "Add a new picklist field on Account via .field-meta.xml with FLS for the 7 standard permsets.",
+      "prompt": "Add a new Account.Region__c picklist field via .field-meta.xml with values [North, South, East, West].",
       "expected_skill": "sf-metadata",
-      "expected_markers": [".field-meta.xml", "FLS"],
+      "expected_markers": [".field-meta.xml", "picklist"],
       "not_expected_markers": [],
       "not_expected_skills": [],
       "judge_rubric": null,
       "estimated_cost": "$0.10",
-      "notes": "Core trigger — .field-meta.xml + 7-permset FLS sync"
+      "notes": "Core trigger — pure metadata authoring via .field-meta.xml. FLS-permset-sync intentionally omitted to avoid sf-permissions collision (\"7-permset sync reminder\" is verbatim in sf-permissions TRIGGER); deferred to Phase 2."
     },
     {
       "id": "R11-TN",
