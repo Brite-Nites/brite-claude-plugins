@@ -442,7 +442,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-9 | BC-6307 — Phase 2 email-type segmentation | **partially validated** | Classification logic ✅ confirmed (per-lead `is_role`/`is_free` tagging matches expected on all 9 leads). Segmentation-axis design ⚠️ flagged: spec uses ESP-axis, production uses email-type-axis. Operator-stated ideal is multiplicative. | **BC-6514** (architectural redesign issue, assigned Holden Halford) |
 | R-10 | New flags introduced by round-2 fixes | *pending* | | |
 | R-11 | New metadata schema fields populate | *pending* | | |
-| R-12 | F22 `allow_parallel_sending` (deferred again) | *deferred* | Brainstorm decision 4 — same rationale as round-2 brainstorm decision 3 | |
+| R-12 | F22 `allow_parallel_sending` (deferred again) | ⏭️ **deferred (3rd round)** | Brainstorm decision 4 — same rationale as round-2 brainstorm decision 3. Endpoint param confirmed in API spec; safety-check behavior not live-tested. | **BC-6545** (institutional-memory issue capturing 3-round deferral pattern + test setup + trigger conditions for future verification) |
 | R-13 | F14 pagination regression | ✅ **confirmed** | `?page=N` Laravel-style meta with `per_page: 15` unchanged from round-2. NOT cursor-based. No regression. | None |
 | R-14 | F16 workspace-scoped variable persistence regression | ✅ **confirmed** | 8 round-2 variables (IDs 7-14, dated 2026-04-27) still present in workspace 13 at T4 list call. No regression in cross-session persistence. | None |
 | R-15 | F26 sub-second eventual consistency regression | *pending* | | |
