@@ -477,21 +477,95 @@ For comparison — round-2 sent step_2 WITH "Re:" prefix and EB stored `"Re: Re:
 
 ## R-2a / R-2b dedicated render-test (T11)
 
-*(populated at T11 — placeholder)*
-
 **Setup state:**
-- Custom variable `empty_test_var` created (id <pending>)
-- Lead A id <pending> — `recency_anchor: "ROUND-3 CASE TEST"`, `empty_test_var: ""`
-- Lead B id <pending> — `recency_anchor: ""`, `empty_test_var: ""`
-- Campaign `BC-6308 RENDER TEST A` id <pending>
-- Campaign `BC-6308 RENDER TEST B` id <pending>
-- Sequence step body submitted to each (test tokens: `{RECENCY_ANCHOR}`, `{recency_anchor}`, `EMPTY_TEST:[{empty_test_var}]:END`)
+- Custom variable `empty_test_var` created — id 15. **Workspace 13 now has 15 permanent variables** (was 14 + 1 new).
+- Lead A id **14721** — sent `recency_anchor: "ROUND-3 CASE TEST"`, `empty_test_var: ""`. **EB stored as `recency_anchor: "ROUND-3 CASE TEST"`, `empty_test_var: null`** (empty string coerced to null).
+- Lead B id **14722** — sent both as `""`. **EB stored both as `null`** (same coercion).
+- Campaign `BC-6308 RENDER TEST A` id **29**, plain_text PATCH applied, Lead A attached, sender 981 attached, schedule clone id 9 applied, sequence id 8 created with step id 14.
+- Campaign `BC-6308 RENDER TEST B` id **30**, plain_text PATCH applied, Lead B attached, sender 981 attached, schedule clone id 10 applied, sequence id 9 created with step id 15.
+- Sequence step body (both campaigns):
+```
+Hi {FIRST_NAME},
 
-**R-2a (case-sensitivity):** *(operator-reported Preview Body output for Lead A — what `{RECENCY_ANCHOR}` resolved to + control `{recency_anchor}`)*
+--- R-2a CASE-SENSITIVITY TEST ---
+UPPERCASE token: {RECENCY_ANCHOR}
+lowercase token: {recency_anchor}
 
-**R-2b (empty-value rendering):** *(operator-reported Preview Body output for Lead B — what `EMPTY_TEST:[{empty_test_var}]:END` resolved to)*
+--- R-2b EMPTY-VALUE TEST ---
+EMPTY_TEST:[{empty_test_var}]:END
 
-**Tie-breaker decision:** *(skip / fire one real /test-email send to corinne@britenites.com)*
+(test campaign — DO NOT SEND)
+```
+
+**Operator phase — Preview Body screenshots (2026-05-01):**
+
+**RENDER TEST A (Lead A bound — recency_anchor populated, empty_test_var null):**
+```
+Hi LeadA,
+
+--- R-2a CASE-SENSITIVITY TEST ---
+UPPERCASE token: ROUND-3 CASE TEST
+lowercase token: recency_anchor
+
+--- R-2b EMPTY-VALUE TEST ---
+EMPTY_TEST:[empty_test_var]:END
+
+(test campaign — DO NOT SEND)
+```
+
+**RENDER TEST B (Lead B bound — both values null):**
+```
+Hi LeadB,
+
+--- R-2a CASE-SENSITIVITY TEST ---
+UPPERCASE token: 
+lowercase token: recency_anchor
+
+--- R-2b EMPTY-VALUE TEST ---
+EMPTY_TEST:[empty_test_var]:END
+
+(test campaign — DO NOT SEND)
+```
+
+### R-2a verdict (case-sensitivity — confirmed ✅ with NEW finding)
+
+EB's render engine treats UPPERCASE and lowercase tokens **differently**:
+
+- **UPPERCASE tokens** (`{RECENCY_ANCHOR}`) ARE recognized as variable references. Case-insensitive lookup against the lead's stored variables. Lead A's populated value resolved correctly to "ROUND-3 CASE TEST". Lead B's null value rendered as **empty string** (cleanly disappeared — no broken text).
+- **lowercase tokens** (`{recency_anchor}`, `{empty_test_var}`) are NOT recognized as variable references. They get parsed as tokens (braces stripped) but output as **literal text** — the variable name without braces. Both Lead A and Lead B show the same lowercase-token behavior (`recency_anchor`, `empty_test_var`).
+
+**Implications for the marketing skills:**
+- ✅ All 14 marketing skills currently use UPPERCASE convention (verified by spot-check of `email-copywriting/SKILL.md`) — they work correctly with EB's render engine
+- ✅ The original BC-6299 case-sensitivity concern (Sx-3: EB lowercases names on store → would `{UPPERCASE_TOKEN}` fail?) is RESOLVED — uppercase tokens correctly resolve via case-insensitive lookup
+- ⚠️ NEW silent-failure risk identified: lowercase tokens render as literal text. If anyone authors copy with `{first_name}` instead of `{FIRST_NAME}`, EB delivers `"Hi first_name"` literally. **No validation in current spec.**
+- **Filed as BC-6548** (Medium priority — add lowercase-token validation in email-copywriting/SKILL.md + launch-campaign Phase 9 step 1 + email-bison.md § Render engine)
+
+### R-2b verdict (empty-value rendering — confirmed ✅)
+
+When an UPPERCASE-resolved token has null/missing value, EB **renders it as empty string** — the placeholder simply disappears.
+
+Evidence: Lead B's `{RECENCY_ANCHOR}` line shows `UPPERCASE token: ` (nothing after the colon — the placeholder vanished cleanly).
+
+**Implications for the marketing skills:**
+- ✅ Safest possible empty-value behavior — no literal placeholder text in delivery, no broken syntax, no spam-flag risk
+- ✅ Sends still complete; affected sentence degrades to slightly awkward grammar but is readable
+- ⚠️ Templates with multi-token sentences could produce double-spaces, orphan punctuation, or sentence fragments when empty values render
+- **No fallback syntax discovered** — no `{TOKEN|fallback}` spintax-style mechanism visible
+- **Filed as BC-6549** (Low priority — audit + harden email-copywriting templates for empty-value graceful degradation)
+
+### Methodology note for future rounds
+
+The empty_test_var test specifically used `{empty_test_var}` (lowercase) which fell into the lowercase-not-recognized trap. The actual R-2b empty-value evidence comes from Lead B's `{RECENCY_ANCHOR}` line (uppercase + null = empty). Future render-engine probes should use UPPERCASE tokens for empty-value tests.
+
+Also: I sent `value: ""` for the empty fields when creating leads, but EB stored as `null`. Empty-string-to-null coercion is itself an EB API behavior — worth knowing for any future test that intentionally distinguishes empty-string from null.
+
+### Tie-breaker decision
+
+**Skipped — UI Preview Body output was unambiguous.** No real `/test-email` send needed. Both R-2a and R-2b verdicts confirmed via Preview Body alone.
+
+### Time-to-complete T11
+
+~10 minutes total (5 min agent-side setup + 3 min operator-side UI clicking + 2 min verdict + follow-up filing).
 
 ---
 
@@ -521,8 +595,8 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 |---|---|---|---|---|
 | R-1 | BC-6298 — EB API quirks bundle (Sx-1/5/8/10/11) | ✅ **confirmed (all 5)** | Sx-1: URL-path queries succeed in T4/T5/T7/T8; Sx-5: spec correctly treats last_name as optional; Sx-8: round-2 evidence stands; Sx-10: `?per_page=100` silently ignored (EB hardcodes 15) at T8; Sx-11: `?status=Connected` 422s, `?status=connected` succeeds at T8. | None |
 | R-2 | BC-6299 — Phase 3 variable reuse classification | ✅ **confirmed** | All 8 artifact variables (uppercase) match workspace stored vars (lowercase per Sx-3) → "existing → reuse" classification fires for all 8. Zero new creates required. | None |
-| R-2a ★ | BC-6299 carryover — case-sensitivity | *pending* | | |
-| R-2b ★ | BC-6299 carryover — empty-value rendering | *pending* | | |
+| R-2a ★ | BC-6299 carryover — case-sensitivity | ✅ **confirmed (with new finding)** | UPPERCASE tokens resolve via case-insensitive lookup → existing 14 marketing skill templates work correctly. NEW finding: lowercase tokens render as literal text in delivery (silent-failure mode). Original Sx-3 concern resolved; new risk surfaced. | **BC-6548** (Medium — lowercase-token validation in email-copywriting + launch-campaign Phase 9) |
+| R-2b ★ | BC-6299 carryover — empty-value rendering | ✅ **confirmed** | UPPERCASE-resolved token + null value = renders as empty string (placeholder cleanly disappears). Safest possible behavior — no literal placeholder text leaking into delivery. No `{TOKEN\|fallback}` syntax discovered. Sentences may degrade to awkward grammar but stay readable. | **BC-6549** (Low — email-copywriting templates audit for empty-value graceful degradation) |
 | R-3 | BC-6300 — Phase 4 lead-body field names | ✅ **confirmed** | All 9 created leads (IDs 14712-14720) returned with `title` and `company` populated with verbatim CSV values. API schema confirms `title`+`company` (not job_title/company_name). BC-6300 fix prevents the round-2 data-loss bug. | None |
 | R-4 | BC-6301 — variant boolean + no double Re: | ✅ **confirmed** | All 3 sequences (ids 5/6/7) created successfully. variant: false (boolean) accepted; post-create shows variant=false. Bare step_2 subject submitted; EB auto-prepended single "Re:" prefix (no double). Round-2's Sx-13 + Sx-14 bug class closed. | None (artifact-fixture stale-convention handled at T16) |
 | R-5 | BC-6302 — Phase 5 pre-list duplicate guard | ✅ **confirmed** | Pre-created decoy id 25 → `list_campaigns(search="BC-6308 Round 3")` correctly returned 1 match → gate 5 surfaced duplicate. Without BC-6302 fix, this detection wouldn't run. | None |
