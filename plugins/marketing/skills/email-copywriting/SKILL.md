@@ -44,7 +44,7 @@ Four frameworks govern this skill: **Email Bison format rules**, **Hormozi value
 
 Every artifact the skill emits MUST satisfy all of these rules before Write. Adapted from the Email Bison vendor docs and codified in `plugins/marketing/tools/integrations/email-bison.md`:
 
-- Use uppercase single-brace variables only: `{FIRST_NAME}`, `{COMPANY}`, `{CITY}`. Never `{{firstname}}` or `{{FIRST_NAME}}` — double-brace breaks the EB merge engine.
+- **All `{TOKEN}` references in step_1.subject, step_1.body, step_2.subject, step_2.body MUST be UPPERCASE** (e.g., `{FIRST_NAME}`, `{COMPANY}`, `{RECENCY_ANCHOR}`). EB's render engine does NOT recognize lowercase tokens as variable references — they render as **literal text** in delivery (verified BC-6308 round-3 R-2a). Authoring a lowercase token (`{first_name}`) is a silent-failure deliverability bug. Never `{{firstname}}` or `{{FIRST_NAME}}` either — double-brace breaks the EB merge engine.
 - Paragraph breaks are `<br><br>`, never `<p>...</p>` tags. EB's HTML-to-plain converter eats `<p>` and corrupts the greeting-merged first sentence.
 - Greeting merges into the first sentence. No separate "Hi {FIRST_NAME}," line. Write: "Quick note {FIRST_NAME}, ..." or "Saw the {DOWNTOWN_INITIATIVE} news {FIRST_NAME}, ..." — the salutation lives inline.
 - Zero em-dashes (`—`) in body copy. Em-dashes are a known EB spam trigger; replace with commas, periods, or hyphens. This is auto-replaced at draft time, not prompted per-occurrence.
@@ -442,6 +442,7 @@ Base guardrails (shared across marketing plugin) + skill-specific hard failures.
 **Skill-specific hard failures (validation-gated — fail the artifact emit):**
 
 - **Do not emit `{{variable}}` double-brace tokens.** Email Bison requires single-brace uppercase variables (`{FIRST_NAME}`). If a draft contains `{{`, self-correct to single-brace before emit. Hard failure if present in the written artifact.
+- **Do not emit lowercase or mixed-case `{token}` references in subjects or bodies.** EB's render engine ONLY resolves UPPERCASE tokens (e.g., `{FIRST_NAME}`); lowercase or mixed-case tokens (`{first_name}`, `{First_Name}`) render as literal text in delivery — verified BC-6308 round-3 R-2a Preview Body output. If a draft contains any `{[a-z][A-Za-z_]*}` pattern, self-correct to UPPERCASE before emit. Hard failure if present in the written artifact.
 - **Do not emit `<p>` or `</p>` tags in body copy.** EB's HTML-to-plain converter eats `<p>` and corrupts the greeting-merged first sentence. Use `<br><br>` for paragraph breaks. Hard failure if present.
 - **Do not emit em-dashes (`—`) in body copy.** Known EB spam trigger. Auto-replace with commas, periods, or hyphens at draft time. Hard failure if present in the written artifact. (Em-dashes in this SKILL.md spec prose are OK where explaining the rule; the rule applies only to body template examples and generated artifact text.)
 - **Do not emit sequences with more than 2 steps.** v0.1 of this skill supports step 1 + step 2 only. Longer sequences belong in `campaign-orchestration`'s multi-phase flow. Hard failure on 3+ steps.
