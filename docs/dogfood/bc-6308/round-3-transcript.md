@@ -621,9 +621,22 @@ All 9 new fields populated correctly with verbatim values matching round-3 walk 
 
 ## Phase 11 ACTIVATE — spec re-check (T13, no live execution)
 
-*(populated at T13 — placeholder)*
+Per round-3 scope, Phase 11 not exercised (no `--activate`; no real customer emails sent). Paper-spec-check confirms BC-6303 schema integration is correct throughout Phase 11.
 
-Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema + resume rule alignment.
+**Spec references to `activated_per_campaign` verified:**
+- Line 166: "`activated` flips to `true` only when every entry in `activated_per_campaign` is non-null (Phase 11 finalization)"
+- Line 183: schema documented in metadata fields
+- Line 546: Phase 5 seeds `activated_per_campaign` with null per bucket — pre-populates so Phase 11 doesn't need object-presence probes
+- Line 900: Phase 11 user gate 11a explanation includes per-campaign tracking semantics
+- Line 916: Per-iteration metadata write of `activated_per_campaign[<bucket>] = "<ISO-8601>"`; explicitly noted as the resume primitive
+- Line 917: Abort behavior — already-activated campaigns retain their timestamps
+- Line 919: Finalization gates `activated: true` on every bucket key being non-null
+
+**Round-2 schema gap closed.** Round-2 found that Phase 11's resume rule ("skip campaigns whose metadata shows they're already activated") was uncomputable because metadata had no per-campaign granularity. BC-6303's `activated_per_campaign` field provides exactly that. The spec now consistently references this field everywhere needed.
+
+**No EB state changed in T13.** All 4 main + decoy + 2 render-test campaigns remain in `draft` status. Phase 10 (local render) covered by Phase 1 IV-validation; Phase 10 mode 2 (`--test-send`) skipped per R-2a/R-2b UI Preview Body sufficiency.
+
+**T13 completes the verification phases of round-3.** Workspace cleanup at T14 next.
 
 ---
 
