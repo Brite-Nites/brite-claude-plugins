@@ -128,6 +128,8 @@ Full CRUD over cold-email campaigns including create, import leads, attach sende
 
 Lead create, bulk create (up to 500 per call), upsert, blacklist. See rate limits below for the 500-per-call cap ([WIP §6 Q6](../../../../docs/research/outbound-pipeline-findings.md#6-open-design-questions)).
 
+Lead-create responses (`POST /api/leads`, `POST /api/leads/multiple`) include both `id` (integer) and `uuid` (string) fields; use `id` for downstream API calls — every other EB endpoint that takes a lead reference accepts the integer form. The `uuid` field is forward-compatible additive (verified live 2026-05-01 — added in the ~3-day window between BC-5906 round-2 (2026-04-27) and BC-6308 round-3 (2026-04-30)).
+
 ### Inbox / replies (13 tools)
 
 Send reply, mark interested, push to follow-up, reply analytics ([WIP §6 Q6](../../../../docs/research/outbound-pipeline-findings.md#6-open-design-questions)).
@@ -303,7 +305,9 @@ This pattern is **stronger** than a skill-level "ask the user" step — when inv
 
 ## Last verified
 
-`2026-04-29` — BC-6301: appended 2 §Known gotchas bullets (Sx-13 `variant` is boolean not string, Sx-14 EB auto-prepends `Re: ` when `thread_reply: true`) sourced from BC-5906 round-2 dogfood transcript Phase 9 + verbatim sequence-response evidence (campaign 22 step ID 7 stored `"Re: Re: ..."` from spec input `"Re: ..."`). Live API behavior verified during round-2; round-3 (BC-6308) will re-walk to confirm.
+`2026-05-01` — BC-6515: appended forward-compat note to § Tool inventory § Leads (15 tools) flagging that lead-create responses now include both `id` (integer) and `uuid` (string) fields. Verified live via `POST /api/leads/multiple` against `emailbison-personal` workspace 13 (lead ID 14723 created + deleted; raw response captured in `docs/plans/BC-6515-plan.md`). API spec response schema (`search_api_spec(POST /api/leads/multiple)`) does NOT yet list `uuid` — runtime added it ahead of spec docs; spec-doc-lag observation logged but not promoted to a §Known gotchas bullet (issue scope tight per round-3 chain pattern).
+
+Prior: `2026-04-29` — BC-6301: appended 2 §Known gotchas bullets (Sx-13 `variant` is boolean not string, Sx-14 EB auto-prepends `Re: ` when `thread_reply: true`) sourced from BC-5906 round-2 dogfood transcript Phase 9 + verbatim sequence-response evidence (campaign 22 step ID 7 stored `"Re: Re: ..."` from spec input `"Re: ..."`). Live API behavior verified during round-2; round-3 (BC-6308) will re-walk to confirm.
 
 Prior: `2026-04-28` — BC-6300: appended §Known gotchas bullet (Sx-6 lead-body field-name divergence — `title`/`company`/no-`company_domain`) sourced from BC-5906 round-2 dogfood transcript + `search_api_spec` verification of `/api/leads/multiple` schema. Same-day stack with the BC-6298 entry below.
 
