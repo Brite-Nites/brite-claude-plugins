@@ -571,13 +571,51 @@ Also: I sent `value: ""` for the empty fields when creating leads, but EB stored
 
 ## R-7 / R-10 / R-11 — spec-read + flag/metadata sweep (T12)
 
-*(populated at T12 — placeholder)*
+### R-7 verdict (BC-6304 — Tool tier map clarifies wrapper-vs-API gate — confirmed ✅)
 
-**R-7 (BC-6304 — Tool tier map clarifies wrapper-vs-API gate):** *(verbatim quote from spec § Tool tier map)*
+`plugins/marketing/commands/launch-campaign.md` § Tool tier map at lines 33–60 contains the BC-6304 fix language. Verbatim quote from spec line 55:
 
-**R-10 (new flags introduced by round-2 fixes):** *(any new flags, e.g., `--no-deliverability-defaults`; default round-3 invocation paths verified)*
+> "Vendor confirmation gates via `call_api` (Sx-9, BC-5906; BC-6439). Extended-tier tools advertised by `discover_tools` may describe `confirmation` parameters and two-call vendor gates in their tool prose. **No runtime-enforced gate exists for these tools at any layer.** Round-2 dogfood verified: `/api/leads/multiple` POST and `/api/campaigns/{id}/leads/attach-leads` POST have no `confirmation` field at the API level; `/api/campaigns/{id}/resume` follows the same pattern. BC-6439 then verified that none of `resume_campaign`, `import_leads_to_campaign`, or `bulk_create_leads` appear as direct callables in the `mcp__emailbison-personal__*` namespace — they surface only as `tier: extended` description strings in `discover_tools`, with the explicit instruction to invoke via `search_api_spec` + `call_api`. The `confirmation` prose in those descriptions is documentation aimed at the agent's planning loop, not a wrapper-layer gate that's being routed around. **The agent-side AskUserQuestion semantic gate is therefore the sole safeguard for every `call_api`-routed mutation.** ... There is no future migration path to wrapper-tool invocation for these tools — closure of BC-6439 (2026-04-29)."
 
-**R-11 (new metadata schema fields populated):** *(verbatim metadata excerpt showing `email_type_segments`, `email_type_filter_applied`, `existing_campaign_matches`, `reused_existing_ids`, `plain_text_applied`, `lead_ids_by_bucket`, `schedule_template_id`, `campaign_schedule_ids`, `activated_per_campaign`)*
+The fix correctly clarifies the wrapper-vs-API distinction round-2 surfaced. Operators reading the spec now understand that:
+- Vendor-side gates DO NOT enforce at the API level
+- Wrapper-side gates DO NOT exist (BC-6439 closed)
+- Agent-side `AskUserQuestion` is the load-bearing gate
+
+Round-3's walk implicitly exercised this — every mutation went through `call_api` (no wrapper invocation), and the operator was prompted via `AskUserQuestion` at every gate (User gates 1, 2, 3, 4, 5, 6, 7, 8, 9 across phases). All gates fired as agent-side prompts. No silent vendor gate fired. **R-7 confirmed.**
+
+### R-10 verdict (new flags introduced by round-2 fixes — confirmed ✅ none)
+
+Spec flag inventory at lines 105–117 shows **13 total flags**: `--csv`, `--workspace`, `--copy-artifact`, `--campaign-name`, `--entity`, `--no-segment`, `--no-host-lookup`, `--no-sequence`, `--preview`, `--activate`, `--test-send`, `--test-send-sender`, `--reference`. All 13 pre-date round-2.
+
+**No new flags introduced by round-2 follow-ups (BC-6298–6307).** Specifically:
+- BC-6306 (plain_text deliverability PATCH) — always applies on every campaign create; no opt-out flag (operator preference per BC-6306 brainstorm)
+- BC-6307 (email-type segmentation) — operator-runtime choice at gate 2; no flag
+- BC-6298, BC-6299, BC-6300, BC-6301, BC-6302, BC-6303, BC-6304 — all spec-correctness fixes; no new flag surface
+
+Default round-3 invocation (`/marketing:launch-campaign --csv ... --copy-artifact ... --workspace emailbison-personal --campaign-name "BC-6308 Round 3" --entity brite-labs`) runs all round-2 fix paths via default behavior. No opt-out flags needed. **R-10 confirmed.**
+
+### R-11 verdict (new metadata schema fields populated — confirmed ✅)
+
+Compiled runtime metadata JSON written to `dogfood/BC-6308-Round-3-2026-05-01.json` (will be preserved at T16 to `docs/dogfood/bc-6308/launch-metadata.json`). All new BC-6303 + BC-6306 + BC-6307 + BC-6302 schema fields populate correctly:
+
+| Field | Source issue | Round-3 value |
+|---|---|---|
+| `email_type_segments` | BC-6307 | `{professional: 2, role: 3, personal: 4}` |
+| `email_type_filter_applied` | BC-6307 | `"include_all"` |
+| `existing_campaign_matches` | BC-6302 | `[25]` (the decoy id) |
+| `reused_existing_ids` | BC-6302 | `false` |
+| `plain_text_applied` | BC-6306 | `true` |
+| `lead_ids_by_bucket` | BC-6303 | `{Google: [14712,14713,14716,14717], Microsoft: [14714,14715], Other: [14718,14719,14720]}` |
+| `schedule_template_id` | BC-6303 | `3` (renamed from old `schedule_id`) |
+| `campaign_schedule_ids` | BC-6303 | `{Google: 6, Microsoft: 7, Other: 8}` (per-campaign clones) |
+| `activated_per_campaign` | BC-6303 | `{Google: null, Microsoft: null, Other: null}` (seeded; not flipped — Phase 11 not exercised) |
+
+All 9 new fields populated correctly with verbatim values matching round-3 walk evidence. **R-11 confirmed.** No regression vs round-2 evidence for the existing fields (`campaign_ids`, `lead_ids_uploaded`, `sender_ids_attached`, etc.).
+
+### Time-to-complete T12
+
+~5 minutes (3 spec-read confirmations + 1 metadata JSON compilation + 1 transcript update).
 
 ---
 
@@ -601,11 +639,11 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-4 | BC-6301 — variant boolean + no double Re: | ✅ **confirmed** | All 3 sequences (ids 5/6/7) created successfully. variant: false (boolean) accepted; post-create shows variant=false. Bare step_2 subject submitted; EB auto-prepended single "Re:" prefix (no double). Round-2's Sx-13 + Sx-14 bug class closed. | None (artifact-fixture stale-convention handled at T16) |
 | R-5 | BC-6302 — Phase 5 pre-list duplicate guard | ✅ **confirmed** | Pre-created decoy id 25 → `list_campaigns(search="BC-6308 Round 3")` correctly returned 1 match → gate 5 surfaced duplicate. Without BC-6302 fix, this detection wouldn't run. | None |
 | R-6 | BC-6303 — metadata schema (4 new fields) | ✅ **confirmed** | T7: `lead_ids_by_bucket` populated `{Google: [14712,14713,14716,14717], Microsoft: [14714,14715], Other: [14718,14719,14720]}`. T9: `schedule_template_id: 3` + `campaign_schedule_ids: {Google: 6, Microsoft: 7, Other: 8}` populated correctly. T6: `activated_per_campaign` seeded with null; `existing_campaign_matches: [25]` captured. All 4 BC-6303 fields verified. | None |
-| R-7 | BC-6304 — Tool tier map clarifies wrapper-vs-API gate | *pending* | | |
+| R-7 | BC-6304 — Tool tier map clarifies wrapper-vs-API gate | ✅ **confirmed** | Spec lines 33-60 contain BC-6304 fix language stating "agent-side AskUserQuestion is the sole safeguard"; wrapper-side gate doesn't exist (BC-6439 closure). Round-3 walk implicitly exercised — all 9 user gates fired as agent prompts; no vendor-side gate fired. | None |
 | R-8 ★ | BC-6306 — Phase 5 `plain_text` PATCH | ✅ **confirmed** | All 3 main campaigns (26/27/28) show `plain_text: true` post-PATCH. Scope correctly narrowed to plain_text only per BC-6306 deliberate deferral of reputation_building + can_unsubscribe. Production-blocker class from round-2 closed. | **BC-6544** (PATCH-omitted-fields-reset-to-false finding — documentation correctness for future spec changes) |
 | R-9 | BC-6307 — Phase 2 email-type segmentation | **partially validated** | Classification logic ✅ confirmed (per-lead `is_role`/`is_free` tagging matches expected on all 9 leads). Segmentation-axis design ⚠️ flagged: spec uses ESP-axis, production uses email-type-axis. Operator-stated ideal is multiplicative. | **BC-6514** (architectural redesign issue, assigned Holden Halford) |
-| R-10 | New flags introduced by round-2 fixes | *pending* | | |
-| R-11 | New metadata schema fields populate | *pending* | | |
+| R-10 | New flags introduced by round-2 fixes | ✅ **confirmed (none)** | Spec inventory: 13 flags total, all pre-date round-2. BC-6306 + BC-6307 went default-on with operator-runtime-choice; no opt-out flags introduced. Default round-3 invocation runs all round-2 fix paths. | None |
+| R-11 | New metadata schema fields populate | ✅ **confirmed** | All 9 new fields (BC-6307: `email_type_segments`, `email_type_filter_applied`; BC-6302: `existing_campaign_matches`, `reused_existing_ids`; BC-6306: `plain_text_applied`; BC-6303: `lead_ids_by_bucket`, `schedule_template_id`, `campaign_schedule_ids`, `activated_per_campaign`) populated correctly. Compiled JSON at `dogfood/BC-6308-Round-3-2026-05-01.json`. | None |
 | R-12 | F22 `allow_parallel_sending` (deferred again) | ⏭️ **deferred (3rd round)** | Brainstorm decision 4 — same rationale as round-2 brainstorm decision 3. Endpoint param confirmed in API spec; safety-check behavior not live-tested. | **BC-6545** (institutional-memory issue capturing 3-round deferral pattern + test setup + trigger conditions for future verification) |
 | R-13 | F14 pagination regression | ✅ **confirmed** | `?page=N` Laravel-style meta with `per_page: 15` unchanged from round-2. NOT cursor-based. No regression. | None |
 | R-14 | F16 workspace-scoped variable persistence regression | ✅ **confirmed** | 8 round-2 variables (IDs 7-14, dated 2026-04-27) still present in workspace 13 at T4 list call. No regression in cross-session persistence. | None |
