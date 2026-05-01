@@ -14,11 +14,33 @@
 
 ## Outcome
 
-*(filled at T15 convergence call — placeholder)*
+**Pass — full-walk dogfood completed against live `emailbison-personal` workspace 13.** All scoped phases (3–9) ran end-to-end. R-2a/R-2b dedicated render-test side-flow at T11 produced clean verdicts via UI Preview Body (no real-email tie-breaker needed). Workspace cleanup verified at T14 — sub-second async drain, zero residual state.
 
-**Hypothesis tally:** *(15 R-rows pending — fix-validation R-1 through R-9, BC-6299 carryover R-2a + R-2b, new fixes R-10/R-11/R-12, regressions R-13/R-14/R-15)*
+**Hypothesis tally:** 17 R-rows total. **13 confirmed clean** + 2 confirmed with new findings (R-2a, R-2b) + 1 partially validated (R-9 — classification ✅; architectural axis question filed separately) + 1 re-deferred (R-12 / F22 — 3rd round). **Zero R-rows refuted** — every shipped round-2 follow-up (BC-6298–6304 + BC-6306–6307) actually behaves correctly in practice.
 
-**Convergence verdict:** *(zero blockers → terminate chain; ≥1 blockers → file round-4)*
+**6 follow-up issues filed during round-3:**
+- **BC-6514** (Medium) — segmentation-axis architectural redesign (Holden assigned)
+- **BC-6515** (Low) — UUID forward-compat note on lead responses
+- **BC-6544** (Medium) — PATCH-omitted-fields-reset-to-false documentation correction
+- **BC-6545** (Low) — F22 deferral institutional memory
+- **BC-6548** (Medium) — lowercase-token validation in email-copywriting + launch-campaign
+- **BC-6549** (Low) — empty-value template degradation audit
+
+**Convergence verdict (per BC-6308 issue-body strict rule):** Zero blocking findings. Chain CAN terminate.
+
+**Operator decision (2026-05-01):** Continue chain via **round-4 (BC-6554)** — conservative reading. 3 of the 6 follow-ups (BC-6514, BC-6544, BC-6548) involve real spec changes that benefit from walked re-validation. BC-6554 filed at High priority, blocked-by all 6 round-3 follow-ups.
+
+**Spec health verdict:** The launch-campaign command spec is **broadly correct in shape and behavior after round-2's 9-issue corrections shipped**. Round-3 found:
+- ✅ All round-2 fixes work as documented
+- ⚠️ 1 silent-failure mode previously uncaught (lowercase tokens render as literal text → BC-6548)
+- ⚠️ 1 architectural question worth surfacing (Brite production practice diverges from spec's segmentation model → BC-6514)
+- 🔧 4 preventive/maintenance issues (BC-6515, BC-6544, BC-6545, BC-6549)
+
+The MVP launch path is feasible **today** — no production-blockers remain. Round-3's filings are about preventive maintenance + architectural alignment, not unblocking launches.
+
+**Workspace state delta:** +1 net new permanent custom variable (`empty_test_var`). Workspace 13 starts at 15 permanent vars going forward.
+
+**Chain status:** BC-5826 → BC-5906 → BC-6308 → BC-6554. Round-3 closes Done; round-4 gated on all 6 round-3 follow-ups landing.
 
 ---
 
@@ -718,12 +740,52 @@ Per round-3 scope, Phase 11 not exercised (no `--activate`; no real customer ema
 
 ## Convergence call (T15)
 
-*(populated at T15 — placeholder)*
+**Blocking findings count (per BC-6308 issue body's strict definition):** **zero**.
+- 0 R-rows marked `refuted` (every fix-validation R-row passed)
+- 0 R-2a/R-2b verdicts revealed broken render-engine behavior requiring downstream skill changes (R-2a confirmed UPPERCASE convention works; R-2b confirmed empty values disappear cleanly — neither requires changes to existing 14 marketing skill templates)
 
-**Blocking findings count:** *(zero → terminate chain; ≥1 → file round-4)*
+**Strict-rule verdict:** Convergence achieved. Chain CAN terminate.
 
-**Verdict:** *(Convergence achieved | Recurse to round-4)*
+**Operator decision (2026-05-01):** Continue the chain via round-4. Rationale recorded in BC-6554 body — 3 of the 6 round-3 follow-ups (BC-6514 architectural redesign, BC-6544 PATCH semantics doc fix, BC-6548 lowercase-token validation logic) involve real spec changes that benefit from walked re-validation. Conservative reading of the chain pattern preserves validation discipline rather than hard-stopping at the strict rule.
 
-**If recursing — round-4 issues filed:** *(list of new follow-up issue IDs + round-4 dogfood issue ID)*
+**Verdict: Recurse to round-4.** BC-6554 filed.
 
-**Workspace state delta after round-3:** +1 net new permanent variable (`empty_test_var`); 9 permanent variables total; everything else reverted via T14 cleanup.
+### R-row final tally — round-3
+
+| Bucket | Count | R-rows |
+|---|---|---|
+| ✅ Confirmed clean | 13 | R-1, R-2, R-3, R-4, R-5, R-6, R-7, R-8, R-10, R-11, R-13, R-14, R-15 |
+| ✅ Confirmed with new finding | 2 | R-2a (→ BC-6548), R-2b (→ BC-6549) |
+| ⚠️ Partially validated | 1 | R-9 (classification ✅; segmentation-axis design → BC-6514) |
+| ⏭️ Deferred (3rd round) | 1 | R-12 / F22 (→ BC-6545) |
+
+**17 R-rows total. No R-row refuted. All 6 round-3 follow-ups documented and tracked.**
+
+### Round-3 follow-ups filed
+
+| Issue | Priority | Class | Class of need-walked-validation |
+|---|---|---|---|
+| **BC-6514** | Medium | Architectural redesign (Holden assigned) | Yes — IF resolution produces spec changes |
+| **BC-6515** | Low | Forward-compat doc note | No — pure documentation |
+| **BC-6544** | Medium | Documentation correctness | Yes — spec wording verification |
+| **BC-6545** | Low | Institutional memory | No — tracked artifact only |
+| **BC-6548** | Medium | New validation logic | Yes — happy + sad path tests needed |
+| **BC-6549** | Low | Template quality audit | No — review-by-reading |
+
+**Of 6 follow-ups: 3 benefit from walked re-validation (BC-6514, BC-6544, BC-6548).** That's the basis for the operator's "continue the chain" decision.
+
+### Round-4 issue filed
+
+**BC-6554** — `BC-6308 round-4 launch-campaign dogfood — re-walk Phases 3-9 after round-3 follow-ups land`. Priority: High. Status: Backlog. `blockedBy`: BC-6514, BC-6515, BC-6544, BC-6545, BC-6548, BC-6549. Assigned: Corinne Brewer.
+
+Round-4 issue mirrors BC-6308's structure with **S-prefixed hypothesis IDs** (S-1 through S-13) covering: 6 fix-validation rows (one per round-3 follow-up), 3 new-introduction rows (new flags, new metadata, F22 re-defer), and 4 regression rows (F14/F16/F26 plus an optional R-2a/R-2b re-run if BC-6548/BC-6549 touch render-engine integration).
+
+### Workspace state delta after round-3
+
+- **+1 permanent custom variable** (`empty_test_var`, id 15) — joins 14 leftovers from prior rounds. Sx-4 (no DELETE endpoint) means this is a permanent change.
+- **Everything else reverted** via T14 cleanup. No leftover campaigns, leads, schedules, sequences, or sender-attaches.
+- **Future rounds inherit 15 permanent variables.**
+
+### Round-3 outcome — chain status
+
+The BC-5826 → BC-5906 → BC-6308 → **BC-6554** launch-campaign dogfood chain continues. BC-6308 itself closes Done (round-3 scope fully completed). BC-6554 is the next iteration, gated on the 6 round-3 follow-ups landing first.
