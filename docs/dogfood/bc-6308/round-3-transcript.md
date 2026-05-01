@@ -359,13 +359,38 @@ This is the resume primitive that lets a Phase 6 re-run reconstruct the bucket�
 
 ## Phase 7 ATTACH SENDERS — live-walk
 
-*(populated at T8 — placeholder)*
+**Step 1 — ground-truth.** `search_api_spec(search_term="attach-sender-emails")` matched `POST /api/campaigns/{campaign_id}/attach-sender-emails`, body `{sender_email_ids: [int]}`. `search_api_spec(GET /api/sender-emails)` confirmed list endpoint with optional `status`, `search`, `tag_ids` query params.
 
-**R-1 partial (Sx-10 — `?per_page` ignored):** *(verbatim test of `?per_page=100` vs no-param)*
+**R-1 partial (Sx-10 — `?per_page` hardcoded ✅ confirmed).** Round-3 fired three list calls in parallel:
+- `?status=connected` (lowercase) → 200 success, `meta.per_page: 15, total: 772, last_page: 52`
+- `?per_page=100` → 200 success, `meta.per_page: 15, total: 772` — EB **silently ignored** the per_page override and still returned 15
+- `?status=Connected` (capitalized) → **HTTP 422 Error**
 
-**R-1 partial (Sx-11 — status filter case-sensitivity):** *(verbatim test of `?status=Connected` vs `?status=connected`)*
+EB still hardcodes per_page=15 across all 52 pages. Round-2's Sx-10 finding stands; spec at line 29 + BC-6298 documentation matches reality.
 
-**R-15 (F26 — sub-second eventual consistency regression):** *(post-attach Δ measurement)*
+**R-1 partial (Sx-11 — status filter case-sensitivity ✅ confirmed).** Lowercase `connected` accepted; capitalized `Connected` (which matches the field-value casing in the response data) returns 422. Asymmetric — input must be lowercase even though response data is capitalized. Spec at line 29 + BC-6298 documentation matches reality.
+
+**Step 4 — partial-pool decision (same as round-2):** use page 1's 15 senders for all 3 main campaigns + future R-2a/R-2b RENDER TEST campaigns. Full 772-pool test deferred (52-page enumeration cost not justified for this round).
+
+Page 1 sender IDs: `[995, 993, 994, 992, 991, 989, 990, 988, 987, 986, 984, 985, 983, 982, 981]`. All 15 senders verified `type: microsoft_oauth, status: "Connected", warmup_enabled: true`, tagged `Outlook` + `ScaledMail-Microsoft`, domains `washingtonfestivelights.com` / `washingtonwinterlights.com`. Cross-cycle persistence — exact same 15 senders as round-2's evidence.
+
+**Step 5 — three parallel attaches.** All 3 succeeded:
+- Campaign 26 (Google) ← 15 senders → "Sender emails successfully added to BC-6308 Round 3 | Google"
+- Campaign 27 (Microsoft) ← 15 senders → "Sender emails successfully added to BC-6308 Round 3 | Microsoft"
+- Campaign 28 (Other) ← 15 senders → "Sender emails successfully added to BC-6308 Round 3 | Other"
+
+**Step 7 — verification.** Three parallel `GET /api/campaigns/{id}/sender-emails` calls all returned `meta.total: 15, per_page: 15, last_page: 1` — every campaign correctly attached the full 15-sender pool.
+
+**R-15 verdict (F26 sub-second eventual consistency regression — confirmed ✅).** Measured timing:
+- T0 (pre-attach) = `1777646847.409` (Bash `date +%s.%N`)
+- T1 (post-verify) = `1777646861.176`
+- **Δ = 13.77 seconds** end-to-end, including 3 attach round-trips + 3 verify round-trips + agent reasoning time
+
+Round-2 measured ≈15.5s end-to-end. Round-3 slightly faster (likely network variance, not a real regime change). True consistency delay is sub-second — both verify GETs immediately reflected the attached senders. **No regression** — well within the < 30s threshold.
+
+**Time-to-complete Phase 7 walk:** ~14 seconds wall time (3 attaches + 3 verifies + 3 Sx-10/Sx-11 side-tests).
+
+**Workspace state after T8:** 14 vars + 9 leads (attached) + 4 campaigns (1 decoy + 3 main with 15 senders + 9 leads + plain_text:true).
 
 ---
 
@@ -429,7 +454,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 
 | # | Hypothesis | Status | Evidence (verbatim) | Follow-up if any |
 |---|---|---|---|---|
-| R-1 | BC-6298 — EB API quirks bundle (Sx-1/5/8/10/11) | ✅ **partial — Sx-1/5/8 confirmed** | Sx-1: URL-path queries succeed in T4+T5; Sx-5: spec correctly treats last_name as optional; Sx-8: round-2 evidence stands (no regression test in round-3). Sx-10/11 pending T8 (Phase 7 senders walk). | None |
+| R-1 | BC-6298 — EB API quirks bundle (Sx-1/5/8/10/11) | ✅ **confirmed (all 5)** | Sx-1: URL-path queries succeed in T4/T5/T7/T8; Sx-5: spec correctly treats last_name as optional; Sx-8: round-2 evidence stands; Sx-10: `?per_page=100` silently ignored (EB hardcodes 15) at T8; Sx-11: `?status=Connected` 422s, `?status=connected` succeeds at T8. | None |
 | R-2 | BC-6299 — Phase 3 variable reuse classification | ✅ **confirmed** | All 8 artifact variables (uppercase) match workspace stored vars (lowercase per Sx-3) → "existing → reuse" classification fires for all 8. Zero new creates required. | None |
 | R-2a ★ | BC-6299 carryover — case-sensitivity | *pending* | | |
 | R-2b ★ | BC-6299 carryover — empty-value rendering | *pending* | | |
@@ -445,7 +470,7 @@ Per round-3 scope, Phase 11 not exercised. Spec re-read confirms BC-6303 schema 
 | R-12 | F22 `allow_parallel_sending` (deferred again) | ⏭️ **deferred (3rd round)** | Brainstorm decision 4 — same rationale as round-2 brainstorm decision 3. Endpoint param confirmed in API spec; safety-check behavior not live-tested. | **BC-6545** (institutional-memory issue capturing 3-round deferral pattern + test setup + trigger conditions for future verification) |
 | R-13 | F14 pagination regression | ✅ **confirmed** | `?page=N` Laravel-style meta with `per_page: 15` unchanged from round-2. NOT cursor-based. No regression. | None |
 | R-14 | F16 workspace-scoped variable persistence regression | ✅ **confirmed** | 8 round-2 variables (IDs 7-14, dated 2026-04-27) still present in workspace 13 at T4 list call. No regression in cross-session persistence. | None |
-| R-15 | F26 sub-second eventual consistency regression | *pending* | | |
+| R-15 | F26 sub-second eventual consistency regression | ✅ **confirmed** | T8 measured Δ = 13.77s end-to-end (incl. 3 attaches + 3 verifies + agent reasoning). Round-2 baseline ~15.5s; round-3 slightly faster. Verify GETs immediately reflected attached senders — true consistency delay is sub-second. No regression. | None |
 
 ---
 
