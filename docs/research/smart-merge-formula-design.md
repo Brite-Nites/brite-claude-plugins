@@ -482,4 +482,38 @@ The acceptance criteria for BC-6557 list "Implementation issue filed (separate t
 
 ## Sources
 
-<!-- Task 12 — to be written (Linear URLs + production preset paths + dogfood evidence) -->
+### Linear issues
+
+- [BC-6557](https://linear.app/brite-nites/issue/BC-6557) — this issue
+- [BC-6556](https://linear.app/brite-nites/issue/BC-6556) — near-term backstop (fail-closed gate at launch)
+- [BC-6549](https://linear.app/brite-nites/issue/BC-6549) — original framing for empty-render fix; superseded by BC-6556 + BC-6557
+- [BC-6308](https://linear.app/brite-nites/issue/BC-6308) — round-3 dogfood walk where R-2b empty-render finding surfaced
+- [BC-5537](https://linear.app/brite-nites/issue/BC-5537) — Brite enrichment MCP scaffold (per-lead raw value source, future)
+- [BC-2717](https://linear.app/brite-nites/issue/BC-2717) — `list-building` skill (consumer of enrichment outputs)
+- [BC-2727](https://linear.app/brite-nites/issue/BC-2727) — `data-enrichment` skill (per-lead value producer, future)
+
+### Conversations
+
+- 2026-05-01 conversation with Holden during BC-6549 analysis — origin of the Clay-style merge-column framing that became BC-6557.
+
+### Production templates referenced
+
+- `plugins/marketing/skills/email-copywriting/presets/list-building-ski-resorts.md` — primary template grounding for Example 1 (`RECENCY_ANCHOR`)
+- `plugins/marketing/skills/email-copywriting/presets/list-building-casinos.md` — secondary grounding (same opener pattern)
+- `plugins/marketing/skills/email-copywriting/presets/risk-reversal-sports-stadiums.md` — additional grounding for the Hey {FIRST_NAME}, saw {COMPANY}'s {RECENCY_ANCHOR} opening pattern
+
+### Spec references
+
+- `plugins/marketing/commands/launch-campaign.md` line 217 — BC-6556's variable-presence check, which already names BC-6557 as the deeper context-aware fallback that supersedes the gate
+- `plugins/marketing/skills/email-copywriting/SKILL.md` § JSON artifact schema — current `custom_variables[]` schema (the `default` field this design extends)
+
+### Dogfood evidence
+
+- `docs/dogfood/bc-6308/test-copy.json` — BC-6308 round-3 test copy artifact; source of the BC-6308 test template's variable list
+- `docs/dogfood/bc-6308/launch-metadata.json` — round-3 walk metadata; documents the R-2b empty-render finding in Phase 10's `_render_test_side_flow_T11` block
+
+### Prototype artifacts
+
+- `docs/research/smart-merge-prototype.py` — Python 3 prototype implementing the render-order pseudocode
+- `docs/research/smart-merge-sample-leads.csv` — 5-lead sample input
+- `docs/research/smart-merge-sample-variables.json` — variable definitions exercising all 3 verbs + variable-referencing fallback

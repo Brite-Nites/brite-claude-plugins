@@ -305,15 +305,15 @@ These are settled, not open. Plan tasks transcribe them into the doc.
 
 ---
 
-## Acceptance criteria mapping
+## Acceptance criteria mapping (post-execution)
 
-| AC | Status |
-|---|---|
-| Research deliverable exists at `docs/research/smart-merge-formula-design.md` | Tasks 1-8, 11, 12 |
-| Document picks the home with reasoning | Task 3 |
-| Document defines the formula DSL with concrete examples for high-risk variables | Tasks 4-6 |
-| Prototype demonstrates formula logic against sample CSV | Tasks 9-11 |
-| Implementation issue filed (separate ticket) | **DEFERRED** — flagged in Task 8 Open Questions and Task 12 self-review |
+| AC | Status | Evidence |
+|---|---|---|
+| Research deliverable exists at `docs/research/smart-merge-formula-design.md` | ✓ MET | File exists; 10 sections populated; 480+ lines |
+| Document picks the home with reasoning | ✓ MET | § Architecture — execution at launch-campaign Phase 4, definition in copy artifact JSON authored by email-copywriting; 4 alternatives explicitly rejected with reasoning |
+| Document defines the formula DSL with concrete examples for high-risk variables | ✓ MET | § Formula language defines 3 verbs + 2 rules + render-order pseudocode; § Examples shows 4 worked examples with template position + JSON formula + render tables for raw-present and raw-null cases |
+| Prototype demonstrates formula logic against sample CSV — visibly better than static-default | ✓ MET | `smart-merge-prototype.py` runs against 5-lead sample CSV; output shows raw-present, single-null fallback, multi-null fallback, valid_if-fail fallback, and literal-only fallback paths all rendering coherent emails. Output embedded in design doc § Examples § Prototype evidence. |
+| Implementation issue filed (separate ticket) with concrete tasks based on the deliverable | ✗ DEFERRED | Per scope decision at session start — filing the implementation ticket before Holden review risks locking in details (home pick, verb set, schema shape) that may need adjustment. Flagged in design doc § Open Questions item 4. Estimated ~10 minutes to file once the design is settled. |
 
 ## Out of scope for this session
 
