@@ -26,7 +26,55 @@ This document is the **research/design deliverable** for that formula layer. The
 
 ## Architecture
 
-<!-- Task 3 — to be written -->
+The formula layer has two distinct parts that live in different places, owned by different skills, and only need to agree on a shared schema: where the formula **runs**, and where the formula **gets written**.
+
+**Formula execution — `launch-campaign` Phase 4.** The formula has to evaluate per lead, just before the lead's payload is uploaded to Email Bison via `bulk_create_leads`. That's the only point in the codebase that has both (a) the lead's per-row data and (b) the EB upload boundary. Evaluating earlier means we don't yet have the per-lead context; evaluating later means EB already sees the unrendered token. Phase 4 is the only structurally correct home for the engine.
+
+**Formula definition — copy artifact JSON, authored by `email-copywriting`.** The fallback string's quality depends overwhelmingly on the variable's surrounding sentence ("Hey there," works because of the leading `Hey ` and trailing `,`; "a similar team" works because it sits after `was {PROOF_POINT_COMPANY}`). Only the template author has full visibility into that surrounding context. The `email-copywriting` skill already produces the copy artifact JSON with a `custom_variables[]` array; the formula extends that same array as a new optional field per variable. Authoring lives where the template lives.
+
+These two parts are independent. The execution engine doesn't care who wrote the formula; the authoring skill doesn't care when or how the formula is evaluated. They share only the schema (defined in the next section).
+
+### Data flow
+
+```
+lead row (CSV)             copy artifact (JSON)
+       │                          │
+       ▼                          ▼
+  raw value | null   ─┬─►   formula definition
+                      │
+                      ▼
+            ┌─────────────────────┐
+            │  formula evaluator  │   ← runs in launch-campaign Phase 4
+            │  (use_raw / fallback)│     just before bulk_create_leads
+            └─────────┬───────────┘
+                      ▼
+              rendered string
+                      │
+                      ▼
+        custom_variables[].value (per-lead)
+                      │
+                      ▼
+                 EB upload  ─►  EB render at send time
+```
+
+EB itself never sees a formula. Every per-lead value it receives is already a fully rendered string. EB's job stays unchanged — it substitutes the value into the template body the same way it does today.
+
+### Out of scope: raw-column population
+
+Producing the per-lead raw value in the first place is a separate concern. Today, lead lists usually arrive without per-lead values for variables like `{RECENCY_ANCHOR}` — operators hand-type one campaign-level default that applies to every lead. In the future world Holden's enrichment work ([BC-5537](https://linear.app/brite-nites/issue/BC-5537), [BC-2727](https://linear.app/brite-nites/issue/BC-2727)) builds toward, an enrichment pipeline produces per-lead raw values where it can and emits null where it can't.
+
+This document does not specify how those raw values are produced or normalized. Smart-merge **consumes** raw values; it does not **produce** them. The boundary is clean: enrichment fills the column (or leaves it null); the formula handles whatever it gets.
+
+### Rejected alternative homes
+
+We considered four alternatives to email-copywriting as the authoring location and rejected each:
+
+- **`list-building` skill** ([BC-2717](https://linear.app/brite-nites/issue/BC-2717)) — owns the lead list, knows the raw values it produces. But doesn't see the template, so can't pick fallback strings that fit a specific sentence position. **Wrong layer.**
+- **`campaign-orchestration` skill** ([BC-2718](https://linear.app/brite-nites/issue/BC-2718)) — campaign-level decisions, not template-level. Formulas are template-tied. **Wrong layer.**
+- **`launch-campaign` runtime authoring** — the launch command generates fallbacks at execution time. Pushes authoring into execution, where it should be reviewable + stable beforehand. **Wrong stage.**
+- **A new dedicated formula-authoring skill** — decouples formula authoring from template authoring, which means templates can drift from formulas (someone updates a sentence, formula's surrounding-context assumption goes stale). **Adds drift risk for no benefit.**
+
+A fifth option survives as a refinement, not an alternative: **preset files extend to carry suggested formulas per vertical.** When `email-copywriting` generates an artifact for a list-building / ski-resorts campaign, it consults the preset for vertical-tuned fallback suggestions. The skill remains the authoring authority; the preset is a starter library.
 
 ## Formula language
 
