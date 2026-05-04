@@ -116,9 +116,20 @@ def render_value(variable: dict, lead: dict, campaign: dict) -> str:
 
 
 def render_lead(template: str, variables: list, lead: dict, campaign: dict) -> str:
-    """Render the full template body for a single lead."""
+    """Render the full template body for a single lead.
+
+    Order of precedence in the final substitution:
+        resolved formulas > built-in CSV columns > campaign-level vars
+
+    Built-in CSV columns are CSV fields that AREN'T also custom variables — they're
+    passed through verbatim (FIRST_NAME, COMPANY, etc.). Custom-variable CSV columns
+    (RECENCY_ANCHOR, PROOF_POINT_COMPANY, etc.) are intentionally NOT overlaid here,
+    because their resolved formula output already accounts for the raw value.
+    """
+    custom_var_names = {v["name"] for v in variables}
     resolved = {v["name"]: render_value(v, lead, campaign) for v in variables}
-    merged = {**campaign, **resolved, **{k: v for k, v in lead.items() if v}}
+    builtin_lead_fields = {k: v for k, v in lead.items() if v and k not in custom_var_names}
+    merged = {**campaign, **builtin_lead_fields, **resolved}
     return render_string(template, merged, {})
 
 
@@ -151,7 +162,7 @@ def main():
 
     for i, lead in enumerate(leads, 1):
         rendered = render_lead(TEMPLATE, variables, lead, campaign)
-        print(f"--- Lead {i}: {lead.get('email') or '(no email)'} ---")
+        print(f"--- Lead {i}: {lead.get('EMAIL') or '(no email)'} ---")
         print(rendered)
         print()
 

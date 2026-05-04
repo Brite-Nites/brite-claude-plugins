@@ -1,0 +1,41 @@
+{
+  "_comment": "Sample variable definitions for the BC-6557 smart-merge prototype. Custom variables exercise all 3 formula verbs (use_raw, substitute_static, valid_if) and variable-referencing fallbacks. Campaign variables are campaign-level fixed values (BC-6556-guarded; always non-empty in production).",
+
+  "custom_variables": [
+    {
+      "name": "FIRST_NAME",
+      "default": "there",
+      "formula": {
+        "if_missing": "there"
+      }
+    },
+    {
+      "name": "RECENCY_ANCHOR",
+      "default": "recent activity",
+      "formula": {
+        "if_missing": "{VERTICAL_DESCRIPTOR} programming"
+      }
+    },
+    {
+      "name": "PROOF_POINT_COMPANY",
+      "default": "a similar team",
+      "formula": {
+        "if_missing": "{LABS_PEER_VENUE}",
+        "valid_if": "raw not in ['LLC', 'Inc', 'Corp', 'Co']"
+      }
+    },
+    {
+      "name": "SPECIFIC_FRICTION",
+      "default": "the same operational ceiling",
+      "formula": {
+        "if_missing": "the {VERTICAL_DESCRIPTOR} ancillary-revenue ceiling"
+      }
+    }
+  ],
+
+  "campaign_variables": {
+    "VERTICAL_DESCRIPTOR": "ski-resort",
+    "LABS_PEER_VENUE": "Boyne SkyBridge",
+    "SENDER_FIRST_NAME": "Amanuel"
+  }
+}
