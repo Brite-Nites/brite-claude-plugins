@@ -143,7 +143,74 @@ Three guarantees follow from this order: (a) raw value wins when available and v
 
 ## Schema
 
-<!-- Task 5 — to be written -->
+The smart-merge layer extends the existing `custom_variables[]` array in the copy artifact JSON. The change is purely additive: a new optional `formula` field per variable, alongside the existing `default` field. Existing copy artifacts continue to work without modification.
+
+### Today (BC-6556 baseline)
+
+```json
+{
+  "custom_variables": [
+    {
+      "name": "RECENCY_ANCHOR",
+      "default": "downtown master-plan announcement"
+    },
+    {
+      "name": "PROOF_POINT_COMPANY",
+      "default": "Boulder Pearl Street"
+    }
+  ]
+}
+```
+
+Each variable has exactly two fields: `name` and `default`. BC-6556's launch-time gate enforces that `default` is non-empty. EB renders the value of `default` for every lead in the campaign — the same string for everyone.
+
+### Tomorrow (BC-6557 + BC-6556)
+
+```json
+{
+  "custom_variables": [
+    {
+      "name": "RECENCY_ANCHOR",
+      "default": "recent activity",
+      "formula": {
+        "if_missing": "{VERTICAL_DESCRIPTOR} programming"
+      }
+    },
+    {
+      "name": "PROOF_POINT_COMPANY",
+      "default": "a similar team",
+      "formula": {
+        "if_missing": "{LABS_PEER_VENUE}",
+        "valid_if": "raw not in ['LLC', 'Inc', 'Corp']"
+      }
+    },
+    {
+      "name": "FREE_ASSET_NOUN",
+      "default": "production-finance deck"
+    }
+  ]
+}
+```
+
+Each variable still has `name` and `default`. A new optional `formula` object may be present. When the formula engine is active and a variable has a `formula`, the engine evaluates per lead per the render-order pseudocode in the previous section. When the formula is absent (e.g., `FREE_ASSET_NOUN` above), evaluation reduces to today's behavior — use raw if present, otherwise `default`.
+
+### Field reference
+
+| Field | Required | Allowed types | Notes |
+|---|---|---|---|
+| `name` | Yes | string | Uppercase token name (e.g., `RECENCY_ANCHOR`). Same as today. |
+| `default` | **Yes — must be non-empty** | string | Rollback floor. Used when neither raw nor formula resolves to a value. Belt-and-suspenders rule. |
+| `formula` | No | object | Optional. When present, engine evaluates it before falling through to `default`. |
+| `formula.if_missing` | If `formula` present | string | Fallback string. May reference campaign-level variables and built-in CSV-row variables; may NOT reference other per-lead variables with formulas (no-cascading rule). |
+| `formula.valid_if` | No | string predicate | Optional quality check on raw. Defaults to "non-null and non-empty." Stricter checks use the prototype's allowlist (membership, length, regex). |
+
+### Migration
+
+The change is **additive and non-breaking**. No existing copy artifact requires modification. An artifact written under today's BC-6556 schema parses identically under tomorrow's schema; the formula engine simply has nothing to evaluate (no `formula` field present) and falls through to `default`, which is exactly today's behavior.
+
+When the email-copywriting skill is updated (separate ticket) to author formulas, new artifacts gain `formula` fields. Old artifacts shipped before that update continue to work indefinitely without any rewrite.
+
+The required-non-empty-`default` rule already exists today (BC-6556). The smart-merge layer simply preserves it — never relaxes it. An author writing a richly-specified formula is still required to write a sensible `default` as the rollback floor.
 
 ## Examples
 
