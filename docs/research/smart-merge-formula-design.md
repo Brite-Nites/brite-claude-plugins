@@ -353,6 +353,51 @@ The fallback is a literal-only `there` — no variable references needed. This i
 
 All four exercise the no-cascading rule cleanly — every fallback either references a campaign-level variable (always non-empty) or is a literal string. None reference another per-lead variable with its own formula.
 
+### Prototype evidence
+
+A working Python prototype (`docs/research/smart-merge-prototype.py`) implements the render-order pseudocode and exercises every formula behavior against sample data. Inputs:
+
+- `docs/research/smart-merge-sample-leads.csv` — 5 leads spanning every fallback path (full-data, single-variable null, multi-variable null, `valid_if`-fail with corrupted raw, mostly-null lead)
+- `docs/research/smart-merge-sample-variables.json` — variable definitions for the 4 priority variables, exercising all 3 verbs
+
+Run command:
+
+```bash
+python3 docs/research/smart-merge-prototype.py \
+  --leads docs/research/smart-merge-sample-leads.csv \
+  --variables docs/research/smart-merge-sample-variables.json
+```
+
+Two leads from the rendered output, showing raw-present vs. raw-missing cases:
+
+**Lead 1 — all per-lead values populated (raw path):**
+
+```
+--- Lead 1: sam@killington.com ---
+Hey Sam, saw Killington Resort's $3B village master plan and figured I'd reach out before the season sets.
+Most ski-resort teams we work with run into F&B tenant retention, and one that solved it was Killington Village.
+Best,
+Amanuel
+```
+
+Every variable used its raw per-lead value. No formula path fired.
+
+**Lead 4 — `PROOF_POINT_COMPANY = "LLC"` (fails `valid_if`) and `SPECIFIC_FRICTION = null`:**
+
+```
+--- Lead 4: taylor@chamonix.com ---
+Hey Taylor, saw Chamonix Casino's $600M Sky Tower and figured I'd reach out before the season sets.
+Most ski-resort teams we work with run into the ski-resort ancillary-revenue ceiling, and one that solved it was Boyne SkyBridge.
+Best,
+Amanuel
+```
+
+`PROOF_POINT_COMPANY = "LLC"` failed the predicate `raw not in ['LLC', 'Inc', 'Corp', 'Co']` and fell through to the formula's `if_missing`, which references the campaign-level `{LABS_PEER_VENUE}` ("Boyne SkyBridge"). `SPECIFIC_FRICTION = null` fell through to its own variable-referencing fallback, "the {VERTICAL_DESCRIPTOR} ancillary-revenue ceiling," resolving to "the ski-resort ancillary-revenue ceiling." Both fallback paths produce a coherent sentence; neither re-introduces an empty token.
+
+**What the prototype demonstrates:** the 3-verb formula language plus variable-referencing fallbacks produces clean rendered emails for both raw-present and raw-missing cases. The `valid_if` predicate catches data-quality issues (raw is non-null but bad — "LLC" as a company name) and routes them through the same fallback path as a true null. The belt-and-suspenders rule (every variable has a non-empty `default` even alongside a richer `formula`) is enforced at evaluation time — any variable missing a `default` raises a `ValueError` rather than rendering blank.
+
+The prototype also surfaced one real implementation insight worth carrying into the production engine: the order of precedence in the final template substitution must be **resolved formula values > built-in CSV-row fields > campaign-level variables.** Overlaying raw CSV columns after formula resolution would silently clobber the resolved fallback (a custom variable's raw value would overwrite the formula's resolved output). The prototype's `render_lead` function documents and enforces this precedence; the production engine should do the same.
+
 ## Migration
 
 The smart-merge layer ships with **no flag day, no breaking change, and no required action on existing campaigns.** Schema-level migration details live in the previous § Schema § Migration; the broader operational story is:
