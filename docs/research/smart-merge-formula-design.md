@@ -395,11 +395,45 @@ The one thing rollback can't undo: **time and effort spent building the engine +
 
 ## Out of scope
 
-<!-- Task 8 — to be written (with revisit triggers per item) -->
+The following capabilities are explicitly excluded from v1 to keep the formula language tight and shippable. Each item has a concrete revisit trigger — a measurable condition that, when observed in production, justifies promoting the item to the v2 design discussion.
+
+**1. Drop-neighborhood verb** — cut the variable AND specified surrounding chars (e.g., `Hey {FIRST_NAME},` → `Hey,` when FIRST_NAME is empty).
+*Revisit when:* substitute_static fallbacks consistently produce awkward results that would read better with a deletion-style fix, AND a concrete production template demonstrates the substitute path can't recover. Holden's "remove the space and put a comma" framing is the canonical case.
+
+**2. Drop-clause verb** — cut the entire surrounding clause when the variable is empty.
+*Revisit when:* a production template surfaces with multiple correlated per-lead variables in a single clause where every-variable-substituted reads worse than dropping the clause entirely. The BC-6308 dogfood test template's 3-variable proof-point sentence is the prototype case, but it's not in current production.
+
+**3. Conditional logic across variables** — formula reads other variables' raw values to decide its own output (e.g., "if FIRST_NAME is null AND COMPANY is null, use 'Hi there'; else use 'the COMPANY team'").
+*Revisit when:* substitute fallbacks for two or more variables in the same template repeatedly produce inconsistent renderings that would benefit from coordinated logic. v1 keeps each variable's formula independent.
+
+**4. Multi-tier fallback** — formula tries multiple fallback strategies in order (try variable-reference → try static → try a third option).
+*Revisit when:* a single fallback per variable proves insufficient AND a clear waterfall pattern emerges across multiple variables. v1 collapses to a single `if_missing` path; multi-tier becomes a structured array if/when needed.
+
+**5. Recursive formula evaluation** — fallback strings reference other per-lead variables with their own formulas, evaluated recursively with cycle detection.
+*Revisit when:* the no-cascading rule's restriction (fallbacks can't reference other per-lead variables with formulas) consistently blocks valuable authoring patterns. Adding recursion requires a cycle-detection design that v1 deliberately doesn't include.
+
+**6. Format transformations** — apply text transforms to raw or rendered values (capitalize, lowercase, truncate, regex replace).
+*Revisit when:* the upstream enrichment / list-building pipeline produces values that need standardization at the merge step rather than at the source. v1's stance: enrichment normalizes upstream; smart-merge consumes already-normalized values.
 
 ## Open questions
 
-<!-- Task 8 — to be written (Holden as named reviewer) -->
+The following decisions are surfaced explicitly for **Holden's review** before this design progresses to implementation. Each question identifies an architectural choice where alternative answers would change the design materially.
+
+**1. Does the home pick (formula execution at `launch-campaign` Phase 4, formula definition in copy artifact JSON authored by `email-copywriting`) match the intent you had in mind?**
+
+The Architecture section walks the alternatives and rejects them, but the home pick is the single biggest architectural decision in this design. If you'd prefer the formula engine to live elsewhere — e.g., as a feature of the Brite enrichment MCP ([BC-5537](https://linear.app/brite-nites/issue/BC-5537)) so that per-lead raw value production and per-lead fallback evaluation happen in the same layer — that flips much of the architecture. The current pick assumes enrichment produces raw values, smart-merge consumes them; an MCP-side formula layer would couple the two.
+
+**2. Is the no-cascading rule acceptable for v1, or do you want recursive formula evaluation from day one?**
+
+v1 forbids fallback strings from referencing other per-lead variables with their own formulas. That sidesteps cycle detection and prevents cascading empty-render. Recursive evaluation is more expressive (a fallback can fall back to another formula's fallback) but requires cycle-detection infrastructure that v1 deliberately doesn't include. If you want recursion as a first-class feature, the v1 verb count grows and the engine pseudocode adds a recursion-with-cycle-detection layer.
+
+**3. Should `valid_if` be authored by `email-copywriting` alone (v1 plan), or split with the enrichment side?**
+
+`valid_if` is about data quality (is this raw value good enough to use?) — that knowledge plausibly belongs upstream with whoever produces the value, not downstream with whoever frames it in a sentence. v1's stance is unified authorship for simplicity (`email-copywriting` writes the whole formula including `valid_if`, drawing from preset suggestions for known bad-data patterns). Splitting authorship — enrichment owns `valid_if`, email-copywriting owns `if_missing` — gets more right-people-knowing-right-things but adds schema-merge logic and authoring coordination.
+
+**4. Implementation issue spawn is deferred pending your review.**
+
+The acceptance criteria for BC-6557 list "Implementation issue filed (separate ticket) with concrete tasks based on the deliverable." That AC is **deferred** for this session, by design — filing the implementation ticket before you've reviewed the design risks locking in details (home pick, verb set, schema shape) that you may want changed. The expected sequence: review this design → adjust if needed → file the implementation ticket with the agreed-upon details. The ticket itself should be quick to file once the design is settled (~10 minutes), so the deferral is low-cost.
 
 ## Sources
 
