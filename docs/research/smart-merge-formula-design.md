@@ -214,7 +214,144 @@ The required-non-empty-`default` rule already exists today (BC-6556). The smart-
 
 ## Examples
 
-<!-- Task 6 — to be written; prototype evidence appended in Task 11 -->
+Worked examples for the four priority variables. For each, we show: the variable's real template position (citing the preset file where applicable), what empty-render looks like today, the recommended formula in schema form, and the rendered output for two cases — when the lead has a per-lead raw value, and when raw is null.
+
+Two of the four are **forward-looking** — they don't currently appear as per-lead variables in production presets, but they're plausible in a per-lead enrichment world (which is BC-6557's design horizon). Those are noted inline.
+
+### Example 1 — `RECENCY_ANCHOR`
+
+**Template position** (`plugins/marketing/skills/email-copywriting/presets/list-building-ski-resorts.md`, step 1 body opener):
+
+> Hey {FIRST_NAME}, saw {COMPANY}'s {RECENCY_ANCHOR} and figured I'd reach out before the season sets.
+
+**Empty-render today:** `Hey Sam, saw Acme's  and figured I'd reach out before the season sets.` (visible double-space + broken sentence flow.)
+
+**Recommended formula:**
+
+```json
+{
+  "name": "RECENCY_ANCHOR",
+  "default": "recent activity",
+  "formula": {
+    "if_missing": "{VERTICAL_DESCRIPTOR} programming"
+  }
+}
+```
+
+**Renders:**
+
+| Lead state | Rendered string | Final email opener |
+|---|---|---|
+| `RECENCY_ANCHOR = "village expansion announcement"` | `village expansion announcement` | `Hey Sam, saw Acme's village expansion announcement and figured I'd reach out before the season sets.` |
+| `RECENCY_ANCHOR = null`, `VERTICAL_DESCRIPTOR = "village"` | `village programming` | `Hey Sam, saw Acme's village programming and figured I'd reach out before the season sets.` |
+
+The fallback references `VERTICAL_DESCRIPTOR`, a campaign-level variable guaranteed non-empty by BC-6556. This is a clean per-lead → campaign-level fallback path. The reader gets a coherent sentence in both cases.
+
+### Example 2 — `PROOF_POINT_COMPANY` (forward-looking)
+
+**Note:** This variable is **not present in current production presets.** Real presets use `{LABS_PEER_VENUE}` as a single campaign-level proof variable. `PROOF_POINT_COMPANY` appears in the BC-6308 dogfood test template and is plausible in a future per-lead enriched world where each lead gets a vertical-tuned proof venue chosen at enrichment time. The example below is forward-looking design.
+
+**Template position (forward-looking):**
+
+> ...one that solved it was {PROOF_POINT_COMPANY}, who saw a meaningful lift.
+
+**Empty-render today (forward-looking):** `...one that solved it was , who saw a meaningful lift.`
+
+**Recommended formula:**
+
+```json
+{
+  "name": "PROOF_POINT_COMPANY",
+  "default": "a similar team",
+  "formula": {
+    "if_missing": "{LABS_PEER_VENUE}",
+    "valid_if": "raw not in ['LLC', 'Inc', 'Corp', 'Co']"
+  }
+}
+```
+
+**Renders:**
+
+| Lead state | Rendered string | Final clause |
+|---|---|---|
+| `PROOF_POINT_COMPANY = "Yaamava Casino"` | `Yaamava Casino` | `...one that solved it was Yaamava Casino, who saw a meaningful lift.` |
+| `PROOF_POINT_COMPANY = "LLC"` (fails `valid_if`) → falls through to formula | `Boyne SkyBridge` (campaign-level `LABS_PEER_VENUE`) | `...one that solved it was Boyne SkyBridge, who saw a meaningful lift.` |
+| `PROOF_POINT_COMPANY = null` | `Boyne SkyBridge` | `...one that solved it was Boyne SkyBridge, who saw a meaningful lift.` |
+
+This example exercises both `if_missing` and `valid_if`: a corrupted-looking raw ("LLC") gets caught by the predicate and falls through to the same fallback as a null. The fallback references `LABS_PEER_VENUE`, a campaign-level variable that's always populated.
+
+### Example 3 — `SPECIFIC_FRICTION` (forward-looking)
+
+**Note:** Same forward-looking caveat as Example 2 — `SPECIFIC_FRICTION` appears in the BC-6308 dogfood template, not in current production presets. Plausible in a per-lead enriched world where enrichment finds an industry- or company-specific friction signal per lead.
+
+**Template position (forward-looking):**
+
+> Most {VERTICAL_DESCRIPTOR} teams we work with run into {SPECIFIC_FRICTION}, and one that solved it was...
+
+**Empty-render today (forward-looking):** `Most ski-resort teams we work with run into , and one that solved it was...`
+
+**Recommended formula:**
+
+```json
+{
+  "name": "SPECIFIC_FRICTION",
+  "default": "the same operational ceiling",
+  "formula": {
+    "if_missing": "the {VERTICAL_DESCRIPTOR} ancillary-revenue ceiling"
+  }
+}
+```
+
+**Renders:**
+
+| Lead state | Rendered string | Final clause |
+|---|---|---|
+| `SPECIFIC_FRICTION = "F&B tenant retention"` | `F&B tenant retention` | `Most ski-resort teams we work with run into F&B tenant retention, and one that solved it was...` |
+| `SPECIFIC_FRICTION = null`, `VERTICAL_DESCRIPTOR = "ski-resort"` | `the ski-resort ancillary-revenue ceiling` | `Most ski-resort teams we work with run into the ski-resort ancillary-revenue ceiling, and one that solved it was...` |
+
+The fallback composes the campaign-level `VERTICAL_DESCRIPTOR` into a phrase that reads naturally in the friction position.
+
+### Example 4 — `FIRST_NAME`
+
+**Template position** (all production presets — appears in the greeting of every step 1 body):
+
+> Hey {FIRST_NAME}, ...
+
+**Empty-render today:** `Hey , ...` (empty space + comma — visibly broken greeting.)
+
+**Note:** `FIRST_NAME` is an EB built-in variable populated from the lead's CSV row `first_name` column, not a per-lead custom variable. It doesn't strictly need a formula — it has different resolution rules (per `launch-campaign.md` § Variable-presence check). But for completeness, designing the formula schema to support it gives a uniform fallback shape across all variables and future-proofs the system if `FIRST_NAME` is ever surfaced via custom variables (e.g., for a campaign that imports leads from a non-CSV source).
+
+**Recommended formula:**
+
+```json
+{
+  "name": "FIRST_NAME",
+  "default": "there",
+  "formula": {
+    "if_missing": "there"
+  }
+}
+```
+
+**Renders:**
+
+| Lead state | Rendered string | Final greeting |
+|---|---|---|
+| `first_name = "Sam"` (CSV row) | `Sam` | `Hey Sam, ...` |
+| `first_name = ""` or null | `there` | `Hey there, ...` |
+
+The fallback is a literal-only `there` — no variable references needed. This is the simplest formula shape and covers the most common per-lead empty case (incomplete lead lists). The renderer never produces "Hey , ..."
+
+### Summary across the 4 examples
+
+| Variable | Fallback type | References other variables | Quality predicate |
+|---|---|---|---|
+| `RECENCY_ANCHOR` | Variable-referencing | `{VERTICAL_DESCRIPTOR}` (campaign-level) | No |
+| `PROOF_POINT_COMPANY` | Variable-referencing + predicate | `{LABS_PEER_VENUE}` (campaign-level) | Yes (allowlist filter) |
+| `SPECIFIC_FRICTION` | Variable-referencing | `{VERTICAL_DESCRIPTOR}` (campaign-level) | No |
+| `FIRST_NAME` | Literal-only | None | No |
+
+All four exercise the no-cascading rule cleanly — every fallback either references a campaign-level variable (always non-empty) or is a literal string. None reference another per-lead variable with its own formula.
 
 ## Migration
 
