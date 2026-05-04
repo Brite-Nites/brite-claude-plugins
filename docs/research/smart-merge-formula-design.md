@@ -78,7 +78,68 @@ A fifth option survives as a refinement, not an alternative: **preset files exte
 
 ## Formula language
 
-<!-- Task 4 — to be written -->
+A formula is a small object attached to a custom variable's definition. It tells the evaluator what to do when computing that variable's per-lead rendered value. v1 supports three operations.
+
+### Operations
+
+**1. `use_raw` — implicit, always applies first.**
+
+If the lead has a non-null, non-empty value for this variable in their per-lead data, use that value as-is. This is the universal first step of every formula evaluation; authors don't write it explicitly.
+
+Example: lead has `RECENCY_ANCHOR = "Q3 capital plan announcement"` → rendered string is `Q3 capital plan announcement`.
+
+**2. `substitute_static` — fallback string when raw is missing.**
+
+When `use_raw` doesn't apply (raw is null, empty, or fails the `valid_if` predicate below), the formula's `if_missing` field provides a fallback string. The string can contain references to other variables (subject to the no-cascading rule below); those references resolve through the existing render engine before the rendered value is finalized.
+
+Example: variable `RECENCY_ANCHOR` has formula `{ "if_missing": "{VERTICAL_DESCRIPTOR} programming" }`. Lead has `RECENCY_ANCHOR = null`, campaign has `VERTICAL_DESCRIPTOR = "village"` → rendered string is `village programming`.
+
+Example with literal-only fallback (no variable references): variable `FIRST_NAME` has formula `{ "if_missing": "there" }`. Lead has `FIRST_NAME = null` → rendered string is `there`.
+
+**3. `valid_if` — optional quality predicate.**
+
+A predicate that decides whether the raw value is "good enough" to use. If the predicate returns false, the formula treats raw as missing and falls through to `if_missing`. Defaults to "raw is non-null and non-empty," which is the implicit baseline; authors only write `valid_if` when they need stricter validation.
+
+Example: variable `PROOF_POINT_COMPANY` has formula `{ "if_missing": "a similar team", "valid_if": "raw not in ['LLC', 'Inc', 'Corp']" }`. Lead has `PROOF_POINT_COMPANY = "LLC"` → predicate fails → rendered string is `a similar team`.
+
+The exact predicate language is a v1-prototype design decision. The prototype implements `valid_if` as a small allowlist of safe operations (membership check, length check, regex match) rather than arbitrary code, so that copy artifacts stay declarative and reviewable.
+
+### Rules
+
+**The no-cascading rule.** Fallback strings in a formula's `if_missing` field can reference campaign-level variables (which BC-6556's launch-time gate guarantees are non-empty) and built-in CSV-row variables (`{COMPANY}`, `{FIRST_NAME}`, `{LAST_NAME}`, `{JOB_TITLE}`, `{EMAIL}`, populated from the lead's row), but they MUST NOT reference other per-lead variables that have their own formulas.
+
+The rule exists to avoid two failure modes: (1) cascading empty-render — formula A's fallback references variable B, which is also null, leaving the empty-render bug unfixed one level deeper; (2) the need for cycle detection in the evaluator — if A's fallback references B and B's fallback references A, we'd need runtime cycle detection. The simpler rule sidesteps both. v2 may lift the rule once recursive evaluation is designed and a cycle-detection strategy is in place.
+
+**The belt-and-suspenders rule.** The variable's `default` field MUST remain non-empty even when a `formula` is also present. Both fields coexist; the formula wins at evaluation time, but the `default` is the rollback path: disabling the formula engine at any future point causes every variable to fall back to its `default`, with no campaign breakage.
+
+This rule is enforceable at copy-artifact-validation time (the same place BC-6556's gate already runs). Authors writing a formula are still required to write a sensible `default`; the formula simply produces a richer rendered string when the engine is active.
+
+### Render-order pseudocode
+
+For each `(variable, lead)` pair at evaluation time:
+
+```
+def render_value(variable, lead, campaign):
+    raw = lead.custom_values.get(variable.name)            # may be None or ""
+    formula = variable.formula                              # may be None
+
+    # Step 1 — check raw against valid_if (default predicate: non-null and non-empty)
+    valid = (raw is not None and raw != "")
+    if formula and formula.valid_if:
+        valid = valid and evaluate_predicate(formula.valid_if, raw)
+
+    if valid:
+        return raw                                          # use_raw path
+
+    # Step 2 — formula's if_missing fallback (variable-references resolved through render engine)
+    if formula and formula.if_missing:
+        return render_string(formula.if_missing, lead, campaign)
+
+    # Step 3 — bare default (always present per belt-and-suspenders rule)
+    return variable.default
+```
+
+Three guarantees follow from this order: (a) raw value wins when available and valid; (b) formula's fallback wins over `default` when raw is missing or invalid; (c) `default` is the always-present floor — the engine never returns null or empty.
 
 ## Schema
 
