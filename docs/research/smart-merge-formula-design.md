@@ -355,11 +355,43 @@ All four exercise the no-cascading rule cleanly — every fallback either refere
 
 ## Migration
 
-<!-- Task 7 — to be written -->
+The smart-merge layer ships with **no flag day, no breaking change, and no required action on existing campaigns.** Schema-level migration details live in the previous § Schema § Migration; the broader operational story is:
+
+- **Existing copy artifacts** continue to work unchanged. An artifact written today (BC-6556 schema, just `name` + `default`) parses identically tomorrow under the BC-6557 schema. The formula engine has nothing to evaluate (no `formula` field present) and falls through to `default`, which is exactly today's behavior.
+- **Currently-running campaigns** are not impacted. Campaigns already in EB are upstream of the formula engine — the engine only runs at upload time during a fresh launch. Live campaigns continue sending whatever they were authored to send.
+- **email-copywriting skill changes** are a separate ticket, not part of BC-6557. The skill begins authoring formulas only after that ticket lands. New artifacts produced post-change get formulas; old artifacts continue working without rewrite.
+- **List-building / enrichment changes** are also out of scope for BC-6557. Per-lead raw values arrive however the upstream pipeline produces them. Smart-merge consumes whatever shape arrives.
+
+The migration is best framed as: this design adds a new optional capability that activates only when authors opt in by writing a `formula` field. Until that opt-in happens, every campaign behaves exactly as it does under BC-6556 today.
 
 ## Rollback
 
-<!-- Task 7 — to be written -->
+Almost every decision in this design is reversible without breaking anything. The table below maps each design choice to its rollback path.
+
+| Design decision | Rollback path | Reversibility |
+|---|---|---|
+| The `formula` field added to copy artifact schema | Stop writing `formula` fields; engine ignores any present; campaigns fall back to `default`. No data migration required. | High — purely additive |
+| Two verbs (`use_raw` + `substitute_static`) | Adding more verbs later is non-breaking (forward-compatible schema). Removing a verb after authors started using it is harder, but the engine can gracefully ignore unknown verbs and fall through to `default`. | High — schema is additive |
+| Optional `valid_if` quality predicate | Defaults to "non-null and non-empty." If we drop it from the schema, formulas that didn't use it keep working unchanged. | High — invisible by default |
+| The no-cascading rule (constraint, not behavior) | Lifting the rule (allowing recursive formula evaluation) is a v2 enhancement; existing formulas that obeyed it keep working. The rule is a constraint that only excludes certain authoring patterns; lifting it is non-breaking. | High — lifting a constraint is non-breaking |
+| Presets carry suggested formulas | Pure convention layer. If preset suggestions don't get adopted, just stop adding formula sections to presets. No code commitment. | High — documentation/convention only |
+| email-copywriting as sole author | If we need to split authorship later (e.g., enrichment side owns `valid_if`), schema extends additively; existing formulas keep working. | High — additive |
+| The whole formula approach turns out wrong | Stop writing `formula` fields globally; engine ignores; campaigns fall back to `default` (which is required non-empty per the belt-and-suspenders rule). Same behavior as today's BC-6556 baseline. | High — design-level off-switch |
+
+### Big-picture rollback path
+
+If at any future point smart-merge formulas turn out to be the wrong direction, the rollback recipe is:
+
+1. **Stop writing `formula` fields** in new copy artifacts (single change to the email-copywriting skill).
+2. **Disable the formula engine** in launch-campaign Phase 4 (single feature-flag-style change to the engine: short-circuit the formula path and always use `default`).
+3. **Old artifacts with `formula` fields keep working** — the engine ignores them; the variable's `default` (required non-empty per belt-and-suspenders) is the rendered value.
+4. **No data migration. No campaign breakage. No required rewrite of existing artifacts.**
+
+This rollback path is bulletproof precisely because of the belt-and-suspenders rule: every variable has a non-empty `default`, regardless of whether it also has a `formula`. The `default` is the rollback floor.
+
+### What ISN'T reversible
+
+The one thing rollback can't undo: **time and effort spent building the engine + prototype + email-copywriting skill changes.** Sunk-cost lives with the implementation team. This document and its prototype are cheap, so the bounded cost of pursuing this design through the research/design phase is low. The full implementation cost is gated by the deferred follow-up ticket (which is the explicit point at which "should we actually build this?" gets answered with knowledge of the full design).
 
 ## Out of scope
 
