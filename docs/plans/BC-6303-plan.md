@@ -1,5 +1,7 @@
 # BC-6303 — launch-campaign metadata schema (F21 + F31 + Phase 8 schedule_id rename)
 
+> **Note (2026-05-05, BC-6654):** segmentation references in this plan reflect the pre-multiplicative ESP-axis spec. The current spec uses (email-type × ESP) cell segmentation per BC-6514 (`docs/designs/BC-6514-segmentation-axis-decision.md`); the metadata schema, naming convention, and `--no-segment` flag all changed. This plan is preserved as historical execution record.
+
 **Issue:** [BC-6303](https://linear.app/brite-nites/issue/BC-6303)
 **Scope:** Docs-only spec edit to `plugins/marketing/commands/launch-campaign.md`. No code, no tests, no MCP.
 **Verification:** `./scripts/validate.sh` exits 0; `./scripts/check-guardrails.sh` exits 0; visual diff review.

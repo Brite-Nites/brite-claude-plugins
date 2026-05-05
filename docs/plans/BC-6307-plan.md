@@ -1,5 +1,7 @@
 # Plan: BC-6307 — Phase 2 email-type detection in `/marketing:launch-campaign`
 
+> **Note (2026-05-05, BC-6654):** segmentation references in this plan reflect the pre-multiplicative ESP-axis spec. The current spec uses (email-type × ESP) cell segmentation per BC-6514 (`docs/designs/BC-6514-segmentation-axis-decision.md`); the metadata schema, naming convention, and `--no-segment` flag all changed. This plan is preserved as historical execution record.
+
 **Issue**: BC-6307 — BC-5906 follow-up: launch-campaign Phase 2 — extend segmentation by email-type axis (role/personal/professional)
 **Branch**: `corinne/bc-6307-bc-5906-follow-up-launch-campaign-phase-2-extend`
 **Tasks**: 7 (estimated ~60–75 min before review)

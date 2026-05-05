@@ -1,5 +1,7 @@
 # Design: BC-6307 — Phase 2 email-type detection
 
+> **Note (2026-05-05, BC-6654):** Alternatives Considered #2 in this memo was explicitly superseded by BC-6514 (`docs/designs/BC-6514-segmentation-axis-decision.md`). The "augment ESP × email-type → up to 9 buckets" path is now the default per BC-6514's reasoning. This memo is preserved as historical decision record.
+
 **Issue:** BC-6307 (parent: BC-5906)
 **Date:** 2026-04-30
 

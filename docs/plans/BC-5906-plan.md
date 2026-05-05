@@ -8,6 +8,8 @@ target-pr: docs/dogfood + transcript artifact only — no command-spec changes i
 
 # BC-5906 — Round-2 Launch Dogfood Plan
 
+> **Note (2026-05-05, BC-6654):** segmentation references in this plan reflect the pre-multiplicative ESP-axis spec. The current spec uses (email-type × ESP) cell segmentation per BC-6514 (`docs/designs/BC-6514-segmentation-axis-decision.md`); the metadata schema, naming convention, and `--no-segment` flag all changed. This plan is preserved as historical execution record.
+
 Issue 1 of 5 in the Marketing Plugin: GTM Workflows MVP critical path. Validates `/marketing:launch-campaign` Phases 3–9 against the live `emailbison-personal` workspace by actually creating real EB state (custom variables, leads, campaigns, sender attaches, schedule, sequences) — Phase 11 stays off, no real emails sent. Surfaces reality-vs-spec gaps for hypotheses F14–F31 (paper-walked in BC-5826 round-1, never live-validated).
 
 ---
