@@ -510,24 +510,25 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 ## Phase 5 — CAMPAIGN CREATE
 
-**Purpose.** Create one empty campaign shell per ESP segment (or one total if `--no-segment`). Campaigns at this point have no leads, senders, schedule, or sequence — those come in phases 6–9.
+**Purpose.** Create one empty campaign shell per non-empty (email-type × ESP) cell from Phase 2's `segments` map (or one combined campaign if `--no-host-lookup` skipped Phase 2). Campaigns at this point have no leads, senders, schedule, or sequence — those come in phases 6–9.
 
 **With `--reference <campaign-id>` set:** call `get_campaign` on the reference campaign to fetch its name template, offer metadata, and other config. Pre-fill the naming convention + description in the Phase 5 user gate.
 
 **Steps:**
 
 1. **Ground-truth the tool name.** `search_api_spec` with query `create campaign`. Per `email-bison.md` § Common workflows the name is `create_campaign` with path `POST /api/campaigns`. Returns a campaign ID.
-2. **Determine campaign names.** If `--no-segment`: one campaign named `{campaign-name}`. Otherwise: one campaign per ESP bucket from Phase 2 (`esp_segments`). Default naming convention from the copy artifact's preset (if preset supplies one) or the Brite default:
-   - `{Niche} | {Target} | {Source} | {Region} | {Size} | {Offer}` — full convention per issue spec
-   - Short form (default): `{campaign-name-base} | {ESP}` — e.g., `Denver Downtown Lighting | Google`
-   Operator can override the suffix format in the user gate.
+2. **Determine campaign names.** Two paths:
+
+   - **`--no-host-lookup`**: one campaign named `{campaign-name}`.
+   - **Default (multiplicative)**: one campaign per non-empty cell in metadata's `segments` map. Default naming convention from the copy artifact's preset (if preset supplies one) or the Brite default short form: `{campaign-name-base} | {Email-type-titlecased} | {ESP}` — e.g., `Denver Downtown Lighting | Professional | Google`, `Denver Downtown Lighting | Role | Microsoft`. Email-type comes before ESP per BC-6514 (matches workspace 13 production naming, which groups per-vertical campaign rosters by email-type first). Capitalize the email-type label for display: `professional` → `Professional`, `role` → `Role`, `personal` → `Personal`. Full long-form convention per issue spec: `{Niche} | {Target} | {Source} | {Region} | {Size} | {Offer}` — applies when copy artifact preset declares it. Operator can override the suffix format in the user gate.
 3. **Pre-list existing campaigns by base name (silent-duplicate guard, F20 / BC-6302).** Call `list_campaigns(search="{campaign-name-base}")` (core-tier, directly callable per § Tool tier map). EB's `search` is substring-matched and has no API-side dedup — calling `create_campaign` twice with identical names returns two distinct IDs with `success: true` and no warning. This pre-list is the only place the operator sees pre-existing matches before User gate 5. Capture campaigns whose `name` starts with `{campaign-name-base}`. Empty match set is the happy path; non-empty triggers the duplicate-guard render in step 5. Record the matched IDs in scratch state for step 6's reuse path.
 4. **Render the create plan.** Show the operator each proposed campaign:
 
    > Campaigns to create in workspace `{workspace}`:
-   > 1. `Denver Downtown Lighting | Google` — 84 leads
-   > 2. `Denver Downtown Lighting | Microsoft` — 31 leads
-   > 3. `Denver Downtown Lighting | Other` — 12 leads
+   > 1. `Denver Downtown Lighting | Professional | Google` — 84 leads
+   > 2. `Denver Downtown Lighting | Professional | Microsoft` — 31 leads
+   > 3. `Denver Downtown Lighting | Professional | Other` — 12 leads
+   > 4. `Denver Downtown Lighting | Role | Google` — 3 leads
 5. **User gate 5.** Ask via `AskUserQuestion`. The render branches on step 3's pre-list:
 
    **If step 3's pre-list is empty (no duplicates):**
@@ -561,7 +562,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    - **"Abort":** halt; do not advance `last_completed_phase`.
 7. **Verify IDs.** Confirm every bucket has a campaign ID (created or reused). If any campaign create fails, halt and surface the specific bucket + error. Do NOT retry automatically — a partial campaign set is easier to audit than a silently-retried one.
 8. **Apply plain_text deliverability default.** For each campaign ID confirmed in step 7, call `update_campaign` (path `PATCH /api/campaigns/{id}/update` per `email-bison.md` § Tool inventory + verified via `search_api_spec`) with `plain_text: true`. This PATCH is **always** applied — it is a deliverability invariant for cold outreach (the only use case `/marketing:launch-campaign` serves) and has no operator opt-out. EB defaults `plain_text` to `false` on create, which sends emails as HTML; HTML mode for cold B2B carries tracking pixels, link rewrites, and image references that signal "automated marketing" to spam filters. The copy artifacts produced by `email-copywriting` use `<br><br>` for paragraph breaks and contain spintax — both assume plain-text rendering. Note: `update_campaign` is NOT on `email-bison.md` § MCP confirmation gates list; this is a single MCP call per campaign, no two-call cycle. **EB's PATCH treats omitted boolean fields as `false`** (per the API spec — *"If nothing sent, false is assumed."*; verified BC-6544). The single `plain_text: true` PATCH is safe BECAUSE campaigns start with all-false defaults — but ANY future PATCH on this campaign that intends to preserve `plain_text: true` MUST re-send it explicitly in the body. The same rule applies to any other boolean setting (`open_tracking`, `can_unsubscribe`, `reputation_building`, etc.). Re-asserting `plain_text: true` against an already-plain-text campaign is the safe no-op; OMITTING it from a subsequent PATCH silently resets it. Reused campaigns and resume runs are safe under the current single-PATCH flow; do NOT add a second PATCH to this campaign without re-sending `plain_text: true`. Track per-campaign PATCH success in scratch state for step 9's metadata write.
-9. **Append to metadata JSON.** Set `campaign_ids: {"Google": 5551, "Microsoft": 5552, "Other": 5553}` (adjust keys per actual segmentation), `existing_campaign_matches: [<id>, ...]` (matches captured at step 3), `reused_existing_ids: <bool>` (true if User gate 5 chose "Reuse existing IDs"; false otherwise), `plain_text_applied: true` (only if step 8 PATCH succeeded for ALL campaigns; else `false`), `last_completed_phase: 5`. Also seed `activated_per_campaign: {<bucket>: null, ...}` with one key per bucket in `campaign_ids` — pre-populated to null so Phase 11 step 4 can flip them per iteration without first probing for object presence (and so the global `activated` flag has a deterministic AND-of-non-null check at finalization).
+9. **Append to metadata JSON.** Set `campaign_ids: {"professional|Google": 5551, "professional|Microsoft": 5552, "professional|Other": 5553, "role|Google": 5554}` (adjust keys per actual segmentation — one entry per non-empty cell from `segments`, keyed by `{email_type}|{esp}`), `existing_campaign_matches: [<id>, ...]` (matches captured at step 3), `reused_existing_ids: <bool>` (true if User gate 5 chose "Reuse existing IDs"; false otherwise), `plain_text_applied: true` (only if step 8 PATCH succeeded for ALL campaigns; else `false`), `last_completed_phase: 5`. Also seed `activated_per_campaign: {<bucket>: null, ...}` with one key per bucket in `campaign_ids` — pre-populated to null so Phase 11 step 4 can flip them per iteration without first probing for object presence (and so the global `activated` flag has a deterministic AND-of-non-null check at finalization).
 
 **If Phase 5 fails mid-loop:** partial campaigns exist in the workspace. Metadata JSON lists the ones that succeeded and records `plain_text_applied: true` only if the step 8 PATCH loop completed for ALL campaigns. If `last_completed_phase: 5` was written but `plain_text_applied: false`, partial-PATCH state may exist (some campaigns plain-text, others HTML). Operator inspects EB UI, decides whether to delete the partial campaigns or resume by running a reduced version of Phase 5 that creates only the missing ones. On resume, the step 3 pre-list will surface the partial-set as duplicates; the operator selects "Reuse existing IDs" for buckets already created and "Create … anyway" only for buckets that didn't get an ID on the prior run. After partial-PATCH, the spec re-runs the step 8 PATCH loop on every campaign in `campaign_ids` regardless of prior state. Each PATCH re-sends `plain_text: true` explicitly; already-plain-text campaigns are safe no-ops on re-send (the omitted-field reset risk only fires if a different PATCH body is sent without re-asserting `plain_text: true` — see step 8). No automatic partial-resume.
 
@@ -569,7 +570,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 ## Phase 6 — ATTACH LEADS
 
-**Purpose.** Attach the lead IDs created in Phase 4 to the campaign IDs created in Phase 5, bucketed by ESP segment. This is the join step between the lead pool and per-segment campaigns.
+**Purpose.** Attach the lead IDs created in Phase 4 to the campaign IDs created in Phase 5, bucketed by (email-type × ESP) cell. This is the join step between the lead pool and per-cell campaigns.
 
 **Two-call gate applies — agent-side** (Sx-9, BC-5906; turn-structure per BC-2707). `import_leads_to_campaign` is listed as vendor-gated in `email-bison.md § MCP confirmation gates`, but per § Tool tier map this command invokes it via `call_api` against `/api/campaigns/{id}/leads/attach-leads`, which has NO `confirmation` field at the API level. The load-bearing safeguard is the agent-side `AskUserQuestion` turn between call-1 and call-2 — same shape as Phase 4. The `allow_parallel_sending` branch below IS a real semantic vendor gate (verified BC-6545, 2026-05-04 — attach returns HTTP 422 on lead-already-in-any-campaign conflict; through `call_api` the response body is stripped to `{error: HTTP 422 Error}` per the Sx-8 wrapper limitation, but `allow_parallel_sending: true` in the body succeeds when added), so it stays as-written.
 
@@ -580,14 +581,15 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 **Steps:**
 
 1. **Ground-truth the tool name.** `search_api_spec` with query `attach leads` or `import leads to campaign`. Per `email-bison.md` § Common workflows the name is `import_leads_to_campaign` with path `POST /api/campaigns/{id}/leads/attach-leads`.
-2. **Bucket the lead IDs by ESP segment.** From the CSV + Phase 2 bucket assignments, build a map `{ESP bucket → [lead_id, lead_id, ...]}`. Each lead belongs to exactly one bucket.
+2. **Bucket the lead IDs by (email-type × ESP) cell.** From the CSV + Phase 2 cell assignments, build a map `{"{email_type}|{esp}" → [lead_id, lead_id, ...]}` keyed identically to metadata's `segments` and `campaign_ids`. Each lead belongs to exactly one cell.
 3. **Show attach plan.** Render per-campaign counts:
 
    > Attach plan:
-   > - `{campaign_ids.Google}` ← 84 leads
-   > - `{campaign_ids.Microsoft}` ← 31 leads
-   > - `{campaign_ids.Other}` ← 12 leads
-   > Total: 127 leads attached across 3 campaigns.
+   > - `{campaign_ids["professional|Google"]}` ← 84 leads
+   > - `{campaign_ids["professional|Microsoft"]}` ← 31 leads
+   > - `{campaign_ids["professional|Other"]}` ← 12 leads
+   > - `{campaign_ids["role|Google"]}` ← 3 leads
+   > Total: 130 leads attached across 4 campaigns.
 4. **User gate 6 (semantic approval — once, covers all campaigns).** Ask via `AskUserQuestion`:
 
    > Attach {total} leads to {N} campaigns per the plan above? Per-campaign vendor gates fire with minimal turn-structure prompts after this one semantic approval.
@@ -606,7 +608,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    c. **Second vendor call — execute.** On "Continue", invoke again with `confirmation: true`.
    d. **`allow_parallel_sending` branch** (semantic, not turn-structure): if the `call_api` response is `{error: HTTP 422 Error}` against `/leads/attach-leads` (verified BC-6545 — F22 safety check firing on lead-already-in-any-campaign conflict, regardless of the other campaign's status), treat it as a real semantic gate. The verbatim prompt body is stripped through `call_api` (Sx-8 wrapper limitation); the vendor-tool path may surface it but was not verified this round. Relay the prompt body verbatim if the path surfaces it; otherwise present the operator-side diagnostic — call `list_leads` filtered on `lead_campaign_status=in_sequence` and cross-reference against the lead IDs in the failing batch to identify which leads are in conflict. Then ask the operator to either (a) decline (default) — delta the leads already in other campaigns, attach only the delta, list the skipped leads at the end, or (b) approve parallel sending — explicitly documented as a deliverability risk. Never auto-approve.
 6. **Verify per-campaign counts.** After each attach, re-query the campaign's lead count (via `get_campaign` or equivalent) and confirm it matches the attached count. If mismatch, halt and surface the discrepancy.
-7. **Append to metadata JSON.** The `campaign_ids` already list the per-campaign mapping. Add `lead_attach_counts: {<bucket>: <count>, ...}` mirroring `esp_segments`. Add `lead_ids_by_bucket: {<bucket>: [<lead_id>, ...], ...}` from the bucket map built in step 2 — this is the resume primitive that lets a Phase 6 re-run reconstruct the bucket→IDs mapping without re-running Phase 2 MX lookups + CSV-row joins. Set `last_completed_phase: 6`.
+7. **Append to metadata JSON.** The `campaign_ids` already list the per-campaign mapping. Add `lead_attach_counts: {<bucket>: <count>, ...}` mirroring `segments` (compound key shape). Add `lead_ids_by_bucket: {<bucket>: [<lead_id>, ...], ...}` from the bucket map built in step 2 — this is the resume primitive that lets a Phase 6 re-run reconstruct the bucket→IDs mapping without re-running Phase 2 MX lookups + CSV-row joins. Set `last_completed_phase: 6`.
 
 **If Phase 6 fails mid-campaign:** some campaigns have attached leads, others don't. Metadata indicates which ran (`last_completed_phase`). Operator inspects EB UI per campaign and re-runs Phase 6 scoped to the unattached campaigns.
 
@@ -651,9 +653,10 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
    > Sender pool for workspace `{workspace}`: {N-senders} connected senders.
    >
    > Attach plan (per-campaign count must match):
-   > - `{campaign_ids.Google}` ← {N-senders} senders
-   > - `{campaign_ids.Microsoft}` ← {N-senders} senders
-   > - `{campaign_ids.Other}` ← {N-senders} senders
+   > - `{campaign_ids["professional|Google"]}` ← {N-senders} senders
+   > - `{campaign_ids["professional|Microsoft"]}` ← {N-senders} senders
+   > - `{campaign_ids["professional|Other"]}` ← {N-senders} senders
+   > - `{campaign_ids["role|Google"]}` ← {N-senders} senders
    >
    > Sender list preview (first 5): sender@brite.co, ops@brite.co, intro@brite.co, …
 5. **User gate 7.** Ask via `AskUserQuestion`:
@@ -670,11 +673,11 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
    - **If count scalar is absent OR mismatches** — THEN re-query the campaign's full attached-sender list via `get_campaign` + the `while True` pagination loop, diff the sender ID set against the pre-attach enumeration, and identify the specific missing/extra sender IDs. Pagination runs only when diagnostic detail is actually needed.
    - **If count mismatches by even one sender, HALT.** Surface the campaign ID, the expected count, the actual count, and the specific missing/extra sender IDs. Do not advance `last_completed_phase`.
    - **Ground-truth fallback** — if `get_campaign`'s schema doesn't expose a scalar count field this session (verify via `search_api_spec` once up-front), fall back to pagination-first on every campaign. Record the chosen verification mode in metadata: `sender_verify_mode: "scalar" | "paginated"`.
-8. **Append to metadata JSON.** Set `sender_ids_attached: [<full list>]`, `sender_attach_counts: {"Google": N, "Microsoft": N, "Other": N}` — all three values MUST be equal (that's the invariant). `last_completed_phase: 7`.
+8. **Append to metadata JSON.** Set `sender_ids_attached: [<full list>]`, `sender_attach_counts: {"professional|Google": N, "professional|Microsoft": N, "professional|Other": N, "role|Google": N}` (one entry per cell in `campaign_ids`; example shows 4-cell from the gate-2 `include_role` path). All values MUST be equal (that's the invariant — sender pool is the same for every campaign). `last_completed_phase: 7`.
 
 ### Forbidden patterns (hard failures)
 
-- Splitting senders across campaigns (e.g., senders 1–10 to Google, 11–20 to Microsoft). Explicit anti-pattern — never shipped, never offered as an option.
+- Splitting senders across campaigns (e.g., senders 1–10 to `Professional|Google`, 11–20 to `Role|Microsoft`). Explicit anti-pattern — never shipped, never offered as an option.
 - Truncating the pagination loop after the first page of `list_sender_emails`. The `while True` loop must exhaust the cursor.
 - Skipping post-attach verification because the attach call returned 200. The vendor occasionally drops senders silently at high pool sizes; verification is the only authoritative check.
 
@@ -778,7 +781,7 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
    > - Abort
 6. **Execute create per campaign.** For each campaign ID, call `create_sequence_steps` with the request body above. Capture returned sequence IDs.
 7. **Verify per campaign.** Re-read via `get_campaign` or `get_sequence_steps`. Confirm 2 steps present with correct `wait_in_days` and `email_subject` fields. Halt on first mismatch.
-8. **Append to metadata JSON.** Set `sequence_ids: {"Google": 8801, "Microsoft": 8802, "Other": 8803}`, `last_completed_phase: 9`.
+8. **Append to metadata JSON.** Set `sequence_ids: {"professional|Google": 8801, "professional|Microsoft": 8802, "professional|Other": 8803, "role|Google": 8804}` (one entry per cell in `campaign_ids`; example shows 4-cell from gate-2 `include_role`), `last_completed_phase: 9`.
 
 **If Phase 9 fails mid-campaign:** partial sequence creation. Metadata lists completed campaigns. Operator inspects EB UI, deletes the partial sequences if desired, and re-runs scoped to unsequenced campaigns.
 
@@ -799,7 +802,7 @@ Phase 10 therefore has two modes:
 
 **Steps:**
 
-1. **Pick a preview lead.** Prefer the first lead in the largest ESP bucket. Fall back to row 2 of the CSV. Read the lead's CSV row.
+1. **Pick a preview lead.** Prefer the first lead in the largest cell of the `segments` map (most leads → most representative). Ties broken by the cell's display order in the gate-2 grid (`professional|Google` → `professional|Microsoft` → `professional|Other` → `role|Google` → ...). Fall back to row 2 of the CSV if `segments` is empty (`--no-host-lookup` path). Read the lead's CSV row.
 2. **Build the variable values map.** For each `{VARIABLE}` extracted from step_1/step_2 subject+body:
    - EB-standard variables (`FIRST_NAME`, `LAST_NAME`, `COMPANY`) resolve from the lead's CSV fields (`first_name`, `last_name`, `company_name`).
    - All other variables resolve from `custom_variables[].default` in the copy artifact.
@@ -815,7 +818,7 @@ Phase 10 therefore has two modes:
    - No `{{` double-brace
 7. **Display to operator.** Render both step_1 and step_2 with clear section headers:
 
-   > **Preview — campaign `{campaign-name} | Google`, lead `alex@gmail.com`:**
+   > **Preview — campaign `{campaign-name} | Professional | Google`, lead `alex@gmail.com`:**
    >
    > **STEP 1**
    > Subject: Quick question
@@ -849,7 +852,7 @@ Additive to Mode 1 — Mode 1 always runs first. Mode 2 only fires if `--test-se
 2. **Pick a sender.** Default to the first attached sender from Phase 7. Operator can override with `--test-send-sender <id>` if they want a specific mailbox to send from.
 3. **Safety surface to operator** — this mode SENDS A REAL EMAIL. Before the call, make the blast radius explicit:
 
-   > **Mode 2 — real test-send.** This will deliver a real email to `{--test-send email}` via sender `{sender_id}`, using sequence step `{step_1_id}` from campaign `{campaign_name | Google}`. The email counts toward sender reputation and daily limits. No lead is contacted.
+   > **Mode 2 — real test-send.** This will deliver a real email to `{--test-send email}` via sender `{sender_id}`, using sequence step `{step_1_id}` from campaign `{campaign_name | Professional | Google}`. The email counts toward sender reputation and daily limits. No lead is contacted.
 4. **User gate 10b** (real-send confirm):
 
    > Send real test email to `{test-send email}`?
@@ -874,8 +877,8 @@ After Mode 1 completes (and optionally Mode 2):
 After Phase 10 completes, surface the final summary message and exit:
 
 > Launch flow complete at Phase 10. Campaigns created in `Draft` state:
-> - `{campaign_ids.Google}` — 84 leads, 2-step sequence, ready to activate
-> - `{campaign_ids.Microsoft}` — 31 leads, 2-step sequence, ready to activate
+> - `{campaign_ids["professional|Google"]}` — 84 leads, 2-step sequence, ready to activate
+> - `{campaign_ids["professional|Microsoft"]}` — 31 leads, 2-step sequence, ready to activate
 >
 > Metadata: `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`
 >
@@ -909,9 +912,9 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
 2. **Final summary to operator** (pre-first-gate):
 
    > Phase 11 ACTIVATE — this will transition {N} campaigns from `Draft` to `Queued` and begin sending real emails. Summary:
-   > - `{campaign_ids.Google}` — 84 leads, step 1 sends on the campaign's next scheduled window
-   > - `{campaign_ids.Microsoft}` — 31 leads, same
-   > - `{campaign_ids.Other}` — 12 leads, same
+   > - `{campaign_ids["professional|Google"]}` — 84 leads, step 1 sends on the campaign's next scheduled window
+   > - `{campaign_ids["professional|Microsoft"]}` — 31 leads, same
+   > - `{campaign_ids["professional|Other"]}` — 12 leads, same
    >
    > Sender pool: {N-senders} inboxes per campaign.
    > Schedule: Mon–Fri 08:00–17:00 {tz}.
@@ -927,7 +930,7 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
    - First call to `resume_campaign` (`call_api` against `PATCH /api/campaigns/{id}/resume`). Per Sx-9 the API has no `confirmation` parameter; the call returns the standard resume response. The "prompt" the spec relays comes from the wrapper-tool's `discover_tools` description, which describes the resume-campaign action in operator-facing language (typically: "This will transition campaign {id} from Draft to Queued and begin sending emails."). Render that description verbatim before call-2 to preserve BC-2707 turn structure.
    - **User gate 11b — vendor confirmation.** Relay the vendor prompt verbatim via `AskUserQuestion`:
 
-     > Vendor prompt for campaign `{campaign-name} | Google`: "{vendor-prompt-text}"
+     > Vendor prompt for campaign `{campaign-name} | Professional | Google`: "{vendor-prompt-text}"
      >
      > - Yes, activate this campaign
      > - Abort the entire Phase 11 (already-activated campaigns stay activated)
@@ -939,9 +942,9 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
 7. **Final report to operator:**
 
    > Launch complete. {N} campaigns activated in workspace `{workspace}`:
-   > - `{campaign-name} | Google` (id {id}) — Queued, 84 leads, first sends next scheduled window
-   > - `{campaign-name} | Microsoft` (id {id}) — Queued, 31 leads, same
-   > - `{campaign-name} | Other` (id {id}) — Queued, 12 leads, same
+   > - `{campaign-name} | Professional | Google` (id {id}) — Queued, 84 leads, first sends next scheduled window
+   > - `{campaign-name} | Professional | Microsoft` (id {id}) — Queued, 31 leads, same
+   > - `{campaign-name} | Professional | Other` (id {id}) — Queued, 12 leads, same
    >
    > Metadata written to `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`.
    >
