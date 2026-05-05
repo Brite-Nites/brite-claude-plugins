@@ -9,9 +9,9 @@
 
 ## Plain-language summary
 
-EmailBison's template engine already understands Liquid (a popular text-templating language) plus spintax. We discovered this during the canceled BC-6557 research. Liquid lets a template say "use the per-prospect value if it exists, otherwise use a sensible fallback" in one line — exactly the safety we were planning to build from scratch.
+EmailBison's template engine already understands Liquid (a popular text-templating language) plus spintax. We discovered this during the prior research into a custom smart-merge layer (which we canceled once we found Liquid was already shipped natively). Liquid lets a template say "use the per-prospect value if it exists, otherwise use a sensible fallback" in one line — exactly the safety we were planning to build from scratch.
 
-The current safety net (BC-6556's fail-closed gate) blocks the launch entirely if any variable lacks a non-empty default in the artifact. That's safe but blunt. With Liquid, a template can fall back gracefully per-lead without halting the whole launch when one row in a thousand has a blank cell.
+The current safety net (the fail-closed gate in the launch-campaign command's pre-flight phase) blocks the launch entirely if any variable lacks a non-empty default in the artifact. That's safe but blunt. With Liquid, a template can fall back gracefully per-lead without halting the whole launch when one row in a thousand has a blank cell.
 
 **Scope is foundation work, not vertical content.** The 3 hand-coded preset files exist as Holden-authored scaffolds for the verticals; long-term they'll be replaced by a feature that syncs from handbook vertical pages. Editing those scaffold files now would be throwaway. Instead, the foundation work happens at the layers every campaign passes through:
 
@@ -29,13 +29,13 @@ This makes the work durable across all campaigns, all verticals, and survives th
 
 | Issue body claim | Ground truth | Plan resolution |
 |---|---|---|
-| Scope item 2 names "minimum 3 production presets" to update | The 3 preset files are Holden's hand-coded scaffolds; long-term replaced by a handbook-sync feature (not yet scoped). Editing them now is throwaway. | DROP heavy preset edits. Add an optional one-line "see SKILL.md § Liquid usage" note in each preset for future-author discoverability — 5-second touch, not real authoring work. |
-| Scope item 1 enumerates "high-risk variable types: recency anchors, proof points, friction signals..." | Brainstorm reframed: don't anchor on today's variables. Foundation move is updating the inline base skeletons that every preset / generator inherits from. | SKILL.md § Liquid usage teaches the pattern variable-agnostically. Skeleton A and Skeleton B (the inline canonical bodies) USE the pattern on the keystone failure variable (`{RECENCY_ANCHOR}` per BC-6308 R-2b). |
+| Scope item 2 names "minimum 3 production presets" to update | The 3 preset files are Holden's hand-coded scaffolds; long-term replaced by a handbook-sync feature (not yet scoped). Editing them now is throwaway. | DROP heavy preset edits. Add an optional one-line "see SKILL.md § Liquid + spintax for graceful per-lead fallback" note in each preset for future-author discoverability — 5-second touch, not real authoring work. |
+| Scope item 1 enumerates "high-risk variable types: recency anchors, proof points, friction signals..." | Brainstorm reframed: don't anchor on today's variables. Foundation move is updating the inline base skeletons that every preset / generator inherits from. | SKILL.md § Liquid + spintax for graceful per-lead fallback teaches the pattern variable-agnostically. Skeleton A and Skeleton B (the inline canonical bodies) USE the pattern on the keystone failure variable (`{RECENCY_ANCHOR}` per BC-6308 R-2b). |
 | Scope item 4 marks Liquid-aware validator as "optional but recommended" | BC-6554 round-4 walks the patterns live before any mechanism is built. | Validator deferred to a follow-up issue, filed during ship. |
 | AC: "Liquid `default` filter wrapping the variable" satisfies gate | EB also documents `{% if %}` truthy + `{% else %}` fallback as equivalent shape. Conditional + spintax composition is the most expressive pattern. | Gate-relax extends to: `{% assign %}` ending in `default:`, OR truthy `{% if local_var %}` with non-empty `{% else %}`, OR `{% if '{TOKEN}' contains '...' %}` keyword-branch with non-empty `{% else %}`. Variable-agnostic. |
 | Issue body does not mention Phase 1 step 8 (lead spot-check) | Phase 1 step 8 substitutes tokens + renders for operator preview. Liquid blocks need handling decision. | Option (b): spot-check renders post-substitution body with raw Liquid blocks visible, plus clarifying note pointing to `--test-send` for full Liquid evaluation. No Liquid parser bundled into the spec. |
-| Issue body does not mention whitespace control | Shopify Liquid docs: every uncontrolled `{% ... %}` line prints a blank line in the rendered output. Without `{%- -%}`, every `{% assign %}` at top of body adds a blank line before the greeting. | SKILL.md § Liquid usage covers whitespace-control hyphens. Skeleton A + B use `{%- -%}` form. Critical to ship correctly. |
-| Issue body does not mention spintax inside Liquid fallbacks | EB docs verbatim: `{% if city %}...{% else %}...in {your area\|the region}...{% endif %}` — spintax composes natively inside `{% else %}` clauses. | SKILL.md § Liquid usage shows the conditional + spintax composition pattern verbatim from EB article 184. |
+| Issue body does not mention whitespace control | Shopify Liquid docs: every uncontrolled `{% ... %}` line prints a blank line in the rendered output. Without `{%- -%}`, every `{% assign %}` at top of body adds a blank line before the greeting. | SKILL.md § Liquid + spintax for graceful per-lead fallback covers whitespace-control hyphens. Skeleton A + B use `{%- -%}` form. Critical to ship correctly. |
+| Issue body does not mention spintax inside Liquid fallbacks | EB docs verbatim: `{% if city %}...{% else %}...in {your area\|the region}...{% endif %}` — spintax composes natively inside `{% else %}` clauses. | SKILL.md § Liquid + spintax for graceful per-lead fallback shows the conditional + spintax composition pattern verbatim from EB article 184. |
 | Anti-slop rule "no `{{` double-brace anywhere" (currently in SKILL.md § Anti-Slop + launch-campaign.md Phase 1 step 6) | Rule was authored to catch typos like `{{FIRST_NAME}}`. Liquid render reference is also `{{ var }}` — current rule would hard-fail every Liquid template. | NEW foundation work: tighten the regex to `\{\{[A-Z_]+\}\}` (uppercase, no spaces — the canonical typo shape) so Liquid `{{ var }}` (lowercase, space-padded) is allowed. Add authoring rule: Liquid local variables must be lowercase. |
 
 ---
@@ -50,7 +50,7 @@ This makes the work durable across all campaigns, all verticals, and survives th
 | Gate-relax shape | Additive 5th resolution path in Phase 1 step 5 | Smallest reversible change; preserves existing 4 paths |
 | Phase 1 step 8 (spot-check) | Option (b) — substitution-only preview, raw Liquid blocks visible, point to `--test-send` for full eval | Avoids bundling a Liquid parser into the spec; `--test-send` is the existing escape hatch for server-side render verification |
 | Anti-slop `{{` rule | Tighten regex to allow Liquid `{{ var }}` while still catching `{{TOKEN}}` typos | Foundation gap — current rule blocks the pattern we're adopting |
-| Preset file edits | DROP — replace with one-line "see SKILL.md § Liquid usage" pointer | Holden's scaffolds; future handbook-sync replaces them; the pointer is for whoever opens those files in the meantime |
+| Preset file edits | DROP — replace with one-line "see SKILL.md § Liquid + spintax for graceful per-lead fallback" pointer | Holden's scaffolds; future handbook-sync replaces them; the pointer is for whoever opens those files in the meantime |
 | Fallback-quality concern | Authoring rule in SKILL.md, not code | Liquid fallbacks are for data sparsity, not lazy authoring; honest guardrail belongs in prose |
 
 ---
@@ -140,7 +140,7 @@ Output: `Wow, John G. Chalmers-Smith, you have a long name!` (no leading or trai
 
 ## Tasks
 
-### Task 1 — Add § Liquid usage section to email-copywriting/SKILL.md
+### Task 1 — Add § Liquid + spintax for graceful per-lead fallback section to email-copywriting/SKILL.md
 
 **File:** `plugins/marketing/skills/email-copywriting/SKILL.md`
 **Insertion point:** Between § Methodology subsection "Lazy-load per-vertical overrides" (line 161-179 currently) and the `---` divider before § Brite Implementation (line 181). New subsection lives at the bottom of § Methodology so per-vertical preset authors find it next to the skeleton patterns they're authoring.
@@ -268,7 +268,7 @@ Output: `Wow, John G. Chalmers-Smith, you have a long name!` (no leading or trai
 **Verification:**
 - `grep -c "{{TOKEN}}" plugins/marketing/commands/launch-campaign.md` returns ≥1 (in step 6 prose)
 - Step 6 prose explicitly allows Liquid output `{{ var }}` in body, forbids in subject
-- Cross-link to SKILL.md § Liquid usage section present
+- Cross-link to SKILL.md § Liquid + spintax for graceful per-lead fallback section present
 
 ### Task 6 — Add option (b) clarifying note to launch-campaign Phase 1 step 8
 
@@ -370,7 +370,7 @@ This is a discoverability aid only. The preset bodies are NOT being rewritten in
 - [ ] `./scripts/validate.sh` exits 0
 - [ ] `./scripts/check-guardrails.sh --claude-md CLAUDE.md` exits 0
 - [ ] Marketing plugin version bumped in BOTH `plugins/marketing/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` (BC-6000)
-- [ ] SKILL.md § Liquid usage is variable-agnostic — does not enumerate which specific tokens to wrap
+- [ ] SKILL.md § Liquid + spintax for graceful per-lead fallback is variable-agnostic — does not enumerate which specific tokens to wrap
 - [ ] Skeleton A + Skeleton B in SKILL.md USE the Liquid + filter-chain pattern on `{RECENCY_ANCHOR}` with `{%- -%}` whitespace control
 - [ ] SKILL.md § Anti-Slop `{{` rule allows Liquid `{{ var }}` (lowercase, space-padded) while still catching `{{TOKEN}}` typos (uppercase, no spaces)
 - [ ] launch-campaign.md Phase 1 step 5 lists exactly 5 resolution paths
