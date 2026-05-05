@@ -6,6 +6,8 @@ when: Ownership transition (12-24mo, strongest first 6), new GM appointment (6-1
 situation_mining_row: Ski Resorts, Exploring tier Offer E primary (SKILL.md §3 Brite-adaptation; email-copywriting preset roadmap R-14)
 ---
 
+<!-- Liquid + spintax fallback patterns: see plugins/marketing/skills/email-copywriting/SKILL.md § Liquid + spintax for graceful per-lead fallback -->
+
 # list-building | Ski Resorts | Brite Labs
 
 ## Hook (vertical-specific recency waterfall)

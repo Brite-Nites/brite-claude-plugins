@@ -44,7 +44,7 @@ Four frameworks govern this skill: **Email Bison format rules**, **Hormozi value
 
 Every artifact the skill emits MUST satisfy all of these rules before Write. Adapted from the Email Bison vendor docs and codified in `plugins/marketing/tools/integrations/email-bison.md`:
 
-- **All `{TOKEN}` references in step_1.subject, step_1.body, step_2.subject, step_2.body MUST be UPPERCASE** (e.g., `{FIRST_NAME}`, `{COMPANY}`, `{RECENCY_ANCHOR}`). EB's render engine does NOT recognize lowercase tokens as variable references — they render as **literal text** in delivery (verified BC-6308 round-3 R-2a). Authoring a lowercase token (`{first_name}`) is a silent-failure deliverability bug. Never `{{firstname}}` or `{{FIRST_NAME}}` either — double-brace breaks the EB merge engine.
+- **All `{TOKEN}` references in step_1.subject, step_1.body, step_2.subject, step_2.body MUST be UPPERCASE** (e.g., `{FIRST_NAME}`, `{COMPANY}`, `{RECENCY_ANCHOR}`). EB's render engine does NOT recognize lowercase tokens as variable references — they render as **literal text** in delivery (verified BC-6308 round-3 R-2a). Authoring a lowercase token (`{first_name}`) is a silent-failure deliverability bug. The double-brace EB-token form `{{FIRST_NAME}}` or `{{ FIRST_NAME }}` (uppercase identifier, regex `\{\{\s*[A-Z_]+\s*\}\}`) is a typo and is hard-failed by § Anti-Slop Guardrails. Liquid output `{{ var }}` (lowercase, space-padded) is allowed in body — it's required for the Liquid fallback patterns; see § Liquid + spintax for graceful per-lead fallback.
 - Paragraph breaks are `<br><br>`, never `<p>...</p>` tags. EB's HTML-to-plain converter eats `<p>` and corrupts the greeting-merged first sentence.
 - Greeting merges into the first sentence. No separate "Hi {FIRST_NAME}," line. Write: "Quick note {FIRST_NAME}, ..." or "Saw the {DOWNTOWN_INITIATIVE} news {FIRST_NAME}, ..." — the salutation lives inline.
 - Zero em-dashes (`—`) in body copy. Em-dashes are a known EB spam trigger; replace with commas, periods, or hyphens. This is auto-replaced at draft time, not prompted per-occurrence.
@@ -120,13 +120,14 @@ Two base skeletons live inline per D3. Per-vertical overrides lazy-load from `pr
 
 #### Skeleton A — list-building base
 
-Used for T1 / T2 framing. Diagnostic hook + proof point + low-commitment free-asset CTA. Greeting-merged first sentence, `<br><br>` paragraph breaks, word-level spintax.
+Used for T1 / T2 framing. Diagnostic hook + proof point + low-commitment free-asset CTA. Greeting-merged first sentence, `<br><br>` paragraph breaks, word-level spintax. The skeleton uses Liquid + filter-chain fallback for `{RECENCY_ANCHOR}` (the keystone per-lead failure variable per BC-6308 R-2b); preset authors and future generators inherit this pattern. Add additional `{%- assign -%}` lines for any other per-lead variable that needs graceful fallback — see § Liquid + spintax for graceful per-lead fallback for the full pattern reference.
 
 ```
 Subject: {Quick|Fast|30s} {question|check|idea}
 
 Body:
-Saw the {RECENCY_ANCHOR} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked closely|it mapped well} with a pattern we've been watching across {VERTICAL_DESCRIPTOR}.<br><br>{Most|A few|Several} {VERTICAL_DESCRIPTOR} teams we work with run into {SPECIFIC_FRICTION}, and one that {solved|shortcut|sidestepped} it was {PROOF_POINT_COMPANY}, who {PROOF_POINT_NUMBER} in {PROOF_POINT_TIMEFRAME}.<br><br>{Happy|Glad} to {pull|share|send} a {short|quick|focused} {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|interesting}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{%- assign recency = '{RECENCY_ANCHOR}' | strip | default: 'recent activity' -%}
+Saw the {{ recency }} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked closely|it mapped well} with a pattern we've been watching across {VERTICAL_DESCRIPTOR}.<br><br>{Most|A few|Several} {VERTICAL_DESCRIPTOR} teams we work with run into {SPECIFIC_FRICTION}, and one that {solved|shortcut|sidestepped} it was {PROOF_POINT_COMPANY}, who {PROOF_POINT_NUMBER} in {PROOF_POINT_TIMEFRAME}.<br><br>{Happy|Glad} to {pull|share|send} a {short|quick|focused} {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|interesting}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
 ```
 
 **Step 2 bump:**
@@ -140,13 +141,14 @@ Body:
 
 #### Skeleton B — risk-reversal base
 
-Used for T4 framing. Heavier commitment context, guarantee as the headline, pilot CTA. Same format rules as skeleton A.
+Used for T4 framing. Heavier commitment context, guarantee as the headline, pilot CTA. Same format rules as skeleton A, including Liquid + filter-chain fallback for `{RECENCY_ANCHOR}` — see § Liquid + spintax for graceful per-lead fallback to extend the pattern to additional variables.
 
 ```
 Subject: {Guarantee|Pilot|On us}
 
 Body:
-With the {RECENCY_ANCHOR} at {COMPANY} {FIRST_NAME}, the {scope|spend|commitment} {feels serious|deserves care|reads as high-stakes}, and that's the kind of project we {take on|scope|pilot} with a {measurable|specific|concrete} guarantee.<br><br>For {COMPANY}'s {INITIATIVE_NOUN}, we can {run|deliver|execute} the first {PHASE_NOUN} with {GUARANTEE_TERMS}, so the risk sits with us and the {proof|outcome|signal} sits with you.<br><br>{Worth a 20-minute scope|Open to a quick scope call|Happy to scope a pilot}?<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{%- assign recency = '{RECENCY_ANCHOR}' | strip | default: 'recent activity' -%}
+With the {{ recency }} at {COMPANY} {FIRST_NAME}, the {scope|spend|commitment} {feels serious|deserves care|reads as high-stakes}, and that's the kind of project we {take on|scope|pilot} with a {measurable|specific|concrete} guarantee.<br><br>For {COMPANY}'s {INITIATIVE_NOUN}, we can {run|deliver|execute} the first {PHASE_NOUN} with {GUARANTEE_TERMS}, so the risk sits with us and the {proof|outcome|signal} sits with you.<br><br>{Worth a 20-minute scope|Open to a quick scope call|Happy to scope a pilot}?<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
 ```
 
 **Step 2 bump:**
@@ -177,6 +179,153 @@ situation_mining_row: <cite situation-mining §3 row>
 Body sections: Hook (vertical-specific recency waterfall line) → Step 1 skeleton (override of base skeleton A or B with vertical-specific variables) → Step 2 bump → Vertical anti-slop (3-5 bullets for what NOT to say in that vertical).
 
 **Fallback behavior** — when the operator does NOT supply a `vertical`, OR supplies one but no matching preset file exists, the skill falls back to the base inline skeleton (A or B) plus the entity tone from `docs/marketing-context.md`. In the artifact, `vertical` is written as `null` (per D3 nullable schema) and a one-line warning surfaces to the operator naming which fan-out issue (BC-5879 / BC-5880 / BC-5881) will eventually ship that preset. The skill NEVER halts on missing preset files. See `presets/README.md` for the lazy-load index + per-tier fan-out mapping.
+
+### Liquid + spintax for graceful per-lead fallback
+
+Per-lead variables go missing. A 1000-row CSV will have rows with empty `RECENCY_ANCHOR`, missing `JOB_TITLE`, blank `CITY`. Email Bison's render engine substitutes empty strings silently — verified BC-6308 round-3 R-2b: a missing `{RECENCY_ANCHOR}` produced `"Saw the  at Acme Bob..."` with a visible double-space and orphan apostrophe-s. The fail-closed gate at `launch-campaign.md` Phase 1 step 5 prevents this by halting the launch when any variable lacks a non-empty default — safe but blunt. Liquid syntax provides per-lead graceful fallback inside the template body itself, so the launch proceeds and only the affected lead sees the fallback rendering. EB ships this capability natively. Authoritative reference: [EmailBison article 184](https://help.bisonsphere.com/en/articles/184-liquid-syntax-spintax-how-to-use-and-templates).
+
+#### Substitution order rule
+
+Verbatim from EB docs: *"Bison replaces custom variables before parsing your liquid templates."*
+
+Plain language: EB token substitution runs FIRST. Liquid runs SECOND. So Liquid sees the post-substitution result, not the raw `{TOKEN}`. A template like `{% assign x = '{FIRST_NAME}' %}` works because EB substitutes `{FIRST_NAME}` to the lead's name (or empty string) before Liquid evaluates the assign. Authors writing Liquid fallback patterns rely on this ordering — without it, the patterns wouldn't compose.
+
+#### Pattern A — assign + filter chain fallback
+
+Single-line fallback for one variable. Filter chain handles whitespace-only values + empty + case normalization in one expression.
+
+```
+{%- assign name = '{FIRST_NAME}' | strip | default: 'there' | downcase | capitalize -%}
+```
+
+Then in body: `Hey {{ name }}, ...`
+
+Filter explanations:
+
+- `strip` — removes whitespace; whitespace-only values become empty strings
+- `default: 'there'` — empty/nil triggers the fallback string `'there'`
+- `downcase` — lowercases the result (case-insensitive matching downstream)
+- `capitalize` — uppercases the first character
+
+The `{%- -%}` form strips whitespace per the Shopify whitespace rule (see "Whitespace control" below).
+
+#### Pattern B — conditional + spintax fallback
+
+Whole-clause swap when the empty case warrants different sentence structure. Spintax composes inside the `{% else %}` clause for natural variation.
+
+```
+{%- assign city = '{CITY}' -%}
+{%- if city -%}
+I'm helping several clients in {CITY} who need guidance with insurance.
+{%- else -%}
+I'm helping several clients in {your area|the region} who need guidance with insurance.
+{%- endif -%}
+```
+
+The truthy check `{% if city %}` evaluates the assigned local — when EB substituted an empty string into `{CITY}`, the local `city` is empty, the truthy check is false, the `{% else %}` clause renders. Spintax `{your area|the region}` rotates per-send.
+
+#### Pattern C — keyword-branched value-prop
+
+Branch a paragraph by job title or other keyword signal. Demonstrates the Hormozi value-equation paragraph 1 framing differently for executives vs. revenue ops vs. default.
+
+```
+{%- assign title = '{TITLE}' | downcase | strip -%}
+{%- if title contains "founder" or title contains "ceo" -%}
+I'll keep this brief given your schedule.
+{%- elsif title contains "sales" or title contains "revops" -%}
+Happy to share a quick pipeline impact summary.
+{%- else -%}
+I can tailor this to your team's priorities.
+{%- endif -%}
+```
+
+EB's documented gotcha verbatim: *"The downcase in the first line of code is used to make all text in the variable lower case as matching is case sensitive."* Without `downcase`, "Founder" won't match "founder" in `contains`. Always chain `| downcase | strip` before keyword comparison.
+
+#### Whitespace control
+
+Authoritative reference: [Shopify Liquid whitespace docs](https://shopify.github.io/liquid/basics/whitespace/).
+
+Verbatim rule: *"Any line of Liquid in your template will still print a blank line in your rendered HTML."*
+
+Without hyphens (broken — every Liquid line adds a blank line):
+
+```
+{% assign recency = '{RECENCY_ANCHOR}' | strip | default: 'a recent capital plan' %}
+Hey {FIRST_NAME}, saw {COMPANY}'s {{ recency }}...
+```
+
+Renders as:
+
+```
+
+Hey Bob, saw Acme's $3B village expansion...
+```
+
+(Note the leading blank line — the template's `{% assign %}` line printed an empty line in the output.)
+
+With hyphens (correct — Liquid lines emit nothing):
+
+```
+{%- assign recency = '{RECENCY_ANCHOR}' | strip | default: 'a recent capital plan' -%}
+Hey {FIRST_NAME}, saw {COMPANY}'s {{ recency }}...
+```
+
+Renders as:
+
+```
+Hey Bob, saw Acme's $3B village expansion...
+```
+
+Rule: every Liquid line in a body uses `{%- ... -%}` (or `{{- ... -}}` for output tags) unless the author explicitly wants a line break in the rendered output. This is non-negotiable — without it, every preset that adopts Liquid ships a render bug worse than the one Liquid is fixing.
+
+#### Liquid local variable naming rule
+
+Liquid local variables (the names introduced by `{% assign %}`) MUST be lowercase, snake_case acceptable. Examples:
+
+- Good: `{% assign name = ... %}`, `{% assign company_legal_name = ... %}`, `{% assign first_name = ... %}`
+- Forbidden: `{% assign NAME = ... %}`, `{% assign FirstName = ... %}`, `{% assign Company = ... %}`
+
+Why: the anti-slop rule (§ Anti-Slop Guardrails) detects EB-token typos like `{{FIRST_NAME}}` and `{{ FIRST_NAME }}` (uppercase identifier, with or without internal whitespace) via the regex `\{\{\s*[A-Z_]+\s*\}\}`. Lowercase Liquid locals (rendered as `{{ name }}`, lowercase identifier) are unambiguously distinct from typos. Uppercase Liquid locals (e.g., `{{ NAME }}`) ARE caught by the typo regex — that's intentional. They're forbidden by both convention AND regex enforcement, so the typo-detection rule is unambiguous and safe to apply mechanically regardless of authoring whitespace.
+
+#### Authoring guidance — fallbacks are for data sparsity, not lazy authoring
+
+Liquid fallbacks are a safety net for the 1-of-1000 lead with a missing per-lead value. They are not a substitute for per-lead research.
+
+Rule: if a campaign expects ≥10% of leads to use the fallback (i.e., ≥10% have empty per-lead values for the wrapped variable), the CSV needs better enrichment, not a smarter fallback. Generic fallbacks signal vendor-who-didn't-research at the prospect-side; per-lead values are the quality lever. The fallback exists to prevent visible glitches, not to make low-research email feel personalized.
+
+When choosing a fallback string, target "okay-ish if hit, signals nothing distinctive if not hit." A `RECENCY_ANCHOR` fallback like "a recent capital-plan announcement" reads as plausibly per-lead. A fallback like "your recent stuff" reads as obviously generic and is a quality drop. The former is acceptable for a rare-case safety net; the latter is not.
+
+#### Per-lead value safety — no Liquid metacharacters in CSV values
+
+EmailBison's substitution-order rule means lead values are inlined into the body BEFORE Liquid parses. A CSV row whose `RECENCY_ANCHOR` (or any per-lead variable) contains Liquid metacharacters — `{{`, `}}`, `{%`, `%}` — would inject Liquid that runs at EB render time. Worst case: a lead value like `{% for i in (1..1000000) %}{% endfor %}` triggers a Liquid render-loop DoS against the EB sender, or a quote-breakout like `'; some_filter; '` smuggles arbitrary Liquid filter invocation into the assign string.
+
+`/marketing:launch-campaign` enforces this at the input boundary via IV-10 (CSV row value Liquid-metacharacter rejection — see `plugins/marketing/commands/launch-campaign.md` § Input validation). Authors of campaign artifacts and per-lead enrichment pipelines should NOT manually defeat this check. Per-lead values should be plain text; if a campaign needs Liquid logic, it lives in the body template (authored by this skill), not in CSV cells. Threat model: enrichment-vendor data integrity boundary — Apollo, Clay, ZoomInfo, and similar paid sources have integrity guarantees, but the boundary is real and IV-10 is fail-closed.
+
+#### Available filters and conditionals
+
+Filters EB documents (verbatim list from article 184):
+
+- `strip` — removes whitespace
+- `downcase` — converts to lowercase
+- `capitalize` — capitalizes the first character
+- `default: '<value>'` — fallback when empty/nil
+- `date: '<format>'` — formats dates/times (e.g., `"now" | date: "%A"`)
+- `plus: <number>` — mathematical addition
+
+Conditional operators:
+
+- `==` (equality), `!=` (inequality)
+- `contains` (substring; case-sensitive — chain `| downcase` for case-insensitive)
+- `or`, `and` (logical composition)
+- `<`, `>`, `<=`, `>=` (numeric comparison)
+
+Comparing custom variables: EB docs verbatim: *"if you're using custom variables, and you're looking to make comparisons in 'if' statements, you must put them in quotes."* Pattern: `{% if '{FIRST_NAME}' == 'Cody' %}`. Comparing assigned locals: no quotes needed. Pattern: `{% if name == 'cody' %}` (after `{% assign name = '{FIRST_NAME}' | downcase %}`).
+
+#### Cross-reference
+
+Vendor-fact reference for Liquid + spintax + whitespace: `plugins/marketing/tools/integrations/email-bison.md` § Liquid + spintax + whitespace.
+
+Gate-relax accepting Liquid as a resolution path: `plugins/marketing/commands/launch-campaign.md` Phase 1 step 5 (5th resolution path) and Phase 1 step 6 (sanity checklist regex tightening).
 
 ---
 
@@ -265,7 +414,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
 - **Preset files are lazy-loaded.** One preset file read per invocation, not the whole library. Use `Glob` + `Grep` to check existence before `Read`; on missing, fall back to base inline skeleton without halting (D3).
 - **Supply vertical triggers are out of scope.** The handbook 23-vertical taxonomy excludes professional installers + property management (see `Brite-Nites/handbook@main:marketing/go-to-market/verticals/README.md`). If an operator supplies a Supply-framed prospect, pause and clarify — do not produce a Supply-tone email. Inherited from BC-5824 precedent.
 - **Hypothesis framing is non-negotiable.** Inherited from situation-mining §3 — body copy never states worldview as fact. When incorporating inferred signals from the situation artifact, the copy must read as "we noticed X and thought {HYPOTHESIS}" — never "you are X."
-- **Content-variable defaults must be non-empty (BC-6556 fail-closed gate).** Email Bison's render engine substitutes any unresolved `{TOKEN}` with empty string — silent, no error (verified BC-6308 round-3 R-2b: `{RECENCY_ANCHOR}` with null value rendered as `""`, producing `"Saw the  at Acme Bob..."` with double-space). To prevent this in production: every content variable referenced in `step_1` / `step_2` subject + body MUST have a non-empty `custom_variables[].default` in the artifact. Per-lead variables (`{COMPANY}`, `{FIRST_NAME}`) and sender variables (`{SENDER_*}`) are exceptions — they're resolved via per-lead CSV values and the §5 Workflow 1 priority chain respectively, not via campaign-level defaults. Enforced fail-closed by `launch-campaign.md` Phase 1 step 5. Defaults are a **safety net** for prospects with thin per-lead data, not a substitute for good per-lead values — for high-personalization campaigns, populate the per-lead value via the CSV. Long-term direction: smart-merge formula layer with context-aware fallback (BC-6557).
+- **Content-variable defaults must be non-empty (BC-6556 fail-closed gate).** Email Bison's render engine substitutes any unresolved `{TOKEN}` with empty string — silent, no error (verified BC-6308 round-3 R-2b: `{RECENCY_ANCHOR}` with null value rendered as `""`, producing `"Saw the  at Acme Bob..."` with double-space). To prevent this in production: every content variable referenced in `step_1` / `step_2` subject + body MUST have a non-empty `custom_variables[].default` in the artifact. Per-lead variables (`{COMPANY}`, `{FIRST_NAME}`) and sender variables (`{SENDER_*}`) are exceptions — they're resolved via per-lead CSV values and the §5 Workflow 1 priority chain respectively, not via campaign-level defaults. Enforced fail-closed by `launch-campaign.md` Phase 1 step 5. Defaults are a **safety net** for prospects with thin per-lead data, not a substitute for good per-lead values — for high-personalization campaigns, populate the per-lead value via the CSV. Graceful per-lead fallback (per-lead empty without campaign-level halt) is now handled via Liquid syntax in the template body — see § Liquid + spintax for graceful per-lead fallback (BC-6613, supersedes the canceled smart-merge formula approach).
 
 ---
 
@@ -302,7 +451,7 @@ Six flows — the common paths operators actually run. Each flow states precondi
 3. Run §2 value-equation gate — confirm the 4 inputs resolve from marketing-context.md + situation artifact. If any missing, interview the operator one input at a time.
 4. `Glob` check `presets/{template_preset}-{vertical}.md`. If it exists, `Read` it. If not, flag the fallback path (Flow 6).
 5. Fill slots: `{RECENCY_ANCHOR}` from the situation artifact's top waterfall signal, `{PROOF_POINT_*}` from marketing-context.md case studies, `{SENDER_*}` from marketing-context.md or §5 Workflow 1 fallback, `{FREE_ASSET_NOUN}` / `{INITIATIVE_NOUN}` / `{GUARANTEE_TERMS}` from value-equation inputs.
-6. Validate draft against §8 anti-slop guardrails — auto-replace em-dashes, check for `{{` double-brace tokens, check for `<p>` tags, confirm subject has no `{FIRST_NAME}`, confirm step count is exactly 2.
+6. Validate draft against §8 anti-slop guardrails — auto-replace em-dashes, check for `{{TOKEN}}` EB-token typos (regex `\{\{\s*[A-Z_]+\s*\}\}`; Liquid output `{{ var }}` is allowed), check for `<p>` tags, confirm subject has no `{FIRST_NAME}`, confirm step count is exactly 2.
 7. Build the `custom_variables` array (every `{VARIABLE}` in body or subject must be declared).
 8. `Write` the JSON artifact to `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`.
 9. Report the artifact path + offer summary + tier + preset used to the operator.
@@ -422,10 +571,10 @@ Six flows — the common paths operators actually run. Each flow states precondi
 
 | Score | Criteria |
 |------:|----------|
-| 10 | Artifact is EB-format-compliant (no `{{`, no `<p>`, no em-dashes in body, no `{FIRST_NAME}` in subject, exactly 2 steps, sign-off spintax correct); Hormozi value equation visible in body copy (all 4 inputs map to specific paragraphs); entity-aware tier from the §3 matrix is picked and confirmed by operator; recency-waterfall anchor appears in the hook and cites the waterfall level; every `{VARIABLE}` in body + subject is declared in `custom_variables`; base or per-vertical preset is cited in the artifact; `situation_mining_source` cited when applicable; all §8 anti-slop guardrails pass validation. |
+| 10 | Artifact is EB-format-compliant (no `{{TOKEN}}` EB-token typos per regex `\{\{\s*[A-Z_]+\s*\}\}`; Liquid output `{{ var }}` is allowed in body for fallback patterns; no `<p>`, no em-dashes in body, no `{FIRST_NAME}` in subject, exactly 2 steps, sign-off spintax correct); Hormozi value equation visible in body copy (all 4 inputs map to specific paragraphs); entity-aware tier from the §3 matrix is picked and confirmed by operator; recency-waterfall anchor appears in the hook and cites the waterfall level; every `{VARIABLE}` in body + subject is declared in `custom_variables`; base or per-vertical preset is cited in the artifact; `situation_mining_source` cited when applicable; all §8 anti-slop guardrails pass validation. |
 | 7-9 | Mostly excellent with one gap — e.g. recency anchor cites a level but the signal is weak; one custom variable in the body is missing from the array; spintax is word-level but less dense than the 3-5 word guideline; sign-off is correct but not spintax-expanded. |
 | 4-6 | Functional but missing structural elements — e.g. value equation applied but proof point is generic (no numbers), or step 2 bump summarizes step 1 instead of referencing it, or tier was recommended but not confirmed with operator (D2 bypassed), or `vertical: null` without a valid fallback reason, or the preset file exists but wasn't read. |
-| 1-3 | Format violations (any one: `{{` double-brace present, `<p>` tag present, em-dash in body, `{FIRST_NAME}` in subject, >2 steps, Supply-vertical trigger like "installers" or "property mgmt" in body); OR `docs/marketing-context.md` was ignored (silent entity default); OR fact-claim framing ("you are X" instead of "we noticed X and thought Y"); OR fabricated proof point / statistic / case study not in marketing-context.md or operator input. |
+| 1-3 | Format violations (any one: `{{TOKEN}}` EB-token typo present per regex `\{\{\s*[A-Z_]+\s*\}\}` — note Liquid output `{{ var }}` is allowed and not a violation, `<p>` tag present, em-dash in body, `{FIRST_NAME}` in subject, >2 steps, Supply-vertical trigger like "installers" or "property mgmt" in body); OR `docs/marketing-context.md` was ignored (silent entity default); OR fact-claim framing ("you are X" instead of "we noticed X and thought Y"); OR fabricated proof point / statistic / case study not in marketing-context.md or operator input. |
 
 ---
 
@@ -442,7 +591,9 @@ Base guardrails (shared across marketing plugin) + skill-specific hard failures.
 
 **Skill-specific hard failures (validation-gated — fail the artifact emit):**
 
-- **Do not emit `{{variable}}` double-brace tokens.** Email Bison requires single-brace uppercase variables (`{FIRST_NAME}`). If a draft contains `{{`, self-correct to single-brace before emit. Hard failure if present in the written artifact.
+- **Do not emit `{{TOKEN}}` double-brace EB-token typos.** Email Bison requires single-brace uppercase variables (`{FIRST_NAME}`). The double-brace form `{{FIRST_NAME}}` or `{{ FIRST_NAME }}` (uppercase identifier, with or without internal whitespace) is a typo — EB does NOT resolve it; it renders as literal text in delivery. Detection regex: `\{\{\s*[A-Z_]+\s*\}\}` (uppercase letters or underscores only; internal whitespace allowed but the identifier itself must be uppercase). If a draft contains this pattern, self-correct to single-brace before emit. Hard failure if present in the written artifact.
+
+  **Liquid output `{{ var }}` is allowed and required for the Liquid fallback patterns** (see § Liquid + spintax for graceful per-lead fallback). Liquid local variables MUST be lowercase (snake_case acceptable, e.g., `{{ name }}`, `{{ first_name }}`, `{{ recency }}`). The lowercase-required rule is what makes the typo regex unambiguous and safe to apply mechanically: `{{FIRST_NAME}}` (uppercase, no spaces) gets caught as a typo; `{{ name }}` (lowercase, space-padded) passes as Liquid output. Uppercase Liquid locals (e.g., `{{ NAME }}`) are forbidden by convention because they collide with the typo regex.
 - **Do not emit lowercase or mixed-case `{token}` references in subjects or bodies.** EB's render engine ONLY resolves UPPERCASE tokens (e.g., `{FIRST_NAME}`); lowercase or mixed-case tokens (`{first_name}`, `{First_Name}`) render as literal text in delivery — verified BC-6308 round-3 R-2a Preview Body output. If a draft contains any `{[a-z][A-Za-z_]*}` pattern, self-correct to UPPERCASE before emit. Hard failure if present in the written artifact.
 - **Do not emit `<p>` or `</p>` tags in body copy.** EB's HTML-to-plain converter eats `<p>` and corrupts the greeting-merged first sentence. Use `<br><br>` for paragraph breaks. Hard failure if present.
 - **Do not emit em-dashes (`—`) in body copy.** Known EB spam trigger. Auto-replace with commas, periods, or hyphens at draft time. Hard failure if present in the written artifact. (Em-dashes in this SKILL.md spec prose are OK where explaining the rule; the rule applies only to body template examples and generated artifact text.)
@@ -460,7 +611,7 @@ Eight scenarios covering the core paths. Structured assertions + expected-output
 ### Tier 1 — Free assertions (no tool calls needed)
 
 - **`scratch-path-value-equation`** — Given no situation artifact and an entity-only input, the skill's first response asks for the 4 §2 value-equation inputs (Dream Outcome, Perceived Likelihood, Time Delay, Effort + Sacrifice) before any drafting. No JSON artifact is emitted until the operator answers.
-- **`format-violation-self-correct`** — Given a draft (operator-supplied template or mid-generation text) containing `{{firstname}}`, the skill self-corrects to `{FIRST_NAME}` before artifact emit. Output artifact body contains zero `{{` tokens.
+- **`format-violation-self-correct`** — Given a draft (operator-supplied template or mid-generation text) containing `{{FIRST_NAME}}` (uppercase double-brace EB-token typo, matches regex `\{\{\s*[A-Z_]+\s*\}\}`), the skill self-corrects to `{FIRST_NAME}` before artifact emit. Output artifact body contains zero `\{\{\s*[A-Z_]+\s*\}\}` typo matches; lowercase Liquid output `{{ var }}` (e.g., `{{ recency }}` from a Liquid fallback assign) is allowed and preserved.
 - **`em-dash-auto-replace`** — Given operator-supplied proof-point text containing em-dashes, the skill auto-replaces all em-dashes with commas, periods, or hyphens before artifact emit. Output artifact body contains zero `—` characters.
 - **`unknown-vertical-fallback`** — Given `vertical: hoas` (preset file not yet shipped — expected pre-BC-5879), the skill falls back to base skeleton A + Nites tone and logs a one-line warning citing BC-5879. Output artifact has `vertical: null` and body matches base-template shape, not a vertical-override shape.
 - **`missing-offer-tier-gate`** — Given no `offer_tier` input, the skill's first response recommends a tier from the §3 matrix with one-line rationale AND asks for operator confirmation via AskUserQuestion. No JSON artifact is emitted until the operator confirms or overrides.
