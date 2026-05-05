@@ -6,6 +6,8 @@ when: Large multi-stream capital commitment (full-season production-finance with
 situation_mining_row: Sports Stadiums, Active tier fan-out row T4 variant (SKILL.md §3 Brite-adaptation; email-copywriting preset roadmap R-15; playbook Offer E primary, T4 guarantee structure)
 ---
 
+<!-- Liquid + spintax fallback patterns: see plugins/marketing/skills/email-copywriting/SKILL.md § Liquid + spintax for graceful per-lead fallback -->
+
 # risk-reversal | Sports Stadiums | Brite Labs
 
 ## Hook (vertical-specific recency waterfall)

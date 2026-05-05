@@ -284,6 +284,91 @@ This pattern is **stronger** than a skill-level "ask the user" step — when inv
 - **`variant` field on sequence steps is BOOLEAN, not a string.** EB's `POST /api/campaigns/v1.1/{id}/sequence-steps` request body marks `variant` as boolean (`false` / `true`) — A/B variant flag, not a label. Sending `"A"` or `"B"` (string A/B label borrowed from other platforms' terminology) will silently coerce or 422; reliable contract is boolean. Non-variant steps send `false`. Surfaced by BC-5906 round-2 (Sx-13); spec fix shipped in BC-6301.
 - **EB auto-prepends `Re: ` to subjects when `thread_reply: true`.** When a sequence step carries `thread_reply: true` (always the case for step 2 of a 2-step sequence), EB inserts `Re: ` at delivery regardless of whether the `email_subject` already starts with `Re:`. Sending `"Re: Quick question"` produces `"Re: Re: Quick question"` in the recipient's inbox — double-prefix, deliverability-degrading. Always send the BARE subject for `thread_reply: true` steps; let EB prepend. Surfaced by BC-5906 round-2 (Sx-14); spec fix shipped in BC-6301.
 
+## Liquid + spintax + whitespace
+
+EB's render engine supports Liquid templating (a popular text-templating language) plus spintax. Per the substitution-order rule, EB token substitution runs FIRST, then Liquid evaluates against the post-substitution result. Authors writing per-lead graceful fallback patterns (BC-6613) rely on this ordering — without it, the patterns would not compose.
+
+### Authoritative sources
+
+- **EmailBison article 184** — vendor-of-record help article with verbatim working code examples: https://help.bisonsphere.com/en/articles/184-liquid-syntax-spintax-how-to-use-and-templates
+- **Shopify Liquid whitespace docs** — upstream Liquid spec EB references: https://shopify.github.io/liquid/basics/whitespace/
+
+### Canonical patterns
+
+**Pattern A — assign + filter chain fallback** (single-line per-variable safety net):
+
+```
+{%- assign name = '{FIRST_NAME}' | strip | default: 'there' | downcase | capitalize -%}
+```
+
+Use in body: `Hey {{ name }}, ...`. The filter chain handles whitespace-only values (`strip`), empty/nil (`default:`), and case normalization (`downcase | capitalize`) in one expression.
+
+**Pattern B — conditional + spintax fallback** (whole-clause swap when empty case warrants different sentence structure):
+
+```
+{%- assign city = '{CITY}' -%}
+{%- if city -%}
+I'm helping several clients in {CITY} who need guidance with insurance.
+{%- else -%}
+I'm helping several clients in {your area|the region} who need guidance with insurance.
+{%- endif -%}
+```
+
+The `{% else %}` clause can contain spintax (`{your area|the region}`), which EB rotates per-send.
+
+**Pattern C — keyword-branched value-prop** (branch a paragraph by job title or other keyword signal):
+
+```
+{%- assign title = '{TITLE}' | downcase | strip -%}
+{%- if title contains "founder" or title contains "ceo" -%}
+I'll keep this brief given your schedule.
+{%- elsif title contains "sales" or title contains "revops" -%}
+Happy to share a quick pipeline impact summary.
+{%- else -%}
+I can tailor this to your team's priorities.
+{%- endif -%}
+```
+
+**Pattern D — whitespace-stripped compact form** (Shopify whitespace doc reference):
+
+```
+{% assign username = "John G. Chalmers-Smith" -%}
+{%- if username and username.size > 10 -%}
+  Wow, {{ username -}} , you have a long name!
+{%- else -%}
+  Hello there!
+{%- endif %}
+```
+
+Output: `Wow, John G. Chalmers-Smith, you have a long name!` (no leading or trailing blank lines).
+
+### Documented filters
+
+EB documents these filters in article 184:
+
+- `strip` — removes whitespace
+- `downcase` — converts to lowercase
+- `capitalize` — capitalizes the first character
+- `default: '<value>'` — fallback when empty/nil
+- `date: '<format>'` — formats dates/times (e.g., `"now" | date: "%A"`)
+- `plus: <number>` — mathematical addition
+
+Conditional operators: `==`, `!=`, `contains` (substring; case-sensitive), `or`, `and`, `<`, `>`, `<=`, `>=`.
+
+### Documented gotchas
+
+- **Substitution order:** EB substitutes `{TOKEN}` references BEFORE Liquid parses the template. Authors should write `{% assign x = '{TOKEN}' %}` and rely on EB substituting `{TOKEN}` to a value (or empty string) before Liquid sees it.
+- **Case-sensitivity in `contains`:** EB's docs verbatim: *"The downcase in the first line of code is used to make all text in the variable lower case as matching is case sensitive."* Without `| downcase`, "Founder" won't match "founder" in `contains` comparisons. Always chain `| downcase | strip` before keyword matching.
+- **Whitespace in rendered output:** Shopify's docs verbatim: *"Any line of Liquid in your template will still print a blank line in your rendered HTML."* Without hyphens, every `{% ... %}` line emits a blank line in the rendered email. Always use `{%- ... -%}` (or `{{- ... -}}` for output tags) unless the author explicitly wants a line break.
+- **Quoting custom variables in conditionals:** EB's docs verbatim: *"if you're using custom variables, and you're looking to make comparisons in 'if' statements, you must put them in quotes."* Pattern: `{% if '{FIRST_NAME}' == 'Cody' %}`. Comparing assigned locals: no quotes needed. Pattern: `{% if name == 'cody' %}` after `{% assign name = '{FIRST_NAME}' | downcase %}`.
+- **Liquid local variable naming convention:** Liquid local variables in this codebase MUST be lowercase (snake_case acceptable, e.g., `name`, `first_name`, `recency`) per the anti-slop typo-detection convention — see `plugins/marketing/skills/email-copywriting/SKILL.md` § Anti-Slop Guardrails. Uppercase Liquid locals would collide with the `\{\{[A-Z_]+\}\}` typo regex and trigger false-positives.
+
+### Cross-references
+
+- `plugins/marketing/skills/email-copywriting/SKILL.md` § Liquid + spintax for graceful per-lead fallback — the authoritative pattern reference for skill authors and future generators
+- `plugins/marketing/commands/launch-campaign.md` Phase 1 step 5 — gate-relax accepting Liquid fallback as a 5th resolution path
+- `plugins/marketing/commands/launch-campaign.md` Phase 1 step 6 — sanity checklist `{{TOKEN}}` typo regex (allows Liquid output `{{ var }}` while still catching EB-token typos)
+
 ## Related skills
 
 **Primary consumers:**

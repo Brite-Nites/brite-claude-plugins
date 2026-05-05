@@ -6,6 +6,8 @@ when: Non-gaming expansion or capital-plan announcement (6-12mo, strongest first
 situation_mining_row: Casinos, Exploring tier Offer E co-primary (SKILL.md §3 Brite-adaptation; email-copywriting preset roadmap R-12)
 ---
 
+<!-- Liquid + spintax fallback patterns: see plugins/marketing/skills/email-copywriting/SKILL.md § Liquid + spintax for graceful per-lead fallback -->
+
 # list-building | Casinos | Brite Labs
 
 ## Hook (vertical-specific recency waterfall)
