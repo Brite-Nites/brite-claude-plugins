@@ -624,7 +624,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 > **Attach ALL connected senders to ALL campaigns. Never split senders across campaigns.**
 
-Why: sender warmup and reputation are per-inbox, not per-campaign. Splitting the sender pool across per-ESP campaigns concentrates volume on a subset of inboxes, which burns reputation unevenly and produces asymmetric deliverability across campaigns for no analytical benefit. Revgrowth 10's upstream `launch.py` encodes this as an explicit rule; Brite inherits it verbatim. **Any deviation from this invariant is a hard failure and must be surfaced to the operator — the command does not offer a split-sender flag.**
+Why: sender warmup and reputation are per-inbox, not per-campaign. Splitting the sender pool across per-cell campaigns concentrates volume on a subset of inboxes, which burns reputation unevenly and produces asymmetric deliverability across campaigns for no analytical benefit. Revgrowth 10's upstream `launch.py` encodes this as an explicit rule; Brite inherits it verbatim. **Any deviation from this invariant is a hard failure and must be surfaced to the operator — the command does not offer a split-sender flag.**
 
 ### Pagination is mandatory
 
@@ -820,7 +820,7 @@ Phase 10 therefore has two modes:
    - No `{{` double-brace
 7. **Display to operator.** Render both step_1 and step_2 with clear section headers:
 
-   > **Preview — campaign `{campaign-name} | Professional | Google`, lead `alex@gmail.com`:**
+   > **Preview — campaign `{campaign-name} | Professional | Google`, lead `alex@denvergov.org`:**
    >
    > **STEP 1**
    > Subject: Quick question
@@ -881,6 +881,8 @@ After Phase 10 completes, surface the final summary message and exit:
 > Launch flow complete at Phase 10. Campaigns created in `Draft` state:
 > - `{campaign_ids["professional|Google"]}` — 84 leads, 2-step sequence, ready to activate
 > - `{campaign_ids["professional|Microsoft"]}` — 31 leads, 2-step sequence, ready to activate
+> - `{campaign_ids["professional|Other"]}` — 12 leads, 2-step sequence, ready to activate
+> - `{campaign_ids["role|Google"]}` — 3 leads, 2-step sequence, ready to activate
 >
 > Metadata: `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`
 >
@@ -917,6 +919,7 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
    > - `{campaign_ids["professional|Google"]}` — 84 leads, step 1 sends on the campaign's next scheduled window
    > - `{campaign_ids["professional|Microsoft"]}` — 31 leads, same
    > - `{campaign_ids["professional|Other"]}` — 12 leads, same
+   > - `{campaign_ids["role|Google"]}` — 3 leads, same
    >
    > Sender pool: {N-senders} inboxes per campaign.
    > Schedule: Mon–Fri 08:00–17:00 {tz}.
@@ -947,6 +950,7 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
    > - `{campaign-name} | Professional | Google` (id {id}) — Queued, 84 leads, first sends next scheduled window
    > - `{campaign-name} | Professional | Microsoft` (id {id}) — Queued, 31 leads, same
    > - `{campaign-name} | Professional | Other` (id {id}) — Queued, 12 leads, same
+   > - `{campaign-name} | Role | Google` (id {id}) — Queued, 3 leads, same
    >
    > Metadata written to `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`.
    >
