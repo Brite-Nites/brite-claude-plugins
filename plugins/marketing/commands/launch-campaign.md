@@ -177,7 +177,7 @@ The worked example uses a single email-type (`professional`) only because the op
 
 `last_completed_phase` advances monotonically from 1 to 11. `activated` flips to `true` only when every entry in `activated_per_campaign` is non-null (Phase 11 finalization). `activated_at` is the ISO-8601 timestamp of the LAST successful per-campaign resume call.
 
-`segments` records one entry per non-empty (email-type × ESP) cell post-gate-2 filter. Each entry carries the cell's `email_type`, `esp`, and `count`. Empty cells are absent from the object — F12 prune (Phase 2 step 4b) drops zero-lead cells before the metadata write. The operator's chosen email-type filter is recorded separately in `email_type_filter_applied` (see optional fields below). All downstream per-bucket fields (`lead_ids_by_bucket`, `campaign_ids`, `sender_attach_counts`, `campaign_schedule_ids`, `sequence_ids`, `activated_per_campaign`, `lead_attach_counts`) use the same `{email_type}|{esp}` key shape.
+`segments` records one entry per non-empty (email-type × ESP) cell post-gate-2 filter. Each entry carries the cell's `email_type`, `esp`, and `count`. Empty cells are absent from the object — F12 prune (Phase 2 step 4b) drops zero-lead cells before the metadata write. The operator's chosen email-type filter is recorded separately in `email_type_filter_applied` (see optional fields below). All downstream per-bucket fields (`lead_ids_by_bucket`, `campaign_ids`, `sender_attach_counts`, `campaign_schedule_ids`, `sequence_ids`, `activated_per_campaign`, plus the optional `lead_attach_counts` documented below) use the same `{email_type}|{esp}` key shape.
 
 **Resume-breadcrumb compat (one-way break).** Pre-BC-6654 metadata files written with the old `esp_segments` / `email_type_segments` shape will not auto-resume — the per-phase resume code reads `segments` and won't find it. Manual recovery: open the legacy metadata, manually map each ESP bucket count into the corresponding (professional × ESP) cell of the new shape (assumes default email-type filter, which dropped role/personal pre-gate), then save and re-run from the next phase. Acceptable cost — schema migration is structural and resume from breadcrumb is a rare path.
 
@@ -279,7 +279,7 @@ The worked example uses a single email-type (`professional`) only because the op
 
 **One skip flag:**
 
-- **`--no-host-lookup`** — skip Phase 2 entirely. Step 1 (email-type detection) does NOT run; step 2 (ESP detection) does NOT run. Set `segmented: false`, `segments: null`, `email_type_filter_applied: null`, `skipped_leads_csv_path: null`, `invalid_email_rows: []` in metadata. No gate 2. Proceed to Phase 3 with one combined campaign on the full lead set.
+- **`--no-host-lookup`** — skip Phase 2 entirely. Step 1 (email-type detection) does NOT run; step 2 (ESP detection) does NOT run. Set `segmented: false`, `segments: null`, `email_type_filter_applied: null`, `skipped_leads_csv_path: null`, `invalid_email_rows: []`, `invalid_domain_rows: []` in metadata. No gate 2. Proceed to Phase 3 with one combined campaign on the full lead set.
 
 Without `--no-host-lookup` Phase 2 always runs and produces the multiplicative segmentation grid. There is no escape hatch from email-type-axis or ESP-axis individually — that path was removed per BC-6514 (opting into either rejected single-axis model would silently bypass the multiplicative call).
 
@@ -310,7 +310,7 @@ Without `--no-host-lookup` Phase 2 always runs and produces the multiplicative s
 
    - **Malformed-email handling.** If a lead's email is missing `@`, has multiple `@`, or fails Phase 1's email-format check, record the row number in `invalid_email_rows` (sibling of `invalid_domain_rows` populated in step 2) and skip the lead from BOTH email-type and ESP buckets. Operator sees the count at gate 2.
 
-   Steps 2–3 below operate on the lead set as a preview pass — they classify ESP for ALL leads (regardless of email-type tag) so gate 2 can show the post-filter 9-cell grid for any of the 4 filter choices the operator might pick. Step 4 (post-gate) is where the chosen filter is actually applied to produce the final per-cell lead lists, including the F12 skip-empty-cells prune (now step 4b) which only runs after the filter is known. If gate 2's chosen action drops all leads, halt with a clear message: "Email-type filter dropped all leads. Adjust filter at gate 2 or re-source the CSV."
+   Steps 2–3 below operate on the lead set as a preview pass — they classify ESP for ALL leads (regardless of email-type tag) so gate 2 can show the post-filter 9-cell grid for any of the 4 filter choices the operator might pick. Step 4 (post-gate) is where the chosen filter is actually applied to produce the final per-cell lead lists, including the F12 skip-empty-cells prune (now step 4b) which only runs after the filter is known. The "all cells empty" halt path lives in step 4b — see below.
 
 2. **Resolve ESP per domain via Bash `dig` (F10 — primary path).** Email Bison has no lead-side ESP detection tool today (BC-5826 X17 dogfood confirmed: `search_api_spec` on `host lookup`, `ESP`, `domain detection`, `check-mx-records` returns only sender-side tools). Bash `dig` is the primary — and currently only — path. Extract domains from ALL leads (not yet filtered — gate 2 needs ESP counts under any filter choice the operator might preview), filter invalid ones (per Input validation § IV-4), resolve MX records in **parallel in one Bash invocation**, bucket client-side:
    - **Extract + filter + resolve in a single Bash call.** Do NOT loop the Bash tool per domain — that turns a 5k-unique-domain 10k-lead CSV into hours of round-trip latency. One invocation pipeline:
@@ -363,6 +363,10 @@ Without `--no-host-lookup` Phase 2 always runs and produces the multiplicative s
 >
 > {IF invalid_email_rows non-empty:}
 > Skipped due to malformed email format: N rows.
+> {END IF}
+>
+> {IF invalid_domain_rows non-empty:}
+> Skipped due to invalid domain format (IV-4 regex filter, dropped before `dig`): N rows.
 > {END IF}
 >
 > **9-cell segmentation grid** (after applying the chosen email-type filter — preview reflects current radio selection):
@@ -629,6 +633,8 @@ Why: sender warmup and reputation are per-inbox, not per-campaign. Splitting the
 ### Pagination is mandatory
 
 **Note: `?per_page=N` is silently ignored** — EB hardcodes `per_page: 15` regardless of the parameter (Sx-10, BC-5906). For 500 connected senders that's ~34 pages; for 772 senders it's 52. Pagination is N/15 pages and not operator-configurable. Plan loop iteration counts accordingly.
+
+**Cardinality under multiplicative segmentation.** Post-attach verification (step 7) calls `get_campaign` once per campaign — at up to 9 cells, that's up to 9 calls in the scalar-first happy path. The fallback `sender_verify_mode: "paginated"` runs the full `while True` cursor loop per campaign, so worst case at 772 senders × 9 campaigns = 9 × 52 = ~468 paginated requests. Always exhaust scalar-first first; surface the failing campaign ID before paginating to keep the diagnostic scoped.
 
 Workspaces can have 500+ connected senders. `list_sender_emails` is cursor-paginated. The `while True` / cursor-loop pattern from Revgrowth 10:
 
