@@ -23,7 +23,21 @@
 
 ## Outcome summary
 
-> **(Filled at end of walk — paste the verdict table summary here. State convergence verdict: terminate or recurse to round-5.)**
+**Result: RECURSE → file round-5.**
+
+| Category | Count |
+|---|---|
+| Total S-rows | 23 |
+| ✅ Expected | 18 (S-1, S-2, S-3, S-4, S-5, S-6, S-7★, S-8, S-10, S-11, S-13, S-14, S-15, S-16, S-17, S-18, S-19, S-22) |
+| ⚠️ Unexpected (per literal hypothesis) | 1 (S-9 — implementation scope was narrowed at BC-6306 brainstorm; hypothesis didn't track) |
+| 🔴 Refuted | 1 (S-23 — BC-6613 Liquid naked form is mechanistically broken) |
+| ⏭️ Deferred | 1 (S-12 — BC-6545 spec-read suffices; live-fire requires pre-poison setup not justified) |
+
+**Round-4 keystone (S-7 ★) ✅ holds:** BC-6514 multiplicative segmentation + BC-6654 spec rewrite both verified at runtime. 4 campaigns created with `{base} | {Email-type} | {ESP}` naming; segments map keyed by `{email_type}|{esp}` per BC-6654 schema; F12 prune correctly drops 5 empty cells.
+
+**Blocking findings: 3 🔴 + 2 🟡** (see Round-4 follow-up candidates table for full detail).
+
+**Termination: NO.** Per the convergent-dogfood termination rule ("chain terminates when a round produces ZERO blocking findings"), round-5 must be filed.
 
 ---
 
@@ -415,10 +429,10 @@ Net-new permanent variables expected: 0.
 
 ## Workspace cleanup (end of walk)
 
-- Bulk-delete campaigns: TBD list
-- Bulk-delete leads: TBD list (including the 9 leads 14727-14735 left from abandoned T5)
-- Async drain time: TBD
-- Custom variables: should remain at 15 permanent (no net new)
+- **Bulk-delete campaigns (7):** 33 (decoy), 34/35/36/37 (main multiplicative), 38/39 (Liquid test). Endpoint: `DELETE /api/campaigns/bulk` with `{campaign_ids: [...]}`. Response: `success: true, "The selected campaigns have been queued for deletion."` Async — drains in background.
+- **Bulk-delete leads (12):** 14736-14744 (main, 9 leads) + 14745-14747 (Liquid, 3 leads). Endpoint: `DELETE /api/leads/bulk` with `{lead_ids: [...]}`. Response: `success: true, "Lead deletion process started. This might take some time depending on how much data you have."` Async — drains in background.
+- **Pre-walk cleanup debt** (separate, completed at session start): 9 leads (14727-14735) from abandoned T5 attempt — already cleaned up by prior session; 422'd at session start because they'd already been deleted.
+- **Custom variables remain at 15 permanent** (per Sx-4 — no DELETE endpoint exists for custom variables; they persist workspace-scoped indefinitely). Net-new variables this round: 0.
 
 ---
 
@@ -440,11 +454,27 @@ Captured as the walk progresses; promoted to round-5 issues at end-of-walk if th
 
 ## Convergence call (end of walk)
 
-> Walk findings table; count blocking findings (refuted S-rows or render-engine-broken verdicts); render terminate-or-recurse decision; post comment to BC-6554; if recurse, file round-5 follow-up issues + round-5 dogfood issue.
+**Blocking findings count: 3 🔴**
 
-**Blocking findings count:** TBD
-**Verdict:** TERMINATE / RECURSE
-**Round-5 issues filed (if any):** TBD
+1. **🔴 Case-asymmetry on lead-create binding** (Phase 4 / S-4 walk) — `POST /api/leads/multiple` rejects (HTTP 422) when `custom_variables[].name` is sent UPPERCASE. Three different rules apply at three different points: variable-create auto-lowercases (BC-6299), body-render lookup is case-insensitive but body must be UPPERCASE (BC-6548), lead-create binding requires exact lowercase. Spec defect: launch-campaign Phase 4 step 2 example uses UPPERCASE — would 422 in production. Required round-5 fix: correct Phase 4 step 2 example to lowercase + add "case asymmetry across endpoints" gotcha to email-bison.md.
+
+2. **🔴 `test-copy-liquid.json` artifact uses the wrong Liquid form** (Phase 10 / S-23) — naked references like `{{ recency_anchor | default: "recently" }}` and `{% if proof_point_company %}` don't connect to lead-level custom_variables. EB's Liquid evaluator doesn't auto-populate lowercase variable names from custom_variables. Required round-5 fix: rewrite test-copy-liquid.json using canonical `{%- assign name = '{TOKEN}' | strip | default: 'fallback' -%}` form + re-walk S-23 in round-5 to verify per-lead values render correctly.
+
+3. **🔴 Phase 1 step 5 Path (5e)(a) detection regex is too permissive** (Phase 10 / S-23) — current regex `default:\s*['"][^'"]+['"]` matches both the working `{% assign %}` form AND the broken naked form. Production copy authored via the broken form would pass Phase 1 validation and silently render wrong at send time. Required round-5 fix: tighten regex to require `{% assign %}` wrapper.
+
+**Non-blocking parked items (4 🟡 / decisions):**
+
+4. **🟡 S-9 hypothesis-vs-implementation drift** (Phase 5) — issue body S-9 lists 3 deliverability fields (plain_text + reputation_building + can_unsubscribe), but BC-6306 (PR #227) shipped only `plain_text`. Required round-5 fix: update BC-6554 issue body S-9 row to list `plain_text` only.
+
+5. **🟡 `{SENDER_*}` token resolution diverges between local spot-check and EB render** (Phase 9 implicit / operator UI preview on campaign 36) — EB's render engine has built-in SENDER_* resolution that pulls from the sender record at render time, shadowing any lead-level custom_variable with the same name. The launch-campaign spec § Phase 1 step 7 priority chain implicitly suggests the resolved value is what recipients see — that's true ONLY for the agent's local spot-check, not the actual EB-side render. Required round-5 fix: spec edits at Phase 1 step 7 + Phase 10 Mode 1 noting that `{SENDER_*}` tokens are EB-resolved at render time and override agent-side resolution.
+
+6. **Decision parked — gate-2 default filter behavior** — operator surfaced concern about whether default filter ("skip role + skip personal") is the right default. Touches BC-6307 design + relates to BC-6655/BC-6718 free-mail filter audit. Spec-level decision; will be revisited if/when scoped.
+
+7. **Decision parked — broader cell coverage in future rounds** — 5 of 9 grid cells unreached by current 9-lead test set (2 structurally unreachable due to role+free-mail tiebreak). If a future round wants to validate the other 3 reachable cells, that would be a separate hypothesis with an expanded test CSV.
+
+**Verdict: RECURSE.** Round-4 produced 3 🔴 blocking findings → round-5 must be filed per the convergent-dogfood termination rule.
+
+**Round-5 issues filed:** _(to be populated post-filing)_
 
 ---
 
