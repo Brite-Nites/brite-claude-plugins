@@ -173,9 +173,19 @@ Net-new permanent variables expected: 0.
 
 ## S-11 — F21/BC-6303 lead bucket mapping fix-validation (Phase 6)
 
-> **Output:** [verbatim]
-> **Expected:** metadata `lead_ids_by_bucket` AND `lead_attach_counts` populate per cell key
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** Attached 9 leads across 4 campaigns via 4 parallel POSTs to `/api/campaigns/{id}/leads/attach-leads`. All 4 returned `success: true`. Post-attach `get_campaign` confirms per-bucket counts:
+> - id 34 (professional|Google): `total_leads: 2` (14740, 14741) ✓
+> - id 35 (personal|Google): `total_leads: 2` (14736, 14737) ✓
+> - id 36 (personal|Microsoft): `total_leads: 2` (14738, 14739) ✓
+> - id 37 (role|Other): `total_leads: 3` (14742, 14743, 14744) ✓
+>
+> Sum: 9 leads, matches `lead_count`. Each lead attached to exactly one campaign. Counts equal `segments[*].count` per BC-6654 schema. Metadata's `lead_ids_by_bucket` was populated in Phase 4 (Phase 6 step 7 spec); `lead_attach_counts` populated post-attach.
+>
+> **Side observation for S-15:** post-attach `get_campaign` returned immediate-consistent counts on all 4 campaigns — no propagation lag observed. Bonus signal for the eventual-consistency hypothesis when it formally fires in Phase 7.
+>
+> **Expected:** metadata `lead_ids_by_bucket` AND `lead_attach_counts` populate per cell key (`{email_type}|{esp}`); leads correctly partitioned across multiplicative cells.
+>
+> **Verdict:** ✅ Expected — F21 lead-bucket mapping + BC-6303 schema both verified at runtime.
 
 ## S-12 — F22/BC-6545 allow_parallel_sending — DEFERRED 4th round
 
@@ -300,7 +310,7 @@ Net-new permanent variables expected: 0.
 | S-8 | BC-6302/F20 silent-duplicate guard | round-2 fix-validation | ✅ | Decoy id 33 forced gate-5 4-option duplicate-guard branch; render correct |
 | S-9 | BC-6306/R-8 deliverability auto-PATCH | round-2/3 fix-validation | ⚠️ | Hypothesis says all 3 (plain_text/reputation_building/can_unsubscribe); BC-6306 actually shipped plain_text only. ✅ per implemented scope, ⚠️ per literal hypothesis. 🟡 process-cleanup follow-up: update issue-body S-9 row |
 | S-10 | BC-6544 PATCH-omit live test | round-3 fix-validation | ✅ | Live-confirmed: PATCH name-only on id 34 reverted plain_text to false; re-PATCH plain_text:true restored |
-| S-11 | F21/BC-6303 lead bucket mapping | round-2 fix-validation | TBD | |
+| S-11 | F21/BC-6303 lead bucket mapping | round-2 fix-validation | ✅ | 4 attaches succeeded; total_leads matches per-bucket: 2/2/2/3=9. Side signal: immediate consistency observed, bonus for S-15. |
 | S-12 | F22/BC-6545 allow_parallel_sending | DEFERRED 4th round | ⏭️ | |
 | S-13 | F23/Sx-10/Sx-11 sender pagination | F-row regression | TBD | |
 | S-14 | F24 partial-pool 15-sender | F-row regression | TBD | |
