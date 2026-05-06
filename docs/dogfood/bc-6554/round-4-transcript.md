@@ -125,27 +125,51 @@ Net-new permanent variables expected: 0.
 
 ## S-7 ★ — BC-6514+BC-6654 multiplicative fix-validation (Phase 5)
 
-> **Output:** [verbatim]
-> **Expected:** 9-cell grid; F12 prune; ~4 cells survive (Pro|Google, Personal|Google, Personal|Microsoft, Role|Other); naming `{base} | {Email-type} | {ESP}`; metadata `segments` map keyed by `{email_type}|{esp}`
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:**
+> - 9-cell grid built (Phase 2 step 3, verified earlier as part of S-19)
+> - F12 prune dropped 5 empty cells (verified at S-19; surviving 4 cells)
+> - 4 campaigns created with naming `{base} | {Email-type-titlecased} | {ESP}` per BC-6514:
+>   - id 34: `BC-6554 Round 4 multiplicative | Professional | Google`
+>   - id 35: `BC-6554 Round 4 multiplicative | Personal | Google`
+>   - id 36: `BC-6554 Round 4 multiplicative | Personal | Microsoft`
+>   - id 37: `BC-6554 Round 4 multiplicative | Role | Other`
+> - Email-type comes BEFORE ESP per BC-6514 (matches workspace 13 production naming convention)
+> - Metadata `segments` map populated with compound `{email_type}|{esp}` keys per BC-6654 schema
+>
+> **Expected:** 9-cell grid; F12 prune; ~4 cells survive (Pro|Google, Personal|Google, Personal|Microsoft, Role|Other); naming `{base} | {Email-type} | {ESP}`; metadata `segments` keyed by `{email_type}|{esp}`.
+>
+> **Verdict:** ✅ Expected — every sub-check passed. **Keystone holds.** BC-6514 architectural decision and BC-6654 spec rewrite both verified at runtime.
 
 ## S-8 — BC-6302/F20 silent-duplicate guard fix-validation (Phase 5)
 
-> **Output:** [verbatim]
-> **Expected:** Pre-create decoy → gate-5 surfaces match inline + 4-option render including "Reuse existing IDs"
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** Pre-created decoy `id: 33` named `BC-6554 Round 4 multiplicative DECOY` via `create_campaign`. Pre-list call `list_campaigns(search="BC-6554 Round 4 multiplicative")` returned 1 match (the decoy via substring). User gate 5 rendered the duplicate-guard branch with **4 options** (Reuse existing IDs / Create N anyway / Rename / Abort) instead of the 3-option default branch. Match preview correctly listed `id 33`, `BC-6554 Round 4 multiplicative DECOY`, `draft`.
+>
+> **Expected:** Pre-create decoy → gate-5 surfaces match inline + 4-option render including "Reuse existing IDs".
+>
+> **Verdict:** ✅ Expected — duplicate-guard branch fired and rendered correctly.
 
 ## S-9 — BC-6306/R-8 deliverability auto-PATCH regression (Phase 5)
 
-> **Output:** [verbatim]
-> **Expected:** plain_text/reputation_building/can_unsubscribe all set true on every campaign post-create
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** PATCH `plain_text: true` applied to all 4 campaigns; every response confirms `plain_text: true`. **Other 2 hypothesis fields NOT applied:** `reputation_building` not in PATCH body; `can_unsubscribe: false` in response (EB default, not PATCHed). Per memory: BC-6306 (PR #227) was scoped to `plain_text` only at brainstorm time; `reputation_building` + `can_unsubscribe` were deferred. The S-9 hypothesis as written in this issue body lists all 3 — but the hypothesis was authored before BC-6306's brainstorm narrowing landed and never got updated.
+>
+> **Expected (per literal hypothesis):** plain_text/reputation_building/can_unsubscribe all true on every campaign post-create.
+>
+> **Expected (per implemented scope):** plain_text only.
+>
+> **Verdict:** ⚠️ Unexpected per literal hypothesis (1-of-3 fields applied); ✅ Expected per implemented scope. **Hypothesis-vs-implementation drift** — the BC-6554 issue body S-9 row needs an update to match BC-6306's narrowed shipping scope. Logged as 🟡 process-cleanup follow-up (not a code defect).
 
 ## S-10 — BC-6544 PATCH-omit live test (Phase 5)
 
-> **Output:** [verbatim]
-> **Expected:** PATCH omitting plain_text reverts it to false (post-PATCH GET shows reverted state); restore via re-PATCH
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** Sequential 3-step test on campaign id 34:
+> 1. Initial PATCH `{"plain_text": true}` → response confirms `plain_text: true`.
+> 2. Subsequent PATCH `{"name": "<same name>"}` (omitting plain_text) → response shows `plain_text: false` (reverted to false).
+> 3. Restore PATCH `{"plain_text": true}` → response confirms `plain_text: true` (restored).
+>
+> Live-confirms the API spec's verbatim claim: *"If nothing sent, false is assumed"* for boolean fields. The PATCH endpoint description verbatim contains this sentence on plain_text/open_tracking/reputation_building/can_unsubscribe (verified via `search_api_spec` for `/api/campaigns/{id}/update`).
+>
+> **Expected:** PATCH omitting plain_text reverts it to false; restore via re-PATCH.
+>
+> **Verdict:** ✅ Expected — BC-6544 PATCH-omits-omitted-booleans behavior live-verified.
 
 ## S-11 — F21/BC-6303 lead bucket mapping fix-validation (Phase 6)
 
@@ -272,10 +296,10 @@ Net-new permanent variables expected: 0.
 | S-4 | BC-6300 field names + BC-6515 UUID | round-2/3 fix-validation | ✅ + 🔴 side | All 9 leads have `id` (int) + `uuid` (str); `title`/`company` accepted. Side-finding 🔴: case asymmetry at lead-create binding (UPPERCASE custom_variables names → 422). |
 | S-5 | F18 mid-chunk failure recovery | F-row regression | ✅ | 422 atomic — synthetic email did NOT commit when paired with duplicate; behavior held into round-4 |
 | S-6 | BC-6304/Sx-9 wrapper-vs-API gate clarity | round-2 fix-validation | ✅ | `search_api_spec` confirms no `confirmation` field on POST /api/leads/multiple; agent-side User gate 4 is sole safeguard |
-| S-7 ★ | BC-6514+BC-6654 multiplicative | KEYSTONE | TBD | |
-| S-8 | BC-6302/F20 silent-duplicate guard | round-2 fix-validation | TBD | |
-| S-9 | BC-6306/R-8 deliverability auto-PATCH | round-2/3 fix-validation | TBD | |
-| S-10 | BC-6544 PATCH-omit live test | round-3 fix-validation | TBD | |
+| S-7 ★ | BC-6514+BC-6654 multiplicative | KEYSTONE | ✅ | 4 campaigns created (ids 34/35/36/37); naming `{base} \| {Email-type} \| {ESP}` per BC-6514; segments map keyed by `{email_type}\|{esp}` per BC-6654 |
+| S-8 | BC-6302/F20 silent-duplicate guard | round-2 fix-validation | ✅ | Decoy id 33 forced gate-5 4-option duplicate-guard branch; render correct |
+| S-9 | BC-6306/R-8 deliverability auto-PATCH | round-2/3 fix-validation | ⚠️ | Hypothesis says all 3 (plain_text/reputation_building/can_unsubscribe); BC-6306 actually shipped plain_text only. ✅ per implemented scope, ⚠️ per literal hypothesis. 🟡 process-cleanup follow-up: update issue-body S-9 row |
+| S-10 | BC-6544 PATCH-omit live test | round-3 fix-validation | ✅ | Live-confirmed: PATCH name-only on id 34 reverted plain_text to false; re-PATCH plain_text:true restored |
 | S-11 | F21/BC-6303 lead bucket mapping | round-2 fix-validation | TBD | |
 | S-12 | F22/BC-6545 allow_parallel_sending | DEFERRED 4th round | ⏭️ | |
 | S-13 | F23/Sx-10/Sx-11 sender pagination | F-row regression | TBD | |
@@ -309,6 +333,7 @@ Captured as the walk progresses; promoted to round-5 issues at end-of-walk if th
 |---|---|---|
 | Phase 2 gate-2 (S-19 walk) | Revisit default filter — should it default to "include all" instead of skipping role + personal? Touches BC-6307 design + relates to BC-6655/BC-6718 free-mail filter audit. Operator surfaced concern after gate-2 filter explanation. | parked |
 | Phase 2 (post-S-19) | 5 of 9 grid cells unreached by current 9-lead test set (2 of those structurally unreachable due to role+free-mail tiebreak; 3 reachable but not in scope). Question: does the keystone need broader cell coverage in a future round? | parked |
+| Phase 5 S-9 walk | **🟡 PROCESS GAP — issue-body hypothesis-vs-implementation drift.** S-9 hypothesis lists all 3 deliverability fields (plain_text + reputation_building + can_unsubscribe), but BC-6306 (PR #227) was scoped to `plain_text` only at brainstorm time; the other 2 were deferred. Verdict shows up as ⚠️ per literal hypothesis, ✅ per implemented scope. **Required round-5 fix:** update BC-6554 issue body S-9 row to list `plain_text` only (and add a separate row, if desired, to track whether `reputation_building`/`can_unsubscribe` should be brainstormed back into scope). Pattern: when a brainstorm narrows the scope of a follow-up, the dogfood hypothesis carrying that follow-up's narrative needs to be updated in lockstep. | parked — file at loop-close |
 | Phase 4 S-4 walk | **🔴 SPEC DEFECT — case asymmetry at lead-create binding.** `POST /api/leads/multiple` rejects (HTTP 422) when `custom_variables[].name` is sent UPPERCASE, even though variable rendering at body-substitution time is case-insensitive (BC-6299) and email body tokens MUST be UPPERCASE (BC-6548). Three different rules at three different points: variable creation auto-lowercases (BC-6299), body-render lookup is case-insensitive but body MUST be UPPERCASE (BC-6548), lead-create binding requires EXACT lowercase. The launch-campaign spec at Phase 4 step 2 shows an example body with UPPERCASE custom_variables names — would 422 in production. **Required round-5 fixes:** (1) correct Phase 4 step 2 example to lowercase, (2) add a "case asymmetry across endpoints" gotcha in `email-bison.md § Known gotchas`, (3) consider an agent-side automatic case-translation step that lowercases custom_variables names in the lead-create body so authors can keep the artifact mental model consistent (UPPERCASE everywhere they author, agent translates at the API boundary). | parked — file at loop-close |
 
 ---
