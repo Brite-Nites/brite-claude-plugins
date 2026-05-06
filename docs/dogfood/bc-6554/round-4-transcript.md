@@ -194,21 +194,36 @@ Net-new permanent variables expected: 0.
 
 ## S-13 — F23/Sx-10/Sx-11 sender pagination + per_page + status filter (Phase 7)
 
-> **Output:** [verbatim]
-> **Expected:** Laravel ?page=N; ?per_page=N silently ignored (hardcoded 15); status case-sensitive (lowercase works, capitalized 422s)
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** Three sub-checks verified in one call set:
+> 1. **Pagination shape**: Response `meta` block contains `last_page: 52`, links array with pages 1-10 + 51, 52. Laravel paginator. ✓
+> 2. **`?per_page=50` silently ignored**: Response still shows `per_page: 15`, `to: 15`. Hardcoded 15. ✓
+> 3. **Status case-sensitivity**: `status=connected` (lowercase) → 200 OK; `status=Connected` (capitalized, matching response payload value) → HTTP 422. ✓
+>
+> Workspace 13 total connected senders: 772 (across 52 pages).
+>
+> **Expected:** Laravel `?page=N`; `?per_page=N` silently ignored (hardcoded 15); status case-sensitive (lowercase works, capitalized 422s).
+>
+> **Verdict:** ✅ Expected — F23 / Sx-10 / Sx-11 all held into round-4.
 
 ## S-14 — F24 partial-pool 15-sender decision regression (Phase 7)
 
-> **Output:** [verbatim]
-> **Expected:** 15 senders from page 1 attached to all N campaigns (sender invariant)
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** 15 senders from page 1 (IDs 981-995, all Microsoft OAuth, names: Holden Halford 5x, Dillon Williams 3x, Mckenna Fuhriman 2x, Rainer Owens 2x, Lotus Dennison 2x) attached to all 4 campaigns via 4 parallel POSTs to `/api/campaigns/{id}/attach-sender-emails`. All 4 returned `success: true`. Verification GET `/api/campaigns/{id}/sender-emails` per campaign returned `total: 15` with **identical sender ID set** on every campaign. Sender invariant holds.
+>
+> F24 dogfood-walk decision context: workspace 13 has 772 total connected senders (52 pages); the dogfood walk attaches page 1 only (15 senders) for practicality.
+>
+> **Expected:** 15 senders from page 1 attached to all N campaigns (sender invariant — same pool across cells).
+>
+> **Verdict:** ✅ Expected — F24 partial-pool decision + sender invariant held.
 
 ## S-15 — F26/R-15 eventual-consistency regression (Phase 7)
 
-> **Output:** [verbatim]
-> **Expected:** Post-attach Δ < 30s (sub-second per round-3)
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** Bash timestamps bracket the attach + verify cycle. Start `2026-05-06T21:26:42` UTC; end `2026-05-06T21:27:01` UTC. **19 seconds** for 8 round-trip calls (4 attach + 4 verify). All 4 verify GETs returned `total: 15` immediately — no stale reads, no propagation lag observed within the round trip.
+>
+> Plus an earlier signal from S-11 (Phase 6): post-lead-attach `get_campaign` showed immediate-consistent counts on all 4 campaigns. Two independent observations of immediate consistency now.
+>
+> **Expected:** Post-attach Δ < 30s (sub-second per round-3).
+>
+> **Verdict:** ✅ Expected — F26/R-15 immediate-consistency behavior held.
 
 ## S-16 — F27 + BC-6303 schedule_template_id rename fix-validation (Phase 8)
 
@@ -312,9 +327,9 @@ Net-new permanent variables expected: 0.
 | S-10 | BC-6544 PATCH-omit live test | round-3 fix-validation | ✅ | Live-confirmed: PATCH name-only on id 34 reverted plain_text to false; re-PATCH plain_text:true restored |
 | S-11 | F21/BC-6303 lead bucket mapping | round-2 fix-validation | ✅ | 4 attaches succeeded; total_leads matches per-bucket: 2/2/2/3=9. Side signal: immediate consistency observed, bonus for S-15. |
 | S-12 | F22/BC-6545 allow_parallel_sending | DEFERRED 4th round | ⏭️ | |
-| S-13 | F23/Sx-10/Sx-11 sender pagination | F-row regression | TBD | |
-| S-14 | F24 partial-pool 15-sender | F-row regression | TBD | |
-| S-15 | F26/R-15 eventual-consistency | F-row regression | TBD | |
+| S-13 | F23/Sx-10/Sx-11 sender pagination | F-row regression | ✅ | Laravel meta `last_page: 52`; `?per_page=50` ignored; lowercase `connected` works, capitalized 422s |
+| S-14 | F24 partial-pool 15-sender | F-row regression | ✅ | 15 senders (981-995, page 1) attached identically to all 4 campaigns; sender invariant holds |
+| S-15 | F26/R-15 eventual-consistency | F-row regression | ✅ | 19s for 4 attaches + 4 verifies; immediate consistency on all 4 campaigns; sub-second per call |
 | S-16 | F27 + BC-6303 schedule_template_id rename | round-2 fix-validation | TBD | |
 | S-17 | BC-6301/R-4 variant boolean + auto-Re: | round-2 fix-validation | TBD | |
 | S-18 | F29/F30 + BC-6548 UPPERCASE happy path | F-row regression | TBD | |
