@@ -163,9 +163,17 @@ Net-new permanent variables expected: 0.
 
 ## S-19 — BC-6307 + BC-6654 grid construction fix-validation (Phase 2)
 
-> **Output:** [verbatim]
+> **Output:**
+> - Email-type tags: 4 personal (gmail.com 2 + outlook.com 2) + 2 professional (brite.co 2) + 3 role (info/sales/contact @ dogfoodtest.com)
+> - 9-cell grid built from join of email-type × ESP
+> - dig MX results: gmail.com → Google, outlook.com → Microsoft (`outlook-com.olc.protection.outlook.com`), brite.co → Google (`aspmx.l.google.com`), dogfoodtest.com → no MX (Unknown → rolled into Other)
+> - Gate-2 filter: `include_all` (operator chose to keep all leads to exercise the multiplicative happy path)
+> - F12 prune dropped **5** empty cells: `professional|Microsoft`, `professional|Other`, `role|Google`, `role|Microsoft`, `personal|Other`
+> - **4 cells survive**: `professional|Google` (2), `personal|Google` (2), `personal|Microsoft` (2), `role|Other` (3) — total 9 leads
+>
 > **Expected:** Email-type tags 4 personal + 2 professional + 3 role; 9-cell grid joins email-type with ESP; F12 drops 5 empty cells
-> **Verdict:** ✅ / ⚠️ / 🔴
+>
+> **Verdict:** ✅ Expected — every sub-check matched.
 
 ---
 
@@ -243,7 +251,7 @@ Net-new permanent variables expected: 0.
 | S-16 | F27 + BC-6303 schedule_template_id rename | round-2 fix-validation | TBD | |
 | S-17 | BC-6301/R-4 variant boolean + auto-Re: | round-2 fix-validation | TBD | |
 | S-18 | F29/F30 + BC-6548 UPPERCASE happy path | F-row regression | TBD | |
-| S-19 | BC-6307 + BC-6654 grid construction | round-2/3 fix-validation | TBD | |
+| S-19 | BC-6307 + BC-6654 grid construction | round-2/3 fix-validation | ✅ | 4+2+3 email-type tags, 4 cells survive (Pro\|Google, Personal\|Google, Personal\|Microsoft, Role\|Other), F12 dropped 5 empty cells |
 | S-20 | BC-6556 empty-default fail-closed sad-path | round-3 fix-validation | TBD | |
 | S-21 | BC-6548 lowercase-token sad-path | round-3 fix-validation | TBD | |
 | S-22 | --no-host-lookup + --no-segment | BC-6654 new-surface | TBD | |
@@ -257,6 +265,17 @@ Net-new permanent variables expected: 0.
 - Bulk-delete leads: TBD list (including the 9 leads 14727-14735 left from abandoned T5)
 - Async drain time: TBD
 - Custom variables: should remain at 15 permanent (no net new)
+
+---
+
+## Round-4 follow-up candidates (parked during walk)
+
+Captured as the walk progresses; promoted to round-5 issues at end-of-walk if they still seem worth filing.
+
+| Source | Concern | Status |
+|---|---|---|
+| Phase 2 gate-2 (S-19 walk) | Revisit default filter — should it default to "include all" instead of skipping role + personal? Touches BC-6307 design + relates to BC-6655/BC-6718 free-mail filter audit. Operator surfaced concern after gate-2 filter explanation. | parked |
+| Phase 2 (post-S-19) | 5 of 9 grid cells unreached by current 9-lead test set (2 of those structurally unreachable due to role+free-mail tiebreak; 3 reachable but not in scope). Question: does the keystone need broader cell coverage in a future round? | parked |
 
 ---
 
