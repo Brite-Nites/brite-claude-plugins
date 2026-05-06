@@ -243,15 +243,29 @@ Net-new permanent variables expected: 0.
 
 ## S-17 — BC-6301/R-4 variant boolean + auto-Re: prefix (Phase 9)
 
-> **Output:** [verbatim post-create stored subject]
-> **Expected:** `"variant": false` boolean; step_2 stored subject has single "Re: " prefix
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** Sent step_2.email_subject as bare `"{Quick|Fast|30s} {question|check|idea}"`. Stored response shows step_2.email_subject = `"Re: {Quick|Fast|30s} {question|check|idea}"` — **single "Re: " prefix** (not double). EB auto-prepended due to `thread_reply: true`. Both steps stored with `variant: false` (boolean) and `variant_from_step: null` (standalone, not chained).
+>
+> Sequence IDs created (one per campaign):
+> - id 10 (Pro|Google): steps 16, 17
+> - id 11 (Personal|Google): steps 18, 19
+> - id 12 (Personal|Microsoft): steps 20, 21
+> - id 13 (Role|Other): steps 22, 23
+>
+> **Expected:** `"variant": false` boolean; step_2 stored subject has single "Re: " prefix.
+>
+> **Verdict:** ✅ Expected — BC-6301 fix held into round-4.
 
 ## S-18 — F29/F30 + BC-6548 UPPERCASE happy path (Phase 9)
 
-> **Output:** [verbatim]
-> **Expected:** `max(1, wait_in_days)` clamp; `thread_reply` field name; UPPERCASE token validator passes clean artifact
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:**
+> - Step 1 stored `wait_in_days: 1` (clamped from artifact's 0 via `max(1, 0)` rule). ✓
+> - Step 2 stored `wait_in_days: 4` (no clamp needed). ✓
+> - `thread_reply` field name accepted (boolean: false on step 1, true on step 2). ✓
+> - Bodies + subjects contained only UPPERCASE tokens; sequence creation proceeded without halt at Phase 9 step 2 UPPERCASE validator (and Phase 1 step 6 validator earlier). ✓
+>
+> **Expected:** `max(1, wait_in_days)` clamp; `thread_reply` field name; UPPERCASE token validator passes clean artifact.
+>
+> **Verdict:** ✅ Expected — F29 + F30 + BC-6548 all held.
 
 ## S-19 — BC-6307 + BC-6654 grid construction fix-validation (Phase 2)
 
@@ -341,8 +355,8 @@ Net-new permanent variables expected: 0.
 | S-14 | F24 partial-pool 15-sender | F-row regression | ✅ | 15 senders (981-995, page 1) attached identically to all 4 campaigns; sender invariant holds |
 | S-15 | F26/R-15 eventual-consistency | F-row regression | ✅ | 19s for 4 attaches + 4 verifies; immediate consistency on all 4 campaigns; sub-second per call |
 | S-16 | F27 + BC-6303 schedule_template_id rename | round-2 fix-validation | ✅ | template id 3 (M-F 08:00-20:00 Denver) applied to all 4; clone IDs 11/12/13/14 per bucket; each apply creates new clone |
-| S-17 | BC-6301/R-4 variant boolean + auto-Re: | round-2 fix-validation | TBD | |
-| S-18 | F29/F30 + BC-6548 UPPERCASE happy path | F-row regression | TBD | |
+| S-17 | BC-6301/R-4 variant boolean + auto-Re: | round-2 fix-validation | ✅ | step 2 stored with single "Re: " prefix; variant: false boolean preserved on both; sequence IDs 10/11/12/13 |
+| S-18 | F29/F30 + BC-6548 UPPERCASE happy path | F-row regression | ✅ | wait_in_days clamped 0→1; thread_reply boolean accepted; UPPERCASE-only body+subject passed validators |
 | S-19 | BC-6307 + BC-6654 grid construction | round-2/3 fix-validation | ✅ | 4+2+3 email-type tags, 4 cells survive (Pro\|Google, Personal\|Google, Personal\|Microsoft, Role\|Other), F12 dropped 5 empty cells |
 | S-20 | BC-6556 empty-default fail-closed sad-path | round-3 fix-validation | TBD | |
 | S-21 | BC-6548 lowercase-token sad-path | round-3 fix-validation | TBD | |
