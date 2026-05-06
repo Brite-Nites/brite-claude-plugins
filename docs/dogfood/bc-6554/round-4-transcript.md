@@ -287,30 +287,54 @@ Net-new permanent variables expected: 0.
 
 ### S-20 — BC-6556 fail-closed gate sad-path
 
-> **Invocation:** `/marketing:launch-campaign --csv ... --copy-artifact dogfood/test-copy-empty.json ...`
-> **Output:** [verbatim error message]
-> **Expected:** Phase 1 step 5 HARD FAIL with diagnostic naming RECENCY_ANCHOR; zero EB mutations
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Method:** Spec-read verdict against `dogfood/test-copy-empty.json`. The artifact has `RECENCY_ANCHOR.default = ""` and `step_1.body` references `{RECENCY_ANCHOR}` bare (no Liquid wrapper).
+>
+> **Phase 1 step 5 trace** for `{RECENCY_ANCHOR}`:
+> - (1) Not on EB-standard allowlist (FIRST_NAME, LAST_NAME, COMPANY, JOB_TITLE, EMAIL) ✗
+> - (2) No CSV column matches `recency_anchor` ✗
+> - (3) `custom_variables[].default` is `""` (fails non-empty check) ✗
+> - (4) Not a `{SENDER_*}` token ✗
+> - (5) No Liquid wrapper (assign + default, if/else, contains-branch) in body ✗
+>
+> All 5 paths fail → **HARD FAIL** with diagnostic naming RECENCY_ANCHOR. Phase 1 is read-only; halt fires before any Phase 2-11 work. Zero EB mutations.
+>
+> **Expected:** Phase 1 step 5 HARD FAIL with diagnostic naming RECENCY_ANCHOR; zero EB mutations.
+>
+> **Verdict:** ✅ Expected — BC-6556 fail-closed gate fires correctly.
 
 ### S-21 — BC-6548 lowercase-token sad-path
 
-> **Invocation:** `/marketing:launch-campaign --csv ... --copy-artifact dogfood/test-copy-lowercase.json ...`
-> **Output:** [verbatim error message]
-> **Expected:** Phase 1 step 6 OR Phase 9 step 2 HARD FAIL naming `{first_name}`; sequence does NOT create
-> **Verdict:** ✅ / ⚠️ / 🔴
-> **Cleanup:** if reaches Phase 5+, partial-state cleanup of campaigns/leads created before halt.
+> **Method:** Spec-read verdict against `dogfood/test-copy-lowercase.json`. The artifact has `step_1.body` with single token `{FIRST_NAME}` lowercased to `{first_name}`. All other tokens UPPERCASE.
+>
+> **Where the validator catches it:**
+> - **Phase 1 step 5 — does NOT catch.** Extraction regex is `\{[A-Z_]+\}` (UPPERCASE only); `{first_name}` is invisible to step 5.
+> - **Phase 1 step 6 — does NOT catch.** Step 6 specifically targets `{{TOKEN}}` double-brace AND explicitly allows lowercase single-brace `{{ var }}` for Liquid fallback patterns. Lowercase single-brace `{first_name}` doesn't match its regex.
+> - **Phase 9 step 2 — DOES catch.** Regex `\{[A-Za-z_]+\}` matches `{first_name}`; HARD FAIL fires because it contains `[a-z]` characters. Error message names the offending token and recommends UPPERCASE.
+>
+> **Hypothesis-vs-actual nuance:** The S-21 hypothesis says "HARD FAIL at Phase 1 step 6 OR Phase 9 step 2." Only Phase 9 step 2 catches this specific input — Phase 1 step 6 deliberately carves out lowercase single-brace for Liquid. Verdict still ✅; hypothesis wording is slightly imprecise but verdict is unambiguous.
+>
+> **Cleanup note:** Phase 9 step 2 catches the bug AFTER Phases 1-8 succeed — campaigns + leads + senders + schedule already exist. Sequence is NOT created. Partial state must be cleaned up by operator. (Spec acknowledges this.)
+>
+> **Expected:** Phase 1 step 6 OR Phase 9 step 2 HARD FAIL naming `{first_name}`; sequence does NOT create.
+>
+> **Verdict:** ✅ Expected via Phase 9 step 2 — BC-6548 UPPERCASE-only validator fires correctly.
 
 ### S-22 — Combined --no-host-lookup + --no-segment
 
 > **(a) `--no-host-lookup`:**
-> > **Output:** [verbatim]
-> > **Expected:** Phase 2 skipped; 1 combined campaign with all 9 leads; metadata `segments: null` or absent
-> > **Verdict:** ✅ / ⚠️ / 🔴
+> > **Method:** Spec-read.
+> > Per spec § Phase 2 line 282: with `--no-host-lookup` set, "skip Phase 2 entirely. Step 1 (email-type detection) does NOT run; step 2 (ESP detection) does NOT run. Set `segmented: false`, `segments: null`, `email_type_filter_applied: null`, ... in metadata. No gate 2. Proceed to Phase 3 with one combined campaign on the full lead set."
+> > Per § Phase 5 line 528: "`--no-host-lookup`: one campaign named `{campaign-name}`."
+> > With our 9-lead CSV → 1 combined campaign with all 9 leads. ✓
+> > **Expected:** Phase 2 skipped; 1 combined campaign with all 9 leads; metadata `segments: null` or absent.
+> > **Verdict:** ✅ Expected — escape hatch documented and consistent.
 
 > **(b) `--no-segment` (REMOVED per BC-6514):**
-> > **Output:** [verbatim arg-parse error]
-> > **Expected:** Arg-parse rejection before any EB call
-> > **Verdict:** ✅ / ⚠️ / 🔴
+> > **Method:** Live invocation via Skill tool with `--no-segment` flag included.
+> > Skill response: "❌ Invocation rejected — `--no-segment` flag is removed." Cited spec lines 28, 118, 284 (BC-6514 supersession block, argument list, Phase 2 doc). Skill recommended `--no-host-lookup` as the only retained opt-out. **No Phase 1 work performed. No EB calls made. No metadata written.**
+> > Halt fired at the very first turn (arg-parse stage), before any phase ran.
+> > **Expected:** Arg-parse rejection before any EB call.
+> > **Verdict:** ✅ Expected — runtime rejection clean; `--no-segment` removed at both spec layer and runtime.
 
 ### S-23 — BC-6613 Liquid Pattern A + B render via UI Preview Body
 
@@ -358,9 +382,9 @@ Net-new permanent variables expected: 0.
 | S-17 | BC-6301/R-4 variant boolean + auto-Re: | round-2 fix-validation | ✅ | step 2 stored with single "Re: " prefix; variant: false boolean preserved on both; sequence IDs 10/11/12/13 |
 | S-18 | F29/F30 + BC-6548 UPPERCASE happy path | F-row regression | ✅ | wait_in_days clamped 0→1; thread_reply boolean accepted; UPPERCASE-only body+subject passed validators |
 | S-19 | BC-6307 + BC-6654 grid construction | round-2/3 fix-validation | ✅ | 4+2+3 email-type tags, 4 cells survive (Pro\|Google, Personal\|Google, Personal\|Microsoft, Role\|Other), F12 dropped 5 empty cells |
-| S-20 | BC-6556 empty-default fail-closed sad-path | round-3 fix-validation | TBD | |
-| S-21 | BC-6548 lowercase-token sad-path | round-3 fix-validation | TBD | |
-| S-22 | --no-host-lookup + --no-segment | BC-6654 new-surface | TBD | |
+| S-20 | BC-6556 empty-default fail-closed sad-path | round-3 fix-validation | ✅ | All 5 Phase 1 step 5 paths fail for RECENCY_ANCHOR (empty default + no Liquid wrapper) → HARD FAIL pre-Phase-2; zero EB mutations |
+| S-21 | BC-6548 lowercase-token sad-path | round-3 fix-validation | ✅ | Phase 9 step 2 catches `{first_name}` (Phase 1 step 6 carves out lowercase single-brace for Liquid); sequence not created. Hypothesis wording slightly imprecise (says "Phase 1 step 6 OR Phase 9 step 2"; only Phase 9 catches) |
+| S-22 | --no-host-lookup + --no-segment | BC-6654 new-surface | ✅ | (a) spec confirms 1 combined campaign on `--no-host-lookup`. (b) live runtime rejection of `--no-segment` via Skill invocation — halt at arg-parse, zero EB work, cited BC-6514 + recommended `--no-host-lookup` |
 | S-23 | BC-6613 Liquid Pattern A + B | round-3 fix-validation | TBD | |
 
 ---
