@@ -227,9 +227,19 @@ Net-new permanent variables expected: 0.
 
 ## S-16 — F27 + BC-6303 schedule_template_id rename fix-validation (Phase 8)
 
-> **Output:** [verbatim]
-> **Expected:** Workspace 13 has 1 template (id 3); applied to all N campaigns; metadata `schedule_template_id: 3` + `campaign_schedule_ids` per-cell clones
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:**
+> - `GET /api/campaigns/schedule/templates` returned exactly 1 template: `id: 3`, M-F (mon-fri true, sat-sun false), `start_time: 08:00:00`, `end_time: 20:00:00`, `timezone: America/Denver`. Verbatim match to hypothesis.
+> - 4 parallel `POST /api/campaigns/{id}/create-schedule-from-template` calls with `{"schedule_id": 3}` returned 4 cloned schedule entities:
+>   - campaign 34 → clone id 11
+>   - campaign 35 → clone id 12
+>   - campaign 36 → clone id 13
+>   - campaign 37 → clone id 14
+> - All clones have `type: "Campaign Schedule"`, M-F 08:00-20:00 America/Denver. Each clone is distinct, NOT a ref to template id 3 — confirms BC-6303 round-2 each-apply-creates-new-clone behavior.
+> - Metadata: `schedule_template_id: 3` (source) + `campaign_schedule_ids: {bucket: clone_id}` per BC-6303 schema.
+>
+> **Expected:** Workspace 13 has 1 template (id 3, M-F 08:00-20:00 America/Denver); applied to all N campaigns; metadata `schedule_template_id: 3` + `campaign_schedule_ids` per-cell clones.
+>
+> **Verdict:** ✅ Expected — F27 + BC-6303 schema both held.
 
 ## S-17 — BC-6301/R-4 variant boolean + auto-Re: prefix (Phase 9)
 
@@ -330,7 +340,7 @@ Net-new permanent variables expected: 0.
 | S-13 | F23/Sx-10/Sx-11 sender pagination | F-row regression | ✅ | Laravel meta `last_page: 52`; `?per_page=50` ignored; lowercase `connected` works, capitalized 422s |
 | S-14 | F24 partial-pool 15-sender | F-row regression | ✅ | 15 senders (981-995, page 1) attached identically to all 4 campaigns; sender invariant holds |
 | S-15 | F26/R-15 eventual-consistency | F-row regression | ✅ | 19s for 4 attaches + 4 verifies; immediate consistency on all 4 campaigns; sub-second per call |
-| S-16 | F27 + BC-6303 schedule_template_id rename | round-2 fix-validation | TBD | |
+| S-16 | F27 + BC-6303 schedule_template_id rename | round-2 fix-validation | ✅ | template id 3 (M-F 08:00-20:00 Denver) applied to all 4; clone IDs 11/12/13/14 per bucket; each apply creates new clone |
 | S-17 | BC-6301/R-4 variant boolean + auto-Re: | round-2 fix-validation | TBD | |
 | S-18 | F29/F30 + BC-6548 UPPERCASE happy path | F-row regression | TBD | |
 | S-19 | BC-6307 + BC-6654 grid construction | round-2/3 fix-validation | ✅ | 4+2+3 email-type tags, 4 cells survive (Pro\|Google, Personal\|Google, Personal\|Microsoft, Role\|Other), F12 dropped 5 empty cells |
