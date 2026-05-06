@@ -55,22 +55,43 @@ Net-new permanent variables expected: 0.
 
 ## S-1 — F14/R-13 pagination regression (Phase 3)
 
-> **(Result — fill during execution)**
-> **Output:** [verbatim]
-> **Expected:** Laravel `?page=N` pagination, hardcoded `per_page: 15`
-> **Verdict:** ✅ Expected / ⚠️ Unexpected / 🔴 Follow-up
+> **Output:** `GET /api/custom-variables` response includes a Laravel `meta` block with `current_page: 1`, `last_page: 1`, `from: 1`, `to: 15`, `per_page: 15`, `total: 15`, and standard `links: [Previous, 1, Next]` array. No `?per_page` param was sent. Response is single-page (15 records fit one page exactly).
+>
+> **Expected:** Laravel `?page=N` paginated meta with hardcoded `per_page: 15`.
+>
+> **Verdict:** ✅ Expected — Laravel pagination meta present, `per_page` hardcoded at 15.
 
 ## S-2 — F16/R-14 workspace-scoped persistence regression (Phase 3)
 
-> **Output:** [verbatim]
-> **Expected:** 15 permanent vars from round-3 cleanup all present
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** `meta.total: 15`, all 15 vars enumerated. Names + IDs match the issue-body pre-state exactly:
+> - IDs 1–6: `company address`, `company linkedin url`, `company phone`, `company website`, `person job title`, `person linkedin url` (round-1 era, created 2025-11-14)
+> - IDs 7–14: `recency_anchor`, `vertical_descriptor`, `specific_friction`, `proof_point_company`, `proof_point_number`, `proof_point_timeframe`, `free_asset_noun`, `sender_first_name` (round-2, created 2026-04-27)
+> - ID 15: `empty_test_var` (round-3 T11, created 2026-05-01)
+>
+> **Expected:** 15 permanent vars from round-3 cleanup all present at start of round-4.
+>
+> **Verdict:** ✅ Expected — all 15 vars present, no drift, no net-new.
 
 ## S-3 — BC-6299 existing→reuse classification fix-validation (Phase 3)
 
-> **Output:** [verbatim]
-> **Expected:** 8 artifact UPPERCASE variables → 8 lowercase EB-stored matches; zero new creates
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** Artifact has 8 UPPERCASE custom variables. Each maps case-insensitively to an existing lowercase EB-stored var:
+>
+> | Artifact (UPPERCASE) | EB-stored (lowercase) | EB ID | Classification |
+> |---|---|---|---|
+> | RECENCY_ANCHOR | recency_anchor | 7 | existing → reuse |
+> | VERTICAL_DESCRIPTOR | vertical_descriptor | 8 | existing → reuse |
+> | SPECIFIC_FRICTION | specific_friction | 9 | existing → reuse |
+> | PROOF_POINT_COMPANY | proof_point_company | 10 | existing → reuse |
+> | PROOF_POINT_NUMBER | proof_point_number | 11 | existing → reuse |
+> | PROOF_POINT_TIMEFRAME | proof_point_timeframe | 12 | existing → reuse |
+> | FREE_ASSET_NOUN | free_asset_noun | 13 | existing → reuse |
+> | SENDER_FIRST_NAME | sender_first_name | 14 | existing → reuse |
+>
+> All 8 classify as existing → reuse. Zero new creates needed (Phase 3 step 6 skipped).
+>
+> **Expected:** 8 artifact UPPERCASE → 8 lowercase EB matches; zero new creates.
+>
+> **Verdict:** ✅ Expected — case-insensitive lookup works as designed (BC-6299 fix held).
 
 ## S-4 — BC-6300 lead-body field names + BC-6515 UUID forward-compat (Phase 4)
 
@@ -233,9 +254,9 @@ Net-new permanent variables expected: 0.
 
 | S-ID | Hypothesis | Source | Verdict | Notes / round-5 follow-up |
 |---|---|---|---|---|
-| S-1 | F14/R-13 pagination | F-row regression | TBD | |
-| S-2 | F16/R-14 workspace persistence (15 vars) | F-row regression | TBD | |
-| S-3 | BC-6299 existing→reuse classification | round-2 fix-validation | TBD | |
+| S-1 | F14/R-13 pagination | F-row regression | ✅ | Laravel meta block present, `per_page: 15` hardcoded, `total: 15` single-page |
+| S-2 | F16/R-14 workspace persistence (15 vars) | F-row regression | ✅ | All 15 IDs + names match pre-state exactly; zero drift |
+| S-3 | BC-6299 existing→reuse classification | round-2 fix-validation | ✅ | All 8 UPPERCASE artifact vars matched lowercase EB vars (case-insensitive); zero new creates |
 | S-4 | BC-6300 field names + BC-6515 UUID | round-2/3 fix-validation | TBD | |
 | S-5 | F18 mid-chunk failure recovery | F-row regression | TBD | |
 | S-6 | BC-6304/Sx-9 wrapper-vs-API gate clarity | round-2 fix-validation | TBD | |
