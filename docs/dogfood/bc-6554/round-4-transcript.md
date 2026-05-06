@@ -95,21 +95,33 @@ Net-new permanent variables expected: 0.
 
 ## S-4 — BC-6300 lead-body field names + BC-6515 UUID forward-compat (Phase 4)
 
-> **Output:** [verbatim]
-> **Expected:** POST /api/leads/multiple accepts title/company; response includes both id (int) and uuid (str)
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** All 9 leads created (IDs 14736–14744). EB accepted `title` (renamed from `job_title`) and `company` (renamed from `company_name`) as the lead-body field names. Every response object includes both `id` (int) and `uuid` (string, format `a1b79dd4-3f99-4b83-8c62-509d0b21dba2`).
+>
+> Lead ID assignments by bucket:
+> - `personal|Google` (gmail.com): 14736 Alex, 14737 Sam
+> - `personal|Microsoft` (outlook.com): 14738 Jordan, 14739 Taylor
+> - `professional|Google` (brite.co): 14740 Casey, 14741 Morgan
+> - `role|Other` (dogfoodtest.com): 14742 Info, 14743 Sales, 14744 Contact
+>
+> **Expected:** POST /api/leads/multiple accepts title/company; response includes both id (int) and uuid (str).
+>
+> **Verdict:** ✅ Expected on hypothesis. **Side-finding 🔴 logged separately:** initial bulk-POST with UPPERCASE custom_variables names returned 422; switching to lowercase succeeded. Spec defect at Phase 4 step 2 (example uses UPPERCASE). See Round-4 follow-up candidates table for full detail.
 
 ## S-5 — F18 mid-chunk failure recovery regression (Phase 4)
 
-> **Output:** [verbatim]
-> **Expected:** Forced duplicate-email → all-or-nothing 422 (Sx-8 atomic)
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** Probe POST /api/leads/multiple with 2 leads: 1 synthetic (`dogfood-s5-probe@dogfoodtest.com` — never seen) + 1 duplicate (`dogfood-test-01@gmail.com` — existing lead 14736). Response: `HTTP 422 Error` (body stripped per Sx-8 wrapper limitation). Post-422 GET /api/leads search for `dogfood-s5-probe` returned `total: 0` — synthetic was NOT silently created. Atomic rejection: the duplicate triggered the 422, the synthetic also failed to commit.
+>
+> **Expected:** Forced duplicate-email → all-or-nothing 422 (Sx-8 atomic).
+>
+> **Verdict:** ✅ Expected — Sx-8 atomic-rejection behavior held into round-4. No round-3 → round-4 drift.
 
 ## S-6 — BC-6304/Sx-9 wrapper-vs-API gate clarity spec-read (Phase 4)
 
-> **Output:** [verbatim quote from spec]
-> **Expected:** call_api has no vendor confirmation field; agent-side AskUserQuestion is sole safeguard
-> **Verdict:** ✅ / ⚠️ / 🔴
+> **Output:** `search_api_spec` for `POST /api/leads/multiple` returned the body schema. **No `confirmation` field in the request body schema** — only `leads[]` (with required `first_name`, `last_name`, `email` per item). The launch-campaign command spec § Tool tier map confirms: "this command invokes [bulk_create_leads] via `call_api` against `/api/leads/multiple`, which has NO `confirmation` field at the API level. The two-call gate this phase enforces is the **agent-side `AskUserQuestion`** turn".
+>
+> **Expected:** call_api has no vendor confirmation field; agent-side AskUserQuestion is sole safeguard.
+>
+> **Verdict:** ✅ Expected — spec-read confirms no vendor confirmation field; agent-side User gate 4 is the sole safeguard.
 
 ## S-7 ★ — BC-6514+BC-6654 multiplicative fix-validation (Phase 5)
 
@@ -257,9 +269,9 @@ Net-new permanent variables expected: 0.
 | S-1 | F14/R-13 pagination | F-row regression | ✅ | Laravel meta block present, `per_page: 15` hardcoded, `total: 15` single-page |
 | S-2 | F16/R-14 workspace persistence (15 vars) | F-row regression | ✅ | All 15 IDs + names match pre-state exactly; zero drift |
 | S-3 | BC-6299 existing→reuse classification | round-2 fix-validation | ✅ | All 8 UPPERCASE artifact vars matched lowercase EB vars (case-insensitive); zero new creates |
-| S-4 | BC-6300 field names + BC-6515 UUID | round-2/3 fix-validation | TBD | |
-| S-5 | F18 mid-chunk failure recovery | F-row regression | TBD | |
-| S-6 | BC-6304/Sx-9 wrapper-vs-API gate clarity | round-2 fix-validation | TBD | |
+| S-4 | BC-6300 field names + BC-6515 UUID | round-2/3 fix-validation | ✅ + 🔴 side | All 9 leads have `id` (int) + `uuid` (str); `title`/`company` accepted. Side-finding 🔴: case asymmetry at lead-create binding (UPPERCASE custom_variables names → 422). |
+| S-5 | F18 mid-chunk failure recovery | F-row regression | ✅ | 422 atomic — synthetic email did NOT commit when paired with duplicate; behavior held into round-4 |
+| S-6 | BC-6304/Sx-9 wrapper-vs-API gate clarity | round-2 fix-validation | ✅ | `search_api_spec` confirms no `confirmation` field on POST /api/leads/multiple; agent-side User gate 4 is sole safeguard |
 | S-7 ★ | BC-6514+BC-6654 multiplicative | KEYSTONE | TBD | |
 | S-8 | BC-6302/F20 silent-duplicate guard | round-2 fix-validation | TBD | |
 | S-9 | BC-6306/R-8 deliverability auto-PATCH | round-2/3 fix-validation | TBD | |
@@ -297,6 +309,7 @@ Captured as the walk progresses; promoted to round-5 issues at end-of-walk if th
 |---|---|---|
 | Phase 2 gate-2 (S-19 walk) | Revisit default filter — should it default to "include all" instead of skipping role + personal? Touches BC-6307 design + relates to BC-6655/BC-6718 free-mail filter audit. Operator surfaced concern after gate-2 filter explanation. | parked |
 | Phase 2 (post-S-19) | 5 of 9 grid cells unreached by current 9-lead test set (2 of those structurally unreachable due to role+free-mail tiebreak; 3 reachable but not in scope). Question: does the keystone need broader cell coverage in a future round? | parked |
+| Phase 4 S-4 walk | **🔴 SPEC DEFECT — case asymmetry at lead-create binding.** `POST /api/leads/multiple` rejects (HTTP 422) when `custom_variables[].name` is sent UPPERCASE, even though variable rendering at body-substitution time is case-insensitive (BC-6299) and email body tokens MUST be UPPERCASE (BC-6548). Three different rules at three different points: variable creation auto-lowercases (BC-6299), body-render lookup is case-insensitive but body MUST be UPPERCASE (BC-6548), lead-create binding requires EXACT lowercase. The launch-campaign spec at Phase 4 step 2 shows an example body with UPPERCASE custom_variables names — would 422 in production. **Required round-5 fixes:** (1) correct Phase 4 step 2 example to lowercase, (2) add a "case asymmetry across endpoints" gotcha in `email-bison.md § Known gotchas`, (3) consider an agent-side automatic case-translation step that lowercases custom_variables names in the lead-create body so authors can keep the artifact mental model consistent (UPPERCASE everywhere they author, agent translates at the API boundary). | parked — file at loop-close |
 
 ---
 
