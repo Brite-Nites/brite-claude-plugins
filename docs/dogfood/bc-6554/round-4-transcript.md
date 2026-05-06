@@ -474,7 +474,20 @@ Captured as the walk progresses; promoted to round-5 issues at end-of-walk if th
 
 **Verdict: RECURSE.** Round-4 produced 3 🔴 blocking findings → round-5 must be filed per the convergent-dogfood termination rule.
 
-**Round-5 issues filed:** _(to be populated post-filing)_
+**Round-5 issues filed:**
+
+| ID | Type | Title | Priority |
+|---|---|---|---|
+| [BC-6785](https://linear.app/brite-nites/issue/BC-6785) | Round-5 dogfood (parent) | re-walk after Liquid + lead-create-case + regex fixes land | High |
+| [BC-6780](https://linear.app/brite-nites/issue/BC-6780) | 🔴 Spinoff (blocker) | fix case-asymmetry at lead-create binding (Phase 4 step 2 + email-bison.md) | High |
+| [BC-6781](https://linear.app/brite-nites/issue/BC-6781) | 🔴 Spinoff (blocker) | rewrite test-copy-liquid.json using canonical `{% assign %}` pattern + verify Liquid renders per-lead values | High |
+| [BC-6782](https://linear.app/brite-nites/issue/BC-6782) | 🔴 Spinoff (blocker) | tighten Phase 1 step 5 Path (5e)(a) regex to require `{% assign %}` wrapper | High |
+| [BC-6783](https://linear.app/brite-nites/issue/BC-6783) | 🟡 Spinoff (related-to) | correct S-9 hypothesis row in BC-6554 issue body to match BC-6306 implementation scope | Low |
+| [BC-6784](https://linear.app/brite-nites/issue/BC-6784) | 🟡 Spinoff (related-to) | clarify `{SENDER_*}` token resolution diverges between local spot-check and EB render | Low |
+
+Relationships:
+- BC-6785 (round-5 dogfood) **blocked by** BC-6780 + BC-6781 + BC-6782 (3 🔴 blockers)
+- BC-6785 **related to** BC-6554 (this round-4) + BC-6783 + BC-6784 (2 🟡 non-blockers; can land in parallel)
 
 ---
 
