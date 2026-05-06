@@ -4,7 +4,7 @@
   "author": {
     "name": "Brite"
   },
-  "version": "0.3.24",
+  "version": "0.3.25",
   "homepage": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "repository": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "license": "MIT",
@@ -22,9 +22,9 @@
   "skills": "./skills/",
   "userConfig": {
     "enrichment_provider": {
+      "title": "Enrichment provider",
       "type": "string",
-      "enum": ["blitz_waterfall", "brite_cli", "brite_mcp", "skip"],
-      "description": "Phase 5 enrichment provider for tam-mapping. Unset → auto-detect per ADR-008 (probe brite_mcp → brite_cli → blitz_waterfall). See docs/decisions/008-tam-mapping-enrichment-pluggability.md and SKILL.md §Phase 5 for per-value semantics."
+      "description": "Phase 5 enrichment provider for tam-mapping. Valid values: blitz_waterfall, brite_cli, brite_mcp, skip. Unset → auto-detect per ADR-008 (probe brite_mcp → brite_cli → blitz_waterfall). See docs/decisions/008-tam-mapping-enrichment-pluggability.md and SKILL.md §Phase 5 for per-value semantics."
     }
   }
 }
