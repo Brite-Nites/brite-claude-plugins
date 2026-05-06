@@ -338,24 +338,48 @@ Net-new permanent variables expected: 0.
 
 ### S-23 — BC-6613 Liquid Pattern A + B render via UI Preview Body
 
-> **Setup:** 2 dedicated single-lead test campaigns (`BC-6554 LIQUID TEST DEFAULT` + `BC-6554 LIQUID TEST IF`) with sender + schedule + sequence step using Liquid bodies. Operator clicks Preview Body in EB UI and reports verbatim rendered output.
-
-> **(a) Pattern A — `{{ recency_anchor | default: "recently" }}`:**
-> Lead with `recency_anchor` empty → expect rendered: `Saw the recently at ...` (default fired)
-> > **Rendered output:** [paste from operator]
-> > **Verdict:** ✅ / ⚠️ / 🔴
-
-> **(b) Pattern B truthy — `{% if proof_point_company %}{{ proof_point_company }}{% else %}NO_PROOF_POINT_company{% endif %}`:**
-> Lead with `proof_point_company: "TestCo"` → expect rendered: `... TestCo, who ...` (truthy branch)
-> > **Rendered output:** [paste]
-> > **Verdict:** ✅ / ⚠️ / 🔴
-
+> **Setup:** 2 dedicated test campaigns + 3 test leads with varied custom_variable values. Sequence body uses test-copy-liquid.json's step_1.body verbatim with both Liquid Pattern A (`{{ recency_anchor | default: "recently" }}`) and Pattern B (`{% if proof_point_company %}...{% else %}NO_PROOF_POINT_company...{% endif %}`).
+>
+> Campaigns + leads:
+> - Campaign 38 (LIQUID TEST DEFAULT): seq id 14, steps 24/25, 1 lead
+>   - Lead 14745: `recency_anchor: null`, `proof_point_company: "Boulder Pearl Street"`
+> - Campaign 39 (LIQUID TEST IF): seq id 15, steps 26/27, 2 leads
+>   - Lead 14746: `recency_anchor: "downtown master-plan announcement"`, `proof_point_company: "TestCo"`
+>   - Lead 14747: `recency_anchor: "downtown master-plan announcement"`, `proof_point_company: null`
+>
+> **Preview Body results (3 leads):**
+>
+> | Lead | recency_anchor (set) | proof_point_company (set) | Pattern A renders | Pattern B branch |
+> |---|---|---|---|---|
+> | 14745 | null | "Boulder Pearl Street" | "**recently**" | **else** ("NO_PROOF_POINT_company") |
+> | 14746 | "downtown master-plan announcement" | "TestCo" | "**recently**" | **else** ("NO_PROOF_POINT_company") |
+> | 14747 | "downtown master-plan announcement" | null | "**recently**" | **else** ("NO_PROOF_POINT_company") |
+>
+> **Pattern observed:** all 3 leads render identically regardless of custom_variable values. Pattern A always fires the `default:` fallback. Pattern B always fires the `{% else %}` branch. The actual values never reach Liquid evaluation.
+>
+> **(a) Pattern A fallback (`{{ recency_anchor | default: "recently" }}`):**
+> > Observably ✅ on lead 14745 (which has empty `recency_anchor`) but observably ❌ on leads 14746 and 14747 (which have populated `recency_anchor` but still render fallback).
+> > **Verdict:** 🔴 Pattern A's `default:` fires regardless of value — fallback always renders, not just when value empty. Hypothesis "renders fallback when value empty" is technically met, but the inverse ("renders the value when value present") is refuted.
+>
+> **(b) Pattern B truthy (`{% if proof_point_company %}{{ proof_point_company }}{% else %}NO_PROOF_POINT_company{% endif %}`):**
+> > Lead 14746 has `proof_point_company: "TestCo"` (truthy real value). Truthy branch should fire ("...one that solved it was TestCo, who..."). **Else branch fired instead** ("NO_PROOF_POINT_company worked through it"). Lead 14745 same outcome with `proof_point_company: "Boulder Pearl Street"` truthy value.
+> > **Verdict:** 🔴 Pattern B truthy branch is REFUTED. The `{% if %}` evaluates the variable as undefined regardless of lead value.
+>
 > **(c) Pattern B falsy:**
-> Lead with `proof_point_company: ""` → expect rendered: `... NO_PROOF_POINT_company worked through it` (else branch)
-> > **Rendered output:** [paste]
-> > **Verdict:** ✅ / ⚠️ / 🔴
-
-> **Tie-breaker:** if any verdict ambiguous from UI Preview Body, fall back to single real `--test-send` to corinne@britenites.com.
+> > Lead 14747 has `proof_point_company: null` (empty). Else branch fires correctly. But this is the same outcome as the truthy leads (14745, 14746) — observably "correct" only by coincidence.
+> > **Verdict:** 🔴 Pattern B else branch fires, but for the wrong reason (always fires regardless of value).
+>
+> **Root cause:** EB's Liquid evaluator does NOT auto-populate lowercase variable names from lead-level `custom_variables`. Naked references like `{{ recency_anchor }}` and `{% if proof_point_company %}` evaluate to nil/undefined in Liquid scope, regardless of what value the lead's custom_variable has.
+>
+> The launch-campaign spec § Phase 1 step 5 Path (5e)(a) actually says the canonical Pattern A is `{%- assign name = '{TOKEN}' | strip | default: 'fallback' -%}` — note the `{% assign %}` step + the **UPPERCASE token** `'{TOKEN}'`. The assign uses EB's `{UPPERCASE}` substitution layer to inject the value into Liquid's local scope. The test artifact skipped this step.
+>
+> **Two compounding 🔴 findings to file at loop-close:**
+> 1. `test-copy-liquid.json` artifact is wrong (naked Liquid form, missing `{% assign %}` step). Round-5 should rewrite the artifact + verify the canonical form actually renders correctly.
+> 2. Phase 1 step 5 Path (5e)(a) detection regex is too permissive — matches both the working `{% assign %}` form AND the broken naked form. Production copy authored via the naked form would pass Phase 1 validation and silently render wrong at send time.
+>
+> **Verdict:** 🔴 Needs round-5 follow-up. Pattern B truthy refuted. Both Pattern A and Pattern B are mechanistically broken in the naked-Liquid form.
+>
+> **Tie-breaker (deferred):** real `--test-send` not exercised — UI Preview Body output was unambiguous; tie-breaker not needed.
 
 ---
 
@@ -385,7 +409,7 @@ Net-new permanent variables expected: 0.
 | S-20 | BC-6556 empty-default fail-closed sad-path | round-3 fix-validation | ✅ | All 5 Phase 1 step 5 paths fail for RECENCY_ANCHOR (empty default + no Liquid wrapper) → HARD FAIL pre-Phase-2; zero EB mutations |
 | S-21 | BC-6548 lowercase-token sad-path | round-3 fix-validation | ✅ | Phase 9 step 2 catches `{first_name}` (Phase 1 step 6 carves out lowercase single-brace for Liquid); sequence not created. Hypothesis wording slightly imprecise (says "Phase 1 step 6 OR Phase 9 step 2"; only Phase 9 catches) |
 | S-22 | --no-host-lookup + --no-segment | BC-6654 new-surface | ✅ | (a) spec confirms 1 combined campaign on `--no-host-lookup`. (b) live runtime rejection of `--no-segment` via Skill invocation — halt at arg-parse, zero EB work, cited BC-6514 + recommended `--no-host-lookup` |
-| S-23 | BC-6613 Liquid Pattern A + B | round-3 fix-validation | TBD | |
+| S-23 | BC-6613 Liquid Pattern A + B | round-3 fix-validation | 🔴 | All 3 leads render identically regardless of values: Pattern A always fires fallback, Pattern B always fires else. EB's Liquid scope doesn't see lead custom_variables. Test artifact uses naked form (missing `{% assign %}`); spec validator regex is too permissive. **Pattern B truthy branch REFUTED.** Two compounding round-5 findings (artifact + spec). |
 
 ---
 
@@ -406,6 +430,8 @@ Captured as the walk progresses; promoted to round-5 issues at end-of-walk if th
 |---|---|---|
 | Phase 2 gate-2 (S-19 walk) | Revisit default filter — should it default to "include all" instead of skipping role + personal? Touches BC-6307 design + relates to BC-6655/BC-6718 free-mail filter audit. Operator surfaced concern after gate-2 filter explanation. | parked |
 | Phase 2 (post-S-19) | 5 of 9 grid cells unreached by current 9-lead test set (2 of those structurally unreachable due to role+free-mail tiebreak; 3 reachable but not in scope). Question: does the keystone need broader cell coverage in a future round? | parked |
+| Phase 10 / S-23 (operator UI preview on campaigns 38 + 39) | **🔴 SPEC DEFECT — `test-copy-liquid.json` artifact uses the wrong Liquid form.** Naked references like `{{ recency_anchor | default: "recently" }}` and `{% if proof_point_company %}` don't connect to lead-level custom_variables. EB's Liquid evaluator doesn't auto-populate lowercase variable names from custom_variables, so naked references always evaluate as undefined → Pattern A always fires fallback, Pattern B always fires else. Verified across 3 leads with varied values (14745/14746/14747); rendering identical regardless of lead values. The launch-campaign spec § Phase 1 step 5 Path (5e)(a) actually documents the canonical form: `{%- assign name = '{TOKEN}' | strip | default: 'fallback' -%}` (note the `{% assign %}` + UPPERCASE `{TOKEN}` injection through EB's substitution layer). Required round-5 fix: rewrite test-copy-liquid.json to use canonical assign form + re-walk S-23 in round-5 to verify it actually renders per-lead values correctly. | parked — file at loop-close |
+| Phase 10 / S-23 (operator UI preview on campaigns 38 + 39) | **🔴 SPEC DEFECT — Phase 1 step 5 Path (5e)(a) detection regex too permissive.** Current regex `default:\s*['"][^'"]+['"]` matches both the working `{% assign %}` form AND the broken naked form (`{{ var \| default: "..." }}`). A copy author writing the broken form would pass Phase 1 validation and silently render wrong at send time. Required round-5 fix: tighten regex to require the `{% assign %}` wrapper, not just the `default:` filter pattern. Pair with finding above — these compound: artifact is wrong AND validator misses it. | parked — file at loop-close |
 | Phase 9 / Phase 10 implicit (operator UI preview on campaign 36) | **🟡 SPEC DOCS GAP — `{SENDER_*}` token resolution diverges between local spot-check and EB render.** Operator clicked Preview Body in EB UI on Personal\|Microsoft campaign (id 36, lead 14739 Taylor / dogfood-test-04@outlook.com). Rendered output shows `{SENDER_FIRST_NAME}` → "Rainer" (matches the chosen sender `rainer.o@washingtonfestivelights.com`), NOT "Amanuel" (the artifact's `custom_variables[].default` value we set on every lead). Refresh Email Variation rotates senders → `{SENDER_FIRST_NAME}` re-resolves per render, dynamically pulling the actual sender's first_name. EB has built-in SENDER_* resolution that pulls from the sender record at render time and **shadows** any lead-level custom_variable with the same name. Production behavior is CORRECT (sign-off matches actual sender). But the launch-campaign spec § Phase 1 step 7 SENDER_* "resolution priority chain" (artifact-default → marketing-context → SF → operator-prompt) implicitly suggests the resolved value is what recipients see — that's true ONLY for the agent's local Phase 10 Mode 1 spot-check, not the actual EB-side render. **Required round-5 fix:** spec edit at Phase 1 step 7 + Phase 10 Mode 1 to explicitly note that `{SENDER_*}` tokens are EB-resolved at render time and override any agent-side resolution; the priority chain governs local-preview display only. **Bonus signal logged at S-7:** this same UI preview also validates the entire multiplicative pipeline rendering is clean (all UPPERCASE tokens substituted, all spintax resolved, paragraph structure intact, no leftover braces) — additional ✅ corroboration for S-7 keystone via real EB-engine rendering. | parked — file at loop-close |
 | Phase 5 S-9 walk | **🟡 PROCESS GAP — issue-body hypothesis-vs-implementation drift.** S-9 hypothesis lists all 3 deliverability fields (plain_text + reputation_building + can_unsubscribe), but BC-6306 (PR #227) was scoped to `plain_text` only at brainstorm time; the other 2 were deferred. Verdict shows up as ⚠️ per literal hypothesis, ✅ per implemented scope. **Required round-5 fix:** update BC-6554 issue body S-9 row to list `plain_text` only (and add a separate row, if desired, to track whether `reputation_building`/`can_unsubscribe` should be brainstormed back into scope). Pattern: when a brainstorm narrows the scope of a follow-up, the dogfood hypothesis carrying that follow-up's narrative needs to be updated in lockstep. | parked — file at loop-close |
 | Phase 4 S-4 walk | **🔴 SPEC DEFECT — case asymmetry at lead-create binding.** `POST /api/leads/multiple` rejects (HTTP 422) when `custom_variables[].name` is sent UPPERCASE, even though variable rendering at body-substitution time is case-insensitive (BC-6299) and email body tokens MUST be UPPERCASE (BC-6548). Three different rules at three different points: variable creation auto-lowercases (BC-6299), body-render lookup is case-insensitive but body MUST be UPPERCASE (BC-6548), lead-create binding requires EXACT lowercase. The launch-campaign spec at Phase 4 step 2 shows an example body with UPPERCASE custom_variables names — would 422 in production. **Required round-5 fixes:** (1) correct Phase 4 step 2 example to lowercase, (2) add a "case asymmetry across endpoints" gotcha in `email-bison.md § Known gotchas`, (3) consider an agent-side automatic case-translation step that lowercases custom_variables names in the lead-create body so authors can keep the artifact mental model consistent (UPPERCASE everywhere they author, agent translates at the API boundary). | parked — file at loop-close |
