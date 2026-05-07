@@ -406,10 +406,10 @@ If the operator's chosen action leaves zero leads in any (email-type × ESP) cel
 **Steps:**
 
 1. **Ground-truth the tool name.** `search_api_spec` with query `custom variable create` — locate the exact tool (likely `create_custom_variable`). Also identify the `list_custom_variables` tool to check for pre-existing variables with the same name.
-2. **Load variables from copy artifact.** From the parsed artifact (Phase 1 step 4), read `custom_variables[]`. Each entry has `{name, default}`. Example: `[{"name": "RECENCY_ANCHOR", "default": ""}, {"name": "PROOF_POINT_COMPANY", "default": ""}]`. The `default` is consumed in Phase 4 as the per-lead fill-in value when the CSV row lacks a column for this variable (see Phase 4 step 2 line 364) — it is NOT a workspace-scoped property of the variable in EB (per Sx-2, BC-6299 — EB's `POST /api/custom-variables` accepts only `{name}`).
+2. **Load variables from copy artifact.** From the parsed artifact (Phase 1 step 4), read `custom_variables[]`. Each entry has `{name, default}`. Example: `[{"name": "RECENCY_ANCHOR", "default": ""}, {"name": "PROOF_POINT_COMPANY", "default": ""}]`. The `default` is consumed in Phase 4 as the per-lead fill-in value when the CSV row lacks a column for this variable (see Phase 4 step 2 — the per-row custom_variables values + fallbacks paragraph) — it is NOT a workspace-scoped property of the variable in EB (per Sx-2, BC-6299 — EB's `POST /api/custom-variables` accepts only `{name}`).
 3. **Check for existing variables.** Call `list_custom_variables` in the target workspace. For each artifact variable, classify:
    - **New** — not present in the workspace. Will create.
-   - **Existing** — name matches; will NOT re-create (EB returns 422 on duplicate `POST /api/custom-variables`). Reuse as-is.
+   - **Existing** — name matches case-insensitively (compare via `.lower()`; EB stores names lowercased per Sx-3 / BC-6299 — see `email-bison.md` § Known gotchas § Case-rule asymmetry); will NOT re-create (EB returns 422 on duplicate `POST /api/custom-variables`). Reuse as-is.
 4. **Render the create plan.** Show the operator:
 
    > Variables to create in workspace `{workspace}`:
@@ -460,9 +460,11 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
      "title": "<csv job_title — if column present>",
      "company": "<csv company_name — if column present>",
      "custom_variables": [
-       {"name": "RECENCY_ANCHOR", "value": "<row-specific value>"},
-       {"name": "PROOF_POINT_COMPANY", "value": "<row-specific value>"},
-       {"name": "COMPANY_DOMAIN", "value": "<csv company_domain>"}
+       // Names lowercased here — EB's POST /api/leads/multiple rejects (HTTP 422) UPPERCASE names (BC-6780).
+       // Artifact uses UPPERCASE everywhere; agent translates at this boundary only. See "Lowercase names before send" below.
+       {"name": "recency_anchor", "value": "<row-specific value>"},
+       {"name": "proof_point_company", "value": "<row-specific value>"},
+       {"name": "company_domain", "value": "<csv company_domain>"}
      ]
    }
    ```
@@ -481,12 +483,16 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    `company_domain` is required in the CSV for Phase 2 HOST LOOKUP (Bash `dig` resolves ESP from the domain) — it does NOT have a native EB lead-body field. Stash as a custom variable if the copy artifact references `{COMPANY_DOMAIN}`; drop otherwise.
 
    The per-row custom_variables values come from CSV columns matching each variable name (case-insensitive), plus fallbacks from the copy artifact's `custom_variables[].default` for any variable the CSV doesn't cover.
+
+   **Lowercase names before send (BC-6780).** EB's `POST /api/leads/multiple` requires `custom_variables[].name` to be exact-lowercase — UPPERCASE names return HTTP 422 and reject the whole chunk (verified BC-6554 round-4 S-4). Apply `name.lower()` to every `custom_variables[].name` entry as the final step of body construction; the result must match `^[a-z][a-z0-9_]*$` (verified by the step 6 pre-loop guard). Touch ONLY the `.name` keys inside the `custom_variables` array — do NOT lowercase `.value` (per-lead content), the surrounding lead-body fields (`email` / `first_name` / etc.), or any artifact content; only the per-call body's variable-name keys. Authors keep UPPERCASE everywhere in the copy artifact (BC-6548 token-render rule); the translation happens here only, at the API boundary.
+
+   This is consistent with EB's silent lowercase-on-store at variable creation (Phase 3 step 7) and case-insensitive render-engine lookup. `POST /api/leads/multiple` is the ONLY endpoint with a strict lowercase requirement — see `email-bison.md` § Known gotchas § Case-rule asymmetry for the full three-rule table.
 3. **Chunk to the 500-lead limit.** `bulk_create_leads` and `upsert_multiple_leads` both accept 500 leads per call (verified in `email-bison.md` § Rate limits). If `lead_count > 500`, split into chunks of 500. Per the "Gate cadence for chunked uploads" note above, User gate 4 fires ONCE for the full batch; each chunk subsequently fires only a minimal turn-structure prompt.
 4. **Show sample.** Before User gate 4, show the operator a sample of 3 leads (rows 2, middle, last) with full `custom_variables` rendered:
 
    > Sample of 3 leads from chunk 1 of {M}:
    >
-   > 1. email: `alex@denvergov.org`, first_name: `Alex`, custom_variables: [RECENCY_ANCHOR: "the Denver downtown master plan announcement last month"]
+   > 1. email: `alex@denvergov.org`, first_name: `Alex`, custom_variables: [recency_anchor: "the Denver downtown master plan announcement last month"]
    > 2. ...
    > 3. ...
 5. **User gate 4 (semantic approval — once, covers all chunks).** Ask via `AskUserQuestion`:
@@ -495,7 +501,10 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    >
    > - Yes, create all {lead_count} leads across {M} chunks
    > - Abort the upload
-6. **Per-chunk two-call loop with turn-structure preservation.** For each chunk `i` in 1..M:
+6. **Pre-loop guard (BC-6780) — HARD FAIL, fires once.** After User gate 4, before entering the per-chunk loop, assert that every `custom_variables[].name` in the constructed body schema matches `^[a-z][a-z0-9_]*$` — no uppercase characters anywhere. The name set comes from the artifact (`custom_variables[]` in the copy JSON) and is loop-invariant across all M chunks; one assertion covers the whole run. **HALT** the run if any name fails the check. Error message: "Body contains UPPERCASE custom_variables[].name `{name}` — EB's POST /api/leads/multiple requires lowercase or returns HTTP 422 (BC-6780). Agent translation step (Phase 4 step 2 'Lowercase names before send') was skipped or incomplete." This guard mirrors the BC-6548 Phase 1 step 5 token-UPPERCASE check (inverse case, same enforcement shape — pre-loop, single pass) — its role is to catch translation-step regressions before they hit EB and 422 the first chunk.
+
+7. **Per-chunk two-call loop with turn-structure preservation.** For each chunk `i` in 1..M:
+
    a. **First vendor call** — invoke `bulk_create_leads` without `confirmation`. Vendor returns the per-chunk prompt (typically: "This will create {N} lead records in workspace {W}. Proceed?").
    b. **Turn-structure prompt** (thin, fires per chunk to preserve BC-2707 turn structure — not a re-approval):
 
@@ -506,9 +515,9 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
       Operator rapid-fire affirmatives are expected. The prompt exists solely to create the user turn required by the two-call gate.
    c. **Second vendor call — execute.** On "Continue", invoke `bulk_create_leads` again with `confirmation: true`. Capture the returned lead IDs. Loop to the next chunk.
-7. **Abort handling.** On any chunk's "Abort remaining chunks" response, HALT — do not start the next chunk. Chunks 1..{i-1} remain committed (their leads exist in EB); `lead_ids_uploaded` in metadata reflects only committed chunks. Operator re-runs with a delta CSV if they want to resume.
-8. **Verify lead count.** Sum the lead IDs across all chunks. Confirm `sum == lead_count` from Phase 1. If a chunk returned HTTP 422 the **whole chunk** rejected — bulk-POST is all-or-nothing on validation failure (Sx-8, BC-5906). The `call_api` wrapper surfaces only `{"error": "HTTP 422 Error"}` with no per-lead detail; per-row diagnostics require inspecting the EB UI for which rows tripped the batch. HALT with the body summary and the chunk's lead-row range; operator inspects EB UI, removes the offending row(s) from the CSV, and re-runs from Phase 4.
-9. **Append to metadata JSON.** Set `lead_ids_uploaded: <total>`, `last_completed_phase: 4`.
+8. **Abort handling.** On any chunk's "Abort remaining chunks" response, HALT — do not start the next chunk. Chunks 1..{i-1} remain committed (their leads exist in EB); `lead_ids_uploaded` in metadata reflects only committed chunks. Operator re-runs with a delta CSV if they want to resume.
+9. **Verify lead count.** Sum the lead IDs across all chunks. Confirm `sum == lead_count` from Phase 1. If a chunk returned HTTP 422 the **whole chunk** rejected — bulk-POST is all-or-nothing on validation failure (Sx-8, BC-5906). The `call_api` wrapper surfaces only `{"error": "HTTP 422 Error"}` with no per-lead detail; per-row diagnostics require inspecting the EB UI for which rows tripped the batch. HALT with the body summary and the chunk's lead-row range; operator inspects EB UI, removes the offending row(s) from the CSV, and re-runs from Phase 4.
+10. **Append to metadata JSON.** Set `lead_ids_uploaded: <total>`, `last_completed_phase: 4`.
 
 **If Phase 4 fails mid-chunk:** some chunks have succeeded, others haven't. `lead_ids_uploaded` in the metadata is authoritative. Re-run reads the metadata, identifies that not all leads uploaded, and operator chooses to (a) delete the partial set via EB UI and re-upload from scratch, or (b) delta the CSV to only the unuploaded leads and re-run. The command does NOT auto-delta.
 
