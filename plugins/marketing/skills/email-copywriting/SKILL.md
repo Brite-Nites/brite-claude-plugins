@@ -209,6 +209,18 @@ Filter explanations:
 
 The `{%- -%}` form strips whitespace per the Shopify whitespace rule (see "Whitespace control" below).
 
+#### Anti-pattern — naked default without `{% assign %}` wrapper
+
+The seductive shape that **does not work** for per-lead fallback:
+
+```
+{{ recency_anchor | default: 'recently' }}
+```
+
+Every lead renders the fallback `'recently'` — the per-lead value never appears. Why: the lowercase identifier `recency_anchor` is a Liquid local that was never assigned via `{% assign %}`, so it is always `nil`, and `default:` always triggers. EB only substitutes the UPPERCASE `{TOKEN}` form (per the substitution-order rule above), and the naked shape above has no UPPERCASE token at all — only the lowercase Liquid local. Pattern A above is what binds a per-lead value to a Liquid local correctly: EB substitutes `{TOKEN}` inside the `'{TOKEN}'` single-quotes, the substituted value becomes a string literal, and `{% assign %}` binds it to the local.
+
+The `launch-campaign.md` Phase 1 step 5 Path (5e)(a) gate hard-rejects copy containing this shape via the regex `\{%-?\s*assign\s+\w+\s*=\s*'\{[A-Z_]+\}'[^%]*default:\s*['"][^'"]+['"][^%]*-?%\}` — copy with the naked form halts pre-flight with a "Liquid fallback must use `{% assign %}` wrapper" error. Authors who hit this at gate-time should rewrite to Pattern A above before re-running. Origin: BC-6554 round-4 S-23 / BC-6782.
+
 #### Pattern B — conditional + spintax fallback
 
 Whole-clause swap when the empty case warrants different sentence structure. Spintax composes inside the `{% else %}` clause for natural variation.
