@@ -460,9 +460,11 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
      "title": "<csv job_title — if column present>",
      "company": "<csv company_name — if column present>",
      "custom_variables": [
-       {"name": "RECENCY_ANCHOR", "value": "<row-specific value>"},
-       {"name": "PROOF_POINT_COMPANY", "value": "<row-specific value>"},
-       {"name": "COMPANY_DOMAIN", "value": "<csv company_domain>"}
+       // Names lowercased here — EB's POST /api/leads/multiple rejects (HTTP 422) UPPERCASE names (BC-6780).
+       // Artifact uses UPPERCASE everywhere; agent translates at this boundary only. See "Lowercase names before send" below.
+       {"name": "recency_anchor", "value": "<row-specific value>"},
+       {"name": "proof_point_company", "value": "<row-specific value>"},
+       {"name": "company_domain", "value": "<csv company_domain>"}
      ]
    }
    ```
@@ -481,12 +483,16 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    `company_domain` is required in the CSV for Phase 2 HOST LOOKUP (Bash `dig` resolves ESP from the domain) — it does NOT have a native EB lead-body field. Stash as a custom variable if the copy artifact references `{COMPANY_DOMAIN}`; drop otherwise.
 
    The per-row custom_variables values come from CSV columns matching each variable name (case-insensitive), plus fallbacks from the copy artifact's `custom_variables[].default` for any variable the CSV doesn't cover.
+
+   **Lowercase names before send (BC-6780).** EB's `POST /api/leads/multiple` requires `custom_variables[].name` to be exact-lowercase — UPPERCASE names return HTTP 422 and reject the whole chunk (verified BC-6554 round-4 S-4). Convert each `custom_variables[].name` to lowercase as the final step of body construction, after the artifact-driven name resolution above. Authors keep UPPERCASE everywhere in the copy artifact (BC-6548 token-render rule); the translation happens here only, at the API boundary. Do NOT lowercase the artifact itself — only the per-call body.
+
+   Note (BC-6299): EB silently lowercases names at variable creation (Phase 3), so the lowercased per-lead `name` matches the EB-side stored form. Render-engine token lookup is case-insensitive against that lowercased store (BC-6308 round-3 R-2a). The ONLY endpoint with a strict lowercase requirement is `POST /api/leads/multiple` lead-create binding — see `email-bison.md` § Known gotchas § Case-rule asymmetry.
 3. **Chunk to the 500-lead limit.** `bulk_create_leads` and `upsert_multiple_leads` both accept 500 leads per call (verified in `email-bison.md` § Rate limits). If `lead_count > 500`, split into chunks of 500. Per the "Gate cadence for chunked uploads" note above, User gate 4 fires ONCE for the full batch; each chunk subsequently fires only a minimal turn-structure prompt.
 4. **Show sample.** Before User gate 4, show the operator a sample of 3 leads (rows 2, middle, last) with full `custom_variables` rendered:
 
    > Sample of 3 leads from chunk 1 of {M}:
    >
-   > 1. email: `alex@denvergov.org`, first_name: `Alex`, custom_variables: [RECENCY_ANCHOR: "the Denver downtown master plan announcement last month"]
+   > 1. email: `alex@denvergov.org`, first_name: `Alex`, custom_variables: [recency_anchor: "the Denver downtown master plan announcement last month"]
    > 2. ...
    > 3. ...
 5. **User gate 4 (semantic approval — once, covers all chunks).** Ask via `AskUserQuestion`:
@@ -496,6 +502,9 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    > - Yes, create all {lead_count} leads across {M} chunks
    > - Abort the upload
 6. **Per-chunk two-call loop with turn-structure preservation.** For each chunk `i` in 1..M:
+
+   **Pre-send guard (BC-6780) — HARD FAIL.** Before issuing the chunk's POST, assert that every `custom_variables[].name` in the constructed body matches `^[a-z][a-z0-9_]*$` — no uppercase characters anywhere. **HARD FAIL** if the assertion fails. Error message: "Chunk {i} body contains UPPERCASE custom_variables[].name `{name}` — EB's POST /api/leads/multiple requires lowercase or returns HTTP 422 (BC-6780). Agent translation step (Phase 4 step 2 'Lowercase names before send') was skipped or incomplete." Halt the entire run; chunks already committed stay; operator inspects the body construction and re-runs from Phase 4. This guard mirrors the BC-6548 Phase 1 step 5 token-UPPERCASE check (inverse case, same enforcement shape) — its role is to catch translation-step regressions before they hit EB and 422 the chunk.
+
    a. **First vendor call** — invoke `bulk_create_leads` without `confirmation`. Vendor returns the per-chunk prompt (typically: "This will create {N} lead records in workspace {W}. Proceed?").
    b. **Turn-structure prompt** (thin, fires per chunk to preserve BC-2707 turn structure — not a re-approval):
 
