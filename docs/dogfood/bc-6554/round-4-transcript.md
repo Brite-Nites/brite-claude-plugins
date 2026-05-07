@@ -480,7 +480,7 @@ Captured as the walk progresses; promoted to round-5 issues at end-of-walk if th
 |---|---|---|---|
 | [BC-6785](https://linear.app/brite-nites/issue/BC-6785) | Round-5 dogfood (parent) | re-walk after Liquid + lead-create-case + regex fixes land | High |
 | [BC-6780](https://linear.app/brite-nites/issue/BC-6780) | 🔴 Spinoff (blocker) | fix case-asymmetry at lead-create binding (Phase 4 step 2 + email-bison.md) | High |
-| [BC-6781](https://linear.app/brite-nites/issue/BC-6781) | 🔴 Spinoff (blocker) | rewrite test-copy-liquid.json using canonical `{% assign %}` pattern + verify Liquid renders per-lead values | High |
+| [BC-6781](https://linear.app/brite-nites/issue/BC-6781) | 🔴 Spinoff (blocker) | rewrite test-copy-liquid.json using canonical `{% assign %}` pattern → corrected artifact at `docs/dogfood/bc-6554/test-copy-liquid.json` (live verification deferred to BC-6785 S-23 walk per scope split — round-5 covers same Preview Body inspection structurally) | High |
 | [BC-6782](https://linear.app/brite-nites/issue/BC-6782) | 🔴 Spinoff (blocker) | tighten Phase 1 step 5 Path (5e)(a) regex to require `{% assign %}` wrapper | High |
 | [BC-6783](https://linear.app/brite-nites/issue/BC-6783) | 🟡 Spinoff (related-to) | correct S-9 hypothesis row in BC-6554 issue body to match BC-6306 implementation scope | Low |
 | [BC-6784](https://linear.app/brite-nites/issue/BC-6784) | 🟡 Spinoff (related-to) | clarify `{SENDER_*}` token resolution diverges between local spot-check and EB render | Low |
