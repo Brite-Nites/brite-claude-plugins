@@ -409,7 +409,7 @@ If the operator's chosen action leaves zero leads in any (email-type × ESP) cel
 2. **Load variables from copy artifact.** From the parsed artifact (Phase 1 step 4), read `custom_variables[]`. Each entry has `{name, default}`. Example: `[{"name": "RECENCY_ANCHOR", "default": ""}, {"name": "PROOF_POINT_COMPANY", "default": ""}]`. The `default` is consumed in Phase 4 as the per-lead fill-in value when the CSV row lacks a column for this variable (see Phase 4 step 2 — the per-row custom_variables values + fallbacks paragraph) — it is NOT a workspace-scoped property of the variable in EB (per Sx-2, BC-6299 — EB's `POST /api/custom-variables` accepts only `{name}`).
 3. **Check for existing variables.** Call `list_custom_variables` in the target workspace. For each artifact variable, classify:
    - **New** — not present in the workspace. Will create.
-   - **Existing** — name matches; will NOT re-create (EB returns 422 on duplicate `POST /api/custom-variables`). Reuse as-is.
+   - **Existing** — name matches case-insensitively (compare via `.lower()`; EB stores names lowercased per Sx-3 / BC-6299 — see `email-bison.md` § Known gotchas § Case-rule asymmetry); will NOT re-create (EB returns 422 on duplicate `POST /api/custom-variables`). Reuse as-is.
 4. **Render the create plan.** Show the operator:
 
    > Variables to create in workspace `{workspace}`:
