@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "entity": "brite-nites",
+  "template_preset": "list-building",
+  "vertical": "municipalities",
+  "offer_tier": 2,
+  "offer_summary": "Free architectural lighting preview for the downtown master-plan RFP response — BC-6781 dogfood test fixture exercising canonical Liquid Pattern A + Pattern B.",
+  "custom_variables": [
+    {"name": "FIRST_NAME", "default": ""},
+    {"name": "COMPANY", "default": ""},
+    {"name": "RECENCY_ANCHOR", "default": "downtown master-plan announcement"},
+    {"name": "PROOF_POINT_COMPANY", "default": "Boulder's Pearl Street"},
+    {"name": "SENDER_FIRST_NAME", "default": ""}
+  ],
+  "step_1": {
+    "subject": "{Quick|Fast|30s} {question|check|idea}",
+    "body": "{%- assign anchor = '{RECENCY_ANCHOR}' | strip | default: 'recent activity' -%}\n{%- assign company = '{PROOF_POINT_COMPANY}' | strip -%}\nSaw the {{ anchor }} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked closely|it mapped well} with a pattern we've been watching across municipal teams.<br><br>{Most|A few|Several} downtown teams we work with run into evening engagement drop-offs. {%- if company -%}One that solved it was {{ company }}, who ran 38% higher evening visits in the first 90 days.{%- else -%}A few NO_PROOF_POINT_company-style teams have piloted similar setups and seen 30%+ lifts.{%- endif -%}<br><br>{Happy|Glad} to {pull|share|send} a {short|quick|focused} architectural preview for {COMPANY} if {useful|helpful|interesting}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}",
+    "wait_in_days": 0
+  },
+  "step_2": {
+    "subject": "{Quick|Fast|30s} {follow-up|nudge|note}",
+    "body": "{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. {Still happy|Glad still} to send the {architectural preview|visual concept} whenever it's {useful|helpful|timely}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}",
+    "wait_in_days": 4
+  },
+  "situation_mining_source": "docs/dogfood/bc-6554/round-4-transcript.md (S-23 — BC-6613 Liquid Pattern A + B verification)",
+  "generated_at": "2026-05-07T00:00:00Z"
+}
