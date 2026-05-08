@@ -131,7 +131,28 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 2 (multiplicative grid)
 
-- **R-1** — TBD
+- **R-1** — ✅ **Expected.**
+  - **Output:** Email-type detection: 4 personal + 2 professional + 3 role per the static lists (19 role-prefix + 12 free-mail entries; tiebreak personal-beats-role applied to no leads in this set). ESP detection via parallel `dig MX +short`: gmail.com → Google (`gmail-smtp-in.l.google.com.`), outlook.com → Microsoft (`outlook-com.olc.protection.outlook.com.`), brite.co → Google (Workspace, `aspmx.l.google.com.` + googlemail.com aliases), dogfoodtest.com → Unknown (no MX records returned) → rolled into Other in the 3-bucket grid. 9-cell grid built: Professional|Google=2, Role|Other=3, Personal|Google=2, Personal|Microsoft=2, all other 5 cells=0. F12 prune dropped the 5 empty cells (Professional|Microsoft, Professional|Other, Role|Google, Role|Microsoft, Personal|Other). 4 surviving cells.
+  - **Expected per spec:** Issue body R-1 (BC-6307 + BC-6654 multiplicative segmentation): "9 leads tagged: 4 personal + 2 professional + 3 role per the 19+12 entry static lists; 9-cell grid constructed by joining email-type tags with ESP MX classification; F12 prune drops 5 empty cells."
+  - **Match:** Every part — counts, cell-shape, prune behavior. No surprises.
+  - **Operator gate-2 choice:** "Include all" (matches round-4; preserves multiplicative test surface for R-8★ in Task 5).
+
+### Phase 2 — surviving 4-cell grid (post-include_all + post-F12-prune)
+
+| | Google | Microsoft | Other |
+|---|---|---|---|
+| **Professional** | 2 (`dogfood-test-05/06@brite.co`) | 0 (skipped) | 0 (skipped) |
+| **Role**         | 0 (skipped) | 0 (skipped) | 3 (`info|sales|contact@dogfoodtest.com`) |
+| **Personal**     | 2 (`dogfood-test-01/02@gmail.com`) | 2 (`dogfood-test-03/04@outlook.com`) | 0 (skipped) |
+
+### Phase 2 — F-IV-3 finding (outside R-1-28 set, surfaced at Phase 1 step 10)
+
+- **F-IV-3** — ⚠️ Spec drift / regex case-sensitivity bug (round-6 candidate).
+  - **What:** § Input validation IV-3 dogfood-path detection regex requires `<worktree-name>` to match `[a-z0-9._-]+` (lowercase only). Worktree convention from `git-worktrees` skill is uppercase Linear-issue-ID (`BC-6785`), which the regex rejects.
+  - **Effect:** auto-detection falls through to `docs/campaigns/{entity}/` (production audit-trail directory) — actively defeats IV-3's stated intent of preventing dogfood metadata from polluting production.
+  - **Mitigation for round-5:** manual override at Phase 1 step 10 — metadata written to `<worktree>/dogfood/BC-6785-2026-05-08.json` (worktree-local) per IV-3's intent.
+  - **Fix size:** one-character regex change (`[a-z0-9._-]+` → `[A-Za-z0-9._-]+`).
+  - **Round-6 candidacy:** if round-5 closes convergent, file as a standalone follow-up rather than triggering round-6 by itself; if round-5 files round-6 anyway, fold in.
 
 ### Phase 3 (VARIABLES)
 

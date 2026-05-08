@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "entity": "brite-labs",
+  "campaign_name_base": "BC-6785",
+  "workspace": "emailbison-personal",
+  "copy_artifact_path": "docs/dogfood/bc-6554-round-5/test-copy.json",
+  "csv_path": "docs/dogfood/bc-6554-round-5/test-leads.csv",
+  "lead_count": 9,
+  "workspace_mismatch": {
+    "expected": "emailbison-b2b",
+    "actual": "emailbison-personal",
+    "reason": "dogfood walk against production personal-email workspace; cross-mapping is expected per BC-6785 round-5 plan"
+  },
+  "sender_resolution_method": "artifact-default",
+  "unique_per_lead_enabled": true,
+  "launched_at": "2026-05-08T11:40:00-06:00",
+  "last_completed_phase": 2,
+  "_round_5_notes": {
+    "isolation_discipline": "Lead tag `bc-6785-r5`; campaign name prefix `BC-6785`; no new permanent custom variables (R-28 uses existing UPPERCASE name).",
+    "metadata_path_override": "Spec \u00a7 IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects the uppercase worktree name `BC-6785`. Auto-detection falls through to docs/campaigns/brite-labs/ (production audit dir), defeating IV-3's intent. Manual override: writing to <worktree>/dogfood/ per IV-3's stated purpose. Finding F-IV-3 logged in transcript as a round-6 candidate (regex case-sensitivity bug)."
+  },
+  "segmented": true,
+  "segments": {
+    "professional|Google": {
+      "email_type": "professional",
+      "esp": "Google",
+      "count": 2
+    },
+    "role|Other": {
+      "email_type": "role",
+      "esp": "Other",
+      "count": 3
+    },
+    "personal|Google": {
+      "email_type": "personal",
+      "esp": "Google",
+      "count": 2
+    },
+    "personal|Microsoft": {
+      "email_type": "personal",
+      "esp": "Microsoft",
+      "count": 2
+    }
+  },
+  "skipped_cells": [
+    "professional|Microsoft",
+    "professional|Other",
+    "role|Google",
+    "role|Microsoft",
+    "personal|Other"
+  ],
+  "email_type_filter_applied": "include_all",
+  "skipped_leads_csv_path": null,
+  "invalid_email_rows": [],
+  "invalid_domain_rows": []
+}
