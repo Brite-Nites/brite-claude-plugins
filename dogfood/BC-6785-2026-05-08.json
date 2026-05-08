@@ -14,7 +14,7 @@
   "sender_resolution_method": "artifact-default",
   "unique_per_lead_enabled": true,
   "launched_at": "2026-05-08T11:40:00-06:00",
-  "last_completed_phase": 3,
+  "last_completed_phase": 4,
   "_round_5_notes": {
     "isolation_discipline": "Lead tag `bc-6785-r5`; campaign name prefix `BC-6785`; no new permanent custom variables (R-28 uses existing UPPERCASE name).",
     "metadata_path_override": "Spec \u00a7 IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects the uppercase worktree name `BC-6785`. Auto-detection falls through to docs/campaigns/brite-labs/ (production audit dir), defeating IV-3's intent. Manual override: writing to <worktree>/dogfood/ per IV-3's stated purpose. Finding F-IV-3 logged in transcript as a round-6 candidate (regex case-sensitivity bug)."
@@ -95,5 +95,49 @@
       "artifact_name": "SENDER_FIRST_NAME",
       "eb_stored_name": "sender_first_name"
     }
-  ]
+  ],
+  "lead_ids_uploaded": 9,
+  "lead_ids": [
+    14753,
+    14754,
+    14755,
+    14756,
+    14757,
+    14758,
+    14759,
+    14760,
+    14761
+  ],
+  "lead_uuids": [
+    "a1bb7187-561c-4b47-89c2-8f7811616739",
+    "a1bb7187-585f-45dd-8b75-13f85d61a30f",
+    "a1bb7187-5a0a-4c46-a2a2-99b03b796ff3",
+    "a1bb7187-5b9b-4758-9e1b-3321c4ec92d3",
+    "a1bb7187-5d59-4d63-ae4b-fc7e65b3ef0e",
+    "a1bb7187-5fe1-44dc-9ab4-540cbd3227ab",
+    "a1bb7187-62c2-4e5d-b284-674f0a271bd5",
+    "a1bb7187-652b-4a07-824e-eb1841b9c7e4",
+    "a1bb7187-67ec-4c0c-a267-e3b7c4ce7ac5"
+  ],
+  "isolation_tag": {
+    "id": 41,
+    "name": "bc-6785-r5"
+  },
+  "auto_attached_esp_tags_observed": {
+    "Google": [
+      "dogfood-test-01@gmail.com",
+      "dogfood-test-02@gmail.com",
+      "dogfood-test-05@brite.co",
+      "dogfood-test-06@brite.co"
+    ],
+    "Outlook": [
+      "dogfood-test-03@outlook.com",
+      "dogfood-test-04@outlook.com"
+    ],
+    "none": [
+      "info@dogfoodtest.com",
+      "sales@dogfoodtest.com",
+      "contact@dogfoodtest.com"
+    ]
+  }
 }

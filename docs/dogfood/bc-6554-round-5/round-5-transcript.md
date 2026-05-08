@@ -187,10 +187,46 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 4 (UPLOAD)
 
-- **R-5 ★** — TBD
-- **R-28** — TBD (sibling-endpoint case-asymmetry spot-check)
-- **R-6** — TBD
-- **R-7** — TBD
+- **R-5 ★** — ✅ **Expected.** **(BC-6780 task-1 fix-validation: ratified at runtime.)**
+  - **Pre-loop HARD FAIL guard (BC-6780):** all 9 leads' `custom_variables[].name` matched `^[a-z][a-z0-9_]*$` regex (translation step at body-build worked correctly). Guard fired once, covered all chunks (single chunk in this run).
+  - **Output:** `POST /api/leads/multiple` with 9-lead body (1 chunk ≤ 500 limit) returned `success: true` with all 9 leads created. Lead IDs: 14753-14761 (assigned sequentially). All responses include both `id` (int) and `uuid` (str) per BC-6515 forward-compat (UUIDs all `a1bb7187-*` — Laravel UUIDv4 timestamp prefix).
+  - **Per-lead bodies:** EB lead-body field renames applied per Sx-6 (CSV `job_title→title`, `company_name→company`); 8 per-lead `custom_variables` with lowercased names. Sample lead 14753 (`dogfood-test-01@gmail.com`): all 8 vars persisted with values intact.
+  - **Tag attachment (Isolation Discipline Rule 1):** `POST /api/tags` created tag `bc-6785-r5` (id 41). `POST /api/tags/attach-to-leads` attached tag id 41 to lead IDs [14753..14761] in one call. Verified: `list_leads({tag_ids: [41]})` returns 9/9 expected leads on a single page.
+  - **Side-finding (auto-attached ESP tags, outside R-1-28 set):** EB auto-attaches ESP tags at lead-create based on email domain MX:
+    - 4 leads tagged `Google` (gmail.com x2 + brite.co x2 — both on Google Workspace MX).
+    - 2 leads tagged `Outlook` (outlook.com x2).
+    - 3 leads (`*@dogfoodtest.com` — no MX) carry NO ESP auto-tag.
+    - This is a *useful* default from EB's lead-tag taxonomy; for round-5 the `bc-6785-r5` tag is layered on top of the auto-tag, which keeps cleanup filtering precise.
+  - **Expected per spec:** Issue body R-5★ — "`POST /api/leads/multiple` accepts `title`/`company`; response includes both `id` (int) and `uuid` (str); per-lead `custom_variables[].name` lowercased at body-build per BC-6780 translation step; pre-loop HARD FAIL guard verified to fire if names UPPERCASE; happy-path bulk-create succeeds without UPPERCASE→422 detour observed in round-4."
+  - **Match:** Every component. **The BC-6780 fix holds at runtime; UPPERCASE→422 detour from round-4 (S-4) is gone.**
+
+- **R-28** — ⚠️ **Unexpected — INCONCLUSIVE on case-asymmetry; produced 2 spec-correctness findings.**
+  - **Probe (a) — `POST /api/leads/upsert-multiple`:**
+    - POST → 405 ("The POST method is not supported for route api/leads/upsert-multiple. Supported methods: GET, HEAD, PUT, PATCH, DELETE.")
+    - PUT with UPPERCASE name `RECENCY_ANCHOR` → 422.
+    - PUT with lowercase control name `recency_anchor` → 422 (same error). 422 is therefore NOT the BC-6780 case rule — it's a body-shape/method mismatch.
+    - PATCH → 404. GET → 404. (The 405 message claimed PATCH/GET were "supported" but they actually return 404 — Laravel auto-generated 405 messages can be misleading for non-POST/PUT routes.)
+    - `search_api_spec` for `upsert` returns no matches; spec for `/api/leads/multiple` shows POST only (no upsert variant documented).
+    - **Concrete finding F-R-28a (round-6 candidate):** launch-campaign spec § Phase 4 step 1 describes `upsert_multiple_leads` as a "variant of `/api/leads/multiple` (for merging against existing leads)." This is phantom — POST is rejected, no variant endpoint is documented. Either (i) the path in the spec is wrong, OR (ii) "upsert" semantics are achieved by re-POSTing `/api/leads/multiple` (per the bulk-delete description's hint: "I mapped the wrong custom variables for these leads — Simply re-upload the leads and we'll update the records in place").
+  - **Probe (b) — `POST /api/leads/bulk` (CSV-upload variant):**
+    - `search_api_spec` confirms the CSV-upload endpoint is actually `POST /api/leads/bulk/csv` — not `POST /api/leads/bulk` as the launch-campaign spec describes.
+    - `POST /api/leads/bulk` is not documented; `DELETE /api/leads/bulk` is the bulk-delete variant.
+    - **Concrete finding F-R-28b (round-6 candidate):** launch-campaign spec § Phase 4 step 1 describes `bulk_create_leads_csv (POST /api/leads/bulk)` — the actual path per `search_api_spec` is `POST /api/leads/bulk/csv`.
+    - The CSV-upload endpoint takes multipart/form-data; `call_api` is JSON-only, so the case-asymmetry test for this endpoint cannot be exercised through the available transport. This is a **known limitation** of the round-5 test design that R-28 surfaces — testing UPPERCASE/lowercase column-header behavior for `POST /api/leads/bulk/csv` requires multipart upload via curl/UI, not `call_api`.
+  - **Cleanup:** zero R-28 leads created (all probes 422'd before any record landed). Verified via `list_leads({search: "r5-sibling-test"})` → 0 results. Zero new permanent custom variables created (Isolation Discipline Rule 3 preserved by definition — probes failed before any custom-variable side effect).
+  - **Verdict for case-asymmetry hypothesis:** UNVERIFIED. The test design assumed the launch-campaign spec was accurate about sibling endpoint names; spec turns out to be wrong about both. Sibling-endpoint case-asymmetry remains an open question from BC-6780 task-7 / 2026-05-07 comment — round-6 follow-up via fixing the spec endpoints first, then re-probing.
+
+- **R-6** — ✅ **Expected.**
+  - **Output:** `POST /api/leads/multiple` with body `{leads: [{email: "dogfood-test-01@gmail.com", ...}]}` (already-existing lead from R-5★ mass-create) returned HTTP 422. The whole single-lead request rejected — atomic-rejection semantics held.
+  - **Expected per spec:** Issue body R-6 (round-4 S-5 regression) — "forced duplicate-email in chunk → all-or-nothing 422 (Sx-8 atomic rejection)."
+  - **Match:** Atomic 422 confirmed. Side-observation: the spec's bulk-delete description hint ("Simply re-upload the leads and we'll update the records in place") appears to apply to a different operation flow (likely the EB UI's lead-import which detects existing records and routes to upsert), NOT raw `POST /api/leads/multiple`. Logged for future spec clarification, not a finding.
+
+- **R-7** — ✅ **Expected.** **(Spec-read only.)**
+  - **Read targets:** launch-campaign skill spec § Tool tier map + § Phase 4 § "Two-call gate required — agent-side, not vendor-side."
+  - **Confirmation:** spec text continues to differentiate:
+    - **Wrapper-tool layer:** `create_lead` is core-tier, directly callable as `mcp__emailbison-<workspace>__create_lead`. Wrapper-side `confirmation` prose is documentation-only per BC-6439 (no runtime gate at any layer).
+    - **API-direct layer:** `bulk_create_leads` is invoked via `call_api` against `/api/leads/multiple`, which has NO `confirmation` field at the API level. Agent-side `AskUserQuestion` gate is the sole safeguard for every `call_api`-routed mutation per Sx-9 / BC-5906.
+  - **Match:** wrapper-vs-API distinction live in spec at every gate site (Phase 4 + Phase 6 + Phase 11) per BC-6304 task-1 fix.
 
 ### Phase 5 (CAMPAIGN CREATE)
 

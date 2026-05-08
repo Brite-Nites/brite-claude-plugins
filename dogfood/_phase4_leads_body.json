@@ -1,0 +1,373 @@
+{
+  "leads": [
+    {
+      "email": "dogfood-test-01@gmail.com",
+      "first_name": "Alex",
+      "last_name": "Testlead",
+      "title": "Mayor",
+      "company": "Test Denver City",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    },
+    {
+      "email": "dogfood-test-02@gmail.com",
+      "first_name": "Sam",
+      "last_name": "Testlead",
+      "title": "Parks Director",
+      "company": "Test Aurora City",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    },
+    {
+      "email": "dogfood-test-03@outlook.com",
+      "first_name": "Jordan",
+      "last_name": "Testlead",
+      "title": "CFO",
+      "company": "Test Boulder City",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    },
+    {
+      "email": "dogfood-test-04@outlook.com",
+      "first_name": "Taylor",
+      "last_name": "Testlead",
+      "title": "Downtown Coord",
+      "company": "Test Lakewood City",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    },
+    {
+      "email": "dogfood-test-05@brite.co",
+      "first_name": "Casey",
+      "last_name": "Testlead",
+      "title": "Master Planner",
+      "company": "Test Fort Collins",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    },
+    {
+      "email": "dogfood-test-06@brite.co",
+      "first_name": "Morgan",
+      "last_name": "Testlead",
+      "title": "Cultural Officer",
+      "company": "Test Colorado Springs",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    },
+    {
+      "email": "info@dogfoodtest.com",
+      "first_name": "Info",
+      "last_name": "Account",
+      "title": "Operations Manager",
+      "company": "Test Dogfood Aquarium",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    },
+    {
+      "email": "sales@dogfoodtest.com",
+      "first_name": "Sales",
+      "last_name": "Account",
+      "title": "Sales Director",
+      "company": "Test Dogfood Stadium",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    },
+    {
+      "email": "contact@dogfoodtest.com",
+      "first_name": "Contact",
+      "last_name": "Account",
+      "title": "General Manager",
+      "company": "Test Dogfood Zoo",
+      "custom_variables": [
+        {
+          "name": "recency_anchor",
+          "value": "downtown master-plan announcement"
+        },
+        {
+          "name": "vertical_descriptor",
+          "value": "municipalities"
+        },
+        {
+          "name": "specific_friction",
+          "value": "downtown lighting specs getting stuck at design review"
+        },
+        {
+          "name": "proof_point_company",
+          "value": "Boulder Pearl Street"
+        },
+        {
+          "name": "proof_point_number",
+          "value": "ran 38% higher evening foot traffic"
+        },
+        {
+          "name": "proof_point_timeframe",
+          "value": "2024"
+        },
+        {
+          "name": "free_asset_noun",
+          "value": "architectural lighting preview"
+        },
+        {
+          "name": "sender_first_name",
+          "value": "Amanuel"
+        }
+      ]
+    }
+  ]
+}
