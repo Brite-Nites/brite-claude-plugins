@@ -156,9 +156,34 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 3 (VARIABLES)
 
-- **R-2** — TBD
-- **R-3** — TBD
-- **R-4 ★** — TBD
+- **R-2** — ✅ **Expected.**
+  - **Output:** `GET /api/custom-variables?per_page=50` returned `meta: {current_page: 1, last_page: 1, per_page: 15, total: 15}`. The `?per_page=50` request parameter was silently ignored — EB hardcodes `per_page: 15` regardless. Single-page result; no pagination loop fired (15 ≤ 15).
+  - **Expected per spec:** Issue body R-2 (round-4 S-1 regression) — "`list_custom_variables` returns Laravel `?page=N` paginated meta with hardcoded `per_page: 15`."
+  - **Match:** Exact. Sx-10/BC-5906 hardcoded-per_page behavior re-verified.
+
+- **R-3** — ✅ **Expected.**
+  - **Output:** 15 entries returned; roster matches pre-state recorded at Phase 1 step 4 / Task 1 baseline exactly. IDs 1-15 all present; names: `company address`, `company linkedin url`, `company phone`, `company website`, `person job title`, `person linkedin url` (round-1 era 1-6), `recency_anchor`, `vertical_descriptor`, `specific_friction`, `proof_point_company`, `proof_point_number`, `proof_point_timeframe`, `free_asset_noun`, `sender_first_name` (round-2 7-14), `empty_test_var` (round-3 T11, id 15). No drift mid-session.
+  - **Expected per spec:** Issue body R-3 (round-4 S-2 regression) — "15 permanent vars from round-4 cleanup all present at start of round-5."
+  - **Match:** Exact.
+
+- **R-4 ★** — ✅ **Expected.** **(BC-6780 task-2 fix-validation: ratified at runtime.)**
+  - **Output:** Phase 3 step 3 classification table (`.lower()` comparison per launch-campaign Phase 3 step 3, "compare via `.lower()`; EB stores names lowercased per Sx-3/BC-6299"):
+
+    | Artifact name (UPPERCASE) | `.lower()` | EB stored name | Match | Classification |
+    |---|---|---|---|---|
+    | `RECENCY_ANCHOR` | `recency_anchor` | id 7 — `recency_anchor` | ✓ | existing → reuse |
+    | `VERTICAL_DESCRIPTOR` | `vertical_descriptor` | id 8 — `vertical_descriptor` | ✓ | existing → reuse |
+    | `SPECIFIC_FRICTION` | `specific_friction` | id 9 — `specific_friction` | ✓ | existing → reuse |
+    | `PROOF_POINT_COMPANY` | `proof_point_company` | id 10 — `proof_point_company` | ✓ | existing → reuse |
+    | `PROOF_POINT_NUMBER` | `proof_point_number` | id 11 — `proof_point_number` | ✓ | existing → reuse |
+    | `PROOF_POINT_TIMEFRAME` | `proof_point_timeframe` | id 12 — `proof_point_timeframe` | ✓ | existing → reuse |
+    | `FREE_ASSET_NOUN` | `free_asset_noun` | id 13 — `free_asset_noun` | ✓ | existing → reuse |
+    | `SENDER_FIRST_NAME` | `sender_first_name` | id 14 — `sender_first_name` | ✓ | existing → reuse |
+
+    8/8 artifact UPPERCASE names mapped case-insensitively to existing lowercase EB-stored names. Zero new-variable creates issued. Zero 422 duplicate-name responses. Operator confirmed at User gate 3 with "Yes — reuse all 8 existing." Phase 3 step 6 fired ZERO `POST /api/custom-variables` calls (zero-create branch).
+  - **Expected per spec:** Issue body R-4 (round-4 S-3 regression + BC-6780 task-2 fix-validation NEW for round-5) — "8 artifact UPPERCASE variables map to lowercase EB-stored vars via case-insensitive `.lower()` comparison per BC-6780 Phase 3 step 3 fix; all classify as 'existing → reuse'; zero new creates; zero 422 duplicates."
+  - **Match:** Every component — 8 names, lowercase mapping, all existing-reuse, zero creates, zero 422.
+  - **Isolation Discipline Rule 3 status:** preserved by definition (zero creates → zero new permanent custom variables).
 
 ### Phase 4 (UPLOAD)
 

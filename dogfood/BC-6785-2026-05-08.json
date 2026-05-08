@@ -14,7 +14,7 @@
   "sender_resolution_method": "artifact-default",
   "unique_per_lead_enabled": true,
   "launched_at": "2026-05-08T11:40:00-06:00",
-  "last_completed_phase": 2,
+  "last_completed_phase": 3,
   "_round_5_notes": {
     "isolation_discipline": "Lead tag `bc-6785-r5`; campaign name prefix `BC-6785`; no new permanent custom variables (R-28 uses existing UPPERCASE name).",
     "metadata_path_override": "Spec \u00a7 IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects the uppercase worktree name `BC-6785`. Auto-detection falls through to docs/campaigns/brite-labs/ (production audit dir), defeating IV-3's intent. Manual override: writing to <worktree>/dogfood/ per IV-3's stated purpose. Finding F-IV-3 logged in transcript as a round-6 candidate (regex case-sensitivity bug)."
@@ -52,5 +52,48 @@
   "email_type_filter_applied": "include_all",
   "skipped_leads_csv_path": null,
   "invalid_email_rows": [],
-  "invalid_domain_rows": []
+  "invalid_domain_rows": [],
+  "custom_variables_created": [],
+  "custom_variables_reused": [
+    {
+      "id": 7,
+      "artifact_name": "RECENCY_ANCHOR",
+      "eb_stored_name": "recency_anchor"
+    },
+    {
+      "id": 8,
+      "artifact_name": "VERTICAL_DESCRIPTOR",
+      "eb_stored_name": "vertical_descriptor"
+    },
+    {
+      "id": 9,
+      "artifact_name": "SPECIFIC_FRICTION",
+      "eb_stored_name": "specific_friction"
+    },
+    {
+      "id": 10,
+      "artifact_name": "PROOF_POINT_COMPANY",
+      "eb_stored_name": "proof_point_company"
+    },
+    {
+      "id": 11,
+      "artifact_name": "PROOF_POINT_NUMBER",
+      "eb_stored_name": "proof_point_number"
+    },
+    {
+      "id": 12,
+      "artifact_name": "PROOF_POINT_TIMEFRAME",
+      "eb_stored_name": "proof_point_timeframe"
+    },
+    {
+      "id": 13,
+      "artifact_name": "FREE_ASSET_NOUN",
+      "eb_stored_name": "free_asset_noun"
+    },
+    {
+      "id": 14,
+      "artifact_name": "SENDER_FIRST_NAME",
+      "eb_stored_name": "sender_first_name"
+    }
+  ]
 }
