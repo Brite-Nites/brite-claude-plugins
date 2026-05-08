@@ -316,7 +316,20 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 8 (SCHEDULE)
 
-- **R-17** — TBD
+- **R-17** — ✅ **Expected.** **(F27 + BC-6303 schedule_template_id rename + clone-per-campaign ratified.)**
+  - **Endpoint discovery:** initial guess `GET /api/schedule-templates` → 404. Correct path per `search_api_spec`: `GET /api/campaigns/schedule/templates`. Spec-drift candidate (the campaign-namespaced path is unintuitive for a workspace-level resource) but already documented in launch-campaign.md § Phase 8.
+  - **Workspace 13 schedule templates (only 1):** id 3 — Mon-Fri true; sat/sun false; `start_time: 08:00:00`, `end_time: 20:00:00`, `timezone: America/Denver`. **Note:** the spec example shows `08:00-17:00`, but workspace 13's actual template runs `08:00-20:00` (12-hour window). Operator-set; matches Brite production cadence.
+  - **Apply execution:** 4 parallel `POST /api/campaigns/{id}/create-schedule-from-template` calls with body `{"schedule_id": 3}` — all returned `success: true`.
+  - **Clone-per-campaign confirmed (BC-6303 / round-2 finding):** each apply created a NEW Campaign Schedule entity, NOT a reference to the source template. Response `type: "Campaign Schedule"` (distinct from source `type: "Schedule template"`):
+
+    | Campaign | Cloned schedule_id | Source template | Notes |
+    |---|---|---|---|
+    | 43 (Professional\|Google) | 20 | 3 | Inherits Mon-Fri 08:00-20:00 America/Denver |
+    | 44 (Role\|Other) | 21 | 3 | Inherits ditto |
+    | 45 (Personal\|Google) | 22 | 3 | Inherits ditto |
+    | 46 (Personal\|Microsoft) | 23 | 3 | Inherits ditto |
+  - **Status:** all clones return `status: "Not Started"` (campaigns are still in Draft).
+  - **Match:** every component — schedule_template_id source recorded, campaign_schedule_ids per-campaign clone IDs recorded, schedule fields copied from source.
 
 ### Phase 9 (SEQUENCE)
 
