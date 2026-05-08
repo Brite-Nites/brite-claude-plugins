@@ -266,8 +266,24 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 6 (ATTACH LEADS)
 
-- **R-12** — TBD
-- **R-13** — ⏭️ Deferred (BC-6545 spec-read suffices; live-fire requires pre-poison setup not justified for institutional-memory-only check).
+- **R-12** — ✅ **Expected.**
+  - **Endpoint verified:** `POST /api/campaigns/{campaign_id}/leads/attach-leads` per `search_api_spec`. Body schema `{lead_ids: [int], allow_parallel_sending: bool}`. No `confirmation` field at API level (consistent with Sx-9/BC-5906/BC-6439 vendor-confirmation gate findings). Agent-side `AskUserQuestion` is the sole safeguard.
+  - **Bucket map (from Phase 2 grid + Phase 4 lead IDs):**
+
+    | Campaign | Cell | Lead IDs |
+    |---|---|---|
+    | 43 | `BC-6785 \| MAIN \| Professional \| Google` | [14757, 14758] |
+    | 44 | `BC-6785 \| MAIN \| Role \| Other` | [14759, 14760, 14761] |
+    | 45 | `BC-6785 \| MAIN \| Personal \| Google` | [14753, 14754] |
+    | 46 | `BC-6785 \| MAIN \| Personal \| Microsoft` | [14755, 14756] |
+  - **Operator gate-6 choice:** "Yes — attach all 9 leads across all 4 campaigns" (single-pass mode; no per-campaign turn-structure re-prompts).
+  - **Output:** 4 sequential `POST /api/campaigns/{id}/leads/attach-leads` calls all returned `success: true` with messages `"Leads successfully added to {campaign-name}. Existing leads were not added."` (defensive idempotency hint for re-attach scenarios; no dedup applied here since all leads were fresh attaches).
+  - **Verification (post-attach `get_campaign` per campaign):** total_leads counts match expected — campaign 43=2, 44=3, 45=2, 46=2; sum=9 matches Phase 4 `lead_count`. Sub-second eventual-consistency observed (get_campaign fired immediately after attach showed accurate counts). Settings `plain_text: true` preserved on all 4 (R-11 PATCH-omit revert was successfully restored at end of Phase 5).
+  - **Expected per spec:** Issue body R-12 (round-4 S-11 regression + F21/BC-6303 lead bucket mapping) — "metadata `lead_ids_by_bucket` + `lead_attach_counts` populate per cell key."
+  - **Match:** every component.
+  - **Spec-drift observation (sub-finding, not blocking):** the launch-campaign spec § Phase 6 describes a "two-call gate ... per-campaign vendor gates fire a minimal turn-structure prompt" pattern, but the actual API has no preflight/commit split — there's no second call to gate. The single AskUserQuestion (User gate 6) IS the safeguard. Per-campaign turn-structure prompts would add no information for `/api/leads/attach-leads`. This was offered as an option at User gate 6 (operator chose single-pass). Same observation applies to Phase 4 UPLOAD's two-call narrative. Could feed into spec tightening at Task 13 close — fold into existing Sx-9/BC-5906/BC-6439 lineage.
+
+- **R-13** — ⏭️ **Deferred.** BC-6545 spec-read suffices; live-fire requires pre-poison setup (lead pre-staged in another campaign with `in_sequence` status) that's not justified for an institutional-memory-only check. Spec at launch-campaign.md § Phase 6 step 5d ("`allow_parallel_sending` branch") + email-bison.md § Known gotchas continue to enforce the never-auto-enable rule.
 
 ### Phase 7 (ATTACH SENDERS)
 
