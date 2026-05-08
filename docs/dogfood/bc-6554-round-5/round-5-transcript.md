@@ -357,8 +357,42 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 10 (PREVIEW — first live-walk in chain)
 
-- **R-20** — TBD
-- **R-21 ★** — TBD
+- **R-20** — ✅ **Expected.** **(Mode 1 local-render sanity checklist passes.)**
+  - **Preview lead selection:** largest cell = `Role|Other` (3 leads); first lead by lead-id order = `info@dogfoodtest.com` (id 14759, Info Account, Test Dogfood Aquarium, Operations Manager). Per Phase 10 step 1 spec.
+  - **Render algorithm:** EB-substitution layer (`{TOKEN}` → CSV value or `custom_variables[].default`) + deterministic spintax (first-option pick) + `<br><br>` → `\n\n` for display.
+  - **`{SENDER_FIRST_NAME}` resolution:** priority chain hit #1 (artifact-default = `"Amanuel"`). BC-6784 caveat applies — recipients see actual sender record's first_name, not artifact default.
+  - **5/5 sanity checks pass:**
+    - ✅ No unresolved `{VARIABLE}` tokens
+    - ✅ No unresolved spintax
+    - ✅ No em-dash (`—`)
+    - ✅ No `<p>` / `</p>` tags
+    - ✅ No `{{` double-brace
+  - **Rendered output (verbatim):**
+
+    **STEP 1 (subject):** `Quick question`
+
+    **STEP 1 (body):**
+    > Saw the downtown master-plan announcement at Test Dogfood Aquarium Info, and it lined up with a pattern we've been watching across municipalities.
+    >
+    > Most municipalities teams we work with run into downtown lighting specs getting stuck at design review, and one that solved it was Boulder Pearl Street, who ran 38% higher evening foot traffic in 2024.
+    >
+    > Happy to pull a short architectural lighting preview for Test Dogfood Aquarium if useful, no commitment.
+    >
+    > Best,
+    > Amanuel
+
+    **STEP 2 (subject artifact form):** `Quick question` (EB auto-prepends `Re: ` at delivery)
+
+    **STEP 2 (body):**
+    > Circling back in case it got buried. Still happy to send the architectural lighting preview whenever it's useful.
+    >
+    > Best,
+    > Amanuel
+  - **Operator-noted artifacts of synthetic test data (non-issues):** the `{COMPANY} {FIRST_NAME}` adjacency reads as "Test Dogfood Aquarium Info" (placeholder name "Info Account" of role-prefix test lead colliding with company-name placement); the `{COMPANY}` token appears twice in step 1. Both are inherent to the round-1-era synthetic CSV, not artifact bugs. R-20 validates render mechanics, not copy quality. Operator confirmed: "this is mostly a non issue ... as long as it is rendering how we expect it to render."
+  - **Match:** every component of Phase 10 Mode 1 spec.
+
+- **R-21 ★** — ⏸️ **Paused before Mode 2 `--test-send`** per operator pacing decision. Will resume in next session.
+  - Pending: pick one of 4 main campaigns → call `POST /api/campaigns/sequence-steps/{step_1_id}/test-email` with `to_email: corinne+bc-6785-r5@britenites.com` → 1 real email lands in operator inbox → compare against R-20 Mode 1 render to verify BC-6784 `{SENDER_*}` shadow at delivery.
 
 ### Phase 11 (ACTIVATE — first live-walk in chain)
 

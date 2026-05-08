@@ -243,5 +243,9 @@
     }
   },
   "f29_clamp_observed": "step_1.wait_in_days clamped from artifact 0 \u2192 1 per F29",
-  "bc_6301_re_prepend_observed": "step_2.subject submitted bare; stored as `Re: {bare-subject}` (single Re: prepend) on all 4 sequences"
+  "bc_6301_re_prepend_observed": "step_2.subject submitted bare; stored as `Re: {bare-subject}` (single Re: prepend) on all 4 sequences",
+  "preview_method": "local-render",
+  "preview_lead_email": "info@dogfoodtest.com",
+  "preview_rendered_at": "2026-05-08T21:35:00-06:00",
+  "phase_10_mode_2_pending": true
 }
