@@ -14,7 +14,7 @@
   "sender_resolution_method": "artifact-default",
   "unique_per_lead_enabled": true,
   "launched_at": "2026-05-08T11:40:00-06:00",
-  "last_completed_phase": 6,
+  "last_completed_phase": 7,
   "_round_5_notes": {
     "isolation_discipline": "Lead tag `bc-6785-r5`; campaign name prefix `BC-6785`; no new permanent custom variables (R-28 uses existing UPPERCASE name).",
     "metadata_path_override": "Spec \u00a7 IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects the uppercase worktree name `BC-6785`. Auto-detection falls through to docs/campaigns/brite-labs/ (production audit dir), defeating IV-3's intent. Manual override: writing to <worktree>/dogfood/ per IV-3's stated purpose. Finding F-IV-3 logged in transcript as a round-6 candidate (regex case-sensitivity bug)."
@@ -182,5 +182,32 @@
       14755,
       14756
     ]
-  }
+  },
+  "sender_pool_total": 772,
+  "sender_pool_pages": 52,
+  "sender_ids_attached": [
+    981,
+    982,
+    983,
+    984,
+    985,
+    986,
+    987,
+    988,
+    989,
+    990,
+    991,
+    992,
+    993,
+    994,
+    995
+  ],
+  "sender_attach_counts": {
+    "professional|Google": 15,
+    "role|Other": 15,
+    "personal|Google": 15,
+    "personal|Microsoft": 15
+  },
+  "sender_verify_mode": "paginated",
+  "f24_partial_pool_decision": "page-1-only (15 of 772) \u2014 round-4 dogfood pattern preserved; senders attached to Draft campaigns that never activate so no warmup pollution"
 }

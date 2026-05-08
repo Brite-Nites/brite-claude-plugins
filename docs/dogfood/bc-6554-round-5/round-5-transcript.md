@@ -287,9 +287,32 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 7 (ATTACH SENDERS)
 
-- **R-14** — TBD
-- **R-15** — TBD
-- **R-16** — TBD
+- **R-14** — ✅ **Expected.**
+  - **Endpoint verified:** `GET /api/sender-emails` (paginated; `?status` filter; `?per_page` silently ignored).
+  - **Pagination meta (page 1 of `?status=connected`):** `current_page: 1, last_page: 52, per_page: 15, total: 772`. Sx-10 hardcoded `per_page: 15` confirmed: passing `?per_page=100` returned 15 items with `meta.per_page: 15` (silent ignore).
+  - **Status filter case-asymmetry (Sx-11):** lowercase `?status=connected` accepted; response data shows `status: "Connected"` (titlecase). Lowercase-on-filter / titlecase-on-data asymmetry verified.
+  - **Match:** Every component of F23/Sx-10/Sx-11 combined hypothesis.
+
+- **R-15** — ✅ **Expected.** **(F24 partial-pool decision faithfully applied; sender invariant preserved across the 4-campaign set.)**
+  - **Workspace 13 sender pool:** 772 connected senders. F24 decision per round-4 + plan: attach page 1 (15 senders) only — testing API mechanics, not production warmup. Operator confirmed at User gate 7.
+  - **Senders attached:** IDs 981-995 (all `microsoft_oauth`, `washington[festive|winter]lights.com`, all `Connected`, all `warmup_enabled: true`, all tagged `Outlook` + `ScaledMail-Microsoft`). Brite production scaled-mail pool.
+  - **4 parallel `POST /api/campaigns/{id}/attach-sender-emails` calls all returned `success: true`.**
+  - **Sender invariant preserved:** the same 15-sender set was attached to each of the 4 campaigns. NEVER split senders across campaigns — invariant holds at runtime.
+  - **No warmup pollution risk:** campaigns 43-46 are in `Draft` state and stay there for round-5; sender-attach to never-activating campaigns produces no warmup activity.
+  - **Match:** F24 partial-pool decision applied as intended; sender invariant preserved.
+
+- **R-16** — ✅ **Expected.**
+  - **Verification mode:** `get_campaign` does NOT expose `attached_senders_count` (or any sender count scalar); fallback to spec's pagination-mode verification via `GET /api/campaigns/{campaign_id}/sender-emails` (verified via `search_api_spec`). `sender_verify_mode: "paginated"`.
+  - **Per-campaign verification (4 parallel calls immediately after attach):**
+
+    | Campaign | meta.total | sender IDs returned |
+    |---|---|---|
+    | 43 | 15 | 981-995 ✓ |
+    | 44 | 15 | 981-995 ✓ |
+    | 45 | 15 | 981-995 ✓ |
+    | 46 | 15 | 981-995 ✓ |
+  - **Sub-second eventual-consistency:** all 4 verification calls fired immediately after the attach calls returned, and all 4 returned the expected attach state with no stale-read or partial-attach observed.
+  - **Match:** F26/R-15 eventual-consistency hypothesis holds.
 
 ### Phase 8 (SCHEDULE)
 
