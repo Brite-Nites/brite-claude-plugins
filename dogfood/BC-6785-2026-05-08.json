@@ -14,7 +14,7 @@
   "sender_resolution_method": "artifact-default",
   "unique_per_lead_enabled": true,
   "launched_at": "2026-05-08T11:40:00-06:00",
-  "last_completed_phase": 4,
+  "last_completed_phase": 5,
   "_round_5_notes": {
     "isolation_discipline": "Lead tag `bc-6785-r5`; campaign name prefix `BC-6785`; no new permanent custom variables (R-28 uses existing UPPERCASE name).",
     "metadata_path_override": "Spec \u00a7 IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects the uppercase worktree name `BC-6785`. Auto-detection falls through to docs/campaigns/brite-labs/ (production audit dir), defeating IV-3's intent. Manual override: writing to <worktree>/dogfood/ per IV-3's stated purpose. Finding F-IV-3 logged in transcript as a round-6 candidate (regex case-sensitivity bug)."
@@ -139,5 +139,23 @@
       "sales@dogfoodtest.com",
       "contact@dogfoodtest.com"
     ]
-  }
+  },
+  "campaign_ids": {
+    "professional|Google": 43,
+    "role|Other": 44,
+    "personal|Google": 45,
+    "personal|Microsoft": 46
+  },
+  "decoy_campaign_id": 47,
+  "existing_campaign_matches": [],
+  "reused_existing_ids": false,
+  "plain_text_applied": true,
+  "activated_per_campaign": {
+    "professional|Google": null,
+    "role|Other": null,
+    "personal|Google": null,
+    "personal|Microsoft": null
+  },
+  "patch_omit_test_run": true,
+  "patch_omit_test_result": "REVERT_OBSERVED \u2014 `sequence_prioritization`-only PATCH silently reverted `plain_text: true \u2192 false`; restored via re-PATCH with `plain_text: true`."
 }

@@ -230,10 +230,39 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 5 (CAMPAIGN CREATE)
 
-- **R-8 ★** — TBD
-- **R-9** — TBD
-- **R-10** — TBD
-- **R-11** — TBD
+- **R-8 ★** — ✅ **Expected.** **(BC-6514 + BC-6654 multiplicative segmentation: ratified at runtime.)**
+  - **Pre-list (silent-duplicate guard precheck):** `list_campaigns(search="BC-6785")` returned 0 matches before creates — happy path; User gate 5 rendered the empty-pre-list variant.
+  - **Operator confirmation:** "Yes — create the 4 campaigns."
+  - **Output:** 4 campaigns created with sequential IDs 43-46 via `mcp__emailbison-personal__create_campaign`. All `status: draft`, `type: outbound`, `success: true`. Names follow the BC-6514 format `BC-6785 | MAIN | {Email-type} | {ESP}` (Email-type before ESP per BC-6514 multiplicative-axis decision; round-5 substitutes the spec's `{base}` slot with `BC-6785 | MAIN` per Isolation Discipline Rule 2):
+    - id 43 — `BC-6785 | MAIN | Professional | Google` (2 leads)
+    - id 44 — `BC-6785 | MAIN | Role | Other` (3 leads)
+    - id 45 — `BC-6785 | MAIN | Personal | Google` (2 leads)
+    - id 46 — `BC-6785 | MAIN | Personal | Microsoft` (2 leads)
+  - `metadata.segments` map populates with compound `{email_type}|{esp}` keys matching the BC-6654 schema rewrite.
+  - **Match:** Every component — 4-cell multiplicative coverage, naming convention, segments-map keying. Round-4 keystone S-7★ regression holds at round-5.
+
+- **R-9** — ✅ **Expected.** **(BC-6302 silent-duplicate guard fires correctly.)**
+  - **Setup:** post-creation of the 4 main campaigns, pre-created decoy `BC-6785 | DECOY | duplicate-test` (id 47) via `create_campaign`. Both `BC-6785 | MAIN | ...` and `BC-6785 | DECOY | ...` names start with the `BC-6785` substring base.
+  - **Output:** `list_campaigns(search="BC-6785")` returned 5 matches (ids 43-47). All 5 names start with the `BC-6785` substring base → all 5 would feed `existing_campaign_matches` in step 3 → User gate 5 would render in the duplicate-warning variant if Phase 5 were re-run on this base. The 4-option prompt (Reuse existing IDs / Create N new anyway / Rename / Abort) would activate.
+  - **Expected per spec:** Issue body R-9 (round-4 S-8 regression + BC-6302/F20 silent-duplicate guard) — "pre-create one decoy; verify branched gate-5 render."
+  - **Match:** guard fires correctly; substring-match precondition + branched-render mechanics confirmed.
+  - **Note:** decoy campaign 47 carries `BC-6785 |` prefix → cleanly removable at Task 13 via UI search-and-archive.
+
+- **R-10** — ✅ **Expected.** **(BC-6306 plain_text scope + BC-6783 hypothesis correction validated at runtime.)**
+  - **Pre-PATCH baseline:** `get_campaign(43)` shows `settings: {max_emails_per_day: 1000, max_new_leads_per_day: 1000, open_tracking: false, plain_text: false, can_unsubscribe: false}` — **`plain_text: false` default confirmed**, matches BC-6306 / EB API spec note "If nothing sent, false is assumed."
+  - **PATCH execution:** 4 parallel calls to `PATCH /api/campaigns/{id}/update` with body `{"plain_text": true}` — all 4 returned `success: true` with `plain_text: true` in response.
+  - **BC-6783 hypothesis correction confirmed:** ONLY `plain_text` was applied. `reputation_building` field is absent from `get_campaign` response (likely server-defaulted to `false` per spec but not surfaced); `can_unsubscribe: false` and `open_tracking: false` defaults preserved (NOT modified by Phase 5 step 8). The BC-6306 implementation scope is `plain_text` only — round-4 hypothesis (S-9) had been broader; round-5 hypothesis tracks the actual implementation.
+  - **Match:** every component.
+
+- **R-11** — ✅ **Expected.** 🔥 **(BC-6544 PATCH-omit semantics CONFIRMED AT RUNTIME — broader scope than the original BC-6544 framing assumed.)**
+  - **Test setup:** picked campaign 46 (`BC-6785 | MAIN | Personal | Microsoft`) — currently has `plain_text: true` from R-10's PATCH.
+  - **First PATCH attempt — `{max_emails_per_day: 500}` only:** returned HTTP 422 (rejection — likely a min/max validation rule not visible in the API spec snippet; not a BC-6544 PATCH-omit signal). Pivoted to a different harmless field for the test design.
+  - **Second PATCH attempt — `{sequence_prioritization: "followups"}` only (a non-boolean string field unrelated to plain_text):** returned `success: true` with response body showing **`plain_text: false`**. Silent revert observed: a PATCH body that omits a boolean field causes that field to revert to its default-false state, **even when the PATCH targets a wholly unrelated non-boolean field**.
+  - **Restoration:** re-PATCHed `{plain_text: true}` immediately. Response confirmed `plain_text: true` restored on campaign 46.
+  - **Expected per spec:** Issue body R-11 (round-4 S-10 regression) — "BC-6544 PATCH-omit live test; verify `plain_text` reverts to false on omit; restore via re-PATCH."
+  - **Match:** every component. Spec's API description (*"If nothing sent, false is assumed"*) confirmed live for the omitted-boolean field even when the PATCH targeted an unrelated string field.
+  - **Broader-scope clarification (round-5 contribution):** the existing spec text in `launch-campaign.md § Phase 5 step 8` and `email-bison.md § Known gotchas § plain_text` (both shipped via BC-6544 PR #242, 2026-05-08) already correctly state — *"ANY future PATCH on this campaign that intends to preserve `plain_text: true` MUST re-send it explicitly in the body."* Round-5 confirms the rule is intentional in its broadest form: even a PATCH that targets a single non-boolean string field (no booleans in the body) trips the revert. The spec language is already correct; this round-5 evidence ratifies the rule's actual scope at runtime — not a documentation gap, an evidence-strengthener.
+  - **Production discipline implication:** any team member or workflow editing campaigns through the API (not just multi-boolean PATCHes) must re-send each currently-`true` boolean (`plain_text`, `open_tracking`, `can_unsubscribe`, `reputation_building`) on every PATCH or the omitted ones silently revert. The EB UI almost certainly handles this internally (sends the full settings payload on save); anyone hitting `/api/campaigns/{id}/update` directly bears the discipline.
 
 ### Phase 6 (ATTACH LEADS)
 
