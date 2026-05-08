@@ -305,6 +305,18 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ## Round-5 follow-up candidates (populated at close)
 
+### Standalone findings (not blocking; round-6 candidates)
+
+- **F-IV-3** (Phase 1 step 10) — IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects uppercase worktree names. Mitigated for round-5 via manual path override. Round-6 candidate; one-character regex fix.
+- **F-R-28a** (Phase 4) — launch-campaign spec § Phase 4 step 1 describes `upsert_multiple_leads` as a "variant of `/api/leads/multiple`," but POST `/api/leads/upsert-multiple` returns 405 and `search_api_spec` shows no upsert variant. Either the path is wrong, or upsert is achieved by re-POSTing.
+- **F-R-28b** (Phase 4) — launch-campaign spec describes `bulk_create_leads_csv` as `POST /api/leads/bulk`; actual path per `search_api_spec` is `POST /api/leads/bulk/csv`. `/api/leads/bulk` is a DELETE-only path.
+
+### Non-blocking ratifications worth optional follow-up
+
+- **R-11 broader-scope ratification (Phase 5)** — BC-6544 PATCH-omit footgun confirmed at runtime in its broadest form: a non-boolean string-field PATCH (e.g., `{sequence_prioritization}` only) reverts an unrelated boolean (`plain_text`) to false. Existing BC-6544 spec text already states this in the broadest possible framing — round-5 contributes runtime evidence, not a documentation gap. Optional follow-ups for operator decision at close: (a) annotate BC-6544 spec sites with `verified-at-runtime BC-6785 R-11`, (b) audit b2b workspace 55 production campaigns for current plain_text state (the actively-sending workspace; not done in round-5 because round-5 scope = workspace 13), (c) file a Linear follow-up capturing the broader-scope evidence + workspace-55 audit recommendation. Decision deferred to Task 13 close.
+
+### Hypothesis-by-row populated at close
+
 TBD.
 
 ---
