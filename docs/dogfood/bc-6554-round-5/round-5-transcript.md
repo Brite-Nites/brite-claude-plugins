@@ -333,8 +333,27 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 9 (SEQUENCE)
 
-- **R-18** — TBD
-- **R-19** — TBD
+- **R-18** — ✅ **Expected.** **(BC-6301 variant boolean + bare step_2.subject + auto Re: prepend ratified.)**
+  - **Endpoint verified:** v1.1 path `POST /api/campaigns/v1.1/{campaign_id}/sequence-steps` (legacy `/api/campaigns/{id}/sequence-steps` not used) per `search_api_spec`.
+  - **Body construction:** `{title: "BC-6785 round-5 sequence", sequence_steps: [{step1}, {step2}]}`. Step 1: `variant: false`, `thread_reply: false`. Step 2: `variant: false` (no A/B for dogfood), `thread_reply: true`. Both steps submitted with `email_subject: "{Quick|Fast|30s} {question|check|idea}"` BARE (no Re: prefix on step 2).
+  - **4 parallel POST calls all returned `success: true`.** Sequence IDs assigned 19-22 with step IDs 34-41 (sequential):
+
+    | Campaign | Sequence id | Step 1 id | Step 2 id |
+    |---|---|---|---|
+    | 43 (Professional\|Google) | 19 | 34 | 35 |
+    | 44 (Role\|Other) | 20 | 36 | 37 |
+    | 45 (Personal\|Google) | 21 | 38 | 39 |
+    | 46 (Personal\|Microsoft) | 22 | 40 | 41 |
+  - **BC-6301 auto Re: prepend confirmed live:** all 4 sequences' stored step_2 returned `email_subject: "Re: {Quick|Fast|30s} {question|check|idea}"` (single Re: prepend, no double-prefix). The artifact's bare submission round-trips correctly through EB's render layer.
+  - **`variant: false` boolean (not int):** all 4 step_1 + step_2 returned `variant: false` in response. BC-6301 boolean-vs-int rule held.
+  - **Match:** every component.
+
+- **R-19** — ✅ **Expected.** **(F29/F30 + BC-6548 wait_in_days clamp + thread_reply boolean + UPPERCASE-only token rule happy-path ratified.)**
+  - **F29 clamp:** artifact's `step_1.wait_in_days = 0` → submitted as `1` (per `max(1, n)` clamp) → stored as `1`. Step 1 cannot send immediately on resume; minimum 1-day wait is enforced.
+  - **F30 / step 2 floor:** `step_2.wait_in_days = 4` (≥ 3 production rule) → stored as `4`.
+  - **`thread_reply` boolean shape:** step 1 returned `thread_reply: false` (boolean); step 2 returned `thread_reply: true` (boolean). v1.1 spec contract held — not int, not string, native boolean.
+  - **BC-6548 UPPERCASE-only token rule (happy path):** all 10 distinct UPPERCASE tokens in step 1 body (`{RECENCY_ANCHOR}`, `{COMPANY}`, `{FIRST_NAME}`, `{VERTICAL_DESCRIPTOR}`, `{SPECIFIC_FRICTION}`, `{PROOF_POINT_COMPANY}`, `{PROOF_POINT_NUMBER}`, `{PROOF_POINT_TIMEFRAME}`, `{FREE_ASSET_NOUN}`, `{SENDER_FIRST_NAME}`) round-tripped intact through the EB render layer — stored bodies preserve exact UPPERCASE casing as submitted. No lowercase coercion, no token mangling. Sad-path UPPERCASE-violation test deferred to R-26 (Task 12 side-flow).
+  - **Match:** every component.
 
 ### Phase 10 (PREVIEW — first live-walk in chain)
 

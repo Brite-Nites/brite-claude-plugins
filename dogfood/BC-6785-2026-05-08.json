@@ -14,7 +14,7 @@
   "sender_resolution_method": "artifact-default",
   "unique_per_lead_enabled": true,
   "launched_at": "2026-05-08T11:40:00-06:00",
-  "last_completed_phase": 8,
+  "last_completed_phase": 9,
   "_round_5_notes": {
     "isolation_discipline": "Lead tag `bc-6785-r5`; campaign name prefix `BC-6785`; no new permanent custom variables (R-28 uses existing UPPERCASE name).",
     "metadata_path_override": "Spec \u00a7 IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects the uppercase worktree name `BC-6785`. Auto-detection falls through to docs/campaigns/brite-labs/ (production audit dir), defeating IV-3's intent. Manual override: writing to <worktree>/dogfood/ per IV-3's stated purpose. Finding F-IV-3 logged in transcript as a round-6 candidate (regex case-sensitivity bug)."
@@ -217,5 +217,31 @@
     "personal|Google": 22,
     "personal|Microsoft": 23
   },
-  "schedule_clone_observed": "BC-6303 confirmed \u2014 each apply created a NEW Campaign Schedule entity (ids 20-23), NOT a reference to source template (id 3)."
+  "schedule_clone_observed": "BC-6303 confirmed \u2014 each apply created a NEW Campaign Schedule entity (ids 20-23), NOT a reference to source template (id 3).",
+  "sequence_ids": {
+    "professional|Google": 19,
+    "role|Other": 20,
+    "personal|Google": 21,
+    "personal|Microsoft": 22
+  },
+  "sequence_step_ids": {
+    "professional|Google": {
+      "step_1": 34,
+      "step_2": 35
+    },
+    "role|Other": {
+      "step_1": 36,
+      "step_2": 37
+    },
+    "personal|Google": {
+      "step_1": 38,
+      "step_2": 39
+    },
+    "personal|Microsoft": {
+      "step_1": 40,
+      "step_2": 41
+    }
+  },
+  "f29_clamp_observed": "step_1.wait_in_days clamped from artifact 0 \u2192 1 per F29",
+  "bc_6301_re_prepend_observed": "step_2.subject submitted bare; stored as `Re: {bare-subject}` (single Re: prepend) on all 4 sequences"
 }
