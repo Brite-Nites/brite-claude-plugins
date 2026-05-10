@@ -38,11 +38,6 @@ if [ "${#EXPORTS[@]}" -gt 0 ]; then
       echo "bw-run.sh: bw get password failed for item \`$item\`" >&2
       exit 3
     }
-    # T8 instrumentation (TEMPORARY — strip in T10 per plan): log first 8
-    # hex chars of SHA-256 of the fetched value so Q6 rotation propagation
-    # can be observed without exposing the secret.
-    sha=$(printf '%s' "$value" | shasum -a 256 | awk '{print substr($1,1,8)}')
-    echo "bw-run.sh: $key fetched [sha256=$sha]" >&2
     export "$key=$value"
   done
 fi
