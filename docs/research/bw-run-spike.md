@@ -34,3 +34,16 @@ into the structured `## Q1` … `## Q7` sections above this appendix.)
   - N=7 (BC-6906 all keys): sequential ≈ 22.4s, batch ≈ 3.2s — batch saves ~19s (86%)
 - **BC-6906 wrapper-interface recommendation**: replace sequential `bw get password $item` loop with single `bw list items --search $prefix | jq …` batch parse. Spike's POC stays sequential per design decision #3 (simplicity for ~25-line spec); production wrapper should batch.
 - **Caveat**: `bw list items --search` returns full item objects including `.login.password`. Use a deterministic prefix (e.g., `tam-map-` for tam-map keys) to scope the batch. Notes-stored secrets (the existing bundle shape) need separate handling — BC-6906 provisions per-item Login entries instead.
+
+### Q4 — MCP `initialize` handshake passthrough
+
+- **Wrapped command**: `bw-run.sh SPIDER_API_KEY=tam-map-spider-api-key -- npx -y spider-cloud-mcp@2.1.1`
+- **Driver**: `scripts/spike-bw-run/exercise-q4.sh` (perl-alarm 45s timeout — macOS has no GNU `timeout`/`gtimeout`)
+- **Stdin**: `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"bc-6905-spike","version":"0"}}}`
+- **Stdout (first line)**: `{"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"spider-cloud-mcp","version":"2.1.0"}},"jsonrpc":"2.0","id":1}`
+- **Stdout byte count**: 172 (just the response — nothing else)
+- **Stderr byte count**: **0** (zero wrapper noise, zero npx noise)
+- **`bw-run.sh:` substring grep on stdout**: 0 matches
+- **Exit code**: 0 (clean shutdown on stdin EOF)
+- **Server reported**: `protocolVersion=2025-06-18`, `serverInfo.name=spider-cloud-mcp`, `serverInfo.version=2.1.0` (npm resolved `@2.1.1` request to `2.1.0` — server-side tag, not a wrapper concern)
+- **Verdict**: **PASS — wrapper is a transparent stdio passthrough**. `bw-run.sh` writes its own preflight checks to stderr (lines `scripts/spike-bw-run/bw-run.sh:9-13`), never to stdout, and uses `exec "$@"` (`scripts/spike-bw-run/bw-run.sh:46`) so the MCP inherits stdin/stdout directly with no shell-level buffering or interleaving. No corruption of MCP `initialize` request/response observed.
