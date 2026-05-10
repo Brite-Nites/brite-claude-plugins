@@ -3,7 +3,7 @@
 # Ported: 2026-04-24
 # License: MIT — see plugins/marketing/references/tam/UPSTREAM.md
 # Upstream path: scripts/enrich_waterfall.py
-# Changes: verbatim port, no functional edits
+# Changes: verbatim port + BC-7051 local fix (split async/sync CMs at line 99 — see UPSTREAM.md)
 
 """
 Enrichment waterfall — BlitzAPI (owner discovery) → Prospeo (fallback).
@@ -96,16 +96,17 @@ async def run(companies: list[dict], outfile: str):
     blitz_sem = asyncio.Semaphore(1)  # serialized
     prospeo_sem = asyncio.Semaphore(20)
 
-    async with aiohttp.ClientSession() as session, open(outfile, "w") as f:
-        tasks = [enrich_one(session, blitz_sem, prospeo_sem, c) for c in companies]
-        done = 0
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            f.write(json.dumps(result) + "\n")
-            f.flush()
-            done += 1
-            if done % 100 == 0:
-                print(f"  [enrich] {done}/{len(companies)}", file=sys.stderr)
+    with open(outfile, "w") as f:
+        async with aiohttp.ClientSession() as session:
+            tasks = [enrich_one(session, blitz_sem, prospeo_sem, c) for c in companies]
+            done = 0
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
+                f.write(json.dumps(result) + "\n")
+                f.flush()
+                done += 1
+                if done % 100 == 0:
+                    print(f"  [enrich] {done}/{len(companies)}", file=sys.stderr)
 
 
 def main():
