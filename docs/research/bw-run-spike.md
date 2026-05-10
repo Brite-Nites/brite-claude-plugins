@@ -47,3 +47,13 @@ into the structured `## Q1` … `## Q7` sections above this appendix.)
 - **Exit code**: 0 (clean shutdown on stdin EOF)
 - **Server reported**: `protocolVersion=2025-06-18`, `serverInfo.name=spider-cloud-mcp`, `serverInfo.version=2.1.0` (npm resolved `@2.1.1` request to `2.1.0` — server-side tag, not a wrapper concern)
 - **Verdict**: **PASS — wrapper is a transparent stdio passthrough**. `bw-run.sh` writes its own preflight checks to stderr (lines `scripts/spike-bw-run/bw-run.sh:9-13`), never to stdout, and uses `exec "$@"` (`scripts/spike-bw-run/bw-run.sh:46`) so the MCP inherits stdin/stdout directly with no shell-level buffering or interleaving. No corruption of MCP `initialize` request/response observed.
+
+### Q7 — collection-share retrieval semantics
+
+- **Item**: `tam-map-spider-api-key` (provisioned in T2 via Bitwarden web UI)
+- **Sharing**: Engineering collection (organizationId `f4adda58-...`, collectionIds `["7d6f25ca-...]"`); explicitly NOT user-share
+- **Driver**: inline bash heredoc (content equivalent to `scripts/spike-bw-run/verify-q7.sh`, kept on disk for repro)
+- **Metadata projection**: type=1 (login), organizationId set, inEngineering=true, hasLoginPassword=true
+- **Retrieval check**: `bw_get_exit=0`, `value_length=39` (consistent with Spider's typical alphanumeric key length), `value_nonempty=true`
+- **Verdict**: **PASS — collection-share is sufficient for `bw get password`**. BC-6906's per-item provisioning model (one Bitwarden Login item per env-var key, shared via Engineering collection-level permission, NOT individually user-shared) works with CLI semantics. No per-user share gymnastics required.
+- **BC-6906 implication**: admin step provisions 7 items in Engineering collection via Bitwarden UI. Each Brite engineer gets access automatically through their collection membership. No per-user provisioning needed.
