@@ -28,6 +28,13 @@ case "$cmd" in
     search="${arg3:-tam-map-}"
     echo "## Q3 — \`bw list items --search $search\` ($mode, n=$trials)"
     if [ "$mode" = "warm" ]; then bw sync >/dev/null; fi
+    # Items-returned inspection (names + hasPassword, no values)
+    inspection=$(bw list items --search "$search" \
+      | jq '[.[] | {name, hasPassword: (.login.password != null and .login.password != "")}]')
+    count=$(echo "$inspection" | jq 'length')
+    echo "items_returned=$count"
+    echo "$inspection"
+    # Timing trials
     for i in $(seq 1 "$trials"); do
       out=$( { /usr/bin/time -p bw list items --search "$search" >/dev/null; } 2>&1 )
       real=$(echo "$out" | awk '/^real/ {print $2}')
