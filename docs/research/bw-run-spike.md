@@ -70,3 +70,21 @@ into the structured `## Q1` … `## Q7` sections above this appendix.)
 - **Wrapper-side verdict**: **PASS — fresh value on every spawn.** No caching observed at wrapper layer.
 - **Lifecycle-side gap (deferred to BC-6906)**: Q6's full UX promise — "no Claude Code restart for key rotation" — also requires Claude Code to *re-spawn* the MCP server when something changes (e.g., a tool call after rotation). The spike does NOT validate this dimension because doing so requires `.mcp.json` wiring (out of spike scope per design decision #5). BC-6906's `.mcp.json` change to wrap `spider-cloud-mcp` through bw-run is the necessary precondition; BC-6906 must measure the lifecycle dimension before promoting bw-run to the canonical pattern.
 - **Spider-auth round-trip not run**: Plan T8 step 3 originally suggested calling a Spider tool (`spider_get_credits`) to confirm the new value reached Spider. Skipped because the wrapper-side question is fully answered by the SHA pattern; Spider-auth would only test that Spider rejects bad keys, which is Spider's behavior, not the wrapper's. Saved scope.
+
+### Q5 — vault-locked-mid-session UX
+
+- **Setup**: `bw status` confirmed unlocked, then `bw lock` invalidated the session server-side. `bw status` post-lock reports `locked` (BW_SESSION env var still in shell, but the token is now stale — server rejects it).
+- **Wrapper run**: `bash scripts/spike-bw-run/bw-run.sh SPIDER_API_KEY=tam-map-spider-api-key -- echo wrapped`
+- **Result**:
+  - exit code: **1** ✓
+  - stdout: **0 bytes** — `echo wrapped` never executed (exec was blocked)
+  - stderr: `bw-run.sh: vault is not unlocked (BW_SESSION may be stale). Run \`bw unlock\` again.`
+- **Checks (all PASS)**:
+  - stderr contains `bw unlock` ✓
+  - stdout does NOT contain `wrapped` ✓
+  - exit code = 1 ✓
+- **Code paths cited**:
+  - `scripts/spike-bw-run/bw-run.sh:7-9` — BW_SESSION-not-set branch (not exercised here; BW_SESSION was still set, just stale)
+  - `scripts/spike-bw-run/bw-run.sh:11-13` — `bw status` returns `"status":"locked"`, grep fails, stderr message + exit 1 (exercised here)
+- **Verdict**: **PASS — message clear, exec blocked, exit code informative**. Failure mode is observable (stderr message names the remediation: `bw unlock`), and the wrapped command never sees a partially-initialized environment. No silent failure, no opaque MCP-side error cascade.
+- **Option-A UX cost** (recorded for findings/adapt list): in restart-based env-propagation mode (Pattern A per BC-5947 task-3 + this spike's T1 decision), recovering from a mid-session lock means: user `bw unlock`s in parent shell, exports new `BW_SESSION`, restarts Claude Code. ~30 seconds of ergonomic friction per lock event. Acceptable for occasional locks; would compound for users on aggressive vault-lock policies (e.g., 5-min idle timeout).
