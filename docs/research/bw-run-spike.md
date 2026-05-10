@@ -57,3 +57,16 @@ into the structured `## Q1` … `## Q7` sections above this appendix.)
 - **Retrieval check**: `bw_get_exit=0`, `value_length=39` (consistent with Spider's typical alphanumeric key length), `value_nonempty=true`
 - **Verdict**: **PASS — collection-share is sufficient for `bw get password`**. BC-6906's per-item provisioning model (one Bitwarden Login item per env-var key, shared via Engineering collection-level permission, NOT individually user-shared) works with CLI semantics. No per-user share gymnastics required.
 - **BC-6906 implication**: admin step provisions 7 items in Engineering collection via Bitwarden UI. Each Brite engineer gets access automatically through their collection membership. No per-user provisioning needed.
+
+### Q6 — rotation propagation (wrapper-side)
+
+- **Item**: `tam-map-spider-api-key` (Engineering collection)
+- **Driver**: `scripts/spike-bw-run/exercise-rotation.sh` — runs the wrapper with a `true` no-op tail and reads the temporary SHA-256-prefix log line that bw-run.sh emits to stderr (added in T8, stripped in T10 per plan)
+- **Trials** (each with `bw sync` first, then a fresh wrapper invocation):
+  - Trial 1 (baseline): `sha256_prefix=5669e29e`, exit 0
+  - Trial 2 (post-mutation — single char prepended in Bitwarden UI, saved, sync'd): `sha256_prefix=49c65812`, exit 0 (≠ Trial 1, fresh fetch)
+  - Trial 3 (post-restoration — char removed, saved, sync'd): `sha256_prefix=5669e29e`, exit 0 (= Trial 1, fresh fetch back to baseline)
+- **Pattern observed**: X → Y → X. Wrapper has zero caching; every invocation runs `bw get password` afresh. No stale-value risk.
+- **Wrapper-side verdict**: **PASS — fresh value on every spawn.** No caching observed at wrapper layer.
+- **Lifecycle-side gap (deferred to BC-6906)**: Q6's full UX promise — "no Claude Code restart for key rotation" — also requires Claude Code to *re-spawn* the MCP server when something changes (e.g., a tool call after rotation). The spike does NOT validate this dimension because doing so requires `.mcp.json` wiring (out of spike scope per design decision #5). BC-6906's `.mcp.json` change to wrap `spider-cloud-mcp` through bw-run is the necessary precondition; BC-6906 must measure the lifecycle dimension before promoting bw-run to the canonical pattern.
+- **Spider-auth round-trip not run**: Plan T8 step 3 originally suggested calling a Spider tool (`spider_get_credits`) to confirm the new value reached Spider. Skipped because the wrapper-side question is fully answered by the SHA pattern; Spider-auth would only test that Spider rejects bad keys, which is Spider's behavior, not the wrapper's. Saved scope.
