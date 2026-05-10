@@ -14,8 +14,8 @@ echo ""
 
 # Metadata: collectionIds, organizationId, type, hasPassword
 echo "=== Metadata (no values) ==="
-bw list items --search "$ITEM" | jq --arg engId "$ENG_COLL_ID" '
-  [.[] | select(.name == $ENV.ITEM // "tam-map-spider-api-key")
+bw list items --search "$ITEM" | jq --arg engId "$ENG_COLL_ID" --arg item "$ITEM" '
+  [.[] | select(.name == $item)
        | {
            name,
            type,

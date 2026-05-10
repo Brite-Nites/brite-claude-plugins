@@ -38,5 +38,6 @@ echo ""
 echo "=== STDOUT first-line shape (jq probe) ==="
 head -1 /tmp/q4-stdout.txt | jq '{jsonrpc, id, hasResult: (.result != null), protocolVersion: .result.protocolVersion, hasCapabilities: (.result.capabilities != null), serverInfo: .result.serverInfo}' 2>&1 || echo "(stdout not parseable as JSON)"
 echo ""
-echo "=== STDOUT bw-run.sh noise check (should be EMPTY) ==="
-grep -c "bw-run.sh:" /tmp/q4-stdout.txt || echo "no matches"
+echo "=== STDOUT bw-run.sh noise check (should be 0) ==="
+printf "bw-run.sh substring count on stdout: "
+grep -c "bw-run.sh:" /tmp/q4-stdout.txt || true
