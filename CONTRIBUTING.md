@@ -170,6 +170,31 @@ Email Bison exposes two vendor-hosted HTTP MCP endpoints (`emailbison-b2b`, `ema
 
 Full onboarding flow, workspace-routing rules, 141-tool inventory, confirmation-gate list, and known gotchas live in [`plugins/marketing/tools/integrations/email-bison.md`](plugins/marketing/tools/integrations/email-bison.md).
 
+## Plugin secret-config canon
+
+Stdio MCPs and CLI scripts read credentials from OS environment variables — that's the Anthropic-recommended pattern (`@anthropics/claude-code/plugins/plugin-dev/skills/mcp-integration/references/authentication.md`). The friction is *how secrets reach env* without each developer hand-editing `~/.zshrc` and rotating values across machines. The canonical Brite answer is `bw-run.sh`: a thin wrapper that fetches values from Bitwarden's Engineering collection at MCP/CLI spawn time, exports them as env, and execs the wrapped command. Vault is the single source of truth; rotated values reach the next process spawn — instantly for one-shot CLI invocations via Bash, and at the next Claude Code re-launch for long-lived stdio MCPs (see Tradeoffs below).
+
+**Reference implementation:** [`plugins/marketing/scripts/bw-run.sh`](plugins/marketing/scripts/bw-run.sh) (~98 lines) plus [`plugins/marketing/scripts/bw-run.test.sh`](plugins/marketing/scripts/bw-run.test.sh). Spike validation findings: [`docs/research/bw-run-spike.md`](docs/research/bw-run-spike.md) (BC-6905).
+
+**Authority and scope.** The marketing-plugin copy at `plugins/marketing/scripts/bw-run.sh` is canonical until a second plugin adopts the pattern. On the second adoption, promote the script to `scripts/bw-run.sh` (repo-level) and have each plugin reference it via a thin shim or relative path; that's the right time to formalize the decision in an ADR (see `## ADR Convention`). The single-adopter framing keeps the script's ownership inside the marketing plugin's release cycle today; plugin-version bumps for this script's edits follow the marketing plugin's CHANGELOG.
+
+**Adopt in a new plugin:**
+
+1. **Provision N items** in the Engineering Bitwarden collection — one Login entry per env-var key. Use a deterministic prefix (`<plugin>-<env-name>-` or similar) so the wrapper's batch-fetch path engages.
+2. **Copy the script** to your plugin: `cp plugins/marketing/scripts/bw-run.sh plugins/<plugin>/scripts/bw-run.sh` — and on this second adoption, also propose promoting the script to `scripts/bw-run.sh` (repo-level) so the canon has one source of truth going forward. Until then, fixes to the marketing copy must be cherry-picked into yours.
+3. **Wrap stdio MCP entries** in your plugin's `.mcp.json`: `command: "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh", args: ["KEY=item-name", "--", <original cmd>...]`. Drop the `env: { KEY: "${KEY}" }` block — the wrapper fills env at runtime.
+4. **Wrap Bash CLI invocations** in your skills: `bw-run.sh KEY=item -- <original cmd>`. The skill's instruction text is the spec; just prepend the wrapper invocation in each `Bash`-tool call site.
+5. **Add `bw-run.test.sh`** mirroring the marketing plugin's shape: 4 mandated cases (locked vault, missing item, multi-key batch, divergent naming) + 1 usage-error case. Tests use a PATH-mocked `bw` stub via `mktemp -d`; no bats / no external test runner.
+
+**Tradeoffs (be honest about these in your plugin's setup command):**
+
+- Adds `bw` (`brew install bitwarden-cli`) and `jq` (`brew install jq`) as runtime requirements. Both are widely available; the marketing plugin's setup-tam-map detects them in Phase 1.
+- **Vault-lock-mid-session UX:** ~30s recovery cost per lock event in restart-based env-propagation mode (BC-5947 task-3 Pattern A; BC-6905 Q5 measurement). Aggressive idle-lock policies compound this — document expected unlock cadence in onboarding.
+- **Rotation propagation:** values are fetched per-MCP-process-spawn, not per-tool-call. MCP server processes are persistent for the Claude Code session; tool calls reuse the running process and its in-memory env. **`/reload-plugins` does NOT re-spawn MCP processes** (measured in BC-6906 T14: it reloads plugin metadata only). To pick up a rotated Bitwarden value, the user must trigger a real MCP-process re-spawn — typically by re-launching Claude Code from a shell where `BW_SESSION` is exported (or, if your Claude Code version exposes it, a per-server `claude mcp restart <name>` command). This is still cheaper than the pre-wrapper world (which required `~/.zshrc` edits *and* a re-launch); it just isn't zero-touch.
+- **Privacy:** wrapper memory holds vault items matching the auto-detected common prefix (e.g., `tam-map-*`), not the entire user-accessible vault. If your plugin needs broader access, prefer fan-out to multiple wrapper invocations rather than widening the search prefix.
+
+**Exception — HTTP MCPs.** This canon applies to **stdio MCPs and CLI scripts only.** For HTTP MCPs with credentialed `Authorization: Bearer ${...}` headers, both `${ENV_VAR}` and `${user_config.*}` substitution into headers are broken in current Claude Code (BC-5551 / upstream issues [#6204](https://github.com/anthropics/claude-code/issues/6204), [#9427](https://github.com/anthropics/claude-code/issues/9427)). Ship user-level registration with guided onboarding (the Email Bison pattern at `/marketing:setup-email-bison`) until upstream lands fixes — see § Email Bison MCP Onboarding above.
+
 ## ADR Convention
 
 Architecture Decision Records live in `docs/decisions/NNN-kebab-title.md`. They are imported into CLAUDE.md via individual `@` imports (directory imports are not supported). The `/workflows:architecture-decision` command generates ADRs and auto-appends the import. `/workflows:project-start` generates ADRs for all major tech decisions made during the interview.

@@ -15,28 +15,34 @@
     },
     "spider": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "spider-cloud-mcp@2.1.1"],
-      "env": {
-        "SPIDER_API_KEY": "${SPIDER_API_KEY}"
-      }
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "args": [
+        "SPIDER_API_KEY=tam-map-spider-api-key",
+        "--",
+        "npx",
+        "-y",
+        "spider-cloud-mcp@2.1.1"
+      ]
     },
     "aiark": {
       "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/aiark-mcp.js"],
-      "env": {
-        "AIARK_API_KEY": "${AIARK_API_KEY}"
-      }
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "args": [
+        "AIARK_API_KEY=tam-map-aiark-api-key",
+        "--",
+        "node",
+        "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/aiark-mcp.js"
+      ]
     },
     "discolike": {
       "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js"],
-      "env": {
-        "DISCOLIKE_API_KEY": "${DISCOLIKE_API_KEY}"
-      }
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "args": [
+        "DISCOLIKE_API_KEY=tam-map-discolike-api-key",
+        "--",
+        "node",
+        "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js"
+      ]
     }
-
   }
 }
