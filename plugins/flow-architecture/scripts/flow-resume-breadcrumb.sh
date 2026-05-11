@@ -51,21 +51,35 @@ cmd_read() {
     return 0
   fi
 
-  # Parse via python3 (no jq per Q32). Emit STATUS / LAST_UPDATED to caller env-style.
-  # Python3 must succeed; malformed JSON is a hard error (caller should re-prompt).
+  # Parse via python3 (no jq per Q32). Conservative read-contract: malformed
+  # JSON and unparseable timestamps both emit STALE=yes with a specific
+  # STALE_REASON so callers fall through to artifact-driven classification
+  # rather than hard-aborting on a single corrupted state file. Exit stays 0
+  # for these soft-fail cases; the python heredoc only exits non-zero on
+  # genuinely unexpected errors that should propagate.
   local parsed
-  if ! parsed="$(STALE_AGE_SECONDS="$STALE_AGE_SECONDS" python3 - "$path" <<'PY'
+  parsed="$(STALE_AGE_SECONDS="$STALE_AGE_SECONDS" python3 - "$path" <<'PY'
 import json, os, sys, datetime
+
+def sanitize(value):
+    # Newlines / carriage returns would break the KEY=VALUE per-line contract.
+    return (value or "").replace("\n", " ").replace("\r", " ").strip()
+
 path = sys.argv[1]
 try:
     with open(path, "r", encoding="utf-8") as fh:
         data = json.load(fh)
 except Exception as exc:
-    print(f"PARSE_ERROR={exc}", file=sys.stderr)
-    sys.exit(3)
+    # Soft-fail: treat malformed JSON as stale so callers fall through.
+    print(f"flow-resume-breadcrumb: parse failed for {path} ({exc})", file=sys.stderr)
+    print("STATUS=unknown")
+    print("LAST_UPDATED=")
+    print("STALE=yes")
+    print("STALE_REASON=parse-error")
+    sys.exit(0)
 
-status = data.get("status", "unknown") or "unknown"
-last_updated = data.get("last_updated", "") or ""
+status = sanitize(data.get("status", "unknown")) or "unknown"
+last_updated = sanitize(data.get("last_updated", ""))
 
 stale = "no"
 stale_reason = "none"
@@ -85,18 +99,17 @@ elif last_updated:
         if age_seconds > int(os.environ["STALE_AGE_SECONDS"]):
             stale = "yes"; stale_reason = "age"
     except Exception:
-        # Unparseable timestamp — treat as fresh; caller may surface a warning.
-        pass
+        # Unparseable timestamp is conservative-stale per Q31.3 spirit
+        # (be cautious about resume); caller falls through to fresh start.
+        print(f"flow-resume-breadcrumb: unparseable last_updated for {path}", file=sys.stderr)
+        stale = "yes"; stale_reason = "timestamp-unparseable"
 
 print(f"STATUS={status}")
 print(f"LAST_UPDATED={last_updated}")
 print(f"STALE={stale}")
 print(f"STALE_REASON={stale_reason}")
 PY
-)"; then
-    echo "flow-resume-breadcrumb: parse failed for $path" >&2
-    exit 3
-  fi
+)"
 
   printf 'EXISTS=yes\n'
   printf '%s\n' "$parsed"

@@ -70,10 +70,23 @@ PY
 fi
 
 # ── gh auth (soft per Q32) ───────────────────────────────────────────
-if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  GH_AUTH="yes"
-else
-  GH_AUTH="no"
+# `gh auth status` hits the OS keychain and (depending on version) issues a
+# token-validity ping — ~300-400ms wall-clock per call. The orchestrator may
+# cache the result for the session via FLOW_GH_AUTH_CACHE (mirrors
+# FLOW_SHAPE_CACHE). Standalone callers fall back to a direct probe.
+if [ -n "${FLOW_GH_AUTH_CACHE:-}" ]; then
+  case "$FLOW_GH_AUTH_CACHE" in
+    yes|no) GH_AUTH="$FLOW_GH_AUTH_CACHE" ;;
+    *) echo "flow-context-load: FLOW_GH_AUTH_CACHE='$FLOW_GH_AUTH_CACHE' not in {yes,no}; re-probing" >&2
+       FLOW_GH_AUTH_CACHE="" ;;
+  esac
+fi
+if [ -z "${GH_AUTH:-}" ]; then
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    GH_AUTH="yes"
+  else
+    GH_AUTH="no"
+  fi
 fi
 
 # ── LINEAR_MCP sentinel ──────────────────────────────────────────────
