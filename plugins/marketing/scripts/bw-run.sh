@@ -82,12 +82,39 @@ if [ "${#EXPORTS[@]}" -gt 0 ]; then
     CACHE="$(bw list items --search "$PREFIX")"
     for entry in "${EXPORTS[@]}"; do
       key="${entry%%=*}"; item="${entry#*=}"
-      value="$(printf '%s' "$CACHE" | jq -r --arg n "$item" '[.[] | select(.name==$n) | .login.password] | first // ""')"
-      if [ -z "$value" ]; then
-        echo "bw-run.sh: item \`$item\` not found in batch search" >&2
-        exit 3
-      fi
-      export "$key=$value"
+      # Two-pass discrimination via jq (~2N calls at N=7 is still <5% of the
+      # 3.2s `bw list items` network round-trip, well within BC-6905 budget).
+      # Pass 1: structural status — `absent` / `wrong_type` / `ok`.
+      # `wrong_type` covers items present but lacking a `.login` block (e.g.
+      # secure-note type), which an in-band `// ""` fallback would have
+      # silently misclassified as empty. Pass 2 only runs on `ok` to extract
+      # the actual password — no in-band sentinels, no delimiter parsing,
+      # no collision risk with values that happen to look like sentinels.
+      status="$(printf '%s' "$CACHE" | jq -r --arg n "$item" '
+        [.[] | select(.name==$n)] as $m |
+        if ($m|length) == 0 then "absent"
+        elif ($m[0] | has("login") | not) then "wrong_type"
+        else "ok"
+        end')"
+      case "$status" in
+        absent)
+          echo "bw-run.sh: item \`$item\` not found in batch search" >&2
+          exit 3
+          ;;
+        wrong_type)
+          echo "bw-run.sh: item \`$item\` exists but is not a Bitwarden login type (re-create as Login with a password)" >&2
+          exit 3
+          ;;
+        ok)
+          value="$(printf '%s' "$CACHE" | jq -r --arg n "$item" '
+            first(.[] | select(.name==$n) | .login.password // "")')"
+          if [ -z "$value" ]; then
+            echo "bw-run.sh: item \`$item\` exists in batch but has empty password (set the password in Bitwarden)" >&2
+            exit 3
+          fi
+          export "$key=$value"
+          ;;
+      esac
     done
   else
     for entry in "${EXPORTS[@]}"; do
@@ -103,9 +130,11 @@ fi
 
 # --- Exec wrapped command (transparent stdio passthrough; BC-6905 Q4) ------
 # Drop BW_SESSION before exec so the wrapped MCP/CLI process can't read the
-# vault token from its env (defense-in-depth: spider-cloud-mcp + the upstream
-# aiark/discolike Node wrappers ship as third-party deps; a compromised
-# transitive dep with process.env access could otherwise exfiltrate the
-# token. The wrapper itself has finished all bw calls by this point.)
+# vault token from its env. Defense-in-depth against compromised transitive
+# deps in third-party Node/Python packages (spider-cloud-mcp, aiark-mcp.js,
+# discolike-mcp.js, the Python tam-map scripts) — a malicious dep with
+# process.env access could otherwise exfiltrate the master vault token.
+# The wrapper has finished all bw calls by this point; the wrapped process
+# only needs the per-vendor KEY=value exports we already set above.
 unset BW_SESSION
 exec "$@"
