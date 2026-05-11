@@ -1,5 +1,8 @@
 # Audit artifacts
 AUDIT.md
+# Negation: case-insensitive filesystems (macOS APFS default) match the rule
+# above against `audit.md` too — keep the FDA-plugin audit command tracked.
+!plugins/flow-architecture/commands/audit.md
 
 # OS
 .DS_Store
