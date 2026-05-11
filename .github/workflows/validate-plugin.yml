@@ -35,3 +35,17 @@ jobs:
 
       - name: Test end-to-end scenarios
         run: bash scripts/test-scenarios.sh  # workflows-only by design (project-start PRD scenarios)
+
+  vslice-greenfield:
+    # BC-7057 v-slice integration test: exercises FDA helper-script Phase 1 surface
+    # against a synthetic greenfield fixture. Advisory (continue-on-error) per spec.
+    # Extends as BC-6959 sub-skills land. See plugins/flow-architecture/tests/vslice-report.md.
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run v-slice greenfield harness
+        run: bash plugins/flow-architecture/tests/run-greenfield-vslice.sh
