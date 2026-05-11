@@ -196,7 +196,7 @@ What FDA creates vs what already exists in the consuming project. Use this when 
 
 - [CDR-023 — Flow-Driven Architecture][cdr-023] — Brite handbook decision record (Q33 lock).
 - [operating-standards/flow-driven-architecture.md][ops-fda] — practitioner-facing operating standard (Q34 lock).
-- [CDR-014 (amended by CDR-023, 2026-05-07)](https://github.com/Brite-Nites/handbook/blob/main/decisions/CDR-014-phase-pattern.md) + [milestones.md](https://github.com/Brite-Nites/handbook/blob/main/how-we-work/operating-standards/milestones.md) — Phase Pattern scoped to non-product surfaces (Q35 lock).
+- [CDR-014 (amended by CDR-023, 2026-05-07)](https://github.com/Brite-Nites/handbook/blob/main/decisions/CDR-014-milestone-standards.md) + [milestones.md](https://github.com/Brite-Nites/handbook/blob/main/how-we-work/operating-standards/milestones.md) — Phase Pattern scoped to non-product surfaces (Q35 lock).
 - [about-handbook/style-guide/templates/](https://github.com/Brite-Nites/handbook/tree/main/about-handbook/style-guide/templates/) — Q22-Q28 + Q41 promoted templates (issue templates, journey template, story-doc template, INDEX schema, PROJECT-INTENT template).
 - `docs/design-rationale/project_fda_plugin_interview.md` — canonical Q-lock record (Q1-Q55, multiple amendments). When in doubt, read the Q-lock entry, not this file.
 - `docs/design-rationale/fda-plugin-architecture-overview.md` — visual architecture overview (4-tier hierarchy, command surface diagrams, phase flows, quality-gate stack diagram, state substrate map).
