@@ -8,7 +8,7 @@ Heavier of the two incremental-add FDA orchestrators. Adds a whole new domain (1
 
 > **Scope:** UI-bearing builds only (CDR-023 partition). Non-UI-bearing work uses CDR-014's Phase Pattern, not FDA. `flow-preflight` performs upstream mode classification — `/flow:add-domain` runs only when mode resolves to `incremental-add`.
 
-> **DO NOT re-derive** the phase sequence, gate count + labels (`Q20.6`, `Q13.4` — NOT `G1`/`G2`), interactive-only invocation form, per-domain write-count formula `2+7N`, or per-phase failure matrix below. All seven Q47 sub-decisions are locked at memory:745+ with a refinement audit trail at memory:782. The `G1`/`G2` framing is a known mis-label that has appeared in earlier derivative drafts (and in this command's Linear issue body) — Q47 sub-decision 5 (memory:771) explicitly labels both gates by their owning sub-skill (`Q20.6` + `Q13.4`); use the sub-skill labels.
+> **DO NOT re-derive** the phase sequence, gate count + labels (`Q20.6`, `Q13.4` — NOT `G1`/`G2`), interactive-only invocation form, per-domain write-count formula `2+7N`, or per-phase failure matrix below. All seven Q47 sub-decisions are locked at memory:745-780 with a refinement audit trail at memory:782-789. The `G1`/`G2` framing is a known mis-label that has appeared in earlier derivative drafts (and in this command's Linear issue body) — Q47 sub-decision 5 (memory:771) explicitly labels both gates by their owning sub-skill (`Q20.6` + `Q13.4`); use the sub-skill labels.
 
 ## Architecture overview
 
@@ -36,7 +36,7 @@ Heavier of the two incremental-add FDA orchestrators. Adds a whole new domain (1
 
 **SKIPS `flow-legacy-cross-reference`** (Q14) per Q47 sub-decision 2 — incremental-add isn't a retrofit operation.
 
-> **Gate labeling note.** Both gates are within-skill and labeled by their sub-skill locks per Q47 sub-decision 5 (memory:771): **Q20.6** lives inside `flow-inventory-add`; **Q13.4** lives inside `flow-linear-scaffold`. Sibling commands `/flow:start-project` and `/flow:retrofit-project` use orchestrator-budget gate numbering (`G1`-`G4`, `G1`-`G5`) because Q10 (memory:66) is mode-aware on retrofit/greenfield budgets and silent on incremental-add. Q47 derives the incremental-add gate count from the underlying sub-skill locks instead — Q47 refinement 6 (memory:789) confirms Q10's silence on incremental-add; Q47 refinement 2 (memory:785) further corrected drafter C's earlier 1+2 gate-count draft to the locked 2+2 (Q20.6 + Q13.4 per command).
+> **Gate labeling note.** Both gates are within-skill and labeled by their sub-skill locks per Q47 sub-decision 5 (memory:771): **Q20.6** lives inside `flow-inventory-add`; **Q13.4** lives inside `flow-linear-scaffold`. Sibling commands `/flow:start-project` and `/flow:retrofit-project` use orchestrator-budget gate numbering (`G1`-`G4`, `G1`-`G5`) because Q10 (memory:66) is mode-aware on retrofit/greenfield budgets and silent on incremental-add (Q47 refinement 6 confirmation, memory:789). Q47 refinement 2 (memory:785) further corrected drafter C's earlier 1+2 gate-count draft to the locked 2+2 (Q20.6 + Q13.4 per command).
 
 ## Invocation
 
