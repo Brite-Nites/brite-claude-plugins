@@ -3,7 +3,7 @@
 # Ported: 2026-04-24
 # License: MIT — see plugins/marketing/references/tam/UPSTREAM.md
 # Upstream path: scripts/spider_crawl.py
-# Changes: verbatim port, no functional edits
+# Changes: verbatim port + BC-7050 local fix (REST endpoint+streaming shape — see UPSTREAM.md)
 
 """
 Spider.cloud crawler — pull structured data from company websites.
@@ -31,7 +31,7 @@ load_dotenv()
 SPIDER_API_KEY = os.getenv("SPIDER_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
-SPIDER_URL = "https://api.spider.cloud/v1/crawl"
+SPIDER_URL = "https://api.spider.cloud/crawl"
 CONCURRENCY = 50
 
 
@@ -41,15 +41,24 @@ async def crawl_one(session, company: dict) -> dict:
         return {**company, "crawl_error": "no domain"}
 
     url = f"https://{domain}"
-    headers = {"Authorization": f"Bearer {SPIDER_API_KEY}", "Content-Type": "application/json"}
+    # Spider negotiates NDJSON response shape via the request Content-Type (non-standard;
+    # Accept would be the spec-correct header). Mirrors `spider-cloud-mcp@2.1.1` dist/api.js:74.
+    headers = {"Authorization": f"Bearer {SPIDER_API_KEY}", "Content-Type": "application/jsonl"}
     payload = {"url": url, "limit": 5, "return_format": "markdown"}
 
     try:
         async with session.post(SPIDER_URL, json=payload, headers=headers, timeout=60) as r:
             if r.status != 200:
                 return {**company, "crawl_error": f"status {r.status}"}
-            data = await r.json()
-            pages = data if isinstance(data, list) else data.get("pages", [])
+            text = await r.text()
+            pages = []
+            for line in text.splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    pages.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue  # mirror MCP parseJsonlStream silent-skip on partial/malformed lines
             markdown = "\n\n".join(p.get("content", "") for p in pages[:5])[:8000]
             return {**company, "crawl": {"markdown": markdown, "pages": len(pages)}}
     except Exception as e:
