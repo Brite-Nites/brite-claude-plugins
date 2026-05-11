@@ -1,0 +1,11 @@
+{
+  "name": "synthetic-greenfield-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "description": "BC-7057 v-slice fixture: synthetic greenfield project for /flow:start-project harness. Build/lint/test return 0 with no real code so Q8 sub-criterion 5 (build && lint && test exit 0) is exercisable.",
+  "scripts": {
+    "build": "echo synthetic-build && exit 0",
+    "lint": "echo synthetic-lint && exit 0",
+    "test": "echo synthetic-test && exit 0"
+  }
+}
