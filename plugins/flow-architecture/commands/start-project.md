@@ -262,7 +262,7 @@ Options:
 3. Fires the **L2 review** per domain — CEO + Design parallel — and the orchestrator stashes each domain's L2 output as `state.l2_review_<domain-slug>` for Phase 6 hand-off (in-memory only per parking lot #31 v1; on crash-resume, Phase 6 re-runs L2 — ~2-5 min per domain).
 4. Writes `docs/product/master-flow-inventory.md` via atomic-rename.
 
-**Capture into state:** `state.inventory_path`, `state.inventory.domains[]`, `state.l2_review.<domain-slug>` per domain.
+**Capture into state:** `state.inventory_path`, `state.inventory.domains[]`, `state.l2_review_<domain-slug>` per domain.
 
 **Initialize `state.domains[]` from inventory:** for each domain in `state.inventory.domains[]`, append `{slug, scaffold_state: "pending", failure_reason: null, parent_issue_ids: []}` to `state.domains[]`. Persist to breadcrumb `domains[]` for Phase 4's per-domain resume support.
 
