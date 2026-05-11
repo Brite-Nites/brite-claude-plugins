@@ -48,7 +48,7 @@ Unknown writeback type '<value>'. Valid types: <enum>. To add a new type,
 amend Q46 + register at _shared/linear-writeback-pattern.md.
 ```
 
-This forces deliberate type proliferation and catches typos.
+This forces deliberation when adding new types and catches typos.
 
 ## Interface
 
@@ -88,7 +88,7 @@ The `linear_writeback_state` slot of `.flow-phase-state.json` (Q31 amendment 2) 
 ## References
 
 - Q46 — `docs/design-rationale/project_fda_plugin_interview.md` lines 986-1048.
-- Q14.2 — line 80 (precursor `FDA-MIGRATION-*` marker convention; same hyphenation).
+- Q14.2 — line 98 (precursor `FDA-MIGRATION-*` marker convention; same hyphenation; Q14 lock starts at line 94).
 - Q31 amendment 2 — line 323 (`linear_writeback_state` breadcrumb slot).
 - Q38 sub-decision 4 — line 1046 (deferred-decision resolution that keeps `audit-concerns` registered but unused in v1).
 - Q30.2 — line 281 (file location lock).

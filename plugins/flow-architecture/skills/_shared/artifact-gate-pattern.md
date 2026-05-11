@@ -59,7 +59,7 @@ Overrides persist for the phase invocation and are NOT re-prompted within the sa
 
 ## Runner
 
-`/flow:audit` (Q38, pending) is the gate runner: emits stdout + optional `--json`. v1 is strictly local — no Linear writeback (per Q38 sub-decision 4 deferred-decision resolution, lines 1041-1048). The `audit-concerns` writeback type IS registered in `linear-writeback-pattern.md` but UNUSED in v1; reserved for v1.1 `--linear-surface` promotion.
+`/flow:audit` (Q38, pending) is the gate runner: emits stdout + optional `--json`. v1 is strictly local — no Linear writeback (per Q38 sub-decision 4 deferred-decision resolution, lines 1041-1048). For the `audit-concerns` v1.1 promotion path, see `linear-writeback-pattern.md` § v1 type registry.
 
 ## References
 
