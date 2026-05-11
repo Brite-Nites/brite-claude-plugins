@@ -41,6 +41,8 @@ async def crawl_one(session, company: dict) -> dict:
         return {**company, "crawl_error": "no domain"}
 
     url = f"https://{domain}"
+    # Spider negotiates NDJSON response shape via the request Content-Type (non-standard;
+    # Accept would be the spec-correct header). Mirrors `spider-cloud-mcp@2.1.1` dist/api.js:74.
     headers = {"Authorization": f"Bearer {SPIDER_API_KEY}", "Content-Type": "application/jsonl"}
     payload = {"url": url, "limit": 5, "return_format": "markdown"}
 
@@ -49,7 +51,14 @@ async def crawl_one(session, company: dict) -> dict:
             if r.status != 200:
                 return {**company, "crawl_error": f"status {r.status}"}
             text = await r.text()
-            pages = [json.loads(line) for line in text.splitlines() if line.strip()]
+            pages = []
+            for line in text.splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    pages.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue  # mirror MCP parseJsonlStream silent-skip on partial/malformed lines
             markdown = "\n\n".join(p.get("content", "") for p in pages[:5])[:8000]
             return {**company, "crawl": {"markdown": markdown, "pages": len(pages)}}
     except Exception as e:
