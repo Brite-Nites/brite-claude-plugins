@@ -7,10 +7,12 @@
 
 ## Source-of-truth references
 
-- **Q21 lock** — `~/.claude/projects/-Users-holdenhalford-Projects-work-brite-nites-brite-base/memory/project_fda_plugin_interview.md:452-485` — 12-agent spec (per-agent: model, tools, invokers, return shape).
-- **Q21 amendment 1** — same file `:1236-1273` — adds scope-axis fields (`mode` + `expansions[]` / `reductions[]` / `rigor_focus[]` / `rationale[]`) to **7 of 12** four-mode reviewer agents.
-- **Q32 tool-scope audit** — same file `:344` — only `fidelity-reviewer` + `inventory-author` need network/MCP tools.
-- **Q30.2 file-location** — same file `:283` — `plugins/flow-architecture/agents/<name>.md`, exactly 12 files.
+Citations below resolve against `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` (in-plugin canonical per plugin CLAUDE.md § See also). The user-memory mirror at `~/.claude/projects/-Users-holdenhalford-Projects-work-brite-nites-brite-base/memory/project_fda_plugin_interview.md` is the same content with ~11-12 line offsets and is NOT canonical for tooling.
+
+- **Q21 lock** — in-plugin canonical `:463`; 12-agent spec rows at `:469-480` (per-agent: model, tools, invokers, return shape).
+- **Q21 amendment 1** — same file `:1251` / `:1277` — adds scope-axis fields (`mode` + `expansions[]` / `reductions[]` / `rigor_focus[]` / `rationale[]`) to **7 of 12** four-mode reviewer agents.
+- **Q32 tool-scope audit** — same file `:355` — only `fidelity-reviewer` + `inventory-author` need network/MCP tools.
+- **Q30.2 file-location** — same file `:289` — `plugins/flow-architecture/agents/<name>.md`, exactly 12 files.
 - **Four-mode contract** — `plugins/flow-architecture/skills/_shared/four-mode-framework.md` — interface signature, mode-specific field rules, founder-mode framing (cribbed verbatim from gstack).
 - **Plugin CLAUDE.md agent dispatch MATRIX** — `plugins/flow-architecture/CLAUDE.md` § Surface map → Agent dispatch MATRIX — invoker + return-shape + L-scope per agent.
 - **Frontmatter precedents** — `plugins/cadence/agents/{narrative-writer,project-audit,project-enricher,housekeeping-preflight}.md` (4-field frontmatter: `name` + `description` + `model` + `tools`).
