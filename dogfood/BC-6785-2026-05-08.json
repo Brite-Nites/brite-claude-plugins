@@ -304,5 +304,39 @@
     "plain_text_preserved_through_resume": true
   },
   "activated": false,
-  "activated_at": "2026-05-11T15:34:55-06:00"
+  "activated_at": "2026-05-11T15:34:55-06:00",
+  "liquid_live_test": {
+    "campaign_id": 49,
+    "campaign_name": "BC-6785 | LIQUID | live-test",
+    "sequence_id": 24,
+    "sequence_step_ids": {
+      "step_1": 44,
+      "step_2": 45
+    },
+    "lead_ids": {
+      "A_aurora_both_populated": 14763,
+      "B_bryce_recency_empty": 14764,
+      "C_cypress_proof_company_empty": 14765
+    },
+    "campaign_schedule_id": 25,
+    "ui_preview_body_results": {
+      "lead_A_pattern_a": "Pearl Street RFP win (per-lead value)",
+      "lead_A_pattern_b": "One that solved it was Boulder downtown, who ran 38% higher evening visits in the first 90 days. (truthy branch)",
+      "lead_B_pattern_a": "recent activity (FALLBACK fired correctly per BC-6781 canonical default)",
+      "lead_B_pattern_b": "One that solved it was Aspen Glow Festival, who ran 38% higher evening visits in the first 90 days. (truthy branch)",
+      "lead_C_pattern_a": "Cherry Creek lighting RFP (per-lead value)",
+      "lead_C_pattern_b": "A few NO_PROOF_POINT_company-style teams have piloted similar setups and seen 30%+ lifts. (ELSE branch fired correctly)",
+      "all_6_match_expected": true
+    },
+    "sender_shadow_observed_across_leads": {
+      "lead_A_sender": "Rainer Owens (sender 994)",
+      "lead_B_sender": "Holden Halford (sender 981)",
+      "lead_C_sender": "Holden Halford (sender 981)",
+      "bc_6784_confirmed_multi_lead": true
+    },
+    "f_newline_to_br_resolution": "NOT a finding \u2014 EB stored body with <br> tags between Liquid assigns, but Preview Body shows no <br> leakage in rendered output. EB strips them correctly."
+  },
+  "r25_keystone_verdict": "PASS \u2014 6/6 spot-checks; Pattern A fallback + Pattern B if + Pattern B else all fire correctly per BC-6613+BC-6781+BC-6782 canonical chain",
+  "round_5_keystones_passed": 6,
+  "round_5_keystones_total": 6
 }

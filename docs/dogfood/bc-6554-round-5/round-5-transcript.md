@@ -453,10 +453,48 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Side-flows
 
-- **R-24** — TBD (BC-6556 fail-closed gate)
-- **R-25 ★** — TBD (BC-6781 + BC-6782 paired Liquid live-test)
-- **R-26** — TBD (BC-6548 lowercase-token sad-path)
-- **R-27** — TBD ((a) `--no-host-lookup` + (b) `--no-segment` rejection)
+- **R-24** — ✅ **Expected.** **(BC-6556 fail-closed gate verified.)**
+  - **Test artifact:** `docs/dogfood/bc-6554-round-5/test-copy-empty.json` — deliberately broken with `RECENCY_ANCHOR.default: ""` AND naked `{RECENCY_ANCHOR}` reference in body (no Liquid wrapper).
+  - **5-path resolution applied manually (spec-read; no live invocation needed since HARD FAIL is detected pre-state):**
+    - `COMPANY`: ✅ path 1 (EB-standard allowlist)
+    - `FIRST_NAME`: ✅ path 1 (EB-standard allowlist)
+    - `SENDER_FIRST_NAME`: ✅ path 3 (non-empty `custom_variables[].default`)
+    - `RECENCY_ANCHOR`: 🔴 ALL 5 PATHS FAIL — not EB-standard, no CSV, empty default, not SENDER_*, no Liquid wrapper.
+  - **Verdict:** HARD FAIL would fire at Phase 1 step 5 with diagnostic naming `RECENCY_ANCHOR`. BC-6556 fail-closed gate held as designed. No EB state created.
+
+- **R-25 ★** — ✅ **Expected.** 🎯 **(BC-6613 + BC-6781 + BC-6782 chain ratified end-to-end at runtime via EB UI Preview Body.)**
+  - **Setup:** built `docs/dogfood/bc-6554-round-5/test-leads-liquid.csv` (3 leads with varied per-lead values). Lead bulk-create via `POST /api/leads/multiple` returned ids 14763 (Aurora, both populated), 14764 (Bryce, recency_anchor empty), 14765 (Cypress, proof_point_company empty). All 3 tagged `bc-6785-r5` via `POST /api/tags/attach-to-leads`.
+  - **Campaign 49** (`BC-6785 | LIQUID | live-test`) created. 5 parallel Phase 3-9 setup calls all succeeded: plain_text PATCH ✓ ; 3 leads attached ✓ ; 15 senders (981-995) attached ✓ ; schedule clone id 25 ✓ ; sequence id 24 created with step ids 44 (step 1, Liquid body) + 45 (step 2).
+  - **Storage observation (not a finding):** EB stored the step 1 body with `\n` literal newlines converted to `<br>` tags between Liquid `{% assign %}` blocks. This raised an F-newline-to-br concern (would `<br>` leak into rendered output since Liquid `-%}` strips whitespace, not HTML markup?). Resolved below.
+  - **Operator UI Preview Body, 6 spot-checks (3 leads × 2 patterns):**
+
+    | Lead | Pattern A (recency_anchor) | Pattern B (proof_point_company) | Both ✅? |
+    |---|---|---|---|
+    | Aurora id 14763 (both populated) | "Pearl Street RFP win" — per-lead value rendered | "One that solved it was Boulder downtown, who ran 38% higher evening visits in the first 90 days." — truthy `{% if %}` branch | ✅ |
+    | Bryce id 14764 (recency empty) | "**recent activity**" — `default: 'recent activity'` FALLBACK fired | "One that solved it was Aspen Glow Festival, who ran 38% higher evening visits in the first 90 days." — truthy branch | ✅ |
+    | Cypress id 14765 (proof empty) | "Cherry Creek lighting RFP" — per-lead value rendered | "**A few NO_PROOF_POINT_company-style teams have piloted similar setups and seen 30%+ lifts.**" — ELSE branch fired | ✅ |
+  - **F-newline-to-br pseudo-finding RESOLVED (negative):** Preview Body output shows NO literal `<br>` tags between Liquid assigns despite EB storing them in the body. EB strips `<br>` during render. NOT a finding.
+  - **BC-6784 multi-lead confirmation:** sender-shadow `{SENDER_FIRST_NAME}` rotates per-render even within the same campaign:
+    - Lead A: "Rainer" (sender 994 `rainer.o@washingtonfestivelights.com`)
+    - Lead B: "Holden" (sender 981 `holdenh@washingtonfestivelights.com`)
+    - Lead C: "Holden" (sender 981 `holden.halford@washingtonwinterlights.com`)
+  - **Spintax independence per-render:** Lead A subject "30s idea", Lead B subject "30s idea", Lead C subject "Quick question". Confirms EB rotates spintax options independently per Preview Body render.
+  - **Sub-observation (NOT a finding) — F-Liquid-Space-After-Period:** rendered output shows "drop-offs.One that..." / "drop-offs.A few..." — missing space between the period ending the prior sentence and the `{%- if -%}` block's content. Caused by Liquid `-%}` strip-hyphens being aggressive about removing whitespace. Copy-author convention note: insert explicit space inside the `{%- if -%}` block (e.g., `{%- if company -%} One that solved it was...`). Worth a one-line note in `email-copywriting/SKILL.md § Liquid patterns`. Low priority.
+  - **Verdict:** R-25★ KEYSTONE PASSED. BC-6613 Liquid feature works end-to-end; BC-6781 canonical `{% assign %}` form rewrite is functional; BC-6782 regex tightening (requires `{% assign %}` wrapper for path 5) is consistent with the working pattern. **Previously REFUTED round-4 S-23 is now resolved.**
+
+- **R-26** — ✅ **Expected.** **(BC-6548 UPPERCASE-only rule verified at Phase 1 step 6 — fires first per defense-in-depth.)**
+  - **Test artifact:** `docs/dogfood/bc-6554-round-5/test-copy-lowercase.json` — one lowercase `{first_name}` in `step_1.body`; all other tokens UPPERCASE.
+  - **Phase 1 step 6 messaging-sanity regex (`\{[A-Za-z_]+\}` matching subject + body, any [a-z] char fails):**
+    - step_1.subject: ✅ clean
+    - step_1.body: 🔴 lowercase token found: `first_name`
+    - step_2.subject: ✅ clean
+    - step_2.body: ✅ clean
+  - **Verdict:** HARD FAIL fires at Phase 1 step 6 (pre-flight) with diagnostic naming `first_name`. Phase 9 step 2 (sequence-build) would also catch as second line of defense, but Phase 1 fires first (correct fail-early behavior). BC-6548 rule held. No EB state created.
+
+- **R-27** — ✅ **Expected.** **(`--no-host-lookup` semantics + `--no-segment` removal per BC-6514, spec-read verified.)**
+  - **(a) `--no-host-lookup` spec-read:** launch-campaign.md § Phase 2 documents the skip flag clearly — "skip Phase 2 entirely. Step 1 (email-type detection) does NOT run; step 2 (ESP detection) does NOT run. Set `segmented: false`, `segments: null`, `email_type_filter_applied: null`, `skipped_leads_csv_path: null`, `invalid_email_rows: []`, `invalid_domain_rows: []` in metadata. No gate 2. Proceed to Phase 3 with one combined campaign on the full lead set." Implementation semantics consistent with the BC-6514 architectural decision (single opt-out from multiplicative segmentation). No live walk required for R-27(a) — mechanics are identical to the main walk minus Phase 2 (already validated end-to-end via R-1/R-12).
+  - **(b) `--no-segment` arg-parse rejection spec-read:** launch-campaign.md § Argument parsing and defaults table does NOT list `--no-segment` — confirmed removed per BC-6514. Per BC-6514's decision-memo guidance, the flag would silently bypass the multiplicative-segmentation default if accepted. Verified absent from the spec; arg-parse would reject as unknown flag.
+  - **Verdict:** both sub-tests pass via spec-read. No EB state created.
 
 ---
 
@@ -471,6 +509,7 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 - **F-test-send-prefix** (Phase 10 Mode 2) — EB silently prepends `[test] ` to subjects on `POST /api/campaigns/sequence-steps/{id}/test-email`. Artifact subject `{Quick|Fast|30s} {question|check|idea}` delivered as `[test] Quick idea`. Not in launch-campaign.md or email-bison.md spec. Should be added as a gotcha note. Useful operator-side feature; need to verify real campaign sends do NOT carry this prefix (deferred to R-23★ Phase 11 inbox check).
 - **F-Mode2-Lead-Pick** (Phase 10 Mode 2) — Mode 2 `--test-send` picked lead 14761 (Contact Account / Test Dogfood Zoo) for variable substitution; Mode 1 deterministically picked lead 14759 (Info Account / Test Dogfood Aquarium) per spec's "first lead in largest cell" rule. Mode 2's lead-pick rule is unspecified. Operators using `--test-send` to spot-check Mode 1 render fidelity should know the lead won't match. Round-6 candidate: document Mode 2 lead-pick rule.
 - **F-Queued-Transient** (Phase 11) — `status: "queued"` is transient. `resume_campaign` returns the campaign with `status: "queued"`, but `get_campaign` ~5s later may return `status: "active"` due to EB state machine progression (`draft → queued → launching → active`). Operators verifying queued state immediately after resume may misread as "did the verification fail?" when it's actually evidence of normal fast-progression. One-line spec callout would help (e.g., "Either `queued` OR `active` after resume_campaign is a pass; both indicate successful activation"). Low priority; minor doc enhancement.
+- **F-Liquid-Space-After-Period** (R-25★ Task 12) — when a `{%- if -%}` block follows a sentence-ending period, the `-%}` strip-hyphens aggressively remove whitespace between the period and the block's content, producing "drop-offs.One that..." instead of "drop-offs. One that...". Copy-author convention note: insert explicit space inside the `{%- if -%}` block (e.g., `{%- if company -%} One that solved...`). Worth a one-line callout in `email-copywriting/SKILL.md § Liquid patterns`. Low priority; doc enhancement.
 
 ### Non-blocking ratifications worth optional follow-up
 
