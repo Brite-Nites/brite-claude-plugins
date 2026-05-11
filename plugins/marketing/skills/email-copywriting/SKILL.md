@@ -290,6 +290,34 @@ Hey Bob, saw Acme's $3B village expansion...
 
 Rule: every Liquid line in a body uses `{%- ... -%}` (or `{{- ... -}}` for output tags) unless the author explicitly wants a line break in the rendered output. This is non-negotiable — without it, every preset that adopts Liquid ships a render bug worse than the one Liquid is fixing.
 
+#### Inline Liquid: do NOT use strip-hyphens (BC-7598)
+
+The above rule applies to Liquid tags **on their own line** — the typical `{% assign %}` declarations at the top of a template, where the alternative is a printed blank line. For **inline** Liquid (mid-sentence `{% if %}` blocks embedded in prose), the opposite rule applies: do NOT use strip-hyphens. They consume the surrounding sentence whitespace and collapse the rendered text.
+
+Why: per Shopify Liquid spec, `{%- tag -%}` strips whitespace on **both sides** of the tag — before `{%-` and after `-%}`. For an inline block following a sentence period, this consumes (a) the space between the period and the opening tag, AND (b) the space between the closing tag and the next sentence. Result: `drop-offs. {%- if x -%} One that matters.{%- endif -%} More text.` renders as `drop-offs.One that matters.More text.` — both sentence boundaries collapse.
+
+The fix is mechanical: drop the strip-hyphens for inline tags.
+
+**Broken** (both strip-hyphens, sentence whitespace collapses):
+
+```
+We saw your drop-offs. {%- if company -%} One that matters: yours.{%- endif -%} More text.
+```
+
+Renders: `We saw your drop-offs.One that matters: yours.More text.`
+
+**Correct** (no strip-hyphens — surrounding sentence whitespace preserved):
+
+```
+We saw your drop-offs. {% if company %} One that matters: yours.{% endif %} More text.
+```
+
+Renders: `We saw your drop-offs. One that matters: yours. More text.`
+
+**Verified live, 2026-05-11**, via UI Preview Body (canonical Liquid-render verification surface per BC-6785 round-5). Four variants tested; only the no-strip-hyphens form rendered correctly. Inline tags do not produce blank lines in rendered output (the blank-line concern that motivates strip-hyphens applies only to tags occupying their own line).
+
+**Not a fix** — moving the space inside the block content (e.g., `drop-offs.{%- if x -%} One that...`) **does not work**. The right-strip on `{%- if x -%}` consumes the leading space inside the block content. The Shopify whitespace rule strips ALL whitespace adjacent to the tag, not just one character. Verified 2026-05-11 alongside the working form above.
+
 #### Liquid local variable naming rule
 
 Liquid local variables (the names introduced by `{% assign %}`) MUST be lowercase, snake_case acceptable. Examples:

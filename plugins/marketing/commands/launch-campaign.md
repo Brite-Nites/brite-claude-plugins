@@ -880,7 +880,9 @@ Additive to Mode 1 — Mode 1 always runs first. Mode 2 only fires if `--test-se
    > - Skip test-send (Mode 1 local render is already complete)
 5. **Execute test-send.** Call `call_api` with `POST /api/campaigns/sequence-steps/{step_1_id}/test-email` and body `{"sender_email_id": N, "to_email": "<test-send email>", "use_dedicated_ips": false}`. Record the response.
 6. **Append to metadata JSON.** Extend `preview_method` to `"local-render + test-send"`, add `test_send_recipient: "<email>"`, `test_send_at: "<ISO-8601>"`.
-7. **Prompt operator to check inbox.** Ask them to visually confirm the email rendered correctly in a real mail client (plus or beyond what local render showed).
+7. **Prompt operator to check inbox.** Ask them to visually confirm the email rendered correctly in a real mail client (plus or beyond what local render showed). **Two operator-facing notes** (BC-7598, BC-6785 R-21★):
+   * Subject will carry `[test] ` prefix — e.g., authored `"Quick idea"` arrives as `"[test] Quick idea"`. EB-side test-distinction marker; real-campaign sends do not carry this prefix (see `email-bison.md` § Known gotchas).
+   * Mode 2's test-send may use a different lead's data than Mode 1's local render showed. EB's `test-email` endpoint does NOT expose which lead is picked — operators should validate render STRUCTURE (variable substitution, spintax, line breaks) rather than expecting specific lead values to match Mode 1's preview.
 
 ### User gate 10 (single gate, both modes)
 
@@ -959,7 +961,7 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
    - On operator affirmative, second `call_api` request against the resume endpoint (no `confirmation` field — see § Tool tier map). Record the returned campaign state (should be `Queued`).
    - **Per-iteration metadata write.** Immediately after the second `call_api` returns success, set `activated_per_campaign[<bucket>] = "<ISO-8601-of-the-second-call-response>"` in the metadata JSON. This is the resume primitive: if Phase 11 fails or aborts mid-loop, the metadata authoritatively records exactly which campaigns activated. The global `activated: true` does NOT flip yet — that's step 6's finalization, gated on every bucket key being non-null.
    - On operator abort, HALT the loop — do not continue to other campaigns. Already-activated campaigns in this loop remain activated and their `activated_per_campaign[<bucket>]` timestamps remain authoritative.
-5. **Post-activate verification.** For each activated campaign, call `get_campaign_stats` (or equivalent) and confirm `status: "Queued"` as directed in `email-bison.md` § Common workflows. Capture the initial counters for the final report.
+5. **Post-activate verification.** For each activated campaign, call `get_campaign_stats` (or equivalent) and confirm the campaign activated successfully. **Pass state is `Queued` OR `Active`** — EB's state machine progresses `draft → queued → launching → active` over a few seconds after `resume_campaign`, so a `get_campaign` call within ~5s may return `Active` instead of `Queued`. Both indicate successful activation (BC-6785 round-5 R-23★ — see `email-bison.md` § Known gotchas). Capture the initial counters for the final report.
 6. **Finalize metadata JSON.** Confirm every entry in `activated_per_campaign` is non-null. Set `activated: true` only when that holds; otherwise leave `activated: false` (a partial-success state — phase ran, some campaigns activated, the operator aborted before the rest). Set `activated_at: "<ISO-8601-of-final-resume-call>"` (the timestamp of the LAST successful per-iteration call, not a wall-clock now()). Set `last_completed_phase: 11` regardless — `last_completed_phase` tracks "phase ran", not "phase fully succeeded"; partial-success state is encoded in `activated_per_campaign`.
 7. **Final report to operator:**
 
