@@ -85,8 +85,14 @@ print(f"LINEAR_PROJECT_ID={sanitize(data.get('linear_project_id'))}")
 print(f"LINEAR_PROJECT_NAME={sanitize(data.get('linear_project_name'))}")
 PY
 )"
-  LINEAR_PROJECT_ID="$(printf '%s\n' "$CONFIG_OUT" | sed -n 's/^LINEAR_PROJECT_ID=//p')"
-  LINEAR_PROJECT_NAME="$(printf '%s\n' "$CONFIG_OUT" | sed -n 's/^LINEAR_PROJECT_NAME=//p')"
+  # Parse the 2-line CONFIG_OUT in a single while/read pass — folds the
+  # prior 4 sed-pipeline subshells into one bash builtin loop.
+  while IFS='=' read -r _key _val; do
+    case "$_key" in
+      LINEAR_PROJECT_ID)   LINEAR_PROJECT_ID="$_val" ;;
+      LINEAR_PROJECT_NAME) LINEAR_PROJECT_NAME="$_val" ;;
+    esac
+  done <<< "$CONFIG_OUT"
 fi
 
 # ── gh auth (soft per Q32) ───────────────────────────────────────────
