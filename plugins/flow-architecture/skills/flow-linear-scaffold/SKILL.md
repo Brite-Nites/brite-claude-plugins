@@ -107,7 +107,7 @@ Returns either `PASS` or top-5 drift findings capped at 150 words.
 
 **FAILs fixed via** `save_issue {id, body: <corrected>}` + re-dispatch the review on the fixed version. Re-fixes loop until PASS OR `--max-fix-attempts=2` (defaults to 2). Persistent FAIL after attempts -> flag in scaffold log, surface in end-of-run summary.
 
-**Fix-attempt writes inflate the 2+7N happy-path tally.** The headline "2+7N writes per domain" budget is the lower bound — fix-loop iterations add up to 2 extra `save_issue` calls per failed fidelity-review. Worst-case write count is `2 + 7N + 2 * (fail_rate * 7N)`. With 10% fidelity-review fail rate and N=8 sub-flows, expect ~12 extra writes on top of the 58 happy-path floor. The pre-scaffold preview gate's wall-time estimate is a lower-bound floor — surface this caveat in the preview.
+**Fix-attempt writes inflate the 2+7N happy-path tally.** The headline "2+7N writes per domain" budget is the lower bound — fix-loop iterations add up to 2 extra `save_issue` calls per failed fidelity-review. Only the **1 milestone + 6N fidelity-reviewed surfaces** (N parents + 5N children; comments and milestone refresh are NOT fidelity-reviewed per Q13.3) can trigger fix-attempts, so worst-case write count is `2 + 7N + 2 * (fail_rate * (1 + 6N))`. With 10% fidelity-review fail rate and N=8 sub-flows: 2 + 56 + 2 * 0.10 * 49 ≈ 58 + 10 = **~68 worst-case writes** (vs 58 happy-path floor). The pre-scaffold preview gate's wall-time estimate is a lower-bound floor — surface this caveat in the preview as a bracketed range, e.g., `Estimated wall time: ~29s happy-path; up to ~34s with fidelity-fix retries at 10% fail rate`.
 
 Pattern from `feedback_bulk_create_review_agents.md`.
 
@@ -125,7 +125,7 @@ Per-sub-flow L3 review headlines:
   AUTH-02: ...
   ...
 
-Estimated wall time: 58 * 500ms = ~29s.
+Estimated wall time: ~29s happy-path (58 * 500ms); up to ~34s if fidelity-review fixes fire at 10% fail rate (see Section 3 caveat).
 
   - Execute
   - Edit (open inventory rows for editing)

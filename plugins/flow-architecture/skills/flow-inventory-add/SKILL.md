@@ -19,7 +19,16 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **Append-only contract.** Existing rows are never rewritten. Existing IDs are never renamed (CLAUDE.md "never rename existing IDs" guardrail + master-flow-inventory.md schema lock). Silent overwrites are not a v1 behaviour — duplicate IDs hard-reject.
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q20 (memory:224-238). Q19 (memory:208-222) defines the parent 5-phase greenfield interview; `domain-add` mode invokes the Q19-mini subset (Phases 1+4+5 — interview, synthesis for one domain only, user confirmation) via `_shared/app-classifier-pattern.md`. (`_shared/app-classifier-pattern.md` itself owns Phases 0/1/2/5; the 1+4+5 subset here is the orchestration-level slice Q20.1 invokes for single-domain authoring.)
+The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q20 (memory:224-238). Q19 (memory:208-222) defines the parent 5-phase greenfield interview. `domain-add` mode invokes the Q19-mini subset — Phases 1+4+5, scoped to one domain — sourced from two layers:
+
+| Phase | Sourced from | Content |
+|---|---|---|
+| 1 (base classifier) | `_shared/app-classifier-pattern.md` | framework / app category / persona shape / scale |
+| 1 (greenfield follow-ups) | `flow-inventory-interview/SKILL.md` body, Section 2 | the 4 Q19.2 follow-up questions (domain envisioning, density, MVP sequencing, persona density) |
+| 4 (synthesis) | `flow-inventory-interview/SKILL.md` body, Section 3 | 3-tag scope-priority taxonomy, but scoped to one domain |
+| 5 (user confirmation) | `_shared/app-classifier-pattern.md` | preview rendering + Approve/Edit/Reject |
+
+`_shared/app-classifier-pattern.md` owns Phases 0/1/2/5 generically; this skill's Q19-mini reuses Phases 1 (base) + 5 from that utility and Phases 1 (greenfield follow-ups) + 4 from `flow-inventory-interview`'s body. Skipping Phases 0 (no PROJECT-INTENT scope filter for single-domain add) and 2 (no pattern-catalog candidate generation — the user is naming the domain directly).
 
 ---
 

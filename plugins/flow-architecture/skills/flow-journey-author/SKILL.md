@@ -1,6 +1,6 @@
 ---
 name: flow-journey-author
-description: Per-domain journey doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes ONE markdown file at `docs/product/journeys/<domain>.md` per domain, conforming to the Q26 locked template (variable phase count per Q26 mod 5; ~290-450+ lines based on TEAM precedent). Hybrid authoring — programmatic substitution for 8 deterministic top-level YAML keys + 2 body items; single `Agent(general-purpose)` call for 7-9 narrative sections (single-agent preserves cross-phase narrative continuity). Runs AFTER `flow-doc-author` so story docs are available as authoring context. 1 agent per domain; parallel across domains for multi-domain scaffolds (concurrency cap ~10 to avoid Claude Code background-agent queueing; queue depth N-10). 0 synchronous gates in default mode. Per-domain footprint ~90s; multi-domain projects ~90s wall total in parallel within the concurrency cap.
+description: Per-domain journey doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes ONE markdown file at `docs/product/journeys/<domain>.md` per domain, conforming to the Q26 locked template (variable phase count per Q26 mod 5; ~290-450+ lines based on TEAM precedent). Hybrid authoring — programmatic substitution for 8 deterministic top-level YAML keys + 2 body items; single `Agent(general-purpose)` call for 7-9 narrative sections (single-agent preserves cross-phase narrative continuity). Runs AFTER `flow-doc-author` so story docs are available as authoring context. 1 agent per domain; parallel across domains for multi-domain scaffolds with a concurrency cap of ~10 to avoid Claude Code background-agent queueing. 0 synchronous gates in default mode. Per-domain footprint ~90s; wall time scales as `ceil(N/10) * ~90s` — N≤10 domains finish in ~90s, N=27 finishes in ~270s (3 batches under the cap).
 user-invocable: false
 disable-model-invocation: true
 allowed-tools: Agent, Bash, Read, Write, Edit, Glob, Grep
@@ -75,10 +75,10 @@ Each `## Phase N` entry contains:
 | Invocation | Wall time |
 |---|---|
 | `/flow:add-domain` (1 domain) | ~60-90s |
-| `/flow:start-project` (multi-domain) | ~60-90s regardless of N (parallel across domains) |
-| `/flow:retrofit-project` (multi-domain) | ~60-90s regardless of N (parallel across domains) |
+| `/flow:start-project` (multi-domain) | `ceil(N/10) * ~90s` — N≤10 → ~90s; N=27 → ~270s (3 batches under ~10 concurrency cap) |
+| `/flow:retrofit-project` (multi-domain) | same formula |
 
-The agent runs in parallel across domains, NOT in parallel within a domain (which would break cross-phase narrative continuity).
+The agent runs in parallel across domains within a concurrency cap of ~10 (avoids Claude Code background-agent queueing), NOT in parallel within a domain (which would break cross-phase narrative continuity).
 
 ---
 
