@@ -124,15 +124,23 @@ else
   fail "docs/plans/ directory missing — flow-resume-breadcrumb write would mkdir, but explicit is better"
 fi
 
-# Fixture build/lint/test stubs return 0 — Q8 sub-criterion 5 shape only.
-# Distinguish "npm absent" (legit SKIP) from "build stub returned non-zero"
-# (genuine FAIL — fixture package.json contract requires exit 0).
+# Fixture build/lint/test stubs all return 0 per Q8 sub-criterion 5
+# (build && lint && test pass on the fixture). Test all three so a regression
+# in any package.json stub (or removal of a script) surfaces here rather than
+# silently slipping under the build-only assertion. Distinguish "npm absent"
+# (legit SKIP for the whole row) from "stub returned non-zero" (genuine FAIL).
 if ! command -v npm >/dev/null 2>&1; then
-  skip "fixture: npm run build" "npm not in PATH on this runner"
-elif (cd "$FIXTURE" && npm run --silent build > /dev/null 2>&1); then
-  pass "fixture: npm run build exits 0"
+  for FIXTURE_SCRIPT in build lint test; do
+    skip "fixture: npm run $FIXTURE_SCRIPT" "npm not in PATH on this runner"
+  done
 else
-  fail "fixture build stub returned non-zero — package.json contract violated"
+  for FIXTURE_SCRIPT in build lint test; do
+    if (cd "$FIXTURE" && npm run --silent "$FIXTURE_SCRIPT" > /dev/null 2>&1); then
+      pass "fixture: npm run $FIXTURE_SCRIPT exits 0"
+    else
+      fail "fixture $FIXTURE_SCRIPT stub returned non-zero — package.json contract violated"
+    fi
+  done
 fi
 
 # ── Section 2: flow-detect-fda-shape.sh ─────────────────────────────

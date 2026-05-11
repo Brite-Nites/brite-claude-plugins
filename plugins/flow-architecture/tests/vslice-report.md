@@ -8,7 +8,7 @@
 
 | Group | Asserts |
 |---|---|
-| 1. Fixture shape | Fixture dir + `package.json` + `.flow/config.json` (parses) + `docs/plans/` + `npm run build` exits 0 (or FAIL if npm present + stub returns non-zero; SKIP only on npm absence) |
+| 1. Fixture shape | Fixture dir + `package.json` + `.flow/config.json` (parses) + `docs/plans/` + `npm run build` / `npm run lint` / `npm test` all exit 0 (each one a separate assertion; FAIL if npm present + any stub returns non-zero; SKIP only on npm absence — applies to all three) |
 | 2. `flow-detect-fda-shape.sh` | Exits 0; emits 5 `EXISTS=no` lines for a fresh greenfield fixture (INTENT / INVENTORY / FLOWS_DIR / JOURNEYS_DIR / BREADCRUMB) |
 | 3. `flow-detect-mode.sh` | `MODE=greenfield` with `LINEAR_ISSUE_COUNT=0`; `MODE=greenfield` with `LINEAR_ISSUE_COUNT=9` (just-below boundary); `MODE=retrofit` with `LINEAR_ISSUE_COUNT=10` (Q36.3 step 4 heuristic) |
 | 4. `flow-context-load.sh` | Exits 0; emits exactly 10-line Q12.5 preamble (`grep -cE '^[A-Z_]+='`-counted, robust to stderr leakage); all canonical fields populated correctly; `JOURNEYS_DIR_EXISTS` deliberately absent (preamble drops the 5th shape key) |
