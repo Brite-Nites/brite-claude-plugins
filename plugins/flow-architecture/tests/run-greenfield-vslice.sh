@@ -19,6 +19,36 @@ PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCRIPTS_DIR="$PLUGIN_ROOT/scripts"
 FIXTURE="$SCRIPT_DIR/fixtures/synthetic-greenfield"
 BREADCRUMB="$FIXTURE/docs/plans/.flow-phase-state.json"
+SCRATCH_BREADCRUMB="$FIXTURE/docs/plans/.flow-test-scratch.json"
+
+# Refuse to operate if the breadcrumb path ever drifts outside the fixture.
+# Defensive: guards against a future edit that resolves $BREADCRUMB to the
+# parent repo's docs/plans/.flow-phase-state.json (real state).
+case "$BREADCRUMB" in
+  "$FIXTURE"/*) ;;
+  *) echo "fatal: \$BREADCRUMB ($BREADCRUMB) is not under \$FIXTURE ($FIXTURE); refusing to run" >&2
+     exit 2 ;;
+esac
+
+# Preflight: ensure interpreters the harness assumes are on PATH. We fail
+# fast with a clear message rather than emit a confusing assertion mid-run.
+command -v python3 >/dev/null 2>&1 || { echo "fatal: python3 required" >&2; exit 2; }
+
+# Hermetic env: drop any env-vars that influence helper-script behavior so the
+# harness ignores parent-shell state. LINEAR_ISSUE_COUNT in particular comes
+# from BriteBase-rooted shells and would silently flip detect-mode behavior.
+unset LINEAR_ISSUE_COUNT FLOW_GH_AUTH_CACHE FLOW_SHAPE_CACHE \
+      _FLOW_SHAPE_INTENT_EXISTS _FLOW_SHAPE_INVENTORY_EXISTS \
+      _FLOW_SHAPE_FLOWS_DIR_EXISTS _FLOW_SHAPE_BREADCRUMB_EXISTS
+
+# Pre-flight rerun reset: a prior failed run may have left a breadcrumb at
+# $BREADCRUMB (intentional inspection contract). On rerun we explicitly note
+# and clean so Section 2's BREADCRUMB_EXISTS=no assertion is meaningful.
+if [ -f "$BREADCRUMB" ]; then
+  printf 'pre-flight: removing stale breadcrumb from prior run: %s\n' "$BREADCRUMB"
+  rm -f "$BREADCRUMB"
+fi
+rm -f "$SCRATCH_BREADCRUMB"
 
 # ── Counters ─────────────────────────────────────────────────────────
 PASS=0
@@ -30,11 +60,27 @@ fail() { printf '  FAIL  %s\n' "$1"; FAIL=$((FAIL + 1)); }
 skip() { printf '  SKIP  %s — %s\n' "$1" "$2"; SKIP=$((SKIP + 1)); }
 section() { printf '\n[%s] %s\n' "$1" "$2"; }
 
+# Match KEY=VALUE inside a captured stdout buffer.
+expect_kv() {
+  local hay="$1" key="$2" expected="$3"
+  local line
+  line="$(printf '%s\n' "$hay" | grep -E "^${key}=" || true)"
+  if [ "$line" = "${key}=${expected}" ]; then
+    pass "$key=$expected"
+  else
+    fail "expected $key=$expected, got: ${line:-<missing>}"
+  fi
+}
+
 # ── Cleanup contract ────────────────────────────────────────────────
-# Remove the test-written breadcrumb on clean run; leave in place on failure
-# so the failed state is inspectable.
+# Remove test-written breadcrumbs on clean run; leave the main breadcrumb in
+# place on failure so the failed state is inspectable. The scratch file (used
+# by Section 5b negative-path tests) is always removed.
 cleanup_on_success() {
-  rm -f "$BREADCRUMB"
+  rm -f "$BREADCRUMB" "$SCRATCH_BREADCRUMB"
+}
+cleanup_scratch_only() {
+  rm -f "$SCRATCH_BREADCRUMB"
 }
 
 # ── Section 1: Fixture shape ────────────────────────────────────────
@@ -72,10 +118,14 @@ else
 fi
 
 # Fixture build/lint/test stubs return 0 — Q8 sub-criterion 5 shape only.
-if (cd "$FIXTURE" && npm run --silent build > /dev/null 2>&1); then
+# Distinguish "npm absent" (legit SKIP) from "build stub returned non-zero"
+# (genuine FAIL — fixture package.json contract requires exit 0).
+if ! command -v npm >/dev/null 2>&1; then
+  skip "fixture: npm run build" "npm not in PATH on this runner"
+elif (cd "$FIXTURE" && npm run --silent build > /dev/null 2>&1); then
   pass "fixture: npm run build exits 0"
 else
-  skip "fixture: npm run build" "npm not available in CI image or build stub failed"
+  fail "fixture build stub returned non-zero — package.json contract violated"
 fi
 
 # ── Section 2: flow-detect-fda-shape.sh ─────────────────────────────
@@ -90,22 +140,11 @@ else
 fi
 
 # Expected: all 5 EXISTS keys = no (fresh greenfield fixture, no FDA artifacts yet).
-expect_shape_field() {
-  local key="$1" expected="$2"
-  local line
-  line="$(printf '%s\n' "$SHAPE_OUT" | grep -E "^${key}=" || true)"
-  if [ "$line" = "${key}=${expected}" ]; then
-    pass "$key=$expected"
-  else
-    fail "expected $key=$expected, got: ${line:-<missing>}"
-  fi
-}
-
-expect_shape_field "INTENT_EXISTS"     "no"
-expect_shape_field "INVENTORY_EXISTS"  "no"
-expect_shape_field "FLOWS_DIR_EXISTS"  "no"
-expect_shape_field "JOURNEYS_DIR_EXISTS" "no"
-expect_shape_field "BREADCRUMB_EXISTS" "no"
+expect_kv "$SHAPE_OUT" "INTENT_EXISTS"       "no"
+expect_kv "$SHAPE_OUT" "INVENTORY_EXISTS"    "no"
+expect_kv "$SHAPE_OUT" "FLOWS_DIR_EXISTS"    "no"
+expect_kv "$SHAPE_OUT" "JOURNEYS_DIR_EXISTS" "no"
+expect_kv "$SHAPE_OUT" "BREADCRUMB_EXISTS"   "no"
 
 # ── Section 3: flow-detect-mode.sh ──────────────────────────────────
 section "3/6" "flow-detect-mode.sh classifies as greenfield"
@@ -126,7 +165,17 @@ else
   fail "expected 'greenfield', got: '$MODE_OUT'"
 fi
 
-# Q36.3 step 4 heuristic: same fixture with LINEAR_ISSUE_COUNT=10 → retrofit.
+# Q36.3 step 4 heuristic: bracket the 10-issue threshold both sides.
+# LINEAR_ISSUE_COUNT=9 → still greenfield (just below threshold).
+MODE_OUT_9="$(LINEAR_ISSUE_COUNT=9 "$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>&1)" || \
+  MODE_OUT_9="<helper-failed>"
+if [ "$MODE_OUT_9" = "greenfield" ]; then
+  pass "MODE=greenfield when LINEAR_ISSUE_COUNT=9 (just below Q36.3 threshold)"
+else
+  fail "expected 'greenfield' when LINEAR_ISSUE_COUNT=9, got: '$MODE_OUT_9'"
+fi
+
+# LINEAR_ISSUE_COUNT=10 → retrofit (at-and-above threshold).
 MODE_OUT_RETROFIT=""
 if MODE_OUT_RETROFIT="$(LINEAR_ISSUE_COUNT=10 "$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>&1)"; then
   if [ "$MODE_OUT_RETROFIT" = "retrofit" ]; then
@@ -152,36 +201,36 @@ else
   printf '%s\n' "$PREAMBLE_OUT" | sed 's/^/    | /'
 fi
 
-# Q12.5 contract: exactly 10 KEY=VALUE lines, fixed order.
-PREAMBLE_LINES="$(printf '%s\n' "$PREAMBLE_OUT" | wc -l | tr -d ' ')"
-if [ "$PREAMBLE_LINES" = "10" ]; then
-  pass "preamble emits exactly 10 lines (Q12.5 contract)"
+# Q12.5 contract: exactly 10 KEY=VALUE lines, fixed order. grep -c counts
+# only schema-matching lines, so stderr leakage (warnings, etc.) wouldn't
+# inflate the count under 2>&1 capture.
+PREAMBLE_KV_COUNT="$(printf '%s\n' "$PREAMBLE_OUT" | grep -cE '^[A-Z_]+=' || true)"
+if [ "$PREAMBLE_KV_COUNT" = "10" ]; then
+  pass "preamble emits exactly 10 KEY=VALUE lines (Q12.5 contract)"
 else
-  fail "expected 10 preamble lines, got $PREAMBLE_LINES"
+  fail "expected 10 KEY=VALUE preamble lines, got $PREAMBLE_KV_COUNT"
 fi
 
 # Per-field assertions.
-expect_preamble_field() {
-  local key="$1" expected="$2"
-  local line
-  line="$(printf '%s\n' "$PREAMBLE_OUT" | grep -E "^${key}=" || true)"
-  if [ "$line" = "${key}=${expected}" ]; then
-    pass "$key=$expected"
-  else
-    fail "expected $key=$expected, got: ${line:-<missing>}"
-  fi
-}
+expect_kv "$PREAMBLE_OUT" "MODE"                "greenfield"
+expect_kv "$PREAMBLE_OUT" "LINEAR_PROJECT_ID"   "00000000-0000-0000-0000-000000000000"
+expect_kv "$PREAMBLE_OUT" "LINEAR_PROJECT_NAME" "synthetic-greenfield-fixture"
+expect_kv "$PREAMBLE_OUT" "REPO_ROOT"           "$FIXTURE"
+expect_kv "$PREAMBLE_OUT" "INTENT_EXISTS"       "no"
+expect_kv "$PREAMBLE_OUT" "INVENTORY_EXISTS"    "no"
+expect_kv "$PREAMBLE_OUT" "FLOWS_DIR_EXISTS"    "no"
+expect_kv "$PREAMBLE_OUT" "BREADCRUMB_EXISTS"   "no"
+expect_kv "$PREAMBLE_OUT" "GH_AUTH"             "no"
+expect_kv "$PREAMBLE_OUT" "LINEAR_MCP"          "unknown"
 
-expect_preamble_field "MODE"               "greenfield"
-expect_preamble_field "LINEAR_PROJECT_ID"  "00000000-0000-0000-0000-000000000000"
-expect_preamble_field "LINEAR_PROJECT_NAME" "synthetic-greenfield-fixture"
-expect_preamble_field "REPO_ROOT"          "$FIXTURE"
-expect_preamble_field "INTENT_EXISTS"      "no"
-expect_preamble_field "INVENTORY_EXISTS"   "no"
-expect_preamble_field "FLOWS_DIR_EXISTS"   "no"
-expect_preamble_field "BREADCRUMB_EXISTS"  "no"
-expect_preamble_field "GH_AUTH"            "no"
-expect_preamble_field "LINEAR_MCP"         "unknown"
+# Q12.5 preamble is exactly 10 fields — JOURNEYS_DIR_EXISTS comes from the
+# shape probe (5 keys) but the preamble deliberately drops it. Catch a
+# regression that re-introduces it.
+if printf '%s\n' "$PREAMBLE_OUT" | grep -q '^JOURNEYS_DIR_EXISTS='; then
+  fail "preamble leaked JOURNEYS_DIR_EXISTS (Q12.5 schema is 10 fields, journeys not included)"
+else
+  pass "preamble does NOT leak JOURNEYS_DIR_EXISTS (Q12.5 10-field schema)"
+fi
 
 # ── Section 5: flow-resume-breadcrumb.sh write/read round-trip ──────
 section "5/6" "flow-resume-breadcrumb.sh write/read round-trip"
@@ -232,21 +281,10 @@ else
   printf '%s\n' "$READ_OUT" | sed 's/^/    | /'
 fi
 
-expect_read_field() {
-  local key="$1" expected="$2"
-  local line
-  line="$(printf '%s\n' "$READ_OUT" | grep -E "^${key}=" || true)"
-  if [ "$line" = "${key}=${expected}" ]; then
-    pass "$key=$expected"
-  else
-    fail "expected $key=$expected, got: ${line:-<missing>}"
-  fi
-}
-
-expect_read_field "EXISTS"       "yes"
-expect_read_field "STATUS"       "in_flight"
-expect_read_field "STALE"        "no"
-expect_read_field "STALE_REASON" "none"
+expect_kv "$READ_OUT" "EXISTS"       "yes"
+expect_kv "$READ_OUT" "STATUS"       "in_flight"
+expect_kv "$READ_OUT" "STALE"        "no"
+expect_kv "$READ_OUT" "STALE_REASON" "none"
 
 # After the breadcrumb write, the shape probe should flip BREADCRUMB_EXISTS to yes.
 SHAPE_OUT_2=""
@@ -256,6 +294,9 @@ if SHAPE_OUT_2="$("$SCRIPTS_DIR/flow-detect-fda-shape.sh" "$FIXTURE" 2>&1)"; the
   else
     fail "shape probe still reports BREADCRUMB_EXISTS=no after write"
   fi
+else
+  fail "flow-detect-fda-shape.sh exit non-zero after breadcrumb write"
+  printf '%s\n' "$SHAPE_OUT_2" | sed 's/^/    | /'
 fi
 
 # Mode classifier should now return `resume` (in_flight + not stale).
@@ -266,7 +307,98 @@ if MODE_RESUME="$("$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>&1)"; then
   else
     fail "expected MODE=resume after in_flight breadcrumb, got: '$MODE_RESUME'"
   fi
+else
+  fail "flow-detect-mode.sh exit non-zero after breadcrumb write"
+  printf '%s\n' "$MODE_RESUME" | sed 's/^/    | /'
 fi
+
+# ── Section 5b: breadcrumb-read soft-fail paths ─────────────────────
+# flow-resume-breadcrumb.sh `read` has 5 documented soft-fail outcomes per
+# Q31.3, each surfacing a distinct STALE_REASON. Exercise each so a regression
+# in the stale-detection logic surfaces before reaching production resume
+# dispatch decisions.
+section "5b/6" "flow-resume-breadcrumb.sh read soft-fail STALE_REASONs"
+
+# Helper: write a synthetic JSON to scratch path (bypasses write subcommand
+# which would parse-verify), then read + assert.
+assert_read_outcome() {
+  local label="$1" payload="$2" exp_status="$3" exp_stale="$4" exp_reason="$5"
+  printf '%s' "$payload" > "$SCRATCH_BREADCRUMB"
+  local out=""
+  if ! out="$("$SCRIPTS_DIR/flow-resume-breadcrumb.sh" read "$SCRATCH_BREADCRUMB" 2>&1)"; then
+    fail "[$label] read exit non-zero"
+    printf '%s\n' "$out" | sed 's/^/    | /'
+    return
+  fi
+  expect_kv "$out" "EXISTS"       "yes"
+  expect_kv "$out" "STATUS"       "$exp_status"
+  expect_kv "$out" "STALE"        "$exp_stale"
+  expect_kv "$out" "STALE_REASON" "$exp_reason"
+}
+
+# (1) Malformed JSON → STALE=yes STALE_REASON=parse-error STATUS=unknown
+assert_read_outcome "malformed-json" \
+  "this is not json {{{" \
+  "unknown" "yes" "parse-error"
+
+# (2) status=completed → STALE=yes STALE_REASON=status-completed
+COMPLETED_JSON="$(python3 - "$NOW" <<'PY'
+import json, sys
+print(json.dumps({"status": "completed", "last_updated": sys.argv[1]}))
+PY
+)"
+assert_read_outcome "status-completed" "$COMPLETED_JSON" \
+  "completed" "yes" "status-completed"
+
+# (3) status=abandoned → STALE=yes STALE_REASON=status-abandoned
+ABANDONED_JSON="$(python3 - "$NOW" <<'PY'
+import json, sys
+print(json.dumps({"status": "abandoned", "last_updated": sys.argv[1]}))
+PY
+)"
+assert_read_outcome "status-abandoned" "$ABANDONED_JSON" \
+  "abandoned" "yes" "status-abandoned"
+
+# (4) Unparseable timestamp → STALE=yes STALE_REASON=timestamp-unparseable
+BAD_TS_JSON="$(python3 <<'PY'
+import json
+print(json.dumps({"status": "in_flight", "last_updated": "not-a-timestamp-at-all"}))
+PY
+)"
+assert_read_outcome "bad-timestamp" "$BAD_TS_JSON" \
+  "in_flight" "yes" "timestamp-unparseable"
+
+# (5) Timestamp 6 days ago (just inside 7-day stale window) → STALE=no
+WITHIN_WINDOW_TS="$(python3 <<'PY'
+import datetime
+now = datetime.datetime.now(datetime.timezone.utc)
+print((now - datetime.timedelta(days=6)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+PY
+)"
+WITHIN_WINDOW_JSON="$(python3 - "$WITHIN_WINDOW_TS" <<'PY'
+import json, sys
+print(json.dumps({"status": "in_flight", "last_updated": sys.argv[1]}))
+PY
+)"
+assert_read_outcome "within-7d-window" "$WITHIN_WINDOW_JSON" \
+  "in_flight" "no" "none"
+
+# (6) Timestamp 8 days ago (outside stale window) → STALE=yes STALE_REASON=age
+OUT_OF_WINDOW_TS="$(python3 <<'PY'
+import datetime
+now = datetime.datetime.now(datetime.timezone.utc)
+print((now - datetime.timedelta(days=8)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+PY
+)"
+OUT_OF_WINDOW_JSON="$(python3 - "$OUT_OF_WINDOW_TS" <<'PY'
+import json, sys
+print(json.dumps({"status": "in_flight", "last_updated": sys.argv[1]}))
+PY
+)"
+assert_read_outcome "outside-7d-window" "$OUT_OF_WINDOW_JSON" \
+  "in_flight" "yes" "age"
+
+cleanup_scratch_only
 
 # ── Section 6: Phase 2-8 skip-with-reason ───────────────────────────
 section "6/6" "Phase 2-8 deep assertions (pending BC-6959)"
@@ -289,14 +421,15 @@ skip "4 user-confirmation gates fire (G1-G4) per Q37" \
      "AskUserQuestion is LLM-only; not headlessly testable in this category"
 
 # ── Summary ─────────────────────────────────────────────────────────
-TOTAL=$((PASS + FAIL))
 printf '\n──────────────────────────────────────────\n'
 printf 'BC-7057 v-slice greenfield: %d pass / %d fail / %d skip (%d hard assertions)\n' \
-       "$PASS" "$FAIL" "$SKIP" "$TOTAL"
+       "$PASS" "$FAIL" "$SKIP" "$((PASS + FAIL))"
 printf '──────────────────────────────────────────\n'
 
 if [ "$FAIL" -gt 0 ]; then
   printf '\nHarness failed. Leaving breadcrumb at %s for inspection.\n' "$BREADCRUMB"
+  printf 'Scratch breadcrumb cleaned up.\n'
+  cleanup_scratch_only
   exit 1
 fi
 

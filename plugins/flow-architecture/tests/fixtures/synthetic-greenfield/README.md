@@ -9,12 +9,12 @@ The fixture is intentionally **documentation-only at the domain level today** �
 Three domains the harness expects `/flow:start-project` to produce when sub-skills exist:
 
 1. **`assets`** — image upload, browse, edit, share, archive (5 sub-flows).
-2. **`account`** — sign-in, profile, settings, billing, sign-out (3 sub-flows actively asserted; remaining 2 documentation-only).
-3. **`admin`** — user roster, permissions, audit log (3 sub-flows; harness asserts 2 actively).
+2. **`account`** — sign-in, profile, settings, billing, sign-out (5 sub-flows).
+3. **`admin`** — user roster, permissions, audit log (3 sub-flows).
 
-Total target: 3 domains × ~5 sub-flows = ~13 sub-flow stories; ≈ 60-100 discipline children once `/flow:start-project` Phase 4 scaffolds the Linear tree.
+Planned total: 3 domains × ~4-5 sub-flows = 13 sub-flow stories; ≈ 60-100 discipline children once `/flow:start-project` Phase 4 scaffolds the Linear tree.
 
-For BC-7057 v0.2.8 the harness only checks fixture **shape** + helper **behavior**, not the LLM-produced inventory or per-flow doc content.
+**v0.2.8 harness asserts none of these domain-level outputs.** Section 6 of the harness is pure skip-with-reason for Phases 2-8 — every domain assertion activates as the matching BC-6959 sub-skill PR lands per the matrix in `vslice-report.md`. v0.2.8 only checks fixture **shape** + helper **behavior**, not the LLM-produced inventory or per-flow doc content.
 
 ## Build / lint / test contract
 

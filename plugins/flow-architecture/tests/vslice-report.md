@@ -4,18 +4,27 @@
 
 ## Scope today (v0.2.8)
 
-`run-greenfield-vslice.sh` exercises **Phase 1 surface only** — the four FDA helper scripts under `plugins/flow-architecture/scripts/` against the `tests/fixtures/synthetic-greenfield/` fixture. Six assertion groups, 37 hard assertions:
+`run-greenfield-vslice.sh` exercises **Phase 1 surface only** — the four FDA helper scripts under `plugins/flow-architecture/scripts/` against the `tests/fixtures/synthetic-greenfield/` fixture. Seven assertion groups, 63 hard assertions (current count emitted by the harness summary at runtime; this number will grow as BC-6959 sub-skill PRs land):
 
 | Group | Asserts |
 |---|---|
-| 1. Fixture shape | Fixture dir + `package.json` + `.flow/config.json` (parses) + `docs/plans/` + `npm run build` exits 0 |
+| 1. Fixture shape | Fixture dir + `package.json` + `.flow/config.json` (parses) + `docs/plans/` + `npm run build` exits 0 (or FAIL if npm present + stub returns non-zero; SKIP only on npm absence) |
 | 2. `flow-detect-fda-shape.sh` | Exits 0; emits 5 `EXISTS=no` lines for a fresh greenfield fixture (INTENT / INVENTORY / FLOWS_DIR / JOURNEYS_DIR / BREADCRUMB) |
-| 3. `flow-detect-mode.sh` | `MODE=greenfield` with `LINEAR_ISSUE_COUNT=0`; `MODE=retrofit` with `LINEAR_ISSUE_COUNT=10` (Q36.3 step 4 heuristic) |
-| 4. `flow-context-load.sh` | Exits 0; emits exactly 10-line Q12.5 preamble with all canonical fields populated correctly |
-| 5. `flow-resume-breadcrumb.sh` | Write/read round-trip preserves `STATUS=in_flight` + `STALE=no`; subsequent shape probe flips `BREADCRUMB_EXISTS=yes`; subsequent mode probe returns `MODE=resume` |
+| 3. `flow-detect-mode.sh` | `MODE=greenfield` with `LINEAR_ISSUE_COUNT=0`; `MODE=greenfield` with `LINEAR_ISSUE_COUNT=9` (just-below boundary); `MODE=retrofit` with `LINEAR_ISSUE_COUNT=10` (Q36.3 step 4 heuristic) |
+| 4. `flow-context-load.sh` | Exits 0; emits exactly 10-line Q12.5 preamble (`grep -cE '^[A-Z_]+='`-counted, robust to stderr leakage); all canonical fields populated correctly; `JOURNEYS_DIR_EXISTS` deliberately absent (preamble drops the 5th shape key) |
+| 5. `flow-resume-breadcrumb.sh` happy path | Write/read round-trip preserves `STATUS=in_flight` + `STALE=no`; subsequent shape probe flips `BREADCRUMB_EXISTS=yes`; subsequent mode probe returns `MODE=resume` |
+| 5b. `flow-resume-breadcrumb.sh` soft-fail paths | All 5 Q31.3-documented `STALE_REASON`s exercised: `parse-error` (malformed JSON), `status-completed`, `status-abandoned`, `timestamp-unparseable`, `age` (8-day-old timestamp); plus a positive 6-day-old "within-window" boundary case |
 | 6. Phase 2-8 skip-with-reason | 8 skip lines documenting pending coverage (see § Pending coverage matrix) |
 
 CI job: `vslice-greenfield` in `.github/workflows/validate-plugin.yml` (advisory; `continue-on-error: true` per BC-7057 spec "advisory job" framing). Runs on every PR to `main`.
+
+**Follow-up: advisory → blocking demotion.** Once the harness has accumulated 1-2 weeks of stable green runs, demote `continue-on-error: true` to `false` so regressions actually block PRs (rather than producing a green check despite a failed harness). Track as a separate Linear issue when the time arrives.
+
+**Hermeticity controls** (introduced in v0.2.8):
+- `unset` of all `LINEAR_ISSUE_COUNT` / `FLOW_GH_AUTH_CACHE` / `FLOW_SHAPE_CACHE` / `_FLOW_SHAPE_*` env-vars at script top — parent-shell state cannot influence helper behavior.
+- `command -v python3` preflight — bail fast on missing interpreter rather than emit confusing assertion-mid-run failure.
+- `case "$BREADCRUMB"` defensive guard — refuses to operate if the breadcrumb path ever resolves outside the fixture (catches future edits that might silently target the parent repo's state).
+- Pre-flight breadcrumb cleanup — rerunnable after a failed run; the "leave breadcrumb on failure for inspection" contract still works within a single run, and the next run announces the cleanup explicitly.
 
 ## Pending coverage matrix
 
@@ -45,7 +54,7 @@ If the new surface requires LLM dispatch to test end-to-end, route through `beha
 
 ## No findings (v0.2.8 initial run)
 
-All 37 hard assertions pass under the synthetic fixture as of 2026-05-11. No bugs surfaced in any of the four helper scripts under the fixture conditions tested.
+All 63 hard assertions pass under the synthetic fixture as of 2026-05-11. No bugs surfaced in any of the four helper scripts under the fixture conditions tested.
 
 Per BC-7057 acceptance criterion 5: this report constitutes the formal "no findings" attestation. Future runs may surface regressions — those file as separate Linear issues in the `flow-architecture` Linear project.
 
@@ -53,7 +62,7 @@ Per BC-7057 acceptance criterion 5: this report constitutes the formal "no findi
 
 | Date | Plugin version | Covered | Pending |
 |---|---|---|---|
-| 2026-05-11 | 0.2.8 | Phase 1 (37 assertions across helpers + breadcrumb round-trip) | Phases 2-8 (8 skips) |
+| 2026-05-11 | 0.2.8 | Phase 1 (63 assertions: helpers + breadcrumb round-trip + 5 `STALE_REASON` negative-paths + LINEAR_ISSUE_COUNT boundary + preamble schema discipline) | Phases 2-8 (8 skips) |
 
 Append new rows as sub-skill PRs land.
 
