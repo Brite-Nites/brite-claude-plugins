@@ -429,8 +429,27 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ### Phase 11 (ACTIVATE — first live-walk in chain)
 
-- **R-22** — TBD
-- **R-23 ★** — TBD (round-5 main walk closes here)
+- **R-22** — ✅ **Expected.** **(Single-lead test campaign built; Phases 3-9 walked inline.)**
+  - **Artifact built:** `docs/dogfood/bc-6554-round-5/test-copy-single-lead.json` mirrors `test-copy.json` verbatim + adds `single_lead_target` metadata block (metadata-only, not consumed by EB API).
+  - **Lead created:** `POST /api/leads/multiple` with `{email: "corinne+bc-6785-r5@britenites.com", first_name: "Corinne", last_name: "Brewer", title: "Operations", company: "Brite Nites", custom_variables: [<8 lowercased entries>]}` returned lead id 14762, uuid `a1c13f1f-abc7-4057-9493-c476d6ffa743`. Tag id 41 (`bc-6785-r5`) attached via `POST /api/tags/attach-to-leads`.
+  - **Campaign created:** `BC-6785 | SINGLE-LEAD | activate-test` (id 48, uuid `a1c13f22-a7c0-4b12-9817-d398e318601b`, status `draft`, type `outbound`).
+  - **5 parallel Phase 3-9 steps fired:** plain_text PATCH ✓ ; lead 14762 attached ✓ ; 15 senders (981-995) attached ✓ ; schedule template 3 cloned to id 24 ✓ ; sequence id 23 created with step ids 42 (step 1, wait 1d) + 43 (step 2, wait 4d, thread_reply true) ✓. All settings preserved through bring-up; BC-6301 auto-Re: prepend on step 2 confirmed (`Re: {Quick|Fast|30s} {question|check|idea}`).
+  - **Match:** every component of R-22 spec.
+
+- **R-23 ★** — ✅ **Expected.** 🎯 **(Phase 11 ACTIVATE live-walk first in chain.)**
+  - **Endpoint verified:** `PATCH /api/campaigns/{id}/resume` per launch-campaign.md spec.
+  - **Pre-state:** campaign 48 in `status: draft` with all Phases 3-9 setup complete.
+  - **resume call fired:** `PATCH /api/campaigns/48/resume` returned `success: true` with response body `status: "queued"`, `total_leads: 1`, `plain_text: true` preserved through resume (resume endpoint does NOT trigger BC-6544 omit-revert; different endpoint than `/update`).
+  - **Verification read:** `get_campaign(48)` ~5s later returned `status: "active"` (campaign progressed through `queued → active` in the verification window). EB state machine: `draft → queued → launching → active`. The transient nature of `queued` means operators verifying immediately after resume may see `active`.
+  - **Closing summary for round-5 main walk:**
+    - Campaign 48 activated; step 1 scheduled for next 08:00-20:00 America/Denver window (today is Mon 2026-05-11; step_1.wait_in_days=1 → likely Tue 2026-05-12 morning delivery).
+    - Step 2 follows ~4 days later (~Sat 2026-05-16) with auto-Re: subject and `thread_reply: true` threading.
+    - 2 real emails to `corinne+bc-6785-r5@britenites.com` over ~4-5 days.
+    - **Multiplicative-grid campaigns 43-46 remain in `Draft` state** per round-5 plan (operator-intent gate at User gate 11a was scoped to single-lead test only).
+    - `activated_per_campaign["single-lead-test"]` populated; multiplicative-grid bucket keys still `null`. Global `activated: false` (correct — only the single-lead test was activated).
+  - **Sub-observation (not a finding, optional doc note):** `status: "queued"` is transient. Operators expecting to verify queued state via `get_campaign` after `resume_campaign` may see `active` due to fast state-machine progression. One-line callout in spec would help; low priority. Adding to follow-up candidates as **F-Queued-Transient**.
+  - **Match:** every component of R-23★ spec.
+  - **Round-5 main walk CLOSES HERE per session decision.** Actual delivery verification (did step 1 land, did step 2 thread correctly) is post-close investigation; if either fails, file separate follow-up.
 
 ### Side-flows
 
@@ -451,6 +470,7 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 - **F-IV-5** (Phase 10 Mode 2) — IV-5 has no recovery path for fresh worktrees absent `docs/marketing-context.md`. Strict halt blocks the operator-self-send use case (recipient is operator's own `@britenites.com` inbox). Mitigated for round-5 via stub-file creation at `docs/marketing-context.md` with `## test_send_allowlist` listing `britenites.com`. Round-6 candidate: add automatic operator-self-send allowlist (via `git config user.email` domain match) OR ship workspace bootstrap with a default marketing-context.md stub.
 - **F-test-send-prefix** (Phase 10 Mode 2) — EB silently prepends `[test] ` to subjects on `POST /api/campaigns/sequence-steps/{id}/test-email`. Artifact subject `{Quick|Fast|30s} {question|check|idea}` delivered as `[test] Quick idea`. Not in launch-campaign.md or email-bison.md spec. Should be added as a gotcha note. Useful operator-side feature; need to verify real campaign sends do NOT carry this prefix (deferred to R-23★ Phase 11 inbox check).
 - **F-Mode2-Lead-Pick** (Phase 10 Mode 2) — Mode 2 `--test-send` picked lead 14761 (Contact Account / Test Dogfood Zoo) for variable substitution; Mode 1 deterministically picked lead 14759 (Info Account / Test Dogfood Aquarium) per spec's "first lead in largest cell" rule. Mode 2's lead-pick rule is unspecified. Operators using `--test-send` to spot-check Mode 1 render fidelity should know the lead won't match. Round-6 candidate: document Mode 2 lead-pick rule.
+- **F-Queued-Transient** (Phase 11) — `status: "queued"` is transient. `resume_campaign` returns the campaign with `status: "queued"`, but `get_campaign` ~5s later may return `status: "active"` due to EB state machine progression (`draft → queued → launching → active`). Operators verifying queued state immediately after resume may misread as "did the verification fail?" when it's actually evidence of normal fast-progression. One-line spec callout would help (e.g., "Either `queued` OR `active` after resume_campaign is a pass; both indicate successful activation"). Low priority; minor doc enhancement.
 
 ### Non-blocking ratifications worth optional follow-up
 
