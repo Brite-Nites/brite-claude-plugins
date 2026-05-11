@@ -24,7 +24,7 @@ Slash commands organized by role. The directory `commands/` and `plugin.json` ar
 
 - **Orchestrators** — multi-phase runs with user-confirmation gates between phases. Examples: `/flow:start-project` (greenfield), `/flow:retrofit-project`, `/flow:add-domain`, `/flow:add-sub-flow`.
 - **Utilities** — single-purpose commands with no user-gates between internal steps. Examples: `/flow:audit`, `/flow:office-hours` (project-intent interview with internal L1-review phase).
-- **Reflect** — `/flow:retro` (sub-flow-scoped retrospective).
+- **Reflect** — `/flow:retro` (per-domain retrospective; output target is the completed domain milestone per Q44 sub-decision 7 call signature `issue_id: <milestone_id>`).
 - **L4 plan-X suite** — one per discipline, dispatched on-demand from `/flow:session-start`. Examples: `/flow:plan-story`, `/flow:plan-eng`, `/flow:plan-design`, `/flow:plan-qa`, `/flow:plan-docs`.
 - **Cloned inner-loop commands** — FDA-swapped clones of workflows-plugin commands per the workflows-cloned cribbing pattern (see § Methodology notes). Examples: `/flow:session-start`, `/flow:review`, `/flow:ship`.
 
@@ -136,7 +136,7 @@ Several command pairs have overlapping vocabulary but distinct purposes. Mixing 
 
 - **`/flow:audit` vs `/flow:review` (Q52 sub-decision 4; cross-cutting requirement #5).** `/flow:audit` runs FDA-process-compliance gates (filesystem-existence + Linear-state checks against the 35-gate stack). `/flow:review` runs code-review agents on a diff (P1/P2/P3 findings classification, simplification pass). Distinct purposes. `/flow:audit` auto-invokes before `/flow:ship`; `/flow:review` is invoked when the user wants diff-level review. A `--audit-preflight` flag for `/flow:review` is a v1.1 candidate (parking lot #48) if Brand Hub dogfood reveals demand for bundled coverage.
 - **Orchestrators vs utilities vs cloned commands.** Orchestrators (`/flow:start-project`, `/flow:retrofit-project`, `/flow:add-domain`, `/flow:add-sub-flow`) are multi-phase + multi-gate and own the breadcrumb. Utilities (`/flow:audit`, `/flow:office-hours`, `/flow:retro`) are single-purpose. Cloned commands (`/flow:session-start`, `/flow:review`, `/flow:ship`) preserve workflows structure with FDA-swap axes — they are **not** orchestrators and do not write the breadcrumb.
-- **`/flow:office-hours` vs `/flow:retro`.** Office-hours is a **project-scoped** intent interview (Q42 — output is `intent.md`); retro is a **sub-flow-scoped** retrospective (Q44). Different scope, different output target, different cadence (office-hours fires once or rarely; retro fires per sub-flow shipped).
+- **`/flow:office-hours` vs `/flow:retro`.** Office-hours is a **project-scoped** intent interview (Q42 — output is `intent.md`); retro is a **per-domain** retrospective (Q44 — output target is the completed domain milestone, with filesystem-canonical `docs/retros/<domain>-<YYYY-MM-DD>.md` mirrored by a Q46 `retro-summary` comment on the milestone). Different scope, different output target, different cadence (office-hours fires once or rarely; retro fires per domain shipped — typically alongside `/flow:ship` completion).
 - **`flow-sandbox-scaffold` vs hand-off agents.** `flow-sandbox-scaffold` (Q17) is a sub-skill that bootstraps the sandbox harness during scaffold. Hand-off agents (`story-doc-author`, `journey-doc-author`) are review-style agents that **produce** doc markdown for an authoring sub-skill to write. Same shape, different layer.
 
 ## Q46 writeback layer
