@@ -4,11 +4,11 @@ description: Greenfield Flow-Driven Architecture orchestrator — 8 phases / 4 g
 
 # /flow:start-project
 
-Greenfield UI-bearing FDA build orchestrator. Runs **8 phases / 4 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:671`): Phase 4 is a per-domain inner loop preserving Q13.5 atomic recovery; Phases 5+6 are globally batched activating Q15.2 + Q16.2 internal parallelism. Wall ≈ 22–70 min on Brand Hub-shape projects depending on domain count.
+Greenfield UI-bearing FDA build orchestrator. Runs **8 phases / 4 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:682`): Phase 4 is a per-domain inner loop preserving Q13.5 atomic recovery; Phases 5+6 are globally batched activating Q15.2 + Q16.2 internal parallelism. Wall ≈ 22–70 min on Brand Hub-shape projects depending on domain count.
 
 > **Scope:** UI-bearing builds only (CDR-023 partition). Non-UI-bearing work uses CDR-014's Phase Pattern with `/workflows:fix-milestone --migrate ...`, not FDA. `flow-preflight` performs upstream mode classification — `/flow:start-project` runs only when mode resolves to `greenfield`.
 
-> **DO NOT re-derive** the phase sequence, gate positions, L-review routing, or per-phase failure matrix below. All seven sub-decisions are locked at memory:671+ with a refinement audit trail at memory:687. Re-litigation already resolved at lock time.
+> **DO NOT re-derive** the phase sequence, gate positions, L-review routing, or per-phase failure matrix below. All seven sub-decisions are locked at memory:682+ with a refinement audit trail at memory:698. Re-litigation already resolved at lock time.
 
 ## Architecture overview
 
@@ -43,7 +43,7 @@ Greenfield UI-bearing FDA build orchestrator. Runs **8 phases / 4 user-confirmat
 
 Greenfield SKIPS `flow-legacy-cross-reference` (Q14) — that's retrofit-only. Retrofit shape is 9 phases / 5 gates and lives in `/flow:retrofit-project` (BC-6963 territory).
 
-> **Diagram note on G4 placement.** Both G3 and G4 are `(3→4)` transition gates per Q37 sub-decision 3 lock (memory:677): "G3 (3→4): master-flow-inventory.md content; G4 (3→4 — fires alongside G3 OR after G3 if user pauses, whichever): pre-scaffold batch preview". G4 gates **entry into Phase 4 execution** (Q13.4 pre-scaffold preview lock at memory:70), NOT the Phase-4-to-Phase-5 boundary. The ASCII diagram above places G4 visually between the Phase-4 and Phase-5 boxes for layout reasons — the authoritative source is the textual gate definitions in this file (and the lock at memory:677), not the box positioning.
+> **Diagram note on G4 placement.** Both G3 and G4 are `(3→4)` transition gates per Q37 sub-decision 3 lock (memory:688): "G3 (3→4): master-flow-inventory.md content; G4 (3→4 — fires alongside G3 OR after G3 if user pauses, whichever): pre-scaffold batch preview". G4 gates **entry into Phase 4 execution** (Q13 lock at memory:80, sub-decision 4 "pre-scaffold preview"), NOT the Phase-4-to-Phase-5 boundary. The ASCII diagram above places G4 visually between the Phase-4 and Phase-5 boxes for layout reasons — the authoritative source is the textual gate definitions in this file (and the lock at memory:688), not the box positioning.
 
 ## Breadcrumb
 
@@ -123,7 +123,7 @@ Phases flow via a single session-scoped state object. No re-fetching from filesy
   "inventory":         { "domains": [ { "slug", "display_name", "sub_flows": [...] } ] },
   "domains":           [ { "slug", "scaffold_state", "failure_reason", "parent_issue_ids": [...] } ],
   "l1_review":         { "summary_written_at": "<ISO-8601 | null>" },
-  "l2_review":         { "<domain-slug>": "<in-memory blob>" },
+  "l2_review_<slug>":  "<in-memory blob, one entry per domain slug>",
   "l3_review":         { "<sub-flow-id>": "<in-memory blob>" },
   "ship_artifacts":    { "story_docs": [...], "journey_docs": [...], "index_path": "..." },
   "status":            "in_flight"
@@ -141,7 +141,7 @@ This object is **session-scoped**. The breadcrumb is the persistent projection �
 
 Phases 5/6/7 run without further orchestrator gates per Q15.6 / Q16.6 / Q18.8 lock 0 sync gates each.
 
-## Per-phase failure matrix (Q37 sub-decision 6 — verbatim from memory:683)
+## Per-phase failure matrix (Q37 sub-decision 6 — verbatim from memory:694)
 
 | Phase | Failure semantics |
 |---|---|
@@ -153,7 +153,7 @@ Phases 5/6/7 run without further orchestrator gates per Q15.6 / Q16.6 / Q18.8 lo
 | 6 | log + continue per Q16.5 (same shape as Phase 5). |
 | 7 | Q18.7 log + continue + skip-row marker. INDEX renders a "regen-failed: <reason>" row instead of clobbering with a partial INDEX. |
 | 8 | n/a — terminator. |
-| user halt at any gate | breadcrumb `status: abandoned`; future `/flow:start-project` invocation detects abandoned + offers discard per Q31.3 stale-breadcrumb policy. (Q31.1 lock at memory:284 reserves the `reason` field for `overrides[]` entries — Q29.5 hard-gate decisions, not user-cancel attribution; do not add a top-level `reason` field without a Q31 amendment + audit trail.) |
+| user halt at any gate | breadcrumb `status: abandoned`; future `/flow:start-project` invocation detects abandoned + offers discard per Q31.3 stale-breadcrumb policy. (Q31.1 lock at memory:313 reserves the `reason` field for `overrides[]` entries — Q29.5 hard-gate decisions, not user-cancel attribution; do not add a top-level `reason` field without a Q31 amendment + audit trail.) |
 
 ---
 
@@ -220,7 +220,7 @@ Options:
 
 ## Phase 2: office hours
 
-**Sub-skill / command:** `/flow:office-hours` (Q42 — pending; orchestrator references by name; pre-shipped sub-skill names locked in interview record at memory:671).
+**Sub-skill / command:** `/flow:office-hours` (Q42 — pending; orchestrator references by name; pre-shipped sub-skill names locked in interview record at memory:682, Q37 sub-decision 1).
 
 **Run:** dispatch `/flow:office-hours`. The command:
 
@@ -257,7 +257,7 @@ Options:
 
 **Run:** dispatch `flow-inventory-interview`. The skill:
 
-1. Reads `docs/product/intent.md` as Phase 0 priority filter per Q19 Phase 0 input contract (memory:192).
+1. Reads `docs/product/intent.md` as Phase 0 priority filter per Q19 Phase 0 input contract (memory:208, Q19 lock).
 2. Runs the Q19.6 interview-loop to enumerate domains + their sub-flows. Hard-rejects duplicate domain or sub-flow IDs per Q20.4.
 3. Fires the **L2 review** per domain — CEO + Design parallel — and the orchestrator stashes each domain's L2 output as `state.l2_review_<domain-slug>` for Phase 6 hand-off (in-memory only per parking lot #31 v1; on crash-resume, Phase 6 re-runs L2 — ~2-5 min per domain).
 4. Writes `docs/product/master-flow-inventory.md` via atomic-rename.
@@ -460,7 +460,7 @@ The breadcrumb append is the **last step** of a phase, after all of the phase's 
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:671` — Q37 lock (canonical source; seven sub-decisions + refinement audit trail at line 687).
+- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:682` — Q37 lock (canonical source; seven sub-decisions + refinement audit trail at line 698).
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` §3e — Greenfield Orchestrator Phase Flow (synthesis view).
 - `plugins/flow-architecture/skills/flow-preflight/SKILL.md` — Phase 1 sub-skill (BC-6957 shipped).
 - `plugins/flow-architecture/scripts/flow-resume-breadcrumb.sh` — Q31.5 atomic-rename breadcrumb helper (BC-6956 shipped).
