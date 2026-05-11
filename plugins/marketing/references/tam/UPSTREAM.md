@@ -29,7 +29,7 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 | `aiark_client.py` | `scripts/aiark_client.py` | Verbatim (+ 5-line `#` header after shebang) |
 | `discolike_client.py` | `scripts/discolike_client.py` | Verbatim (+ 5-line `#` header after shebang) |
 | `icypeas_client.py` | `scripts/icypeas_client.py` | Verbatim (+ 5-line `#` header after shebang) |
-| `spider_crawl.py` | `scripts/spider_crawl.py` | Verbatim (+ 5-line `#` header after shebang) |
+| `spider_crawl.py` | `scripts/spider_crawl.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7050) — see § Local deviations |
 | `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `tier_and_segment.py` | `scripts/tier_and_segment.py` | Verbatim (+ 5-line `#` header after shebang) |
@@ -70,6 +70,22 @@ Brite ships the minimal fix: outer sync `with open(outfile, "w") as f:` wrapping
 **Validated:** Python 3.13.11 + 3.14.3, both scripts, with real vendor round-trips (BlitzAPI, Prospeo, MillionVerifier). MillionVerifier returned `result_code: 2` (catch_all) — definitive vendor-side evidence.
 
 **Re-port action:** if a future upstream pull at a newer SHA includes the same (or equivalent) split, drop this local diff and remove this section. If upstream's fix differs structurally, re-apply this section's split shape on top of the new upstream body — the diff is two functions, one line each.
+
+### `spider_crawl.py:34,44,51-52` — REST endpoint + JSONL streaming shape (BC-7050)
+
+Upstream calls `https://api.spider.cloud/v1/crawl` with `Content-Type: application/json` and parses the response with `await r.json()` as a single JSON object/list. BC-6906 Stage 2b live validation (2026-05-10) confirmed the wrapper returned `status 401` against the live Spider REST API, despite the credential being independently validated as correct via the Spider MCP path (which returned a valid 302,500-credit balance using the same env-var key).
+
+BC-7050 verified the canonical request shape against the npm-distributed `spider-cloud-mcp@2.1.1` package (`dist/api.js` and `dist/server.js`, fetched via `npm pack`). Three classes of drift were fixed:
+
+1. **Endpoint path** — `https://api.spider.cloud/v1/crawl` → `https://api.spider.cloud/crawl`. The MCP's `API_BASE` is `https://api.spider.cloud` (no `/v1` prefix) and `spider_crawl` posts to `/crawl` directly (`dist/server.js:318`).
+2. **Content-Type** — `application/json` → `application/jsonl`. The MCP sets `application/jsonl` whenever the call uses `stream: true`, which is the default for `crawl`/`scrape`/`search`/`links`/`screenshot`/`unblocker`/`transform` (`dist/api.js:74`, `dist/server.js:318`).
+3. **Response parsing** — `await r.json()` (single JSON parse) → JSONL stream parse via `text.splitlines()` + per-line `json.loads`. The MCP's `parseJsonlStream` is a chunk-level reader; the equivalent shape for the script's already-buffered `await r.text()` path is line-split-and-parse, mirroring the BC-7051 verbatim-port-with-minimal-diff discipline.
+
+Auth header (`Authorization: Bearer ${SPIDER_API_KEY}`) is unchanged — the MCP uses the same shape (`dist/api.js:73`), so the original 401 was an endpoint-path rejection, not an auth-header rejection. The 401 (vs 404) on a stale path is consistent with Spider's auth middleware running before path routing.
+
+**Validated:** live round-trip through `bw-run.sh` against `https://stripe.com` returned `EXIT=0`, `1/1 crawled in 3.2s`, `crawl.pages=5`, 8000-char markdown payload (output truncated by the script's existing `[:8000]` slice). Pre-fix the same invocation returned `0/1 crawled` + `crawl_error: status 401`.
+
+**Re-port action:** if a future upstream pull at a newer SHA includes the same `/crawl` + `application/jsonl` + JSONL-parse shape, drop this local diff and remove this section. If upstream still uses `/v1/crawl` + single-JSON parsing, re-apply this section's three line changes on top of the new upstream body.
 
 ### `aiark-mcp.js` — endpoint drift fixes (BC-7011)
 
