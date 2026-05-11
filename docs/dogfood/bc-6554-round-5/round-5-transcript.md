@@ -32,17 +32,23 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 ---
 
-## Outcome summary (populated at close)
+## Outcome summary (closed 2026-05-11)
 
-| Category | Count |
-|---|---|
-| Total R-rows (incl. R-28 added at plan-gate) | 28 |
-| ✅ Expected | TBD |
-| ⚠️ Unexpected | TBD |
-| 🔴 Refuted / round-6 follow-up | TBD |
-| ⏭️ Deferred | 1 (R-13 — BC-6545 spec-read suffices) |
+**Result: CONVERGENT — chain terminates here.** Round-5 produced ZERO blocking findings. Per the convergent-dogfood termination rule, no round-6 is filed.
 
-**Termination decision:** TBD (zero blocking findings → terminate; ≥1 → file round-6).
+| Category | Count | R-rows |
+|---|---|---|
+| Total R-rows (incl. R-28 added at plan-gate) | 28 | R-1 through R-28 |
+| ✅ Expected | 26 | R-1, R-2, R-3, R-4★, R-5★, R-6, R-7, R-8★, R-9, R-10, R-11, R-12, R-14, R-15, R-16, R-17, R-18, R-19, R-20, R-21★, R-22, R-23★, R-24, R-25★, R-26, R-27 |
+| ⚠️ Unexpected (non-blocking) | 1 | R-28 (sibling-endpoint case-asymmetry probe — inconclusive due to 2 spec-correctness findings F-R-28a + F-R-28b; rule itself unverified, blocked on spec correction first) |
+| 🔴 Refuted / round-6 follow-up | 0 | (none) |
+| ⏭️ Deferred | 1 | R-13 (BC-6545 spec-read suffices; live-fire requires pre-poison setup not justified) |
+
+**Keystone slate: 6 of 6 ✅** — R-4★ (BC-6780 task-2 case-asymmetry at Phase 3 var classification), R-5★ (BC-6780 task-1 case-asymmetry at lead-create), R-8★ (BC-6514 + BC-6654 multiplicative segmentation), R-21★ (BC-6784 `{SENDER_*}` shadow at delivery), R-23★ (Phase 11 ACTIVATE first live-walk), R-25★ (BC-6613 + BC-6781 + BC-6782 Liquid chain end-to-end).
+
+**Round-4 follow-up fixes ratified at runtime:** BC-6780 (case-asymmetry, both Phase 3 + Phase 4 surfaces), BC-6781 (canonical `{% assign %}` Liquid form), BC-6782 (regex tightening), BC-6783 (S-9 hypothesis correction), BC-6784 (`{SENDER_*}` shadow). All 5 hold.
+
+**Termination decision: CONVERGENT.** This is the first round-N in the BC-5826 → BC-5906 → BC-6308 → BC-6554 → BC-6785 chain to terminate convergent. The 8 round-6 candidates (F-IV-3, F-R-28a, F-R-28b, F-IV-5, F-test-send-prefix, F-Mode2-Lead-Pick, F-Queued-Transient, F-Liquid-Space-After-Period) are spec-correctness gaps and doc enhancements — they do not rise to 🔴 blocking findings. Per the termination rule, no round-6 is filed; the candidates become standalone follow-ups grouped into 3 bundles (see § Round-5 follow-up candidates below).
 
 ---
 
@@ -515,9 +521,61 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 
 - **R-11 broader-scope ratification (Phase 5)** — BC-6544 PATCH-omit footgun confirmed at runtime in its broadest form: a non-boolean string-field PATCH (e.g., `{sequence_prioritization}` only) reverts an unrelated boolean (`plain_text`) to false. Existing BC-6544 spec text already states this in the broadest possible framing — round-5 contributes runtime evidence, not a documentation gap. Optional follow-ups for operator decision at close: (a) annotate BC-6544 spec sites with `verified-at-runtime BC-6785 R-11`, (b) audit b2b workspace 55 production campaigns for current plain_text state (the actively-sending workspace; not done in round-5 because round-5 scope = workspace 13), (c) file a Linear follow-up capturing the broader-scope evidence + workspace-55 audit recommendation. Decision deferred to Task 13 close.
 
-### Hypothesis-by-row populated at close
+### Proposed follow-up bundles (3 issues vs 8 standalone)
 
-TBD.
+**Bundle 1 — Spec text + regex corrections (TRIVIAL ship, single PR):**
+- F-IV-3 (regex case-sensitivity, 1-char fix)
+- F-R-28a (phantom `upsert_multiple_leads` variant)
+- F-R-28b (wrong path for `bulk_create_leads_csv`)
+- All mechanical edits in `launch-campaign.md`. ~15 min work.
+
+**Bundle 2 — Documentation gaps (TRIVIAL ship, single PR):**
+- F-test-send-prefix (`[test] ` subject prepend at Mode 2)
+- F-Mode2-Lead-Pick (Mode 2 lead-pick rule unspecified)
+- F-Queued-Transient (`queued → active` fast transition)
+- F-Liquid-Space-After-Period (copy-author Liquid convention)
+- 3 gotchas in `email-bison.md` + 1 note in `email-copywriting/SKILL.md`. ~20 min work.
+
+**Bundle 3 — F-IV-5 design (needs brainstorm):**
+- IV-5 strict-halt has no recovery path for fresh worktrees absent `marketing-context.md`. Multiple resolution approaches (auto-allowlist via `git config user.email` domain, ship default stub at install time, `--allow-operator-self-send` flag). Deserves a brainstorm + decision-memo before implementation.
+
+**Plus 1 non-blocking ratification (no issue needed):**
+- R-11 broader-scope BC-6544 PATCH-omit confirmation. Existing spec text already correct in broadest framing; round-5 contributes runtime evidence-strengthener.
+
+## Cleanup verification (2026-05-11 close)
+
+| Verification | Pre-cleanup | Post-cleanup | Expected | Match |
+|---|---|---|---|---|
+| `bc-6785-r5` tagged leads | 13 | 1 (only 14762 for post-close delivery verification) | 1 | ✅ |
+| `BC-6785` prefixed campaigns | 6 | 1 (only 48 active for delivery) | 1 | ✅ |
+| Permanent custom variables | 15 | 15 (exact roster identical to Task 1 baseline) | 15 | ✅ |
+
+**Isolation Discipline held all 3 rules end-to-end:**
+- **Rule 1 (tag)** — 12 of 13 `bc-6785-r5` tagged leads cleanly deleted via `DELETE /api/leads/bulk`; only lead 14762 kept by operator decision for delivery verification.
+- **Rule 2 (prefix)** — 5 of 6 `BC-6785 |` prefixed campaigns cleanly deleted via `DELETE /api/campaigns/bulk`; only campaign 48 active for delivery.
+- **Rule 3 (no new vars)** — custom variable roster identical to Task 1 baseline (ids 1-15, same names, same created_at timestamps).
+
+**Production data untouched** — 14,701 production leads + 21 production campaigns from Task 1 baseline preserved. Workspace 13 production deliverability unaffected.
+
+**Operator-managed cleanup remaining (post-delivery, ~Sun 2026-05-17 after step 2 lands):**
+- Stop + delete campaign 48 (`BC-6785 | SINGLE-LEAD | activate-test`)
+- Delete lead 14762 (`corinne+bc-6785-r5@britenites.com`)
+- Optionally delete tag id 41 (`bc-6785-r5`) once empty
+
+## Loop-closing decision
+
+**Chain terminates here per convergent-dogfood termination rule.**
+
+Round-5 ledger:
+- Total R-rows: 28 (incl. R-28 added at plan-gate)
+- ✅ Expected: 26
+- ⚠️ Unexpected (non-blocking): 1 (R-28, blocked on spec-correction)
+- 🔴 Refuted / blocking: 0
+- ⏭️ Deferred: 1 (R-13)
+- Keystones passed: 6/6
+- Round-4 follow-up fixes ratified at runtime: 5/5
+
+**Architecture-9 promotion eligibility:** convergent-dogfood pattern has now produced its first clean termination in the BC-5826 → BC-5906 → BC-6308 → BC-6554 → BC-6785 chain (5 iterations; round-5 = first convergent close). The pattern itself (recurse-until-zero-blockers; isolation discipline for production-workspace overlay; 3-way verdict per R-row; per-phase commit pacing) has demonstrated end-to-end utility across diverse fix types (multi-axis architectural changes, spec-text corrections, runtime-behavior verifications, vendor-quirk documentation). Promotion-eligible to org-level handbook architecture decisions.
 
 ---
 

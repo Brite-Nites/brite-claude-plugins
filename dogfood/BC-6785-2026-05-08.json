@@ -14,7 +14,7 @@
   "sender_resolution_method": "artifact-default",
   "unique_per_lead_enabled": true,
   "launched_at": "2026-05-08T11:40:00-06:00",
-  "last_completed_phase": 11,
+  "last_completed_phase": 13,
   "_round_5_notes": {
     "isolation_discipline": "Lead tag `bc-6785-r5`; campaign name prefix `BC-6785`; no new permanent custom variables (R-28 uses existing UPPERCASE name).",
     "metadata_path_override": "Spec \u00a7 IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects the uppercase worktree name `BC-6785`. Auto-detection falls through to docs/campaigns/brite-labs/ (production audit dir), defeating IV-3's intent. Manual override: writing to <worktree>/dogfood/ per IV-3's stated purpose. Finding F-IV-3 logged in transcript as a round-6 candidate (regex case-sensitivity bug)."
@@ -338,5 +338,50 @@
   },
   "r25_keystone_verdict": "PASS \u2014 6/6 spot-checks; Pattern A fallback + Pattern B if + Pattern B else all fire correctly per BC-6613+BC-6781+BC-6782 canonical chain",
   "round_5_keystones_passed": 6,
-  "round_5_keystones_total": 6
+  "round_5_keystones_total": 6,
+  "task_13_cleanup": {
+    "leads_deleted": [
+      14753,
+      14754,
+      14755,
+      14756,
+      14757,
+      14758,
+      14759,
+      14760,
+      14761,
+      14763,
+      14764,
+      14765
+    ],
+    "leads_kept_for_delivery": [
+      14762
+    ],
+    "campaigns_deleted": [
+      43,
+      44,
+      45,
+      46,
+      47,
+      49
+    ],
+    "campaigns_kept_for_delivery": [
+      48
+    ],
+    "tag_41_status": "kept (still attached to lead 14762); operator deletes manually post-delivery",
+    "post_cleanup_verification": {
+      "bc_6785_r5_tagged_leads": 1,
+      "bc_6785_prefixed_campaigns": 1,
+      "permanent_custom_variables": 15,
+      "permanent_custom_variables_match_baseline": true,
+      "production_data_untouched": true
+    },
+    "marketing_context_md_kept": true,
+    "isolation_discipline_held": true
+  },
+  "round_5_outcome": "CONVERGENT",
+  "round_5_blocking_findings": 0,
+  "round_6_filed": false,
+  "follow_up_bundles_proposed": 3,
+  "closed_at": "2026-05-11T17:00:00-06:00"
 }
