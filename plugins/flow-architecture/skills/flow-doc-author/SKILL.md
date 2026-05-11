@@ -1,6 +1,6 @@
 ---
 name: flow-doc-author
-description: Per-domain story doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes N markdown files at `docs/product/flows/<domain>/<flow-id>.md`, one per sub-flow under a domain, conforming to the Q27 locked template. Hybrid authoring — programmatic substitution for 17 deterministic YAML keys + 2 deterministic body items; parallel background `Agent(general-purpose)` dispatch for 8 narrative sections. Runs AFTER `flow-linear-scaffold` so parent + children BC numbers are available. 2-layer fidelity-review (mechanical `verify-docs.sh` + per-doc narrative drift check). 0 synchronous gates (filesystem writes; git review is the implicit gate). Per-domain footprint ~60s greenfield, ~90s retrofit with code-evidence.
+description: Per-domain story doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes N markdown files at `docs/product/flows/<domain>/<flow-id>.md`, one per sub-flow under a domain, conforming to the Q27 locked template. Hybrid authoring — programmatic substitution for 17 deterministic top-level YAML keys + 2 deterministic body items (`children` is one top-level key with 5 nested fields); parallel background `Agent(general-purpose)` dispatch for 8 narrative sections. Runs AFTER `flow-linear-scaffold` so parent + children BC numbers are available. 2-layer fidelity-review (mechanical `verify-docs.sh` + per-doc narrative drift check). 0 synchronous gates in default mode (filesystem writes; git review is the implicit gate). Per-domain authoring wall ~60s greenfield, ~90s retrofit; the second-wave fidelity-review fan-out adds ~30-60s, which can be overlapped with downstream `flow-journey-author`.
 user-invocable: false
 disable-model-invocation: true
 allowed-tools: Agent, Bash, Read, Write, Edit, Glob, Grep
@@ -25,7 +25,9 @@ The full design rationale lives in `docs/design-rationale/project_fda_plugin_int
 
 ## 1. Authoring strategy (Q15.1) --- hybrid
 
-### Programmatic substitution (17 deterministic YAML keys + 2 body items)
+### Programmatic substitution (17 deterministic top-level YAML keys + 2 body items)
+
+`children.*` is one top-level key with 5 nested fields — counted as 1 of 17 in the top-level tally; expanded into 5 rows in the table below for readability.
 
 The skill substitutes the following without LLM dispatch:
 

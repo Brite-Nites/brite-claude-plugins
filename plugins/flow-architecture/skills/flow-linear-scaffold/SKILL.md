@@ -107,6 +107,8 @@ Returns either `PASS` or top-5 drift findings capped at 150 words.
 
 **FAILs fixed via** `save_issue {id, body: <corrected>}` + re-dispatch the review on the fixed version. Re-fixes loop until PASS OR `--max-fix-attempts=2` (defaults to 2). Persistent FAIL after attempts -> flag in scaffold log, surface in end-of-run summary.
 
+**Fix-attempt writes inflate the 2+7N happy-path tally.** The headline "2+7N writes per domain" budget is the lower bound — fix-loop iterations add up to 2 extra `save_issue` calls per failed fidelity-review. Worst-case write count is `2 + 7N + 2 * (fail_rate * 7N)`. With 10% fidelity-review fail rate and N=8 sub-flows, expect ~12 extra writes on top of the 58 happy-path floor. The pre-scaffold preview gate's wall-time estimate is a lower-bound floor — surface this caveat in the preview.
+
 Pattern from `feedback_bulk_create_review_agents.md`.
 
 ---
@@ -130,7 +132,14 @@ Estimated wall time: 58 * 500ms = ~29s.
   - Cancel
 ```
 
-**L3 reviews fire INSIDE scaffold BUT BEFORE the preview gate.** Each parent's `## L3 review summary` is rendered into the preview so the user sees per-discipline headlines before approving.
+**Two distinct review passes — do not conflate.**
+
+| Pass | Fires | Reviews | Lives at |
+|---|---|---|---|
+| **L3 review** (5-discipline, parent-scope) | Pre-write, BEFORE the preview gate | The **draft** parent + children bodies in memory | Parent issue body `## L3 review summary` (post-write) |
+| **Per-issue fidelity review** (Section 3) | Post-write, AFTER each issue is written | The **live Linear body** of the just-written issue | Background-collected at sub-flow boundary |
+
+L3 reviews run against drafts so their per-discipline headlines can populate the parent's `## L3 review summary` section in the preview-gate render — the user sees them before approving the scaffold. Per-issue fidelity reviews (Section 3) run against live Linear bodies post-write to catch Prosemirror mangling and template-substitution drift. **They are separate passes against different content with different cadences** — Section 3's "live Linear body" claim and this section's "BEFORE the preview gate" claim describe the two passes respectively.
 
 ### Conditional recovery gates (Q13.5)
 

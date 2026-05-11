@@ -1,6 +1,6 @@
 ---
 name: flow-legacy-cross-reference
-description: Retrofit-only sub-skill for the flow-architecture plugin (implements CDR-023). NEVER invoked from greenfield. Satisfies Q9's additive-only "cross-reference annotations" lock by appending an HTML-comment-bracketed `## FDA migration` section to every legacy Linear milestone description, mapping it to one or more FDA domains. Three-tier mapping cascade (flow-ID histogram -> title-fuzzy -> LLM semantic), marker-based idempotency, two-pass execution (generate review doc -> user edits + bumps `last_reviewed` -> re-invoke executes). Per-domain footprint ~27s for M=27 legacy milestones.
+description: Retrofit-only sub-skill for the flow-architecture plugin (implements CDR-023). NEVER invoked from greenfield. Satisfies Q9's additive-only "cross-reference annotations" lock by appending an HTML-comment-bracketed `## FDA migration` section to every legacy Linear milestone description, mapping it to one or more FDA domains. Three-tier mapping cascade (flow-ID histogram -> title-fuzzy -> LLM semantic), marker-based idempotency, two-pass execution (generate review doc -> user edits + bumps `last_reviewed` -> re-invoke executes). Per-domain footprint for M=27 legacy milestones: ~14s Tier 1 batched-body reads (one `list_issues` per milestone) + ~40s Pass 2 writes (3 calls per milestone: pre-write `get_milestone` + `save_milestone` + post-write `get_milestone` spot-check) ~= ~55s end-to-end.
 user-invocable: false
 disable-model-invocation: true
 allowed-tools: mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__get_milestone, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, Agent, AskUserQuestion, Bash, Read, Write
@@ -47,9 +47,13 @@ Levenshtein and token-overlap match the legacy milestone title against the inven
 
 Or `null` when nothing maps. **Tier 3 is NOT authoritative** --- its output seeds the Q14.6 review doc; the user is the final arbiter.
 
-### Wall-time estimate
+### Tier 1 read budget (Pass-1 only)
 
-Theoretical max = ~27 parallel calls * ~5-10s ~= ~10s assuming unlimited concurrency. Realistic fan-out 6-10 concurrent -> 20-50s for all 27. Most milestones hit Tier 2; Tier 3 realistically fires for 5-10 fall-throughs only --- **~5-15s actual** for Brand-Hub-shaped retrofit. Re-measure once the skill is built (parking lot).
+Each milestone needs its child-issue bodies parsed for flow-ID tokens. Use **batched `list_issues({milestone: <id>, includeBody: true})`** — one call per milestone — NOT per-child `get_issue` (which would be 5-10x more calls per milestone). 27 milestones * ~500ms ~= ~14s for the read phase, regardless of Tier outcomes. Tier 1 fires its histogram against the returned bodies in-memory; no additional Linear calls.
+
+### Wall-time estimate (Pass-1 mapping only)
+
+Theoretical max for the LLM tier = ~27 parallel calls * ~5-10s ~= ~10s assuming unlimited concurrency. Realistic fan-out 6-10 concurrent -> 20-50s for all 27. Most milestones hit Tier 2; Tier 3 realistically fires for 5-10 fall-throughs only --- **~5-15s actual** for Brand-Hub-shaped retrofit, ON TOP of the ~14s Tier 1 read phase above. Re-measure once the skill is built (parking lot).
 
 The review-doc's `Source signal` column shows which tier produced each proposal so the user can spot Tier-3 fallbacks first.
 
@@ -87,7 +91,7 @@ Markers are the idempotency mechanism. Re-runs rewrite content between markers; 
 
 ## 3. Mutation order (Q14.3) --- preview -> review-doc gate -> execute serial
 
-No parallelism. 27 milestones * ~500ms each ~= 14s execute, plus ~14s pre-write `get_milestone` reads -> ~27s total. Each `save_milestone` is independent.
+No parallelism. **3 Linear calls per milestone in Pass 2**: pre-write `get_milestone` + `save_milestone` + post-write `get_milestone` spot-check (per Q13.5 pattern in Section 2). 27 milestones * 3 calls * ~500ms ~= **~40.5s for Pass-2 writes**. Each milestone is independent (no chains). Tier 1 reads from Pass-1 (Section 1) are NOT re-fetched.
 
 Sequence:
 
@@ -104,7 +108,7 @@ Pre-write `get_milestone(id)` per legacy milestone:
 - `<!-- FDA-MIGRATION-START -->` present -> **rewrite content between markers** (replace section).
 - Markers absent -> **append section** to end of description.
 
-**Linear-side state IS the persistence layer.** Unlike `flow-linear-scaffold` (Q13), this skill does NOT write an append-only log under `.flow/scaffold-log/`. 27 milestones * 2 MCP calls * ~500ms ~= ~27s overhead is acceptable; the marker contract is the single source of truth.
+**Linear-side state IS the persistence layer.** Unlike `flow-linear-scaffold` (Q13), this skill does NOT write an append-only log under `.flow/scaffold-log/`. 27 milestones * 3 MCP calls * ~500ms ~= ~40.5s overhead is acceptable; the marker contract is the single source of truth.
 
 ---
 
@@ -155,7 +159,7 @@ Brand Hub retrofit, M=27 legacy milestones:
 4. Tier 3 fires for 5/27 fall-throughs; ~3 agents parallel -> ~10s wall.
 5. Skill writes `docs/plans/brand-hub-retrofit-cross-reference.md` with `last_reviewed: TBD`. Exits.
 6. User reviews; corrects 2 of the Tier-3 proposals; bumps `last_reviewed: 2026-05-15`. Re-invokes orchestrator.
-7. **Pass 2.** Skill re-reads the doc; serially executes 27 `save_milestone` writes with ~500ms each + 27 spot-check `get_milestone` reads. Total ~27s.
+7. **Pass 2.** Skill re-reads the doc; serially executes 27 milestones with 3 Linear calls each (pre-write `get_milestone` + `save_milestone` + post-write spot-check `get_milestone`) at ~500ms each. Total ~40.5s.
 8. 1 milestone hits a transient timeout; retried after 2s + succeeds. 0 permanent failures.
 9. Skill exits cleanly with summary: `flow-legacy-cross-reference: 27/27 milestones updated, 1 transient retried, 0 permanent failures.`
 

@@ -203,7 +203,7 @@ Run `npm run build && npm run lint && npm test` after harness creation.
 Per-flow log + continue.
 
 - **EXTRACT-mode failure** (Page logic too intertwined to cleanly split) -> fall through to STUB mode + flag for manual; flag captured in the scaffold log.
-- **Build-failure on EXTRACT mode** -> trigger `git-stash` rollback BEFORE the user-gate result is committed. Surface the build error verbatim.
+- **Build-failure on EXTRACT mode** (after the user approved the refactor in Section 3 and the agent wrote the new `<FeatureView>` + Page wrapper) -> `git stash` the agent's filesystem mutations to revert the working tree to its pre-refactor state. Surface the build error verbatim. The user gate is treated as a tentative authorization — a failing build retroactively voids it; the user re-runs after addressing the build error or falls through to STUB.
 
 ---
 

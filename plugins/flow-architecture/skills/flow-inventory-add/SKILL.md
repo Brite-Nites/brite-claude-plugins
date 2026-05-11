@@ -8,7 +8,7 @@ license: MIT
 metadata:
   version: "0.1.0"
   q-locks: "Q20"
-  related-locks: "memory:224-238 (Q20 7 sub-decisions); memory:208-222 (Q19 — shared Phase 1/2/5 utility)"
+  related-locks: "memory:224-238 (Q20 7 sub-decisions); memory:208-222 (Q19 — `domain-add` reuses Q19-mini subset: Phases 1+4+5)"
 ---
 
 # flow-inventory-add
@@ -19,7 +19,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **Append-only contract.** Existing rows are never rewritten. Existing IDs are never renamed (CLAUDE.md "never rename existing IDs" guardrail + master-flow-inventory.md schema lock). Silent overwrites are not a v1 behaviour — duplicate IDs hard-reject.
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q20 (memory:224-238). Q19 (memory:208-222) defines the shared Phase 1/2/5 utility this skill reuses in `domain-add` mode via `_shared/app-classifier-pattern.md`.
+The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q20 (memory:224-238). Q19 (memory:208-222) defines the parent 5-phase greenfield interview; `domain-add` mode invokes the Q19-mini subset (Phases 1+4+5 — interview, synthesis for one domain only, user confirmation) via `_shared/app-classifier-pattern.md`. (`_shared/app-classifier-pattern.md` itself owns Phases 0/1/2/5; the 1+4+5 subset here is the orchestration-level slice Q20.1 invokes for single-domain authoring.)
 
 ---
 
@@ -127,7 +127,7 @@ If the same call re-fires (user re-runs `/flow:add-sub-flow` with identical inpu
 ## See also
 
 - `docs/design-rationale/project_fda_plugin_interview.md` Q20 --- canonical 7-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q19 --- shared Phase 1/2/5 utility used by `domain-add` mode.
+- `docs/design-rationale/project_fda_plugin_interview.md` Q19 --- parent 5-phase greenfield interview; `domain-add` invokes the Phases 1+4+5 Q19-mini subset.
 - `skills/_shared/app-classifier-pattern.md` --- the shared interview utility (BC-6955 deliverable) consumed by `domain-add`.
 - `skills/flow-regen-index/SKILL.md` --- downstream auto-dispatched by the orchestrator after this skill emits `inventory_changed=true`.
 - `skills/flow-preflight/SKILL.md` --- preceding sub-skill; emits the structured preamble this skill's caller passes through.

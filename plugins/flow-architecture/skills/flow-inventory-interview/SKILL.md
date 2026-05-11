@@ -166,7 +166,7 @@ Preview the proposed inventory rendered as output markdown. User picks:
 
 ## Worked example
 
-Brand Hub greenfield (28-domain target):
+Brand Hub greenfield (runtime-determined domain count per Q34 disambiguation; ~5-7 in this example, NOT pinned to BriteBase's 28 nor the legacy-milestone count):
 
 1. **Phase 0.** Read `docs/product/intent.md` --- pull out priority verbs ("self-serve brand asset reuse", "agency tenancy", "audit trail").
 2. **Phase 1.** App-classifier interview via `_shared/app-classifier-pattern.md` + 4 greenfield follow-ups. User responds: framework=Next.js, persona-density=multi-tenant (4-8), MVP-essential=brand/library/admin, post-launch=integrations/analytics.
