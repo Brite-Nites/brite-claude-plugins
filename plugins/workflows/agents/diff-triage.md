@@ -36,6 +36,16 @@ A diff is non-trivial if **any** of the following are true:
 - 50 or more lines changed with mixed content
 - Dependency changes (new packages added or removed)
 
+### Auto-NON-TRIVIAL — load-bearing artifacts
+
+These rules override the TRIVIAL criteria above. A diff is non-trivial if **any** of the following are true:
+
+- Any changed file is under `docs/decisions/`, `docs/designs/`, `docs/research/`, or `docs/precedents/`.
+- Any changed file matches a routing artifact: `**/skills/**/SKILL.md`, `**/commands/*.md`, or `**/agents/*.md`.
+- Any changed file is a canonical reference doc: `**/UPSTREAM.md`, `**/CLAUDE.md`, `**/CONTRIBUTING.md`, `**/ARCHITECTURE.md`, or a plugin's `README.md`.
+
+Small diffs in these paths often hide factual errors, mis-routings, or upstream-port drift. Precedent cluster: BC-5786, BC-5820, BC-6436, BC-7051 (4 surfaces).
+
 ## Output Format
 
 Output exactly one of these two lines, followed by a 1-line reason:
