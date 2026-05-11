@@ -43,6 +43,8 @@ Greenfield UI-bearing FDA build orchestrator. Runs **8 phases / 4 user-confirmat
 
 Greenfield SKIPS `flow-legacy-cross-reference` (Q14) — that's retrofit-only. Retrofit shape is 9 phases / 5 gates and lives in `/flow:retrofit-project` (BC-6963 territory).
 
+> **Diagram note on G4 placement.** Both G3 and G4 are `(3→4)` transition gates per Q37 sub-decision 3 lock (memory:677): "G3 (3→4): master-flow-inventory.md content; G4 (3→4 — fires alongside G3 OR after G3 if user pauses, whichever): pre-scaffold batch preview". G4 gates **entry into Phase 4 execution** (Q13.4 pre-scaffold preview lock at memory:70), NOT the Phase-4-to-Phase-5 boundary. The ASCII diagram above places G4 visually between the Phase-4 and Phase-5 boxes for layout reasons — the authoritative source is the textual gate definitions in this file (and the lock at memory:677), not the box positioning.
+
 ## Breadcrumb
 
 The orchestrator writes phase progress to `docs/plans/.flow-phase-state.json` (Q31.4 lock — note the **leading dot** on the filename; NOT `.flow/phase-state.json`) after every phase completion. Writes go through `bash $CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh write` (BC-6956 shipped) — atomic-rename via mktemp + python3 json.dump + parse-verify + content-match per Q31.5 lock. Never write the breadcrumb file directly with a heredoc.
@@ -59,7 +61,12 @@ Breadcrumb shape (per Q31.4):
   "current_phase": "1|2|3|4|5|6|7|8",
   "completed_phases": ["1", "2", ...],
   "domains": [
-    {"slug": "<domain-slug>", "scaffold_state": "pending|in_progress|completed|failed", "failure_reason": null}
+    {
+      "slug": "<domain-slug>",
+      "scaffold_state": "pending|in_progress|completed|failed",
+      "failure_reason": null,
+      "parent_issue_ids": []
+    }
   ],
   "status": "in_flight",
   "updated_at": "<ISO-8601 refreshed each write>"
@@ -81,7 +88,7 @@ Breadcrumb shape (per Q31.4):
 | 5 | re-run whole Phase 5 (~30-60s with Q15.2 internal parallelism). Q15's skip-if-exists per Q15.3 keeps already-written story docs from being clobbered without `--force`. |
 | 6 | re-run whole Phase 6 (~60-90s with Q16.2 internal parallelism). L2 review state not persisted; re-runs (~2-5 min per domain) per parking lot #31 v1. Q16's skip-if-exists per Q16.3 likewise gates journey-doc clobber. |
 | 7 | re-run whole Phase 7. INDEX regeneration is idempotent. |
-| 8 | inline terminator; write `status: completed`. |
+| 8 | only reached for a mid-Phase-8 in_flight crash (after summary render, before the final breadcrumb write); re-emit the completion summary, then write `status: completed`. A breadcrumb already at `status: completed` is stale per Q31.3 and flow-preflight offers discard instead of resuming here. |
 
 Stale breadcrumb handling (>7 days, or `status: completed | abandoned`, or malformed) lives inside `flow-preflight` Section 3.1 and prompts the user via `AskUserQuestion` to discard / force-resume / cancel. Orchestrator does not re-implement that policy.
 
@@ -146,7 +153,7 @@ Phases 5/6/7 run without further orchestrator gates per Q15.6 / Q16.6 / Q18.8 lo
 | 6 | log + continue per Q16.5 (same shape as Phase 5). |
 | 7 | Q18.7 log + continue + skip-row marker. INDEX renders a "regen-failed: <reason>" row instead of clobbering with a partial INDEX. |
 | 8 | n/a — terminator. |
-| user halt at any gate | breadcrumb `status: abandoned` with `reason: 'user-cancel-at-<gate>'`; future `/flow:start-project` invocation detects abandoned + offers discard per Q31.3 stale-breadcrumb policy. |
+| user halt at any gate | breadcrumb `status: abandoned`; future `/flow:start-project` invocation detects abandoned + offers discard per Q31.3 stale-breadcrumb policy. (Q31.1 lock at memory:284 reserves the `reason` field for `overrides[]` entries — Q29.5 hard-gate decisions, not user-cancel attribution; do not add a top-level `reason` field without a Q31 amendment + audit trail.) |
 
 ---
 
@@ -161,7 +168,7 @@ LINEAR_ISSUE_COUNT="$(... list_issues scoped to candidate project, limit: 10 ...
 export LINEAR_ISSUE_COUNT
 ```
 
-The `limit: 10` cap matches the Q36.3 step-4 threshold IS the cap behavior — a returned count of exactly 10 means "≥ 10" without paginating. If the candidate project isn't yet known (first-ever run with no `.flow/config.json`), pass `LINEAR_ISSUE_COUNT=` (empty) and flow-preflight degrades to `greenfield` by default per Section 6.4.
+The `limit: 10` cap aligns with Q36.3 step-4's threshold-IS-the-cap semantics — a returned count of exactly 10 means "≥ 10" (no pagination needed). If the candidate project isn't yet known (first-ever run with no `.flow/config.json`), pass `LINEAR_ISSUE_COUNT=` (empty) and flow-preflight degrades to `greenfield` by default per Section 6.4.
 
 **Run:**
 
@@ -376,7 +383,7 @@ This phase is **globally batched** — orchestrator invokes `flow-journey-author
 
 1. Reads `intent.md` + `master-flow-inventory.md` + per-domain story docs + `state.l2_review_<domain>` stash from Phase 3.
 2. Writes journey docs at `docs/product/journeys/<domain>.md` per domain.
-3. Populates each journey doc's `## L2 review summary` section from the stash per Q26 mod 2 / Q16.7 optional read path.
+3. Populates each journey doc's `## L2 review summary` section from the stash per Q26 mod 2 / Q16.7 optional read path. **Read the stash only — DO NOT re-fire L2 reviewers in Phase 6.** L2 fires exactly once per domain inside Phase 3; on crash-resume, Phase 3 re-runs (and re-fires L2) per parking lot #31 v1, never Phase 6.
 4. Q16.2 internal parallelism dispatches per-domain drafters concurrently.
 5. Skip-if-exists per Q16.3: existing journey docs preserved unless `--force` flag passed.
 6. Q16.5 log + continue: partial failures within the batch surface in batch summary.
@@ -425,7 +432,7 @@ Inline terminator phase. No sub-skill dispatch — orchestrator owns the final s
 2. **Final breadcrumb write:** `status: completed`, `current_phase: 8`, `completed_phases: ["1"..."8"]`. The Q31.5 atomic-rename write through `flow-resume-breadcrumb.sh write` is the **last operation** of the orchestrator — never write the `completed` marker before all artifacts land on disk (BC-5761 precedent applied here).
 
 3. Recommend next steps:
-   - Run `/flow:audit` (Q38; BC-? — pending) for project-health snapshot covering the 35-gate stack.
+   - Run `/flow:audit` (Q38; pending) for project-health snapshot covering the 35-gate stack.
    - Run `/flow:plan-<discipline>` per discipline child for AC + Tasks population.
    - Hand-edit `docs/product/journeys/<domain>.md` to refine narrative voice if needed (atomic rename ensures journey doc fully written; `--force` regen will clobber hand-edits per Q16.3).
 
