@@ -35,7 +35,7 @@
       "name": "flow-architecture",
       "source": "./plugins/flow-architecture",
       "description": "Flow-Driven Architecture plugin — scaffolds Linear domain milestones, 5-discipline child issues, and repo flow docs for UI-bearing Brite product builds. Implements CDR-023.",
-      "version": "0.2.2"
+      "version": "0.2.3"
     }
   ]
 }
