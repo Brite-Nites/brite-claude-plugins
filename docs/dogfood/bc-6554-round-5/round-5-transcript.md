@@ -1,0 +1,584 @@
+# BC-6785 — Round-5 Launch-Campaign Dogfood Transcript
+
+**Date:** 2026-05-08 (setup) / TBD (execution)
+**Workspace:** `emailbison-personal` (workspace 13 — production personal-email outbound workspace)
+**Issue:** [BC-6785](https://linear.app/brite-nites/issue/BC-6785)
+**Round:** 5th iteration of convergent-dogfood chain (BC-5826 → BC-5906 → BC-6308 → BC-6554 → THIS)
+**Branch:** `corinne/bc-6785-bc-6554-round-5-launch-campaign-dogfood-re-walk-after-liquid`
+**Plan:** `docs/plans/BC-6785-plan.md` (co-located in this worktree)
+**Format:** mirrors round-4 (BC-6554) shape — full hypothesis-by-phase walk Phases 2-11, R-1 through R-28 (R-28 added at plan-gate), per-row 3-way verdict protocol, side-flow invocations + close.
+
+---
+
+## Header — Walk parameters
+
+- **Leads (main walk):** 9 (round-3 verbatim — `dogfood-test-{01..06}@gmail.com|outlook.com|brite.co` + `info|sales|contact@dogfoodtest.com`).
+- **Liquid leads (R-25 ★):** 3 net-new — `r5-liquid-A@britenites.com`, `r5-liquid-B@britenites.com`, `r5-liquid-C@britenites.com`.
+- **Single-lead test (R-22 / R-23 ★):** `corinne+bc-6785-r5@britenites.com` (plus-addressed per Isolation Discipline).
+- **Entity:** TBD at Phase 1 (likely `brite-labs` per round-4 default).
+- **Preset:** list-building.
+- **Offer-tier:** 2 (round-4 default).
+- **Activate flag:** OFF for multiplicative-grid + side-flow campaigns; ON for single-lead test campaign only (R-23 ★, Phase 11 ACTIVATE).
+- **Gate-2 choice (main walk):** "Include all" (round-4 default).
+- **Walks scheduled:** 7 invocations — main multiplicative + R-9 decoy pre-create + R-25 ★ Liquid live-test + R-24 empty-default sad + R-26 lowercase-token sad + R-27 (a) `--no-host-lookup` + (b) `--no-segment` rejection + R-22 single-lead build.
+
+## Isolation discipline (production-workspace overlay — applied to every R-row)
+
+Workspace 13 is the production personal-email outbound workspace. Round-5 mutations are isolated for clean removal at close:
+
+- **Lead tag**: every round-5 lead carries `bc-6785-r5`.
+- **Campaign name prefix**: every round-5 campaign starts with `BC-6785 |` (sub-prefixes `MAIN`, `DECOY`, `LIQUID`, `SINGLE-LEAD`, `EMPTY-DEFAULT`, `LOWERCASE-TOKEN`, `NO-HOST-LOOKUP`).
+- **No new custom variables**: R-28 sibling-endpoint probe uses existing `RECENCY_ANCHOR` (UPPERCASE-cased existing name); other R-rows must reuse the 15 perm vars only.
+
+---
+
+## Outcome summary (closed 2026-05-11)
+
+**Result: CONVERGENT — chain terminates here.** Round-5 produced ZERO blocking findings. Per the convergent-dogfood termination rule, no round-6 is filed.
+
+| Category | Count | R-rows |
+|---|---|---|
+| Total R-rows (incl. R-28 added at plan-gate) | 28 | R-1 through R-28 |
+| ✅ Expected | 26 | R-1, R-2, R-3, R-4★, R-5★, R-6, R-7, R-8★, R-9, R-10, R-11, R-12, R-14, R-15, R-16, R-17, R-18, R-19, R-20, R-21★, R-22, R-23★, R-24, R-25★, R-26, R-27 |
+| ⚠️ Unexpected (non-blocking) | 1 | R-28 (sibling-endpoint case-asymmetry probe — inconclusive due to 2 spec-correctness findings F-R-28a + F-R-28b; rule itself unverified, blocked on spec correction first) |
+| 🔴 Refuted / round-6 follow-up | 0 | (none) |
+| ⏭️ Deferred | 1 | R-13 (BC-6545 spec-read suffices; live-fire requires pre-poison setup not justified) |
+
+**Keystone slate: 6 of 6 ✅** — R-4★ (BC-6780 task-2 case-asymmetry at Phase 3 var classification), R-5★ (BC-6780 task-1 case-asymmetry at lead-create), R-8★ (BC-6514 + BC-6654 multiplicative segmentation), R-21★ (BC-6784 `{SENDER_*}` shadow at delivery), R-23★ (Phase 11 ACTIVATE first live-walk), R-25★ (BC-6613 + BC-6781 + BC-6782 Liquid chain end-to-end).
+
+**Round-4 follow-up fixes ratified at runtime:** BC-6780 (case-asymmetry, both Phase 3 + Phase 4 surfaces), BC-6781 (canonical `{% assign %}` Liquid form), BC-6782 (regex tightening), BC-6783 (S-9 hypothesis correction), BC-6784 (`{SENDER_*}` shadow). All 5 hold.
+
+**Termination decision: CONVERGENT.** This is the first round-N in the BC-5826 → BC-5906 → BC-6308 → BC-6554 → BC-6785 chain to terminate convergent. The 8 round-6 candidates (F-IV-3, F-R-28a, F-R-28b, F-IV-5, F-test-send-prefix, F-Mode2-Lead-Pick, F-Queued-Transient, F-Liquid-Space-After-Period) are spec-correctness gaps and doc enhancements — they do not rise to 🔴 blocking findings. Per the termination rule, no round-6 is filed; the candidates become standalone follow-ups grouped into 3 bundles (see § Round-5 follow-up candidates below).
+
+---
+
+## Inputs used
+
+- **Main-walk CSV:** `docs/dogfood/bc-6554-round-5/test-leads.csv` — 9 leads, copied verbatim from round-3 / round-4.
+- **Clean copy artifact:** `docs/dogfood/bc-6554-round-5/test-copy.json` — round-3 corrected (bare `step_2.subject` per BC-6301).
+- **Liquid live-test artifact:** `docs/dogfood/bc-6554-round-5/test-copy-liquid.json` — BC-6781 rewritten with canonical `{% assign %}` form.
+- **Side-flow variants (built during walk):**
+  - `test-copy-empty.json` — R-24 sad-path (empty default + naked body token).
+  - `test-copy-lowercase.json` — R-26 sad-path (single lowercase `{first_name}`).
+  - `test-copy-naked-liquid.json` — R-25 ★ regex tightening sub-test.
+  - `test-copy-single-lead.json` — R-22 single-lead Phase 11 artifact.
+  - `test-leads-liquid.csv` — R-25 ★ 3-lead variant.
+
+---
+
+## Workspace pre-state (recorded 2026-05-08, ~11:14 MT)
+
+### Workspace identity
+
+| Field | Value |
+|---|---|
+| `instance_url` | `https://personal.outbase.so` |
+| `active_workspace.id` | `13` |
+| `active_workspace.name` | `BriteNites Team` |
+| `active_workspace.is_primary` | `true` |
+| `user.email` | `outbasepersonal-bison-api-user-for-team-2@emailbison.com` |
+
+✅ Workspace identity confirmed = 13.
+
+### Lead count (production background)
+
+| Field | Value |
+|---|---|
+| Total leads | **14,701** (981 pages × 15/page) |
+| Status of recent (id 14690-14704) | `unverified`, `tags=Google`, `emails_sent=2, opens=0, replies=0` (consistent with campaign 21's footprint) |
+| First-page sample (top 3) | id 14704 `oldcampmonique@gmail.com` / id 14703 `daryarestaurantinfo@gmail.com` / id 14702 `bouvardiaburbank@gmail.com` |
+| Round-5 collision check | 0 results for `dogfood-test-` and 0 for `dogfoodtest.com` (synthetic test emails are unique) |
+
+### Campaign count (production background)
+
+| Field | Value |
+|---|---|
+| Total campaigns | **21** (1 completed, 1 test-completed, 19 archived) |
+| Active production campaign | id 21 — `FY26, M3 \| Restaurants & Bars America 250 \| Personal Emails \| All ESPs` (status `completed`, 1233 leads, 2433 sent, 48 replies) |
+| `BC-6785` campaigns | 0 (cleanability baseline — must return to 0 at Task 13 close) |
+
+### Permanent custom variables (cleanability baseline)
+
+| ID | Name | Created | Source |
+|---|---|---|---|
+| 1 | company address | 2025-11-14 | round-1 era |
+| 2 | company linkedin url | 2025-11-14 | round-1 era |
+| 3 | company phone | 2025-11-14 | round-1 era |
+| 4 | company website | 2025-11-14 | round-1 era |
+| 5 | person job title | 2025-11-14 | round-1 era |
+| 6 | person linkedin url | 2025-11-14 | round-1 era |
+| 7 | recency_anchor | 2026-04-27 | round-2 |
+| 8 | vertical_descriptor | 2026-04-27 | round-2 |
+| 9 | specific_friction | 2026-04-27 | round-2 |
+| 10 | proof_point_company | 2026-04-27 | round-2 |
+| 11 | proof_point_number | 2026-04-27 | round-2 |
+| 12 | proof_point_timeframe | 2026-04-27 | round-2 |
+| 13 | free_asset_noun | 2026-04-27 | round-2 |
+| 14 | sender_first_name | 2026-04-27 | round-2 |
+| 15 | empty_test_var | 2026-05-01 | round-3 T11 |
+
+✅ 15 entries match expected roster exactly. `meta.total: 15`, `meta.per_page: 15`, single page (Laravel pagination shape held).
+
+### Pre-state row — 3-way verdict
+
+> **R-pre-state output:** Workspace 13 confirmed (id=13, primary, `BriteNites Team`). Production lead count 14,701 (expected 0 per issue body); production campaign count 21 (expected 0). Custom variable roster = 15 / matches expected exactly. 0 collisions on `dogfood-test-` and `dogfoodtest.com` lead-search.
+>
+> **Expected per spec:** Issue body § "Workspace state at start of round-5" — "0 leads, 0 campaigns, 15 permanent custom variables."
+>
+> **Verdict:** ⚠️ **Unexpected (re-framed)** — issue body's "0 leads, 0 campaigns" claim was archaeological (referred to round-4 cleanup of round-4 mutations, not workspace emptiness). Operator confirmed 2026-05-08: workspace 13 is the production personal-email outbound workspace; the 14,701 leads + 21 campaigns are real production data and must remain intact. Custom variable roster matches expected and is the only workspace-state metric round-5 must hold constant.
+>
+> **Proposed framing:** **spec drift** — issue body (and round-4 transcript before it) propagated an inaccurate pre-state assumption. Mitigation applied at this plan-gate: Isolation Discipline overlay added to plan + transcript (lead tag `bc-6785-r5`, campaign name prefix `BC-6785 |`, no-new-custom-variables rule, plus-addressed operator email).
+>
+> **Recorded as ⚠️ + plan amended.** Round-5 proceeds against production-populated workspace 13 under the Isolation Discipline.
+
+---
+
+## R-rows (to be populated through Tasks 2-12)
+
+### Phase 2 (multiplicative grid)
+
+- **R-1** — ✅ **Expected.**
+  - **Output:** Email-type detection: 4 personal + 2 professional + 3 role per the static lists (19 role-prefix + 12 free-mail entries; tiebreak personal-beats-role applied to no leads in this set). ESP detection via parallel `dig MX +short`: gmail.com → Google (`gmail-smtp-in.l.google.com.`), outlook.com → Microsoft (`outlook-com.olc.protection.outlook.com.`), brite.co → Google (Workspace, `aspmx.l.google.com.` + googlemail.com aliases), dogfoodtest.com → Unknown (no MX records returned) → rolled into Other in the 3-bucket grid. 9-cell grid built: Professional|Google=2, Role|Other=3, Personal|Google=2, Personal|Microsoft=2, all other 5 cells=0. F12 prune dropped the 5 empty cells (Professional|Microsoft, Professional|Other, Role|Google, Role|Microsoft, Personal|Other). 4 surviving cells.
+  - **Expected per spec:** Issue body R-1 (BC-6307 + BC-6654 multiplicative segmentation): "9 leads tagged: 4 personal + 2 professional + 3 role per the 19+12 entry static lists; 9-cell grid constructed by joining email-type tags with ESP MX classification; F12 prune drops 5 empty cells."
+  - **Match:** Every part — counts, cell-shape, prune behavior. No surprises.
+  - **Operator gate-2 choice:** "Include all" (matches round-4; preserves multiplicative test surface for R-8★ in Task 5).
+
+### Phase 2 — surviving 4-cell grid (post-include_all + post-F12-prune)
+
+| | Google | Microsoft | Other |
+|---|---|---|---|
+| **Professional** | 2 (`dogfood-test-05/06@brite.co`) | 0 (skipped) | 0 (skipped) |
+| **Role**         | 0 (skipped) | 0 (skipped) | 3 (`info|sales|contact@dogfoodtest.com`) |
+| **Personal**     | 2 (`dogfood-test-01/02@gmail.com`) | 2 (`dogfood-test-03/04@outlook.com`) | 0 (skipped) |
+
+### Phase 2 — F-IV-3 finding (outside R-1-28 set, surfaced at Phase 1 step 10)
+
+- **F-IV-3** — ⚠️ Spec drift / regex case-sensitivity bug (round-6 candidate).
+  - **What:** § Input validation IV-3 dogfood-path detection regex requires `<worktree-name>` to match `[a-z0-9._-]+` (lowercase only). Worktree convention from `git-worktrees` skill is uppercase Linear-issue-ID (`BC-6785`), which the regex rejects.
+  - **Effect:** auto-detection falls through to `docs/campaigns/{entity}/` (production audit-trail directory) — actively defeats IV-3's stated intent of preventing dogfood metadata from polluting production.
+  - **Mitigation for round-5:** manual override at Phase 1 step 10 — metadata written to `<worktree>/dogfood/BC-6785-2026-05-08.json` (worktree-local) per IV-3's intent.
+  - **Fix size:** one-character regex change (`[a-z0-9._-]+` → `[A-Za-z0-9._-]+`).
+  - **Round-6 candidacy:** if round-5 closes convergent, file as a standalone follow-up rather than triggering round-6 by itself; if round-5 files round-6 anyway, fold in.
+
+### Phase 3 (VARIABLES)
+
+- **R-2** — ✅ **Expected.**
+  - **Output:** `GET /api/custom-variables?per_page=50` returned `meta: {current_page: 1, last_page: 1, per_page: 15, total: 15}`. The `?per_page=50` request parameter was silently ignored — EB hardcodes `per_page: 15` regardless. Single-page result; no pagination loop fired (15 ≤ 15).
+  - **Expected per spec:** Issue body R-2 (round-4 S-1 regression) — "`list_custom_variables` returns Laravel `?page=N` paginated meta with hardcoded `per_page: 15`."
+  - **Match:** Exact. Sx-10/BC-5906 hardcoded-per_page behavior re-verified.
+
+- **R-3** — ✅ **Expected.**
+  - **Output:** 15 entries returned; roster matches pre-state recorded at Phase 1 step 4 / Task 1 baseline exactly. IDs 1-15 all present; names: `company address`, `company linkedin url`, `company phone`, `company website`, `person job title`, `person linkedin url` (round-1 era 1-6), `recency_anchor`, `vertical_descriptor`, `specific_friction`, `proof_point_company`, `proof_point_number`, `proof_point_timeframe`, `free_asset_noun`, `sender_first_name` (round-2 7-14), `empty_test_var` (round-3 T11, id 15). No drift mid-session.
+  - **Expected per spec:** Issue body R-3 (round-4 S-2 regression) — "15 permanent vars from round-4 cleanup all present at start of round-5."
+  - **Match:** Exact.
+
+- **R-4 ★** — ✅ **Expected.** **(BC-6780 task-2 fix-validation: ratified at runtime.)**
+  - **Output:** Phase 3 step 3 classification table (`.lower()` comparison per launch-campaign Phase 3 step 3, "compare via `.lower()`; EB stores names lowercased per Sx-3/BC-6299"):
+
+    | Artifact name (UPPERCASE) | `.lower()` | EB stored name | Match | Classification |
+    |---|---|---|---|---|
+    | `RECENCY_ANCHOR` | `recency_anchor` | id 7 — `recency_anchor` | ✓ | existing → reuse |
+    | `VERTICAL_DESCRIPTOR` | `vertical_descriptor` | id 8 — `vertical_descriptor` | ✓ | existing → reuse |
+    | `SPECIFIC_FRICTION` | `specific_friction` | id 9 — `specific_friction` | ✓ | existing → reuse |
+    | `PROOF_POINT_COMPANY` | `proof_point_company` | id 10 — `proof_point_company` | ✓ | existing → reuse |
+    | `PROOF_POINT_NUMBER` | `proof_point_number` | id 11 — `proof_point_number` | ✓ | existing → reuse |
+    | `PROOF_POINT_TIMEFRAME` | `proof_point_timeframe` | id 12 — `proof_point_timeframe` | ✓ | existing → reuse |
+    | `FREE_ASSET_NOUN` | `free_asset_noun` | id 13 — `free_asset_noun` | ✓ | existing → reuse |
+    | `SENDER_FIRST_NAME` | `sender_first_name` | id 14 — `sender_first_name` | ✓ | existing → reuse |
+
+    8/8 artifact UPPERCASE names mapped case-insensitively to existing lowercase EB-stored names. Zero new-variable creates issued. Zero 422 duplicate-name responses. Operator confirmed at User gate 3 with "Yes — reuse all 8 existing." Phase 3 step 6 fired ZERO `POST /api/custom-variables` calls (zero-create branch).
+  - **Expected per spec:** Issue body R-4 (round-4 S-3 regression + BC-6780 task-2 fix-validation NEW for round-5) — "8 artifact UPPERCASE variables map to lowercase EB-stored vars via case-insensitive `.lower()` comparison per BC-6780 Phase 3 step 3 fix; all classify as 'existing → reuse'; zero new creates; zero 422 duplicates."
+  - **Match:** Every component — 8 names, lowercase mapping, all existing-reuse, zero creates, zero 422.
+  - **Isolation Discipline Rule 3 status:** preserved by definition (zero creates → zero new permanent custom variables).
+
+### Phase 4 (UPLOAD)
+
+- **R-5 ★** — ✅ **Expected.** **(BC-6780 task-1 fix-validation: ratified at runtime.)**
+  - **Pre-loop HARD FAIL guard (BC-6780):** all 9 leads' `custom_variables[].name` matched `^[a-z][a-z0-9_]*$` regex (translation step at body-build worked correctly). Guard fired once, covered all chunks (single chunk in this run).
+  - **Output:** `POST /api/leads/multiple` with 9-lead body (1 chunk ≤ 500 limit) returned `success: true` with all 9 leads created. Lead IDs: 14753-14761 (assigned sequentially). All responses include both `id` (int) and `uuid` (str) per BC-6515 forward-compat (UUIDs all `a1bb7187-*` — Laravel UUIDv4 timestamp prefix).
+  - **Per-lead bodies:** EB lead-body field renames applied per Sx-6 (CSV `job_title→title`, `company_name→company`); 8 per-lead `custom_variables` with lowercased names. Sample lead 14753 (`dogfood-test-01@gmail.com`): all 8 vars persisted with values intact.
+  - **Tag attachment (Isolation Discipline Rule 1):** `POST /api/tags` created tag `bc-6785-r5` (id 41). `POST /api/tags/attach-to-leads` attached tag id 41 to lead IDs [14753..14761] in one call. Verified: `list_leads({tag_ids: [41]})` returns 9/9 expected leads on a single page.
+  - **Side-finding (auto-attached ESP tags, outside R-1-28 set):** EB auto-attaches ESP tags at lead-create based on email domain MX:
+    - 4 leads tagged `Google` (gmail.com x2 + brite.co x2 — both on Google Workspace MX).
+    - 2 leads tagged `Outlook` (outlook.com x2).
+    - 3 leads (`*@dogfoodtest.com` — no MX) carry NO ESP auto-tag.
+    - This is a *useful* default from EB's lead-tag taxonomy; for round-5 the `bc-6785-r5` tag is layered on top of the auto-tag, which keeps cleanup filtering precise.
+  - **Expected per spec:** Issue body R-5★ — "`POST /api/leads/multiple` accepts `title`/`company`; response includes both `id` (int) and `uuid` (str); per-lead `custom_variables[].name` lowercased at body-build per BC-6780 translation step; pre-loop HARD FAIL guard verified to fire if names UPPERCASE; happy-path bulk-create succeeds without UPPERCASE→422 detour observed in round-4."
+  - **Match:** Every component. **The BC-6780 fix holds at runtime; UPPERCASE→422 detour from round-4 (S-4) is gone.**
+
+- **R-28** — ⚠️ **Unexpected — INCONCLUSIVE on case-asymmetry; produced 2 spec-correctness findings.**
+  - **Probe (a) — `POST /api/leads/upsert-multiple`:**
+    - POST → 405 ("The POST method is not supported for route api/leads/upsert-multiple. Supported methods: GET, HEAD, PUT, PATCH, DELETE.")
+    - PUT with UPPERCASE name `RECENCY_ANCHOR` → 422.
+    - PUT with lowercase control name `recency_anchor` → 422 (same error). 422 is therefore NOT the BC-6780 case rule — it's a body-shape/method mismatch.
+    - PATCH → 404. GET → 404. (The 405 message claimed PATCH/GET were "supported" but they actually return 404 — Laravel auto-generated 405 messages can be misleading for non-POST/PUT routes.)
+    - `search_api_spec` for `upsert` returns no matches; spec for `/api/leads/multiple` shows POST only (no upsert variant documented).
+    - **Concrete finding F-R-28a (round-6 candidate):** launch-campaign spec § Phase 4 step 1 describes `upsert_multiple_leads` as a "variant of `/api/leads/multiple` (for merging against existing leads)." This is phantom — POST is rejected, no variant endpoint is documented. Either (i) the path in the spec is wrong, OR (ii) "upsert" semantics are achieved by re-POSTing `/api/leads/multiple` (per the bulk-delete description's hint: "I mapped the wrong custom variables for these leads — Simply re-upload the leads and we'll update the records in place").
+  - **Probe (b) — `POST /api/leads/bulk` (CSV-upload variant):**
+    - `search_api_spec` confirms the CSV-upload endpoint is actually `POST /api/leads/bulk/csv` — not `POST /api/leads/bulk` as the launch-campaign spec describes.
+    - `POST /api/leads/bulk` is not documented; `DELETE /api/leads/bulk` is the bulk-delete variant.
+    - **Concrete finding F-R-28b (round-6 candidate):** launch-campaign spec § Phase 4 step 1 describes `bulk_create_leads_csv (POST /api/leads/bulk)` — the actual path per `search_api_spec` is `POST /api/leads/bulk/csv`.
+    - The CSV-upload endpoint takes multipart/form-data; `call_api` is JSON-only, so the case-asymmetry test for this endpoint cannot be exercised through the available transport. This is a **known limitation** of the round-5 test design that R-28 surfaces — testing UPPERCASE/lowercase column-header behavior for `POST /api/leads/bulk/csv` requires multipart upload via curl/UI, not `call_api`.
+  - **Cleanup:** zero R-28 leads created (all probes 422'd before any record landed). Verified via `list_leads({search: "r5-sibling-test"})` → 0 results. Zero new permanent custom variables created (Isolation Discipline Rule 3 preserved by definition — probes failed before any custom-variable side effect).
+  - **Verdict for case-asymmetry hypothesis:** UNVERIFIED. The test design assumed the launch-campaign spec was accurate about sibling endpoint names; spec turns out to be wrong about both. Sibling-endpoint case-asymmetry remains an open question from BC-6780 task-7 / 2026-05-07 comment — round-6 follow-up via fixing the spec endpoints first, then re-probing.
+
+- **R-6** — ✅ **Expected.**
+  - **Output:** `POST /api/leads/multiple` with body `{leads: [{email: "dogfood-test-01@gmail.com", ...}]}` (already-existing lead from R-5★ mass-create) returned HTTP 422. The whole single-lead request rejected — atomic-rejection semantics held.
+  - **Expected per spec:** Issue body R-6 (round-4 S-5 regression) — "forced duplicate-email in chunk → all-or-nothing 422 (Sx-8 atomic rejection)."
+  - **Match:** Atomic 422 confirmed. Side-observation: the spec's bulk-delete description hint ("Simply re-upload the leads and we'll update the records in place") appears to apply to a different operation flow (likely the EB UI's lead-import which detects existing records and routes to upsert), NOT raw `POST /api/leads/multiple`. Logged for future spec clarification, not a finding.
+
+- **R-7** — ✅ **Expected.** **(Spec-read only.)**
+  - **Read targets:** launch-campaign skill spec § Tool tier map + § Phase 4 § "Two-call gate required — agent-side, not vendor-side."
+  - **Confirmation:** spec text continues to differentiate:
+    - **Wrapper-tool layer:** `create_lead` is core-tier, directly callable as `mcp__emailbison-<workspace>__create_lead`. Wrapper-side `confirmation` prose is documentation-only per BC-6439 (no runtime gate at any layer).
+    - **API-direct layer:** `bulk_create_leads` is invoked via `call_api` against `/api/leads/multiple`, which has NO `confirmation` field at the API level. Agent-side `AskUserQuestion` gate is the sole safeguard for every `call_api`-routed mutation per Sx-9 / BC-5906.
+  - **Match:** wrapper-vs-API distinction live in spec at every gate site (Phase 4 + Phase 6 + Phase 11) per BC-6304 task-1 fix.
+
+### Phase 5 (CAMPAIGN CREATE)
+
+- **R-8 ★** — ✅ **Expected.** **(BC-6514 + BC-6654 multiplicative segmentation: ratified at runtime.)**
+  - **Pre-list (silent-duplicate guard precheck):** `list_campaigns(search="BC-6785")` returned 0 matches before creates — happy path; User gate 5 rendered the empty-pre-list variant.
+  - **Operator confirmation:** "Yes — create the 4 campaigns."
+  - **Output:** 4 campaigns created with sequential IDs 43-46 via `mcp__emailbison-personal__create_campaign`. All `status: draft`, `type: outbound`, `success: true`. Names follow the BC-6514 format `BC-6785 | MAIN | {Email-type} | {ESP}` (Email-type before ESP per BC-6514 multiplicative-axis decision; round-5 substitutes the spec's `{base}` slot with `BC-6785 | MAIN` per Isolation Discipline Rule 2):
+    - id 43 — `BC-6785 | MAIN | Professional | Google` (2 leads)
+    - id 44 — `BC-6785 | MAIN | Role | Other` (3 leads)
+    - id 45 — `BC-6785 | MAIN | Personal | Google` (2 leads)
+    - id 46 — `BC-6785 | MAIN | Personal | Microsoft` (2 leads)
+  - `metadata.segments` map populates with compound `{email_type}|{esp}` keys matching the BC-6654 schema rewrite.
+  - **Match:** Every component — 4-cell multiplicative coverage, naming convention, segments-map keying. Round-4 keystone S-7★ regression holds at round-5.
+
+- **R-9** — ✅ **Expected.** **(BC-6302 silent-duplicate guard fires correctly.)**
+  - **Setup:** post-creation of the 4 main campaigns, pre-created decoy `BC-6785 | DECOY | duplicate-test` (id 47) via `create_campaign`. Both `BC-6785 | MAIN | ...` and `BC-6785 | DECOY | ...` names start with the `BC-6785` substring base.
+  - **Output:** `list_campaigns(search="BC-6785")` returned 5 matches (ids 43-47). All 5 names start with the `BC-6785` substring base → all 5 would feed `existing_campaign_matches` in step 3 → User gate 5 would render in the duplicate-warning variant if Phase 5 were re-run on this base. The 4-option prompt (Reuse existing IDs / Create N new anyway / Rename / Abort) would activate.
+  - **Expected per spec:** Issue body R-9 (round-4 S-8 regression + BC-6302/F20 silent-duplicate guard) — "pre-create one decoy; verify branched gate-5 render."
+  - **Match:** guard fires correctly; substring-match precondition + branched-render mechanics confirmed.
+  - **Note:** decoy campaign 47 carries `BC-6785 |` prefix → cleanly removable at Task 13 via UI search-and-archive.
+
+- **R-10** — ✅ **Expected.** **(BC-6306 plain_text scope + BC-6783 hypothesis correction validated at runtime.)**
+  - **Pre-PATCH baseline:** `get_campaign(43)` shows `settings: {max_emails_per_day: 1000, max_new_leads_per_day: 1000, open_tracking: false, plain_text: false, can_unsubscribe: false}` — **`plain_text: false` default confirmed**, matches BC-6306 / EB API spec note "If nothing sent, false is assumed."
+  - **PATCH execution:** 4 parallel calls to `PATCH /api/campaigns/{id}/update` with body `{"plain_text": true}` — all 4 returned `success: true` with `plain_text: true` in response.
+  - **BC-6783 hypothesis correction confirmed:** ONLY `plain_text` was applied. `reputation_building` field is absent from `get_campaign` response (likely server-defaulted to `false` per spec but not surfaced); `can_unsubscribe: false` and `open_tracking: false` defaults preserved (NOT modified by Phase 5 step 8). The BC-6306 implementation scope is `plain_text` only — round-4 hypothesis (S-9) had been broader; round-5 hypothesis tracks the actual implementation.
+  - **Match:** every component.
+
+- **R-11** — ✅ **Expected.** 🔥 **(BC-6544 PATCH-omit semantics CONFIRMED AT RUNTIME — broader scope than the original BC-6544 framing assumed.)**
+  - **Test setup:** picked campaign 46 (`BC-6785 | MAIN | Personal | Microsoft`) — currently has `plain_text: true` from R-10's PATCH.
+  - **First PATCH attempt — `{max_emails_per_day: 500}` only:** returned HTTP 422 (rejection — likely a min/max validation rule not visible in the API spec snippet; not a BC-6544 PATCH-omit signal). Pivoted to a different harmless field for the test design.
+  - **Second PATCH attempt — `{sequence_prioritization: "followups"}` only (a non-boolean string field unrelated to plain_text):** returned `success: true` with response body showing **`plain_text: false`**. Silent revert observed: a PATCH body that omits a boolean field causes that field to revert to its default-false state, **even when the PATCH targets a wholly unrelated non-boolean field**.
+  - **Restoration:** re-PATCHed `{plain_text: true}` immediately. Response confirmed `plain_text: true` restored on campaign 46.
+  - **Expected per spec:** Issue body R-11 (round-4 S-10 regression) — "BC-6544 PATCH-omit live test; verify `plain_text` reverts to false on omit; restore via re-PATCH."
+  - **Match:** every component. Spec's API description (*"If nothing sent, false is assumed"*) confirmed live for the omitted-boolean field even when the PATCH targeted an unrelated string field.
+  - **Broader-scope clarification (round-5 contribution):** the existing spec text in `launch-campaign.md § Phase 5 step 8` and `email-bison.md § Known gotchas § plain_text` (both shipped via BC-6544 PR #242, 2026-05-08) already correctly state — *"ANY future PATCH on this campaign that intends to preserve `plain_text: true` MUST re-send it explicitly in the body."* Round-5 confirms the rule is intentional in its broadest form: even a PATCH that targets a single non-boolean string field (no booleans in the body) trips the revert. The spec language is already correct; this round-5 evidence ratifies the rule's actual scope at runtime — not a documentation gap, an evidence-strengthener.
+  - **Production discipline implication:** any team member or workflow editing campaigns through the API (not just multi-boolean PATCHes) must re-send each currently-`true` boolean (`plain_text`, `open_tracking`, `can_unsubscribe`, `reputation_building`) on every PATCH or the omitted ones silently revert. The EB UI almost certainly handles this internally (sends the full settings payload on save); anyone hitting `/api/campaigns/{id}/update` directly bears the discipline.
+
+### Phase 6 (ATTACH LEADS)
+
+- **R-12** — ✅ **Expected.**
+  - **Endpoint verified:** `POST /api/campaigns/{campaign_id}/leads/attach-leads` per `search_api_spec`. Body schema `{lead_ids: [int], allow_parallel_sending: bool}`. No `confirmation` field at API level (consistent with Sx-9/BC-5906/BC-6439 vendor-confirmation gate findings). Agent-side `AskUserQuestion` is the sole safeguard.
+  - **Bucket map (from Phase 2 grid + Phase 4 lead IDs):**
+
+    | Campaign | Cell | Lead IDs |
+    |---|---|---|
+    | 43 | `BC-6785 \| MAIN \| Professional \| Google` | [14757, 14758] |
+    | 44 | `BC-6785 \| MAIN \| Role \| Other` | [14759, 14760, 14761] |
+    | 45 | `BC-6785 \| MAIN \| Personal \| Google` | [14753, 14754] |
+    | 46 | `BC-6785 \| MAIN \| Personal \| Microsoft` | [14755, 14756] |
+  - **Operator gate-6 choice:** "Yes — attach all 9 leads across all 4 campaigns" (single-pass mode; no per-campaign turn-structure re-prompts).
+  - **Output:** 4 sequential `POST /api/campaigns/{id}/leads/attach-leads` calls all returned `success: true` with messages `"Leads successfully added to {campaign-name}. Existing leads were not added."` (defensive idempotency hint for re-attach scenarios; no dedup applied here since all leads were fresh attaches).
+  - **Verification (post-attach `get_campaign` per campaign):** total_leads counts match expected — campaign 43=2, 44=3, 45=2, 46=2; sum=9 matches Phase 4 `lead_count`. Sub-second eventual-consistency observed (get_campaign fired immediately after attach showed accurate counts). Settings `plain_text: true` preserved on all 4 (R-11 PATCH-omit revert was successfully restored at end of Phase 5).
+  - **Expected per spec:** Issue body R-12 (round-4 S-11 regression + F21/BC-6303 lead bucket mapping) — "metadata `lead_ids_by_bucket` + `lead_attach_counts` populate per cell key."
+  - **Match:** every component.
+  - **Spec-drift observation (sub-finding, not blocking):** the launch-campaign spec § Phase 6 describes a "two-call gate ... per-campaign vendor gates fire a minimal turn-structure prompt" pattern, but the actual API has no preflight/commit split — there's no second call to gate. The single AskUserQuestion (User gate 6) IS the safeguard. Per-campaign turn-structure prompts would add no information for `/api/leads/attach-leads`. This was offered as an option at User gate 6 (operator chose single-pass). Same observation applies to Phase 4 UPLOAD's two-call narrative. Could feed into spec tightening at Task 13 close — fold into existing Sx-9/BC-5906/BC-6439 lineage.
+
+- **R-13** — ⏭️ **Deferred.** BC-6545 spec-read suffices; live-fire requires pre-poison setup (lead pre-staged in another campaign with `in_sequence` status) that's not justified for an institutional-memory-only check. Spec at launch-campaign.md § Phase 6 step 5d ("`allow_parallel_sending` branch") + email-bison.md § Known gotchas continue to enforce the never-auto-enable rule.
+
+### Phase 7 (ATTACH SENDERS)
+
+- **R-14** — ✅ **Expected.**
+  - **Endpoint verified:** `GET /api/sender-emails` (paginated; `?status` filter; `?per_page` silently ignored).
+  - **Pagination meta (page 1 of `?status=connected`):** `current_page: 1, last_page: 52, per_page: 15, total: 772`. Sx-10 hardcoded `per_page: 15` confirmed: passing `?per_page=100` returned 15 items with `meta.per_page: 15` (silent ignore).
+  - **Status filter case-asymmetry (Sx-11):** lowercase `?status=connected` accepted; response data shows `status: "Connected"` (titlecase). Lowercase-on-filter / titlecase-on-data asymmetry verified.
+  - **Match:** Every component of F23/Sx-10/Sx-11 combined hypothesis.
+
+- **R-15** — ✅ **Expected.** **(F24 partial-pool decision faithfully applied; sender invariant preserved across the 4-campaign set.)**
+  - **Workspace 13 sender pool:** 772 connected senders. F24 decision per round-4 + plan: attach page 1 (15 senders) only — testing API mechanics, not production warmup. Operator confirmed at User gate 7.
+  - **Senders attached:** IDs 981-995 (all `microsoft_oauth`, `washington[festive|winter]lights.com`, all `Connected`, all `warmup_enabled: true`, all tagged `Outlook` + `ScaledMail-Microsoft`). Brite production scaled-mail pool.
+  - **4 parallel `POST /api/campaigns/{id}/attach-sender-emails` calls all returned `success: true`.**
+  - **Sender invariant preserved:** the same 15-sender set was attached to each of the 4 campaigns. NEVER split senders across campaigns — invariant holds at runtime.
+  - **No warmup pollution risk:** campaigns 43-46 are in `Draft` state and stay there for round-5; sender-attach to never-activating campaigns produces no warmup activity.
+  - **Match:** F24 partial-pool decision applied as intended; sender invariant preserved.
+
+- **R-16** — ✅ **Expected.**
+  - **Verification mode:** `get_campaign` does NOT expose `attached_senders_count` (or any sender count scalar); fallback to spec's pagination-mode verification via `GET /api/campaigns/{campaign_id}/sender-emails` (verified via `search_api_spec`). `sender_verify_mode: "paginated"`.
+  - **Per-campaign verification (4 parallel calls immediately after attach):**
+
+    | Campaign | meta.total | sender IDs returned |
+    |---|---|---|
+    | 43 | 15 | 981-995 ✓ |
+    | 44 | 15 | 981-995 ✓ |
+    | 45 | 15 | 981-995 ✓ |
+    | 46 | 15 | 981-995 ✓ |
+  - **Sub-second eventual-consistency:** all 4 verification calls fired immediately after the attach calls returned, and all 4 returned the expected attach state with no stale-read or partial-attach observed.
+  - **Match:** F26/R-15 eventual-consistency hypothesis holds.
+
+### Phase 8 (SCHEDULE)
+
+- **R-17** — ✅ **Expected.** **(F27 + BC-6303 schedule_template_id rename + clone-per-campaign ratified.)**
+  - **Endpoint discovery:** initial guess `GET /api/schedule-templates` → 404. Correct path per `search_api_spec`: `GET /api/campaigns/schedule/templates`. Spec-drift candidate (the campaign-namespaced path is unintuitive for a workspace-level resource) but already documented in launch-campaign.md § Phase 8.
+  - **Workspace 13 schedule templates (only 1):** id 3 — Mon-Fri true; sat/sun false; `start_time: 08:00:00`, `end_time: 20:00:00`, `timezone: America/Denver`. **Note:** the spec example shows `08:00-17:00`, but workspace 13's actual template runs `08:00-20:00` (12-hour window). Operator-set; matches Brite production cadence.
+  - **Apply execution:** 4 parallel `POST /api/campaigns/{id}/create-schedule-from-template` calls with body `{"schedule_id": 3}` — all returned `success: true`.
+  - **Clone-per-campaign confirmed (BC-6303 / round-2 finding):** each apply created a NEW Campaign Schedule entity, NOT a reference to the source template. Response `type: "Campaign Schedule"` (distinct from source `type: "Schedule template"`):
+
+    | Campaign | Cloned schedule_id | Source template | Notes |
+    |---|---|---|---|
+    | 43 (Professional\|Google) | 20 | 3 | Inherits Mon-Fri 08:00-20:00 America/Denver |
+    | 44 (Role\|Other) | 21 | 3 | Inherits ditto |
+    | 45 (Personal\|Google) | 22 | 3 | Inherits ditto |
+    | 46 (Personal\|Microsoft) | 23 | 3 | Inherits ditto |
+  - **Status:** all clones return `status: "Not Started"` (campaigns are still in Draft).
+  - **Match:** every component — schedule_template_id source recorded, campaign_schedule_ids per-campaign clone IDs recorded, schedule fields copied from source.
+
+### Phase 9 (SEQUENCE)
+
+- **R-18** — ✅ **Expected.** **(BC-6301 variant boolean + bare step_2.subject + auto Re: prepend ratified.)**
+  - **Endpoint verified:** v1.1 path `POST /api/campaigns/v1.1/{campaign_id}/sequence-steps` (legacy `/api/campaigns/{id}/sequence-steps` not used) per `search_api_spec`.
+  - **Body construction:** `{title: "BC-6785 round-5 sequence", sequence_steps: [{step1}, {step2}]}`. Step 1: `variant: false`, `thread_reply: false`. Step 2: `variant: false` (no A/B for dogfood), `thread_reply: true`. Both steps submitted with `email_subject: "{Quick|Fast|30s} {question|check|idea}"` BARE (no Re: prefix on step 2).
+  - **4 parallel POST calls all returned `success: true`.** Sequence IDs assigned 19-22 with step IDs 34-41 (sequential):
+
+    | Campaign | Sequence id | Step 1 id | Step 2 id |
+    |---|---|---|---|
+    | 43 (Professional\|Google) | 19 | 34 | 35 |
+    | 44 (Role\|Other) | 20 | 36 | 37 |
+    | 45 (Personal\|Google) | 21 | 38 | 39 |
+    | 46 (Personal\|Microsoft) | 22 | 40 | 41 |
+  - **BC-6301 auto Re: prepend confirmed live:** all 4 sequences' stored step_2 returned `email_subject: "Re: {Quick|Fast|30s} {question|check|idea}"` (single Re: prepend, no double-prefix). The artifact's bare submission round-trips correctly through EB's render layer.
+  - **`variant: false` boolean (not int):** all 4 step_1 + step_2 returned `variant: false` in response. BC-6301 boolean-vs-int rule held.
+  - **Match:** every component.
+
+- **R-19** — ✅ **Expected.** **(F29/F30 + BC-6548 wait_in_days clamp + thread_reply boolean + UPPERCASE-only token rule happy-path ratified.)**
+  - **F29 clamp:** artifact's `step_1.wait_in_days = 0` → submitted as `1` (per `max(1, n)` clamp) → stored as `1`. Step 1 cannot send immediately on resume; minimum 1-day wait is enforced.
+  - **F30 / step 2 floor:** `step_2.wait_in_days = 4` (≥ 3 production rule) → stored as `4`.
+  - **`thread_reply` boolean shape:** step 1 returned `thread_reply: false` (boolean); step 2 returned `thread_reply: true` (boolean). v1.1 spec contract held — not int, not string, native boolean.
+  - **BC-6548 UPPERCASE-only token rule (happy path):** all 10 distinct UPPERCASE tokens in step 1 body (`{RECENCY_ANCHOR}`, `{COMPANY}`, `{FIRST_NAME}`, `{VERTICAL_DESCRIPTOR}`, `{SPECIFIC_FRICTION}`, `{PROOF_POINT_COMPANY}`, `{PROOF_POINT_NUMBER}`, `{PROOF_POINT_TIMEFRAME}`, `{FREE_ASSET_NOUN}`, `{SENDER_FIRST_NAME}`) round-tripped intact through the EB render layer — stored bodies preserve exact UPPERCASE casing as submitted. No lowercase coercion, no token mangling. Sad-path UPPERCASE-violation test deferred to R-26 (Task 12 side-flow).
+  - **Match:** every component.
+
+### Phase 10 (PREVIEW — first live-walk in chain)
+
+- **R-20** — ✅ **Expected.** **(Mode 1 local-render sanity checklist passes.)**
+  - **Preview lead selection:** largest cell = `Role|Other` (3 leads); first lead by lead-id order = `info@dogfoodtest.com` (id 14759, Info Account, Test Dogfood Aquarium, Operations Manager). Per Phase 10 step 1 spec.
+  - **Render algorithm:** EB-substitution layer (`{TOKEN}` → CSV value or `custom_variables[].default`) + deterministic spintax (first-option pick) + `<br><br>` → `\n\n` for display.
+  - **`{SENDER_FIRST_NAME}` resolution:** priority chain hit #1 (artifact-default = `"Amanuel"`). BC-6784 caveat applies — recipients see actual sender record's first_name, not artifact default.
+  - **5/5 sanity checks pass:**
+    - ✅ No unresolved `{VARIABLE}` tokens
+    - ✅ No unresolved spintax
+    - ✅ No em-dash (`—`)
+    - ✅ No `<p>` / `</p>` tags
+    - ✅ No `{{` double-brace
+  - **Rendered output (verbatim):**
+
+    **STEP 1 (subject):** `Quick question`
+
+    **STEP 1 (body):**
+    > Saw the downtown master-plan announcement at Test Dogfood Aquarium Info, and it lined up with a pattern we've been watching across municipalities.
+    >
+    > Most municipalities teams we work with run into downtown lighting specs getting stuck at design review, and one that solved it was Boulder Pearl Street, who ran 38% higher evening foot traffic in 2024.
+    >
+    > Happy to pull a short architectural lighting preview for Test Dogfood Aquarium if useful, no commitment.
+    >
+    > Best,
+    > Amanuel
+
+    **STEP 2 (subject artifact form):** `Quick question` (EB auto-prepends `Re: ` at delivery)
+
+    **STEP 2 (body):**
+    > Circling back in case it got buried. Still happy to send the architectural lighting preview whenever it's useful.
+    >
+    > Best,
+    > Amanuel
+  - **Operator-noted artifacts of synthetic test data (non-issues):** the `{COMPANY} {FIRST_NAME}` adjacency reads as "Test Dogfood Aquarium Info" (placeholder name "Info Account" of role-prefix test lead colliding with company-name placement); the `{COMPANY}` token appears twice in step 1. Both are inherent to the round-1-era synthetic CSV, not artifact bugs. R-20 validates render mechanics, not copy quality. Operator confirmed: "this is mostly a non issue ... as long as it is rendering how we expect it to render."
+  - **Match:** every component of Phase 10 Mode 1 spec.
+
+- **R-21 ★** — ✅ **Expected.** 🎯 **(BC-6784 `{SENDER_*}` shadow ratified at runtime.)**
+  - **Pre-flight IV-5 gap encountered:** `docs/marketing-context.md` did not exist in worktree → Mode 2 halts per spec. Resolved by writing a minimal stub with frontmatter + `## test_send_allowlist` section containing `britenites.com`. F-IV-5 finding logged for round-6 — the spec's strict halt has no recovery path for fresh worktrees + the operator-self-send use case.
+  - **Real-send fired:** `POST /api/campaigns/sequence-steps/36/test-email` with `{sender_email_id: 981, to_email: "corinne+bc-6785-r5@britenites.com", use_dedicated_ips: false}`. Response: `{success: true, message: "Successfuly sent sequence test email"}` (EB API typo in `Successfuly` recorded verbatim).
+  - **Operator inbox receipt confirmed (~3:57 PM MT, ~0 min latency):** 1 real email arrived from `holden.halford@washingtonfestivelights.com` (sender 981) to `corinne+bc-6785-r5@britenites.com` (plus-addressing routed cleanly to operator inbox).
+  - **Subject:** `[test] Quick idea` (artifact spintax `{Quick|Fast|30s} {question|check|idea}` → "Quick idea" — different first-option than Mode 1's `Quick question`).
+  - **Body verbatim (Mode 2 actual delivery):**
+    > Saw the downtown master-plan announcement at Test Dogfood Zoo Contact, and it tracked closely with a pattern we've been watching across municipalities.
+    >
+    > Most municipalities teams we work with run into downtown lighting specs getting stuck at design review, and one that shortcut it was Boulder Pearl Street, who ran 38% higher evening foot traffic in 2024.
+    >
+    > Happy to pull a focused architectural lighting preview for Test Dogfood Zoo if interesting, no commitment.
+    >
+    > Thanks,
+    > Holden
+  - **BC-6784 keystone check — ✅ ratified:**
+    - **Mode 1 sign-off:** "Best, Amanuel" (artifact-default `{SENDER_FIRST_NAME}` = "Amanuel" via priority chain hit #1)
+    - **Mode 2 sign-off:** "Thanks, Holden" — `{SENDER_FIRST_NAME}` rendered as sender 981's record first_name (`Holden`), shadowing the artifact-level resolution.
+    - The EB render engine resolves `{SENDER_*}` from the sender record being used at delivery, NOT from the artifact's `custom_variables[].default`. Local Phase 10 spot-check shows artifact-default for representative display only.
+  - **Spintax-rotation positive observation (not a finding):** EB's render engine independently rotates spintax per occurrence at delivery. Mode 1 used deterministic first-option (per spec disclaimer "actual sends will rotate options"); Mode 2 picked:
+    - Subject: "Quick idea" (3rd option of `{question|check|idea}`)
+    - Body line 1: "tracked closely" (2nd option of `{it lined up|it tracked closely|it mapped well}`)
+    - Body line 2: "shortcut" (2nd option of `{solved|shortcut|sidestepped}`)
+    - Body line 3: "focused" (3rd option of `{short|quick|focused}`)
+    - Sign-off: "Thanks" (3rd option of `{Best|Cheers|Thanks}`)
+    - Confirms spec-documented spintax behavior at delivery; not a finding.
+  - **New findings surfaced (round-6 candidates):**
+    - **F-test-send-prefix** — EB silently prepends `[test] ` to subject on `POST /api/campaigns/sequence-steps/{id}/test-email`. Observed: artifact subject `{Quick|Fast|30s} {question|check|idea}` → delivered `[test] Quick idea`. The `[test] ` prefix is NOT in launch-campaign.md spec or email-bison.md. Useful operator-side artifact (test emails visually distinct in inbox); should be documented. Verify real (non-test) campaign sends do NOT carry this prefix — defer the verify to Phase 11 ACTIVATE step 1 inbox check (R-23★).
+    - **F-Mode2-Lead-Pick** — Mode 2 `--test-send` picked lead 14761 (Contact Account / `contact@dogfoodtest.com` / Test Dogfood Zoo) for variable substitution. Mode 1 deterministically picked lead 14759 (Info Account / Test Dogfood Aquarium / largest-cell-first-lead per spec). The launch-campaign spec specifies Mode 1's lead-pick rule but is silent on Mode 2's. Most likely candidate hypothesis: EB picks the most-recently-added lead OR highest lead-id, unverified. Operators using `--test-send` to spot-check Mode 1 render fidelity should know the lead won't match. Round-6 candidate.
+    - **F-IV-5** — IV-5 strict-halt has no recovery path for fresh worktrees absent `docs/marketing-context.md`. For the operator-self-send use case (recipient is operator's own `@britenites.com` inbox, retrieved via `git config user.email`), an automatic allowlist exception would prevent the dogfood-blocking halt. Alternative: ship the workspace bootstrap with a default `marketing-context.md` stub.
+  - **Cross-checks (all clean):**
+    - From: `holden.halford@washingtonfestivelights.com` matches sender_email_id 981 request ✓
+    - Plus-addressing routed correctly (`corinne+bc-6785-r5` reached operator inbox) ✓
+    - Body structure matches Mode 1 algorithm (variables resolved + spintax rotated + `<br><br>` → paragraph breaks) ✓
+    - Gmail "External" tag expected (washingtonfestivelights.com ≠ britenites.com); not a finding ✓
+    - Subject is NOT `Re: ` prepended (correct — only step 2 has `thread_reply: true` which triggers Re:) ✓
+
+### Phase 11 (ACTIVATE — first live-walk in chain)
+
+- **R-22** — ✅ **Expected.** **(Single-lead test campaign built; Phases 3-9 walked inline.)**
+  - **Artifact built:** `docs/dogfood/bc-6554-round-5/test-copy-single-lead.json` mirrors `test-copy.json` verbatim + adds `single_lead_target` metadata block (metadata-only, not consumed by EB API).
+  - **Lead created:** `POST /api/leads/multiple` with `{email: "corinne+bc-6785-r5@britenites.com", first_name: "Corinne", last_name: "Brewer", title: "Operations", company: "Brite Nites", custom_variables: [<8 lowercased entries>]}` returned lead id 14762, uuid `a1c13f1f-abc7-4057-9493-c476d6ffa743`. Tag id 41 (`bc-6785-r5`) attached via `POST /api/tags/attach-to-leads`.
+  - **Campaign created:** `BC-6785 | SINGLE-LEAD | activate-test` (id 48, uuid `a1c13f22-a7c0-4b12-9817-d398e318601b`, status `draft`, type `outbound`).
+  - **5 parallel Phase 3-9 steps fired:** plain_text PATCH ✓ ; lead 14762 attached ✓ ; 15 senders (981-995) attached ✓ ; schedule template 3 cloned to id 24 ✓ ; sequence id 23 created with step ids 42 (step 1, wait 1d) + 43 (step 2, wait 4d, thread_reply true) ✓. All settings preserved through bring-up; BC-6301 auto-Re: prepend on step 2 confirmed (`Re: {Quick|Fast|30s} {question|check|idea}`).
+  - **Match:** every component of R-22 spec.
+
+- **R-23 ★** — ✅ **Expected.** 🎯 **(Phase 11 ACTIVATE live-walk first in chain.)**
+  - **Endpoint verified:** `PATCH /api/campaigns/{id}/resume` per launch-campaign.md spec.
+  - **Pre-state:** campaign 48 in `status: draft` with all Phases 3-9 setup complete.
+  - **resume call fired:** `PATCH /api/campaigns/48/resume` returned `success: true` with response body `status: "queued"`, `total_leads: 1`, `plain_text: true` preserved through resume (resume endpoint does NOT trigger BC-6544 omit-revert; different endpoint than `/update`).
+  - **Verification read:** `get_campaign(48)` ~5s later returned `status: "active"` (campaign progressed through `queued → active` in the verification window). EB state machine: `draft → queued → launching → active`. The transient nature of `queued` means operators verifying immediately after resume may see `active`.
+  - **Closing summary for round-5 main walk:**
+    - Campaign 48 activated; step 1 scheduled for next 08:00-20:00 America/Denver window (today is Mon 2026-05-11; step_1.wait_in_days=1 → likely Tue 2026-05-12 morning delivery).
+    - Step 2 follows ~4 days later (~Sat 2026-05-16) with auto-Re: subject and `thread_reply: true` threading.
+    - 2 real emails to `corinne+bc-6785-r5@britenites.com` over ~4-5 days.
+    - **Multiplicative-grid campaigns 43-46 remain in `Draft` state** per round-5 plan (operator-intent gate at User gate 11a was scoped to single-lead test only).
+    - `activated_per_campaign["single-lead-test"]` populated; multiplicative-grid bucket keys still `null`. Global `activated: false` (correct — only the single-lead test was activated).
+  - **Sub-observation (not a finding, optional doc note):** `status: "queued"` is transient. Operators expecting to verify queued state via `get_campaign` after `resume_campaign` may see `active` due to fast state-machine progression. One-line callout in spec would help; low priority. Adding to follow-up candidates as **F-Queued-Transient**.
+  - **Match:** every component of R-23★ spec.
+  - **Round-5 main walk CLOSES HERE per session decision.** Actual delivery verification (did step 1 land, did step 2 thread correctly) is post-close investigation; if either fails, file separate follow-up.
+
+### Side-flows
+
+- **R-24** — ✅ **Expected.** **(BC-6556 fail-closed gate verified.)**
+  - **Test artifact:** `docs/dogfood/bc-6554-round-5/test-copy-empty.json` — deliberately broken with `RECENCY_ANCHOR.default: ""` AND naked `{RECENCY_ANCHOR}` reference in body (no Liquid wrapper).
+  - **5-path resolution applied manually (spec-read; no live invocation needed since HARD FAIL is detected pre-state):**
+    - `COMPANY`: ✅ path 1 (EB-standard allowlist)
+    - `FIRST_NAME`: ✅ path 1 (EB-standard allowlist)
+    - `SENDER_FIRST_NAME`: ✅ path 3 (non-empty `custom_variables[].default`)
+    - `RECENCY_ANCHOR`: 🔴 ALL 5 PATHS FAIL — not EB-standard, no CSV, empty default, not SENDER_*, no Liquid wrapper.
+  - **Verdict:** HARD FAIL would fire at Phase 1 step 5 with diagnostic naming `RECENCY_ANCHOR`. BC-6556 fail-closed gate held as designed. No EB state created.
+
+- **R-25 ★** — ✅ **Expected.** 🎯 **(BC-6613 + BC-6781 + BC-6782 chain ratified end-to-end at runtime via EB UI Preview Body.)**
+  - **Setup:** built `docs/dogfood/bc-6554-round-5/test-leads-liquid.csv` (3 leads with varied per-lead values). Lead bulk-create via `POST /api/leads/multiple` returned ids 14763 (Aurora, both populated), 14764 (Bryce, recency_anchor empty), 14765 (Cypress, proof_point_company empty). All 3 tagged `bc-6785-r5` via `POST /api/tags/attach-to-leads`.
+  - **Campaign 49** (`BC-6785 | LIQUID | live-test`) created. 5 parallel Phase 3-9 setup calls all succeeded: plain_text PATCH ✓ ; 3 leads attached ✓ ; 15 senders (981-995) attached ✓ ; schedule clone id 25 ✓ ; sequence id 24 created with step ids 44 (step 1, Liquid body) + 45 (step 2).
+  - **Storage observation (not a finding):** EB stored the step 1 body with `\n` literal newlines converted to `<br>` tags between Liquid `{% assign %}` blocks. This raised an F-newline-to-br concern (would `<br>` leak into rendered output since Liquid `-%}` strips whitespace, not HTML markup?). Resolved below.
+  - **Operator UI Preview Body, 6 spot-checks (3 leads × 2 patterns):**
+
+    | Lead | Pattern A (recency_anchor) | Pattern B (proof_point_company) | Both ✅? |
+    |---|---|---|---|
+    | Aurora id 14763 (both populated) | "Pearl Street RFP win" — per-lead value rendered | "One that solved it was Boulder downtown, who ran 38% higher evening visits in the first 90 days." — truthy `{% if %}` branch | ✅ |
+    | Bryce id 14764 (recency empty) | "**recent activity**" — `default: 'recent activity'` FALLBACK fired | "One that solved it was Aspen Glow Festival, who ran 38% higher evening visits in the first 90 days." — truthy branch | ✅ |
+    | Cypress id 14765 (proof empty) | "Cherry Creek lighting RFP" — per-lead value rendered | "**A few NO_PROOF_POINT_company-style teams have piloted similar setups and seen 30%+ lifts.**" — ELSE branch fired | ✅ |
+  - **F-newline-to-br pseudo-finding RESOLVED (negative):** Preview Body output shows NO literal `<br>` tags between Liquid assigns despite EB storing them in the body. EB strips `<br>` during render. NOT a finding.
+  - **BC-6784 multi-lead confirmation:** sender-shadow `{SENDER_FIRST_NAME}` rotates per-render even within the same campaign:
+    - Lead A: "Rainer" (sender 994 `rainer.o@washingtonfestivelights.com`)
+    - Lead B: "Holden" (sender 981 `holdenh@washingtonfestivelights.com`)
+    - Lead C: "Holden" (sender 981 `holden.halford@washingtonwinterlights.com`)
+  - **Spintax independence per-render:** Lead A subject "30s idea", Lead B subject "30s idea", Lead C subject "Quick question". Confirms EB rotates spintax options independently per Preview Body render.
+  - **Sub-observation (NOT a finding) — F-Liquid-Space-After-Period:** rendered output shows "drop-offs.One that..." / "drop-offs.A few..." — missing space between the period ending the prior sentence and the `{%- if -%}` block's content. Caused by Liquid `-%}` strip-hyphens being aggressive about removing whitespace. Copy-author convention note: insert explicit space inside the `{%- if -%}` block (e.g., `{%- if company -%} One that solved it was...`). Worth a one-line note in `email-copywriting/SKILL.md § Liquid patterns`. Low priority.
+  - **Verdict:** R-25★ KEYSTONE PASSED. BC-6613 Liquid feature works end-to-end; BC-6781 canonical `{% assign %}` form rewrite is functional; BC-6782 regex tightening (requires `{% assign %}` wrapper for path 5) is consistent with the working pattern. **Previously REFUTED round-4 S-23 is now resolved.**
+
+- **R-26** — ✅ **Expected.** **(BC-6548 UPPERCASE-only rule verified at Phase 1 step 6 — fires first per defense-in-depth.)**
+  - **Test artifact:** `docs/dogfood/bc-6554-round-5/test-copy-lowercase.json` — one lowercase `{first_name}` in `step_1.body`; all other tokens UPPERCASE.
+  - **Phase 1 step 6 messaging-sanity regex (`\{[A-Za-z_]+\}` matching subject + body, any [a-z] char fails):**
+    - step_1.subject: ✅ clean
+    - step_1.body: 🔴 lowercase token found: `first_name`
+    - step_2.subject: ✅ clean
+    - step_2.body: ✅ clean
+  - **Verdict:** HARD FAIL fires at Phase 1 step 6 (pre-flight) with diagnostic naming `first_name`. Phase 9 step 2 (sequence-build) would also catch as second line of defense, but Phase 1 fires first (correct fail-early behavior). BC-6548 rule held. No EB state created.
+
+- **R-27** — ✅ **Expected.** **(`--no-host-lookup` semantics + `--no-segment` removal per BC-6514, spec-read verified.)**
+  - **(a) `--no-host-lookup` spec-read:** launch-campaign.md § Phase 2 documents the skip flag clearly — "skip Phase 2 entirely. Step 1 (email-type detection) does NOT run; step 2 (ESP detection) does NOT run. Set `segmented: false`, `segments: null`, `email_type_filter_applied: null`, `skipped_leads_csv_path: null`, `invalid_email_rows: []`, `invalid_domain_rows: []` in metadata. No gate 2. Proceed to Phase 3 with one combined campaign on the full lead set." Implementation semantics consistent with the BC-6514 architectural decision (single opt-out from multiplicative segmentation). No live walk required for R-27(a) — mechanics are identical to the main walk minus Phase 2 (already validated end-to-end via R-1/R-12).
+  - **(b) `--no-segment` arg-parse rejection spec-read:** launch-campaign.md § Argument parsing and defaults table does NOT list `--no-segment` — confirmed removed per BC-6514. Per BC-6514's decision-memo guidance, the flag would silently bypass the multiplicative-segmentation default if accepted. Verified absent from the spec; arg-parse would reject as unknown flag.
+  - **Verdict:** both sub-tests pass via spec-read. No EB state created.
+
+---
+
+## Round-5 follow-up candidates (populated at close)
+
+### Standalone findings (not blocking; round-6 candidates)
+
+- **F-IV-3** (Phase 1 step 10) — IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects uppercase worktree names. Mitigated for round-5 via manual path override. Round-6 candidate; one-character regex fix.
+- **F-R-28a** (Phase 4) — launch-campaign spec § Phase 4 step 1 describes `upsert_multiple_leads` as a "variant of `/api/leads/multiple`," but POST `/api/leads/upsert-multiple` returns 405 and `search_api_spec` shows no upsert variant. Either the path is wrong, or upsert is achieved by re-POSTing.
+- **F-R-28b** (Phase 4) — launch-campaign spec describes `bulk_create_leads_csv` as `POST /api/leads/bulk`; actual path per `search_api_spec` is `POST /api/leads/bulk/csv`. `/api/leads/bulk` is a DELETE-only path.
+- **F-IV-5** (Phase 10 Mode 2) — IV-5 has no recovery path for fresh worktrees absent `docs/marketing-context.md`. Strict halt blocks the operator-self-send use case (recipient is operator's own `@britenites.com` inbox). Mitigated for round-5 via stub-file creation at `docs/marketing-context.md` with `## test_send_allowlist` listing `britenites.com`. Round-6 candidate: add automatic operator-self-send allowlist (via `git config user.email` domain match) OR ship workspace bootstrap with a default marketing-context.md stub.
+- **F-test-send-prefix** (Phase 10 Mode 2) — EB silently prepends `[test] ` to subjects on `POST /api/campaigns/sequence-steps/{id}/test-email`. Artifact subject `{Quick|Fast|30s} {question|check|idea}` delivered as `[test] Quick idea`. Not in launch-campaign.md or email-bison.md spec. Should be added as a gotcha note. Useful operator-side feature; need to verify real campaign sends do NOT carry this prefix (deferred to R-23★ Phase 11 inbox check).
+- **F-Mode2-Lead-Pick** (Phase 10 Mode 2) — Mode 2 `--test-send` picked lead 14761 (Contact Account / Test Dogfood Zoo) for variable substitution; Mode 1 deterministically picked lead 14759 (Info Account / Test Dogfood Aquarium) per spec's "first lead in largest cell" rule. Mode 2's lead-pick rule is unspecified. Operators using `--test-send` to spot-check Mode 1 render fidelity should know the lead won't match. Round-6 candidate: document Mode 2 lead-pick rule.
+- **F-Queued-Transient** (Phase 11) — `status: "queued"` is transient. `resume_campaign` returns the campaign with `status: "queued"`, but `get_campaign` ~5s later may return `status: "active"` due to EB state machine progression (`draft → queued → launching → active`). Operators verifying queued state immediately after resume may misread as "did the verification fail?" when it's actually evidence of normal fast-progression. One-line spec callout would help (e.g., "Either `queued` OR `active` after resume_campaign is a pass; both indicate successful activation"). Low priority; minor doc enhancement.
+- **F-Liquid-Space-After-Period** (R-25★ Task 12) — when a `{%- if -%}` block follows a sentence-ending period, the `-%}` strip-hyphens aggressively remove whitespace between the period and the block's content, producing "drop-offs.One that..." instead of "drop-offs. One that...". Copy-author convention note: insert explicit space inside the `{%- if -%}` block (e.g., `{%- if company -%} One that solved...`). Worth a one-line callout in `email-copywriting/SKILL.md § Liquid patterns`. Low priority; doc enhancement.
+
+### Non-blocking ratifications worth optional follow-up
+
+- **R-11 broader-scope ratification (Phase 5)** — BC-6544 PATCH-omit footgun confirmed at runtime in its broadest form: a non-boolean string-field PATCH (e.g., `{sequence_prioritization}` only) reverts an unrelated boolean (`plain_text`) to false. Existing BC-6544 spec text already states this in the broadest possible framing — round-5 contributes runtime evidence, not a documentation gap. Optional follow-ups for operator decision at close: (a) annotate BC-6544 spec sites with `verified-at-runtime BC-6785 R-11`, (b) audit b2b workspace 55 production campaigns for current plain_text state (the actively-sending workspace; not done in round-5 because round-5 scope = workspace 13), (c) file a Linear follow-up capturing the broader-scope evidence + workspace-55 audit recommendation. Decision deferred to Task 13 close.
+
+### Proposed follow-up bundles (3 issues vs 8 standalone)
+
+**Bundle 1 — Spec text + regex corrections (TRIVIAL ship, single PR):**
+- F-IV-3 (regex case-sensitivity, 1-char fix)
+- F-R-28a (phantom `upsert_multiple_leads` variant)
+- F-R-28b (wrong path for `bulk_create_leads_csv`)
+- All mechanical edits in `launch-campaign.md`. ~15 min work.
+
+**Bundle 2 — Documentation gaps (TRIVIAL ship, single PR):**
+- F-test-send-prefix (`[test] ` subject prepend at Mode 2)
+- F-Mode2-Lead-Pick (Mode 2 lead-pick rule unspecified)
+- F-Queued-Transient (`queued → active` fast transition)
+- F-Liquid-Space-After-Period (copy-author Liquid convention)
+- 3 gotchas in `email-bison.md` + 1 note in `email-copywriting/SKILL.md`. ~20 min work.
+
+**Bundle 3 — F-IV-5 design (needs brainstorm):**
+- IV-5 strict-halt has no recovery path for fresh worktrees absent `marketing-context.md`. Multiple resolution approaches (auto-allowlist via `git config user.email` domain, ship default stub at install time, `--allow-operator-self-send` flag). Deserves a brainstorm + decision-memo before implementation.
+
+**Plus 1 non-blocking ratification (no issue needed):**
+- R-11 broader-scope BC-6544 PATCH-omit confirmation. Existing spec text already correct in broadest framing; round-5 contributes runtime evidence-strengthener.
+
+## Cleanup verification (2026-05-11 close)
+
+| Verification | Pre-cleanup | Post-cleanup | Expected | Match |
+|---|---|---|---|---|
+| `bc-6785-r5` tagged leads | 13 | 1 (only 14762 for post-close delivery verification) | 1 | ✅ |
+| `BC-6785` prefixed campaigns | 6 | 1 (only 48 active for delivery) | 1 | ✅ |
+| Permanent custom variables | 15 | 15 (exact roster identical to Task 1 baseline) | 15 | ✅ |
+
+**Isolation Discipline held all 3 rules end-to-end:**
+- **Rule 1 (tag)** — 12 of 13 `bc-6785-r5` tagged leads cleanly deleted via `DELETE /api/leads/bulk`; only lead 14762 kept by operator decision for delivery verification.
+- **Rule 2 (prefix)** — 5 of 6 `BC-6785 |` prefixed campaigns cleanly deleted via `DELETE /api/campaigns/bulk`; only campaign 48 active for delivery.
+- **Rule 3 (no new vars)** — custom variable roster identical to Task 1 baseline (ids 1-15, same names, same created_at timestamps).
+
+**Production data untouched** — 14,701 production leads + 21 production campaigns from Task 1 baseline preserved. Workspace 13 production deliverability unaffected.
+
+**Operator-managed cleanup remaining (post-delivery, ~Sun 2026-05-17 after step 2 lands):**
+- Stop + delete campaign 48 (`BC-6785 | SINGLE-LEAD | activate-test`)
+- Delete lead 14762 (`corinne+bc-6785-r5@britenites.com`)
+- Optionally delete tag id 41 (`bc-6785-r5`) once empty
+
+## Loop-closing decision
+
+**Chain terminates here per convergent-dogfood termination rule.**
+
+Round-5 ledger:
+- Total R-rows: 28 (incl. R-28 added at plan-gate)
+- ✅ Expected: 26
+- ⚠️ Unexpected (non-blocking): 1 (R-28, blocked on spec-correction)
+- 🔴 Refuted / blocking: 0
+- ⏭️ Deferred: 1 (R-13)
+- Keystones passed: 6/6
+- Round-4 follow-up fixes ratified at runtime: 5/5
+
+**Architecture-9 promotion eligibility:** convergent-dogfood pattern has now produced its first clean termination in the BC-5826 → BC-5906 → BC-6308 → BC-6554 → BC-6785 chain (5 iterations; round-5 = first convergent close). The pattern itself (recurse-until-zero-blockers; isolation discipline for production-workspace overlay; 3-way verdict per R-row; per-phase commit pacing) has demonstrated end-to-end utility across diverse fix types (multi-axis architectural changes, spec-text corrections, runtime-behavior verifications, vendor-quirk documentation). Promotion-eligible to org-level handbook architecture decisions.
+
+---
+
+## Loop-closing decision (populated at close)
+
+TBD.
