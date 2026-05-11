@@ -72,7 +72,7 @@ Run this block before Phase 1. Every input that flows into `Bash`, the metadata 
 
 **IV-4. Extracted-domain safety (Phase 2 pre-dig filter).** Phase 2 parses the domain from each CSV email column. Before passing any domain value to `dig`, require it to match regex `^[A-Za-z0-9][A-Za-z0-9.-]{0,253}[A-Za-z0-9]$`. Drop anything that doesn't match with a warning logged per skipped row. Poisoned CSV rows whose email column contains characters outside this set cannot reach the `dig` invocation. Record dropped rows in Phase 2 metadata (`invalid_domain_rows: [<row-numbers>]`).
 
-**IV-5. `--test-send <email>` validation (Phase 10 Mode 2 pre-call).** If `--test-send` is present, validate the email against regex `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`. Halt Mode 2 (not the whole Phase 10) on regex failure. The email then flows into the `call_api` body via **structured JSON construction** (the agent's JSON serializer), never via string concatenation. Additionally, the recipient domain MUST be on the Brite-internal test-send allowlist declared in `docs/marketing-context.md` § `test_send_allowlist` (authored per environment). If marketing-context lacks this block OR the domain isn't in it, Mode 2 halts — this command does not offer an `--allow-external-test-send` override. Rationale: typo-misdirection (operator intends their own inbox, types a customer inbox) would contradict Phase 10's "No lead is contacted" guarantee.
+**IV-5. `--test-send <email>` validation (Phase 10 Mode 2 pre-call).** If `--test-send` is present, validate the email against regex `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`. Halt Mode 2 (not the whole Phase 10) on regex failure. The email then flows into the `call_api` body via **structured JSON construction** (the agent's JSON serializer), never via string concatenation. Per-send safety is provided by the Phase 10 Mode 2 step 4 operator-confirmation prompt, which displays the exact recipient address and requires explicit Y/n affirmation before the `call_api` fires. See [ADR-011](../../../docs/decisions/011-launch-campaign-iv5-allowlist-removal.md) for the rationale behind removing the prior domain-allowlist layer.
 
 **IV-6. Operator-email SOQL interpolation (Phase 1 step 7.3).** Before interpolating the operator-email value into the SOQL `WHERE Email = '{operator-email}' LIMIT 1` clause, validate against the same email regex in IV-5. On regex failure, skip step 7.3 entirely and fall through to step 7.4 (operator-prompt fallback). The SOQL path is not the sole resolution path; failing closed here is cheap.
 
@@ -861,7 +861,7 @@ Phase 10 therefore has two modes:
 
 ### Mode 2 — Optional real EB test-send (`--test-send <email>`)
 
-Additive to Mode 1 — Mode 1 always runs first. Mode 2 only fires if `--test-send <email>` was passed AND Mode 1 passed all sanity checks AND the `--test-send` value passed Input validation § IV-5 (regex + Brite-internal domain allowlist). Any IV-5 failure skips Mode 2 with an informative message — does NOT error the whole Phase 10.
+Additive to Mode 1 — Mode 1 always runs first. Mode 2 only fires if `--test-send <email>` was passed AND Mode 1 passed all sanity checks AND the `--test-send` value passed Input validation § IV-5 (email-format regex). Any IV-5 failure skips Mode 2 with an informative message — does NOT error the whole Phase 10.
 
 **Preconditions:** Phases 4–9 completed (sequence step exists in EB, lead attached to campaign). If any precondition fails, skip Mode 2 with an informative message — do NOT error the whole Phase 10.
 
