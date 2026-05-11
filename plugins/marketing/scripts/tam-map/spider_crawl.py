@@ -3,14 +3,16 @@
 # Ported: 2026-04-24
 # License: MIT — see plugins/marketing/references/tam/UPSTREAM.md
 # Upstream path: scripts/spider_crawl.py
-# Changes: verbatim port + BC-7050 local fix (REST endpoint+streaming shape — see UPSTREAM.md)
+# Changes: verbatim port + BC-7050 local fix (REST endpoint+streaming shape) + BC-6907 dead-var cleanup — see UPSTREAM.md
 
 """
 Spider.cloud crawler — pull structured data from company websites.
 
 Reads companies.jsonl (one per line, must have `domain` field), crawls
-the homepage + /about + /contact, extracts signals (tech + content),
-summarizes via Claude Haiku.
+the homepage + /about + /contact, and writes the truncated markdown
+payload back to crawled.jsonl. Downstream tier scoring (formerly via
+this script, now in the icp-scoring skill abc rubric per BC-6907)
+re-reads the markdown from the JSONL.
 
 Usage:
   python scripts/spider_crawl.py --in ./output/{slug}/companies.jsonl --out ./output/{slug}/crawled.jsonl
@@ -29,7 +31,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SPIDER_API_KEY = os.getenv("SPIDER_API_KEY")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 SPIDER_URL = "https://api.spider.cloud/crawl"
 CONCURRENCY = 50

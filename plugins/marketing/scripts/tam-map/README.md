@@ -1,6 +1,6 @@
 # tam-map scripts — invocation pattern
 
-This directory ships 5 Python CLI scripts plus 2 stdio MCP wrappers (`aiark-mcp.js`, `discolike-mcp.js`). Each one needs a vendor API key at runtime. The keys live in the Engineering Bitwarden collection as per-item Login entries (one item per key, names prefixed `tam-map-`); the plugin-shipped `bw-run.sh` wrapper fetches them at spawn time and exports them as env vars.
+This directory ships 4 Python CLI scripts plus 2 stdio MCP wrappers (`aiark-mcp.js`, `discolike-mcp.js`). Each one needs a vendor API key at runtime. The keys live in the Engineering Bitwarden collection as per-item Login entries (one item per key, names prefixed `tam-map-`); the plugin-shipped `bw-run.sh` wrapper fetches them at spawn time and exports them as env vars.
 
 This README is the canonical invocation reference. The wrapper details live in [`CONTRIBUTING.md § Plugin secret-config canon`](../../../../CONTRIBUTING.md#plugin-secret-config-canon); the spike validation that proved the pattern is in [`docs/research/bw-run-spike.md`](../../../../docs/research/bw-run-spike.md) (BC-6905).
 
@@ -15,7 +15,8 @@ This README is the canonical invocation reference. The wrapper details live in [
 | `enrich_waterfall.py`           | `BLITZAPI_KEY`              | `tam-map-blitzapi-key`      |
 | `enrich_waterfall.py`           | `PROSPEO_API_KEY`           | `tam-map-prospeo-api-key`   |
 | `verify_smtp.py`                | `MILLIONVERIFIER_API_KEY`   | `tam-map-millionverifier-api-key` |
-| `tier_and_segment.py`           | `ANTHROPIC_API_KEY`         | (BC-6907 will replace this script with an in-session skill — out of scope for the wrapper) |
+
+> The LLM tier-scoring step (formerly `tier_and_segment.py`) now runs inline via the `icp-scoring` skill (`abc` rubric) and needs no API key — the session's own Claude credentials apply. Removed per BC-6907.
 
 ## Canonical invocation
 
@@ -68,7 +69,7 @@ Three reasons drove the migration from `~/.zshrc`-exported env vars to `bw-run.s
 
 ## Setup
 
-Run `/marketing:setup-tam-map` in Claude Code. It detects current state, walks `bw login` (one-time) and `bw unlock` (per-session), and verifies all 3 MCPs + 5 CLI scripts before exiting.
+Run `/marketing:setup-tam-map` in Claude Code. It detects current state, walks `bw login` (one-time) and `bw unlock` (per-session), and verifies all 3 MCPs + 4 CLI scripts before exiting.
 
 ## Python interpreter
 
