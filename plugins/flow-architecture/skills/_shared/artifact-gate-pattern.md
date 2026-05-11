@@ -11,6 +11,7 @@ Q29 enumerates 35 distinct gate types across three categories. Counts are summar
 Fire between FDA orchestrator phases. Per Q29 sub-decision 1:
 
 - `env-ready` — Linear MCP reachable + repo root + `gh` auth.
+- `preflight-complete` — `.flow/config.json` exists with required v1 fields per Q12.4; structured preamble emitted per Q12.5. Maps to greenfield-orchestrator G1 gate ("bootstrap completed"). Added per Q29 amendment 1.
 - `intent-exists` — `docs/product/intent.md` exists with required sections.
 - `inventory-complete` — `master-flow-inventory.md` has ≥1 domain section + `verify-docs.sh` orphan-flow-IDs check passes.
 - `scaffold-complete` (per domain) — `.flow/scaffold-log/<domain>.md` has rows for 1 milestone + N parents + 5N children, all `result: executed` or `skipped-idempotent`.
@@ -65,6 +66,7 @@ Overrides persist for the phase invocation and are NOT re-prompted within the sa
 
 - Q7 — `docs/design-rationale/project_fda_plugin_interview.md` line 60 (gate philosophy: filesystem-artifact-existence, not LLM self-report).
 - Q29 — lines 240-273 (full gate manifest).
+- Q29 amendment 1 — names the 8th phase-transition gate `preflight-complete` (LOCKED 2026-05-11 per BC-7066 reconciliation).
 - Q38 — pending lock entry for `/flow:audit` runner; see Q38 sub-decision 4 at memory:1046 for the `--linear-surface` parking-lot entry.
 - `checkpoint-pattern.md` — for `overrides[]` breadcrumb slot.
 - Q30.2 — line 281 (file location lock).
