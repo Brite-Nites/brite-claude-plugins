@@ -33,8 +33,14 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Pull FDA-shape signals from sibling helper.
-SHAPE_OUT="$("$SCRIPT_DIR/flow-detect-fda-shape.sh" "$REPO_ROOT")"
+# Pull FDA-shape signals from sibling helper. Caller may pre-populate via
+# FLOW_SHAPE_CACHE env var (set by flow-context-load.sh after its own probe) to
+# avoid a duplicate `find docs/product/{flows,journeys}` walk on the hot path.
+if [ -n "${FLOW_SHAPE_CACHE:-}" ]; then
+  SHAPE_OUT="$FLOW_SHAPE_CACHE"
+else
+  SHAPE_OUT="$("$SCRIPT_DIR/flow-detect-fda-shape.sh" "$REPO_ROOT")"
+fi
 
 # Parse KEY=VALUE lines into variables.
 INTENT_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INTENT_EXISTS=//p')"

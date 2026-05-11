@@ -129,24 +129,17 @@ PY
     exit 3
   fi
 
-  # Snapshot tmp content for content-match step after rename.
+  # Snapshot tmp content for the post-rename content-match defense.
   local pre
   pre="$(cat "$tmp")"
 
   # Atomic rename — POSIX-guaranteed on same filesystem.
   mv "$tmp" "$path"
 
-  # Re-read after rename — defends against partial promotion / external tampering.
-  if ! python3 - "$path" <<'PY'
-import json, sys
-with open(sys.argv[1], "r", encoding="utf-8") as fh:
-    json.load(fh)
-PY
-  then
-    echo "flow-resume-breadcrumb: re-read parse failed after rename — investigate $path" >&2
-    exit 3
-  fi
-
+  # Content-match: bytes at $path must equal the parse-verified bytes from $tmp.
+  # By transitivity (pre parsed as valid JSON above + pre == post) the post-rename
+  # file is still valid JSON, so a separate post-rename `json.load` is redundant.
+  # Defends against partial promotion or external tampering between mv and read.
   local post
   post="$(cat "$path")"
   if [ "$pre" != "$post" ]; then
@@ -159,7 +152,7 @@ PY
 
 if [ "$#" -lt 1 ]; then usage; fi
 
-sub="$1"; shift || true
+sub="$1"; shift
 case "$sub" in
   read)  cmd_read  "$@" ;;
   write) cmd_write "$@" ;;

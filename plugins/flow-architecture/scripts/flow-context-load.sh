@@ -45,7 +45,9 @@ FLOWS_DIR_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^FLOWS_DIR_EXISTS=//p
 BREADCRUMB_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^BREADCRUMB_EXISTS=//p')"
 
 # ── Mode classification (delegates to flow-detect-mode.sh) ───────────
-MODE="$("$SCRIPT_DIR/flow-detect-mode.sh" "$REPO_ROOT")"
+# Pass shape signals via FLOW_SHAPE_CACHE so the child doesn't re-walk
+# docs/product/{flows,journeys}; saves one `find` traversal per preamble.
+MODE="$(FLOW_SHAPE_CACHE="$SHAPE_OUT" "$SCRIPT_DIR/flow-detect-mode.sh" "$REPO_ROOT")"
 
 # ── Linear project from .flow/config.json (Q36.6) ────────────────────
 LINEAR_PROJECT_ID=""
