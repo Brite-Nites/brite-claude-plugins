@@ -6,7 +6,7 @@
 
 AI Ark is the **company-discovery layer** of the tam-map pipeline. Given a firmographic ICP (industry codes, employee band, geography), it returns a list of matching companies with website + LinkedIn + basic firmographics. It is step 1 of the 9-step upstream pipeline (see `plugins/marketing/references/tam/UPSTREAM.md`).
 
-> ⚠ **Unverified upstream endpoint schema.** The upstream stdio wrapper (`plugins/marketing/scripts/tam-map/aiark-mcp.js` lines 14–22) explicitly flags its endpoint paths (`/search`, `/similarity`, `/enrich`), field names, and auth header form as **conventional guesses** — AI Ark's full schema lives at `docs.ai-ark.com/reference` and was not verified at upstream write time. Before shipping any skill against this integration (BC-5947 wiring, BC-5832 tam-mapping skill), validate: (1) `BASE_URL`, (2) endpoint paths, (3) request/response field names, (4) whether auth is `Authorization: Bearer` or `X-API-KEY`. The rest of this guide treats the upstream surface as the working baseline, but every claim below inherits that caveat.
+> **Verified 2026-05-11 (BC-7011).** Endpoint surface and auth confirmed against `docs.ai-ark.com/reference/company-search-1` and `docs.ai-ark.com/docs/authentication`. The pre-BC-7011 wrapper was a "conventional-guess" port that returned nginx 404 in production (BC-6906 Stage 2b); paths, auth header, and request shape have been corrected in `plugins/marketing/scripts/tam-map/aiark-mcp.js`. One open caveat remains: the `account` sub-schema (firmographic filter field names) is not fully published — unknown sub-fields are server-side ignored, not 400'd.
 
 ## Consumed by
 
@@ -16,7 +16,7 @@ AI Ark is the **company-discovery layer** of the tam-map pipeline. Given a firmo
 
 ## Auth
 
-- **Credential type.** API key, passed as `Authorization: Bearer <AIARK_API_KEY>` by the upstream stdio wrapper.
+- **Credential type.** API key, passed as `X-TOKEN: <AIARK_API_KEY>` (no `Bearer` prefix) per `docs.ai-ark.com/docs/authentication`.
 - **Where it comes from.** [ai-ark.com](https://ai-ark.com) → account dashboard → API keys.
 - **Scopes.** Account-wide read + search; no sub-scoping documented.
 - **Env var.** `AIARK_API_KEY`.
@@ -52,15 +52,16 @@ The stdio transport + `env` block avoids the `${user_config.*}` header-substitut
 
 ## Tool inventory
 
-The wrapper registers three tools (see `plugins/marketing/scripts/tam-map/aiark-mcp.js` lines 64–97 at pinned commit `9f5c72e74b`). Endpoint paths and field names are subject to the upstream unverified-schema caveat at the top of this guide.
+The wrapper registers two tools (see `plugins/marketing/scripts/tam-map/aiark-mcp.js`). Both hit `POST https://api.ai-ark.com/api/developer-portal/v1/companies`; the lookalike behavior is driven by which body field is populated.
 
-| Tool | Purpose | Required args | Optional args | Upstream endpoint (unverified) |
+| Tool | Purpose | Required args | Optional args | Upstream endpoint (verified 2026-05-11) |
 |---|---|---|---|---|
-| `aiark_search` | Firmographic search (industry / geo / size-band) → list of companies | — | `industries[]`, `regions[]`, `employee_min`, `employee_max`, `limit` (default 100) | `POST /v1/search` |
-| `aiark_similarity` | Lookalike expansion from a seed list of domains | `seed_domains[]` | `limit` (default 100) | `POST /v1/similarity` |
-| `aiark_enrich` | Single-company enrichment by domain | `domain` | — | `POST /v1/enrich` |
+| `aiark_search` | Firmographic search (industry / geo / size-band) → list of companies | — | `industries[]`, `regions[]`, `employee_min`, `employee_max`, `limit` (default 100, max 100) | `POST /api/developer-portal/v1/companies` — body `{account: {...}, page, size}` |
+| `aiark_similarity` | Lookalike expansion from a seed list of up to 5 domains | `seed_domains[]` (≤5) | `limit` (default 100, max 100) | `POST /api/developer-portal/v1/companies` — body `{lookalikeDomains, page, size}` |
 
-No `search_companies` or `get_company` tool exists at the pinned commit — earlier drafts of this guide listed those names; they were incorrect. The wrapper's full surface may change with upstream syncs — re-run `discover_tools` after any pull.
+`aiark_enrich` was removed in BC-7011: AI Ark has no domain-keyed enrich endpoint as of 2026-05-11 (verified against `docs.ai-ark.com/reference` and `help.ai-ark.com/en/articles/112`). The closest documented surface is Reverse People Lookup (email→person, not domain→company). Re-add if upstream ships a real endpoint.
+
+No `search_companies` or `get_company` tool exists — earlier drafts of this guide listed those names; they were incorrect.
 
 ## Rate limits
 
@@ -94,4 +95,4 @@ For Brite Labs verticals, Active-tier ones (zoos, aquariums) typically return 50
 
 ## Last verified
 
-2026-04-24 — Tool inventory verified from upstream `scripts/aiark-mcp.js` + `aiark_client.py` at commit `9f5c72e74b`. Not yet validated against live vendor API from a Brite install (blocked on BC-5947). Bump this date on first live validation.
+2026-05-11 (BC-7011) — Endpoint paths, base URL, auth header, request body shape, and tool surface verified against `docs.ai-ark.com/reference/company-search-1`, `docs.ai-ark.com/docs/authentication`, and `help.ai-ark.com/en/articles/112-how-does-the-api-work`. Live MCP smoke captured in PR description.

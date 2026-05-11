@@ -33,8 +33,8 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 | `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `tier_and_segment.py` | `scripts/tier_and_segment.py` | Verbatim (+ 5-line `#` header after shebang) |
-| `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header after shebang) |
-| `discolike-mcp.js` | `scripts/discolike-mcp.js` | Verbatim (+ 5-line `//` header after shebang) |
+| `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header) + endpoint-drift fixes (BC-7011) — see § Local deviations |
+| `discolike-mcp.js` | `scripts/discolike-mcp.js` | Verbatim (+ 5-line `//` header + verification comment for BC-7011 — no functional drift) |
 | `package.json` | `scripts/package.json` | Verbatim (+ top-level `_source` + `_license` + `_ported` JSON fields — see § JSON attribution exception) |
 | `requirements.txt` | `scripts/requirements.txt` | Verbatim (+ 5-line `#` header prepended) |
 
@@ -70,6 +70,23 @@ Brite ships the minimal fix: outer sync `with open(outfile, "w") as f:` wrapping
 **Validated:** Python 3.13.11 + 3.14.3, both scripts, with real vendor round-trips (BlitzAPI, Prospeo, MillionVerifier). MillionVerifier returned `result_code: 2` (catch_all) — definitive vendor-side evidence.
 
 **Re-port action:** if a future upstream pull at a newer SHA includes the same (or equivalent) split, drop this local diff and remove this section. If upstream's fix differs structurally, re-apply this section's split shape on top of the new upstream body — the diff is two functions, one line each.
+
+### `aiark-mcp.js` — endpoint drift fixes (BC-7011)
+
+Upstream shipped this wrapper with an explicit `!! VERIFY BEFORE USING !!` warning admitting its endpoint paths, field names, and auth header form were "conventional guesses." BC-6906 Stage 2b live validation (2026-05-10) confirmed the wrapper returned nginx 404 in production — credential plumbing worked, the paths were wrong. BC-7011 verified the current API surface against `docs.ai-ark.com` (Company Search reference, Authentication doc, and `help.ai-ark.com/en/articles/112-how-does-the-api-work`) on 2026-05-11.
+
+Four classes of drift fixed (full per-line detail in the wrapper source — `plugins/marketing/scripts/tam-map/aiark-mcp.js`):
+
+1. **Base URL path component** updated to match the documented developer-portal namespace.
+2. **Endpoint paths** `/search` and `/similarity` both collapse to a single canonical endpoint; the lookalike variant is driven by a request-body field rather than a separate URL.
+3. **Auth header** updated to the documented form. See the wrapper source for the exact header name; `tools/integrations/ai-ark.md` § Auth carries the consumer-facing reference.
+4. **Request body** shape rewritten to the documented top-level keys; pagination cursor swapped for integer-indexed pages with a server-capped page size.
+
+One tool removed: `aiark_enrich` — AI Ark has no domain-keyed enrich endpoint on the developer portal as of 2026-05-11. The wrapper's pre-BC-7011 stub POSTed to a guessed path and returned 404 in production. The closest documented surface is Reverse People Lookup (email→person), which doesn't satisfy the domain→company-data shape the tool was named for.
+
+**Validated:** live MCP smoke through `bw-run.sh` + the reloaded plugin (captured in the BC-7011 PR description).
+
+**Re-port action:** if a future upstream pull at a newer SHA includes the same path/auth fixes, drop this local diff. If upstream restores an `aiark_enrich` tool because a new endpoint shipped, restore that handler. The `account` sub-schema (firmographic filter field names) is the one remaining "unknown" — if AI Ark publishes the full shape, re-map this wrapper's pass-through fields to match.
 
 ## Relationship to the broader marketing plugin
 
