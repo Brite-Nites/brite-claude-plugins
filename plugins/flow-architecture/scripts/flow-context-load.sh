@@ -38,11 +38,18 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── FDA-shape signals ────────────────────────────────────────────────
+# Single while/read pass over SHAPE_OUT — same builtin-loop pattern used
+# for CONFIG_OUT below. Replaces 4 sed-pipeline subshells.
 SHAPE_OUT="$("$SCRIPT_DIR/flow-detect-fda-shape.sh" "$REPO_ROOT")"
-INTENT_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INTENT_EXISTS=//p')"
-INVENTORY_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INVENTORY_EXISTS=//p')"
-FLOWS_DIR_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^FLOWS_DIR_EXISTS=//p')"
-BREADCRUMB_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^BREADCRUMB_EXISTS=//p')"
+INTENT_EXISTS=""; INVENTORY_EXISTS=""; FLOWS_DIR_EXISTS=""; BREADCRUMB_EXISTS=""
+while IFS='=' read -r _key _val; do
+  case "$_key" in
+    INTENT_EXISTS)     INTENT_EXISTS="$_val" ;;
+    INVENTORY_EXISTS)  INVENTORY_EXISTS="$_val" ;;
+    FLOWS_DIR_EXISTS)  FLOWS_DIR_EXISTS="$_val" ;;
+    BREADCRUMB_EXISTS) BREADCRUMB_EXISTS="$_val" ;;
+  esac
+done <<< "$SHAPE_OUT"
 
 # ── Mode classification (delegates to flow-detect-mode.sh) ───────────
 # Pass already-parsed shape signals as individual _FLOW_SHAPE_* env vars

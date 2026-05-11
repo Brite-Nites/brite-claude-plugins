@@ -54,17 +54,27 @@ else
   else
     SHAPE_OUT="$("$SCRIPT_DIR/flow-detect-fda-shape.sh" "$REPO_ROOT")"
   fi
-  INTENT_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INTENT_EXISTS=//p')"
-  INVENTORY_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INVENTORY_EXISTS=//p')"
-  FLOWS_DIR_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^FLOWS_DIR_EXISTS=//p')"
-  BREADCRUMB_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^BREADCRUMB_EXISTS=//p')"
+  INTENT_EXISTS=""; INVENTORY_EXISTS=""; FLOWS_DIR_EXISTS=""; BREADCRUMB_EXISTS=""
+  while IFS='=' read -r _key _val; do
+    case "$_key" in
+      INTENT_EXISTS)     INTENT_EXISTS="$_val" ;;
+      INVENTORY_EXISTS)  INVENTORY_EXISTS="$_val" ;;
+      FLOWS_DIR_EXISTS)  FLOWS_DIR_EXISTS="$_val" ;;
+      BREADCRUMB_EXISTS) BREADCRUMB_EXISTS="$_val" ;;
+    esac
+  done <<< "$SHAPE_OUT"
 fi
 
 # Breadcrumb-driven `resume` takes precedence (Q12.3 + Q31.3 stale check).
 if [ "$BREADCRUMB_EXISTS" = "yes" ]; then
   BC_OUT="$("$SCRIPT_DIR/flow-resume-breadcrumb.sh" read "$REPO_ROOT/docs/plans/.flow-phase-state.json")"
-  BC_STATUS="$(printf '%s\n' "$BC_OUT" | sed -n 's/^STATUS=//p')"
-  BC_STALE="$(printf '%s\n' "$BC_OUT" | sed -n 's/^STALE=//p')"
+  BC_STATUS=""; BC_STALE=""
+  while IFS='=' read -r _key _val; do
+    case "$_key" in
+      STATUS) BC_STATUS="$_val" ;;
+      STALE)  BC_STALE="$_val" ;;
+    esac
+  done <<< "$BC_OUT"
   if [ "$BC_STATUS" = "in_flight" ] && [ "$BC_STALE" = "no" ]; then
     echo "resume"
     exit 0
