@@ -241,6 +241,7 @@ Per-flow footprint: STUB ≈ ~5s; WRAP ≈ ~10-30s; EXTRACT ≈ ~30-90s + user g
 
 1. **Phase-transition gates (8 gates).** Fire between FDA orchestrator phases:
    - `env-ready` (→ preflight): Linear MCP reachable + repo root + `gh` auth (per Q12)
+   - `preflight-complete` (preflight → office-hours): `.flow/config.json` exists with required v1 fields (`linear_project_id`, `linear_project_name`, `linear_team_key`, `fda_first_setup_at`, `fda_plugin_version`) per Q12.4; structured preamble emitted per Q12.5. Maps to greenfield-orchestrator G1 gate per §3e ("bootstrap completed"). **Added per Q29 amendment 1 — see amendment entry below.**
    - `intent-exists` (office-hours → inventory): `docs/product/intent.md` exists with required sections (per Q41 — pending)
    - `inventory-complete` (inventory → linear-scaffold): `master-flow-inventory.md` exists with ≥1 domain section + verify-docs.sh orphan-flow-IDs check passes
    - `scaffold-complete` per domain (linear-scaffold → doc-author): `.flow/scaffold-log/<domain>.md` has rows for 1 milestone + N parents + 5N children, all `result: executed` or `skipped-idempotent`
@@ -270,6 +271,16 @@ Per-flow footprint: STUB ≈ ~5s; WRAP ≈ ~10-30s; EXTRACT ≈ ~30-90s + user g
 6. **`/flow:audit` reporting format.** Three-section markdown: (a) Phase status table; (b) Per-flow discipline-grid (5-column ✓/🚧/⏳/❌/—/⚠ per Q25 legend, one row per flow); (c) Cross-cutting consistency report (flat list); plus Summary line + Overrides section.
 
 7. **`verify-docs.sh` integration — leverage, don't duplicate.** `/flow:audit` runs verify-docs.sh FIRST (mechanical layer: build/lint/test, internal links, orphan flow IDs, front-matter presence, stale dates). Then layers FDA-specific gates on top. If verify-docs.sh fails: FDA-specific gates marked `skipped (verify-docs failed)`; user fixes mechanical issues first, re-runs `/flow:audit`. Keeps existing BriteBase infrastructure load-bearing.
+
+**Q29 amendment 1 — name the 8th phase-transition gate `preflight-complete` (LOCKED 2026-05-11 per BC-7066 reconciliation).** Q29 sub-decision 1 originally enumerated 7 phase-transition gate bullets despite the sub-decision header committing to "(8 gates)" and the Q29 lock entry's total-count line committing to "8 phase-transition + ~22 per-flow + 5 cross-cutting = 35 distinct gate types". /workflows:review of BC-6955 (PR #263) surfaced the gap via code-reviewer P3 + simplify-quality conf 9; validator subagent confirmed faithful-echo discipline ("fix should be filed against the source-of-truth, not the derivative") — see BC-6955 task-3 precedent at `docs/precedents/BC-6955.md`. This amendment adds the missing 8th gate for the preflight → office-hours transition:
+
+- `preflight-complete` (preflight → office-hours): `.flow/config.json` exists with required v1 fields (`linear_project_id`, `linear_project_name`, `linear_team_key`, `fda_first_setup_at`, `fda_plugin_version`) per Q12.4; structured preamble emitted per Q12.5 (`MODE / LINEAR_PROJECT_ID / LINEAR_PROJECT_NAME / REPO_ROOT / INTENT_EXISTS / INVENTORY_EXISTS / FLOWS_DIR_EXISTS / BREADCRUMB_EXISTS / GH_AUTH / LINEAR_MCP`).
+
+Name rationale: matches the dominant `<phase>-complete` naming convention used by 5 of the existing 8 gates (`inventory-complete`, `scaffold-complete`, `story-docs-complete`, `journey-complete`, `index-complete`). The artifact-existence check grounds in `.flow/config.json` per Q7's "filesystem-artifact-existence checks, NOT LLM self-report" philosophy. Maps cleanly onto greenfield-orchestrator G1 user-confirmation gate per §3e architecture overview ("bootstrap completed; `.flow/config.json` written"). The G1 user-gate and the Q29 `preflight-complete` artifact-gate are the same gate viewed from two layers — user-confirmation UX overlay (Q29 sub-decision 5 override mechanism) on top of artifact-existence check.
+
+Derivative re-sync follow-up: `plugins/flow-architecture/skills/_shared/artifact-gate-pattern.md:19` (the BC-6955 utility-kit derivative) faithfully echoes the original 7-bullet enumeration and `(8)` header. Sync to add the 8th bullet once BC-6955 PR #263 merges — tracked as a 1-line edit in a follow-up commit on a fresh branch or as part of any subsequent flow-architecture PR that touches the derivative.
+
+Schema-evolution discipline reinforced: Q29 amendment 1 follows Q31 amendments 1+2 + Q21 amendment 1 + Q24 amendment 1 precedent — explicit amendment-number + audit trail in the lock entry. Future Q29 amendments would be Q29 amendment 2+.
 
 **Q30 — Plugin manifest + directory structure (LOCKED 2026-05-06).** Plugin name: `flow-architecture`. Initial version: `0.1.0` (alpha; → `1.0.0` on first successful Brand Hub retrofit per Q8 acceptance test). Repo placement: `Brite-Nites/brite-claude-plugins/plugins/flow-architecture/` (alongside cadence + marketing + revops + workflows). Mirrors cadence structure with FDA-specific deltas. Nine sub-decisions:
 
