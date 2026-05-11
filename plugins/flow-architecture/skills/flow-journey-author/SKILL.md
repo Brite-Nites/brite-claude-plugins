@@ -164,8 +164,8 @@ Even greenfield `NOT_STARTED` stubs confirm flow IDs + personas + related_flows 
 
 1. Skill reads `state.scaffold_log` for all 5 domains -> 5 milestone BCs + N parent BCs + 5N children BCs.
 2. Skill reads `docs/product/flows/<domain>/*.md` for all 5 domains -> ~31 story docs total (authored by Q15).
-3. Skill fans out 5 background agents in parallel; each writes ONE journey doc.
-4. ~80s wall time.
+3. Skill fans out 5 background agents in parallel (all 5 fit in 1 batch under the ~10 concurrency cap per Section 2).
+4. ~60-90s wall time (5 domains in a single batch; matches the per-domain footprint anchor — `ceil(5/10) * ~90s = ~90s`).
 5. Mechanical layer: `bash scripts/verify-docs.sh` logs 0 errors.
 6. Narrative layer: 5 fidelity-review agents; 4 PASS, 1 flagged for missing `## Open questions` section.
 7. End-of-run summary: `flow-journey-author: 5/5 journeys authored, 1 narrative-drift flagged (tenancy missing Open questions).`
