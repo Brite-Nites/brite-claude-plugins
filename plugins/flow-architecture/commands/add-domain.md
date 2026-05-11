@@ -4,11 +4,11 @@ description: Incremental-add Flow-Driven Architecture orchestrator (whole new do
 
 # /flow:add-domain
 
-Heavier of the two incremental-add FDA orchestrators. Adds a whole new domain (1 milestone + N sub-flows + N story docs + 1 journey doc) under an existing FDA-shaped project. Runs **6 phases / 2 user-confirmation gates** per Q47 lock (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:742`): Phase 3 is a per-domain inner loop with `N=1` domain but N sub-flows inside, mirroring the Q37 hybrid control flow degenerated to N=1 domain (memory:743); Phases 4-5 are globally batched with N=1 domain (degenerate but consistent with the start-project sibling). Wall ≈ 10-30 min depending on sub-flow count.
+Heavier of the two incremental-add FDA orchestrators. Adds a whole new domain (1 milestone + N sub-flows + N story docs + 1 journey doc) under an existing FDA-shaped project. Runs **6 phases / 2 user-confirmation gates** per Q47 lock (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:745`): Phase 3 is a per-domain inner loop with `N=1` domain but N sub-flows inside, mirroring the Q37 hybrid control flow degenerated to N=1 domain (memory:756); Phases 4-5 are globally batched with N=1 domain (degenerate but consistent with the start-project sibling). Wall ≈ 10-30 min depending on sub-flow count.
 
 > **Scope:** UI-bearing builds only (CDR-023 partition). Non-UI-bearing work uses CDR-014's Phase Pattern, not FDA. `flow-preflight` performs upstream mode classification — `/flow:add-domain` runs only when mode resolves to `incremental-add`.
 
-> **DO NOT re-derive** the phase sequence, gate count + labels (`Q20.6`, `Q13.4` — NOT `G1`/`G2`), interactive-only invocation form, per-domain write-count formula `2+7N`, or per-phase failure matrix below. All seven Q47 sub-decisions are locked at memory:742+ with a refinement audit trail at memory:769. Q47 refinement 2 specifically corrected an earlier `G1/G2`-vs-`Q20.6/Q13.4` gate-labeling mistake — see memory:783 — do not reproduce it.
+> **DO NOT re-derive** the phase sequence, gate count + labels (`Q20.6`, `Q13.4` — NOT `G1`/`G2`), interactive-only invocation form, per-domain write-count formula `2+7N`, or per-phase failure matrix below. All seven Q47 sub-decisions are locked at memory:745+ with a refinement audit trail at memory:782. The `G1`/`G2` framing is a known mis-label that has appeared in earlier derivative drafts (and in this command's Linear issue body) — Q47 sub-decision 5 (memory:771) explicitly labels both gates by their owning sub-skill (`Q20.6` + `Q13.4`); use the sub-skill labels.
 
 ## Architecture overview
 
@@ -30,27 +30,27 @@ Heavier of the two incremental-add FDA orchestrators. Adds a whole new domain (1
                           stashed for Phase 5)
 ```
 
-> **Diagram note.** The `Q20.6` and `Q13.4` arrow labels above mark **within-skill gates** owned by the named sub-skill — they fire inside Phase 2 (Q20.6) and Phase 3 (Q13.4), not at the inter-phase boundary the horizontal arrow visually suggests. See § The 2 user gates for the full within-skill semantics. The visual placement is for layout only; the authoritative source is the gate descriptions in § The 2 user gates.
+> **Diagram note.** The `Q20.6` and `Q13.4` arrow labels above mark **within-skill gates** owned by the named sub-skill — they fire inside Phase 2 (Q20.6) and Phase 3 (Q13.4), not at the inter-phase boundary the horizontal arrow visually suggests. See § The 2 user gates for the full within-skill semantics (authoritative source for gate placement; the visual layout above is non-load-bearing).
 
 **AUTHORS `flow-journey-author`** (Q16, Phase 5) — THE substantive differentiator from the sibling `/flow:add-sub-flow` (which skips Q16 and emits a journey-staleness warning instead per Q47 sub-decision 5.5). Authoring fresh is the correct behavior here because the new domain has no pre-existing journey doc to clobber.
 
 **SKIPS `flow-legacy-cross-reference`** (Q14) per Q47 sub-decision 2 — incremental-add isn't a retrofit operation.
 
-> **Gate labeling note.** Both gates are within-skill and labeled by their sub-skill locks per Q47 sub-decision 5 (memory:758): **Q20.6** lives inside `flow-inventory-add`; **Q13.4** lives inside `flow-linear-scaffold`. Sibling commands `/flow:start-project` and `/flow:retrofit-project` use orchestrator-budget gate numbering (`G1`-`G4`, `G1`-`G5`) because Q10 (memory:48) is mode-aware on retrofit/greenfield budgets and silent on incremental-add. Q47 derives the incremental-add gate count from the underlying sub-skill locks instead (memory:776 confirmation). Q47 refinement 2 (memory:783) specifically corrected an earlier `G1/G2` mis-labeling — the gates are `Q20.6` + `Q13.4`, period.
+> **Gate labeling note.** Both gates are within-skill and labeled by their sub-skill locks per Q47 sub-decision 5 (memory:771): **Q20.6** lives inside `flow-inventory-add`; **Q13.4** lives inside `flow-linear-scaffold`. Sibling commands `/flow:start-project` and `/flow:retrofit-project` use orchestrator-budget gate numbering (`G1`-`G4`, `G1`-`G5`) because Q10 (memory:66) is mode-aware on retrofit/greenfield budgets and silent on incremental-add. Q47 derives the incremental-add gate count from the underlying sub-skill locks instead — Q47 refinement 6 (memory:789) confirms Q10's silence on incremental-add; Q47 refinement 2 (memory:785) further corrected drafter C's earlier 1+2 gate-count draft to the locked 2+2 (Q20.6 + Q13.4 per command).
 
 ## Invocation
 
 `/flow:add-domain [--force-incremental-add] [--resume]`
 
-**Interactive only — no positional args** per Q47 sub-decision 1 (memory:738). The new domain's code, display name, and sub-flow set are collected by the Q19-mini interview inside `flow-inventory-add` (domain-add mode per Q20 sub-decision 1, memory:226). A single-command shape with `subcommand`-style positional args was rejected at lock time — Q30.2 enumerates two distinct slash entries (`/flow:add-domain` + `/flow:add-sub-flow`) and Q47 commits to thin orchestrators over the underlying Q20 modes rather than re-litigating Q30.
+**Interactive only — no positional args** per Q47 sub-decision 1 (memory:749). The new domain's code, display name, and sub-flow set are collected by the Q19-mini interview inside `flow-inventory-add` (domain-add mode per Q20 sub-decision 1, memory:226). A single-command shape with `subcommand`-style positional args was rejected at lock time — Q30.2 enumerates two distinct slash entries (`/flow:add-domain` + `/flow:add-sub-flow`) and Q47 commits to thin orchestrators over the underlying Q20 modes rather than re-litigating Q30.
 
-`--force-incremental-add` flag (Q47 sub-decision 3, memory:751): bypasses the preflight mode-classifier check; surfaces a warning + writes an audit-log entry to the breadcrumb's `overrides[]` per Q29.5. Auto-redirect (silently running the recommended command instead of erroring) was rejected at lock time as too magical.
+`--force-incremental-add` flag (Q47 sub-decision 3, memory:764): bypasses the preflight mode-classifier check; surfaces a warning + writes an audit-log entry to the breadcrumb's `overrides[]` per Q29.5. Auto-redirect (silently running the recommended command instead of erroring) was rejected at lock time as too magical.
 
-`--resume` is documented for symmetry with sibling orchestrators; in practice the resume entry runs through `flow-preflight` (`MODE=resume`) and dispatches at `breadcrumb.current_phase` — see § Resume contract.
+`--resume`: see § Resume contract.
 
 ## Mode classifier integration
 
-`flow-preflight` MUST emit `MODE=incremental-add` for this command to proceed. Error redirects per Q47 sub-decision 3 (memory:746-749) — surface the recommended command but **do NOT auto-run** it:
+`flow-preflight` MUST emit `MODE=incremental-add` for this command to proceed. Error redirects per Q47 sub-decision 3 (memory:758-762) — surface the recommended command but **do NOT auto-run** it:
 
 - `MODE=greenfield` (no FDA artifacts present) — error:
   > "Project not yet initialized. Use `/flow:start-project` first."
@@ -167,22 +167,22 @@ Both gates are **within-skill** — the orchestrator does not fire its own `AskU
 
 - **`Q13.4`** (Phase 3 internal — `flow-linear-scaffold` pre-scaffold preview per Q13 lock memory:88):
 
-  Reviews the **2+7N planned Linear writes** for the single new domain per Q47 sub-decision 2 (memory:742; Q13 lock's per-domain formula `2 + 7N`):
+  Reviews the **2+7N planned Linear writes** for the single new domain per Q47 sub-decision 2 (memory:753; Q13 lock's per-domain formula `2 + 7N`):
 
   - 2 milestone-level writes: 1 milestone create + 1 milestone description write (Sub-flows table populated per Q22 schema).
   - 7 writes per sub-flow × N sub-flows: 1 parent issue + 5 discipline children (Story + Eng + Design + QA + Docs) + 1 children-summary comment per parent.
   - Total = `2 + 7N`.
 
-  Fires **regardless of N** (no trivial-preview suppression per Q47 refinement 2, memory:772 + 779). L3 review headlines from inside Q13 are already populated in each parent issue's `## L3 review summary` at preview time so the user sees discipline-grade signal before authorizing the writes.
+  Fires **regardless of N** (no trivial-preview suppression per Q47 refinement 2, memory:785). L3 review headlines from inside Q13 are already populated in each parent issue's `## L3 review summary` at preview time so the user sees discipline-grade signal before authorizing the writes.
 
 Q20.6 + Q13.4 do **NOT collapse** — they serve different review purposes (inventory content vs Linear scaffold preview); the user can edit between them.
 
-## Per-phase failure matrix (Q47 sub-decision 7 — verbatim from memory:767)
+## Per-phase failure matrix (Q47 sub-decision 7 — verbatim from memory:780)
 
 | Phase | Failure semantics |
 |---|---|
 | 1 | preflight fail-closed per Q36.5. No partial `.flow/config.json` on disk — atomic-rename guarantees absent-or-complete. |
-| 2 | Q20 hard-reject on duplicate per Q20.4 (memory:232 — domain code already exists): write breadcrumb at phase 2 entry → on hard-reject, mark `status: abandoned` with `reason: 'duplicate detected (Q20.4)'` for audit trail (per user lock 2026-05-07, memory:767). Consistent with Q31 lifecycle (Q31.3 accommodates abandoned status — future preflight offers discard); diverges from Q36.5's "no partial state" (which applies to bootstrap config-json, NOT breadcrumbs — different concerns). |
+| 2 | Q20 hard-reject on duplicate per Q20.4 (memory:232 — domain code already exists): write breadcrumb at phase 2 entry → on hard-reject, mark `status: abandoned` with `reason: 'duplicate detected (Q20.4)'` for audit trail (per user lock 2026-05-07, memory:780). Consistent with Q31 lifecycle (Q31.3 accommodates abandoned status — future preflight offers discard); diverges from Q36.5's "no partial state" (which applies to bootstrap config-json, NOT breadcrumbs — different concerns). |
 | 3 | per Q13.5 sub-flow-atomic recovery — failure isolated to one sub-flow inside the N-many. Orchestrator pauses inner loop for user adjudication (`AskUserQuestion`: retry / skip-sub-flow / abort). On user choice "retry" or "skip", inner loop resumes with the next pending sub-flow. |
 | 4 | per Q15.5 log + continue. Per-sub-flow failures within the N-doc batch surface in batch summary; orchestrator does NOT roll back since outputs are filesystem writes reviewable via `git diff` + `verify-docs.sh`. |
 | 5 | per Q16.5 log + continue. Single-domain journey author failure surfaces in batch summary. |
@@ -240,8 +240,6 @@ json.dump({
 PY
 ```
 
-The `<<'PY'` heredoc is single-quoted to disable shell expansion of the python body — see § Phase-exit breadcrumb update for the discrete-argument + single-quoted-heredoc discipline that applies to every subsequent breadcrumb write in this orchestrator.
-
 **No user gate after Phase 1.** Q47 sub-decision 5 locks both gates as within-skill (Q20.6 + Q13.4); Phase 1's only failure path is `flow-preflight`'s own fail-closed surface per Q36.5.
 
 **Failure semantics (Phase 1):** fail-closed per Q36.5. No partial `.flow/config.json`. Any failure inside `flow-preflight` surfaces verbatim with the remediation hint preflight emitted.
@@ -255,11 +253,14 @@ The `<<'PY'` heredoc is single-quoted to disable shell expansion of the python b
 **Inputs handed to the sub-skill:**
 
 - `mode: domain-add` — dispatches the heavier mode per Q20 sub-decision 1 (memory:226), running the Q19-mini interview (Phases 1+4+5 of Q19 for one domain only).
-- No positional pre-fills — the domain code, display name, and sub-flow set are collected entirely inside the Q19-mini interview per Q47 sub-decision 1 (memory:738).
+- No positional pre-fills — the domain code, display name, and sub-flow set are collected entirely inside the Q19-mini interview per Q47 sub-decision 1 (memory:749).
 
-**Boundary contract (Q47 sub-decision 4, memory:756): Q47 delegates to Q20 — the orchestrator NEVER edits inventory directly.** Q20 owns inventory append mechanics (memory:230 — append-only semantics; never rewrites existing rows; never renames IDs); the orchestrator only dispatches and observes. If the orchestrator detects a desired inventory change for the new domain mid-flight, it re-invokes Q20; it never edits inventory directly.
+**Boundary contract (Q47 sub-decision 4, memory:769): Q47 delegates to Q20 — the orchestrator NEVER edits inventory directly.** Q20 owns inventory append mechanics (memory:230 — append-only semantics; never rewrites existing rows; never renames IDs); the orchestrator only dispatches and observes. If the orchestrator detects a desired inventory change for the new domain mid-flight, it re-invokes Q20; it never edits inventory directly.
 
-**Pre-write breadcrumb stub:** before invoking the sub-skill, write a breadcrumb following the canonical § Phase-exit breadcrumb update pattern. The helper script reads stdin as a **complete** JSON document — it does NOT merge with the on-disk state — so the python3 heredoc MUST include every canonical field. Specifically: preserve `version`, `mode: incremental-add`, `linear_project_id`, `linear_project_name`, `linear_team_key`, `run_started_at`, and `status: in_flight` from the Phase 1 write; set `current_phase: 2`, `completed_phases: ["1"]`, `last_updated: <now>`; and populate `domains[0]` once the Q19-mini interview captures the target domain slug — until then keep `domains: []` so a Q20.4 duplicate hard-reject has a complete-schema breadcrumb to mark `abandoned` against. After the Q19-mini interview captures the new domain slug, refresh the breadcrumb with `domains: [{slug: <target_domain>, scaffold_state: "pending", failure_reason: null, parent_issue_ids: [], milestone_id: null, new_sub_flow_count: <N>}]`.
+**Pre-write breadcrumb stub (two writes inside Phase 2):** the helper script reads stdin as a **complete** JSON document — it does NOT merge with the on-disk state — so each python3 heredoc MUST include every canonical field per § Phase-exit breadcrumb update. Two distinct writes inside Phase 2:
+
+- **Write 2a — pre-Q19-mini, on Phase 2 entry:** `current_phase: 2`, `completed_phases: ["1"]`, `domains: []`. This ensures a Q20.4 duplicate hard-reject during the interview has a complete-schema breadcrumb to mark `abandoned` against.
+- **Write 2b — post-Q19-mini-interview, pre-Q20.6:** refresh `domains` to `[{slug: <target_domain>, scaffold_state: "pending", failure_reason: null, parent_issue_ids: [], milestone_id: null, new_sub_flow_count: <N>}]`.
 
 **Run:** dispatch `flow-inventory-add` (domain-add mode). The sub-skill:
 
@@ -276,7 +277,7 @@ The `<<'PY'` heredoc is single-quoted to disable shell expansion of the python b
 
 **Capture into state:** `state.target_domain` (final slug), `state.target_domain_display` (final display name), `state.new_sub_flow_ids[]` (the N sub-flow IDs the Q19-mini interview produced), `state.inventory_changed = true`, `state.l2_review_<target_domain>`, `state.domains[0]` populated.
 
-**Breadcrumb update at end of Phase 2:** `current_phase: 3`, `completed_phases: ["1", "2"]`, `domains[0].scaffold_state: "pending"`, `domains[0].new_sub_flow_count: <N>` (Phase 3 will flip `scaffold_state` to `in_progress` → `completed` and populate `milestone_id` + `parent_issue_ids`).
+**Breadcrumb update (end of Phase 2):** per § Phase-exit; next phase is `3`. Phase 3 will flip `domains[0].scaffold_state` from `pending` → `in_progress` → `completed` and populate `milestone_id` + `parent_issue_ids`.
 
 **Failure semantics (Phase 2):** Q20 hard-reject on duplicate per Q20.4 (memory:232 — domain code already has a section). If proposed `<DOMAIN>` already exists as an H3 section, Q20 surfaces a clear error citing line number + redirecting to `/flow:add-sub-flow` (per Q20.4 lock text: "use /flow:add-sub-flow instead") + aborts.
 
@@ -294,7 +295,7 @@ User-cancel at Q20.6 → no write; clean exit; breadcrumb `status: abandoned` (t
 
 This phase mirrors the sibling greenfield Phase-4 per-domain inner loop degenerated to N=1 domain — but the new domain has N sub-flows inside, so the per-sub-flow L3 review + atomic recovery semantics still apply across the N sub-flows. Q13.5's sub-flow-atomic failure recovery semantics + Q13.4's per-domain preview content apply unchanged.
 
-**Per-domain footprint** (Q13 lock + Q47 sub-decision 2 explicit formula, memory:742):
+**Per-domain footprint** (Q13 lock + Q47 sub-decision 2 explicit formula, memory:753):
 
 - 1 milestone create (the new domain milestone)
 - 1 milestone description write (populating the Sub-flows table per Q22 schema)
@@ -302,7 +303,7 @@ This phase mirrors the sibling greenfield Phase-4 per-domain inner loop degenera
 - 5N discipline children (Story + Eng + Design + QA + Docs × N sub-flows)
 - N children-summary comments (one per parent)
 
-Total: **`2 + 7N` Linear writes** for the new domain (Q47 sub-decision 2 explicit lock; Q13 lock's per-domain formula). The 2 milestone-level writes plus 7 per-sub-flow writes (1 parent + 5 children + 1 children-summary comment) × N sub-flows = `2 + 7N`. Carry the formula symbolically through the preview — substitute `N` with the actual count at runtime.
+Total: **`2 + 7N` Linear writes** for the new domain (Q47 sub-decision 2 explicit lock; Q13 lock's per-domain formula — the bullets above sum to `2 + N + 5N + N = 2 + 7N`). Carry the formula symbolically through the preview — substitute `N` with the actual count at runtime.
 
 ### 3.1 L3 review fires INSIDE flow-linear-scaffold (before Q13.4 preview)
 
@@ -314,7 +315,7 @@ L3 review output is stashed in `state.l3_review[<sub-flow-id>]` for the duration
 
 After the L3 reviews fire (one per sub-flow) + per-domain preview content is computed, Q13 fires the **Q13.4 within-skill preview gate** showing the `2+7N` planned Linear writes. The orchestrator does NOT fire this `AskUserQuestion` itself — Q13 owns the prompt. The preview content is computed deterministically from inventory + parent issue numbering (next available BC-NNNN per project) up front; user authorization at Q13.4 covers the whole-domain batch.
 
-Q13.4 fires **regardless of N** per Q47 refinement 2 (memory:772 + 779) — there is no trivial-preview suppression at this lock; the gate is mandatory.
+Q13.4 fires **regardless of N** per Q47 refinement 2 (memory:785) — there is no trivial-preview suppression at this lock; the gate is mandatory.
 
 ### 3.3 Execution with Q13.5 atomic recovery (per sub-flow inside N)
 
@@ -333,9 +334,9 @@ On milestone-create failure (the first of the 2 milestone-level writes), Q13 ret
 
 After all N sub-flows processed (any combination of completed / failed / skipped), mark `breadcrumb.domains[0].scaffold_state = "completed"` if all N succeeded, or `"failed"` with `failure_reason` set if any failed without skip-and-continue. Capture `milestone_id` + the populated `parent_issue_ids[]`.
 
-**Breadcrumb update at end of Phase 3:** `current_phase: 4`, `completed_phases: ["1", "2", "3"]`, `domains[0].scaffold_state: "completed"` (or `"failed"`), `domains[0].milestone_id: "<id>"`, `domains[0].parent_issue_ids: [...]`.
+**Breadcrumb update (end of Phase 3):** per § Phase-exit; next phase is `4`. Additionally set `domains[0].scaffold_state` to `"completed"` (or `"failed"`), `domains[0].milestone_id`, and `domains[0].parent_issue_ids`.
 
-**Failure semantics (Phase 3):** per Q13.5 sub-flow-atomic recovery (memory:778). Q13 retry / skip / abort `AskUserQuestion` per failed sub-flow honors the Gate-respect contract.
+**Failure semantics (Phase 3):** per Q13.5 sub-flow-atomic recovery (memory:780). Q13 retry / skip / abort `AskUserQuestion` per failed sub-flow honors the Gate-respect contract.
 
 ---
 
@@ -359,7 +360,7 @@ This phase invokes `flow-doc-author` ONCE with the new domain's N sub-flows. Thi
 
 **No gate.** Q15.6 locks 0 sync gates for Phase 4. The phase runs to completion (or partial-with-batch-summary) and dispatches to Phase 5.
 
-**Breadcrumb update:** `current_phase: 5`, `completed_phases: ["1", "2", "3", "4"]`.
+**Breadcrumb update (end of Phase 4):** per § Phase-exit; next phase is `5`. No phase-specific delta fields.
 
 **Failure semantics (Phase 4):** log + continue per Q15.5. Partial Q15 failures surface in batch summary; outputs are filesystem writes reviewable via `git diff` + `bash scripts/verify-docs.sh`.
 
@@ -385,7 +386,7 @@ This phase invokes `flow-journey-author` ONCE for the new domain. This is the su
 
 **No gate.** Q16.6 locks 0 sync gates for Phase 5.
 
-**Breadcrumb update:** `current_phase: 6`, `completed_phases: ["1", "2", "3", "4", "5"]`.
+**Breadcrumb update (end of Phase 5):** per § Phase-exit; next phase is `6`. No phase-specific delta fields.
 
 **Failure semantics (Phase 5):** log + continue per Q16.5. Same shape as Phase 4.
 
@@ -446,7 +447,7 @@ The breadcrumb append is the **last step** of a phase, after all of the phase's 
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:742` — Q47 lock (canonical source; seven sub-decisions + refinement audit trail at line 769). Sub-decision 1 at line 736-738 locks the interactive-only invocation form; sub-decision 4 at line 753-756 locks the `delegates to Q20 — never edits inventory` boundary.
+- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:745` — Q47 lock (canonical source; seven sub-decisions + refinement audit trail at line 782). Sub-decision 1 at line 747-749 locks the interactive-only invocation form; sub-decision 4 at line 766-769 locks the `delegates to Q20 — never edits inventory` boundary.
 - `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:224` — Q20 lock (sub-skill ownership boundary; sub-flow-add vs domain-add modes; Q19-mini interview; Q20.4 hard-reject; Q20.6 within-skill gate; Q20.7 `inventory_changed` flag).
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` §3c — plugin command surface (where this command sits in the ~17-command catalog).
 - `plugins/flow-architecture/commands/add-sub-flow.md` — sibling incremental-add orchestrator (BC-6965; 5 phases / 2 gates / skips journey-author; this command is the heavier 6-phase variant that authors the new journey doc).
