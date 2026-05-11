@@ -49,10 +49,11 @@ Greenfield SKIPS `flow-legacy-cross-reference` (Q14) — that's retrofit-only. R
 
 The orchestrator writes phase progress to `docs/plans/.flow-phase-state.json` (Q31.4 lock — note the **leading dot** on the filename; NOT `.flow/phase-state.json`) after every phase completion. Writes go through `bash $CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh write` (BC-6956 shipped) — atomic-rename via mktemp + python3 json.dump + parse-verify + content-match per Q31.5 lock. Never write the breadcrumb file directly with a heredoc.
 
-Breadcrumb shape (per Q31.4):
+Breadcrumb shape (per Q31.4 — the `last_updated` field name is load-bearing: `scripts/flow-resume-breadcrumb.sh read` keys on it for stale detection, so writing `updated_at` would silently skip staleness checks):
 
 ```json
 {
+  "version": "1",
   "mode": "greenfield",
   "linear_project_id": "<uuid from .flow/config.json>",
   "linear_project_name": "<string from .flow/config.json>",
@@ -69,7 +70,7 @@ Breadcrumb shape (per Q31.4):
     }
   ],
   "status": "in_flight",
-  "updated_at": "<ISO-8601 refreshed each write>"
+  "last_updated": "<ISO-8601 refreshed each write>"
 }
 ```
 
@@ -161,12 +162,13 @@ Phases 5/6/7 run without further orchestrator gates per Q15.6 / Q16.6 / Q18.8 lo
 
 **Sub-skill:** `flow-preflight` (Q12 + Q36 embedded 7-step bootstrap; BC-6957 shipped at `plugins/flow-architecture/skills/flow-preflight/SKILL.md`).
 
-**Pre-flow-preflight setup:** the orchestrator owns the `LINEAR_ISSUE_COUNT` env-var per flow-preflight Section 6.4 ownership note. Before dispatch:
+**Pre-flow-preflight setup:** the orchestrator owns the `LINEAR_ISSUE_COUNT` env-var per flow-preflight Section 6.4 ownership note. Before dispatching the skill:
 
-```bash
-LINEAR_ISSUE_COUNT="$(... list_issues scoped to candidate project, limit: 10 ...)"
-export LINEAR_ISSUE_COUNT
-```
+1. Call the Linear MCP `mcp__plugin_workflows_linear-server__list_issues` with `{project: <candidate project_id from .flow/config.json>, limit: 10}`.
+2. Count the returned items as an integer (0–10).
+3. `export LINEAR_ISSUE_COUNT=<integer>` so flow-preflight Section 6.4 picks it up.
+
+Treat the captured integer as data only — never interpolate any Linear-derived field (issue titles, project name, descriptions) into a shell expression, `bash -c`, `eval`, or unquoted `$(...)`. Only the integer count crosses into env. The MCP call is the trust boundary; values from the MCP response stay inside the LLM context, never inside a shell pipeline.
 
 The `limit: 10` cap aligns with Q36.3 step-4's threshold-IS-the-cap semantics — a returned count of exactly 10 means "≥ 10" (no pagination needed). If the candidate project isn't yet known (first-ever run with no `.flow/config.json`), pass `LINEAR_ISSUE_COUNT=` (empty) and flow-preflight degrades to `greenfield` by default per Section 6.4.
 
@@ -192,15 +194,29 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
 - `INTENT_EXISTS`, `INVENTORY_EXISTS`, `FLOWS_DIR_EXISTS`, `BREADCRUMB_EXISTS` (all `no` for fresh greenfield)
 - `GH_AUTH`, `LINEAR_MCP` (orchestrator already probed Linear in flow-preflight Section 1.1)
 
-**Initial breadcrumb write:** at end of Phase 1, set `run_started_at` (ISO-8601 now), `current_phase: 2`, `completed_phases: ["1"]`, `status: in_flight`, empty `domains: []`. Dispatch:
+**Initial breadcrumb write:** at end of Phase 1, write the breadcrumb with `run_started_at` (ISO-8601 now), `current_phase: 2`, `completed_phases: ["1"]`, `status: in_flight`, empty `domains: []`.
+
+The helper script `flow-resume-breadcrumb.sh write <path>` reads the full JSON document from stdin (per BC-6956 contract; it does not take `--mode` / `--current-phase` / `--status` flags). Construct the JSON via python3 (stdlib only per Q32) and pipe it:
 
 ```bash
-bash "$CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh" write \
-  --mode greenfield \
-  --current-phase 2 \
-  --completed-phases 1 \
-  --status in_flight
+BREADCRUMB_PATH="$REPO_ROOT/docs/plans/.flow-phase-state.json"
+python3 <<'PY' | bash "$CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh" write "$BREADCRUMB_PATH"
+import json, sys, datetime
+now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+json.dump({
+    "version": "1",
+    "mode": "greenfield",
+    "status": "in_flight",
+    "run_started_at": now,
+    "last_updated": now,
+    "current_phase": "2",
+    "completed_phases": ["1"],
+    "domains": [],
+}, sys.stdout)
+PY
 ```
+
+The `<<'PY'` heredoc is single-quoted so the inner python source is not subject to shell variable expansion — Linear-derived strings cannot land here as injection vectors. The breadcrumb path is passed as a discrete argument to the helper (never spliced into a `bash -c` string).
 
 ### Gate G1 (1→2)
 
@@ -453,8 +469,8 @@ Every phase ends with a breadcrumb update so resume can reason about what's comp
 1. Append the phase number to `breadcrumb.completed_phases` (in order).
 2. Set `breadcrumb.current_phase` to the next phase number (or leave at `8` after Phase 8).
 3. Set `breadcrumb.status` (`in_flight` until Phase 8 terminator; then `completed`).
-4. Refresh `breadcrumb.updated_at` with the current ISO-8601 timestamp.
-5. Persist via `bash $CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh write ...` (BC-6956 helper; Q31.5 atomic-rename).
+4. Refresh `breadcrumb.last_updated` with the current ISO-8601 timestamp (NOT `updated_at` — the helper script's stale-detection in `read` mode keys on `last_updated`; writing the wrong field name would silently break staleness checks).
+5. Persist via the BC-6956 helper. The helper `write` subcommand takes a positional `<path>` argument and reads the full JSON document from stdin — see the Phase 1 example for the canonical python3-to-stdin form. Construct dynamic values inside a single-quoted python heredoc (`<<'PY'`) so Linear-derived strings cannot expand into the shell; pass `$BREADCRUMB_PATH` as a discrete argument to the helper (never inside `bash -c` or an unquoted `$(...)`).
 
 The breadcrumb append is the **last step** of a phase, after all of the phase's artifacts (intent.md / inventory / Linear writes / story docs / journey docs / INDEX) have landed. Writing the breadcrumb earlier would let a killed session resume with a phase marked "complete" but artifact missing.
 
