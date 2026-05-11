@@ -7,7 +7,7 @@ ported: 2026-04-24
 
 # Fit Scoring Prompt
 
-Claude Haiku uses this prompt (via `scripts/tier_and_segment.py`) to classify each enriched company into tier A / B / C.
+Claude Haiku uses this prompt (via the `icp-scoring` skill's `abc` rubric — see `plugins/marketing/skills/icp-scoring/SKILL.md` §Methodology) to classify each enriched company into tier A / B / C.
 
 ---
 

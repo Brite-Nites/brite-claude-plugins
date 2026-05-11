@@ -32,11 +32,11 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 | `spider_crawl.py` | `scripts/spider_crawl.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7050) — see § Local deviations |
 | `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
-| `tier_and_segment.py` | `scripts/tier_and_segment.py` | Verbatim (+ 5-line `#` header after shebang) |
+| `tier_and_segment.py` | `scripts/tier_and_segment.py` | **Removed** per BC-6907 — see § Local deviations |
 | `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header) + endpoint-drift fixes (BC-7011) — see § Local deviations |
 | `discolike-mcp.js` | `scripts/discolike-mcp.js` | Verbatim (+ 5-line `//` header + verification comment for BC-7011 — no functional drift) |
 | `package.json` | `scripts/package.json` | Verbatim (+ top-level `_source` + `_license` + `_ported` JSON fields — see § JSON attribution exception) |
-| `requirements.txt` | `scripts/requirements.txt` | Verbatim (+ 5-line `#` header prepended) |
+| `requirements.txt` | `scripts/requirements.txt` | Verbatim (+ 5-line `#` header) + local change (BC-6907) — see § Local deviations |
 
 ## JSON attribution exception
 
@@ -86,6 +86,23 @@ Auth header (`Authorization: Bearer ${SPIDER_API_KEY}`) is unchanged — the MCP
 **Validated:** live round-trip through `bw-run.sh` against `https://stripe.com` returned `EXIT=0`, `1/1 crawled in 3.2s`, `crawl.pages=5`, 8000-char markdown payload (output truncated by the script's existing `[:8000]` slice). Pre-fix the same invocation returned `0/1 crawled` + `crawl_error: status 401`.
 
 **Re-port action:** if a future upstream pull at a newer SHA includes the same `/crawl` + `application/jsonl` + JSONL-parse shape, drop this local diff and remove this section. If upstream still uses `/v1/crawl` + single-JSON parsing, re-apply this section's three line changes on top of the new upstream body.
+
+### `tier_and_segment.py` — removed in favor of in-session skill (BC-6907)
+
+Upstream ships `scripts/tier_and_segment.py` as a Python CLI that calls Anthropic Haiku directly to classify each verified record into tier A/B/C and split catch-all into a separate segment. The script is the only piece of the tam-map port whose runtime credential is an Anthropic credential rather than a third-party vendor credential — and it runs inside a Claude Code session where Claude is already executing, so spawning a subprocess to call Claude through a separate credential is architecturally redundant.
+
+Per Anthropic Agent SDK semantics, CLI subprocesses do not inherit the parent Claude Code session's auth, and there is no documented session-reuse pattern. The blessed pattern is to run work that needs Claude as a **skill** in the parent agent context.
+
+Brite removes the script and folds its responsibility into the existing `icp-scoring` skill's `abc` rubric (already implemented at `plugins/marketing/skills/icp-scoring/SKILL.md` §Methodology dual-mode rubric → `abc`). `tam-mapping` Phase 7 invokes `icp-scoring --rubric abc` against the same `verified-flat.csv` input the script consumed, with the same `tier-{a,b,c}.csv` + `catch-all.csv` output contract. The Haiku prompt template (`fit-scoring.md`) is unchanged — it is the canonical source the skill reads at runtime.
+
+**Net effect:**
+
+- `plugins/marketing/scripts/tam-map/tier_and_segment.py` deleted.
+- `anthropic>=0.40.0` dropped from `requirements.txt` (header `Changes:` line updated accordingly — see the file).
+- `plugins/marketing/scripts/tam-map/spider_crawl.py` line 32 dead `ANTHROPIC_API_KEY = os.getenv(...)` removed alongside; module docstring updated to drop the stale "summarizes via Claude Haiku" claim the file never actually implemented. Header `Changes:` line records both BC-7050 + BC-6907.
+- The eighth Brite tam-map runtime credential is eliminated; only the seven vendor credentials remain. Vault cleanup is an admin step documented in the BC-6907 PR description.
+
+**Re-port action:** if a future upstream pull at a newer SHA still ships `scripts/tier_and_segment.py`, do not re-introduce the script — let it stay in upstream and continue absorbing its body into `icp-scoring` `abc` mode (prompt-only changes re-port to `fit-scoring.md`).
 
 ### `aiark-mcp.js` — endpoint drift fixes (BC-7011)
 

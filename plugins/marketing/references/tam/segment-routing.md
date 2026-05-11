@@ -13,7 +13,7 @@ How to route the 4 output CSVs to your sender infrastructure.
 
 ## The segments
 
-`tier_and_segment.py` emits four CSVs per run:
+The `icp-scoring` skill's `abc` rubric emits four CSVs per run (delegated from `tam-mapping` Phase 7; previously emitted by `scripts/tier_and_segment.py` — removed per BC-6907):
 
 | File | What it contains | Routing |
 |------|------------------|---------|
@@ -59,4 +59,4 @@ Most tools (EmailBison, Smartlead, Instantly, Lemlist, etc.) accept CSV with the
 email, first_name, last_name, company, domain, title, linkedin_url, phone, tier
 ```
 
-`tier_and_segment.py` writes exactly this shape. Custom variables (`tier`, `domain`) flow through as merge fields if your sender supports it.
+The `icp-scoring` skill (`abc` rubric) writes the input row shape plus a `tier` column — so when fed `tam-mapping`'s `verified-flat.csv` (6 firmographic columns), the tier CSVs carry firmographic + tier only. For the full contact-level upload shape including `email`/`first_name`/`title`/`linkedin_url`/`phone`, consume `list-building`'s `enriched_leads.csv` (BC-2717) and join on `domain` — that's the two-feeder split documented in `plugins/marketing/skills/tam-mapping/SKILL.md` § "Note on the two icp-scoring upstream feeders." Custom variables (`tier`, `domain`) flow through as merge fields if your sender supports it.

@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, AskUserQuestion
 
 Execute the phases below sequentially. Use `AskUserQuestion` at each numbered checkpoint so the user explicitly acknowledges each step before moving on. If they answer anything other than the "proceed" option, halt and help with their blocker before re-asking.
 
-Seven third-party API keys total: `SPIDER_API_KEY`, `AIARK_API_KEY`, `DISCOLIKE_API_KEY`, `ICYPEAS_API_KEY`, `BLITZAPI_KEY`, `PROSPEO_API_KEY`, `MILLIONVERIFIER_API_KEY`. Three MCPs are plugin-scoped: `spider`, `aiark`, `discolike`. Four other providers (IcyPeas, BlitzAPI, Prospeo, MillionVerifier) are CLI-only — they ship as Python scripts under `plugins/marketing/scripts/tam-map/`. (Note: `ANTHROPIC_API_KEY` previously belonged to this set; its elimination is tracked separately as BC-6907 and is not managed by this command.)
+Seven third-party API keys total: `SPIDER_API_KEY`, `AIARK_API_KEY`, `DISCOLIKE_API_KEY`, `ICYPEAS_API_KEY`, `BLITZAPI_KEY`, `PROSPEO_API_KEY`, `MILLIONVERIFIER_API_KEY`. Three MCPs are plugin-scoped: `spider`, `aiark`, `discolike`. Four other providers (IcyPeas, BlitzAPI, Prospeo, MillionVerifier) are CLI-only — they ship as Python scripts under `plugins/marketing/scripts/tam-map/`.
 
 Pattern: plugin-scoped stdio MCPs + Bitwarden-backed credential broker (`plugins/marketing/scripts/bw-run.sh`). The wrapper resolves each `KEY=tam-map-<item>` argument against the Engineering vault at every spawn and `exec`s the wrapped command. Vault is the single source of truth — rotated values reach a running MCP only on its next process spawn, which currently means re-launching Claude Code (`/reload-plugins` reloads plugin metadata but does NOT re-spawn MCP server processes; measured BC-6906 T14). Pre-req: `BW_SESSION` exported in the shell that launches Claude Code. For background see `docs/research/tam-map-port-policy.md` § 1, `docs/designs/BC-6906-bw-run-prod-migration.md`, and `CONTRIBUTING.md § Plugin secret-config canon`.
 
@@ -210,14 +210,14 @@ If any errors with `401` / `403` / `Invalid API key`, the Bitwarden item value i
 The other four providers ship as Python scripts. Check they parse `--help`:
 
 ```bash
-for s in icypeas_client.py spider_crawl.py enrich_waterfall.py verify_smtp.py tier_and_segment.py; do
+for s in icypeas_client.py spider_crawl.py enrich_waterfall.py verify_smtp.py; do
   python3 plugins/marketing/scripts/tam-map/$s --help >/dev/null 2>&1 && echo "✓ $s" || echo "✗ $s"
 done
 ```
 
-All five must print `✓`. The `--help` smoke catches **import-time failures only**: missing Python deps, syntax errors, broken argparse setup. It does NOT catch missing env vars — `argparse` runs before the script body's `os.getenv()` lookups, so a script can pass `--help` cleanly and still fail at real invocation if its env var is missing or its Bitwarden item is empty. For end-to-end env-var coverage, either invoke each script via `bw-run.sh` against a one-shot test input or rely on Phase 3b's MCP tool probes (which exercise the full credential round-trip for spider/aiark/discolike).
+All four must print `✓`. The `--help` smoke catches **import-time failures only**: missing Python deps, syntax errors, broken argparse setup. It does NOT catch missing env vars — `argparse` runs before the script body's `os.getenv()` lookups, so a script can pass `--help` cleanly and still fail at real invocation if its env var is missing or its Bitwarden item is empty. For end-to-end env-var coverage, either invoke each script via `bw-run.sh` against a one-shot test input or rely on Phase 3b's MCP tool probes (which exercise the full credential round-trip for spider/aiark/discolike).
 
-If any of the 5 `--help` checks fails:
+If any of the 4 `--help` checks fails:
 
 - Missing Python deps → `python3 -m pip install -r plugins/marketing/scripts/tam-map/requirements.txt`.
 - Script-level error → open the script, read the error message; the wrappers ship verbatim from upstream tam-map@`9f5c72e74b` so a runtime error likely means an upstream bug.
@@ -233,7 +233,7 @@ If a script's `--help` passes but a real invocation fails with a missing-env-var
 Claude Code's plugin auto-updater publishes a fresh marketplace clone whenever a new `marketing` plugin version ships (e.g., `~/.claude/plugins/cache/brite-claude-plugins/marketing/0.3.29/` flips to `0.3.30/`). The new clone arrives **WITHOUT** `node_modules/` AND WITHOUT `.venv/`, even if you installed them in the prior version's directory or in a dev worktree. Symptoms:
 
 - `aiark` or `discolike` MCPs report `✗ Failed to connect` with `Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@modelcontextprotocol/sdk'`.
-- Python CLI scripts (`icypeas_client.py`, `spider_crawl.py`, `enrich_waterfall.py`, `verify_smtp.py`, `tier_and_segment.py`) fail with `ModuleNotFoundError` for `requests` / `aiohttp` / `dotenv` / `anthropic`.
+- Python CLI scripts (`icypeas_client.py`, `spider_crawl.py`, `enrich_waterfall.py`, `verify_smtp.py`) fail with `ModuleNotFoundError` for `requests` / `aiohttp` / `dotenv`.
 
 If you see either symptom after no intentional config change, this is almost always the cause.
 

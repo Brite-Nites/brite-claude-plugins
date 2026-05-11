@@ -88,7 +88,7 @@ Skill authors: do not call Spider from Brite Nites Supply-vertical workflows wit
 ## Related skills
 
 - **Primary consumers:** `tam-mapping` (BC-5832, Phase 3c web crawl), `icp-scoring` (BC-5831, optional research-time tech-signal lookup).
-- **Upstream / downstream:** Spider consumes domain lists from AI Ark / IcyPeas / Discolike; emits crawl output to the fit-scoring prompt via `tier_and_segment.py`.
+- **Upstream / downstream:** Spider consumes domain lists from AI Ark / IcyPeas / Discolike; emits crawl output to the fit-scoring prompt via the `icp-scoring` skill (`abc` rubric).
 - **Alternatives:** Apify (considered, heavier footprint), Firecrawl (comparable, rejected pre-tam-map due to earlier Brite experience). Spider is the standing choice.
 
 ## Last verified
