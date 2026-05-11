@@ -1,8 +1,8 @@
 # Four-Mode Scope-Review Framework
 
-Shared review-outcome contract cribbed from gstack `plan-ceo-review`. Establishes the four scope-axis recommendations each FDA reviewer agent returns, and the input/output shape consumer skills parse. This file is a **contract**, not executable code — Q21's seven four-mode reviewer agents implement it; Q42 / Q13 / Q43 / Q47 / `inventory-interview` consume it.
+Shared review-outcome contract cribbed from gstack `plan-ceo-review`. Establishes the four scope-axis recommendations each FDA reviewer agent returns, and the input/output shape consumer skills parse. This file is a **contract**, not executable code — Q21's seven four-mode reviewer agents implement it; Q42 / Q13 / Q43 / Q47 / `flow-inventory-interview` consume it.
 
-Verified against gstack source via `gh api repos/garrytan/gstack/contents/plan-ceo-review/SKILL.md` on 2026-05-07. Drafter C initially cribbed an imagined verdict-axis taxonomy (APPROVED/ADJUSTED/REWORK/CLARIFY); orchestrator caught the divergence. The taxonomy below is the verified scope-axis source.
+Verified against gstack source via `gh api repos/garrytan/gstack/contents/plan-ceo-review/SKILL.md` on 2026-05-07. Drafter C initially cribbed an imagined verdict-axis taxonomy (APPROVED/ADJUSTED/REWORK/CLARIFY); orchestrator caught the divergence; the gh-api verification revealed the actual scope-axis taxonomy locked below. Re-verify whenever this file or Q48 is amended (parking-lot #39).
 
 ## Critical clarification
 
@@ -10,11 +10,11 @@ Verified against gstack source via `gh api repos/garrytan/gstack/contents/plan-c
 
 ## The four modes
 
-Each reviewer returns exactly one mode per invocation. Mutually exclusive. ALL_CAPS_WITH_UNDERSCORES matches gstack source convention for the structured contract.
+Each reviewer returns exactly one mode per invocation. Mutually exclusive. `ALL_CAPS_WITH_UNDERSCORES` matches the gstack source convention for the structured contract.
 
 - **`SCOPE_EXPANSION`** — agent recommends expanding scope; "dream bigger". Used when current scope feels under-ambitious for the opportunity.
 - **`SELECTIVE_EXPANSION`** — agent recommends holding overall scope but cherry-picking specific expansions. Hybrid: keep core + add specific high-value items.
-- **`HOLD_SCOPE`** — agent recommends keeping scope as-is; focus on execution rigor. Default for sound plans where the question is "execute well" not "rethink scope".
+- **`HOLD_SCOPE`** — agent recommends keeping scope as-is; focus on execution rigor. Default for sound plans where the question is "execute well", not "rethink scope".
 - **`SCOPE_REDUCTION`** — agent recommends stripping scope to essentials. Used when current scope feels over-ambitious or unfocused.
 
 ## Founder-mode framing
@@ -23,11 +23,11 @@ Cribbed verbatim from gstack source (verified 2026-05-07):
 
 > CEO/founder-mode plan review. Rethink the problem, find the 10-star product, challenge premises, expand scope when it creates a better product.
 
-This framing applies to `plan-ceo-reviewer` invocations; other reviewer agents adapt the framing to their perspective while preserving the scope-axis taxonomy.
+This framing applies directly to `plan-ceo-reviewer` invocations; other reviewer agents adapt the framing to their perspective while preserving the scope-axis taxonomy.
 
 ## Interface
 
-Closed enum for context fields (mirrors Q46's type-registry pattern). New fields require Q48 amendment with audit trail. The verbatim signature, copied from the Q48 lock (memory:1190-1216):
+Verbatim signature from Q48 sub-decision 3 (`docs/design-rationale/project_fda_plugin_interview.md:1201-1227`). Closed enum for `context` fields mirrors Q46's type-registry pattern; new fields require a Q48 amendment with audit trail. Do NOT re-derive — copy from canonical memory:
 
 ```typescript
 review_input = {
@@ -51,17 +51,17 @@ review_output = {
   reductions?: string[],                           // present iff mode == SCOPE_REDUCTION
   rigor_focus?: string[],                          // present iff mode == HOLD_SCOPE
   rationale?: string[],                            // optional; explanation for chosen mode
-  adjustments?: string[],                          // REFRAMED per refinement 7 lock — see "Adjustments reframed" below
+  adjustments?: string[],                          // REFRAMED per refinement 7 lock — see "Adjustments reframed"
   strategic_concerns?: string[],                   // plan-ceo-reviewer specific (Q21:400)
   ergonomic_concerns?: string[]                    // plan-devex-reviewer specific (Q21:401)
 }
 ```
 
-Soft-warn on headline < 50 words matches Q41's locked discipline. Do NOT re-derive this signature; the spec lives at Q48 sub-decision 3 (memory:1189-1218).
+Soft-warn on `headline` < 50 words matches Q41's locked discipline.
 
 ## Mode-specific field rules
 
-Per Q48 sub-decision 4:
+Per Q48 sub-decision 4 (`:1231-1235`):
 
 - `SCOPE_EXPANSION` → `mode` + `headline` + `expansions[]` (1-5 specific scope additions to consider).
 - `SELECTIVE_EXPANSION` → `mode` + `headline` + `expansions[]` (cherry-picks; 1-3 entries) + optional `rationale[]` (why hold overall).
@@ -83,27 +83,25 @@ Backward compatibility preserved: Q43 sub-decision 5's existing consumption ("re
 
 ## Framework is a contract, not code
 
-Per Q48 sub-decision 7: this framework is a **shared spec**, NOT executable code or a wrapper. Q21 reviewer agents IMPLEMENT the contract (each agent prompt includes mode-classification guidance + return shape). Consumer skills PARSE the contract (each consumer extracts `mode` + relevant fields from the agent return). Q21 agents and consumer dispatchers reference this file directly; neither wraps the other.
+Per Q48 sub-decision 7 (`:1267`): this framework is a **shared spec**, NOT executable code or a wrapper. Q21 reviewer agents IMPLEMENT the contract (each agent prompt includes mode-classification guidance plus the return shape). Consumer skills PARSE the contract (each consumer extracts `mode` and the relevant mode-specific fields). Q21 agents and consumer dispatchers reference this file directly; neither wraps the other.
 
 ## L-scope composition (consumer-owned)
 
 The framework is per-AGENT-invocation. How many agents fire and how returns compose is a consumer concern:
 
-| L-scope | Reviewers | Mode returns | Composer |
-|---|---|---|---|
-| L1 PROJECT | CEO + Design + Eng + DevEx (4 parallel) | 4 | `/flow:office-hours` (Q42) → headlines into `docs/product/intent.md` `## L1 review summary`; concerns persist to `docs/plans/l1-concerns-<ISO-8601>.md` |
-| L2 DOMAIN | CEO + Design (2 parallel × N domains) | 2 per domain | `flow-inventory-interview` / `flow-add-domain` (Q26 mod 2) → journey doc `## L2 review summary` |
-| L3 SUB-FLOW | All 5 disciplines (parallel × N sub-flows) | 5 per sub-flow | `flow-linear-scaffold` (Q13 / Q23 mod 2) → parent issue body `## L3 review summary` |
-| L4 DISCIPLINE CHILD | Single per-discipline | 1 | `/flow:plan-{discipline}` (Q43 sub-decision 5) |
+- L1 PROJECT — CEO + Design + Eng + DevEx (4 parallel). `/flow:office-hours` (Q42) composes; 4 mode returns; headlines into `docs/product/intent.md` `## L1 review summary`; concerns persist to `docs/plans/l1-concerns-<ISO-8601>.md` per Q42 sub-decision 4.
+- L2 DOMAIN — CEO + Design (2 parallel × N domains). `flow-inventory-interview` / `flow-add-domain` (Q26 mod 2) composes; 2 mode returns per domain; headlines into the journey doc `## L2 review summary`.
+- L3 SUB-FLOW — all 5 disciplines (parallel × N sub-flows). `flow-linear-scaffold` (Q13 / Q23 mod 2) composes; 5 mode returns per sub-flow; headlines into the Linear parent issue body `## L3 review summary`.
+- L4 DISCIPLINE CHILD — single per-discipline (1 agent). `/flow:plan-{discipline}` (Q43 sub-decision 5) consumes; 1 mode return; headline populates the Plan-section content.
 
-Genuine inter-agent disagreement (e.g., L1 CEO returns `SCOPE_EXPANSION` while DevEx returns `SCOPE_REDUCTION`) is "team disagreement worth surfacing": consumers render both in summary; the user resolves at the next gate. No hard-fail composition rule; no CLARIFY semantics — agents must form a scope opinion even with limited info. Questions can be embedded in `rationale[]`; they do not pause composition.
+Genuine inter-agent disagreement (e.g. L1 CEO returns `SCOPE_EXPANSION` while DevEx returns `SCOPE_REDUCTION`) is "team disagreement worth surfacing": consumers render both in summary; the user resolves at the next gate. No hard-fail composition rule; no CLARIFY semantics — agents must form a scope opinion even with limited info. Questions can be embedded in `rationale[]`; they do not pause composition.
 
 ## References
 
-- Q48 — `docs/design-rationale/project_fda_plugin_interview.md` lines 1163-1271.
-- Q48 sub-decision 3 (interface signature) — lines 1190-1216.
-- Q48 sub-decision 6 (cribbing scope, gstack verification) — lines 1245-1254.
-- Q21 amendment 1 — line 1262 (adds `mode` + scope-axis fields to seven of twelve Q21 agents).
-- Q54 — meta-Q L-scoping (orthogonal axis).
-- Q30.2 — line 281 (file location lock).
-- gstack source — `gh api repos/garrytan/gstack/contents/plan-ceo-review/SKILL.md`. Re-verify whenever Q48 is amended.
+- `docs/design-rationale/project_fda_plugin_interview.md:1174-1271` — Q48 full lock entry.
+- `docs/design-rationale/project_fda_plugin_interview.md:1180-1186` — Q48 sub-decision 1: four-mode names verbatim from gstack.
+- `docs/design-rationale/project_fda_plugin_interview.md:1201-1227` — Q48 sub-decision 3: interface signature (do not re-derive).
+- `docs/design-rationale/project_fda_plugin_interview.md:1259` — founder-mode framing string (verbatim from gstack).
+- `docs/design-rationale/project_fda_plugin_interview.md:1273` — Q21 amendment 1 (scope-axis fields on 7 of 12 reviewer agents).
+- gstack source — `gh api repos/garrytan/gstack/contents/plan-ceo-review/SKILL.md`. Re-verify whenever Q48 or this file is amended (parking-lot #39).
+- `docs/design-rationale/project_fda_plugin_interview.md:292` — Q30.2 file-location lock.
