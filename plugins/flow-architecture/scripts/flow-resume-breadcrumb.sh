@@ -122,15 +122,33 @@ cmd_write() {
     usage
   fi
 
-  local tmp="${path}.tmp"
   local dir
   dir="$(dirname "$path")"
   mkdir -p "$dir"
 
-  # Capture stdin into the tmp file.
-  cat > "$tmp"
+  # Use mktemp for symlink-attack safety: a hostile pre-staged
+  # `<path>.tmp` symlink to /etc/passwd would be followed by `cat > $tmp`
+  # otherwise. mktemp creates with mode 600 + O_EXCL semantics, picks a
+  # unique 6-char suffix, and lives in the same directory as $path so the
+  # subsequent `mv` is a same-filesystem (atomic) rename.
+  local tmp
+  if ! tmp="$(mktemp "${path}.tmp.XXXXXX")"; then
+    echo "flow-resume-breadcrumb: mktemp failed for $path" >&2
+    exit 3
+  fi
 
-  # Parse-verify before promoting (defends against caller writing malformed JSON).
+  # Plan T3 cleanup contract: every failure path below removes $tmp before
+  # exiting. Explicit if-checks keep failure modes auditable (preferred
+  # over a trap, which would obscure which step triggered the abort).
+
+  # Capture stdin → tmp.
+  if ! cat > "$tmp"; then
+    rm -f "$tmp"
+    echo "flow-resume-breadcrumb: stdin capture failed for $path" >&2
+    exit 3
+  fi
+
+  # Parse-verify before promoting (caller may have piped malformed JSON).
   if ! python3 - "$tmp" <<'PY'
 import json, sys
 with open(sys.argv[1], "r", encoding="utf-8") as fh:
@@ -142,21 +160,26 @@ PY
     exit 3
   fi
 
-  # Snapshot tmp content for the post-rename content-match defense.
+  # Snapshot tmp content for the post-rename content-match check.
   local pre
   pre="$(cat "$tmp")"
 
   # Atomic rename — POSIX-guaranteed on same filesystem.
-  mv "$tmp" "$path"
+  if ! mv "$tmp" "$path"; then
+    rm -f "$tmp"
+    echo "flow-resume-breadcrumb: mv failed for $path" >&2
+    exit 3
+  fi
 
-  # Content-match: bytes at $path must equal the parse-verified bytes from $tmp.
-  # By transitivity (pre parsed as valid JSON above + pre == post) the post-rename
-  # file is still valid JSON, so a separate post-rename `json.load` is redundant.
-  # Defends against partial promotion or external tampering between mv and read.
+  # Content-match DETECTS (does not prevent) external tampering between
+  # mv and read. By transitivity (pre parsed as valid JSON above + pre == post)
+  # the post-rename file is still valid JSON, so a separate post-rename
+  # `json.load` is redundant. On mismatch the corrupted file is left in
+  # place by design — exit 3 signals the caller to investigate.
   local post
   post="$(cat "$path")"
   if [ "$pre" != "$post" ]; then
-    echo "flow-resume-breadcrumb: content-match failed (pre ≠ post-rename) for $path" >&2
+    echo "flow-resume-breadcrumb: content-match detected pre ≠ post-rename for $path" >&2
     exit 3
   fi
 

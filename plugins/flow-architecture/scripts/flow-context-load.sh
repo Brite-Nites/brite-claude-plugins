@@ -45,24 +45,44 @@ FLOWS_DIR_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^FLOWS_DIR_EXISTS=//p
 BREADCRUMB_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^BREADCRUMB_EXISTS=//p')"
 
 # ── Mode classification (delegates to flow-detect-mode.sh) ───────────
-# Pass shape signals via FLOW_SHAPE_CACHE so the child doesn't re-walk
-# docs/product/{flows,journeys}; saves one `find` traversal per preamble.
-MODE="$(FLOW_SHAPE_CACHE="$SHAPE_OUT" "$SCRIPT_DIR/flow-detect-mode.sh" "$REPO_ROOT")"
+# Pass already-parsed shape signals as individual _FLOW_SHAPE_* env vars
+# so the child skips both the `find` walk AND the sed re-parse. Also
+# pass FLOW_SHAPE_CACHE for back-compat (older child binaries still
+# parse the bulk blob).
+MODE="$(_FLOW_SHAPE_INTENT_EXISTS="$INTENT_EXISTS" \
+        _FLOW_SHAPE_INVENTORY_EXISTS="$INVENTORY_EXISTS" \
+        _FLOW_SHAPE_FLOWS_DIR_EXISTS="$FLOWS_DIR_EXISTS" \
+        _FLOW_SHAPE_BREADCRUMB_EXISTS="$BREADCRUMB_EXISTS" \
+        FLOW_SHAPE_CACHE="$SHAPE_OUT" \
+        "$SCRIPT_DIR/flow-detect-mode.sh" "$REPO_ROOT")"
 
 # ── Linear project from .flow/config.json (Q36.6) ────────────────────
+# Soft-fail on parse error: emit empty values + stderr warning + exit 0.
+# This is symmetric with the breadcrumb-read soft-fail contract (a
+# corrupted config doesn't brick preamble emission; the orchestrator can
+# re-prompt). Newlines / CR in string values are sanitized so a hostile
+# or corrupted JSON value can't break the 10-line preamble contract.
 LINEAR_PROJECT_ID=""
 LINEAR_PROJECT_NAME=""
 CONFIG_PATH="$REPO_ROOT/.flow/config.json"
 if [ -f "$CONFIG_PATH" ]; then
   CONFIG_OUT="$(python3 - "$CONFIG_PATH" <<'PY' || true
 import json, sys
+
+def sanitize(value):
+    # Newlines / CR would break the KEY=VALUE per-line contract downstream.
+    return (value or "").replace("\n", " ").replace("\r", " ").strip()
+
 try:
     with open(sys.argv[1], "r", encoding="utf-8") as fh:
         data = json.load(fh)
-except Exception:
+except Exception as exc:
+    print(f"flow-context-load: failed to parse {sys.argv[1]} ({exc}); "
+          "LINEAR_PROJECT_* will be empty", file=sys.stderr)
     sys.exit(0)
-print(f"LINEAR_PROJECT_ID={data.get('linear_project_id', '') or ''}")
-print(f"LINEAR_PROJECT_NAME={data.get('linear_project_name', '') or ''}")
+
+print(f"LINEAR_PROJECT_ID={sanitize(data.get('linear_project_id'))}")
+print(f"LINEAR_PROJECT_NAME={sanitize(data.get('linear_project_name'))}")
 PY
 )"
   LINEAR_PROJECT_ID="$(printf '%s\n' "$CONFIG_OUT" | sed -n 's/^LINEAR_PROJECT_ID=//p')"

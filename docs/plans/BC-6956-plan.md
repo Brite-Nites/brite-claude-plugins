@@ -91,13 +91,16 @@ JSON parse via python3 (no `jq`).
 
 **`write <path>`** — reads JSON from stdin; performs Q31.5 atomic-rename + parse-verify:
 
-1. Write stdin to `<path>.tmp`
-2. python3 parse-verify the `.tmp` file (`json.load`)
-3. `mv` `<path>.tmp` → `<path>` (atomic on same filesystem, POSIX)
-4. Re-read `<path>`; parse-verify again
-5. Content-match: re-read content must equal originally-written content (defends against partial-rename or external tampering between step 3 and step 4)
+1. Create `.tmp` via `mktemp "${path}.tmp.XXXXXX"` (symlink-safe; mode-600; same-dir so the subsequent `mv` is a same-FS atomic rename).
+2. Write stdin to the `.tmp`.
+3. python3 parse-verify the `.tmp` file (`json.load`).
+4. Snapshot the `.tmp` content into `$pre`.
+5. `mv` `<path>.tmp.XXXXXX` → `<path>` (atomic on same filesystem, POSIX).
+6. Read back `<path>` into `$post` and assert `pre == post` (content-match). By transitivity (pre parsed as valid JSON above + `pre == post`) the post-rename file is still valid JSON, so a separate post-rename `json.load` is redundant. The content-match **detects** (does not prevent) external tampering between mv and read — on mismatch the corrupted file is left at `<path>` and exit 3 signals the caller to investigate.
 
-On any failure: leave `<path>` untouched, remove `.tmp`, exit non-zero with a diagnostic.
+On any failure: explicit `if !` checks around `mktemp`, `cat`, parse-verify, and `mv` remove `.tmp` and exit non-zero with a stderr diagnostic. `<path>` stays untouched until the `mv` succeeds.
+
+The `cmd_read` path uses a conservative read-contract: malformed JSON, unparseable `last_updated`, and embedded newlines in `status`/`last_updated` values all soft-fail with `STALE=yes` + a specific `STALE_REASON` (rather than hard-exit), so callers fall through to artifact-driven classification instead of bricking on a single corrupted state file.
 
 ### T4 — `flow-context-load.sh`
 

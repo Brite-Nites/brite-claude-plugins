@@ -33,20 +33,32 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Pull FDA-shape signals from sibling helper. Caller may pre-populate via
-# FLOW_SHAPE_CACHE env var (set by flow-context-load.sh after its own probe) to
-# avoid a duplicate `find docs/product/{flows,journeys}` walk on the hot path.
-if [ -n "${FLOW_SHAPE_CACHE:-}" ]; then
-  SHAPE_OUT="$FLOW_SHAPE_CACHE"
+# Three-tier resolution for FDA-shape signals (cheapest first):
+#   1. Individual `_FLOW_SHAPE_*` env vars — set by flow-context-load.sh
+#      after its own probe; skips both the `find` walk AND the sed re-parse.
+#   2. `FLOW_SHAPE_CACHE` env var — bulk KEY=VALUE blob from a caller's
+#      prior probe; skips the `find` walk, still pays one sed pass.
+#   3. Fresh probe via `flow-detect-fda-shape.sh` — standalone invocation
+#      or caller that didn't cache.
+if [ -n "${_FLOW_SHAPE_INTENT_EXISTS:-}" ] \
+   && [ -n "${_FLOW_SHAPE_INVENTORY_EXISTS:-}" ] \
+   && [ -n "${_FLOW_SHAPE_FLOWS_DIR_EXISTS:-}" ] \
+   && [ -n "${_FLOW_SHAPE_BREADCRUMB_EXISTS:-}" ]; then
+  INTENT_EXISTS="$_FLOW_SHAPE_INTENT_EXISTS"
+  INVENTORY_EXISTS="$_FLOW_SHAPE_INVENTORY_EXISTS"
+  FLOWS_DIR_EXISTS="$_FLOW_SHAPE_FLOWS_DIR_EXISTS"
+  BREADCRUMB_EXISTS="$_FLOW_SHAPE_BREADCRUMB_EXISTS"
 else
-  SHAPE_OUT="$("$SCRIPT_DIR/flow-detect-fda-shape.sh" "$REPO_ROOT")"
+  if [ -n "${FLOW_SHAPE_CACHE:-}" ]; then
+    SHAPE_OUT="$FLOW_SHAPE_CACHE"
+  else
+    SHAPE_OUT="$("$SCRIPT_DIR/flow-detect-fda-shape.sh" "$REPO_ROOT")"
+  fi
+  INTENT_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INTENT_EXISTS=//p')"
+  INVENTORY_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INVENTORY_EXISTS=//p')"
+  FLOWS_DIR_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^FLOWS_DIR_EXISTS=//p')"
+  BREADCRUMB_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^BREADCRUMB_EXISTS=//p')"
 fi
-
-# Parse KEY=VALUE lines into variables.
-INTENT_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INTENT_EXISTS=//p')"
-INVENTORY_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^INVENTORY_EXISTS=//p')"
-FLOWS_DIR_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^FLOWS_DIR_EXISTS=//p')"
-BREADCRUMB_EXISTS="$(printf '%s\n' "$SHAPE_OUT" | sed -n 's/^BREADCRUMB_EXISTS=//p')"
 
 # Breadcrumb-driven `resume` takes precedence (Q12.3 + Q31.3 stale check).
 if [ "$BREADCRUMB_EXISTS" = "yes" ]; then
