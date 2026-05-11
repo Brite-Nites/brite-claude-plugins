@@ -304,6 +304,114 @@ set -e
 assert_eq "$rc" "2" "t11c exit code is 2"
 assert_contains "$(cat "$err_file")" "expected KEY=item or --" "t11c stderr names cause"
 
+# --- TEST 12 (BC-6958 micro-fix 1): empty-vs-absent in batch path ----------
+# Item is PRESENT in cache (jq matches by name) but `login.password` is empty.
+# Defends BC-6958's diagnostic-clarity fix: operator gets "exists but empty"
+# instead of the misleading "not found in batch search".
+echo "--- TEST 12: present-but-empty password -> exit 3 (new stderr) ---"
+setup
+cat >"$STUB_LIST_FILE" <<'JSON'
+[
+  {"name":"tam-map-spider-api-key","login":{"password":""}}
+]
+JSON
+err_file="$STUB_DIR/t12.err"
+set +e
+BW_SESSION=fake bash "$WRAPPER" \
+  SPIDER_API_KEY=tam-map-spider-api-key \
+  -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "3" "t12 exit code is 3"
+assert_contains "$(cat "$err_file")" "exists in batch but has empty password" "t12 stderr names empty-password branch"
+assert_contains "$(cat "$err_file")" "tam-map-spider-api-key" "t12 stderr names the item"
+t12_list_calls=$(grep -c '^list items --search' "$STUB_CALL_LOG" || true)
+assert_eq "$t12_list_calls" "1" "t12 took batch path (1 list call)"
+# Negative: empty-password branch must NOT print the absent-path message.
+case "$(cat "$err_file")" in
+  *"not found in batch search"*) FAIL_MSG=1 ;;
+  *) FAIL_MSG=0 ;;
+esac
+assert_eq "$FAIL_MSG" "0" "t12 stderr does not also print absent-branch message"
+# Symmetry with TESTS 2/3/7: zero sequential get calls (batch path is exclusive).
+t12_get_calls=$(grep -c '^get password' "$STUB_CALL_LOG" || true)
+assert_eq "$t12_get_calls" "0" "t12 zero sequential get calls"
+
+# --- TEST 13 (BC-6958 micro-fix 1 P3): wrong_type — item without .login ----
+# Defends the wrong_type branch added to bw-run.sh. A Bitwarden secure-note
+# (or any non-login type) named correctly should produce a `wrong_type`
+# diagnostic instead of being silently labeled as empty.
+echo "--- TEST 13: wrong-type item (no .login block) -> exit 3 (wrong_type stderr) ---"
+setup
+cat >"$STUB_LIST_FILE" <<'JSON'
+[
+  {"name":"tam-map-spider-api-key","notes":"secure-note-no-login-field"}
+]
+JSON
+err_file="$STUB_DIR/t13.err"
+set +e
+BW_SESSION=fake bash "$WRAPPER" \
+  SPIDER_API_KEY=tam-map-spider-api-key \
+  -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "3" "t13 exit code is 3"
+assert_contains "$(cat "$err_file")" "is not a Bitwarden login type" "t13 stderr names wrong-type branch"
+assert_contains "$(cat "$err_file")" "tam-map-spider-api-key" "t13 stderr names the item"
+case "$(cat "$err_file")" in
+  *"empty password"*|*"not found in batch search"*) FAIL_MSG=1 ;;
+  *) FAIL_MSG=0 ;;
+esac
+assert_eq "$FAIL_MSG" "0" "t13 stderr does not print empty-or-absent branch messages"
+
+# --- TEST 14 (BC-6958 micro-fix 1 P3): null login.password -> empty branch -
+# Bitwarden items can technically have `login.password = null` (e.g. partially
+# edited via `bw edit`). Pin contract: null is treated the same as empty
+# string (the existing `// ""` fallback in the value-fetch jq pipeline).
+echo "--- TEST 14: null login.password -> exit 3 (empty-password stderr) ---"
+setup
+cat >"$STUB_LIST_FILE" <<'JSON'
+[
+  {"name":"tam-map-spider-api-key","login":{"password":null}}
+]
+JSON
+err_file="$STUB_DIR/t14.err"
+set +e
+BW_SESSION=fake bash "$WRAPPER" \
+  SPIDER_API_KEY=tam-map-spider-api-key \
+  -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "3" "t14 exit code is 3"
+assert_contains "$(cat "$err_file")" "exists in batch but has empty password" "t14 stderr routes null to empty-password branch"
+
+# --- TEST 15 (BC-6958 micro-fix 1 P3): duplicate-name first-wins -----------
+# Bitwarden in principle allows duplicate item names. Pin contract: jq's
+# `first(...)` returns the first match — exporting the first item's value.
+# If a future refactor changes the behavior, this test surfaces the choice.
+echo "--- TEST 15: duplicate-name in cache -> first-wins export ---"
+setup
+cat >"$STUB_LIST_FILE" <<'JSON'
+[
+  {"name":"tam-map-spider-api-key","login":{"password":"first-A"}},
+  {"name":"tam-map-spider-api-key","login":{"password":"second-B"}}
+]
+JSON
+out_file="$STUB_DIR/t15.out"
+set +e
+BW_SESSION=fake bash "$WRAPPER" \
+  SPIDER_API_KEY=tam-map-spider-api-key \
+  -- bash -c 'env | grep "^SPIDER_API_KEY="' >"$out_file" 2>/dev/null
+rc=$?
+set -e
+assert_eq "$rc" "0" "t15 exit code is 0"
+assert_contains "$(cat "$out_file")" "SPIDER_API_KEY=first-A" "t15 first-match value wins"
+case "$(cat "$out_file")" in
+  *"second-B"*) FAIL_MSG=1 ;;
+  *) FAIL_MSG=0 ;;
+esac
+assert_eq "$FAIL_MSG" "0" "t15 second-match value is not exported"
+
 # --- Summary ---------------------------------------------------------------
 echo ""
 echo "$TESTS_RUN tests run, $TESTS_FAILED failed"

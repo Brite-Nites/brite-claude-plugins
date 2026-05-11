@@ -35,13 +35,30 @@ fi
 # MCP registration state
 claude mcp list 2>&1 | grep -E "spider|aiark|discolike" || echo "mcps=NONE_REGISTERED"
 
-# Node deps
-[ -f plugins/marketing/scripts/tam-map/node_modules/@modelcontextprotocol/sdk/package.json ] \
-  && echo "npm=set" || echo "npm=MISSING"
+# Node deps — check BOTH dev-mode (repo-relative) and prod-mode (latest marketplace clone).
+# The plugin auto-updater publishes a FRESH clone (without node_modules) when the version
+# bumps. The OLD version's clone is left on disk with its deps intact, so a naive `*` glob
+# would false-positive against the stale prior-version directory. Target the latest version
+# by mtime (`ls -td`) — auto-update is by definition the newest directory.
+MKT_LATEST="$(ls -td ~/.claude/plugins/cache/brite-claude-plugins/marketing/*/scripts/tam-map 2>/dev/null | head -1)"
+if [ -f plugins/marketing/scripts/tam-map/node_modules/@modelcontextprotocol/sdk/package.json ]; then
+  echo "npm=set (repo-relative)"
+elif [ -n "$MKT_LATEST" ] && [ -f "$MKT_LATEST/node_modules/@modelcontextprotocol/sdk/package.json" ]; then
+  echo "npm=set (marketplace clone — $MKT_LATEST)"
+else
+  echo "npm=MISSING"
+fi
 
-# Python deps
-python3 -c "import requests, aiohttp, dotenv" 2>/dev/null \
-  && echo "pip=set" || echo "pip=MISSING"
+# Python deps — same dual-path probe against the latest marketplace clone.
+if python3 -c "import requests, aiohttp, dotenv" 2>/dev/null; then
+  echo "pip=set (system)"
+elif [ -n "$MKT_LATEST" ] && [ -d "$MKT_LATEST/.venv" ]; then
+  echo "pip=set (marketplace venv — $MKT_LATEST)"
+elif [ -d plugins/marketing/scripts/tam-map/.venv ]; then
+  echo "pip=set (repo venv)"
+else
+  echo "pip=MISSING"
+fi
 ```
 
 Interpret the output and route:
@@ -49,7 +66,10 @@ Interpret the output and route:
 - `bw=MISSING` or `jq=MISSING` or `npm=MISSING` or `pip=MISSING` → go to **Phase 2, Step 2a** (one-time bootstrap).
 - `vault=unauthenticated` → go to **Phase 2, Step 2a** (need `bw login`).
 - `vault=locked` or `session=MISSING` → go to **Phase 2, Step 2b** (per-session unlock).
-- All green (`bw`, `jq`, `npm`, `pip`, `vault=unlocked`, `session=set`, all three MCPs `✓ Connected`) → jump to **Phase 3 — Verify**. Bitwarden item provisioning (the 7 `tam-map-*` items) is checked as part of Phase 2a's admin-provisioning step on first-time onboarding; on subsequent runs the count probe is skipped (saves a 3.2s `bw list items --search` round-trip every time the command runs on an already-onboarded machine). If Phase 3 verify shows MCPs failing to connect, the most likely cause is missing Bitwarden items — re-route to Phase 2a's admin-provisioning check.
+- If `vault=unlocked` + `session=set`, skip Step 2b — only Step 2a (one-time bootstrap, if any one-time gap exists) and Phase 3 (verify) remain.
+- All green (`bw`, `jq`, `npm`, `pip`, `vault=unlocked`, `session=set`, all three MCPs `✓ Connected`) → jump to **Phase 3 — Verify**.
+  - Bitwarden item provisioning (the 7 `tam-map-*` items) is checked only in Phase 2a's admin-provisioning step on first-time onboarding; the count probe is deferred to save a 3.2s `bw list items --search` round-trip on already-onboarded machines.
+  - If Phase 3 verify shows MCPs failing to connect, the most likely cause is missing Bitwarden items — re-route to Phase 2a's admin-provisioning check.
 
 If multiple categories are red, run Step 2a first, then Step 2b, then Phase 3.
 
@@ -73,13 +93,24 @@ brew install bitwarden-cli jq
 bw login
 ```
 
-**3. Install Node deps for the 2 stdio wrappers** (skip if Phase 1 showed `npm=set`):
+**3. Install Node deps for the 2 stdio wrappers** (skip if Phase 1 showed `npm=set`).
+
+If you are working in this repo as a developer:
 
 ```bash
 (cd plugins/marketing/scripts/tam-map && npm install)
 ```
 
-**4. Install Python deps for the 5 CLI scripts** (skip if Phase 1 showed `pip=set`). Recommended: a venv:
+If you are running from the production marketplace clone (the common non-dev case — Phase 1 reports `npm=MISSING` against the marketplace clone path; same `MKT_LATEST` resolution as Phase 1):
+
+```bash
+MKT_LATEST="$(ls -td ~/.claude/plugins/cache/brite-claude-plugins/marketing/*/scripts/tam-map 2>/dev/null | head -1)"
+(cd "$MKT_LATEST" && npm install)
+```
+
+**4. Install Python deps for the 5 CLI scripts** (skip if Phase 1 showed `pip=set`). Recommended: a venv.
+
+Dev mode (this repo):
 
 ```bash
 python3 -m venv plugins/marketing/scripts/tam-map/.venv
@@ -87,7 +118,16 @@ source plugins/marketing/scripts/tam-map/.venv/bin/activate
 python3 -m pip install -r plugins/marketing/scripts/tam-map/requirements.txt
 ```
 
-Or without a venv:
+Prod mode (marketplace clone — same shape, just a different cwd; same `MKT_LATEST` resolution as Phase 1):
+
+```bash
+MKT_LATEST="$(ls -td ~/.claude/plugins/cache/brite-claude-plugins/marketing/*/scripts/tam-map 2>/dev/null | head -1)"
+python3 -m venv "$MKT_LATEST/.venv"
+source "$MKT_LATEST/.venv/bin/activate"
+python3 -m pip install -r "$MKT_LATEST/requirements.txt"
+```
+
+Or without a venv (either mode):
 
 ```bash
 python3 -m pip install -r plugins/marketing/scripts/tam-map/requirements.txt
@@ -183,6 +223,25 @@ If any of the 5 `--help` checks fails:
 - Script-level error → open the script, read the error message; the wrappers ship verbatim from upstream tam-map@`9f5c72e74b` so a runtime error likely means an upstream bug.
 
 If a script's `--help` passes but a real invocation fails with a missing-env-var error, re-check that the corresponding Bitwarden item exists with a non-empty value (re-run Phase 2a's admin-provisioning check), then re-launch Claude Code so the wrapper picks up the corrected value on the next spawn.
+
+---
+
+## Troubleshooting
+
+### After a plugin auto-update — re-run setup
+
+Claude Code's plugin auto-updater publishes a fresh marketplace clone whenever a new `marketing` plugin version ships (e.g., `~/.claude/plugins/cache/brite-claude-plugins/marketing/0.3.29/` flips to `0.3.30/`). The new clone arrives **WITHOUT** `node_modules/` AND WITHOUT `.venv/`, even if you installed them in the prior version's directory or in a dev worktree. Symptoms:
+
+- `aiark` or `discolike` MCPs report `✗ Failed to connect` with `Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@modelcontextprotocol/sdk'`.
+- Python CLI scripts (`icypeas_client.py`, `spider_crawl.py`, `enrich_waterfall.py`, `verify_smtp.py`, `tier_and_segment.py`) fail with `ModuleNotFoundError` for `requests` / `aiohttp` / `dotenv` / `anthropic`.
+
+If you see either symptom after no intentional config change, this is almost always the cause.
+
+**Remedy:** re-run `/marketing:setup-tam-map`. Phase 1's dual-path probes will detect `npm=MISSING` and/or `pip=MISSING` against the new marketplace clone path and route you to Step 2a's marketplace-clone install commands. Phase 1's worktree-relative paths stay green for dev mode; the new probes cover prod mode.
+
+(Bitwarden items themselves live in the Engineering vault and are unaffected by auto-update — you do NOT need to re-run Phase 2a's admin-provisioning check unless `bw list items --search tam-map-` returns fewer than 7 rows.)
+
+(Spider's MCP stays connected through auto-updates because `npx -y spider-cloud-mcp` resolves via npx's global cache, not local `node_modules/`. Aiark/discolike are local Node wrappers, hence the divergence.)
 
 ---
 
