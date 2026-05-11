@@ -391,8 +391,41 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
   - **Operator-noted artifacts of synthetic test data (non-issues):** the `{COMPANY} {FIRST_NAME}` adjacency reads as "Test Dogfood Aquarium Info" (placeholder name "Info Account" of role-prefix test lead colliding with company-name placement); the `{COMPANY}` token appears twice in step 1. Both are inherent to the round-1-era synthetic CSV, not artifact bugs. R-20 validates render mechanics, not copy quality. Operator confirmed: "this is mostly a non issue ... as long as it is rendering how we expect it to render."
   - **Match:** every component of Phase 10 Mode 1 spec.
 
-- **R-21 ★** — ⏸️ **Paused before Mode 2 `--test-send`** per operator pacing decision. Will resume in next session.
-  - Pending: pick one of 4 main campaigns → call `POST /api/campaigns/sequence-steps/{step_1_id}/test-email` with `to_email: corinne+bc-6785-r5@britenites.com` → 1 real email lands in operator inbox → compare against R-20 Mode 1 render to verify BC-6784 `{SENDER_*}` shadow at delivery.
+- **R-21 ★** — ✅ **Expected.** 🎯 **(BC-6784 `{SENDER_*}` shadow ratified at runtime.)**
+  - **Pre-flight IV-5 gap encountered:** `docs/marketing-context.md` did not exist in worktree → Mode 2 halts per spec. Resolved by writing a minimal stub with frontmatter + `## test_send_allowlist` section containing `britenites.com`. F-IV-5 finding logged for round-6 — the spec's strict halt has no recovery path for fresh worktrees + the operator-self-send use case.
+  - **Real-send fired:** `POST /api/campaigns/sequence-steps/36/test-email` with `{sender_email_id: 981, to_email: "corinne+bc-6785-r5@britenites.com", use_dedicated_ips: false}`. Response: `{success: true, message: "Successfuly sent sequence test email"}` (EB API typo in `Successfuly` recorded verbatim).
+  - **Operator inbox receipt confirmed (~3:57 PM MT, ~0 min latency):** 1 real email arrived from `holden.halford@washingtonfestivelights.com` (sender 981) to `corinne+bc-6785-r5@britenites.com` (plus-addressing routed cleanly to operator inbox).
+  - **Subject:** `[test] Quick idea` (artifact spintax `{Quick|Fast|30s} {question|check|idea}` → "Quick idea" — different first-option than Mode 1's `Quick question`).
+  - **Body verbatim (Mode 2 actual delivery):**
+    > Saw the downtown master-plan announcement at Test Dogfood Zoo Contact, and it tracked closely with a pattern we've been watching across municipalities.
+    >
+    > Most municipalities teams we work with run into downtown lighting specs getting stuck at design review, and one that shortcut it was Boulder Pearl Street, who ran 38% higher evening foot traffic in 2024.
+    >
+    > Happy to pull a focused architectural lighting preview for Test Dogfood Zoo if interesting, no commitment.
+    >
+    > Thanks,
+    > Holden
+  - **BC-6784 keystone check — ✅ ratified:**
+    - **Mode 1 sign-off:** "Best, Amanuel" (artifact-default `{SENDER_FIRST_NAME}` = "Amanuel" via priority chain hit #1)
+    - **Mode 2 sign-off:** "Thanks, Holden" — `{SENDER_FIRST_NAME}` rendered as sender 981's record first_name (`Holden`), shadowing the artifact-level resolution.
+    - The EB render engine resolves `{SENDER_*}` from the sender record being used at delivery, NOT from the artifact's `custom_variables[].default`. Local Phase 10 spot-check shows artifact-default for representative display only.
+  - **Spintax-rotation positive observation (not a finding):** EB's render engine independently rotates spintax per occurrence at delivery. Mode 1 used deterministic first-option (per spec disclaimer "actual sends will rotate options"); Mode 2 picked:
+    - Subject: "Quick idea" (3rd option of `{question|check|idea}`)
+    - Body line 1: "tracked closely" (2nd option of `{it lined up|it tracked closely|it mapped well}`)
+    - Body line 2: "shortcut" (2nd option of `{solved|shortcut|sidestepped}`)
+    - Body line 3: "focused" (3rd option of `{short|quick|focused}`)
+    - Sign-off: "Thanks" (3rd option of `{Best|Cheers|Thanks}`)
+    - Confirms spec-documented spintax behavior at delivery; not a finding.
+  - **New findings surfaced (round-6 candidates):**
+    - **F-test-send-prefix** — EB silently prepends `[test] ` to subject on `POST /api/campaigns/sequence-steps/{id}/test-email`. Observed: artifact subject `{Quick|Fast|30s} {question|check|idea}` → delivered `[test] Quick idea`. The `[test] ` prefix is NOT in launch-campaign.md spec or email-bison.md. Useful operator-side artifact (test emails visually distinct in inbox); should be documented. Verify real (non-test) campaign sends do NOT carry this prefix — defer the verify to Phase 11 ACTIVATE step 1 inbox check (R-23★).
+    - **F-Mode2-Lead-Pick** — Mode 2 `--test-send` picked lead 14761 (Contact Account / `contact@dogfoodtest.com` / Test Dogfood Zoo) for variable substitution. Mode 1 deterministically picked lead 14759 (Info Account / Test Dogfood Aquarium / largest-cell-first-lead per spec). The launch-campaign spec specifies Mode 1's lead-pick rule but is silent on Mode 2's. Most likely candidate hypothesis: EB picks the most-recently-added lead OR highest lead-id, unverified. Operators using `--test-send` to spot-check Mode 1 render fidelity should know the lead won't match. Round-6 candidate.
+    - **F-IV-5** — IV-5 strict-halt has no recovery path for fresh worktrees absent `docs/marketing-context.md`. For the operator-self-send use case (recipient is operator's own `@britenites.com` inbox, retrieved via `git config user.email`), an automatic allowlist exception would prevent the dogfood-blocking halt. Alternative: ship the workspace bootstrap with a default `marketing-context.md` stub.
+  - **Cross-checks (all clean):**
+    - From: `holden.halford@washingtonfestivelights.com` matches sender_email_id 981 request ✓
+    - Plus-addressing routed correctly (`corinne+bc-6785-r5` reached operator inbox) ✓
+    - Body structure matches Mode 1 algorithm (variables resolved + spintax rotated + `<br><br>` → paragraph breaks) ✓
+    - Gmail "External" tag expected (washingtonfestivelights.com ≠ britenites.com); not a finding ✓
+    - Subject is NOT `Re: ` prepended (correct — only step 2 has `thread_reply: true` which triggers Re:) ✓
 
 ### Phase 11 (ACTIVATE — first live-walk in chain)
 
@@ -415,6 +448,9 @@ Workspace 13 is the production personal-email outbound workspace. Round-5 mutati
 - **F-IV-3** (Phase 1 step 10) — IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects uppercase worktree names. Mitigated for round-5 via manual path override. Round-6 candidate; one-character regex fix.
 - **F-R-28a** (Phase 4) — launch-campaign spec § Phase 4 step 1 describes `upsert_multiple_leads` as a "variant of `/api/leads/multiple`," but POST `/api/leads/upsert-multiple` returns 405 and `search_api_spec` shows no upsert variant. Either the path is wrong, or upsert is achieved by re-POSTing.
 - **F-R-28b** (Phase 4) — launch-campaign spec describes `bulk_create_leads_csv` as `POST /api/leads/bulk`; actual path per `search_api_spec` is `POST /api/leads/bulk/csv`. `/api/leads/bulk` is a DELETE-only path.
+- **F-IV-5** (Phase 10 Mode 2) — IV-5 has no recovery path for fresh worktrees absent `docs/marketing-context.md`. Strict halt blocks the operator-self-send use case (recipient is operator's own `@britenites.com` inbox). Mitigated for round-5 via stub-file creation at `docs/marketing-context.md` with `## test_send_allowlist` listing `britenites.com`. Round-6 candidate: add automatic operator-self-send allowlist (via `git config user.email` domain match) OR ship workspace bootstrap with a default marketing-context.md stub.
+- **F-test-send-prefix** (Phase 10 Mode 2) — EB silently prepends `[test] ` to subjects on `POST /api/campaigns/sequence-steps/{id}/test-email`. Artifact subject `{Quick|Fast|30s} {question|check|idea}` delivered as `[test] Quick idea`. Not in launch-campaign.md or email-bison.md spec. Should be added as a gotcha note. Useful operator-side feature; need to verify real campaign sends do NOT carry this prefix (deferred to R-23★ Phase 11 inbox check).
+- **F-Mode2-Lead-Pick** (Phase 10 Mode 2) — Mode 2 `--test-send` picked lead 14761 (Contact Account / Test Dogfood Zoo) for variable substitution; Mode 1 deterministically picked lead 14759 (Info Account / Test Dogfood Aquarium) per spec's "first lead in largest cell" rule. Mode 2's lead-pick rule is unspecified. Operators using `--test-send` to spot-check Mode 1 render fidelity should know the lead won't match. Round-6 candidate: document Mode 2 lead-pick rule.
 
 ### Non-blocking ratifications worth optional follow-up
 

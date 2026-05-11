@@ -14,7 +14,7 @@
   "sender_resolution_method": "artifact-default",
   "unique_per_lead_enabled": true,
   "launched_at": "2026-05-08T11:40:00-06:00",
-  "last_completed_phase": 9,
+  "last_completed_phase": 10,
   "_round_5_notes": {
     "isolation_discipline": "Lead tag `bc-6785-r5`; campaign name prefix `BC-6785`; no new permanent custom variables (R-28 uses existing UPPERCASE name).",
     "metadata_path_override": "Spec \u00a7 IV-3 dogfood-path detection regex `[a-z0-9._-]+` rejects the uppercase worktree name `BC-6785`. Auto-detection falls through to docs/campaigns/brite-labs/ (production audit dir), defeating IV-3's intent. Manual override: writing to <worktree>/dogfood/ per IV-3's stated purpose. Finding F-IV-3 logged in transcript as a round-6 candidate (regex case-sensitivity bug)."
@@ -244,8 +244,16 @@
   },
   "f29_clamp_observed": "step_1.wait_in_days clamped from artifact 0 \u2192 1 per F29",
   "bc_6301_re_prepend_observed": "step_2.subject submitted bare; stored as `Re: {bare-subject}` (single Re: prepend) on all 4 sequences",
-  "preview_method": "local-render",
+  "preview_method": "local-render + test-send",
   "preview_lead_email": "info@dogfoodtest.com",
   "preview_rendered_at": "2026-05-08T21:35:00-06:00",
-  "phase_10_mode_2_pending": true
+  "phase_10_mode_2_pending": false,
+  "test_send_recipient": "corinne+bc-6785-r5@britenites.com",
+  "test_send_at": "2026-05-08T21:57:00-06:00",
+  "test_send_sender_id": 981,
+  "test_send_sender_name": "Holden Halford",
+  "test_send_sequence_step_id": 36,
+  "test_send_campaign_id": 44,
+  "bc_6784_runtime_ratified": true,
+  "bc_6784_observed_render": "{SENDER_FIRST_NAME} \u2192 'Holden' (sender 981 record), shadowing artifact default 'Amanuel'"
 }
