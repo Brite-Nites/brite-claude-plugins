@@ -37,6 +37,13 @@ command -v python3 >/dev/null 2>&1 || { echo "fatal: python3 required" >&2; exit
 # Hermetic env: drop any env-vars that influence helper-script behavior so the
 # harness ignores parent-shell state. LINEAR_ISSUE_COUNT in particular comes
 # from BriteBase-rooted shells and would silently flip detect-mode behavior.
+#
+# Source for the `_FLOW_SHAPE_*` and `FLOW_*_CACHE` private-var names: the
+# three-tier resolution block at the top of `flow-detect-mode.sh` (`scripts/`
+# sibling) and the corresponding cache emissions in `flow-context-load.sh`.
+# If those helpers rename or add private vars, sync this unset list — a
+# stale unset list silently drops hermeticity protection without a test
+# failure.
 unset LINEAR_ISSUE_COUNT FLOW_GH_AUTH_CACHE FLOW_SHAPE_CACHE \
       _FLOW_SHAPE_INTENT_EXISTS _FLOW_SHAPE_INVENTORY_EXISTS \
       _FLOW_SHAPE_FLOWS_DIR_EXISTS _FLOW_SHAPE_BREADCRUMB_EXISTS
@@ -151,12 +158,17 @@ section "3/6" "flow-detect-mode.sh classifies as greenfield"
 
 # LINEAR_ISSUE_COUNT=0 forces the Q36.3 step-4 heuristic into the greenfield
 # branch deterministically.
+#
+# Stdout-only capture (`2>/dev/null`) on the MODE_* helpers: detect-mode.sh
+# writes the classification result to stdout and may emit diagnostic stderr
+# on edge cases. Whole-buffer equality assertions below would silently break
+# on benign stderr leakage; stdout-only capture keeps the assertion robust
+# and pushes stderr to the terminal where it's still visible during CI.
 MODE_OUT=""
-if MODE_OUT="$(LINEAR_ISSUE_COUNT=0 "$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>&1)"; then
+if MODE_OUT="$(LINEAR_ISSUE_COUNT=0 "$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>/dev/null)"; then
   pass "flow-detect-mode.sh exits 0"
 else
-  fail "flow-detect-mode.sh exit non-zero"
-  printf '%s\n' "$MODE_OUT" | sed 's/^/    | /'
+  fail "flow-detect-mode.sh exit non-zero (run helper standalone for stderr context)"
 fi
 
 if [ "$MODE_OUT" = "greenfield" ]; then
@@ -167,17 +179,20 @@ fi
 
 # Q36.3 step 4 heuristic: bracket the 10-issue threshold both sides.
 # LINEAR_ISSUE_COUNT=9 → still greenfield (just below threshold).
-MODE_OUT_9="$(LINEAR_ISSUE_COUNT=9 "$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>&1)" || \
-  MODE_OUT_9="<helper-failed>"
-if [ "$MODE_OUT_9" = "greenfield" ]; then
-  pass "MODE=greenfield when LINEAR_ISSUE_COUNT=9 (just below Q36.3 threshold)"
+MODE_OUT_9=""
+if MODE_OUT_9="$(LINEAR_ISSUE_COUNT=9 "$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>/dev/null)"; then
+  if [ "$MODE_OUT_9" = "greenfield" ]; then
+    pass "MODE=greenfield when LINEAR_ISSUE_COUNT=9 (just below Q36.3 threshold)"
+  else
+    fail "expected 'greenfield' when LINEAR_ISSUE_COUNT=9, got: '$MODE_OUT_9'"
+  fi
 else
-  fail "expected 'greenfield' when LINEAR_ISSUE_COUNT=9, got: '$MODE_OUT_9'"
+  fail "flow-detect-mode.sh exit non-zero with LINEAR_ISSUE_COUNT=9"
 fi
 
 # LINEAR_ISSUE_COUNT=10 → retrofit (at-and-above threshold).
 MODE_OUT_RETROFIT=""
-if MODE_OUT_RETROFIT="$(LINEAR_ISSUE_COUNT=10 "$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>&1)"; then
+if MODE_OUT_RETROFIT="$(LINEAR_ISSUE_COUNT=10 "$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>/dev/null)"; then
   if [ "$MODE_OUT_RETROFIT" = "retrofit" ]; then
     pass "MODE=retrofit when LINEAR_ISSUE_COUNT=10 (Q36.3 step 4 heuristic)"
   else
@@ -300,8 +315,9 @@ else
 fi
 
 # Mode classifier should now return `resume` (in_flight + not stale).
+# Stdout-only capture matches Section 3's hardened pattern.
 MODE_RESUME=""
-if MODE_RESUME="$("$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>&1)"; then
+if MODE_RESUME="$("$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>/dev/null)"; then
   if [ "$MODE_RESUME" = "resume" ]; then
     pass "mode classifier detects MODE=resume from in_flight breadcrumb"
   else
@@ -309,7 +325,6 @@ if MODE_RESUME="$("$SCRIPTS_DIR/flow-detect-mode.sh" "$FIXTURE" 2>&1)"; then
   fi
 else
   fail "flow-detect-mode.sh exit non-zero after breadcrumb write"
-  printf '%s\n' "$MODE_RESUME" | sed 's/^/    | /'
 fi
 
 # ── Section 5b: breadcrumb-read soft-fail paths ─────────────────────

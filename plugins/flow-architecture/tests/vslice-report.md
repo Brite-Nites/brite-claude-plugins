@@ -4,7 +4,7 @@
 
 ## Scope today (v0.2.8)
 
-`run-greenfield-vslice.sh` exercises **Phase 1 surface only** — the four FDA helper scripts under `plugins/flow-architecture/scripts/` against the `tests/fixtures/synthetic-greenfield/` fixture. Seven assertion groups, 63 hard assertions (current count emitted by the harness summary at runtime; this number will grow as BC-6959 sub-skill PRs land):
+`run-greenfield-vslice.sh` exercises **Phase 1 surface only** — the four FDA helper scripts under `plugins/flow-architecture/scripts/` against the `tests/fixtures/synthetic-greenfield/` fixture. Seven assertion groups; the exact hard-assertion count is emitted by the harness summary at runtime (source of truth — FDA Q55 sub-decision 4 says don't pin top-level counts in body text) and grows as BC-6959 sub-skill PRs land:
 
 | Group | Asserts |
 |---|---|
@@ -54,17 +54,17 @@ If the new surface requires LLM dispatch to test end-to-end, route through `beha
 
 ## No findings (v0.2.8 initial run)
 
-All 63 hard assertions pass under the synthetic fixture as of 2026-05-11. No bugs surfaced in any of the four helper scripts under the fixture conditions tested.
+All hard assertions pass under the synthetic fixture as of 2026-05-11 (exact count emitted by the harness summary at runtime — see FDA Q55 sub-decision 4). No bugs surfaced in any of the four helper scripts under the fixture conditions tested.
 
 Per BC-7057 acceptance criterion 5: this report constitutes the formal "no findings" attestation. Future runs may surface regressions — those file as separate Linear issues in the `flow-architecture` Linear project.
 
 ## Coverage history
 
-| Date | Plugin version | Covered | Pending |
+| Date | Plugin version | Covered surfaces | Pending |
 |---|---|---|---|
-| 2026-05-11 | 0.2.8 | Phase 1 (63 assertions: helpers + breadcrumb round-trip + 5 `STALE_REASON` negative-paths + LINEAR_ISSUE_COUNT boundary + preamble schema discipline) | Phases 2-8 (8 skips) |
+| 2026-05-11 | 0.2.8 | Phase 1 (helpers + breadcrumb round-trip + 5 `STALE_REASON` negative-paths + LINEAR_ISSUE_COUNT boundary + preamble schema discipline) | Phases 2-8 (8 skips) |
 
-Append new rows as sub-skill PRs land.
+Append new rows as sub-skill PRs land. Per Q55 sub-decision 4, do not pin literal assertion counts here — the runtime summary is authoritative.
 
 ## See also
 
