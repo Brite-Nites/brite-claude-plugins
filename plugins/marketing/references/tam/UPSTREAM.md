@@ -30,8 +30,8 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 | `discolike_client.py` | `scripts/discolike_client.py` | Verbatim (+ 5-line `#` header after shebang) |
 | `icypeas_client.py` | `scripts/icypeas_client.py` | Verbatim (+ 5-line `#` header after shebang) |
 | `spider_crawl.py` | `scripts/spider_crawl.py` | Verbatim (+ 5-line `#` header after shebang) |
-| `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header after shebang) |
-| `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header after shebang) |
+| `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
+| `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `tier_and_segment.py` | `scripts/tier_and_segment.py` | Verbatim (+ 5-line `#` header after shebang) |
 | `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header after shebang) |
 | `discolike-mcp.js` | `scripts/discolike-mcp.js` | Verbatim (+ 5-line `//` header after shebang) |
@@ -58,6 +58,18 @@ If upstream improvements are ever pulled, the operation is manual:
 - **Script files** (`.py`, `.js`, `.txt`): carry a 5-line comment header immediately after the shebang (if any), naming upstream path, license, commit, and port date.
 - **JSON** (`package.json`): carries top-level `_source`, `_license`, `_ported` fields in lieu of a comment header.
 - **Markdown reference files** (`*.md`): carry YAML frontmatter naming upstream path, source, license, port date.
+
+## Local deviations from upstream `9f5c72e74b`
+
+### `enrich_waterfall.py:99` and `verify_smtp.py:68` — split async/sync context managers (BC-7051)
+
+Upstream uses `async with aiohttp.ClientSession() as session, open(outfile, "w") as f:`. This shape crashes with `TypeError: '_io.TextIOWrapper' object does not support the asynchronous context manager protocol` on every Python version since async/await landed — `async with X, Y:` desugars to `async with X: async with Y:` and both items must implement `__aexit__`. `open()` returns a sync `TextIOWrapper` that only implements `__exit__`.
+
+Brite ships the minimal fix: outer sync `with open(outfile, "w") as f:` wrapping inner `async with aiohttp.ClientSession() as session:`, with the task loop body re-indented under both. No dependency added (rejects `aiofiles`).
+
+**Validated:** Python 3.13.11 + 3.14.3, both scripts, with real vendor round-trips (BlitzAPI, Prospeo, MillionVerifier). MillionVerifier returned `result_code: 2` (catch_all) — definitive vendor-side evidence.
+
+**Re-port action:** if a future upstream pull at a newer SHA includes the same (or equivalent) split, drop this local diff and remove this section. If upstream's fix differs structurally, re-apply this section's split shape on top of the new upstream body — the diff is two functions, one line each.
 
 ## Relationship to the broader marketing plugin
 

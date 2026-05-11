@@ -3,7 +3,7 @@
 # Ported: 2026-04-24
 # License: MIT — see plugins/marketing/references/tam/UPSTREAM.md
 # Upstream path: scripts/verify_smtp.py
-# Changes: verbatim port, no functional edits
+# Changes: verbatim port + BC-7051 local fix (split async/sync CMs at line 68 — see UPSTREAM.md)
 
 """
 SMTP verification via MillionVerifier.
@@ -65,19 +65,20 @@ async def verify_one(session, record: dict) -> dict:
 
 async def run(records: list[dict], outfile: str):
     sem = asyncio.Semaphore(CONCURRENCY)
-    async with aiohttp.ClientSession() as session, open(outfile, "w") as f:
-        async def bound(rec):
-            async with sem:
-                return await verify_one(session, rec)
-        tasks = [bound(r) for r in records]
-        done = 0
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            f.write(json.dumps(result) + "\n")
-            f.flush()
-            done += 1
-            if done % 500 == 0:
-                print(f"  [smtp] {done}/{len(records)}", file=sys.stderr)
+    with open(outfile, "w") as f:
+        async with aiohttp.ClientSession() as session:
+            async def bound(rec):
+                async with sem:
+                    return await verify_one(session, rec)
+            tasks = [bound(r) for r in records]
+            done = 0
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
+                f.write(json.dumps(result) + "\n")
+                f.flush()
+                done += 1
+                if done % 500 == 0:
+                    print(f"  [smtp] {done}/{len(records)}", file=sys.stderr)
 
 
 def main():
