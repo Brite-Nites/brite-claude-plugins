@@ -70,14 +70,16 @@ Wall ≈ 5-15s. All read-only except the auto-invoked `/flow:audit` which may mu
 
 **Step 1.1 — Load `.flow/config.json`** from `$(git rev-parse --show-toplevel)`. Absence = config missing; abort with `"FDA config missing. Run /flow:start-project or /flow:retrofit-project to bootstrap."` exit 1. Read `linear_project_id`, `linear_project_name`, `linear_team_key` for downstream MCP calls.
 
+**`linear_team_key` shape validation (defense-in-depth).** After load, validate that `linear_team_key` matches `^[A-Z][A-Z0-9_]{0,15}$` (Linear team-key shape — uppercase letters, digits, underscores; bounded length). Mismatch → fail-closed: `"linear_team_key '<value>' has invalid shape; expected ^[A-Z][A-Z0-9_]{0,15}$. Edit .flow/config.json to correct."` exit 1. This guards the Step 1.2 tier 3 git-branch regex construction against regex metacharacters or wildcard team-keys that would defeat the boundary — a `linear_team_key` value of `.*` would silently match any branch substring; `(?:` would raise a regex-compile error at runtime. Even after shape validation, the regex construction in Step 1.2 tier 3 splices via `re.escape(linear_team_key)` (double-layer defense).
+
 **Step 1.2 — Resolve target issue per the 4-tier cascade (Q43 sub-decision 3, priority order):**
 
 1. **Positional arg** — if `<discipline-child-issue-id>` supplied, use verbatim.
 2. **Breadcrumb `domains[N].current_sub_flow`** — read `docs/plans/.flow-phase-state.json` (Q31.4); if `current_phase` indicates a per-sub-flow phase (e.g., `linear-scaffold/<DOMAIN>` per Q31.2) AND a domain entry's `current_sub_flow` is set, use that sub-flow's `[Story]` child. Per-domain field locked at memory:284 — `current_sub_flow` IS a nested field within `domains[]`, not a top-level field.
-3. **Git branch parse** — `git rev-parse --abbrev-ref HEAD` and regex for `BC-\d+`; if exactly one match, use it.
-4. **`AskUserQuestion` fallback** — `list_issues({team: <linear_team_key>, label: "type:story", state: "started" | "unstarted" | "backlog", limit: 10})` filtered to discipline children with parents in the current project; present as a single-select picker. Per the `gotcha_linear_list_issues_project_filter.md` memory, Linear's `project:` filter is unreliable; this tier uses `team:` + `label:` and filters client-side by `parentId.projectId` to scope to the current FDA project.
+3. **Git branch parse** — Search `git rev-parse --abbrev-ref HEAD` output for the issue-ID pattern `(?:^|/)<linear_team_key>-[0-9]+\b` via Python `re.search` (NOT `re.match` — branches typically prefix with `feature/`, `holden/`, `bug/`, so the issue ID rarely starts at offset 0; the `(?:^|/)` alternation accepts start-of-string OR after a slash; the trailing `\b` rejects partial number matches like `BC-1234bar`). Regex constructed by splicing `re.escape(linear_team_key)` into the template — do NOT hardcode the prefix (Step 1.1's shape validation + `re.escape` is the double-layer defense). If exactly one match, use it; if multiple, take the first.
+4. **`AskUserQuestion` fallback** — Linear MCP `list_issues` `state` parameter takes a single enum per call (NOT a union), so fire **three separate parallel calls**, one per state: `list_issues({team: <linear_team_key>, label: "type:story", state: "<one of: started | unstarted | backlog>", limit: 10})`. Merge the three result sets, deduplicate by issue ID, sort by `updatedAt` descending, and present the top 3 most-recently-updated (plus "Other") as a single-select picker. Per the `gotcha_linear_list_issues_project_filter.md` memory, Linear's `project:` filter is unreliable; this tier uses `team:` + `label:` and filters client-side by `parentId.projectId` to scope to the current FDA project. **Capture the resolved issue's `labels[]`, `parentId`, `state`, and any other available metadata** from the `list_issues` response so Step 1.3 below can skip the `get_issue` round-trip ONLY for label verification — `body` and full parent details still require a `get_issue` fetch because `list_issues` truncates `description` (the `Plan not yet generated` placeholder marker can fall beyond the truncation point).
 
-**Step 1.3 — Verify discipline-label match.** Confirm resolved issue has `type:story` label per Q24 mod 3 standardized labels. On mismatch, error-with-redirect:
+**Step 1.3 — Fetch + verify discipline-label match + check parent existence.** Fetch the resolved issue via `get_issue(<resolved-id>)` — this single fetch is REQUIRED regardless of which cascade tier resolved the ID, because Linear's `list_issues` truncates `description` (the `Plan not yet generated` placeholder marker may fall beyond the truncation point, so Step 1.6 below MUST consume the full body from this `get_issue` response). For tier 4 where labels were captured from `list_issues`, the fetched labels should agree — defensive sanity check; mismatch indicates a Linear-side data race and surfaces as a stdout warning before proceeding. **Cache the full `get_issue` response object (`{labels, body, parent, ...}`) for reuse by Steps 1.4 + 1.6 — never re-fetch the same issue within a run.** Confirm `labels[]` contains `type:story` per Q24 mod 3 standardized labels. On mismatch, error-with-redirect:
 
 ```
 Issue <id> has type:<found-discipline> label; use /flow:plan-<found-discipline> instead.
@@ -85,13 +87,20 @@ Issue <id> has type:<found-discipline> label; use /flow:plan-<found-discipline> 
 
 Exit 1. No silent fall-through — the user explicitly selected `/flow:plan-story` and the discipline routing must match.
 
-**Step 1.4 — Fetch parent + siblings.** `list_issues({parentId: <discipline-child>.parentId, limit: 10})` returns the sub-flow parent and the 5 discipline children (Story + Eng + Design + QA + Docs). Title-only summaries are sufficient — Q24 templates' locked title format `<DOMAIN-NN> [<Discipline>] <Inventory title>` carries discipline in the title prefix per Q43 sub-decision 4. Cache the parent body in memory for the agent context package.
+**Orphan-parent halt.** If the cached `parent` field is null (no sub-flow parent), halt cleanly with `"Issue <id> has no parent sub-flow. Re-parent under a sub-flow or re-scaffold via flow-linear-scaffold before running /flow:plan-story."` exit 1. Steps 1.4 / 1.5 / 1.7 all depend on a resolvable parent (sibling list in 1.4 via `parentId`; parent title → `<DOMAIN-NN>` in 1.5; audit `--flow=<DOMAIN-NN>` filter in 1.7); halting here is cleaner than allowing the downstream calls to fail mid-pipeline on null deref.
+
+**Step 1.4 — Fetch parent body + siblings (parallel).** Fire two Linear MCP calls in parallel — both depend only on `parent.id` (known from Step 1.3's cached discipline-child response) with no inter-call data dependency:
+
+- `get_issue(<discipline-child>.parent.id)` → full parent issue body (Q23 mod 2 places `## L3 review summary` here when scaffolded). Required as a separate fetch because Linear's `list_issues` truncates `description` — the parent body cannot be reliably read from a `list_issues` response.
+- `list_issues({parentId: <discipline-child>.parent.id, limit: 10})` → the 5 discipline-child siblings (Story + Eng + Design + QA + Docs). Title-only summaries are sufficient — Q24 templates' locked title format `<DOMAIN-NN> [<Discipline>] <Inventory title>` carries discipline in the title prefix per Q43 sub-decision 4.
+
+Cache the full parent body (from `get_issue`) and the sibling title list (from `list_issues`) in memory for the agent context package. Wait for both parallel calls before proceeding to Step 1.5. Net savings vs serial dispatch: ~1-2s wall.
 
 **Step 1.5 — Locate story doc path.** Parse the parent issue's title for the `<DOMAIN-NN>` prefix; validate the parsed token against `^[A-Z][A-Z0-9-]+-[0-9]+$` (reject malformed tokens with "Malformed DOMAIN-NN token on parent issue title — aborting to prevent path traversal." exit 1). Read `docs/product/master-flow-inventory.md` to confirm the domain slug. Compose the path: `docs/product/flows/<domain>/<flow-id>.md`. Read the file body once into memory (cache for the agent context package). Absence → soft-warn `"Story doc not found at <path>; proceeding with empty story_doc context."` — the reviewer can still form a Story-perspective opinion from the parent body + AC.
 
 **Step 1.6 — Q43 caller-side double-layer safety gate.** Per Q43 sub-decision 6 (caller-side layer):
 
-1. Use the discipline child's body cached from Step 1.4's `list_issues` response (no additional MCP call — `list_issues` returns full bodies per the workflows MCP schema).
+1. Use the discipline child's FULL body cached from Step 1.3's `get_issue` response — NOT from a `list_issues` call. Linear's `list_issues` truncates `description` with `"(truncated, use get_issue for full description)"` (empirically verified against the workflows MCP), and the truncation point may fall BEFORE the `Plan not yet generated` placeholder marker — using a truncated body here produces false-positive "Plan section already populated" verdicts that cause the gate below to fire incorrectly. The `get_issue` fetch from Step 1.3 is the authoritative source.
 2. Locate the `<!-- FDA-WRITEBACK-plan-story-section-START -->` / `<!-- FDA-WRITEBACK-plan-story-section-END -->` marker pair.
 3. Extract content between the markers (verbatim, no trim).
 4. Check whether the extracted content contains the stable substring `Plan not yet generated` (the Q24 amendment 1 placeholder anchor — present in all 5 discipline-child template placeholder strings).
@@ -228,8 +237,10 @@ Q46 handles the rest:
 | Phase | Failure mode | Behavior |
 |---|---|---|
 | 1.1 | `.flow/config.json` missing | Abort with bootstrap pointer; `exit 1` |
+| 1.1 | `linear_team_key` shape validation fails (regex metachar or wildcard) | Abort with `.flow/config.json` edit pointer; `exit 1` |
 | 1.2 | All 4 cascade tiers exhausted (no issue resolvable) | Abort with `"No discipline-story child resolvable. Pass issue ID positionally or run from a project with active story children."`; `exit 1` |
 | 1.3 | Resolved issue has wrong discipline label | Error-with-redirect to the correct `/flow:plan-<X>`; `exit 1` |
+| 1.3 | Resolved issue has null `parent` (orphan parent) | Abort with re-parent / re-scaffold pointer; `exit 1` |
 | 1.4 | `list_issues` fails (Linear MCP auth or rate limit) | Surface MCP error to stdout; `exit 1` |
 | 1.5 | Story doc missing | Soft-warn; proceed with empty `story_doc` context |
 | 1.6 | Plan section already populated AND `--refresh` absent | Error with `--refresh` hint; `exit 1` |
