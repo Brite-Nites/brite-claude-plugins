@@ -33,3 +33,9 @@ tests/evals/behavioral-*.json
 # Python bytecode from scripts/_lib/ linters (lint_hooks.py, lint_cadence_gates.py, …)
 __pycache__/
 *.pyc
+
+# Node dependencies — tam-map ships package.json + lockfile; deps install locally.
+**/node_modules/
+
+# Worktree mountpoints created by /workflows:session-start (per-session, never committed).
+.claude/worktrees/
