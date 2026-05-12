@@ -1,13 +1,13 @@
 # BC-7061 mode-classifier eval report
 
-Generated: `2026-05-12T22:34:09Z`
+Generated: `2026-05-12T22:56:17Z`
 
 Per-case classifier output vs expected_mode, plus per-mode TP/FP matrix.
 Companion to `fixtures/mode-classifier-eval.json` (AC #6).
 
 ## Summary
 
-- PASS: 17
+- PASS: 15
 - FAIL: 0
 - DRIFT: 0 (expected_mode outside recognized registry)
 - SKIP: 4 (non-headless phases)

@@ -31,7 +31,9 @@ REPORT_MD="$SCRIPT_DIR/mode-classifier-eval-report.md"
 
 command -v python3 >/dev/null 2>&1 || { echo "fatal: python3 required" >&2; exit 127; }
 [ -f "$FIXTURE_JSON" ] || { echo "fatal: fixture missing: $FIXTURE_JSON" >&2; exit 1; }
-[ -x "$DETECT_MODE" ] || [ -f "$DETECT_MODE" ] || { echo "fatal: flow-detect-mode.sh missing: $DETECT_MODE" >&2; exit 1; }
+# Detector is invoked via `bash "$DETECT_MODE"` below, so existence (not the
+# +x bit) is the load-bearing precondition.
+[ -f "$DETECT_MODE" ] || { echo "fatal: flow-detect-mode.sh missing: $DETECT_MODE" >&2; exit 1; }
 
 RECOGNIZED_MODES="greenfield retrofit incremental-add resume"
 is_recognized_mode() {
@@ -125,30 +127,25 @@ print("" if lic is None else str(lic))
 PY
 }
 
-# extract_field <case-json> <field>
-# Pulls a single field from the case JSON via python3. Used for id /
-# expected_mode / description after the iterator hands them out.
-extract_field() {
-  CASE_JSON="$1" FIELD="$2" python3 - <<'PY'
-import json, os, sys
-case = json.loads(os.environ["CASE_JSON"])
-val = case.get(os.environ["FIELD"], "")
-sys.stdout.write(str(val))
-PY
-}
-
 # === Run cases =================================================================
+#
+# Preflight is a HARD GATE — case-count + schema-shape failures exit 1 immediately
+# instead of polluting the case-level PASS/FAIL counters. Treating preflight as
+# advisory leaves the case sweep running against a malformed fixture and produces
+# a misleading summary line (e.g., "17 pass" for a 15-case fixture if preflight
+# checks share the counter).
 
-section "1/3" "Fixture preflight"
+section "1/3" "Fixture preflight (hard gate)"
 total_cases="$(FIXTURE_JSON="$FIXTURE_JSON" python3 - <<'PY'
 import json, os
 print(len(json.load(open(os.environ["FIXTURE_JSON"]))))
 PY
 )"
 if [ "$total_cases" -ge 14 ]; then
-  pass "fixture JSON contains $total_cases cases (>= 14 per AC #2)"
+  printf '  [OK]   fixture JSON contains %s cases (>= 14 per AC #2)\n' "$total_cases"
 else
-  fail "fixture JSON contains $total_cases cases (< 14 per AC #2)"
+  printf '  [FAIL] fixture JSON contains %s cases (< 14 per AC #2)\n' "$total_cases" >&2
+  exit 1
 fi
 
 # AC #3 — each case has id / description / fixture_state / expected_mode.
@@ -165,25 +162,22 @@ print("OK")
 PY
 )"
 if [ "$schema_ok" = "OK" ]; then
-  pass "all cases have required fields (id, description, fixture_state, expected_mode)"
+  printf '  [OK]   all cases have required fields (id, description, fixture_state, expected_mode)\n'
 else
-  fail "cases missing required fields: $schema_ok"
+  printf '  [FAIL] cases missing required fields: %s\n' "$schema_ok" >&2
+  exit 1
 fi
 
 section "2/3" "Mode-classifier sweep ($total_cases cases)"
 
-# Iterate via python3 line-by-line so each case is a self-contained JSON object
-# (avoids shell-side JSON parsing under bash 3.2). Process substitution (rather
-# than pipe-to-while) keeps the loop body in the parent shell so PASS/FAIL/DRIFT
-# counter increments propagate — a pipe would fork a subshell and lose them.
-case_index=0
-while IFS= read -r case_line; do
-  case_index=$((case_index + 1))
-  CASE_JSON="$case_line"
-  case_id="$(extract_field "$CASE_JSON" id)"
-  expected="$(extract_field "$CASE_JSON" expected_mode)"
-  description="$(extract_field "$CASE_JSON" description)"
-
+# Generator emits one TSV line per case: id<TAB>expected_mode<TAB>description<TAB>
+# compact-json. Pre-flattening the three fixed fields in the same python3 pass
+# that's already parsing the fixture eliminates a per-case extract_field helper
+# that would otherwise fork python3 three more times per case (45 extra spawns
+# for the 15-case suite). Process substitution (rather than pipe-to-while) keeps
+# the loop body in the parent shell so PASS/FAIL/DRIFT counter increments
+# propagate — a pipe would fork a subshell and lose them.
+while IFS=$'\t' read -r case_id expected description case_json; do
   if ! is_recognized_mode "$expected"; then
     drift "$case_id: expected_mode='$expected' → MODE-CLASSIFIER-DRIFT-FAIL (not in registry: $RECOGNIZED_MODES)"
     printf '%s\t%s\t%s\t%s\n' "$case_id" "$expected" "(skipped)" DRIFT >> "$RESULT_TSV"
@@ -192,7 +186,7 @@ while IFS= read -r case_line; do
 
   case_dir="$WORKROOT/$case_id"
   mkdir -p "$case_dir"
-  lic="$(CASE_JSON="$CASE_JSON" stage_fixture "$case_dir")"
+  lic="$(CASE_JSON="$case_json" stage_fixture "$case_dir")"
 
   # Invoke flow-detect-mode.sh against the staged dir. LINEAR_ISSUE_COUNT is
   # honoured by the script via env (validates as non-negative integer; malformed
@@ -202,10 +196,10 @@ while IFS= read -r case_line; do
   else
     actual="$(bash "$DETECT_MODE" "$case_dir" 2>/dev/null || true)"
   fi
-  # Strip trailing whitespace / CR for cross-platform safety (LC_ALL=C already
-  # rules out locale weirdness, but stdout from a child shell can carry \r on
-  # some CI runners; cheap insurance).
-  actual="$(printf '%s' "$actual" | tr -d '\r\n')"
+  # Strip trailing CR/LF — child shell stdout can carry \r on some CI runners.
+  # Bash 3.2 parameter expansion avoids the subshell + tr fork-exec per case.
+  actual="${actual%$'\n'}"
+  actual="${actual%$'\r'}"
 
   if [ "$actual" = "$expected" ]; then
     pass "$case_id: $expected"
@@ -217,10 +211,15 @@ while IFS= read -r case_line; do
 done < <(FIXTURE_JSON="$FIXTURE_JSON" python3 - <<'PY'
 import json, os
 for case in json.load(open(os.environ["FIXTURE_JSON"])):
-    # Compact one-line JSON per case — newline-delimited stream feeds the
-    # bash `while read` loop above via process substitution. ensure_ascii
-    # keeps it bash 3.2 + LC_ALL=C safe.
-    print(json.dumps(case, ensure_ascii=True))
+    # ensure_ascii=True on the trailing JSON column keeps that field strictly
+    # ASCII (stage_fixture loads it back). Description is emitted raw; LC_ALL=C
+    # + bash `read` are byte-faithful, so the `→` arrows in the fixture survive.
+    print("\t".join((
+        case["id"],
+        case["expected_mode"],
+        case["description"],
+        json.dumps(case, ensure_ascii=True),
+    )))
 PY
 )
 
