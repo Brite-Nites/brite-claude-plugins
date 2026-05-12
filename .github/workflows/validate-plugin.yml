@@ -60,6 +60,25 @@ jobs:
       - name: Run clone-drift classifier regression (BC-7060)
         run: bash plugins/flow-architecture/tests/test-clone-drift.sh
 
+  audit-smoke-test:
+    # BC-7059 /flow:audit smoke test: exercises the Phase B (deterministic
+    # filesystem) gate subset against clean + broken FDA-shape fixtures.
+    # Advisory (continue-on-error) per issue spec — does not hard-block BC-6998
+    # but recommended pre-dogfood. Phase A verify-docs.sh deep parsing and
+    # Phase C Linear-MCP gates are skip-with-reason per vslice-greenfield
+    # precedent (LLM-runner / Linear access not headlessly invocable).
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 3
+    continue-on-error: true
+    permissions:
+      contents: read  # least-privilege — script only reads fixture files
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run /flow:audit smoke test (BC-7059)
+        run: bash plugins/flow-architecture/tests/run-audit-smoke.sh
+
   clone-drift-check:
     # BC-7060 advisory drift detection: compares FDA cloned commands
     # (session-start / review / ship) against current origin/main blobs of
