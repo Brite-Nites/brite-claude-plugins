@@ -8,7 +8,7 @@
 |---|---|
 | Plugin version at iter-1 start | `0.2.22` |
 | Brand Hub repo | `/Users/holdenhalford/projects/work/brite-nites/brand-hub` |
-| Brand Hub commit at iter-1 start | _populated at iter-1 Phase 1 entry_ |
+| Brand Hub commit at iter-1 start | `47dc542` |
 | Brand Hub Linear project | slug `brand-hub-beb1f3e9de7f` / id `61d8cd9b-67ba-4e62-b474-81d9ccf36d31` |
 | Brand Hub release target | 2026-05-19 |
 
@@ -22,8 +22,8 @@ Entry conditions: Brand Hub FDA-blank (verified 2026-05-12 via 5 filesystem `tes
 
 | Phase | Started | Exit | Reason | Artifacts |
 |---|---|---|---|---|
-| 1 — preflight + bootstrap | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
-| 2 — office-hours (fires; intent.md absent) | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
+| 1 — preflight + bootstrap | 2026-05-12T23:38Z | PASS (with 2 findings) | Env checks all PASS (bash 3.2.57, python3 3.14.3, git 2.50.1, gh auth yes). Section 6 bootstrap interview gates consolidated against the user's prior `/workflows:session-start` GO gate to avoid re-asking material already confirmed in the pre-flight findings doc. | `brand-hub/.flow/config.json` + `brand-hub/docs/plans/.flow-phase-state.json` (current_phase=2, completed=["1"], mode=retrofit) |
+| 2 — office-hours (fires; intent.md absent) | 2026-05-12T23:42Z | _in-flight; paused at Step 3 § 1_ | Step 1 defaults-tree row 1 (full-interview + L1 review path) ✓. Step 2 hybrid-input check on `brand-hub-beb1f3e9de7f` project description: NOT CDR-013-shape (no `## Problem` / `## Outcome` H2s) → pure-interview, no pre-fill. Step 3 sequential interview pending — 6 sections × 1 AskUserQuestion-per-turn + final-review + Step 5 L1 dispatch (4 parallel agents) before G2 fires. | none yet |
 | 3 render — cross-reference doc draft | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
 | 3 execute — Linear milestone appendix | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
 | 4 — inventory codebase-scan | _TBD_ | _TBD_ | _TBD_ | _TBD_ |
@@ -72,7 +72,9 @@ Plugin-side bugs caught during dogfood. Each gets a separate BC-issue with `flow
 
 | BC-issue | Severity | Phase | One-line summary |
 |---|---|---|---|
-| _none yet_ | | | |
+| _pending file_ | P1 | 1 (pre-preflight) | `commands/retrofit-project.md:218-222` prescribes `list_issues {project: <id>, limit: 10}`, which hits the known `gotcha_linear_list_issues_project_filter` (silent return of 0 issues). Causes mode classifier to choose `greenfield`, then orchestrator's mode-guard (line 237) errors out with "Use /flow:start-project for greenfield" — completely blocks `/flow:retrofit-project` for any project, including the v1.0 dogfood target. Workaround applied this iter: `team` + `query` text-search + client-side `projectId` filter. Fix: update orchestrator pre-preflight to either (a) document workaround inline, or (b) use a `get_project` slug-based path that returns project metadata + issue counts via a different MCP call. |
+| _pending file_ | P2 | 1 (breadcrumb write) | Plugin security hook (workflows-side) blocks the orchestrator's canonical pattern `python3 <<'PY' | bash $HELPER write ...` as a "piped download/execution" false-positive. The orchestrator at `commands/retrofit-project.md:253-269` explicitly prescribes this exact pattern, with rationale in the surrounding prose ("the `<<'PY'` heredoc is single-quoted so the inner python source is not subject to shell variable expansion"). Workaround: file intermediate via `mktemp -t flow-breadcrumb.XXXXXX` then `bash $HELPER write $PATH < $TMP_JSON`. Fix: either (a) refactor `flow-resume-breadcrumb.sh` to accept an input-path arg (avoiding stdin entirely), (b) update workflows security-hook allowlist to recognize the FDA pattern, or (c) update orchestrator prose + scripts to use file intermediate as the canonical recipe. |
+| _pending file_ | P3 | 2 (Step 3 interview) | Q42's strict one-question-per-turn interview (6 sections × AskUserQuestion + final-review + soft-warn re-prompts) doesn't compose cleanly with `AskUserQuestion`'s multi-choice-with-`Other`-fallback shape — the spec at `commands/office-hours.md:145` says "free-text input prompt with the Q41 length guidance shown inline" but `AskUserQuestion` is multi-choice-primary. The "Other" option provides free-text capture but as a UI-secondary action. Real-world impact: dogfood operator (this session) must either (a) fabricate 2–4 representative multi-choice options per section + an Other fallback, or (b) violate the gate-respect contract by collapsing sections. Recommended fix: amend Q42 to accept `AskUserQuestion`'s "free-text via Other" pattern as canonical, with a representative drafted option as Recommended. |
 
 ## Memory drift caught
 
