@@ -112,7 +112,7 @@ If both H2s present → CDR-013-shape detected → parse + pre-fill. If either m
 | `## Scope (Out)` sub-list (inside `## Scope (In / Out)`) | `## Out of scope` |
 | `## Risks & rabbit holes` | `## Constraints` |
 
-The four other Q41 sections (`## Mission`, `## Target users`, `## L1 review summary`) are NOT pre-filled — Mission and Target users are gap-filled by interview; L1 review summary is auto-populated by the L1 dispatch in Step 5.
+The three other Q41 sections (`## Mission`, `## Target users`, `## L1 review summary`) are NOT pre-filled — Mission and Target users are gap-filled by interview; L1 review summary is auto-populated by the L1 dispatch in Step 5.
 
 **Imprecise-mapping semantic gap.** CDR-013 "Risks & rabbit holes" is not exactly Q41 "Constraints" — risks are tempting actions to avoid, constraints are decision-shaping non-negotiables. Per Q42 user lock: mitigated by per-section **Approve / Edit / Replace** UX (sub-decision 3); the user is final validator on the cross-section mapping. Honest pushback considered: heuristic parsing of non-CDR-013 descriptions rejected because it would mislead users into thinking the system understood content it didn't.
 
@@ -174,7 +174,7 @@ Options:
 - **Edit specific section** — re-prompt that section's input with current value pre-filled (loops back through final-review until user approves or cancels).
 - **Cancel** — abort; no intent.md write; if the breadcrumb captured `office_hours_state`, mark `status: abandoned` per flow-preflight Q31.3 policy.
 
-The Approve / Edit / Cancel option set is load-bearing — three distinct terminal states for the final-review gate. Re-prompting any non-final user choice via a fresh `AskUserQuestion` (gate-respect contract — § below).
+The Approve / Edit / Cancel option set is load-bearing — three distinct terminal states for the final-review gate. Re-prompt any non-final user choice via a fresh `AskUserQuestion` per the gate-respect contract (§ below).
 
 **Front-matter auto-populated (NOT interview-asked):**
 
@@ -240,7 +240,7 @@ Wall: ~30–60s for the 4 parallel agents (haiku/sonnet mix per agent frontmatte
 
 Where `<N>` is the sum of non-empty concerns across the four agents.
 
-**v1.1 parking lot** (per Q42 sub-decision 4): routing L1 concerns to Linear via Q46 writeback (`l1-concerns` type registration) — deferred to v1.1 per Q46 type-registry pattern. Q46 writeback (v1.1) may supersede the file-only concerns destination; in v1 the concerns stay filesystem-only.
+**v1.1 parking lot** (per Q42 sub-decision 4): routing L1 concerns to Linear via Q46 writeback (`l1-concerns` type registration) — deferred to v1.1. In v1 the concerns stay filesystem-only at `docs/plans/l1-concerns-<ISO-8601>.md`.
 
 ## Final-atomic-write (Q42 sub-decision 5)
 
@@ -263,7 +263,9 @@ mv "$INTENT_TMP" "$INTENT_PATH"
 # Parse-verify: re-read $INTENT_PATH and confirm front-matter + 6 body sections + L1 sub-headings present.
 ```
 
-**Reasoning (push back on incremental fill).** Q11/Q19 Phase 0 read `intent.md` as the priority filter (memory:50, 192). If Q42 wrote incrementally (template + partial sections), Q11/Q19 reading mid-interview would see placeholder body — misleading inventory generation. Final-atomic-write means intent.md either doesn't exist (interview in flight) or fully populated (interview + L1 complete) — never partial. The Q41 placeholder strategy is for the `## L1 review summary` section specifically (the template ships with the L1 placeholder so the Q29.1 `intent-exists` structural gate can pass before office-hours runs the L1 review); NOT for incremental section writes during the interview.
+**Reasoning (push back on incremental fill).** Q11/Q19 Phase 0 read `intent.md` as the priority filter (memory:50, 192). If Q42 wrote incrementally (template + partial sections), Q11/Q19 reading mid-interview would see placeholder body — misleading inventory generation. Final-atomic-write means intent.md either doesn't exist (interview in flight) or fully populated (interview + L1 complete) — never partial.
+
+**Scope note on placeholders.** The Q41 placeholder strategy is for the `## L1 review summary` section specifically — the template ships with the L1 placeholder so the Q29.1 `intent-exists` structural gate can pass before office-hours runs the L1 review. It is NOT a license for incremental section writes during the interview; the placeholder lives inside an otherwise-fully-populated file or doesn't exist at all.
 
 **Failure mid-write.** Atomic rename guarantees absent-or-complete: on rename failure, the old intent.md (if any) stays untouched; on parse-verify failure after rename, surface the parse error + remediation hint ("re-run `/flow:office-hours --refresh` to regenerate L1 review section; if the body is corrupt, hand-edit + re-run").
 
