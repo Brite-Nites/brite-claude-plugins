@@ -1,0 +1,17 @@
+{
+  "version": "1",
+  "mode": "retrofit",
+  "status": "completed",
+  "linear_project_id": "00000000-0000-0000-0000-000000000000",
+  "linear_project_name": "audit-broken-shape-fixture",
+  "linear_team_key": "BC",
+  "run_started_at": "2026-05-10T12:00:00Z",
+  "last_updated": "2026-05-10T16:00:00Z",
+  "current_phase": "8",
+  "completed_phases": ["1", "2", "3", "4", "5", "6", "7", "8"],
+  "domains": [
+    {"slug": "team", "scaffold_state": "executed", "failure_reason": null, "parent_issue_ids": ["BC-1001", "BC-1002", "BC-1003"]},
+    {"slug": "ship", "scaffold_state": "executed", "failure_reason": null, "parent_issue_ids": ["BC-2001", "BC-2002", "BC-2003"]}
+  ],
+  "overrides": []
+}
