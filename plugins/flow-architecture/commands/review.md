@@ -2,7 +2,7 @@
 description: Self-verify work, simplify code, run review agents in parallel, fix P1s, report findings
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Drift-detection per parking lot #45. -->
+<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: a0ca0778e9c5629efff226e26fe1505eb05c2446. Drift-detection per parking lot #45. -->
 
 # Review Loop (Phase 5)
 

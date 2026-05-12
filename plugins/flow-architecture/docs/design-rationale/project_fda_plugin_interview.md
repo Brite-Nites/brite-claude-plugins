@@ -1489,6 +1489,11 @@ Seven sub-decisions:
    <!-- Cloned from workflows v3.29.4 (commands/session-start.md) on 2026-05-07. Drift-detection per parking lot #45. -->
    ```
 
+   **Amendment 1 — `Upstream-SHA:` backfill (BC-7060, 2026-05-12).** Header text augmented with `Upstream-SHA: <40-hex-blob>.` between the clone date and the parking-lot reference, operationalizing Q40 sub-decision 7's "SHAs captured in HTML-comment headers" requirement (line ~1864) and parking lot #45's drift-detection contract. SHA reflects the upstream blob at the latest commit ≤ 2026-05-08. Live form (per schema-discipline amendment pattern, plugin CLAUDE.md § Methodology notes item 4):
+   ```markdown
+   <!-- Cloned from workflows v3.29.4 (commands/session-start.md) on 2026-05-07. Upstream-SHA: 607c18cd3e126b588aacf7ec0ade5e2927481259. Drift-detection per parking lot #45. -->
+   ```
+
 2. **9-step structure preservation (NOT 8 — Q50 amendment 1 corrects).** Workflows session-start has Step 0 through Step 8 = 9 steps total. FDA-clone preserves all 9 step numbers + verbatim step titles where possible. Per-step FDA-swap mapping in sub-decision 3.
 
 3. **Per-step FDA-swap classification** (per Q50 sub-decision 5's 7-axis framework):
@@ -1541,6 +1546,11 @@ Seven sub-decisions:
 1. **Source baseline + drift-recording header.** Cloned from `repos/Brite-Nites/brite-claude-plugins/plugins/workflows/commands/review.md` at workflows v3.29.4 (re-verified gh API 2026-05-07 per parking-lot-#39 extension). FDA-clone HTML-comment header per Q50 sub-decision 6 + parking lot #45:
    ```markdown
    <!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Drift-detection per parking lot #45. -->
+   ```
+
+   **Amendment 1 — `Upstream-SHA:` backfill (BC-7060, 2026-05-12).** Header text augmented with `Upstream-SHA: <40-hex-blob>.` per Q51 sub-decision 1 amendment 1 pattern, operationalizing Q40 sub-decision 7. Live form:
+   ```markdown
+   <!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: a0ca0778e9c5629efff226e26fe1505eb05c2446. Drift-detection per parking lot #45. -->
    ```
 
 2. **9-step structure preservation (Step 0 through Step 8).** Workflows review.md has 9 steps verified via gh API re-grep 2026-05-07. FDA-clone preserves all 9 step numbers + verbatim step titles where possible. Per-step FDA-swap mapping in sub-decision 3.
@@ -1642,6 +1652,11 @@ Seven sub-decisions:
 1. **Source baseline + drift-recording header.** Cloned from `repos/Brite-Nites/brite-claude-plugins/plugins/workflows/commands/ship.md` at workflows v3.29.4 (re-verified gh API 2026-05-07 per parking-lot-#39 extension). FDA-clone HTML-comment header per Q50 sub-decision 6 + parking lot #45:
    ```markdown
    <!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Drift-detection per parking lot #45. -->
+   ```
+
+   **Amendment 1 — `Upstream-SHA:` backfill (BC-7060, 2026-05-12).** Header text augmented with `Upstream-SHA: <40-hex-blob>.` per Q51 sub-decision 1 amendment 1 pattern, operationalizing Q40 sub-decision 7. Live form:
+   ```markdown
+   <!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: a22fd5dae19065c499a1202a03120324a68fe2ce. Drift-detection per parking lot #45. -->
    ```
 
 2. **9-step structure preservation (Step 0 through Step 8).** Workflows ship.md has 9 steps verified via gh API re-grep 2026-05-07. FDA-clone preserves all 9 step numbers + verbatim step titles. Per-step FDA-swap mapping in sub-decision 3.
@@ -2055,6 +2070,8 @@ Brand Hub Linear project: id `61d8cd9b-67ba-4e62-b474-81d9ccf36d31`, lead Sarah 
 44. **Team retro facilitation features for Q44 (v1.1 candidate per Q44 sub-decision 5 user lock 2026-05-07).** Q44 v1 is AI-only synthesis from artifacts (no team retro facilitation). v1.1 enhancement: multi-participant input collection (each team member submits "what worked / level up" notes); voting on top items; synthesis from multi-perspective notes → consolidated retro. Cost: significant UX expansion; multiple AskUserQuestion rounds; per-participant input gathering. Promote if dogfood reveals AI-only synthesis is insufficient for team-driven retros (users want to facilitate via Q44 instead of just summarize).
 
 45. **Drift-detection for cloned workflows commands (v1.1 candidate per Q50 sub-decision 6 user lock 2026-05-07).** Q50 v1 accepts drift between FDA-cloned commands (Q51/Q52/Q53) and upstream workflows source (currently v3.29.4). v1.1 enhancement: periodic gh API check of `repos/Brite-Nites/brite-claude-plugins/plugins/workflows/commands/{session-start,review,ship}.md` content hashes vs FDA-clone's source-comment-recorded hash (each FDA-clone's HTML-comment header would record "Cloned from workflows v3.29.4 SHA <hash>"); surface drift warnings via flow-preflight check or dedicated `/flow:audit-clone-drift` command. Cost: implementation + scheduled invocation surface. Promote if Brand Hub dogfood reveals workflows updates are causing FDA-clone behavior drift (e.g., workflows session-start gains a Step 9 that FDA-clone misses).
+
+    **Promoted to advisory CI guard via BC-7060 (2026-05-12).** Implementation: `plugins/flow-architecture/scripts/check-clone-drift.sh` + advisory `clone-drift-check` job in `.github/workflows/validate-plugin.yml` (continue-on-error: true). Script reads each clone's `Upstream-SHA:` header (per Q51/Q52/Q53.1 amendment 1), resolves current upstream blob SHA via `git rev-parse origin/main:...`, classifies drift as trivial (≤5 lines + whitespace-only → WARN, exit 0) vs substantive (FAIL, exit 1). Companion regression test at `plugins/flow-architecture/tests/test-clone-drift.sh` exercises all three classifier paths on every PR via the `vslice-greenfield` job. Hard-block promotion deferred to v1.1; flip is a one-line change (`continue-on-error: false`). Parking lot stays open as a tracker for the hard-block promotion decision.
 
 46. **flow-brainstorming clone if dogfood reveals FDA-context miscalibration (v1.1 candidate per Q50 sub-decision 3 user lock 2026-05-07).** Q50 v1 reuses workflows brainstorming transparently. v1.1 enhancement: if Brand Hub dogfood reveals FDA-cloned session-start's context-prep is insufficient (workflows brainstorming doesn't surface FDA-specific framing in its prompts), introduce `flow-brainstorming` as 11th FDA sub-skill (Q30.2 amendment). FDA-shaped prompts directly reference FDA artifacts (intent.md, story doc, plan-X-section). Promote with dogfood signal + explicit Q30.2 amendment per schema-discipline precedent.
 
