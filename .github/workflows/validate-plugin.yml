@@ -79,6 +79,34 @@ jobs:
       - name: Run /flow:audit smoke test (BC-7059)
         run: bash plugins/flow-architecture/tests/run-audit-smoke.sh
 
+  mode-classifier-eval:
+    # BC-7061 flow-architecture mode-classifier eval fixture: stages temp
+    # project state per case and verifies scripts/flow-detect-mode.sh classifies
+    # greenfield / retrofit / incremental-add / resume correctly. Advisory
+    # (continue-on-error) per issue spec — does not hard-block BC-6998 but
+    # protects the Q36.3 step-4 heuristic from silent regressions. The Q12.5
+    # preamble emission and Q36.3 user-confirmation gate are skip-with-reason
+    # per vslice-greenfield precedent (interactive / LLM-bound surfaces).
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 3
+    continue-on-error: true
+    permissions:
+      contents: read  # least-privilege — harness only reads fixture + scripts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run mode-classifier eval (BC-7061)
+        run: bash plugins/flow-architecture/tests/run-mode-classifier-eval.sh
+
+      - name: Upload mode-classifier eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mode-classifier-eval-report
+          path: plugins/flow-architecture/tests/mode-classifier-eval-report.md
+          retention-days: 30
+
   clone-drift-check:
     # BC-7060 advisory drift detection: compares FDA cloned commands
     # (session-start / review / ship) against current origin/main blobs of
