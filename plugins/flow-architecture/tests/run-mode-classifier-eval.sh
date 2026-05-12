@@ -30,7 +30,9 @@ DETECT_MODE="$SCRIPT_DIR/../scripts/flow-detect-mode.sh"
 REPORT_MD="$SCRIPT_DIR/mode-classifier-eval-report.md"
 
 command -v python3 >/dev/null 2>&1 || { echo "fatal: python3 required" >&2; exit 127; }
-[ -f "$FIXTURE_JSON" ] || { echo "fatal: fixture missing: $FIXTURE_JSON" >&2; exit 1; }
+# -s rather than -f — an empty fixture file would pass -f, then crash with a
+# json.JSONDecodeError stack trace; -s gives a friendlier "missing or empty".
+[ -s "$FIXTURE_JSON" ] || { echo "fatal: fixture missing or empty: $FIXTURE_JSON" >&2; exit 1; }
 # Detector is invoked via `bash "$DETECT_MODE"` below, so existence (not the
 # +x bit) is the load-bearing precondition.
 [ -f "$DETECT_MODE" ] || { echo "fatal: flow-detect-mode.sh missing: $DETECT_MODE" >&2; exit 1; }
@@ -51,7 +53,9 @@ DRIFT=0
 # Per-case result rows (TSV): id<TAB>expected<TAB>actual<TAB>status
 RESULT_TSV="$(mktemp)"
 WORKROOT="$(mktemp -d)"
-trap 'rm -rf "$WORKROOT" "$RESULT_TSV"' EXIT
+# `--` prevents flag injection if either path ever started with a hyphen (mktemp
+# templates we control, so practically unreachable — defensive belt nonetheless).
+trap 'rm -rf -- "$WORKROOT" "$RESULT_TSV"' EXIT
 
 pass()    { printf '  PASS   %s\n' "$1"; PASS=$((PASS + 1)); }
 fail()    { printf '  FAIL   %s\n' "$1"; FAIL=$((FAIL + 1)); }
@@ -93,16 +97,25 @@ bc = state.get("breadcrumb")
 if bc is not None:
     bc_path = dest / "docs/plans/.flow-phase-state.json"
     if bc.get("malformed"):
+        # Distinct stale path from `malformed_timestamp` — exercises
+        # STALE_REASON=parse-error (whole-JSON parse failure).
         bc_path.write_text("{ this is not valid json", encoding="utf-8")
     else:
         # ISO-8601 UTC timestamp offset by age_days into the past. flow-resume-
         # breadcrumb.sh's STALE_AGE_SECONDS is 7 days; we span that boundary
-        # with 0d (fresh), 1d (fresh), 14d (stale-age) across the case list.
+        # at 0d / 1d / 6d (fresh), 8d / 14d (stale-age) across the case list.
+        # Avoid age_days=7 literally — wall-clock drift would make that flaky.
         age_days = int(bc.get("age_days", 0))
-        ts = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
-            days=age_days
-        )
-        last_updated = ts.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if bc.get("malformed_timestamp"):
+            # Exercises STALE_REASON=timestamp-unparseable — valid JSON, but
+            # last_updated cannot be parsed as ISO-8601. Distinct code path
+            # from the whole-JSON `malformed` branch above.
+            last_updated = "not-a-timestamp"
+        else:
+            ts = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+                days=age_days
+            )
+            last_updated = ts.strftime("%Y-%m-%dT%H:%M:%SZ")
         payload = {
             "version": "1",
             "mode": "incremental-add",
@@ -178,6 +191,14 @@ section "2/3" "Mode-classifier sweep ($total_cases cases)"
 # the loop body in the parent shell so PASS/FAIL/DRIFT counter increments
 # propagate — a pipe would fork a subshell and lose them.
 while IFS=$'\t' read -r case_id expected description case_json; do
+  # Path-traversal guard — case_id flows into case_dir below. Fixture is in-repo
+  # and reviewed via PR, so this is defense-in-depth, not a primary control.
+  case "$case_id" in
+    *..*|*/*) drift "$case_id: invalid id (path-traversal characters)"
+              printf '%s\t%s\t%s\t%s\n' "$case_id" "$expected" "(skipped)" DRIFT >> "$RESULT_TSV"
+              continue ;;
+  esac
+
   if ! is_recognized_mode "$expected"; then
     drift "$case_id: expected_mode='$expected' → MODE-CLASSIFIER-DRIFT-FAIL (not in registry: $RECOGNIZED_MODES)"
     printf '%s\t%s\t%s\t%s\n' "$case_id" "$expected" "(skipped)" DRIFT >> "$RESULT_TSV"
@@ -191,14 +212,24 @@ while IFS=$'\t' read -r case_id expected description case_json; do
   # Invoke flow-detect-mode.sh against the staged dir. LINEAR_ISSUE_COUNT is
   # honoured by the script via env (validates as non-negative integer; malformed
   # values are warned to stderr + ignored, matching MC-15's contract).
+  #
+  # Hermetic-env discipline (vslice-greenfield precedent): unset the three-tier
+  # resolution shortcuts so the detector probes the staged $case_dir afresh.
+  # A developer running this harness from a shell that ran flow-context-load.sh
+  # would otherwise inherit stale _FLOW_SHAPE_* / FLOW_SHAPE_CACHE.
   if [ -n "$lic" ]; then
-    actual="$(LINEAR_ISSUE_COUNT="$lic" bash "$DETECT_MODE" "$case_dir" 2>/dev/null || true)"
+    actual="$(unset _FLOW_SHAPE_INTENT_EXISTS _FLOW_SHAPE_INVENTORY_EXISTS \
+                    _FLOW_SHAPE_FLOWS_DIR_EXISTS _FLOW_SHAPE_BREADCRUMB_EXISTS \
+                    FLOW_SHAPE_CACHE
+              LINEAR_ISSUE_COUNT="$lic" bash "$DETECT_MODE" "$case_dir" 2>/dev/null || true)"
   else
-    actual="$(bash "$DETECT_MODE" "$case_dir" 2>/dev/null || true)"
+    actual="$(unset _FLOW_SHAPE_INTENT_EXISTS _FLOW_SHAPE_INVENTORY_EXISTS \
+                    _FLOW_SHAPE_FLOWS_DIR_EXISTS _FLOW_SHAPE_BREADCRUMB_EXISTS \
+                    FLOW_SHAPE_CACHE LINEAR_ISSUE_COUNT
+              bash "$DETECT_MODE" "$case_dir" 2>/dev/null || true)"
   fi
-  # Strip trailing CR/LF — child shell stdout can carry \r on some CI runners.
-  # Bash 3.2 parameter expansion avoids the subshell + tr fork-exec per case.
-  actual="${actual%$'\n'}"
+  # $(...) already strips trailing \n; the \r strip handles CRLF on CI runners
+  # that emit Windows line endings (defensive — current runners are ubuntu-latest).
   actual="${actual%$'\r'}"
 
   if [ "$actual" = "$expected" ]; then
@@ -249,10 +280,13 @@ for line in tsv:
         continue
     cid, expected, actual, status = line.split("\t")
     rows.append((cid, expected, actual, status))
-    if status == "PASS":
-        mode_matrix.setdefault(expected, {"tp": 0, "fp": 0})["tp"] += 1
-    elif status == "FAIL":
-        mode_matrix.setdefault(actual, {"tp": 0, "fp": 0})["fp"] += 1
+    # Guard with `in mode_matrix` — if the detector ever emits an unrecognized
+    # value (e.g., empty string on crash), `setdefault` would otherwise create
+    # a phantom key that never renders but pollutes the dict.
+    if status == "PASS" and expected in mode_matrix:
+        mode_matrix[expected]["tp"] += 1
+    elif status == "FAIL" and actual in mode_matrix:
+        mode_matrix[actual]["fp"] += 1
 
 now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 lines = [

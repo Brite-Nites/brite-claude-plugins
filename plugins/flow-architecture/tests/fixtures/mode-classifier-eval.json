@@ -178,5 +178,65 @@
       "linear_issue_count": "not-a-number"
     },
     "expected_mode": "greenfield"
+  },
+  {
+    "id": "MC-16",
+    "description": "full FDA + breadcrumb in_flight aged 8 days → incremental-add (stale-age boundary +1 from 7d threshold)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 8, "malformed": false},
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-17",
+    "description": "full FDA + breadcrumb in_flight aged 6 days → resume (fresh boundary -1 from 7d threshold)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 6, "malformed": false},
+      "linear_issue_count": null
+    },
+    "expected_mode": "resume"
+  },
+  {
+    "id": "MC-18",
+    "description": "full FDA + breadcrumb valid JSON + last_updated='not-a-timestamp' → incremental-add (Q31.3 STALE_REASON=timestamp-unparseable fallthrough, distinct path from MC-11)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 0, "malformed": false, "malformed_timestamp": true},
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-19",
+    "description": "intent only (no inventory, no flows) → greenfield (partial-FDA: Q12.3 AND gate requires intent AND inventory; single artifact falls through to LIC heuristic)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": false,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": null
+    },
+    "expected_mode": "greenfield"
+  },
+  {
+    "id": "MC-20",
+    "description": "flows only (no intent, no inventory) → greenfield (partial-FDA: Q12.3 AND gate requires intent AND inventory; flows-without-intent falls through)",
+    "fixture_state": {
+      "intent": false,
+      "inventory": false,
+      "flows": true,
+      "breadcrumb": null,
+      "linear_issue_count": null
+    },
+    "expected_mode": "greenfield"
   }
 ]
