@@ -1,7 +1,7 @@
 # BC-6971 — /flow:office-hours implementation plan
 
-> Source-of-truth memory: `~/.claude/projects/-Users-holdenhalford-Projects-work-brite-nites-brite-base/memory/project_fda_plugin_interview.md`
-> - Q42 lock (lines 885+) — 7 sub-decisions
+> Canonical source-of-truth (in-repo): `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md`
+> - Q42 lock (line 885+) — 7 sub-decisions
 > - Q42 refinement audit trail (line 970)
 > - Q31 amendment 1 (line 318) — `office_hours_state` slot
 > - Q41 template — verified live at `Brite-Nites/handbook:about-handbook/style-guide/templates/project-intent.md`
@@ -9,7 +9,7 @@
 
 ## Deliverable
 
-Single new command file: `plugins/flow-architecture/commands/office-hours.md` (utility command, not orchestrator — no breadcrumb writes from the command itself; reads breadcrumb on resume).
+Single new command file: `plugins/flow-architecture/commands/office-hours.md`. Utility command, not orchestrator — it does NOT own the top-level breadcrumb (the orchestrator does), but it DOES write its own `office_hours_state` slot during the interview per Q42 sub-decision 6 + Q31 amendment 1, via a read-then-write merge of the existing breadcrumb document.
 
 ## Approach
 
