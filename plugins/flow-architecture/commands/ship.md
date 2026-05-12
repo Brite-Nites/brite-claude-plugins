@@ -2,7 +2,7 @@
 description: FDA-shaped Ship & Compound — pre-ship audit + FDA-shaped PR + Q46 ship-summary writeback + retro soft-notification. Cloned from workflows ship.md with FDA-swap at Steps 1, 2, 3, 8 (Q53 lock).
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Drift-detection per parking lot #45. -->
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: a22fd5dae19065c499a1202a03120324a68fe2ce. Drift-detection per parking lot #45. -->
 
 # Ship & Compound
 

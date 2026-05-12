@@ -9,6 +9,8 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # least-privilege — all steps are read-only validators
     steps:
       - uses: actions/checkout@v4
 
@@ -40,12 +42,39 @@ jobs:
     # BC-7057 v-slice integration test: exercises FDA helper-script Phase 1 surface
     # against a synthetic greenfield fixture. Advisory (continue-on-error) per spec.
     # Extends as BC-6959 sub-skills land. See plugins/flow-architecture/tests/vslice-report.md.
+    # Also hosts the BC-7060 clone-drift classifier regression — co-located here for
+    # v1.0; split into a dedicated `clone-drift-test` job sitting next to
+    # `clone-drift-check` if a 2nd classifier regression test lands.
     runs-on: ubuntu-latest
     needs: validate
     timeout-minutes: 5
     continue-on-error: true
+    permissions:
+      contents: read  # least-privilege — harness scripts only read in-repo files
     steps:
       - uses: actions/checkout@v4
 
       - name: Run v-slice greenfield harness
         run: bash plugins/flow-architecture/tests/run-greenfield-vslice.sh
+
+      - name: Run clone-drift classifier regression (BC-7060)
+        run: bash plugins/flow-architecture/tests/test-clone-drift.sh
+
+  clone-drift-check:
+    # BC-7060 advisory drift detection: compares FDA cloned commands
+    # (session-start / review / ship) against current origin/main blobs of
+    # plugins/workflows/commands/*. Promotes parking-lot #45 from manual-grep
+    # contract to CI guard. Advisory (continue-on-error) per v1.0 spec —
+    # promotion to hard-block deferred to v1.1.
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    continue-on-error: true
+    permissions:
+      contents: read  # least-privilege — script only reads in-repo files
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history for blob SHA lookups across refs
+
+      - name: Detect FDA clone drift vs workflows-plugin
+        run: bash plugins/flow-architecture/scripts/check-clone-drift.sh
