@@ -1,6 +1,6 @@
 # BC-7061 mode-classifier eval report
 
-Generated: `2026-05-12T23:02:28Z`
+Generated: `2026-05-12T23:05:55Z`
 
 Per-case classifier output vs expected_mode, plus per-mode TP/FP matrix.
 Companion to `fixtures/mode-classifier-eval.json` (AC #6).

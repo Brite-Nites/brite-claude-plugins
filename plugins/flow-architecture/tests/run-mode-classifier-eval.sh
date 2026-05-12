@@ -162,22 +162,33 @@ else
 fi
 
 # AC #3 — each case has id / description / fixture_state / expected_mode.
+# Also enforces a TSV-stream contract: id and description MUST NOT contain
+# tab or newline characters (the case-generator below packs them into a
+# tab-delimited 4-column stream that bash `IFS=$'\t' read -r` parses).
 schema_ok="$(FIXTURE_JSON="$FIXTURE_JSON" python3 - <<'PY'
 import json, os, sys
 required = ("id", "description", "fixture_state", "expected_mode")
 cases = json.load(open(os.environ["FIXTURE_JSON"]))
-missing = [c.get("id", "<no-id>") for c in cases
-           if not all(k in c for k in required)]
-if missing:
-    print(",".join(missing))
+problems = []
+for c in cases:
+    cid = c.get("id", "<no-id>")
+    if not all(k in c for k in required):
+        problems.append(f"{cid}:missing-field")
+        continue
+    for col in ("id", "description"):
+        val = c.get(col, "")
+        if "\t" in val or "\n" in val:
+            problems.append(f"{cid}:tsv-unsafe-{col}")
+if problems:
+    print(",".join(problems))
     sys.exit(0)
 print("OK")
 PY
 )"
 if [ "$schema_ok" = "OK" ]; then
-  printf '  [OK]   all cases have required fields (id, description, fixture_state, expected_mode)\n'
+  printf '  [OK]   all cases have required fields and TSV-safe id/description\n'
 else
-  printf '  [FAIL] cases missing required fields: %s\n' "$schema_ok" >&2
+  printf '  [FAIL] schema violations: %s\n' "$schema_ok" >&2
   exit 1
 fi
 
