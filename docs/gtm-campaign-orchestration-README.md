@@ -8,23 +8,22 @@
 
 ## 1. TL;DR
 
-```
-   What                                   Where
-   ──────────────────────────────────────────────────────────────────
-   The problem                            §2 of this README
-   The architecture (3-layer + SF)        §3 here + design doc §7.8
-   MSPA + experiment-to-campaign flywheel §3.5 here + mmf SKILL.md
-   How we got here (research → BCs)       §4 here
-   What was decided (~30 locks)           §5 here + design doc §1-§7
-   Glossary                               §6 here
-   The 23 Linear issues                   §7 here + docs/linear-
-                                          issues-created.md
-   Why each choice (decision log)         §8 here
-   Onboarding by role                     §9 here
-   Where to find what                     §10 here
-   How we know nothing's missing          §11 here (audit narrative)
-   Next steps + open items                §12 here
-```
+| What | Where |
+|---|---|
+| The problem | [§2](#2-why-this-exists) |
+| The architecture (3-layer + SF) | [§3](#3-the-architecture-at-a-glance) + design doc §7.8 |
+| MSPA + experiment-to-campaign flywheel | [§3.5](#35-mspa--the-experiment-to-campaign-flywheel) + mmf SKILL.md |
+| Worked example (one campaign end-to-end) | [§3.6](#36-worked-example--one-campaign-end-to-end) |
+| How we got here (research → BCs) | [§4](#4-the-journey-how-we-got-here) |
+| What was decided (~30 locks) | [§5](#5-what-was-decided) + design doc §1-§7 |
+| Glossary | [§6](#6-glossary) |
+| The 23 Linear issues | [§7](#7-the-23-linear-issues) + `docs/linear-issues-created.md` |
+| Decision-ID → BC cross-reference | [§7.5](#75-decision-id--bc-cross-reference) |
+| Why each choice (decision log) | [§8](#8-decision-log--why-each-lock) + ADRs 012-019 |
+| Onboarding by role | [§9](#9-per-audience-onboarding) |
+| Where to find what | [§10](#10-artifact-index) |
+| How we know nothing's missing | [§11](#11-how-we-know-nothings-missing--the-audit-narrative) |
+| Next steps + open items | [§12](#12-next-steps--open-items) |
 
 **Critical path entry point**: [BC-8712](https://linear.app/brite-nites/issue/BC-8712) (Task 0 — bootstrap).
 
@@ -706,6 +705,58 @@ Sequential effort: S + S + M + L + M + S + M + L ≈ **5-6 weeks** at single-dev
 
 **Mermaid dependency graph**: `docs/project-plan-refined.md` Section 4.
 **Full per-BC tables**: `docs/linear-issues-created.md` (BC ↔ task mapping, priority rationale, blocked-by map).
+
+---
+
+## 7.5 Decision-ID → BC cross-reference
+
+Every locked decision maps to at least one BC, an ADR, or an explicit out-of-scope acknowledgment. This is the auditor's lens — verifies "every decision has a home."
+
+| Decision | BCs | ADR | Notes |
+|---|---|---|---|
+| **D1** Campaign unit = V × P × O × M | BC-8724 | [ADR-012](decisions/012-gtm-campaign-unit.md) | `/marketing:plan-campaign` implements |
+| **D2** 3-layer split (Handbook/Linear/Plugin) | BC-8712 | [ADR-013](decisions/013-gtm-three-layer-split.md) | Architectural anchor in Task 0 README |
+| **D3** Sub-issues = stand-up work | BC-8724 | — | Sub-issue emission in Step 12 |
+| **D4** 8+2 sub-issue template | BC-8724 | — | Step 12 full blocked-by chain |
+| **D5** Brief in Linear milestone desc | BC-8724 | — | Step 10a handbook template population |
+| **D6** Handbook = navigation | BC-8734 | — | active-campaigns.md repoint |
+| **D7** Thin canonicals schema | BC-8718 | [ADR-016](decisions/016-gtm-plugin-side-canonicals.md) | Schema in Step 1 |
+| **D8** Persona authorship process | BC-8730 | — | Doc + cadence + ownership; depends on V3 |
+| **D9** Single-repo schema versioning | BC-8718 | [ADR-016](decisions/016-gtm-plugin-side-canonicals.md) | `_manifest.yaml` `schema_version: 1` |
+| **D10** DROPPED — `--handbook-ref` flag | — | [ADR-016](decisions/016-gtm-plugin-side-canonicals.md) | Out of scope (canonicals plugin-local) |
+| **D11** 27 verticals day-1 | BC-8718 | — | Backfill scope |
+| **O1** Status labels | BC-8723, BC-8724 | [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md) | Mapping table + label application |
+| **O2** Slug rule + manifest.json | BC-8724 | [ADR-012](decisions/012-gtm-campaign-unit.md) | Slug computation Step 5 + manifest write Step 9 |
+| **O3** `/marketing:plan-campaign` cmd | BC-8724 | — | The command itself |
+| **O5** Same-month -v2 suffix | BC-8724 | — | Step 5 collision branch |
+| **O6.Q1** Salesforce rollup home | BC-8714, BC-8715, BC-8716 | [ADR-014](decisions/014-gtm-salesforce-portfolio-rollup.md) | Views + Performance Dashboard + Pipeline-by-Offer-Family |
+| **O6.Q2** Default view spec | BC-8714 | — | Active Campaigns saved view |
+| **O6.Q3 r1** Daily — no rollup | BC-8735 | — | Handbook PR cadence rows |
+| **O6.Q3 r2** Weekly GTM sync views | BC-8714, BC-8735 | — | Active Campaigns + Launch Calendar |
+| **O6.Q3 r3** Monthly review | BC-8715, BC-8731, BC-8735 | — | Performance Dashboard + snapshot + handbook cadence |
+| **O6.Q3 r4** Quarterly planning | BC-8716, BC-8731, BC-8735 | — | Pipeline Dashboard + snapshot --quarterly + brite-gtm queue |
+| **O6.Q4** Retro subsumed by D4 + Q3 | — | — | No BC (implicit; handbook PR may reference) |
+| **O6.Q5** portfolio-snapshot ships | BC-8731, BC-8729 | [ADR-014](decisions/014-gtm-salesforce-portfolio-rollup.md) | Command + V3 gate |
+| **O7** brite-gtm = pre-Linear queue | — | — | Out of scope (no plugin work needed) |
+| **O11/σ3** SF auto-create | BC-8717 | [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md) | `create_sf_campaign` MCP tool |
+| **σ3 scope expansion** | BC-8723, BC-8752 | [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md) | `update_sf_campaign_status` + trigger wiring |
+| **Vocab Identity Q1** Vertical / Market | — | — | No BC; canonical (handbook prose) |
+| **Vocab Identity Q2** ICP / Segment | — | — | No BC; canonical (handbook prose) |
+| **Vocab Identity Q3** 4-layer offer model | BC-8720 | [ADR-017](decisions/017-gtm-offer-posture-rename.md) | Family / Posture / Angle / Specific Instance |
+| **Vocab Identity Q4** Persona schema | BC-8718 | [ADR-016](decisions/016-gtm-plugin-side-canonicals.md) | slug + display + titles[] in canonicals |
+| **Vocab Identity Q5** Offer Tier → Posture | BC-8720 | [ADR-017](decisions/017-gtm-offer-posture-rename.md) | Cross-skill rename migration |
+| **Vocab State Q1** 3 distinct verdicts | BC-8721 | [ADR-018](decisions/018-gtm-verdict-vocabularies.md) | Parent label renames per skill |
+| **Vocab Artifact Q1** Entity slug short-form | BC-8719 | — | Migration `brite-{entity}/` → `{entity}/` |
+| **discoveries.json category pattern** | BC-8722 | [ADR-019](decisions/019-gtm-mspa-flywheel-as-architecture-spine.md) | 4-category schema |
+| **Phase 2: Handbook = HOW pivot** | BC-8732, BC-8733 | [ADR-013](decisions/013-gtm-three-layer-split.md) | Handbook framework docs |
+| **Phase 2: canonicals plugin-side** | BC-8718 | [ADR-016](decisions/016-gtm-plugin-side-canonicals.md) | Path + schema lock |
+| **MSPA flywheel as architecture spine** | BC-8721, BC-8722, BC-8728, BC-8731, BC-8733 | [ADR-019](decisions/019-gtm-mspa-flywheel-as-architecture-spine.md) | The compounding pattern |
+| **V1** gh CLI auth audit | — | — | Out of scope per plan §7 |
+| **V2** Handbook parsing audit | BC-8732 | — | Inline grep during vocabulary.md drafting |
+| **V3** Marketing buy-in | BC-8729 | — | Load-bearing M2/M3 gate |
+| **O4** Post-launch metric writeback | — | — | Out of scope per plan §7 (future) |
+
+**Verification check**: 40 rows, 23 unique BCs cited + 8 ADRs cited + 6 explicit out-of-scope rows. Spot-check any decision in §5 or §8 → resolves to this table → resolves to BC or ADR.
 
 ---
 
