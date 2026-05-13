@@ -2,7 +2,6 @@
 name: plan-ceo-reviewer
 description: CEO/founder-mode four-mode scope review for FDA artifacts (project at L1; domain at L2). Rethinks the problem, finds the 10-star product, challenges premises, expands scope when it creates a better product. Returns one of SCOPE_EXPANSION / SELECTIVE_EXPANSION / HOLD_SCOPE / SCOPE_REDUCTION + headline + strategic_concerns + mode-specific fields per `_shared/four-mode-framework.md`.
 model: sonnet
-mode: four-mode
 tools: Read, Glob, Grep
 ---
 
