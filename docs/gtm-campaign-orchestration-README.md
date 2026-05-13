@@ -250,6 +250,194 @@ All canonical in handbook per O14 / BC-8732/BC-8733:
 
 ---
 
+## 3.6 Worked example — one campaign, end-to-end
+
+To make all the abstractions concrete, here's a single campaign walked through every layer.
+
+**Scenario**: Brite Nites wants to test a Municipalities-vertical Free ROP Audit offer with Public Works Directors as the targeted persona, launching in May 2026.
+
+### Step 0 — Strategic context (BEFORE the operator runs anything)
+
+The MSPA matrix for `nites` already has a row (from a prior MAP or ITERATE batch):
+
+```
+   Market: "Mid-size US cities exploring smart-lighting RFPs with
+            new federal infrastructure dollars"
+   Segment: Municipalities, $5M-$50M annual budget, no existing
+            outdoor-lighting RFP committee
+   Persona: Public Works Director
+   Angle: "ROP audit shows you what's burning out — and you can
+            fund the next phase from the federal pot you already
+            have."
+   Verdict: PENDING (this is the experiment)
+```
+
+This drives the campaign that's about to be created.
+
+### Step 1 — Operator runs the scaffolding command
+
+```bash
+/marketing:plan-campaign \
+  --vertical municipalities \
+  --persona public-works-director \
+  --offer free-rop-audit \
+  --month 5 \
+  --year 2026 \
+  --launch-date 2026-05-15
+```
+
+(Or runs `/marketing:plan-campaign` with no flags and is walked interactively, one question at a time.)
+
+### Step 2 — Canonicality validation (Plug-in side filesystem read)
+
+The command reads `plugins/marketing/data/canonicals/_manifest.yaml` and `plugins/marketing/data/canonicals/municipalities.yaml`. Verifies:
+
+- `vertical: municipalities` ✓ exists
+- `personas[].slug: public-works-director` ✓ exists, with `titles[]: ["Public Works Director", "Director of Public Works", ...]`
+- `offers[].slug: free-rop-audit` ✓ exists, `status: active`
+
+Any miss → hard-fail with pointer to `/marketing:new-vertical | new-offer | new-persona` (BC-8725).
+
+### Step 3 — Slug computation
+
+`municipalities-public-works-director-free-rop-audit-fy26-m05`
+
+Validates against `^[a-z0-9-]{1,80}$` ✓. Checks Linear "Brite GTM" project for collision → none. (If there were one, operator would be prompted to append `-v2`.)
+
+### Step 4 — Dry-run preview + two-call confirm
+
+Command prints the full plan: slug, entity (nites — auto-inferred from Municipalities vertical), launch date, sub-issue titles, manifest.json schema, SF Campaign payload, EB workspace (`emailbison-personal` for Nites). Operator types `y` to confirm.
+
+### Step 5 — Plugin filesystem write
+
+Creates `docs/campaigns/nites/municipalities-public-works-director-free-rop-audit-fy26-m05/manifest.json`:
+
+```json
+{
+  "schema_version": 1,
+  "slug": "municipalities-public-works-director-free-rop-audit-fy26-m05",
+  "entity": "nites",
+  "vertical": "municipalities",
+  "persona": "public-works-director",
+  "offer": "free-rop-audit",
+  "year": 2026,
+  "month": 5,
+  "linear": { "milestone_id": null, "milestone_url": null, "project": "Brite GTM" },
+  "salesforce": { "campaign_id": null, "campaign_name": "municipalities-public-works-director-free-rop-audit-fy26-m05" },
+  "email_bison": { "workspace": "emailbison-personal", "campaign_id": null, "campaign_name": "...", "launched_at": null },
+  "created_at": "2026-05-12T14:32:11Z",
+  "scaffolded_by": "/marketing:plan-campaign"
+}
+```
+
+### Step 6 — Linear milestone created in "Brite GTM" project
+
+- **Name**: `municipalities-public-works-director-free-rop-audit-fy26-m05`
+- **Description**: filled `campaign-brief-template.md` (8 sections) populated from handbook `verticals/municipalities/README.md` ICP section + `offers/free-rop-audit.md` content
+- **Labels**: `slug:...`, `entity:nites`, `vertical:municipalities`, `persona:public-works-director`, `offer:free-rop-audit`, `year:2026`, `month:05`, `status:planning`
+
+Manifest `linear.milestone_id` + `linear.milestone_url` updated.
+
+### Step 7 — Salesforce auto-create (σ3 / via revops MCP)
+
+`mcp__plugin_revops_salesforce__create_sf_campaign(slug, entity="nites", vertical="municipalities", persona="public-works-director", offer="free-rop-audit", year=2026, month=5, owner_email=<auto-detected>, launch_date=2026-05-15)` fires.
+
+SF Campaign created with `Name=slug`, `Vertical__c="municipalities"`, `Persona__c="public-works-director"`, `Offer__c="free-rop-audit"`, `Entity__c="nites"`, `Status="Planned"`, `StartDate=2026-05-15`.
+
+Manifest `salesforce.campaign_id` + `salesforce.campaign_name` updated.
+
+**Soft-fail path**: if SF MCP is unavailable, manifest gets `campaign_id: null`, command warns + continues. Operator runs `/marketing:sync-campaign-status --slug=... --status=planning` later to reconcile (BC-8752).
+
+### Step 8 — 8 sub-issues created with blocked-by chain
+
+```
+   #1 Brief approved                  blocks #2, #3, #4, #5, #6, #7, #8
+   #2 Target list built               blocks #3
+   #3 Copy written + approved         blocks #4
+   #4 Salesforce setup (post-σ3 = reconciliation + audience members)  blocks #5
+   #5 Pre-launch QA                   blocks #6
+   #6 Launch executed                 blocks #7
+   #7 Active management — weekly      blocks #8
+   #8 Campaign closed + debrief       terminal
+```
+
+Operator can also add `--situation-mining` (rejected here — Labs only) or `--creative-angles` (optional).
+
+### Step 9 — Summary output
+
+Command prints milestone URL, slug, manifest path, sub-issue count + IDs.
+
+### What happens next — execution lifecycle
+
+```
+   T-21d  Sarah Cullen drafts brief → reviews → closes sub-issue #1
+                ↓
+   T-14d  Corinne uses /marketing:list-building to build target list
+          (reads canonicals municipalities.yaml personas[].titles[] for
+           "Public Works Director" cascade) → closes sub-issue #2
+                ↓
+   T-10d  Sarah writes copy via /marketing:email-copywriting (artifact:
+          docs/campaigns/nites/copy-municipalities-public-works-director-
+          {date}.json with offer_posture: "free-asset" + offer_summary
+          field + recency-waterfall framing) → closes sub-issue #3
+                ↓
+   T-7d   Corinne reconciles SF Campaign (sub-issue #4); adds
+          CampaignMember records from list-building export → closes #4
+                ↓
+   T-3d   Pre-launch QA (deliverability + copy + sender warm-up) → #5
+                ↓
+   T+0    /marketing:launch-campaign fires EB campaign
+          → manifest.email_bison.campaign_id populated
+          → manifest.email_bison.launched_at = "2026-05-15T10:00:00Z"
+          → Phase 11 calls update_sf_campaign_status(slug, "active",
+             null) (BC-8752 trigger automation)
+          → SF Campaign.Status = "In Progress"
+          → Linear status:planning label removed; status:active added
+          → sub-issue #6 closed
+                ↓
+   T+7d   /marketing:campaign-analysis runs → emits
+          analysis-municipalities-public-works-director-free-rop-audit-
+          fy26-m05-{date}.md with 6 sections + verdict tokens
+          (TOP PERFORMER / SCALE / TEST MORE / MONITOR / UNDERPERFORM
+           per ranked segment row)
+                ↓
+   T+30d  Corinne closes sub-issue #7 (Active management); runs
+          /marketing:campaign-debrief
+          → reads analysis-*.md for Q1/Q2/Q3 auto-suggestions
+          → appends to docs/campaigns/nites/learnings.md with
+             campaign_verdict: ITERATE + transferable_note: "ROP
+             angle worked on mid-size cities; struggles on small
+             towns under $5M budget"
+          → triggers update_sf_campaign_status(slug, "completed", null)
+          → SF Campaign.Status = "Completed"
+          → sub-issue #8 closed; Linear status:completed label
+                ↓
+   Then   /marketing:message-market-fit ITERATE Step 3.5 reads
+          learnings.md transferable_note back → updates mmf-matrix.md
+          Results Log row from Verdict: PENDING → Verdict: KIND OF
+          WORKS, Notes column: "[from debrief: ROP angle worked on
+          mid-size cities; struggles on small towns under $5M
+          budget]"
+          → mmf-batch-{N+1}.md designed with refined Segment narrowing
+```
+
+### How this campaign shows up in rollup
+
+- **Monthly review (T+30d)**: appears in SF Coverage by Vertical view; Performance Dashboard shows its pipeline; `/marketing:portfolio-snapshot --monthly` includes it in:
+  - Portfolio shape section (1 campaign under Municipalities)
+  - Verdict distribution section (1 ITERATE)
+  - Transferable insights section ("ROP angle worked on mid-size cities; struggles on small towns")
+  - Cumulative transferables get re-aggregated by `campaign-debrief`'s `learnings.md` regen on next debrief
+- **Quarterly review (Q2)**: appears in Pipeline by Offer Family Dashboard alongside other "free-rop-audit" campaigns (if any); `/marketing:portfolio-snapshot --quarterly` shows MSPA matrix transition + persona drilldown
+
+### What got produced
+
+1 Linear milestone + 8 sub-issues + 1 SF Campaign + 1 manifest.json + 1 copy-*.json + 1 analysis-*.md + 1 learnings.md append + 1 mmf-matrix.md Results Log row.
+
+That's the system in operation.
+
+---
+
 ## 4. The journey (how we got here)
 
 ```
@@ -331,7 +519,46 @@ All canonical in handbook per O14 / BC-8732/BC-8733:
 | **O6.Q3 row 3** | Monthly review — Coverage by Vertical + NEW Performance Dashboard + `/marketing:portfolio-snapshot --monthly` | Monthly needs qualitative + quantitative merge; SF alone misses learnings/debriefs |
 | **O6.Q3 row 4** | Quarterly planning — Coverage (FY) + Performance Dashboard (FY) + NEW Pipeline by Offer Family Dashboard + `--quarterly` snapshot + brite-gtm queue | Offer-family granularity is quarterly-specific; brite-gtm is pre-Linear ideation graduation point |
 | **O6.Q4** | Retro rhythm subsumed by D4 + Q3 | No weekly/annual/per-vertical/cycle retro needed; existing layers cover |
-| **O6.Q5** | `/marketing:portfolio-snapshot` ships with two flags only | V3-gated; anti-creep guards (no charts/forecasts/custom windows) load-bearing |
+| **O6.Q5** | `/marketing:portfolio-snapshot` ships with two flags only | V3-gated; anti-creep guards (no charts/forecasts/custom windows) load-bearing — see M2/M3 callout below |
+
+#### M2 vs M3 — what V3 ratification ships (or drops)
+
+V3 ratification (BC-8729) determines the outcome. The decision shapes what 5 BCs ship.
+
+```
+   M2 (Marketing RATIFIES the packet)        M3 (Marketing REJECTS the packet)
+   ───────────────────────────────────       ───────────────────────────────────
+   ✓ 4 SF custom fields (BC-8713)             ✓ 4 SF custom fields (BC-8713)
+   ✓ 4 SF saved list views (BC-8714)          ✓ 4 SF saved list views (BC-8714)
+   ✓ Performance Dashboard (BC-8715)          ✓ Performance Dashboard (BC-8715)
+   ✓ Pipeline-by-Offer-Family Dash (BC-8716)  ✗ Pipeline-by-Offer-Family DROPPED
+   ✓ create_sf_campaign MCP (BC-8717)         ✓ create_sf_campaign MCP (BC-8717)
+   ✓ update_sf_campaign_status MCP (BC-8723)  ✓ update_sf_campaign_status MCP (BC-8723)
+   ✓ σ3 trigger automation (BC-8752)          ✓ σ3 trigger automation (BC-8752)
+   ✓ portfolio-snapshot --monthly|--quarterly ✗ portfolio-snapshot DROPPED
+   ✓ Handbook PR: vocabulary.md (BC-8732)     ? Handbook PRs MAYBE — depends on
+   ✓ Handbook PR: framework docs (BC-8733)      what else V3 rejects in the
+   ✓ Handbook PR: active-campaigns (BC-8734)    ratification packet
+   ✓ Handbook PR: how-we-operate (BC-8735)
+                                              Reader's monthly review uses ONLY:
+   Reader's monthly review uses:               - Coverage by Vertical (SF)
+     - Coverage by Vertical (SF)               - Performance Dashboard (SF)
+     - Performance Dashboard (SF)              No qualitative merge; no frozen
+     - portfolio-snapshot.md packet             markdown packet; no per-offer-
+       (merges SF + plugin qualitative)         family cross-quarter visibility
+     - Pipeline by Offer Family (SF)
+                                              Reader's quarterly planning loses:
+   Reader's quarterly review adds:             - Cross-quarter MSPA synthesis
+     - Cross-quarter MSPA transitions            (lives only in mmf-matrix.md)
+     - Cumulative transferables                - Cumulative transferables digest
+     - Coverage-gap callouts                     (lives only in learnings.md)
+     - brite-gtm pre-Linear queue               - Coverage-gap callouts
+       graduation review
+```
+
+V3 happens against a **populated dogfood snapshot** (T6-O / BC-8727 first; T7-Q dry-run; THEN V3). If Marketing rejects after seeing the actual markdown packet against actual data, the rebound is tractable — 5 BCs cascade to backlog; SF-side artifacts still ship; meetings degrade to SF-only.
+
+
 
 ### σ3 (Salesforce integration)
 
