@@ -252,191 +252,663 @@ All canonical in handbook per O14 / BC-8732/BC-8733:
 
 ---
 
-## 3.6 Worked example — one campaign, end-to-end
+## 3.6 Worked example — one campaign, end-to-end (Path A: canonicality-gate-fails-first)
 
-To make all the abstractions concrete, here's a single campaign walked through every layer.
+This is the realistic operator-first-run experience. The operator is launching Brite Labs' first Hotels & Resorts cohort-1 campaign in M02 (February 2026), targeting Director of Resort Experience with a new Holiday Anchor Audit offer.
 
-**Scenario**: Brite Nites wants to test a Municipalities-vertical Free ROP Audit offer with Public Works Directors as the targeted persona, launching in May 2026.
+This walk demonstrates:
+
+- Canonicality gate working as designed (Step 2 hard-fail)
+- `/marketing:new-persona` + `/marketing:new-offer` sibling commands (BC-8725)
+- canonicals.yaml diff + handbook PR draft pattern
+- D8 persona authorship cadence in operation
+- Re-run plan-campaign happy path with full 11-step scaffolding
+- σ3 SF Campaign auto-create + status sync via BC-8752 triggers
+- MSPA flywheel in operation (situation-mining + creative-angles + email-copywriting + analysis + debrief + matrix update)
+
+The roles below are generic labels — your team will map them to specific people:
+
+- **Marketing brief author** — drafts Linear milestone description; runs `/marketing:email-copywriting` for copy artifact
+- **GTM lead reviewer** — sponsors + approves brief + copy; reviews weekly during active management
+- **Outbound operator** — runs `/marketing:plan-campaign`, `/marketing:list-building` (or `/marketing:tam-mapping`), `/marketing:launch-campaign`, SF reconciliation, `/marketing:campaign-analysis`, `/marketing:campaign-debrief`
 
 ### Step 0 — Strategic context (BEFORE the operator runs anything)
 
-The MSPA matrix for `nites` already has a row (from a prior MAP or ITERATE batch):
+The Brite Labs MSPA matrix at `docs/campaigns/labs/mmf-matrix.md` is about to gain a new batch-1 row driving this campaign:
 
 ```
-   Market: "Mid-size US cities exploring smart-lighting RFPs with
-            new federal infrastructure dollars"
-   Segment: Municipalities, $5M-$50M annual budget, no existing
-            outdoor-lighting RFP committee
-   Persona: Public Works Director
-   Angle: "ROP audit shows you what's burning out — and you can
-            fund the next phase from the federal pot you already
-            have."
-   Verdict: PENDING (this is the experiment)
+   Market   Luxury/upscale resorts with $1M+ outdoor programming
+            budgets, post-Q4-2025-mortem, pre-FY27-capital-ask
+            (6-8 weeks from FY27 commit deadlines), asking
+            "what's our version of Christmas at the Princess?"
+
+   Segment  AAA 4/5-Diamond OR Marriott/Hilton "Luxury Collection"
+            OR boutique luxury (Auberge / Pendry / Rosewood tier),
+            within BN service territory. EXCLUDES Gaylord-owned
+            (proprietary ICE! IP), Princess (incumbent vendor
+            relationship with A3 Visual + Living Light Shows),
+            Mission Inn (Roberts-family owner-led since 1993).
+
+   Persona  director-of-resort-experience (titles[] cascade
+            catches Marriott / Hilton / Fairmont / Hyatt /
+            VP-tier variants — 7 titles total)
+
+   Angle    FY27-Ammunition. "You owe your RVP a strategic brief
+            for FY27. Princess shows what category-king looks like.
+            We'll build that brief for your property — free — so
+            you walk into the FY27 ask with the answer already
+            written." (Asymmetry score 7.2/10, PROMISING)
+
+   Verdict  PENDING (will populate post-batch via mmf ITERATE)
 ```
 
-This drives the campaign that's about to be created.
+This row is the experiment. The campaign that follows is the row's first execution.
 
-### Step 1 — Operator runs the scaffolding command
+### Phase 1 — Operator runs plan-campaign → canonicality gate fails
 
 ```bash
-/marketing:plan-campaign \
-  --vertical municipalities \
-  --persona public-works-director \
-  --offer free-rop-audit \
-  --month 5 \
-  --year 2026 \
-  --launch-date 2026-05-15
+$ /marketing:plan-campaign \
+    --vertical hotels-resorts \
+    --persona director-of-resort-experience \
+    --offer holiday-anchor-audit \
+    --entity labs \
+    --month 2 \
+    --year 2026 \
+    --owner-email marketingadmin@britenites.com \
+    --situation-mining \
+    --creative-angles
 ```
 
-(Or runs `/marketing:plan-campaign` with no flags and is walked interactively, one question at a time.)
+No `--launch-date` flag → plan-campaign auto-defaults to first Tuesday of M02 = 2026-02-03.
 
-### Step 2 — Canonicality validation (Plug-in side filesystem read)
+**Step 1 — Operator invocation**: flags validated ✓
 
-The command reads `plugins/marketing/data/canonicals/_manifest.yaml` and `plugins/marketing/data/canonicals/municipalities.yaml`. Verifies:
+**Step 2 — Canonicality validation**: reads `plugins/marketing/data/canonicals/hotels-resorts.yaml`.
 
-- `vertical: municipalities` ✓ exists
-- `personas[].slug: public-works-director` ✓ exists, with `titles[]: ["Public Works Director", "Director of Public Works", ...]`
-- `offers[].slug: free-rop-audit` ✓ exists, `status: active`
+```
+   ✓ vertical: hotels-resorts exists (handbook canonical)
+   ✗ personas[].slug: director-of-resort-experience NOT FOUND
+   ✗ offers[].slug: holiday-anchor-audit NOT FOUND
+```
 
-Any miss → hard-fail with pointer to `/marketing:new-vertical | new-offer | new-persona` (BC-8725).
+**HARD-FAIL output**:
 
-### Step 3 — Slug computation
+```
+   Canonicality validation failed.
 
-`municipalities-public-works-director-free-rop-audit-fy26-m05`
+   Missing in plugins/marketing/data/canonicals/hotels-resorts.yaml:
+     - persona slug 'director-of-resort-experience'
+     - offer slug 'holiday-anchor-audit'
 
-Validates against `^[a-z0-9-]{1,80}$` ✓. Checks Linear "Brite GTM" project for collision → none. (If there were one, operator would be prompted to append `-v2`.)
+   Run the canonicality-bootstrap sibling commands first:
 
-### Step 4 — Dry-run preview + two-call confirm
+     /marketing:new-persona \
+       --vertical hotels-resorts \
+       --slug director-of-resort-experience \
+       --display "Director of Resort Experience" \
+       --titles "Director of Resort Experience" \
+               "Director of Guest Experience" \
+               "Director of Resort Activations" \
+               "Director of Recreation & Resort Activations" \
+               "Director of Guest Experiences" \
+               "VP Resort Experience" \
+               "VP Guest Experience"
 
-Command prints the full plan: slug, entity (nites — auto-inferred from Municipalities vertical), launch date, sub-issue titles, manifest.json schema, SF Campaign payload, EB workspace (`emailbison-personal` for Nites). Operator types `y` to confirm.
+     /marketing:new-offer \
+       --vertical hotels-resorts \
+       --slug holiday-anchor-audit \
+       --display "Resort Holiday Anchor Audit" \
+       --posture free-asset \
+       --status draft \
+       --target-personas director-of-resort-experience
 
-### Step 5 — Plugin filesystem write
+   See BC-8725 (T9-W) for canonicality-bootstrap command spec.
 
-Creates `docs/campaigns/nites/municipalities-public-works-director-free-rop-audit-fy26-m05/manifest.json`:
+   exit 1
+```
+
+No files written. No Linear milestone created. No SF Campaign created. The canonicality gate did its job — refused to scaffold against non-canonical slugs.
+
+### Phase 2 — /marketing:new-persona
+
+```bash
+$ /marketing:new-persona \
+    --vertical hotels-resorts \
+    --slug director-of-resort-experience \
+    --display "Director of Resort Experience" \
+    --titles "Director of Resort Experience" \
+            "Director of Guest Experience" \
+            "Director of Resort Activations" \
+            "Director of Recreation & Resort Activations" \
+            "Director of Guest Experiences" \
+            "VP Resort Experience" \
+            "VP Guest Experience"
+```
+
+Command writes a canonicals diff to `plugins/marketing/data/canonicals/hotels-resorts.yaml`:
+
+```yaml
+personas:
+  # ... existing personas ...
++ - slug: director-of-resort-experience
++   display: "Director of Resort Experience"
++   titles:
++     - "Director of Resort Experience"
++     - "Director of Guest Experience"
++     - "Director of Resort Activations"
++     - "Director of Recreation & Resort Activations"
++     - "Director of Guest Experiences"
++     - "VP Resort Experience"
++     - "VP Guest Experience"
+```
+
+Command also emits a draft handbook PR at `docs/handbook-prs/hotels-resorts-new-persona-director-of-resort-experience.md` for visibility — Marketing reviews on D8 cadence + (eventually) updates the handbook `hotels-resorts/README.md` "Personas" section. Per ADR-016, the canonicals diff is the canonical (plugin-side); the handbook PR is the slow-graduate process doc.
+
+Outbound operator commits the canonicals diff:
+
+```bash
+$ git add plugins/marketing/data/canonicals/hotels-resorts.yaml
+$ git commit -m "canonicals: add director-of-resort-experience persona to hotels-resorts (cohort-1)"
+```
+
+### Phase 3 — /marketing:new-offer
+
+```bash
+$ /marketing:new-offer \
+    --vertical hotels-resorts \
+    --slug holiday-anchor-audit \
+    --display "Resort Holiday Anchor Audit" \
+    --posture free-asset \
+    --status draft \
+    --target-personas director-of-resort-experience
+```
+
+Command writes a canonicals diff:
+
+```yaml
+offers:
+  # ... existing offers ...
++ - slug: holiday-anchor-audit
++   display: "Resort Holiday Anchor Audit"
++   status: draft
++   posture: free-asset
++   target_personas: [director-of-resort-experience]
++   prose_path: handbook/marketing/go-to-market/verticals/hotels-resorts/offers/holiday-anchor-audit.md
+```
+
+Command also creates a draft offer page at the `prose_path` containing the offer description, deliverable spec, conversion path (Audit → Master Plan → Year 1 build → Year 2 expansion → Year 3 destination), pricing tiers, and disqualifier list. The offer page lives in the handbook repo so it composes with handbook taxonomy + linking.
+
+Outbound operator commits both:
+
+```bash
+$ git add plugins/marketing/data/canonicals/hotels-resorts.yaml
+$ git add docs/handbook-prs/hotels-resorts-new-offer-holiday-anchor-audit.md
+$ git commit -m "canonicals + offer: add holiday-anchor-audit to hotels-resorts (cohort-1, draft)"
+```
+
+The handbook PR for the offer page lands separately on D8 + V3 cadence (Marketing reviews offer prose before it goes live in the handbook).
+
+### Phase 4 — Re-run plan-campaign → full 11-step scaffolding
+
+```bash
+$ /marketing:plan-campaign \
+    --vertical hotels-resorts \
+    --persona director-of-resort-experience \
+    --offer holiday-anchor-audit \
+    --entity labs \
+    --month 2 \
+    --year 2026 \
+    --owner-email marketingadmin@britenites.com \
+    --situation-mining \
+    --creative-angles
+```
+
+**Step 1** — Operator invocation: flags validated ✓
+
+**Step 2** — Canonicality validation:
+
+```
+   ✓ vertical: hotels-resorts (handbook canonical)
+   ✓ personas[].slug: director-of-resort-experience (just added)
+   ✓ offers[].slug: holiday-anchor-audit (just added)
+```
+
+**Step 3** — Slug computation + collision check:
+
+```
+   slug = hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02
+   Length: 74 chars (≤80) ✓
+   Pattern: ^[a-z0-9-]{1,80}$ ✓
+   Linear "Brite GTM" milestone collision check: no collision ✓
+```
+
+**Step 4** — Resolve entity ↔ EB workspace + owner_email + launch date:
+
+```
+   Entity labs → EB workspace `emailbison-b2b` (per locked routing
+   table; nites → personal, supply+labs → b2b).
+   Owner email: marketingadmin@britenites.com (passed via --owner-email).
+   Launch date: 2026-02-03 (first Tuesday of M02 — default since no
+   --launch-date passed).
+```
+
+**Step 5** — Dry-run preview prints full plan:
+
+```
+   Plan:
+     Slug:        hotels-resorts-director-of-resort-experience-
+                  holiday-anchor-audit-fy26-m02
+     Entity:      labs
+     Vertical:    hotels-resorts
+     Persona:     director-of-resort-experience
+     Offer:       holiday-anchor-audit (draft, free-asset)
+     Year:        2026  Month: 2  Launch: 2026-02-03 (Tue; default)
+     EB ws:       emailbison-b2b
+     SF Camp:     (will be created via σ3 at Step 8b)
+     Owner:       marketingadmin@britenites.com
+
+     10 sub-issues will be created:
+       8 standard (D4 template)
+       + Situation Mining (--situation-mining, Labs-gated)
+       + Creative Angles (--creative-angles, cohort-1 new offer)
+
+   Confirm? (y/n)
+```
+
+**Step 6** — Two-call confirm: operator types `y`.
+
+**Step 7** — Plugin filesystem + manifest.json:
+
+Writes `docs/campaigns/labs/hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02/manifest.json`:
 
 ```json
 {
   "schema_version": 1,
-  "slug": "municipalities-public-works-director-free-rop-audit-fy26-m05",
-  "entity": "nites",
-  "vertical": "municipalities",
-  "persona": "public-works-director",
-  "offer": "free-rop-audit",
+  "slug": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "director-of-resort-experience",
+  "offer": "holiday-anchor-audit",
   "year": 2026,
-  "month": 5,
+  "month": 2,
   "linear": { "milestone_id": null, "milestone_url": null, "project": "Brite GTM" },
-  "salesforce": { "campaign_id": null, "campaign_name": "municipalities-public-works-director-free-rop-audit-fy26-m05" },
-  "email_bison": { "workspace": "emailbison-personal", "campaign_id": null, "campaign_name": "...", "launched_at": null },
-  "created_at": "2026-05-12T14:32:11Z",
+  "salesforce": { "campaign_id": null, "campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02" },
+  "email_bison": { "workspace": "emailbison-b2b", "campaign_id": null, "campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02", "launched_at": null },
+  "created_at": "2026-01-13T10:00:00-08:00",
   "scaffolded_by": "/marketing:plan-campaign"
 }
 ```
 
-### Step 6 — Linear milestone created in "Brite GTM" project
+**Step 8a** — Linear milestone created in "Brite GTM" project:
 
-- **Name**: `municipalities-public-works-director-free-rop-audit-fy26-m05`
-- **Description**: filled `campaign-brief-template.md` (8 sections) populated from handbook `verticals/municipalities/README.md` ICP section + `offers/free-rop-audit.md` content
-- **Labels**: `slug:...`, `entity:nites`, `vertical:municipalities`, `persona:public-works-director`, `offer:free-rop-audit`, `year:2026`, `month:05`, `status:planning`
+- **Name**: `hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02`
+- **Labels**: `slug:...`, `entity:labs`, `vertical:hotels-resorts`, `persona:director-of-resort-experience`, `offer:holiday-anchor-audit`, `year:2026`, `month:02`, `status:planning`
+- **Description**: filled brief template (8 sections per D5) populated from:
+  - **Overview**: handbook `hotels-resorts/README.md` (Brite Labs + Hotels & Resorts vertical context)
+  - **Goals**: offer page (3-year program roadmap conversion goal)
+  - **Audience**: canonicals personas[] (Director of Resort Experience + 7-title cascade) + handbook hotels-resorts ICP 1 + ICP 2 firmographics
+  - **Messaging**: Angle A (FY27-Ammunition framing) + offer page value props — subject lines + body emerge later from email-copywriting (sub-issue #3), not pre-resolved here
+  - **Channels**: cold email primary (emailbison-b2b workspace); LinkedIn secondary
+  - **Assets**: Anchor Audit deliverable spec from offer page; sample brief PDF (to be created during Brief approval)
+  - **Budget**: $0 cohort-1 (free-asset offer; Brite-side cost is FTE-time ~$8-12K per Audit delivered)
+  - **Success Metrics**: open rate ≥25% / reply rate ≥1% / Audit acceptance rate ≥15% / Audit → Master Plan conversion ≥20%
 
 Manifest `linear.milestone_id` + `linear.milestone_url` updated.
 
-### Step 7 — Salesforce auto-create (σ3 / via revops MCP)
-
-`mcp__plugin_revops_salesforce__create_sf_campaign(slug, entity="nites", vertical="municipalities", persona="public-works-director", offer="free-rop-audit", year=2026, month=5, owner_email=<auto-detected>, launch_date=2026-05-15)` fires.
-
-SF Campaign created with `Name=slug`, `Vertical__c="municipalities"`, `Persona__c="public-works-director"`, `Offer__c="free-rop-audit"`, `Entity__c="nites"`, `Status="Planned"`, `StartDate=2026-05-15`.
-
-Manifest `salesforce.campaign_id` + `salesforce.campaign_name` updated.
-
-**Soft-fail path**: if SF MCP is unavailable, manifest gets `campaign_id: null`, command warns + continues. Operator runs `/marketing:sync-campaign-status --slug=... --status=planning` later to reconcile (BC-8752).
-
-### Step 8 — 8 sub-issues created with blocked-by chain
+**Step 8b** — SF Campaign auto-create (σ3 / via revops MCP):
 
 ```
-   #1 Brief approved                  blocks #2, #3, #4, #5, #6, #7, #8
-   #2 Target list built               blocks #3
-   #3 Copy written + approved         blocks #4
-   #4 Salesforce setup (post-σ3 = reconciliation + audience members)  blocks #5
-   #5 Pre-launch QA                   blocks #6
-   #6 Launch executed                 blocks #7
-   #7 Active management — weekly      blocks #8
-   #8 Campaign closed + debrief       terminal
+   mcp__plugin_revops_salesforce__create_sf_campaign(
+     slug="hotels-resorts-...-fy26-m02",
+     entity="labs",
+     vertical="hotels-resorts",
+     persona="director-of-resort-experience",
+     offer="holiday-anchor-audit",
+     year=2026, month=2,
+     owner_email="marketingadmin@britenites.com",
+     launch_date="2026-02-03"
+   )
+
+   SF Campaign created. Returns:
+     campaign_id: 701Xx00000ABCDE
+     campaign_url: https://britenites.lightning.force.com/...
 ```
 
-Operator can also add `--situation-mining` (rejected here — Labs only) or `--creative-angles` (optional).
+Manifest `salesforce.campaign_id` + `salesforce.campaign_name` updated. Custom fields written: `Vertical__c`, `Persona__c`, `Offer__c`, `Entity__c`, `Status="Planned"`, `StartDate=2026-02-03`.
 
-### Step 9 — Summary output
-
-Command prints milestone URL, slug, manifest path, sub-issue count + IDs.
-
-### What happens next — execution lifecycle
+**Step 9** — 10 sub-issues created with blocked-by chain (per D4 standard 8 + 2 optional):
 
 ```
-   T-21d  Sarah Cullen drafts brief → reviews → closes sub-issue #1
-                ↓
-   T-14d  Corinne uses /marketing:list-building to build target list
-          (reads canonicals municipalities.yaml personas[].titles[] for
-           "Public Works Director" cascade) → closes sub-issue #2
-                ↓
-   T-10d  Sarah writes copy via /marketing:email-copywriting (artifact:
-          docs/campaigns/nites/copy-municipalities-public-works-director-
-          {date}.json with offer_posture: "free-asset" + offer_summary
-          field + recency-waterfall framing) → closes sub-issue #3
-                ↓
-   T-7d   Corinne reconciles SF Campaign (sub-issue #4); adds
-          CampaignMember records from list-building export → closes #4
-                ↓
-   T-3d   Pre-launch QA (deliverability + copy + sender warm-up) → #5
-                ↓
-   T+0    /marketing:launch-campaign fires EB campaign
-          → manifest.email_bison.campaign_id populated
-          → manifest.email_bison.launched_at = "2026-05-15T10:00:00Z"
-          → Phase 11 calls update_sf_campaign_status(slug, "active",
-             null) (BC-8752 trigger automation)
-          → SF Campaign.Status = "In Progress"
-          → Linear status:planning label removed; status:active added
-          → sub-issue #6 closed
-                ↓
-   T+7d   /marketing:campaign-analysis runs → emits
-          analysis-municipalities-public-works-director-free-rop-audit-
-          fy26-m05-{date}.md with 6 sections + verdict tokens
-          (TOP PERFORMER / SCALE / TEST MORE / MONITOR / UNDERPERFORM
-           per ranked segment row)
-                ↓
-   T+30d  Corinne closes sub-issue #7 (Active management); runs
-          /marketing:campaign-debrief
-          → reads analysis-*.md for Q1/Q2/Q3 auto-suggestions
-          → appends to docs/campaigns/nites/learnings.md with
-             campaign_verdict: ITERATE + transferable_note: "ROP
-             angle worked on mid-size cities; struggles on small
-             towns under $5M budget"
-          → triggers update_sf_campaign_status(slug, "completed", null)
-          → SF Campaign.Status = "Completed"
-          → sub-issue #8 closed; Linear status:completed label
-                ↓
-   Then   /marketing:message-market-fit ITERATE Step 3.5 reads
-          learnings.md transferable_note back → updates mmf-matrix.md
-          Results Log row from Verdict: PENDING → Verdict: KIND OF
-          WORKS, Notes column: "[from debrief: ROP angle worked on
-          mid-size cities; struggles on small towns under $5M
-          budget]"
-          → mmf-batch-{N+1}.md designed with refined Segment narrowing
+   #1  Brief approved                  (gate; blocks #2-#10)
+   #2  Target list built               (blocks #3)
+   #3  Copy written + approved         (blocks #4)
+   #4  Salesforce setup                (post-σ3 reconciliation; blocks #5)
+   #5  Pre-launch QA                   (blocks #6)
+   #6  Launch executed                 (blocks #7)
+   #7  Active management — weekly      (blocks #8)
+   #8  Campaign closed + debrief       (terminal)
+   #9  Situation Mining (Labs-gated)   (after Brief; parallel with #2-#3)
+   #10 Creative Angles (NEW offer)     (after Brief; parallel with #3)
 ```
 
-### How this campaign shows up in rollup
+Each `save_issue` call sets parentId=milestone_id, title prefixed by stand-up phase, description with handbook citation + sub-issue role + expected plugin command + due date back-filled from launch_date.
 
-- **Monthly review (T+30d)**: appears in SF Coverage by Vertical view; Performance Dashboard shows its pipeline; `/marketing:portfolio-snapshot --monthly` includes it in:
-  - Portfolio shape section (1 campaign under Municipalities)
-  - Verdict distribution section (1 ITERATE)
-  - Transferable insights section ("ROP angle worked on mid-size cities; struggles on small towns")
-  - Cumulative transferables get re-aggregated by `campaign-debrief`'s `learnings.md` regen on next debrief
-- **Quarterly review (Q2)**: appears in Pipeline by Offer Family Dashboard alongside other "free-rop-audit" campaigns (if any); `/marketing:portfolio-snapshot --quarterly` shows MSPA matrix transition + persona drilldown
+**Step 10** — Optional sub-issues confirmed:
+
+```
+   --situation-mining ENABLED (Labs entity confirmed). Sub-issue #9
+   added per situation-mining skill spec.
+   --creative-angles ENABLED (NEW offer; cohort-1 batch-1 needs
+   parallel angle testing). Sub-issue #10 added per creative-angles
+   skill spec.
+```
+
+**Step 11** — Summary output:
+
+```
+   Campaign scaffolded.
+
+   Slug:           hotels-resorts-director-of-resort-experience-
+                   holiday-anchor-audit-fy26-m02
+   Linear:         https://linear.app/brite-nites/milestone/...
+   SF Campaign:    https://britenites.lightning.force.com/...
+   Manifest:       docs/campaigns/labs/hotels-resorts-.../manifest.json
+   Sub-issues:     10 created (BC-9001 through BC-9010)
+   EB workspace:   emailbison-b2b (campaign created at Step #6 Launch
+                   via /marketing:launch-campaign)
+
+   Status:         status:planning
+
+   Reminder: when status:paused or status:killed is needed during
+   the campaign lifecycle, run:
+     /marketing:sync-campaign-status --slug=hotels-resorts-...
+       --status=paused  (or killed)
+   This calls the σ3 update_sf_campaign_status MCP tool (BC-8752 /
+   T2-FA) to keep SF Campaign Status in sync with Linear labels.
+```
+
+### Phase 5 — Execution lifecycle T-21d → T+40d
+
+The scaffolded campaign now lives across all 4 layers. Roles execute against it over the next ~4 months:
+
+```
+   2026-01-13 (T-21d)  Brief approved (sub-issue #1)
+     ↓
+     Marketing brief author drafts the brief from the auto-populated
+     Linear milestone description (8 sections per D5). Pulls handbook
+     hotels-resorts ICP 1+ICP 2 firmographics for the Audience section
+     + the Angle A FY27-Ammunition framing into Messaging. Brief
+     includes the "DRAFT OFFER — first-cohort outbound" header per
+     offer status.
+     GTM lead reviewer reviews; close on approval.
+
+   2026-01-20 (T-14d)  Target list built (sub-issue #2)
+     ↓
+     Outbound operator runs /marketing:tam-mapping on Hotels & Resorts
+     filtered to the Segment criteria locked at Step 0 (AAA 4/5-
+     Diamond + Marriott/Hilton Luxury Collection + Auberge/Pendry/
+     Rosewood-tier, BN service territory, exclude Gaylord-owned +
+     Princess + Mission Inn). Output:
+     docs/campaigns/labs/.../tam-mapping-output.json with verified
+     ~80-120 target prospects. Title cascade per canonicals
+     personas[].titles[] catches Marriott "Director of Guest
+     Experience" + Hilton "Director of Recreation & Resort
+     Activations" + Fairmont "Director of Resort Experience" +
+     boutique VP-level analogues.
+
+   2026-01-20 → 2026-01-27 (T-14d → T-7d)
+     SUB-ISSUE #9 — Situation Mining (in parallel with #2 and #3)
+     ↓
+     Outbound operator runs /marketing:situation-mining on top-20
+     highest-value prospects from #2. Emits per-prospect intel like:
+       - JW Marriott Desert Ridge: 950+ rooms; 2026 "Jingle at JW"
+         replicating Gaylord ICE! playbook; positioned as Princess-
+         metro peer without a destination program yet → strong
+         FY27-Ammunition fit
+       - The Phoenician (Scottsdale): luxury peer to Princess;
+         publicly no holiday signature → similar fit
+       - Ritz-Carlton Naples: "A Season of Wonders" early-stage
+         program → Year 2/3 expansion fit
+       - The Boulders (Carefree, AZ): luxury, no holiday signature →
+         green-field opportunity
+     Each gets a per-prospect angle that supplements the Angle A
+     baseline. discoveries.json signals emitted: persona-discovery
+     candidates if BDR finds new title patterns at target accounts
+     (e.g., "Director of Resort & Recreation Programming"); adjacent-
+     offering signals (resort + golf program; resort + spa adjacency).
+
+   2026-01-20 → 2026-01-27 (T-14d → T-7d)
+     SUB-ISSUE #10 — Creative Angles (in parallel with #3)
+     ↓
+     Outbound operator runs /marketing:creative-angles for the
+     holiday-anchor-audit offer + director-of-resort-experience
+     persona. Skill produces 3-5 angle candidates with Asymmetry-
+     rubric scores (0-10):
+       - Angle A: FY27-Ammunition (baseline; 7.2/10 PROMISING)
+       - Angle B: Category-Benchmark-FOMO (6.7/10 PROMISING)
+       - Angle C: Post-Mortem Rebound (6.5/10 PROMISING)
+       - Angle D: Vendor-Tier-Gap (5.8/10 INTERESTING)
+       - Angle E: NEW — discovered during scoring (e.g.,
+         "Sponsor-Stack-Headstart" framing per Princess's
+         BMW/Barrett-Jackson model)
+     Top-2 enter mmf batch-1 as parallel experiments (barbell 80/20:
+     80% of send volume on Angle A; 20% on A/B challenger like
+     Angle B or E).
+
+   2026-01-23 (T-10d-ish)  Copy written + approved (sub-issue #3)
+     ↓
+     Marketing brief author runs /marketing:email-copywriting
+     consuming:
+       - The offer page (verticals/hotels-resorts/offers/
+         holiday-anchor-audit.md)
+       - The Angle A FY27-Ammunition framing as primary + the
+         creative-angles output from #10 (top-2 angles for variant
+         testing)
+       - The situation-mining output from #9 (per-prospect warm
+         angles for personalization where applicable)
+       - canonicals persona slug + display + titles for the recency-
+         waterfall framing (per email-copywriting §3)
+     Skill emits:
+       - copy-hotels-resorts-director-of-resort-experience-
+         {2026-01-23}.json with offer_summary field + offer_posture
+         "free-asset" + variant-pool with primary + challenger
+         subject lines + body templates
+       - Operator-readable preview rendering
+     GTM lead reviewer reviews; close on approval. (Actual subject
+     lines + body copy live in the JSON artifact + are not pre-
+     drafted in the scaffolding output.)
+
+   2026-01-27 (T-7d)  Salesforce setup (sub-issue #4)
+     ↓
+     Outbound operator reconciles SF Campaign:
+       - Verify σ3 auto-create succeeded (it did in Step 8b — SF
+         Campaign 701Xx00000ABCDE exists)
+       - Add CampaignMember records: import target list from
+         sub-issue #2 (~80-120 leads) via SF Data Loader or
+         programmatic insert
+       - Set Opportunity Type = "Hotels & Resorts — Anchor Audit"
+       - Set Lead Source = "Cold Email — FY26-M02-Hotels-Resorts"
+       - Link to parent Brite Labs FY26 Campaign Hierarchy if used
+
+   2026-01-30 (T-3d-ish)  Pre-launch QA (sub-issue #5)
+     ↓
+     Outbound operator validates per handbook cold-outbound-copy-
+     standards.md QA checklist: deliverability (Gmail/Outlook inbox
+     tests), copy QC, sender warmup status, suppression list dedup,
+     EB workspace contract intact. Close on pass.
+
+   2026-02-03 (T+0)   Launch executed (sub-issue #6)
+     ↓
+     Outbound operator runs /marketing:launch-campaign at 09:00 PT
+     (or property-local opener). Skill:
+       - Reads copy-*.json artifact (variant pool)
+       - Reads tam-mapping-output.json (target list)
+       - Creates EB campaign in emailbison-b2b workspace with the
+         locked variant split (80% Angle A / 20% challenger)
+       - Triggers σ3 status sync: update_sf_campaign_status(slug,
+         "active", null) via BC-8752 trigger automation
+       - SF Campaign Status flips: Planned → In Progress
+       - Linear status:planning label removed; status:active added
+       - manifest.email_bison.campaign_id populated
+       - manifest.email_bison.launched_at = "2026-02-03T09:00:00-08:00"
+
+   2026-02-10 → 2026-03-03 (T+7d → T+28d)
+     Active management (sub-issue #7) — weekly reviews
+     ↓
+     Each week outbound operator runs /marketing:campaign-analysis:
+       - Emits docs/campaigns/labs/.../analysis-hotels-resorts-...-
+         {date}.md with the 6-section template + 5-verdict ranking
+         per segment row
+       - Identifies which variant (A vs challenger) is outperforming
+       - Surfaces deliverability anomalies (bounce % / spam complaints)
+       - Captures statistically significant signals once data crosses
+         500-sent floor + 7-days-elapsed floor
+     GTM lead reviewer reviews each weekly. Adjusts cadence + variant
+     weighting mid-batch if signals warrant.
+
+   2026-03-10 (T+35d)  Campaign closed + debrief (sub-issue #8)
+     ↓
+     Send window closes after 30-day cadence per handbook cold-
+     outbound-playbook.
+     Marketing brief author (or GTM lead) runs /marketing:campaign-
+     debrief:
+       - Reads the analysis-*.md artifacts from sub-issue #7
+       - Walks the 5-question debrief format (Q1 hypothesis,
+         Q2 result, Q3 what worked, Q4 surprise, Q5 transferable)
+       - Computes Campaign Verdict per the 4-verdict rubric against
+         numeric thresholds:
+           - If Reply Rate >1% + Interested Rate >25% → SCALE
+           - If 0.5-1% reply + 15-25% interested → ITERATE
+           - If <0.5% reply or sub-floor data → KILL or PAUSE
+         (Real cohort-1 outcome unknown — could land anywhere)
+       - Captures transferable_note IF cross-entity insight surfaces
+         (e.g., "Sponsor-stack-headstart angle outperformed FY27-
+         ammunition by 2x reply rate — Princess-BMW-model framing
+         travels across luxury verticals")
+     Output appended to docs/campaigns/labs/learnings.md (existing
+     file for Labs entity — append-only forever).
+     Sub-issue #8 close triggers σ3 status sync:
+       update_sf_campaign_status(slug, "completed", null) via BC-8752
+       SF Campaign Status flips: In Progress → Completed
+       Linear status:active label removed; status:completed added.
+
+   2026-03-15 (T+40d)  mmf ITERATE picks up the matrix update
+     ↓
+     Outbound operator re-runs /marketing:message-market-fit ITERATE
+     for labs entity:
+       - Reads docs/campaigns/labs/mmf-batch-1.md (the original
+         experiment design)
+       - Reads campaign-debrief's transferable_note from learnings.md
+         (per mmf §3 Step 3.5 cross-skill read)
+       - Updates mmf-matrix.md Results Log:
+           Row for this campaign:
+             Verdict: PENDING → <actual verdict from debrief>
+             Notes: "[from debrief: <transferable_note>]"
+       - Designs mmf-batch-2.md for next iteration:
+           - If batch-1 surfaced Angle E (Sponsor-Stack-Headstart)
+             as outperforming, batch-2 elevates it to primary
+           - Segment narrowing if Marriott/Hilton outperformed
+             boutique (or vice versa)
+       - This batch-2 design feeds the NEXT campaign run for
+         Hotels & Resorts in M03 or M04 (separate plan-campaign
+         invocation)
+```
+
+### Phase 6 — How this campaign surfaces in rollup
+
+```
+   Weekly GTM sync (Mondays during T+7d → T+35d)
+   ─────────────────────────────────────────────────────────
+     - Opens SF "Active Campaigns" default view
+       → sees hotels-resorts-...-fy26-m02 in the "In Progress"
+         block, sorted by StartDate (Feb 3) with vertical "Hotels
+         & Resorts" and owner marketingadmin
+     - Opens SF "Launch Calendar" sibling view
+       → sees follow-up M03/M04 Hotels & Resorts campaigns
+         already planned per active-campaigns.md mermaid timeline
+     - Drills into Linear milestone for sub-issue #7 weekly notes
+
+   Monthly campaign review (Feb / Mar / Apr / May)
+   ─────────────────────────────────────────────────────────
+     - SF Coverage by Vertical view shows the campaign under
+       Hotels & Resorts even after it completes
+     - SF Performance Dashboard tallies its pipeline + lead count
+       in the vertical × month chart
+     - /marketing:portfolio-snapshot --monthly (when shipped via
+       BC-8731) reads:
+         - Linear milestone state (status:completed by March)
+         - SF Campaign pipeline + revenue values
+         - learnings.md entries from this campaign + others
+         - mmf-matrix.md Results Log
+       Emits docs/campaigns/_reviews/monthly-2026-03.md with
+       sections for portfolio shape / pipeline summary / verdict
+       distribution / transferable insights / action items.
+       This campaign shows up in all 5 sections.
+
+   Quarterly planning (Q2 review)
+   ─────────────────────────────────────────────────────────
+     - SF Pipeline by Offer Family Dashboard shows holiday-
+       anchor-audit alongside other Labs offer families
+     - /marketing:portfolio-snapshot --quarterly emits docs/
+       campaigns/_reviews/quarterly-2026-Q1.md with:
+         - Cross-quarter MSPA transitions: this row's verdict
+           progression from PENDING → <actual>
+         - Cumulative transferables from this campaign + sibling
+           Labs campaigns
+         - Per-offer-version aggregation (when O13 / BC-8728
+           ships): offer holiday-anchor-audit version-1
+           performance.md file
+         - Coverage-gap callouts (if Hotels & Resorts is under-
+           represented vs other verticals)
+     - brite-gtm pre-Linear ideation queue (per O7) reviewed for
+       Q3 commits — Hotels & Resorts could graduate to a Year 2
+       expansion campaign here if cohort-1 hit SCALE
+
+   Yearly retro (FY26 → FY27 transition, ~Dec 2026)
+   ─────────────────────────────────────────────────────────
+     - Cumulative learnings from M02 + M03 + M04 + M05 Hotels &
+       Resorts campaigns synthesized
+     - Verdict distribution across all Hotels & Resorts campaigns
+       informs FY27 portfolio scope
+     - Marketing decides: scale Hotels & Resorts to higher cadence
+       in FY27, or iterate before doubling down
+```
 
 ### What got produced
 
-1 Linear milestone + 8 sub-issues + 1 SF Campaign + 1 manifest.json + 1 copy-*.json + 1 analysis-*.md + 1 learnings.md append + 1 mmf-matrix.md Results Log row.
+For a single Hotels & Resorts × Director of Resort Experience × Holiday Anchor Audit × M02 campaign:
 
-That's the system in operation.
+```
+    1  Linear milestone in "Brite GTM" project
+   10  Linear sub-issues (8 standard + 2 optional: Situation Mining
+        + Creative Angles)
+    1  SF Campaign (auto-created via σ3, status-synced via σ3
+        trigger automation)
+    1  manifest.json (cross-system identity + state)
+    1  copy-*.json artifact (variant pool with subject lines + body)
+    1  tam-mapping-output.json (target list ~80-120 prospects)
+   ~N  situation-mining per-prospect intel records (top-20 = N)
+    1  creative-angles output (3-5 scored angles)
+   ~4  analysis-*.md (weekly during active management)
+    1  learnings.md append (Campaign Verdict + transferable_note)
+    1  mmf-matrix.md Results Log row update
+    ?  discoveries.json signals emitted (title-discovery from list-
+       building, persona-discovery from situation-mining, etc. —
+       pending human promotion to canonicals via PR)
+```
+
+That's the system in operation, end-to-end.
+
+### Why this worked example is worth memorizing
+
+This walk demonstrates the load-bearing patterns:
+
+1. **Canonicality gate works as designed.** Plan-campaign refusing to scaffold against non-canonical slugs is the system's most-important safety property (Phase 1 hard-fail). Reading this walk, you've seen it.
+2. **Sibling-command bootstrap path.** `/marketing:new-persona` + `/marketing:new-offer` compose with plan-campaign without violating D8 cadence (Phases 2-3 emit canonicals diff + handbook PR draft for slow-graduate review). canonicals.yaml is plugin-side per ADR-016; handbook PR is the human-process layer per Phase 2 architectural pivot.
+3. **σ3 SF Campaign auto-create + status sync.** Phase 4 Step 8b demonstrates the create; Phase 5 sub-issues #6 + #8 demonstrate the sync via BC-8752 triggers. Manual sync via `/marketing:sync-campaign-status` (BC-8752) is available for paused/killed transitions.
+4. **MSPA flywheel in operation.** Phase 5 sub-issues #9 + #10 + #8 + the mmf ITERATE step show the compound learning loop that makes each campaign feed the next one (ADR-019).
+5. **3-verdict vocabularies trace the lifecycle.** Angle Verdict (creative-angles output, sub-issue #10) → Experiment Verdict (mmf ITERATE post-batch, T+40d step) → Campaign Verdict (campaign-debrief output, sub-issue #8) per ADR-018.
+6. **Multi-system identity threading.** The slug appears verbatim in plugin path, Linear milestone label, SF Campaign Name, EB campaign Name. manifest.json carries all cross-system IDs (ADR-012 + O2).
 
 ---
 
