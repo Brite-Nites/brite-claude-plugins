@@ -1,6 +1,9 @@
 # GTM Campaign Orchestration — Effort README
 
 **Status**: Design phase CLOSED 2026-05-12; pre-implementation audit complete; **23 Linear issues filed and ready for execution** (BC-8712 through BC-8735 + BC-8752).
+**Doc lifecycle**: LIVING — this README is updated as BCs ship + V3 ratifies + Tiers complete. See [§12 Maintenance protocol](#12-next-steps--open-items) for what to update when.
+**Last updated**: 2026-05-13 (session-3 — README shape pass 1+2+3 added §3.5 flywheel + §3.6 worked example + §3.7 operations + §5 M2/M3 callout + §6 infra glossary + §7.5 decision→BC table + 8 ADRs)
+**README version**: v1.0 (initial design-close artifact)
 **Audience**: anyone trying to understand "what is this work, what was decided, and how do I act on it."
 **TL;DR**: Brite had three parallel "campaign" systems with three different definitions. This design unifies them into a 3-layer architecture (Handbook = HOW / Linear = orchestration / Plugin = WHAT, with Salesforce as portfolio reporting surface), locks ~30 architectural decisions, and breaks implementation into 23 atomic Linear issues across 9 tiers. Critical path: ~5-6 weeks at single-developer pace.
 
@@ -437,6 +440,91 @@ That's the system in operation.
 
 ---
 
+## 3.7 Operations cheatsheet — failure modes + routing maps + sequencing
+
+The compressed operational reference. Bookmark this section if you're executing.
+
+### Entity ↔ EB workspace routing
+
+| Entity | EB workspace | Why |
+|---|---|---|
+| `nites` | `emailbison-personal` | Brite Nites maintains its own EB workspace separate from B2B |
+| `supply` | `emailbison-b2b` | Brite Supply shares the B2B workspace |
+| `labs` | `emailbison-b2b` | Brite Labs shares the B2B workspace |
+| `cross-entity` | Operator picks via `--eb-workspace` flag | No default — cross-entity campaigns span workspaces |
+
+Used by `/marketing:plan-campaign` Step 4 (BC-8724) + `/marketing:launch-campaign`. Stored in `manifest.json` `email_bison.workspace` field.
+
+### Linear status → SF Campaign Status mapping (per σ3 / ADR-015)
+
+| Linear label | SF Campaign Status | SF Substatus__c | Auto-trigger from |
+|---|---|---|---|
+| `status:planning` | Planned | — | `/marketing:plan-campaign` Step 7b (BC-8724) |
+| `status:active` | In Progress | — | `launch-campaign` final phase (BC-8752) |
+| `status:active` + `status:paused` | In Progress | Paused | Manual: `/marketing:sync-campaign-status` (BC-8752) |
+| `status:completed` | Completed | — | `campaign-debrief` Workflow 4 post-append (BC-8752) |
+| `status:killed` | Aborted | — | Manual: `/marketing:sync-campaign-status` (BC-8752) |
+
+### Soft-fail paths (what happens when X breaks)
+
+| When | What's expected | What happens | Recovery |
+|---|---|---|---|
+| `/marketing:plan-campaign` Step 7b SF auto-create fails (MCP down, dup slug, missing owner) | SF Campaign created with `campaign_id` populated in manifest | Manifest gets `campaign_id: null` + warning logged; plan-campaign exits 0 | Operator runs `/marketing:sync-campaign-status --slug=... --status=planning` after SF available |
+| `update_sf_campaign_status` called on slug that doesn't exist in SF | Status updated | Returns `{warning: "campaign_not_found"}` + caller continues | Operator manually runs sync-campaign-status to retry |
+| Canonicality validation fails (missing vertical/persona/offer in canonicals.yaml) | plan-campaign scaffolds | Hard-fail with pointer to `/marketing:new-vertical \| new-offer \| new-persona` (BC-8725) | Operator runs the sibling command + retries plan-campaign |
+| `campaign-debrief` Workflow 4 status-sync call fails | SF Status flips to Completed | Soft-fail; learnings.md append still succeeds | Operator runs sync-campaign-status to reconcile |
+| Two-call confirm interrupted | Nothing written | Plan-campaign exits cleanly with no artifacts | Operator re-runs; no cleanup needed |
+| EB launch fails | Campaign launches | `/marketing:launch-campaign` halts with error; SF Status stays Planned | Operator fixes EB issue + re-runs launch-campaign |
+
+### Implementation sequencing (when does what land?)
+
+```
+   Sprint 1-2   Tier 1 brite-salesforce metadata (BC-8713, BC-8714,
+                BC-8715, BC-8716) + Tier 3 canonicals backfill (BC-8718)
+                + Tier 5 migrations independent of Tier 1/2 (BC-8719,
+                BC-8720, BC-8721, BC-8722) → all parallelizable
+
+   Sprint 2-3   Tier 2 revops MCP write tools (BC-8717, BC-8723)
+                → depends on Tier 1.A fields
+
+   Sprint 3-4   Tier 4 plan-campaign (BC-8724)
+                → depends on Tier 1 + Tier 2 + Tier 3-G
+                Tier 2-FA σ3 trigger automation (BC-8752)
+                → depends on Tier 2 MCPs + Tier 4 command
+
+   Sprint 4-5   Tier 6 first dogfood + V3 ratification (BC-8727, BC-8729)
+                → depends on Tier 4 + Tier 2-FA + Tier 5-K (slug migration)
+
+   Sprint 5-6   Tier 7 portfolio-snapshot (BC-8731) IF V3 ratifies M2
+                Tier 8 handbook PRs (BC-8732, BC-8733, BC-8734, BC-8735)
+                → 4 parallel after V3 ratification
+
+   Sprint 6+    Tier 9 deferrable commands (BC-8725, BC-8726, BC-8728)
+                → file as backlog; revisit after Tier 7 ships
+```
+
+### Post-Tier-4 sequence (what happens between plan-campaign live and V3?)
+
+Once BC-8724 ships:
+1. Operator picks one campaign from brite-gtm `campaign-portfolio.md` (BC-8727 / T6-O) — likely a Brite Labs Zoos or similar high-signal candidate
+2. Runs `/marketing:plan-campaign` end-to-end against real handbook canonicals
+3. Captures friction log in `docs/plans/gtm-campaign-orchestration-plan.md` appendix
+4. Tier 7 portfolio-snapshot ships in **dry-run mode** (emits packet against the dogfood data without committing to V3)
+5. V3 meeting (BC-8729) reviews the populated dogfood snapshot — M2 vs M3 decision lands here
+6. Tier 8 handbook PRs (BC-8732 onward) begin AFTER V3 ratifies — handbook PRs commit to M2-or-M3 wording
+
+### V3 timing — when should it happen?
+
+V3 ratification (BC-8729) MUST happen against a **populated dogfood snapshot**, not an empty hypothetical. Required pre-conditions:
+
+- ≥1 campaign through plan-campaign with all 8 sub-issues opened (BC-8727)
+- portfolio-snapshot dry-run produces a real markdown packet against that dogfood
+- V3 packet committed to `docs/v3-ratification-packet-{date}.md` for offline review
+
+V3 decision determines whether 5 BCs ship as-designed or degrade to M3 (see §5 M2/M3 callout).
+
+---
+
 ## 4. The journey (how we got here)
 
 ```
@@ -649,6 +737,29 @@ The shared vocabulary across all artifacts and Linear issues.
 | **M2 vs M3** | M2 = ship portfolio-snapshot + Pipeline-by-Offer-Family Dashboard + handbook PRs. M3 = drop these; SF Dashboard + Coverage view still ship. V3 decides. |
 
 **Full disambiguation**: `memory/project_marketing_vocabulary.md` — complete vocabulary canon with worked examples, rejected alternatives per term, and skill ownership map.
+
+### Brite infrastructure terms (the words this README assumes you know)
+
+Audience: external partners / new hires / anyone outside the Brite engineering org bubble.
+
+| Term | Definition |
+|---|---|
+| **BC-XXXX** | Linear issue prefix for Brite Company team. Example: BC-8712. Linear projects under Brite Company hold all engineering work + the GTM campaign portfolio (separate "Brite GTM" project for campaigns themselves). |
+| **MCP** | Model Context Protocol — Anthropic's standard for letting Claude Code call external services (Linear, Salesforce, Email Bison, etc.). Plugins register MCP servers; skills declare which MCP tools they call via `allowed-tools` frontmatter. |
+| **Plugin** | A bundle under `plugins/{name}/` containing commands, skills, hooks, and MCP servers. This repo has 5 plugins (workflows, marketing, cadence, revops, flow-architecture). Each plugin has its own `plugin.json` + version. |
+| **Skill** | An auto-invoked instruction set under `plugins/{name}/skills/{skill}/SKILL.md`. Claude matches user intent against skill `description` fields and loads matching skills at runtime. |
+| **Command** | An operator-invoked slash command under `plugins/{name}/commands/{cmd}.md`. Examples: `/marketing:plan-campaign`, `/workflows:create-issues`. |
+| **Linear "milestone"** | A grouping anchor inside a Linear project. In the Brite GTM project, one milestone = one campaign (per ADR-012). Distinct from Linear "issue" (a single ticket). |
+| **Linear "sub-issue"** | A Linear issue with a parent issue or parent milestone. The 8+2 sub-issue template (per ADR-012 + D4) groups under a milestone. |
+| **σ3** | Token label for the Salesforce-orchestration sub-decision from the design session's O11 question. See [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md). |
+| **M2 / M3** | Outcomes of V3 Marketing ratification. M2 ships portfolio-snapshot + Pipeline-by-Offer-Family Dashboard + 4 handbook PRs. M3 drops those 5 BCs; SF Performance Dashboard + Coverage view still ship. See [§5 M2/M3 callout](#5-what-was-decided). |
+| **V3** | Validation gate from the design session — Marketing buy-in (Sarah Cullen + Kells) on the canonicals + vocab + framework docs + portfolio-snapshot packet, against a populated dogfood (BC-8729). |
+| **Brite GTM project** | The Linear project that holds campaign milestones (separate from "Brite Plugin Marketplace" which holds plugin engineering work). Per D2 / ADR-013 + O7. Provisioned by BC-8712 Task 0. |
+| **brite-gtm repo** | Sibling git repo at `/Users/holdenhalford/projects/work/brite-nites/brite-gtm/`. Holds the pre-Linear ideation queue (`docs/campaign-portfolio.md` with 🟢🟡⚪ candidates) per O7. NOT the same as the Linear "Brite GTM" project. |
+| **Tier** | Grouping concept from the implementation plan — 9 tiers across the 23 BCs (Tier 1 = SF metadata foundation; Tier 9 = optional sibling commands). See [§7](#7-the-23-linear-issues). |
+| **plugin version bump** | CLAUDE.md gotcha: when any plugin file under `plugins/{name}/{commands,skills,hooks,agents}/**` changes, the matching `plugin.json` + `marketplace.json` entry MUST be version-bumped in the same commit. BC-6000 precedent — 4 stale-cache sessions lost. |
+| **Two-call confirm** | The BC-2707 precedent pattern for plugin commands that mutate state. First Bash call prints the plan + "Confirm? (y/n)"; operator responds; second Bash call proceeds only if confirmed. Used by `/marketing:plan-campaign` Step 6 + `/marketing:launch-campaign`. |
+| **/workflows:create-issues** | The skill that converts a refined plan doc into Linear issues with cross-linked dependencies. Used by BC-8712 Task 0 Step 2. |
 
 ---
 
@@ -919,10 +1030,34 @@ Start at **[BC-8712](https://linear.app/brite-nites/issue/BC-8712)** (Task 0). T
 - **D8 (persona authorship)** depends on V3 ratification but doesn't block plan-campaign — canonicals can ship with skeleton personas (slug + display, empty titles[]) and graduate later.
 - **V3 (BC-8729)** is the load-bearing M2/M3 gate. If Marketing rejects the markdown packet (portfolio-snapshot output), Tier 7 + Tier 1-D + most of Tier 8 cascade to backlog. Tractable rebound path; not a session-blocker.
 
-### Closing
+### Maintenance protocol — this is a LIVING doc
+
+The README is the single-page front door for the entire GTM Campaign Orchestration effort. As BCs ship + V3 ratifies + new patterns emerge, this README needs to stay current.
+
+**When to update what:**
+
+| Event | Update | Section |
+|---|---|---|
+| A BC closes / merges | Update status indicator (✓ / ✗ / 🚧) in the BC table | §7 |
+| Tier N completes | Update sequencing in §3.7 + status indicator in §7 | §3.7, §7 |
+| V3 ratifies (M2 or M3) | Update M2/M3 callout with outcome; update affected BC statuses; update §1 status line | §1, §5, §7 |
+| Dogfood campaign closes | Update §1 TL;DR with learnings; add post-mortem reference to §11 | §1, §11 |
+| A decision changes (re-litigated lock) | Update §5 + §8 + ADR file; bump README version; note in §11 audit narrative | §5, §8, ADRs, §11 |
+| New gotcha surfaces in execution | Add to §3.7 Operations cheatsheet | §3.7 |
+| Plugin version-bumps a relevant artifact | Update §6 infra glossary if naming/contract changes | §6 |
+| Memory file path or schema changes | Update §10 Artifact index | §10 |
+| Audit re-runs (post-V3 or pre-merge of major BC) | Add row to §11 audit narrative table; cite outcome | §11 |
+
+**Update discipline:**
+- Bump "Last updated" date + session-count in top header on every commit touching this README
+- README version: minor bump (v1.1, v1.2, ...) for new sections / table changes / status updates; major bump (v2.0) if the architecture itself changes
+- Cross-link discipline — anchor links in §1 TOC + §7.5 cross-references must stay current when sections renumber
+- Don't trust a stale "Last updated" — re-verify status indicators against Linear before relying on the README for execution decisions
+
+**Closing**:
 
 The design is locked. The plan is filed. The audit is clean. Execute.
 
-When you finish a Tier, update this README's §7 table to mark progress. When the V3 gate resolves, update §12 to record the M2/M3 outcome. When the dogfood campaign closes, update §1 TL;DR with the lessons learned.
+When you finish a Tier, update this README's §7 table to mark progress. When the V3 gate resolves, update §5 M2/M3 callout + §12 to record the outcome. When the dogfood campaign closes, update §1 TL;DR with the lessons learned.
 
 This document is the master entry point. Everything else hangs off it.
