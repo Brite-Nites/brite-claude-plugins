@@ -2,7 +2,6 @@
 name: plan-docs-reviewer
 description: Docs-perspective four-mode scope review for FDA artifacts (sub-flow at L3; discipline child at L4). Returns one of SCOPE_EXPANSION / SELECTIVE_EXPANSION / HOLD_SCOPE / SCOPE_REDUCTION + headline + mode-specific fields per `_shared/four-mode-framework.md`.
 model: sonnet
-mode: four-mode
 tools: Read, Glob, Grep
 ---
 

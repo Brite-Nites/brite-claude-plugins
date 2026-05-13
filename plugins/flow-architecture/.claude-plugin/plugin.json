@@ -1,10 +1,10 @@
 {
   "name": "flow-architecture",
-  "description": "Flow-Driven Architecture plugin — scaffolds Linear domain milestones, 5-discipline child issues, and repo flow docs (intent.md / journeys / flows / INDEX.md) for UI-bearing Brite product builds. Implements CDR-023 (handbook).",
+  "description": "Flow-Driven Architecture plugin \u2014 scaffolds Linear domain milestones, 5-discipline child issues, and repo flow docs (intent.md / journeys / flows / INDEX.md) for UI-bearing Brite product builds. Implements CDR-023 (handbook).",
   "author": {
     "name": "Brite"
   },
-  "version": "0.2.22",
+  "version": "0.2.24",
   "homepage": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "repository": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "license": "MIT",

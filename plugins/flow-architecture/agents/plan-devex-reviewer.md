@@ -2,7 +2,6 @@
 name: plan-devex-reviewer
 description: Developer-experience four-mode scope review for FDA artifacts at L1 only. Early "is this developer-facing?" check — non-developer-facing projects (Brand Hub, BriteBase, internal tools) return minimal "not applicable for this project type" and skip deep analysis. Returns one of SCOPE_EXPANSION / SELECTIVE_EXPANSION / HOLD_SCOPE / SCOPE_REDUCTION + headline + ergonomic_concerns + mode-specific fields per `_shared/four-mode-framework.md`.
 model: sonnet
-mode: four-mode
 tools: Read, Glob, Grep
 ---
 
