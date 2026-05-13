@@ -10,32 +10,32 @@
     {
       "name": "workflows",
       "source": "./plugins/workflows",
-      "description": "Process + Org plugin — structured workflow methodology with Linear integration",
+      "description": "Process + Org plugin \u2014 structured workflow methodology with Linear integration",
       "version": "3.29.6"
     },
     {
       "name": "marketing",
       "source": "./plugins/marketing",
-      "description": "Marketing domain plugin — brand-aware marketing skills ported from coreyhaines31/marketingskills",
+      "description": "Marketing domain plugin \u2014 brand-aware marketing skills ported from coreyhaines31/marketingskills",
       "version": "0.3.38"
     },
     {
       "name": "cadence",
       "source": "./plugins/cadence",
-      "description": "Weekly planning cadence plugin — audit, scope, housekeep, narrate, ops",
+      "description": "Weekly planning cadence plugin \u2014 audit, scope, housekeep, narrate, ops",
       "version": "0.5.5"
     },
     {
       "name": "revops",
       "source": "./plugins/revops",
-      "description": "Revenue operations plugin — Salesforce dev + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
+      "description": "Revenue operations plugin \u2014 Salesforce dev + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
       "version": "0.2.6"
     },
     {
       "name": "flow-architecture",
       "source": "./plugins/flow-architecture",
-      "description": "Flow-Driven Architecture plugin — scaffolds Linear domain milestones, 5-discipline child issues, and repo flow docs for UI-bearing Brite product builds. Implements CDR-023.",
-      "version": "0.2.23"
+      "description": "Flow-Driven Architecture plugin \u2014 scaffolds Linear domain milestones, 5-discipline child issues, and repo flow docs for UI-bearing Brite product builds. Implements CDR-023.",
+      "version": "0.2.24"
     }
   ]
 }
