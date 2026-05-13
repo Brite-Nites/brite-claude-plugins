@@ -1102,6 +1102,60 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15b — Plugin install-status (cross-check with claude CLI)
+# ══════════════════════════════════════════════════════════════════════
+section "Plugin install-status (marketplace.json vs 'claude plugin list')"
+
+if ! command -v claude &>/dev/null; then
+  warn "claude CLI not found — install-status check skipped"
+else
+  claude_plugin_list="$(claude plugin list 2>/dev/null || true)"
+  if [ -z "$claude_plugin_list" ]; then
+    warn "'claude plugin list' returned no output — install-status check skipped"
+  else
+    marketplace_name="$(MARKETPLACE_PATH="$MARKETPLACE" python3 <<'PY' 2>/dev/null
+import json, os, sys
+path = os.environ.get("MARKETPLACE_PATH", "")
+try:
+    with open(path) as f:
+        d = json.load(f)
+    print(d.get("name", ""))
+except Exception:
+    sys.exit(0)
+PY
+)"
+
+    if [ -z "$marketplace_name" ]; then
+      warn "could not resolve marketplace name from $MARKETPLACE — install-status check skipped"
+    else
+      plugins_tsv="$(MARKETPLACE_PATH="$MARKETPLACE" python3 <<'PY' 2>/dev/null
+import json, os, sys
+path = os.environ.get("MARKETPLACE_PATH", "")
+try:
+    with open(path) as f:
+        d = json.load(f)
+    for p in d.get("plugins", []):
+        name = p.get("name", "")
+        version = p.get("version", "")
+        print(name + "\t" + version)
+except Exception:
+    sys.exit(0)
+PY
+)"
+
+      while IFS=$'\t' read -r pname pver; do
+        [ -z "$pname" ] && continue
+        if printf '%s\n' "$claude_plugin_list" | grep -qE "[[:space:]]${pname}@${marketplace_name}([[:space:]]|$)"; then
+          pass "$pname@${marketplace_name} (v$pver) installed"
+        else
+          warn "$pname (v$pver) is in marketplace.json but NOT installed — run 'claude plugin install ${pname}@${marketplace_name}'"
+        fi
+      done <<< "$plugins_tsv"
+    fi
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 16 — Summary
 # ══════════════════════════════════════════════════════════════════════
 section "Summary"
