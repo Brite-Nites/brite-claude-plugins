@@ -13,6 +13,7 @@
    ──────────────────────────────────────────────────────────────────
    The problem                            §2 of this README
    The architecture (3-layer + SF)        §3 here + design doc §7.8
+   MSPA + experiment-to-campaign flywheel §3.5 here + mmf SKILL.md
    How we got here (research → BCs)       §4 here
    What was decided (~30 locks)           §5 here + design doc §1-§7
    Glossary                               §6 here
@@ -135,6 +136,117 @@ Before this design, three separate "campaign" systems ran in parallel with three
 **Campaign = one Vertical × one Persona × one Offer × one Month.** Each persona-targeting is its own Linear milestone. 1:1 mapping milestone ↔ EB campaign ↔ SF Campaign ↔ debrief. ~150-250 milestones/year realistic.
 
 **Deeper architecture detail**: `docs/designs/gtm-campaign-orchestration-design.md` Section 7.8 carries the full O6 chain with ASCII diagrams.
+
+---
+
+## 3.5 MSPA + the experiment-to-campaign flywheel
+
+Campaigns aren't picked by gut feel — they're driven by the **MSPA matrix** (Market × Segment × Persona × Angle), Brite's experiment-design framework from the `message-market-fit` skill. MSPA tells us WHICH campaigns to run; campaigns are the execution unit; verdicts feed back into the matrix.
+
+### The flywheel — one entity, one MSPA matrix, append-only forever
+
+```
+   ┌──────────────────────────────────────────────────────────┐
+   │  MAP mode — first time for an entity                     │
+   │  → mmf-matrix.md created with 5 hypotheses (5 rows,      │
+   │    each = 1 Market × 1 Segment × 1 Persona × 1 Angle)    │
+   │  → mmf-batch-1.md designed                               │
+   │  Verdict column starts at PENDING                        │
+   └────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+   ┌──────────────────────────────────────────────────────────┐
+   │  Each MSPA row → 1+ campaigns                            │
+   │                                                          │
+   │  MSPA matrix dimension  Campaign translation             │
+   │  ─────────────────────────────────────────────────────   │
+   │  Market (hypothesis)    Context for vertical+offer       │
+   │                         selection (NOT in slug)          │
+   │  Segment (instance)     Vertical narrowing or super-set  │
+   │                         (NOT in slug)                    │
+   │  Persona                Persona slug in campaign slug    │
+   │                         {vertical}-{PERSONA}-{offer}-... │
+   │  Angle                  Copy framing in email-           │
+   │                         copywriting body / subject       │
+   │                                                          │
+   │  /marketing:plan-campaign scaffolds the campaign(s) →    │
+   │  /marketing:launch-campaign fires the EB campaign        │
+   └────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+   ┌──────────────────────────────────────────────────────────┐
+   │  After EB send window closes:                            │
+   │  → /marketing:campaign-analysis emits analysis-*.md      │
+   │    with 5-verdict ranking (TOP PERFORMER / SCALE /       │
+   │    TEST MORE / MONITOR / UNDERPERFORM)                   │
+   │  → /marketing:campaign-debrief writes learnings.md       │
+   │    entry with 4-verdict rubric (SCALE / ITERATE /        │
+   │    PAUSE / KILL) + optional transferable_note            │
+   └────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+   ┌──────────────────────────────────────────────────────────┐
+   │  ITERATE mode — after batch completes                    │
+   │  → mmf-results-{N}.md per batch                          │
+   │  → matrix verdict column populated:                      │
+   │      SUPER WORKS / KIND OF WORKS / DOESN'T WORK /        │
+   │      DEFERRED                                            │
+   │  → Step 3.5 reads transferable_notes back into matrix    │
+   │  → mmf-batch-{N+1}.md designed (next 5 experiments)      │
+   │  → barbell 80/20 allocation enforced                     │
+   │  → Kellen's 10 Laws applied                              │
+   └────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼ (loop)
+```
+
+### The 3 verdict vocabularies trace the lifecycle (State Q1 lock)
+
+```
+   Pre-experiment      →    Post-batch          →    Post-campaign
+   (creative-angles)        (mmf ITERATE)            (campaign-debrief)
+   ───────────────          ─────────────            ─────────────────
+   Angle Verdict            Experiment Verdict       Campaign Verdict
+   ALPHA                    SUPER WORKS              SCALE
+   PROMISING                KIND OF WORKS            ITERATE
+   INTERESTING              DOESN'T WORK             KILL
+   COMMODITY                DEFERRED                 PAUSE
+                            PENDING
+
+   Best case:  ALPHA      → SUPER WORKS    → SCALE
+   Iterate:    PROMISING  → KIND OF WORKS  → ITERATE
+   Drop:       PROMISING  → DOESN'T WORK   → KILL
+   Pre-empt:   COMMODITY  (never enters matrix)
+   Wait:       any        → DEFERRED       → PAUSE
+```
+
+### DIAGNOSE mode — when pipeline is stuck
+
+After ≥2 batches with flat results, mmf DIAGNOSE walks a 5-level root-cause sequence (Market → Segment → Persona → Angle → Execution), halts at first failure, emits `mmf-diagnosis-{YYYY-MM-DD}.md` with one root cause + prescription linking to the handling sibling skill (deliverability-audit, list-rebuild, etc.).
+
+### Why this matters for the architecture
+
+The MSPA matrix is what makes the plugin layer **compound**. Each campaign isn't a one-off — it's an experiment row whose verdict trains the next batch. The plugin's append-only `mmf-matrix.md` + `learnings.md` are the compounding surface. `portfolio-snapshot --quarterly` explicitly reads cross-quarter MSPA transitions as a section of the markdown packet (BC-8731).
+
+### Frameworks that govern this loop
+
+All canonical in handbook per O14 / BC-8732/BC-8733:
+
+- **MSPA matrix** — 4 dimensions, append-only, one per entity forever
+- **Barbell 80/20** — allocate 80% to known winners, 20% to bets
+- **Kellen's 10 Laws** — iteration discipline (e.g., "Things that work and things you wanted to work are not synonymous")
+- **MAP / ITERATE / DIAGNOSE modes** — entry rules per mode
+- **Asymmetry Rubric** — upstream from creative-angles; angle quality score 0-10 driving the Angle Verdict
+- **Hormozi Value Equation** — offer construction (orthogonal to MSPA layer)
+- **Recency Waterfall** — 6-level signal hierarchy in email copy
+
+### How MSPA shows up in the 23 BCs
+
+- **BC-8721 (T5-M)** — renames 3 verdict parent labels (Angle Verdict / Experiment Verdict / Campaign Verdict) consistently across creative-angles, mmf, debrief
+- **BC-8718 (T3-G)** — canonicals.yaml personas[] feed the Persona dimension at scaffold time
+- **BC-8724 (T4-I)** — `/marketing:plan-campaign` validates Persona against canonicals (cross-checked vs an MSPA matrix row in the operator's head)
+- **BC-8728 (T9-V)** — `/marketing:offer-performance` per-offer-version aggregation surfaces compounding across MSPA rows that share an Offer Family
+- **BC-8731 (T7-Q)** — `/marketing:portfolio-snapshot --quarterly` reads MSPA Results Log for cross-quarter verdict transitions
 
 ---
 
