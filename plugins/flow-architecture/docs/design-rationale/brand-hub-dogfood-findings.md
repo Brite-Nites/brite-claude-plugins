@@ -186,7 +186,7 @@ _Not yet reviewed — pending dispatch._
 
 ## Iteration 2 outcome summary
 
-- **Phases 1-9**: all completed end-to-end. Phase 5 scaffolded 1 of 10 inventoried domains × 1 of 6 inventoried sub-flows in that domain = 1 of 52 total sub-flows = 5 of 260 expected discipline children.
+- **Phases 1-9**: all completed end-to-end. Phase 5 scaffolded 1 of 10 inventoried domains × 1 of 7 inventoried sub-flows in that domain = 1 of 52 total sub-flows = 5 of 260 expected discipline children.
 - **Acceptance gate verdict mix**: 7 PASS (AC1, AC3, AC5, AC7, Q1, Q3-advisory, Q4) + 2 PARTIAL (AC2 gates compressed, AC6 5/260 children) + 1 DEFERRED (AC4 full /flow:audit pending BC-9559 children) + 1 N/A (Q2 greenfield v-slice gate, not retrofit-relevant).
 - **Plugin v1.0 acceptance**: the orchestrator demonstrably runs end-to-end on a real repo. BC-6998 closed to Done 2026-05-13 with iter-2 partial-scaffold + BC-9559 follow-up tracking the remaining 9 domains.
 - **Two product decisions surfaced + resolved**: HubSpot deprecation (BC-9564) and Deck Generator out-of-scope (BC-9561) — both rolled into `brand-hub/docs/product/intent.md` + `brand-hub/docs/product/master-flow-inventory.md` in PR [#248](https://github.com/Brite-Nites/brand-hub/pull/248).
