@@ -86,6 +86,112 @@ if [ "$is_python" = true ]; then
   fi
 fi
 
+# ── Plugin Version Bump Enforcement (BC-8712 Step 7 / BC-6000 precedent) ─
+# Any staged change under plugins/<name>/{commands,skills,hooks,agents}/**
+# REQUIRES a version bump in BOTH plugins/<name>/.claude-plugin/plugin.json
+# AND the matching entry in .claude-plugin/marketplace.json — same commit.
+# Clients' plugin cache is keyed by version; without the bump, every client
+# serves stale content. Costly precedent: BC-6000 lost 4+ ship sessions.
+
+affected_plugins=()
+for f in "${staged_files[@]}"; do
+  case "$f" in
+    plugins/*/commands/*|plugins/*/skills/*|plugins/*/hooks/*|plugins/*/agents/*)
+      pname=$(printf '%s' "$f" | cut -d/ -f2)
+      already=false
+      if [ "${#affected_plugins[@]}" -gt 0 ]; then
+        for p in "${affected_plugins[@]}"; do
+          if [ "$p" = "$pname" ]; then
+            already=true
+            break
+          fi
+        done
+      fi
+      [ "$already" = false ] && affected_plugins+=("$pname")
+      ;;
+  esac
+done
+
+if [ "${#affected_plugins[@]}" -gt 0 ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo ""
+    echo "WARN: python3 not found — plugin-version-bump check skipped."
+    echo "      Manually verify plugin.json + marketplace.json versions bumped"
+    echo "      for: ${affected_plugins[*]} (per CLAUDE.md plugin-cache gotcha)."
+  else
+    for pname in "${affected_plugins[@]}"; do
+      pj="plugins/$pname/.claude-plugin/plugin.json"
+      mp=".claude-plugin/marketplace.json"
+
+      pj_staged=false
+      mp_staged=false
+      for f in "${staged_files[@]}"; do
+        [ "$f" = "$pj" ] && pj_staged=true
+        [ "$f" = "$mp" ] && mp_staged=true
+      done
+
+      if [ "$pj_staged" = false ]; then
+        echo ""
+        echo "Plugin '$pname' content staged but $pj is not staged."
+        echo "  Bump plugin.json version per CLAUDE.md plugin-cache gotcha (BC-6000)."
+        errors=$((errors + 1))
+        continue
+      fi
+
+      # Compare HEAD version to staged version (JSON-aware — handles single-line JSON)
+      pj_head_ver=$(git show "HEAD:$pj" 2>/dev/null | python3 -c \
+        'import json,sys
+try: print(json.load(sys.stdin).get("version",""))
+except Exception: pass' 2>/dev/null || true)
+      pj_staged_ver=$(git show ":$pj" 2>/dev/null | python3 -c \
+        'import json,sys
+try: print(json.load(sys.stdin).get("version",""))
+except Exception: pass' 2>/dev/null || true)
+
+      if [ -n "$pj_head_ver" ] && [ "$pj_head_ver" = "$pj_staged_ver" ]; then
+        echo ""
+        echo "Plugin '$pname' content staged but $pj version is unchanged ($pj_head_ver)."
+        echo "  Bump the version field per CLAUDE.md plugin-cache gotcha (BC-6000)."
+        errors=$((errors + 1))
+      fi
+
+      if [ "$mp_staged" = false ]; then
+        echo ""
+        echo "Plugin '$pname' content staged but $mp is not staged."
+        echo "  Bump the matching marketplace.json entry to keep versions consistent."
+        errors=$((errors + 1))
+        continue
+      fi
+
+      mp_head_ver=$(git show "HEAD:$mp" 2>/dev/null | PNAME="$pname" python3 -c \
+        'import json,os,sys
+try:
+    target=os.environ["PNAME"]
+    for p in json.load(sys.stdin).get("plugins",[]):
+        if p.get("name")==target: print(p.get("version","")); break
+except Exception: pass' 2>/dev/null || true)
+      mp_staged_ver=$(git show ":$mp" 2>/dev/null | PNAME="$pname" python3 -c \
+        'import json,os,sys
+try:
+    target=os.environ["PNAME"]
+    for p in json.load(sys.stdin).get("plugins",[]):
+        if p.get("name")==target: print(p.get("version","")); break
+except Exception: pass' 2>/dev/null || true)
+
+      if [ -n "$mp_head_ver" ] && [ "$mp_head_ver" = "$mp_staged_ver" ]; then
+        echo ""
+        echo "Plugin '$pname' content staged but $mp version for '$pname' is unchanged ($mp_head_ver)."
+        echo "  Bump the matching plugins[].version entry per CLAUDE.md plugin-cache gotcha (BC-6000)."
+        errors=$((errors + 1))
+      fi
+
+      # Versions changed but to different values would be a separate consistency
+      # issue — validate.sh Section 2b catches per-plugin version mismatch on
+      # the post-commit tree.
+    done
+  fi
+fi
+
 # ── Result ───────────────────────────────────────────────────────────
 if [ "$errors" -gt 0 ]; then
   echo ""

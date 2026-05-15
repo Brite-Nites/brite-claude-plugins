@@ -1,11 +1,11 @@
 # GTM Campaign Orchestration — Effort README
 
-**Status**: Design phase CLOSED 2026-05-12; pre-implementation audit complete; **23 Linear issues filed and ready for execution** (BC-8712 through BC-8735 + BC-8752).
+**Status**: Design phase CLOSED 2026-05-12; pre-implementation audit complete; **25 Linear issues filed and ready for execution** (BC-8712 through BC-8735 + BC-8752; BC-8736 cancelled as duplicate of BC-8752).
 **Doc lifecycle**: LIVING — this README is updated as BCs ship + V3 ratifies + Tiers complete. See [§12 Maintenance protocol](#12-next-steps--open-items) for what to update when.
 **Last updated**: 2026-05-13 (session-3 — README shape pass 1+2+3 added §3.5 flywheel + §3.6 worked example + §3.7 operations + §5 M2/M3 callout + §6 infra glossary + §7.5 decision→BC table + 8 ADRs)
 **README version**: v1.0 (initial design-close artifact)
 **Audience**: anyone trying to understand "what is this work, what was decided, and how do I act on it."
-**TL;DR**: Brite had three parallel "campaign" systems with three different definitions. This design unifies them into a 3-layer architecture (Handbook = HOW / Linear = orchestration / Plugin = WHAT, with Salesforce as portfolio reporting surface), locks ~30 architectural decisions, and breaks implementation into 23 atomic Linear issues across 9 tiers. Critical path: ~5-6 weeks at single-developer pace.
+**TL;DR**: Brite had three parallel "campaign" systems with three different definitions. This design unifies them into a 3-layer architecture (Handbook = HOW / Linear = orchestration / Plugin = WHAT, with Salesforce as portfolio reporting surface), locks ~30 architectural decisions, and breaks implementation into 25 atomic Linear issues across 9 tiers. Critical path: ~5-6 weeks at single-developer pace.
 
 ---
 

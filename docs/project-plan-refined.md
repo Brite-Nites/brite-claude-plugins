@@ -23,7 +23,7 @@
 |        |        | T8-T | [BC-8734](https://linear.app/brite-nites/issue/BC-8734) |
 |        |        | T8-U | [BC-8735](https://linear.app/brite-nites/issue/BC-8735) |
 
-All 22 issues filed in `Brite Plugin Marketplace` project (2026-05-12). Dependencies wired via `blockedBy` per the Mermaid graph below.
+All 25 issues filed in `Brite Plugin Marketplace` project (initial 22 on 2026-05-12; T2-FA audit-fix BC-8752 added 2026-05-13; milestone-assignment pass on 2026-05-14 normalized to 25). Dependencies wired via `blockedBy` per the Mermaid graph below.
 
 ## Summary
 
