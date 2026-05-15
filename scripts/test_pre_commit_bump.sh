@@ -2,10 +2,15 @@
 # Regression harness for the plugin-version-bump section of scripts/pre-commit.sh.
 #
 # Synthesizes a throw-away git repo with a fake plugin layout, then stages
-# 11 scenarios and asserts the pre-commit hook exits with the expected code
-# for each. Decoupled from $CLAUDE_JOB_DIR so it can run from CI and from a
-# developer shell. Originally shipped ephemerally in BC-8712 then promoted
-# per BC-8712 follow-up #1.
+# 15 scenarios (A-O) and asserts the pre-commit hook exits with the expected
+# code AND produces the expected diagnostic message for each. The substring
+# check is load-bearing — a bash crash that happens to exit 1 satisfies the
+# numeric expectation but fires a different code path than the scenario
+# targets (round 2 of /workflows:review surfaced exactly this masking via
+# Scenario M's deletion-only `${staged_files[@]}` unbound-variable crash).
+# Decoupled from $CLAUDE_JOB_DIR so it can run from CI and a developer shell.
+# Originally shipped ephemerally in BC-8712 then promoted per BC-8712
+# follow-up #1, hardened by review rounds 1+2.
 #
 # Scenarios:
 #   A  plugin content changed, NO version bump                 expect FAIL (1)
@@ -61,6 +66,7 @@ cd "$tmproot"
 pass=0
 fail=0
 LAST_HOOK_OUTPUT=""
+LAST_RC=0
 
 assert_exit() {
   local label="$1"
@@ -73,6 +79,38 @@ assert_exit() {
     echo "  FAIL  $label (expected exit=$expected, got exit=$actual)"
     # Surface the hook's own diagnostics on mismatch — otherwise debugging
     # a failing scenario means re-running the harness by hand.
+    if [ -n "${LAST_HOOK_OUTPUT:-}" ]; then
+      printf '%s\n' "$LAST_HOOK_OUTPUT" | tail -10 | sed 's/^/      | /'
+    fi
+    fail=$((fail + 1))
+  fi
+}
+
+# Combined exit-code + substring check. Use on FAIL-expecting scenarios so a
+# bash crash (e.g., the pre-commit.sh `staged_files[@]` unbound-variable bug
+# surfaced in /workflows:review round 2) doesn't silently satisfy `expect=1`
+# without actually firing the policy-rejection code path the scenario targets.
+# The substring is matched against the captured hook stdout+stderr.
+assert_exit_and_contains() {
+  local label="$1"
+  local expected_exit="$2"
+  local actual_exit="$3"
+  local expected_substr="$4"
+
+  local exit_ok=true substr_ok=true
+  [ "$expected_exit" -eq "$actual_exit" ] || exit_ok=false
+  case "${LAST_HOOK_OUTPUT:-}" in
+    *"$expected_substr"*) ;;
+    *) substr_ok=false ;;
+  esac
+
+  if [ "$exit_ok" = true ] && [ "$substr_ok" = true ]; then
+    echo "  PASS  $label (exit=$actual_exit, contains '$expected_substr')"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  $label"
+    [ "$exit_ok" = false ] && echo "         expected exit=$expected_exit, got exit=$actual_exit"
+    [ "$substr_ok" = false ] && echo "         expected output to contain: '$expected_substr'"
     if [ -n "${LAST_HOOK_OUTPUT:-}" ]; then
       printf '%s\n' "$LAST_HOOK_OUTPUT" | tail -10 | sed 's/^/      | /'
     fi
@@ -127,11 +165,14 @@ EOF
 }
 
 run_check() {
-  # Capture combined stdout+stderr into LAST_HOOK_OUTPUT so assert_exit can
-  # surface the hook's own diagnostic on a mismatch (DX win — debugging a
-  # failed scenario otherwise means re-running by hand).
+  # Set LAST_HOOK_OUTPUT + LAST_RC as globals (NOT echoed) so the assignment
+  # propagates to the parent scope. Round 1 used `LAST_HOOK_OUTPUT=$(...);
+  # echo $?` invoked via `rc=$(run_check)`, but that wrapper subshell trapped
+  # the global assignment — the surfaced-diagnostic branch in assert_exit was
+  # dead code. Caller pattern: `run_check; assert_exit ... "$LAST_RC"`.
+  # (Bug surfaced by /workflows:review round 2 on PR #318.)
   LAST_HOOK_OUTPUT=$(bash "$SCRIPT_UNDER_TEST" 2>&1)
-  echo $?
+  LAST_RC=$?
 }
 
 # ── Scenario A: plugin content modified, no bump ────────────────
@@ -140,8 +181,8 @@ echo "=== Scenario A: plugin content changed, NO version bump (expect FAIL) ==="
 setup_repo
 echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
 git add plugins/marketing/skills/foo/SKILL.md
-rc=$(run_check)
-assert_exit "Scenario A: bare content change rejected" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario A: bare content change rejected" 1 "$LAST_RC" "is not staged"
 cd "$tmproot"
 
 # ── Scenario B: plugin content + plugin.json bumped + marketplace bumped ─
@@ -152,8 +193,8 @@ echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
 bump_version plugins/marketing/.claude-plugin/plugin.json 1.0.1
 bump_version .claude-plugin/marketplace.json 1.0.1
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json .claude-plugin/marketplace.json
-rc=$(run_check)
-assert_exit "Scenario B: content + both bumps accepted" 0 "$rc"
+run_check
+assert_exit "Scenario B: content + both bumps accepted" 0 "$LAST_RC"
 cd "$tmproot"
 
 # ── Scenario C: non-plugin file modified ────────────────────────
@@ -162,8 +203,8 @@ echo "=== Scenario C: non-plugin file changed only (expect PASS) ==="
 setup_repo
 echo "some doc" > docs.md
 git add docs.md
-rc=$(run_check)
-assert_exit "Scenario C: non-plugin change accepted" 0 "$rc"
+run_check
+assert_exit "Scenario C: non-plugin change accepted" 0 "$LAST_RC"
 cd "$tmproot"
 
 # ── Scenario D: plugin content + plugin.json staged but version unchanged ─
@@ -174,8 +215,8 @@ echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
 sed -i.bak 's/"description": "x"/"description": "y"/' plugins/marketing/.claude-plugin/plugin.json
 rm -f plugins/marketing/.claude-plugin/plugin.json.bak
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json
-rc=$(run_check)
-assert_exit "Scenario D: staged plugin.json without version bump rejected" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario D: staged plugin.json without version bump rejected" 1 "$LAST_RC" "version is unchanged"
 cd "$tmproot"
 
 # ── Scenario E: plugin content + plugin.json bumped but marketplace.json missing ─
@@ -185,8 +226,8 @@ setup_repo
 echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
 bump_version plugins/marketing/.claude-plugin/plugin.json 1.0.1
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json
-rc=$(run_check)
-assert_exit "Scenario E: missing marketplace bump rejected" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario E: missing marketplace bump rejected" 1 "$LAST_RC" "is not staged"
 cd "$tmproot"
 
 # ── Scenario F: agents/ change (not skills/) — also covered ─────
@@ -200,8 +241,8 @@ description: y
 model: haiku
 ---" > plugins/marketing/agents/x.md
 git add plugins/marketing/agents/x.md
-rc=$(run_check)
-assert_exit "Scenario F: agents/ change without bump rejected" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario F: agents/ change without bump rejected" 1 "$LAST_RC" "is not staged"
 cd "$tmproot"
 
 # ── Scenario G: hooks/ change without bump ───────────────────────
@@ -211,8 +252,8 @@ setup_repo
 mkdir -p plugins/marketing/hooks
 echo '{}' > plugins/marketing/hooks/hooks.json
 git add plugins/marketing/hooks/hooks.json
-rc=$(run_check)
-assert_exit "Scenario G: hooks/ change without bump rejected" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario G: hooks/ change without bump rejected" 1 "$LAST_RC" "is not staged"
 cd "$tmproot"
 
 # ── Scenario H: commands/ change without bump ───────────────────
@@ -225,8 +266,8 @@ description: x
 ---
 body' > plugins/marketing/commands/cmd.md
 git add plugins/marketing/commands/cmd.md
-rc=$(run_check)
-assert_exit "Scenario H: commands/ change without bump rejected" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario H: commands/ change without bump rejected" 1 "$LAST_RC" "is not staged"
 cd "$tmproot"
 
 # ── Scenario I: nested tests/hooks path — should NOT trigger ────
@@ -238,8 +279,8 @@ setup_repo
 mkdir -p plugins/marketing/tests/hooks
 echo "test fixture" > plugins/marketing/tests/hooks/test_fixture.py
 git add plugins/marketing/tests/hooks/test_fixture.py
-rc=$(run_check)
-assert_exit "Scenario I: nested tests/hooks/ NOT flagged" 0 "$rc"
+run_check
+assert_exit "Scenario I: nested tests/hooks/ NOT flagged" 0 "$LAST_RC"
 cd "$tmproot"
 
 # ── Scenario J: nested shared/hooks path — should NOT trigger ───
@@ -249,8 +290,8 @@ setup_repo
 mkdir -p plugins/marketing/shared/hooks
 echo "docs" > plugins/marketing/shared/hooks/lifecycle.md
 git add plugins/marketing/shared/hooks/lifecycle.md
-rc=$(run_check)
-assert_exit "Scenario J: nested shared/hooks/ NOT flagged" 0 "$rc"
+run_check
+assert_exit "Scenario J: nested shared/hooks/ NOT flagged" 0 "$LAST_RC"
 cd "$tmproot"
 
 # ── Scenario K: deeply nested skill content — SHOULD trigger ────
@@ -261,8 +302,8 @@ setup_repo
 mkdir -p plugins/marketing/skills/foo/references
 echo "ref doc" > plugins/marketing/skills/foo/references/ref.md
 git add plugins/marketing/skills/foo/references/ref.md
-rc=$(run_check)
-assert_exit "Scenario K: deeply nested skill ref content IS flagged without bump" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario K: deeply nested skill ref content IS flagged without bump" 1 "$LAST_RC" "is not staged"
 cd "$tmproot"
 
 # ── Scenario L: corrupt staged plugin.json — silent-bypass guard ─
@@ -279,8 +320,8 @@ echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
 echo "GARBAGE NOT JSON {" > plugins/marketing/.claude-plugin/plugin.json
 bump_version .claude-plugin/marketplace.json 1.0.1
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json .claude-plugin/marketplace.json
-rc=$(run_check)
-assert_exit "Scenario L: corrupt plugin.json IS flagged (no silent bypass)" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario L: corrupt plugin.json IS flagged (no silent bypass)" 1 "$LAST_RC" "unparseable or missing version"
 cd "$tmproot"
 
 # ── Scenario M: deletion of plugin runtime content ──────────────
@@ -292,8 +333,11 @@ echo ""
 echo "=== Scenario M: deletion of plugin runtime without bump (expect FAIL) ==="
 setup_repo
 git rm -q plugins/marketing/skills/foo/SKILL.md
-rc=$(run_check)
-assert_exit "Scenario M: deletion of plugin runtime IS flagged without bump" 1 "$rc"
+run_check
+# Substring check pins the right code path — without it, the macOS bash 3.2
+# unbound-variable crash on `${staged_files[@]}` (Round 2 P1) would exit 1
+# and silently satisfy the assertion.
+assert_exit_and_contains "Scenario M: deletion of plugin runtime IS flagged without bump" 1 "$LAST_RC" "is not staged"
 cd "$tmproot"
 
 # ── Scenario N: marketplace entry mismatch ──────────────────────
@@ -334,24 +378,26 @@ cat > .claude-plugin/marketplace.json <<'EOF'
 }
 EOF
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json .claude-plugin/marketplace.json
-rc=$(run_check)
-assert_exit "Scenario N: wrong-plugin marketplace bump rejected" 1 "$rc"
+run_check
+assert_exit_and_contains "Scenario N: wrong-plugin marketplace bump rejected" 1 "$LAST_RC" "version for 'marketing' is unchanged"
 cd "$tmproot"
 
-# ── Scenario O: case-glob symmetric coverage for commands keyword ─
-# Scenario I covers tests/hooks/ NOT triggering. The regex pattern covers
-# all four (commands|skills|hooks|agents) keywords with the same shape, so
-# regressing one tends to regress all — but if a future maintainer ever
-# special-cases one keyword, this scenario catches a re-introduced
-# over-match on commands. See [[gotcha-bash-case-glob-crosses-slash]].
+# ── Scenario O: case-glob spot-check for commands keyword ───────
+# Scenario I covers tests/hooks/ NOT triggering. The regex
+# `^plugins/[^/]+/(commands|skills|hooks|agents)/` puts all four runtime
+# keywords in one alternation arm, so a regression in one tends to regress
+# all four — but this scenario pins the `commands` keyword explicitly so a
+# future special-case for one keyword can't re-introduce the over-match
+# silently. (`skills` and `agents` are implicit-but-untested via the shared
+# regex arm.) See [[gotcha-bash-case-glob-crosses-slash]].
 echo ""
 echo "=== Scenario O: plugins/<name>/tests/commands/<file> should NOT trigger (expect PASS) ==="
 setup_repo
 mkdir -p plugins/marketing/tests/commands
 echo "test fixture" > plugins/marketing/tests/commands/test_fixture.py
 git add plugins/marketing/tests/commands/test_fixture.py
-rc=$(run_check)
-assert_exit "Scenario O: nested tests/commands/ NOT flagged" 0 "$rc"
+run_check
+assert_exit "Scenario O: nested tests/commands/ NOT flagged" 0 "$LAST_RC"
 cd "$tmproot"
 
 # ── Summary ──────────────────────────────────────────────────────

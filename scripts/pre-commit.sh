@@ -43,13 +43,18 @@ is_python=false
 
 # ── JS/TS linting ────────────────────────────────────────────────────
 if [ "$is_js" = true ]; then
-  # Filter staged JS/TS files
+  # Filter staged JS/TS files. The size guard is REQUIRED under macOS bash 3.2
+  # + `set -u`: bare `"${staged_files[@]}"` on an empty array errors with
+  # "unbound variable" (CLAUDE.md "Bash scripts using `set -u`" gotcha).
+  # Deletion-only commits in a JS repo would crash here without the guard.
   js_files=()
-  for f in "${staged_files[@]}"; do
-    case "$f" in
-      *.js|*.jsx|*.ts|*.tsx) js_files+=("$f") ;;
-    esac
-  done
+  if [ "${#staged_files[@]}" -gt 0 ]; then
+    for f in "${staged_files[@]}"; do
+      case "$f" in
+        *.js|*.jsx|*.ts|*.tsx) js_files+=("$f") ;;
+      esac
+    done
+  fi
 
   if [ "${#js_files[@]}" -gt 0 ]; then
     # ESLint
@@ -78,12 +83,15 @@ fi
 
 # ── Python linting ───────────────────────────────────────────────────
 if [ "$is_python" = true ]; then
+  # Same macOS bash 3.2 guard as above — see JS section comment.
   py_files=()
-  for f in "${staged_files[@]}"; do
-    case "$f" in
-      *.py) py_files+=("$f") ;;
-    esac
-  done
+  if [ "${#staged_files[@]}" -gt 0 ]; then
+    for f in "${staged_files[@]}"; do
+      case "$f" in
+        *.py) py_files+=("$f") ;;
+      esac
+    done
+  fi
 
   if [ "${#py_files[@]}" -gt 0 ]; then
     if command -v ruff >/dev/null 2>&1; then
@@ -141,10 +149,19 @@ if [ "${#affected_plugins[@]}" -gt 0 ]; then
 
       pj_staged=false
       mp_staged=false
-      for f in "${staged_files[@]}"; do
-        [ "$f" = "$pj" ] && pj_staged=true
-        [ "$f" = "$mp" ] && mp_staged=true
-      done
+      # macOS bash 3.2 + `set -u` guard: deletion-only commits leave
+      # staged_files=() (since --diff-filter=d excludes deletions), but
+      # all_changed_files still finds the plugin runtime deletion above,
+      # so we reach this loop with an empty array. Without the size guard,
+      # `"${staged_files[@]}"` errors as "unbound variable" and the hook
+      # crashes — masking the intended "plugin.json is not staged" message.
+      # (Surfaced by /workflows:review round 2 on PR #318.)
+      if [ "${#staged_files[@]}" -gt 0 ]; then
+        for f in "${staged_files[@]}"; do
+          [ "$f" = "$pj" ] && pj_staged=true
+          [ "$f" = "$mp" ] && mp_staged=true
+        done
+      fi
 
       if [ "$pj_staged" = false ]; then
         echo ""
