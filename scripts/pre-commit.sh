@@ -13,13 +13,24 @@ set -euo pipefail
 
 errors=0
 
-# ── Get staged files (excluding deleted) ─────────────────────────────
+# ── Get staged files ────────────────────────────────────────────────
+# `staged_files` excludes deletions because the linter sections (ESLint /
+# tsc / Ruff below) cannot lint files that no longer exist on disk.
+# `all_changed_files` includes deletions and is used by the plugin-version-
+# bump enforcement section — per BC-6000, REMOVING a plugin runtime file is
+# also a content change that requires a version bump so clients' caches
+# invalidate.
 staged_files=()
 while IFS= read -r f; do
   [ -n "$f" ] && staged_files+=("$f")
 done < <(git diff --cached --name-only --diff-filter=d 2>/dev/null || true)
 
-if [ "${#staged_files[@]}" -eq 0 ]; then
+all_changed_files=()
+while IFS= read -r f; do
+  [ -n "$f" ] && all_changed_files+=("$f")
+done < <(git diff --cached --name-only 2>/dev/null || true)
+
+if [ "${#all_changed_files[@]}" -eq 0 ]; then
   exit 0
 fi
 
@@ -32,13 +43,18 @@ is_python=false
 
 # ── JS/TS linting ────────────────────────────────────────────────────
 if [ "$is_js" = true ]; then
-  # Filter staged JS/TS files
+  # Filter staged JS/TS files. The size guard is REQUIRED under macOS bash 3.2
+  # + `set -u`: bare `"${staged_files[@]}"` on an empty array errors with
+  # "unbound variable" (CLAUDE.md "Bash scripts using `set -u`" gotcha).
+  # Deletion-only commits in a JS repo would crash here without the guard.
   js_files=()
-  for f in "${staged_files[@]}"; do
-    case "$f" in
-      *.js|*.jsx|*.ts|*.tsx) js_files+=("$f") ;;
-    esac
-  done
+  if [ "${#staged_files[@]}" -gt 0 ]; then
+    for f in "${staged_files[@]}"; do
+      case "$f" in
+        *.js|*.jsx|*.ts|*.tsx) js_files+=("$f") ;;
+      esac
+    done
+  fi
 
   if [ "${#js_files[@]}" -gt 0 ]; then
     # ESLint
@@ -67,12 +83,15 @@ fi
 
 # ── Python linting ───────────────────────────────────────────────────
 if [ "$is_python" = true ]; then
+  # Same macOS bash 3.2 guard as above — see JS section comment.
   py_files=()
-  for f in "${staged_files[@]}"; do
-    case "$f" in
-      *.py) py_files+=("$f") ;;
-    esac
-  done
+  if [ "${#staged_files[@]}" -gt 0 ]; then
+    for f in "${staged_files[@]}"; do
+      case "$f" in
+        *.py) py_files+=("$f") ;;
+      esac
+    done
+  fi
 
   if [ "${#py_files[@]}" -gt 0 ]; then
     if command -v ruff >/dev/null 2>&1; then
@@ -94,11 +113,14 @@ fi
 # serves stale content. Costly precedent: BC-6000 lost 4+ ship sessions.
 
 affected_plugins=()
+# Iterate `all_changed_files` (not `staged_files`) because deletions of
+# plugin runtime files also require a bump (BC-6000 — plugin cache is keyed
+# by version; without a bump, clients serve cached now-deleted content).
 # Regex anchors the second path segment to a single name (no slashes), so
 # only plugins/<name>/{commands,skills,hooks,agents}/... at the canonical
 # depth triggers — NOT nested matches like plugins/<name>/tests/hooks/...
 # (pytest fixtures) or plugins/<name>/shared/hooks/... (non-runtime docs).
-for f in "${staged_files[@]}"; do
+for f in "${all_changed_files[@]}"; do
   if [[ "$f" =~ ^plugins/[^/]+/(commands|skills|hooks|agents)/ ]]; then
     pname=$(printf '%s' "$f" | cut -d/ -f2)
     already=false
@@ -127,10 +149,19 @@ if [ "${#affected_plugins[@]}" -gt 0 ]; then
 
       pj_staged=false
       mp_staged=false
-      for f in "${staged_files[@]}"; do
-        [ "$f" = "$pj" ] && pj_staged=true
-        [ "$f" = "$mp" ] && mp_staged=true
-      done
+      # macOS bash 3.2 + `set -u` guard: deletion-only commits leave
+      # staged_files=() (since --diff-filter=d excludes deletions), but
+      # all_changed_files still finds the plugin runtime deletion above,
+      # so we reach this loop with an empty array. Without the size guard,
+      # `"${staged_files[@]}"` errors as "unbound variable" and the hook
+      # crashes — masking the intended "plugin.json is not staged" message.
+      # (Surfaced by /workflows:review round 2 on PR #318.)
+      if [ "${#staged_files[@]}" -gt 0 ]; then
+        for f in "${staged_files[@]}"; do
+          [ "$f" = "$pj" ] && pj_staged=true
+          [ "$f" = "$mp" ] && mp_staged=true
+        done
+      fi
 
       if [ "$pj_staged" = false ]; then
         echo ""
@@ -149,6 +180,18 @@ except Exception: pass' 2>/dev/null || true)
         'import json,sys
 try: print(json.load(sys.stdin).get("version",""))
 except Exception: pass' 2>/dev/null || true)
+
+      # Fail-closed when the staged file is unparseable — without this, a
+      # malformed plugin.json yields pj_staged_ver="" and the equality check
+      # below short-circuits, letting corrupt JSON commit through with no
+      # enforced bump (silent-bypass surfaced by /workflows:review on PR #318).
+      if [ -z "$pj_staged_ver" ]; then
+        echo ""
+        echo "Plugin '$pname' content staged but $pj has an unparseable or missing version (malformed JSON?)."
+        echo "  Fix the file and bump the version field per CLAUDE.md plugin-cache gotcha (BC-6000)."
+        errors=$((errors + 1))
+        continue
+      fi
 
       if [ -n "$pj_head_ver" ] && [ "$pj_head_ver" = "$pj_staged_ver" ]; then
         echo ""
@@ -179,6 +222,16 @@ try:
     for p in json.load(sys.stdin).get("plugins",[]):
         if p.get("name")==target: print(p.get("version","")); break
 except Exception: pass' 2>/dev/null || true)
+
+      # Fail-closed when the marketplace entry for this plugin can't be parsed
+      # or doesn't exist in the staged file. Same silent-bypass guard as above.
+      if [ -z "$mp_staged_ver" ]; then
+        echo ""
+        echo "Plugin '$pname' content staged but $mp has no parseable version entry for '$pname' (malformed JSON or missing entry?)."
+        echo "  Add/repair the matching plugins[].version entry per CLAUDE.md plugin-cache gotcha (BC-6000)."
+        errors=$((errors + 1))
+        continue
+      fi
 
       if [ -n "$mp_head_ver" ] && [ "$mp_head_ver" = "$mp_staged_ver" ]; then
         echo ""

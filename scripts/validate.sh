@@ -155,6 +155,37 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
+# ══════════════════════════════════════════════════════════════════════
+# Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
+# throw-away git repo. Each scenario asserts the hook exits with the expected
+# code AND produces the expected diagnostic substring. Scenarios I/J/K/O
+# guard the P2 case-glob over-match caught on PR #317; L/M/N/P guard
+# silent-bypasses surfaced by /workflows:review on PR #318. The pass count
+# below is auto-derived from the harness's RESULT contract line — no
+# hardcoded count to drift. (See memory/gotcha_bash_case_glob_crosses_slash.md.)
+section "2c. Pre-commit Guardrail Regression"
+
+precommit_test="$REPO_ROOT/scripts/test_pre_commit_bump.sh"
+precommit_hook="$REPO_ROOT/scripts/pre-commit.sh"
+
+if [ ! -f "$precommit_test" ]; then
+  warn "scripts/test_pre_commit_bump.sh not found — pre-commit regression check skipped"
+elif [ ! -f "$precommit_hook" ]; then
+  warn "scripts/pre-commit.sh not found — pre-commit regression check skipped"
+else
+  # Capture into variable rather than mktemp — no tmpfile leak risk on interrupt
+  # and avoids re-parsing the harness's human-readable PASS lines.
+  if precommit_out=$(bash "$precommit_test" "$precommit_hook" 2>&1); then
+    pass_count=$(printf '%s\n' "$precommit_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "pre-commit hook regression (${pass_count:-?} scenarios)"
+  else
+    fail "pre-commit hook regression failed — run scripts/test_pre_commit_bump.sh for details"
+    printf '%s\n' "$precommit_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
 # ══════════════════════════════════════════════════════════════════════
 
