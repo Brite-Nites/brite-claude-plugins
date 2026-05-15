@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://brite.nites/schemas/canonicals/vertical.json",
+  "title": "GTM Canonicals — Vertical Entry",
+  "description": "Thin schema per ADR-016 (D7). One file per vertical under plugins/marketing/data/canonicals/{slug}.yaml. _manifest.yaml is the index, with schema_version + verticals[].",
+  "type": "object",
+  "required": ["slug", "display", "personas", "offers"],
+  "additionalProperties": false,
+  "properties": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Kebab-case canonical slug. Matches filename ({slug}.yaml)."
+    },
+    "display": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable display name."
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "description": "Optional. Kebab-case slugs that should resolve to this vertical (for renames)."
+    },
+    "playbook_path": {
+      "type": "string",
+      "description": "Optional. Path to handbook playbook README, relative to handbook root."
+    },
+    "personas": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/persona" },
+      "description": "May be empty for skeleton entries (per D11)."
+    },
+    "offers": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/offer" },
+      "description": "May be empty for skeleton entries (per D11)."
+    }
+  },
+  "definitions": {
+    "persona": {
+      "type": "object",
+      "required": ["slug", "display", "titles"],
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "display": {
+          "type": "string",
+          "minLength": 1
+        },
+        "titles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "≥1 required (drives list-building title cascade per ADR-016)."
+        }
+      }
+    },
+    "offer": {
+      "type": "object",
+      "required": ["slug", "display", "status", "posture"],
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "display": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "active", "retired"]
+        },
+        "posture": {
+          "type": "string",
+          "enum": ["knowledge", "free-asset", "pilot", "risk-reversal"],
+          "description": "Per T5-L / ADR-017 (renamed from offer-tier)."
+        },
+        "target_personas": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+        },
+        "replaced_by": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "iterates_from": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "prose_path": { "type": "string" }
+      }
+    }
+  }
+}

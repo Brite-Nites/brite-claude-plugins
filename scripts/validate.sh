@@ -1133,6 +1133,30 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a — GTM Canonicals Lint (BC-8718 / ADR-016)
+# ══════════════════════════════════════════════════════════════════════
+section "GTM Canonicals Lint"
+
+canonicals_lint="$REPO_ROOT/plugins/marketing/scripts/lint_canonicals.py"
+canonicals_dir="$REPO_ROOT/plugins/marketing/data/canonicals"
+if [ ! -f "$canonicals_lint" ]; then
+  warn "lint_canonicals.py not found — canonicals lint skipped"
+elif [ ! -d "$canonicals_dir" ]; then
+  warn "canonicals dir not found — canonicals lint skipped"
+elif ! command -v python3 &>/dev/null; then
+  warn "python3 not found — canonicals lint skipped"
+else
+  if canonicals_output=$(python3 "$canonicals_lint" 2>&1); then
+    pass "$canonicals_output"
+  else
+    fail "Canonicals lint failed:"
+    while IFS= read -r line; do
+      [ -n "$line" ] && printf "          %s\n" "$line"
+    done <<< "$canonicals_output"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"

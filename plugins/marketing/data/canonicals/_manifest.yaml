@@ -1,0 +1,33 @@
+# GTM canonicals manifest — index of valid vertical slugs.
+# Source-of-truth: brite-nites/handbook@main:marketing/go-to-market/verticals/README.md
+# Per ADR-016 (plugin-side canonicals) + D7 (thin schema) + D11 (all 27 day-1).
+# Skills read this manifest before plan-campaign Step 2 hard-fail validation.
+schema_version: 1
+verticals:
+  - amusement-parks
+  - apartments
+  - aquariums
+  - auto-dealerships
+  - bars-restaurants
+  - botanical-gardens
+  - builders
+  - casinos
+  - churches
+  - corporate-campuses
+  - country-clubs
+  - event-venues
+  - historic-sites
+  - hoas
+  - hospitals
+  - hotels-resorts
+  - landscape-architects
+  - landscape-lighting
+  - municipalities
+  - shopping-centers
+  - ski-resorts
+  - sports-stadiums
+  - theaters
+  - tribes-reservations
+  - universities
+  - wineries-breweries
+  - zoos

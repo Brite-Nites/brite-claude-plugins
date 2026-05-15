@@ -1,0 +1,29 @@
+# Canonical entry for the Builders & Developers vertical.
+# Source: handbook@main:marketing/go-to-market/verticals/builders/README.md
+# Display includes ampersand per handbook canon; slug is shortened to `builders`
+# matching handbook directory + manifest entry.
+slug: builders
+display: "Builders & Developers"
+aliases:
+  - builders-developers
+playbook_path: "marketing/go-to-market/verticals/builders/README.md"
+personas:
+  - slug: owner-principal
+    display: "Owner / Principal"
+    titles:
+      - "Owner"
+      - "President"
+      - "Principal"
+  - slug: vp-operations
+    display: "VP of Operations / Construction Manager"
+    titles:
+      - "VP of Operations"
+      - "Construction Manager"
+      - "VP of Purchasing"
+offers:
+  - slug: model-home-partnership
+    display: "Model Home Partnership"
+    status: draft
+    posture: pilot
+    target_personas: [owner-principal, vp-operations]
+    prose_path: "marketing/go-to-market/verticals/builders/offers/model-home-partnership.md"

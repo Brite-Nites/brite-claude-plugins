@@ -1,0 +1,79 @@
+# Canonical entry for the Universities vertical.
+# Source: handbook@main:marketing/go-to-market/verticals/universities/README.md
+slug: universities
+display: "Universities"
+playbook_path: "marketing/go-to-market/verticals/universities/README.md"
+personas:
+  - slug: vp-student-affairs
+    display: "VP for Student Affairs"
+    titles:
+      - "VP for Student Affairs"
+      - "Vice President for Student Affairs"
+      - "Vice President of Student Affairs"
+  - slug: chief-of-staff-student-affairs
+    display: "Chief of Staff / Associate VP for Student Affairs"
+    titles:
+      - "Chief of Staff for Student Affairs"
+      - "Associate VP for Student Affairs"
+      - "Associate Vice President for Student Affairs"
+  - slug: procurement-officer
+    display: "Procurement Officer / Senior Buyer"
+    titles:
+      - "Procurement Officer"
+      - "Senior Buyer"
+      - "Procure to Pay"
+  - slug: dei-officer
+    display: "DEI Officer / Multicultural Center Director"
+    titles:
+      - "DEI Officer"
+      - "Chief Diversity Officer"
+      - "Multicultural Center Director"
+offers:
+  - slug: unity-display
+    display: "Unity Display"
+    status: active
+    posture: knowledge
+    target_personas: [vp-student-affairs, chief-of-staff-student-affairs, dei-officer]
+    prose_path: "marketing/go-to-market/verticals/universities/offers/unity-display.md"
+  - slug: student-wellbeing-framework
+    display: "Student Wellbeing Framework"
+    status: active
+    posture: knowledge
+    target_personas: [vp-student-affairs, chief-of-staff-student-affairs]
+    prose_path: "marketing/go-to-market/verticals/universities/offers/student-wellbeing-framework.md"
+  - slug: alumni-advancement-display
+    display: "Alumni & Advancement Display"
+    status: draft
+    posture: knowledge
+    target_personas: [vp-student-affairs]
+    prose_path: "marketing/go-to-market/verticals/universities/offers/alumni-advancement-display.md"
+  - slug: recruitment-campus-visit
+    display: "Recruitment & Campus Visit"
+    status: draft
+    posture: knowledge
+    target_personas: [vp-student-affairs]
+    prose_path: "marketing/go-to-market/verticals/universities/offers/recruitment-campus-visit.md"
+  - slug: athletics-game-day
+    display: "Athletics & Game Day"
+    status: draft
+    posture: knowledge
+    target_personas: [vp-student-affairs]
+    prose_path: "marketing/go-to-market/verticals/universities/offers/athletics-game-day.md"
+  - slug: new-president-quick-win
+    display: "New President Quick Win"
+    status: draft
+    posture: knowledge
+    target_personas: [vp-student-affairs, chief-of-staff-student-affairs]
+    prose_path: "marketing/go-to-market/verticals/universities/offers/new-president-quick-win.md"
+  - slug: town-gown-community
+    display: "Town-Gown Community"
+    status: draft
+    posture: knowledge
+    target_personas: [vp-student-affairs]
+    prose_path: "marketing/go-to-market/verticals/universities/offers/town-gown-community.md"
+  - slug: retention-belonging
+    display: "Retention & Belonging"
+    status: draft
+    posture: knowledge
+    target_personas: [vp-student-affairs, dei-officer]
+    prose_path: "marketing/go-to-market/verticals/universities/offers/retention-belonging.md"

@@ -1,0 +1,10 @@
+# Canonical entry for the Historic Sites / Landmarks vertical (skeleton).
+# Source: handbook@main:marketing/go-to-market/verticals/historic-sites/README.md
+# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
+# Personas and offers will be promoted via /marketing:new-persona +
+# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+slug: historic-sites
+display: "Historic Sites / Landmarks"
+playbook_path: "marketing/go-to-market/verticals/historic-sites/README.md"
+personas: []
+offers: []

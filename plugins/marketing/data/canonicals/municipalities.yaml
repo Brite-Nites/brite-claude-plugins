@@ -1,0 +1,59 @@
+# Canonical entry for the Municipalities vertical.
+# Source: handbook@main:marketing/go-to-market/verticals/municipalities/README.md
+# Personas + offers mirror the handbook's Personas + Active Offers tables.
+slug: municipalities
+display: "Municipalities"
+playbook_path: "marketing/go-to-market/verticals/municipalities/README.md"
+personas:
+  - slug: parks-rec-director
+    display: "Parks & Recreation Director"
+    titles:
+      - "Director of Parks & Recreation"
+      - "Director of Public Lands"
+      - "Leisure Services Director"
+      - "Parks & Community Services Director"
+  - slug: city-manager
+    display: "City Manager / Administrator"
+    titles:
+      - "City Manager"
+      - "City Administrator"
+      - "Chief Administrative Officer"
+  - slug: downtown-events-manager
+    display: "Downtown / Events Manager"
+    titles:
+      - "Executive Director"
+      - "Downtown Manager"
+      - "Special Events Coordinator"
+      - "BID Executive Director"
+      - "DDA Executive Director"
+offers:
+  - slug: parks-bond
+    display: "Parks & Infrastructure Bond"
+    status: draft
+    posture: knowledge
+    target_personas: [parks-rec-director]
+    prose_path: "marketing/go-to-market/verticals/municipalities/offers/parks-bond.md"
+  - slug: downtown-revitalization
+    display: "Downtown Revitalization"
+    status: draft
+    posture: knowledge
+    target_personas: [parks-rec-director, downtown-events-manager]
+    prose_path: "marketing/go-to-market/verticals/municipalities/offers/downtown-revitalization.md"
+  - slug: new-leadership
+    display: "New Leadership"
+    status: draft
+    posture: knowledge
+    target_personas: [parks-rec-director, city-manager]
+    prose_path: "marketing/go-to-market/verticals/municipalities/offers/new-leadership.md"
+  - slug: existing-program
+    display: "Existing Holiday Program"
+    status: draft
+    posture: knowledge
+    target_personas: [parks-rec-director, downtown-events-manager]
+    prose_path: "marketing/go-to-market/verticals/municipalities/offers/existing-program.md"
+  - slug: tourism
+    display: "Tourism & Economic Development"
+    status: draft
+    posture: knowledge
+    target_personas: [parks-rec-director, city-manager]
+    prose_path: "marketing/go-to-market/verticals/municipalities/offers/tourism.md"

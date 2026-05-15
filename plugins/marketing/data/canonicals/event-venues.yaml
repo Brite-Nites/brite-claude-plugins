@@ -1,0 +1,10 @@
+# Canonical entry for the Event Venues vertical (skeleton).
+# Source: handbook@main:marketing/go-to-market/verticals/event-venues/README.md
+# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
+# Personas and offers will be promoted via /marketing:new-persona +
+# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+slug: event-venues
+display: "Event Venues"
+playbook_path: "marketing/go-to-market/verticals/event-venues/README.md"
+personas: []
+offers: []

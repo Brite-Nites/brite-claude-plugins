@@ -1,0 +1,89 @@
+# Canonical entry for the Hospitals vertical.
+# Source: handbook@main:marketing/go-to-market/verticals/hospitals/README.md
+# Persona set is the handbook's Tier-1 / Tier-1B / Tier-2 prioritized first-call cohort.
+# Tier-3 (CEO, CFO) and Tier-4 (Child Life, Donor Stewardship) personas are
+# intentionally omitted from canonicals — handbook hard-rule "NEVER first-call"
+# means they aren't list-building targets.
+slug: hospitals
+display: "Hospitals"
+playbook_path: "marketing/go-to-market/verticals/hospitals/README.md"
+personas:
+  - slug: director-facilities
+    display: "Director of Facilities / Plant Operations"
+    titles:
+      - "Director of Facilities"
+      - "Director of Plant Operations"
+      - "Director of Environmental Services"
+      - "VP Support Services"
+  - slug: director-marketing-comms
+    display: "Director of Marketing / Communications"
+    titles:
+      - "Director of Marketing"
+      - "Director of Communications"
+      - "Director of Marketing and Communications"
+      - "Director of Marketing & Communications"
+      - "VP Marketing"
+      - "VP Communications"
+  - slug: vp-foundation-development
+    display: "VP Foundation / Chief Development Officer"
+    titles:
+      - "VP Foundation"
+      - "Chief Development Officer"
+      - "Vice President of Development"
+      - "Foundation President"
+  - slug: chief-patient-experience-officer
+    display: "Chief Patient Experience Officer"
+    titles:
+      - "Chief Patient Experience Officer"
+      - "CXO"
+      - "VP Patient Experience"
+      - "VP Patient and Family Experience"
+  - slug: system-chief-facilities-officer
+    display: "System Chief Facilities Officer"
+    titles:
+      - "System Chief Facilities Officer"
+      - "System VP Facilities"
+      - "Corporate Director of Facilities"
+offers:
+  - slug: entrance-pilot
+    display: "Entrance Pilot Program"
+    status: draft
+    posture: pilot
+    target_personas: [director-facilities, director-marketing-comms]
+    prose_path: "marketing/go-to-market/verticals/hospitals/offers/pilot-entrance-program.md"
+  - slug: campus-presence-partnership
+    display: "Campus Presence Partnership"
+    status: draft
+    posture: pilot
+    target_personas: [director-facilities, director-marketing-comms]
+    prose_path: "marketing/go-to-market/verticals/hospitals/offers/campus-presence-partnership.md"
+  - slug: academic-anchor-program
+    display: "Academic Anchor Program"
+    status: draft
+    posture: knowledge
+    target_personas: [director-facilities, director-marketing-comms]
+    prose_path: "marketing/go-to-market/verticals/hospitals/offers/academic-anchor-program.md"
+  - slug: pediatric-childrens-hospital
+    display: "Pediatric Children's Hospital Program"
+    status: draft
+    posture: knowledge
+    target_personas: [chief-patient-experience-officer, vp-foundation-development, director-facilities, director-marketing-comms]
+    prose_path: "marketing/go-to-market/verticals/hospitals/offers/pediatric-childrens-hospital.md"
+  - slug: foundation-donor-season
+    display: "Foundation / Donor Season Program"
+    status: draft
+    posture: knowledge
+    target_personas: [vp-foundation-development]
+    prose_path: "marketing/go-to-market/verticals/hospitals/offers/foundation-donor-season.md"
+  - slug: system-wide-rollout
+    display: "System-Wide Multi-Campus Rollout"
+    status: draft
+    posture: knowledge
+    target_personas: [system-chief-facilities-officer]
+    prose_path: "marketing/go-to-market/verticals/hospitals/offers/system-wide-rollout.md"
+  - slug: multi-year-lease-partnership
+    display: "Multi-Year Lease Partnership"
+    status: draft
+    posture: risk-reversal
+    target_personas: [director-facilities, director-marketing-comms]
+    prose_path: "marketing/go-to-market/verticals/hospitals/offers/multi-year-lease-partnership.md"

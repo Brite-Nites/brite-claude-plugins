@@ -1,0 +1,26 @@
+# Canonical entry for the Landscape Architects vertical.
+# Source: handbook@main:marketing/go-to-market/verticals/landscape-architects/README.md
+slug: landscape-architects
+display: "Landscape Architects"
+playbook_path: "marketing/go-to-market/verticals/landscape-architects/README.md"
+personas:
+  - slug: principal-firm-owner
+    display: "Principal / Firm Owner"
+    titles:
+      - "Principal"
+      - "Owner"
+      - "Founding Partner"
+      - "Design Director"
+  - slug: senior-designer
+    display: "Senior Designer / Project Manager"
+    titles:
+      - "Senior Landscape Designer"
+      - "Project Manager"
+      - "Associate"
+offers:
+  - slug: lighting-design-partnership
+    display: "Lighting Design Partnership"
+    status: draft
+    posture: pilot
+    target_personas: [principal-firm-owner]
+    prose_path: "marketing/go-to-market/verticals/landscape-architects/offers/lighting-design-partnership.md"

@@ -1,0 +1,48 @@
+# Canonical entry for the HOAs vertical.
+# Source: handbook@main:marketing/go-to-market/verticals/hoas/README.md
+# HOAs README uses an ICP catalog pattern (3 sub-playbooks); personas listed here
+# are the KDMs named in the ICP catalog. Offer slugs reference the offers/
+# subtree surfaced via the cross-vertical landscape-lighting README.
+slug: hoas
+display: "HOAs"
+playbook_path: "marketing/go-to-market/verticals/hoas/README.md"
+personas:
+  - slug: regional-property-manager
+    display: "Regional Property Manager"
+    titles:
+      - "Regional Director"
+      - "Property Manager"
+      - "Regional Property Manager"
+      - "Community Manager"
+  - slug: board-president
+    display: "Board President"
+    titles:
+      - "Board President"
+      - "HOA Board President"
+      - "ARC Chair"
+      - "Architectural Review Committee Chair"
+  - slug: developer-marketing-director
+    display: "Developer Marketing Director"
+    titles:
+      - "Developer Marketing Director"
+      - "Director of Marketing"
+      - "Community Marketing Director"
+offers:
+  - slug: year-round-curb-appeal
+    display: "HOA Year-Round Curb Appeal"
+    status: draft
+    posture: knowledge
+    target_personas: [board-president, regional-property-manager]
+    prose_path: "marketing/go-to-market/verticals/hoas/offers/year-round-curb-appeal.md"
+  - slug: portfolio-landscape-lighting
+    display: "Property Management Portfolio Landscape Lighting"
+    status: draft
+    posture: knowledge
+    target_personas: [regional-property-manager]
+    prose_path: "marketing/go-to-market/verticals/hoas/offers/portfolio-landscape-lighting.md"
+  - slug: year-round-beauty-crosssell
+    display: "Year-Round Beauty Cross-Sell"
+    status: draft
+    posture: knowledge
+    target_personas: [regional-property-manager]
+    prose_path: "marketing/go-to-market/verticals/hoas/offers/year-round-beauty-crosssell.md"
