@@ -94,22 +94,24 @@ fi
 # serves stale content. Costly precedent: BC-6000 lost 4+ ship sessions.
 
 affected_plugins=()
+# Regex anchors the second path segment to a single name (no slashes), so
+# only plugins/<name>/{commands,skills,hooks,agents}/... at the canonical
+# depth triggers — NOT nested matches like plugins/<name>/tests/hooks/...
+# (pytest fixtures) or plugins/<name>/shared/hooks/... (non-runtime docs).
 for f in "${staged_files[@]}"; do
-  case "$f" in
-    plugins/*/commands/*|plugins/*/skills/*|plugins/*/hooks/*|plugins/*/agents/*)
-      pname=$(printf '%s' "$f" | cut -d/ -f2)
-      already=false
-      if [ "${#affected_plugins[@]}" -gt 0 ]; then
-        for p in "${affected_plugins[@]}"; do
-          if [ "$p" = "$pname" ]; then
-            already=true
-            break
-          fi
-        done
-      fi
-      [ "$already" = false ] && affected_plugins+=("$pname")
-      ;;
-  esac
+  if [[ "$f" =~ ^plugins/[^/]+/(commands|skills|hooks|agents)/ ]]; then
+    pname=$(printf '%s' "$f" | cut -d/ -f2)
+    already=false
+    if [ "${#affected_plugins[@]}" -gt 0 ]; then
+      for p in "${affected_plugins[@]}"; do
+        if [ "$p" = "$pname" ]; then
+          already=true
+          break
+        fi
+      done
+    fi
+    [ "$already" = false ] && affected_plugins+=("$pname")
+  fi
 done
 
 if [ "${#affected_plugins[@]}" -gt 0 ]; then
