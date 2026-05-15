@@ -2,7 +2,7 @@
 # Regression harness for the plugin-version-bump section of scripts/pre-commit.sh.
 #
 # Synthesizes a throw-away git repo with a fake plugin layout, then stages
-# 16 scenarios (A-P) and asserts the pre-commit hook exits with the expected
+# 18 scenarios (A-R) and asserts the pre-commit hook exits with the expected
 # code AND produces the expected diagnostic message for each. The substring
 # check is load-bearing — a bash crash that happens to exit 1 satisfies the
 # numeric expectation but fires a different code path than the scenario
@@ -29,6 +29,8 @@
 #   N  marketplace entry bumped for wrong plugin name          expect FAIL (1)  [per-plugin name-match]
 #   O  plugins/<name>/tests/commands/<file>                    expect PASS (0)  [case-glob symmetric — commands keyword]
 #   P  marketplace.json missing this plugin's entry            expect FAIL (1)  [fail-closed no-entry guard]
+#   Q  brand-new plugin first commit (no HEAD entry)           expect PASS (0)  [first-commit honored-by-design path]
+#   R  multi-plugin mixed-state (one bumped, one not)          expect FAIL (1)  [per-plugin loop iteration]
 #
 # Usage:
 #   bash scripts/test_pre_commit_bump.sh                     # uses scripts/pre-commit.sh next to this file
@@ -424,6 +426,96 @@ EOF
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json .claude-plugin/marketplace.json
 run_check
 assert_exit_and_contains "Scenario P: marketplace.json missing 'marketing' entry rejected" 1 "$LAST_RC" "no parseable version entry for 'marketing'"
+cd "$tmproot"
+
+# ── Scenario Q: brand-new plugin first commit (no HEAD entry) ───
+# Honored-by-design: when a plugin is being ADDED for the first time, both
+# pj_head_ver and mp_head_ver are empty (no prior content in HEAD), so the
+# equality checks short-circuit and the hook exits 0. Versions can't be
+# "unchanged" if there's no prior. Pin this path so a future hardening that
+# strips the `[ -n "$pj_head_ver" ]` guard doesn't falsely fail first-commit-
+# of-a-plugin commits.
+echo ""
+echo "=== Scenario Q: brand-new plugin first commit (expect PASS) ==="
+setup_repo
+mkdir -p plugins/newthing/.claude-plugin plugins/newthing/skills/foo
+cat > plugins/newthing/.claude-plugin/plugin.json <<'EOF'
+{ "name": "newthing", "description": "x", "author": {"name": "t"}, "version": "1.0.0" }
+EOF
+cat > plugins/newthing/skills/foo/SKILL.md <<'EOF'
+---
+name: foo
+description: orig
+user-invocable: true
+---
+new plugin body
+EOF
+cat > .claude-plugin/marketplace.json <<'EOF'
+{
+  "name": "britenites",
+  "owner": {"name": "t"},
+  "plugins": [
+    {"name": "marketing", "source": "plugins/marketing", "version": "1.0.0"},
+    {"name": "newthing", "source": "plugins/newthing", "version": "1.0.0"}
+  ]
+}
+EOF
+git add plugins/newthing plugins/newthing/.claude-plugin plugins/newthing/skills/foo .claude-plugin/marketplace.json
+run_check
+assert_exit "Scenario Q: new-plugin first commit accepted (no prior version to bump)" 0 "$LAST_RC"
+cd "$tmproot"
+
+# ── Scenario R: multi-plugin mixed-state ────────────────────────
+# Exercises the `for pname in "${affected_plugins[@]}"` loop with multiple
+# entries. Both 'marketing' and 'other' have content changes; 'marketing'
+# is fully bumped, 'other' is not. The hook must iterate to 'other' and
+# fire its diagnostic — a regression that `break`s out of the loop instead
+# of `continue`-ing would silently let 'other' through.
+echo ""
+echo "=== Scenario R: multi-plugin mixed-state — 'other' unbumped (expect FAIL) ==="
+setup_repo
+# Establish baseline with two plugins (same shape as Scenario N's setup)
+cat > .claude-plugin/marketplace.json <<'EOF'
+{
+  "name": "britenites",
+  "owner": {"name": "t"},
+  "plugins": [
+    {"name": "marketing", "source": "plugins/marketing", "version": "1.0.0"},
+    {"name": "other", "source": "plugins/other", "version": "1.0.0"}
+  ]
+}
+EOF
+mkdir -p plugins/other/.claude-plugin plugins/other/skills/bar
+cat > plugins/other/.claude-plugin/plugin.json <<'EOF'
+{ "name": "other", "description": "x", "author": {"name": "t"}, "version": "1.0.0" }
+EOF
+cat > plugins/other/skills/bar/SKILL.md <<'EOF'
+---
+name: bar
+description: orig
+user-invocable: true
+---
+orig body
+EOF
+git add -A && git commit -q -m "add other plugin"
+
+# Modify content in BOTH plugins; bump 'marketing' completely; leave 'other' unbumped
+echo "modified marketing body" >> plugins/marketing/skills/foo/SKILL.md
+echo "modified other body" >> plugins/other/skills/bar/SKILL.md
+bump_version plugins/marketing/.claude-plugin/plugin.json 1.0.1
+cat > .claude-plugin/marketplace.json <<'EOF'
+{
+  "name": "britenites",
+  "owner": {"name": "t"},
+  "plugins": [
+    {"name": "marketing", "source": "plugins/marketing", "version": "1.0.1"},
+    {"name": "other", "source": "plugins/other", "version": "1.0.0"}
+  ]
+}
+EOF
+git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json plugins/other/skills/bar/SKILL.md .claude-plugin/marketplace.json
+run_check
+assert_exit_and_contains "Scenario R: unbumped 'other' rejected in multi-plugin commit" 1 "$LAST_RC" "Plugin 'other'"
 cd "$tmproot"
 
 # ── Summary ──────────────────────────────────────────────────────
