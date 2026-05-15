@@ -155,6 +155,35 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
+# ══════════════════════════════════════════════════════════════════════
+# Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh, which
+# stages 11 synthetic scenarios in a throw-away git repo and asserts the
+# plugin-version-bump enforcement section exits with the expected code for
+# each. Scenarios I/J/K guard the P2 case-glob over-match caught on PR #317
+# (see memory/gotcha_bash_case_glob_crosses_slash.md).
+section "2c. Pre-commit Guardrail Regression"
+
+precommit_test="$REPO_ROOT/scripts/test_pre_commit_bump.sh"
+precommit_hook="$REPO_ROOT/scripts/pre-commit.sh"
+
+if [ ! -f "$precommit_test" ]; then
+  warn "scripts/test_pre_commit_bump.sh not found — pre-commit regression check skipped"
+elif [ ! -f "$precommit_hook" ]; then
+  warn "scripts/pre-commit.sh not found — pre-commit regression check skipped"
+else
+  precommit_log="$(mktemp -t precommit-regression.XXXXXX)"
+  if bash "$precommit_test" "$precommit_hook" > "$precommit_log" 2>&1; then
+    pass_count=$(grep -c '^  PASS  ' "$precommit_log" || true)
+    pass "pre-commit hook regression ($pass_count scenarios)"
+  else
+    fail "pre-commit hook regression failed — run scripts/test_pre_commit_bump.sh for details"
+    tail -25 "$precommit_log" | sed 's/^/    /' >&2
+  fi
+  rm -f "$precommit_log"
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
 # ══════════════════════════════════════════════════════════════════════
 
