@@ -2,7 +2,7 @@
 # Regression harness for the plugin-version-bump section of scripts/pre-commit.sh.
 #
 # Synthesizes a throw-away git repo with a fake plugin layout, then stages
-# 15 scenarios (A-O) and asserts the pre-commit hook exits with the expected
+# 16 scenarios (A-P) and asserts the pre-commit hook exits with the expected
 # code AND produces the expected diagnostic message for each. The substring
 # check is load-bearing — a bash crash that happens to exit 1 satisfies the
 # numeric expectation but fires a different code path than the scenario
@@ -28,6 +28,7 @@
 #   M  deletion of plugin runtime content without bump         expect FAIL (1)  [--diff-filter=d guard]
 #   N  marketplace entry bumped for wrong plugin name          expect FAIL (1)  [per-plugin name-match]
 #   O  plugins/<name>/tests/commands/<file>                    expect PASS (0)  [case-glob symmetric — commands keyword]
+#   P  marketplace.json missing this plugin's entry            expect FAIL (1)  [fail-closed no-entry guard]
 #
 # Usage:
 #   bash scripts/test_pre_commit_bump.sh                     # uses scripts/pre-commit.sh next to this file
@@ -182,7 +183,7 @@ setup_repo
 echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
 git add plugins/marketing/skills/foo/SKILL.md
 run_check
-assert_exit_and_contains "Scenario A: bare content change rejected" 1 "$LAST_RC" "is not staged"
+assert_exit_and_contains "Scenario A: bare content change rejected" 1 "$LAST_RC" "plugin.json is not staged"
 cd "$tmproot"
 
 # ── Scenario B: plugin content + plugin.json bumped + marketplace bumped ─
@@ -227,7 +228,7 @@ echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
 bump_version plugins/marketing/.claude-plugin/plugin.json 1.0.1
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json
 run_check
-assert_exit_and_contains "Scenario E: missing marketplace bump rejected" 1 "$LAST_RC" "is not staged"
+assert_exit_and_contains "Scenario E: missing marketplace bump rejected" 1 "$LAST_RC" "marketplace.json is not staged"
 cd "$tmproot"
 
 # ── Scenario F: agents/ change (not skills/) — also covered ─────
@@ -242,7 +243,7 @@ model: haiku
 ---" > plugins/marketing/agents/x.md
 git add plugins/marketing/agents/x.md
 run_check
-assert_exit_and_contains "Scenario F: agents/ change without bump rejected" 1 "$LAST_RC" "is not staged"
+assert_exit_and_contains "Scenario F: agents/ change without bump rejected" 1 "$LAST_RC" "plugin.json is not staged"
 cd "$tmproot"
 
 # ── Scenario G: hooks/ change without bump ───────────────────────
@@ -253,7 +254,7 @@ mkdir -p plugins/marketing/hooks
 echo '{}' > plugins/marketing/hooks/hooks.json
 git add plugins/marketing/hooks/hooks.json
 run_check
-assert_exit_and_contains "Scenario G: hooks/ change without bump rejected" 1 "$LAST_RC" "is not staged"
+assert_exit_and_contains "Scenario G: hooks/ change without bump rejected" 1 "$LAST_RC" "plugin.json is not staged"
 cd "$tmproot"
 
 # ── Scenario H: commands/ change without bump ───────────────────
@@ -267,7 +268,7 @@ description: x
 body' > plugins/marketing/commands/cmd.md
 git add plugins/marketing/commands/cmd.md
 run_check
-assert_exit_and_contains "Scenario H: commands/ change without bump rejected" 1 "$LAST_RC" "is not staged"
+assert_exit_and_contains "Scenario H: commands/ change without bump rejected" 1 "$LAST_RC" "plugin.json is not staged"
 cd "$tmproot"
 
 # ── Scenario I: nested tests/hooks path — should NOT trigger ────
@@ -303,7 +304,7 @@ mkdir -p plugins/marketing/skills/foo/references
 echo "ref doc" > plugins/marketing/skills/foo/references/ref.md
 git add plugins/marketing/skills/foo/references/ref.md
 run_check
-assert_exit_and_contains "Scenario K: deeply nested skill ref content IS flagged without bump" 1 "$LAST_RC" "is not staged"
+assert_exit_and_contains "Scenario K: deeply nested skill ref content IS flagged without bump" 1 "$LAST_RC" "plugin.json is not staged"
 cd "$tmproot"
 
 # ── Scenario L: corrupt staged plugin.json — silent-bypass guard ─
@@ -337,7 +338,7 @@ run_check
 # Substring check pins the right code path — without it, the macOS bash 3.2
 # unbound-variable crash on `${staged_files[@]}` (Round 2 P1) would exit 1
 # and silently satisfy the assertion.
-assert_exit_and_contains "Scenario M: deletion of plugin runtime IS flagged without bump" 1 "$LAST_RC" "is not staged"
+assert_exit_and_contains "Scenario M: deletion of plugin runtime IS flagged without bump" 1 "$LAST_RC" "plugin.json is not staged"
 cd "$tmproot"
 
 # ── Scenario N: marketplace entry mismatch ──────────────────────
@@ -398,6 +399,31 @@ echo "test fixture" > plugins/marketing/tests/commands/test_fixture.py
 git add plugins/marketing/tests/commands/test_fixture.py
 run_check
 assert_exit "Scenario O: nested tests/commands/ NOT flagged" 0 "$LAST_RC"
+cd "$tmproot"
+
+# ── Scenario P: marketplace.json missing this plugin's entry ────
+# Regression test for pre-commit.sh:228 fail-closed guard. If the staged
+# marketplace.json is valid JSON but has no entry for the affected plugin
+# (entry deleted, renamed, or never added), mp_staged_ver extracts to ""
+# and the guard fires "no parseable version entry for '$pname'".
+echo ""
+echo "=== Scenario P: marketplace.json missing 'marketing' entry (expect FAIL) ==="
+setup_repo
+echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
+bump_version plugins/marketing/.claude-plugin/plugin.json 1.0.1
+# Stage a marketplace.json that's valid JSON but doesn't list 'marketing'
+cat > .claude-plugin/marketplace.json <<'EOF'
+{
+  "name": "britenites",
+  "owner": {"name": "t"},
+  "plugins": [
+    {"name": "other", "source": "plugins/other", "version": "1.0.0"}
+  ]
+}
+EOF
+git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json .claude-plugin/marketplace.json
+run_check
+assert_exit_and_contains "Scenario P: marketplace.json missing 'marketing' entry rejected" 1 "$LAST_RC" "no parseable version entry for 'marketing'"
 cd "$tmproot"
 
 # ── Summary ──────────────────────────────────────────────────────

@@ -157,14 +157,13 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
-# Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh, which
-# stages 15 synthetic scenarios in a throw-away git repo and asserts the
-# plugin-version-bump enforcement section exits with the expected code AND
-# produces the expected diagnostic message for each. Scenarios I/J/K/O guard
-# the P2 case-glob over-match caught on PR #317; L/M/N guard the silent-
-# bypasses surfaced by /workflows:review on PR #318. The pass count below
-# is derived dynamically from the harness's RESULT contract line.
-# (See memory/gotcha_bash_case_glob_crosses_slash.md.)
+# Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
+# throw-away git repo. Each scenario asserts the hook exits with the expected
+# code AND produces the expected diagnostic substring. Scenarios I/J/K/O
+# guard the P2 case-glob over-match caught on PR #317; L/M/N/P guard
+# silent-bypasses surfaced by /workflows:review on PR #318. The pass count
+# below is auto-derived from the harness's RESULT contract line — no
+# hardcoded count to drift. (See memory/gotcha_bash_case_glob_crosses_slash.md.)
 section "2c. Pre-commit Guardrail Regression"
 
 precommit_test="$REPO_ROOT/scripts/test_pre_commit_bump.sh"
