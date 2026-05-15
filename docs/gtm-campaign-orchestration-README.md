@@ -1,11 +1,11 @@
 # GTM Campaign Orchestration — Effort README
 
-**Status**: Design phase CLOSED 2026-05-12; pre-implementation audit complete; **23 Linear issues filed and ready for execution** (BC-8712 through BC-8735 + BC-8752).
+**Status**: Design phase CLOSED 2026-05-12; pre-implementation audit complete; **25 Linear issues filed; Task 0 (BC-8712) complete 2026-05-15; 24 BCs ready for execution** (BC-8713 through BC-8735 + BC-8752; BC-8736 cancelled as duplicate of BC-8752).
 **Doc lifecycle**: LIVING — this README is updated as BCs ship + V3 ratifies + Tiers complete. See [§12 Maintenance protocol](#12-next-steps--open-items) for what to update when.
-**Last updated**: 2026-05-13 (session-3 — README shape pass 1+2+3 added §3.5 flywheel + §3.6 worked example + §3.7 operations + §5 M2/M3 callout + §6 infra glossary + §7.5 decision→BC table + 8 ADRs)
-**README version**: v1.0 (initial design-close artifact)
+**Last updated**: 2026-05-15 (session-4 — BC-8712 closed; plugin-bump guardrail in pre-commit.sh + Repo-line backfill across 11 affected BC bodies + count-drift fixes 22→25 / 23→25)
+**README version**: v1.1 (status-column added; first BC closure)
 **Audience**: anyone trying to understand "what is this work, what was decided, and how do I act on it."
-**TL;DR**: Brite had three parallel "campaign" systems with three different definitions. This design unifies them into a 3-layer architecture (Handbook = HOW / Linear = orchestration / Plugin = WHAT, with Salesforce as portfolio reporting surface), locks ~30 architectural decisions, and breaks implementation into 23 atomic Linear issues across 9 tiers. Critical path: ~5-6 weeks at single-developer pace.
+**TL;DR**: Brite had three parallel "campaign" systems with three different definitions. This design unifies them into a 3-layer architecture (Handbook = HOW / Linear = orchestration / Plugin = WHAT, with Salesforce as portfolio reporting surface), locks ~30 architectural decisions, and breaks implementation into 25 atomic Linear issues across 9 tiers. Critical path: ~5-6 weeks at single-developer pace.
 
 ---
 
@@ -1241,33 +1241,35 @@ All issues in the **Brite Plugin Marketplace** project (team Brite Company).
 
 ### By tier
 
-| BC | Task | Title (abbreviated) | Tier | Complexity |
-|---|---|---|---|---|
-| [BC-8712](https://linear.app/brite-nites/issue/BC-8712) | Task 0 | Bootstrap — create-issues + setup-claude-md + provision Brite GTM project | — | S |
-| [BC-8713](https://linear.app/brite-nites/issue/BC-8713) | T1-A | 4 SF custom fields | 1 | S |
-| [BC-8714](https://linear.app/brite-nites/issue/BC-8714) | T1-B | 4 SF saved list views | 1 | S |
-| [BC-8715](https://linear.app/brite-nites/issue/BC-8715) | T1-C | Performance Dashboard | 1 | M |
-| [BC-8716](https://linear.app/brite-nites/issue/BC-8716) | T1-D | Pipeline by Offer Family Dashboard | 1 | M |
-| [BC-8717](https://linear.app/brite-nites/issue/BC-8717) | T2-E | create_sf_campaign MCP tool | 2 | M |
-| [BC-8723](https://linear.app/brite-nites/issue/BC-8723) | T2-F | update_sf_campaign_status MCP tool | 2 | S |
-| [BC-8752](https://linear.app/brite-nites/issue/BC-8752) | T2-FA | σ3 trigger automation (audit-fix) | 2 | M |
-| [BC-8718](https://linear.app/brite-nites/issue/BC-8718) | T3-G | canonicals.yaml backfill (27 verticals) | 3 | M |
-| [BC-8730](https://linear.app/brite-nites/issue/BC-8730) | T3-H | D8 persona authorship process doc | 3 | S |
-| [BC-8724](https://linear.app/brite-nites/issue/BC-8724) | T4-I | `/marketing:plan-campaign` command | 4 | L |
-| [BC-8719](https://linear.app/brite-nites/issue/BC-8719) | T5-K | Entity slug short-form migration | 5 | S |
-| [BC-8720](https://linear.app/brite-nites/issue/BC-8720) | T5-L | offer-tier → offer-posture rename | 5 | M |
-| [BC-8721](https://linear.app/brite-nites/issue/BC-8721) | T5-M | 3-verdict parent labels rename | 5 | S |
-| [BC-8722](https://linear.app/brite-nites/issue/BC-8722) | T5-N | discoveries.json category schema | 5 | M |
-| [BC-8727](https://linear.app/brite-nites/issue/BC-8727) | T6-O | First dogfood campaign | 6 | M |
-| [BC-8729](https://linear.app/brite-nites/issue/BC-8729) | T6-P | V3 Marketing ratification | 6 | S |
-| [BC-8731](https://linear.app/brite-nites/issue/BC-8731) | T7-Q | `/marketing:portfolio-snapshot` command | 7 | L |
-| [BC-8732](https://linear.app/brite-nites/issue/BC-8732) | T8-R | Handbook PR — vocabulary.md | 8 | M |
-| [BC-8733](https://linear.app/brite-nites/issue/BC-8733) | T8-S | Handbook PR — 7 framework docs | 8 | L |
-| [BC-8734](https://linear.app/brite-nites/issue/BC-8734) | T8-T | Handbook PR — active-campaigns nav refactor | 8 | S |
-| [BC-8735](https://linear.app/brite-nites/issue/BC-8735) | T8-U | Handbook PR — how-we-operate cadence rows | 8 | S |
-| [BC-8728](https://linear.app/brite-nites/issue/BC-8728) | T9-V | `/marketing:offer-performance` (deferrable) | 9 | M |
-| [BC-8725](https://linear.app/brite-nites/issue/BC-8725) | T9-W | new-vertical/offer/persona commands (deferrable) | 9 | M |
-| [BC-8726](https://linear.app/brite-nites/issue/BC-8726) | T9-X | icp-refinement-review command (deferrable) | 9 | M |
+Status legend: `[done]` = shipped + Linear Done; `[wip]` = in flight; `[blocked]` = blocked by upstream; blank = backlog. Per §12 maintenance protocol, update this column when a BC closes.
+
+| Status | BC | Task | Title (abbreviated) | Tier | Complexity |
+|---|---|---|---|---|---|
+| [done] | [BC-8712](https://linear.app/brite-nites/issue/BC-8712) | Task 0 | Bootstrap — create-issues + setup-claude-md + provision Brite GTM project | — | S |
+|  | [BC-8713](https://linear.app/brite-nites/issue/BC-8713) | T1-A | 4 SF custom fields | 1 | S |
+|  | [BC-8714](https://linear.app/brite-nites/issue/BC-8714) | T1-B | 4 SF saved list views | 1 | S |
+|  | [BC-8715](https://linear.app/brite-nites/issue/BC-8715) | T1-C | Performance Dashboard | 1 | M |
+|  | [BC-8716](https://linear.app/brite-nites/issue/BC-8716) | T1-D | Pipeline by Offer Family Dashboard | 1 | M |
+|  | [BC-8717](https://linear.app/brite-nites/issue/BC-8717) | T2-E | create_sf_campaign MCP tool | 2 | M |
+|  | [BC-8723](https://linear.app/brite-nites/issue/BC-8723) | T2-F | update_sf_campaign_status MCP tool | 2 | S |
+|  | [BC-8752](https://linear.app/brite-nites/issue/BC-8752) | T2-FA | σ3 trigger automation (audit-fix) | 2 | M |
+|  | [BC-8718](https://linear.app/brite-nites/issue/BC-8718) | T3-G | canonicals.yaml backfill (27 verticals) | 3 | M |
+|  | [BC-8730](https://linear.app/brite-nites/issue/BC-8730) | T3-H | D8 persona authorship process doc | 3 | S |
+|  | [BC-8724](https://linear.app/brite-nites/issue/BC-8724) | T4-I | `/marketing:plan-campaign` command | 4 | L |
+|  | [BC-8719](https://linear.app/brite-nites/issue/BC-8719) | T5-K | Entity slug short-form migration | 5 | S |
+|  | [BC-8720](https://linear.app/brite-nites/issue/BC-8720) | T5-L | offer-tier → offer-posture rename | 5 | M |
+|  | [BC-8721](https://linear.app/brite-nites/issue/BC-8721) | T5-M | 3-verdict parent labels rename | 5 | S |
+|  | [BC-8722](https://linear.app/brite-nites/issue/BC-8722) | T5-N | discoveries.json category schema | 5 | M |
+|  | [BC-8727](https://linear.app/brite-nites/issue/BC-8727) | T6-O | First dogfood campaign | 6 | M |
+|  | [BC-8729](https://linear.app/brite-nites/issue/BC-8729) | T6-P | V3 Marketing ratification | 6 | S |
+|  | [BC-8731](https://linear.app/brite-nites/issue/BC-8731) | T7-Q | `/marketing:portfolio-snapshot` command | 7 | L |
+|  | [BC-8732](https://linear.app/brite-nites/issue/BC-8732) | T8-R | Handbook PR — vocabulary.md | 8 | M |
+|  | [BC-8733](https://linear.app/brite-nites/issue/BC-8733) | T8-S | Handbook PR — 7 framework docs | 8 | L |
+|  | [BC-8734](https://linear.app/brite-nites/issue/BC-8734) | T8-T | Handbook PR — active-campaigns nav refactor | 8 | S |
+|  | [BC-8735](https://linear.app/brite-nites/issue/BC-8735) | T8-U | Handbook PR — how-we-operate cadence rows | 8 | S |
+|  | [BC-8728](https://linear.app/brite-nites/issue/BC-8728) | T9-V | `/marketing:offer-performance` (deferrable) | 9 | M |
+|  | [BC-8725](https://linear.app/brite-nites/issue/BC-8725) | T9-W | new-vertical/offer/persona commands (deferrable) | 9 | M |
+|  | [BC-8726](https://linear.app/brite-nites/issue/BC-8726) | T9-X | icp-refinement-review command (deferrable) | 9 | M |
 
 ### Critical path
 
@@ -1510,8 +1512,8 @@ The README is the single-page front door for the entire GTM Campaign Orchestrati
 
 | Event | Update | Section |
 |---|---|---|
-| A BC closes / merges | Update status indicator (✓ / ✗ / 🚧) in the BC table | §7 |
-| Tier N completes | Update sequencing in §3.7 + status indicator in §7 | §3.7, §7 |
+| A BC closes / merges | Update status column ([done] / [dropped] / [wip] / [blocked]) in the BC table | §7 |
+| Tier N completes | Update sequencing in §3.7 + status column in §7 | §3.7, §7 |
 | V3 ratifies (M2 or M3) | Update M2/M3 callout with outcome; update affected BC statuses; update §1 status line | §1, §5, §7 |
 | Dogfood campaign closes | Update §1 TL;DR with learnings; add post-mortem reference to §11 | §1, §11 |
 | A decision changes (re-litigated lock) | Update §5 + §8 + ADR file; bump README version; note in §11 audit narrative | §5, §8, ADRs, §11 |
