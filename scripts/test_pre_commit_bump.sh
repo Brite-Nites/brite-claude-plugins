@@ -16,9 +16,13 @@
 #   F  agents/<file> changed without bump                      expect FAIL (1)
 #   G  hooks/<file> changed without bump                       expect FAIL (1)
 #   H  commands/<file> changed without bump                    expect FAIL (1)
-#   I  plugins/<name>/tests/hooks/<file> (test fixture)        expect PASS (0)  [P2 regression test]
-#   J  plugins/<name>/shared/hooks/<file> (non-runtime docs)   expect PASS (0)  [P2 regression test]
+#   I  plugins/<name>/tests/hooks/<file> (test fixture)        expect PASS (0)  [P2 case-glob regression]
+#   J  plugins/<name>/shared/hooks/<file> (non-runtime docs)   expect PASS (0)  [P2 case-glob regression]
 #   K  plugins/<name>/skills/<skill>/references/<file>         expect FAIL (1)  [deep nest still triggers]
+#   L  corrupt staged plugin.json + content change             expect FAIL (1)  [silent-bypass guard]
+#   M  deletion of plugin runtime content without bump         expect FAIL (1)  [--diff-filter=d guard]
+#   N  marketplace entry bumped for wrong plugin name          expect FAIL (1)  [per-plugin name-match]
+#   O  plugins/<name>/tests/commands/<file>                    expect PASS (0)  [case-glob symmetric — commands keyword]
 #
 # Usage:
 #   bash scripts/test_pre_commit_bump.sh                     # uses scripts/pre-commit.sh next to this file
@@ -50,12 +54,13 @@ fi
 SCRIPT_UNDER_TEST="$(cd "$(dirname "$SCRIPT_UNDER_TEST")" && pwd)/$(basename "$SCRIPT_UNDER_TEST")"
 
 # ── Set up isolated tmp dir + cleanup trap ───────────────────────────
-tmproot="$(mktemp -d -t precommit-test.XXXXXX)"
+tmproot="$(mktemp -d -t precommit-test.XXXXXX)" || { echo "FATAL: mktemp -d failed" >&2; exit 2; }
 trap 'rm -rf "$tmproot"' EXIT
 cd "$tmproot"
 
 pass=0
 fail=0
+LAST_HOOK_OUTPUT=""
 
 assert_exit() {
   local label="$1"
@@ -66,8 +71,23 @@ assert_exit() {
     pass=$((pass + 1))
   else
     echo "  FAIL  $label (expected exit=$expected, got exit=$actual)"
+    # Surface the hook's own diagnostics on mismatch — otherwise debugging
+    # a failing scenario means re-running the harness by hand.
+    if [ -n "${LAST_HOOK_OUTPUT:-}" ]; then
+      printf '%s\n' "$LAST_HOOK_OUTPUT" | tail -10 | sed 's/^/      | /'
+    fi
     fail=$((fail + 1))
   fi
+}
+
+bump_version() {
+  # Rewrite "version": "1.0.0" to "version": "$2" in file $1; clean BSD-sed backup.
+  sed -i.bak 's/"version": "1.0.0"/"version": "'"$2"'"/' "$1"
+  rm -f "$1.bak"
+  # Post-condition: the sed pattern is anchored on the literal "1.0.0"
+  # baseline. If setup_repo's baseline version ever drifts, the sed silently
+  # no-ops and scenarios start asserting the inverse of their intent. Guard.
+  grep -q "\"version\": \"$2\"" "$1" || { echo "FATAL: bump_version no-op on $1 (baseline drift?)" >&2; exit 2; }
 }
 
 setup_repo() {
@@ -107,7 +127,10 @@ EOF
 }
 
 run_check() {
-  bash "$SCRIPT_UNDER_TEST" > "$tmproot/precommit-out.$$" 2>&1
+  # Capture combined stdout+stderr into LAST_HOOK_OUTPUT so assert_exit can
+  # surface the hook's own diagnostic on a mismatch (DX win — debugging a
+  # failed scenario otherwise means re-running by hand).
+  LAST_HOOK_OUTPUT=$(bash "$SCRIPT_UNDER_TEST" 2>&1)
   echo $?
 }
 
@@ -126,9 +149,8 @@ echo ""
 echo "=== Scenario B: content + both bumps (expect PASS) ==="
 setup_repo
 echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
-sed -i.bak 's/"version": "1.0.0"/"version": "1.0.1"/' plugins/marketing/.claude-plugin/plugin.json
-sed -i.bak 's/"version": "1.0.0"/"version": "1.0.1"/' .claude-plugin/marketplace.json
-rm -f plugins/marketing/.claude-plugin/plugin.json.bak .claude-plugin/marketplace.json.bak
+bump_version plugins/marketing/.claude-plugin/plugin.json 1.0.1
+bump_version .claude-plugin/marketplace.json 1.0.1
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json .claude-plugin/marketplace.json
 rc=$(run_check)
 assert_exit "Scenario B: content + both bumps accepted" 0 "$rc"
@@ -161,8 +183,7 @@ echo ""
 echo "=== Scenario E: plugin.json bumped but marketplace.json not staged (expect FAIL) ==="
 setup_repo
 echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
-sed -i.bak 's/"version": "1.0.0"/"version": "1.0.1"/' plugins/marketing/.claude-plugin/plugin.json
-rm -f plugins/marketing/.claude-plugin/plugin.json.bak
+bump_version plugins/marketing/.claude-plugin/plugin.json 1.0.1
 git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json
 rc=$(run_check)
 assert_exit "Scenario E: missing marketplace bump rejected" 1 "$rc"
@@ -244,10 +265,102 @@ rc=$(run_check)
 assert_exit "Scenario K: deeply nested skill ref content IS flagged without bump" 1 "$rc"
 cd "$tmproot"
 
+# ── Scenario L: corrupt staged plugin.json — silent-bypass guard ─
+# Regression test for the silent-bypass surfaced by /workflows:review on PR #318.
+# Without the fail-closed check in pre-commit.sh, malformed staged plugin.json
+# yields pj_staged_ver="" and the equality check short-circuits — letting the
+# hook exit 0 with no real bump enforced.
+echo ""
+echo "=== Scenario L: corrupt staged plugin.json rejected (expect FAIL) ==="
+setup_repo
+echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
+# Overwrite plugin.json with invalid JSON; bump marketplace correctly so
+# the only failure mode under test is the plugin.json parse-error path.
+echo "GARBAGE NOT JSON {" > plugins/marketing/.claude-plugin/plugin.json
+bump_version .claude-plugin/marketplace.json 1.0.1
+git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json .claude-plugin/marketplace.json
+rc=$(run_check)
+assert_exit "Scenario L: corrupt plugin.json IS flagged (no silent bypass)" 1 "$rc"
+cd "$tmproot"
+
+# ── Scenario M: deletion of plugin runtime content ──────────────
+# Regression test for the --diff-filter=d bypass. Prior to the fix, the hook
+# excluded deletions from staged_files, so `git rm` of a plugin runtime file
+# silently passed (the deletion is also a content change per BC-6000 — the
+# old version stays in clients' plugin caches and serves now-deleted content).
+echo ""
+echo "=== Scenario M: deletion of plugin runtime without bump (expect FAIL) ==="
+setup_repo
+git rm -q plugins/marketing/skills/foo/SKILL.md
+rc=$(run_check)
+assert_exit "Scenario M: deletion of plugin runtime IS flagged without bump" 1 "$rc"
+cd "$tmproot"
+
+# ── Scenario N: marketplace entry mismatch ──────────────────────
+# Regression test for the per-plugin name-match in marketplace.json. Without
+# it, bumping any plugins[].version would falsely satisfy the marketplace
+# bump check for an unrelated plugin.
+echo ""
+echo "=== Scenario N: marketplace entry bumped for wrong plugin (expect FAIL) ==="
+setup_repo
+# Add a second plugin 'other' to the baseline so we can mis-bump its entry
+cat > .claude-plugin/marketplace.json <<'EOF'
+{
+  "name": "britenites",
+  "owner": {"name": "t"},
+  "plugins": [
+    {"name": "marketing", "source": "plugins/marketing", "version": "1.0.0"},
+    {"name": "other", "source": "plugins/other", "version": "1.0.0"}
+  ]
+}
+EOF
+mkdir -p plugins/other/.claude-plugin
+cat > plugins/other/.claude-plugin/plugin.json <<'EOF'
+{ "name": "other", "description": "x", "author": {"name": "t"}, "version": "1.0.0" }
+EOF
+git add -A && git commit -q -m "add other plugin"
+
+# Stage marketing content, bump marketing's plugin.json, but bump 'other' (not 'marketing') in marketplace
+echo "modified body" >> plugins/marketing/skills/foo/SKILL.md
+bump_version plugins/marketing/.claude-plugin/plugin.json 1.0.1
+cat > .claude-plugin/marketplace.json <<'EOF'
+{
+  "name": "britenites",
+  "owner": {"name": "t"},
+  "plugins": [
+    {"name": "marketing", "source": "plugins/marketing", "version": "1.0.0"},
+    {"name": "other", "source": "plugins/other", "version": "1.0.1"}
+  ]
+}
+EOF
+git add plugins/marketing/skills/foo/SKILL.md plugins/marketing/.claude-plugin/plugin.json .claude-plugin/marketplace.json
+rc=$(run_check)
+assert_exit "Scenario N: wrong-plugin marketplace bump rejected" 1 "$rc"
+cd "$tmproot"
+
+# ── Scenario O: case-glob symmetric coverage for commands keyword ─
+# Scenario I covers tests/hooks/ NOT triggering. The regex pattern covers
+# all four (commands|skills|hooks|agents) keywords with the same shape, so
+# regressing one tends to regress all — but if a future maintainer ever
+# special-cases one keyword, this scenario catches a re-introduced
+# over-match on commands. See [[gotcha-bash-case-glob-crosses-slash]].
+echo ""
+echo "=== Scenario O: plugins/<name>/tests/commands/<file> should NOT trigger (expect PASS) ==="
+setup_repo
+mkdir -p plugins/marketing/tests/commands
+echo "test fixture" > plugins/marketing/tests/commands/test_fixture.py
+git add plugins/marketing/tests/commands/test_fixture.py
+rc=$(run_check)
+assert_exit "Scenario O: nested tests/commands/ NOT flagged" 0 "$rc"
+cd "$tmproot"
+
 # ── Summary ──────────────────────────────────────────────────────
 echo ""
 echo "================================="
 echo "  PASS: $pass"
 echo "  FAIL: $fail"
 echo "================================="
+# Machine-parseable contract line for scripts/validate.sh Section 2c — must be
+# the last non-empty line. Independent of the human-readable banner above.
+printf 'RESULT pass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] && exit 0 || exit 1

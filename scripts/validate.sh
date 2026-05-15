@@ -172,15 +172,15 @@ if [ ! -f "$precommit_test" ]; then
 elif [ ! -f "$precommit_hook" ]; then
   warn "scripts/pre-commit.sh not found — pre-commit regression check skipped"
 else
-  precommit_log="$(mktemp -t precommit-regression.XXXXXX)"
-  if bash "$precommit_test" "$precommit_hook" > "$precommit_log" 2>&1; then
-    pass_count=$(grep -c '^  PASS  ' "$precommit_log" || true)
-    pass "pre-commit hook regression ($pass_count scenarios)"
+  # Capture into variable rather than mktemp — no tmpfile leak risk on interrupt
+  # and avoids re-parsing the harness's human-readable PASS lines.
+  if precommit_out=$(bash "$precommit_test" "$precommit_hook" 2>&1); then
+    pass_count=$(printf '%s\n' "$precommit_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "pre-commit hook regression (${pass_count:-?} scenarios)"
   else
     fail "pre-commit hook regression failed — run scripts/test_pre_commit_bump.sh for details"
-    tail -25 "$precommit_log" | sed 's/^/    /' >&2
+    printf '%s\n' "$precommit_out" | tail -25 | sed 's/^/    /' >&2
   fi
-  rm -f "$precommit_log"
 fi
 
 # ══════════════════════════════════════════════════════════════════════

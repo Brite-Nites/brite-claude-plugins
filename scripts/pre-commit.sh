@@ -13,13 +13,24 @@ set -euo pipefail
 
 errors=0
 
-# ── Get staged files (excluding deleted) ─────────────────────────────
+# ── Get staged files ────────────────────────────────────────────────
+# `staged_files` excludes deletions because the linter sections (ESLint /
+# tsc / Ruff below) cannot lint files that no longer exist on disk.
+# `all_changed_files` includes deletions and is used by the plugin-version-
+# bump enforcement section — per BC-6000, REMOVING a plugin runtime file is
+# also a content change that requires a version bump so clients' caches
+# invalidate.
 staged_files=()
 while IFS= read -r f; do
   [ -n "$f" ] && staged_files+=("$f")
 done < <(git diff --cached --name-only --diff-filter=d 2>/dev/null || true)
 
-if [ "${#staged_files[@]}" -eq 0 ]; then
+all_changed_files=()
+while IFS= read -r f; do
+  [ -n "$f" ] && all_changed_files+=("$f")
+done < <(git diff --cached --name-only 2>/dev/null || true)
+
+if [ "${#all_changed_files[@]}" -eq 0 ]; then
   exit 0
 fi
 
@@ -94,11 +105,14 @@ fi
 # serves stale content. Costly precedent: BC-6000 lost 4+ ship sessions.
 
 affected_plugins=()
+# Iterate `all_changed_files` (not `staged_files`) because deletions of
+# plugin runtime files also require a bump (BC-6000 — plugin cache is keyed
+# by version; without a bump, clients serve cached now-deleted content).
 # Regex anchors the second path segment to a single name (no slashes), so
 # only plugins/<name>/{commands,skills,hooks,agents}/... at the canonical
 # depth triggers — NOT nested matches like plugins/<name>/tests/hooks/...
 # (pytest fixtures) or plugins/<name>/shared/hooks/... (non-runtime docs).
-for f in "${staged_files[@]}"; do
+for f in "${all_changed_files[@]}"; do
   if [[ "$f" =~ ^plugins/[^/]+/(commands|skills|hooks|agents)/ ]]; then
     pname=$(printf '%s' "$f" | cut -d/ -f2)
     already=false
@@ -150,6 +164,18 @@ except Exception: pass' 2>/dev/null || true)
 try: print(json.load(sys.stdin).get("version",""))
 except Exception: pass' 2>/dev/null || true)
 
+      # Fail-closed when the staged file is unparseable — without this, a
+      # malformed plugin.json yields pj_staged_ver="" and the equality check
+      # below short-circuits, letting corrupt JSON commit through with no
+      # enforced bump (silent-bypass surfaced by /workflows:review on PR #318).
+      if [ -z "$pj_staged_ver" ]; then
+        echo ""
+        echo "Plugin '$pname' content staged but $pj has an unparseable or missing version (malformed JSON?)."
+        echo "  Fix the file and bump the version field per CLAUDE.md plugin-cache gotcha (BC-6000)."
+        errors=$((errors + 1))
+        continue
+      fi
+
       if [ -n "$pj_head_ver" ] && [ "$pj_head_ver" = "$pj_staged_ver" ]; then
         echo ""
         echo "Plugin '$pname' content staged but $pj version is unchanged ($pj_head_ver)."
@@ -179,6 +205,16 @@ try:
     for p in json.load(sys.stdin).get("plugins",[]):
         if p.get("name")==target: print(p.get("version","")); break
 except Exception: pass' 2>/dev/null || true)
+
+      # Fail-closed when the marketplace entry for this plugin can't be parsed
+      # or doesn't exist in the staged file. Same silent-bypass guard as above.
+      if [ -z "$mp_staged_ver" ]; then
+        echo ""
+        echo "Plugin '$pname' content staged but $mp has no parseable version entry for '$pname' (malformed JSON or missing entry?)."
+        echo "  Add/repair the matching plugins[].version entry per CLAUDE.md plugin-cache gotcha (BC-6000)."
+        errors=$((errors + 1))
+        continue
+      fi
 
       if [ -n "$mp_head_ver" ] && [ "$mp_head_ver" = "$mp_staged_ver" ]; then
         echo ""
