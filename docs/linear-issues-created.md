@@ -1,10 +1,12 @@
 # Linear Issues Created — GTM Campaign Orchestration
 
-**Created**: 2026-05-12
+**Created**: 2026-05-12 (initial 22) + 2026-05-13 (T2-FA audit-fix BC-8752) + 2026-05-14 (milestone assignment to all 25)
 **Source plan**: [`docs/project-plan-refined.md`](./project-plan-refined.md)
+**Master entry point**: [`docs/gtm-campaign-orchestration-README.md`](./gtm-campaign-orchestration-README.md)
 **Linear project**: [Brite Plugin Marketplace](https://linear.app/brite-nites/project/brite-plugin-marketplace-402b57908532)
+**Milestone**: `GTM Campaign Orchestration v1.0` (id `bcd40909-aa7c-43d7-88e8-6c40b59c5a1f`)
 **Team**: Brite Company (prefix `BC-`)
-**Total issues created**: 22 (Task 0 + 21 BCs T1-A through T9-X)
+**Total issues created**: 25 (Task 0 + 23 BCs T1-A through T9-X + T2-FA audit-fix BC-8752; BC-8736 created in error as duplicate of BC-8752 and canceled with `duplicateOf` link)
 
 ## Issue ID → Task title mapping
 
@@ -34,6 +36,7 @@
 | T8-S | [BC-8733](https://linear.app/brite-nites/issue/BC-8733) | GTM T8-S: Handbook PR — 7 framework docs (O14) | L |
 | T8-T | [BC-8734](https://linear.app/brite-nites/issue/BC-8734) | GTM T8-T: Handbook PR — active-campaigns.md nav refactor (O8) | S |
 | T8-U | [BC-8735](https://linear.app/brite-nites/issue/BC-8735) | GTM T8-U: Handbook PR — how-we-operate.md cadence rows (O14) | S |
+| T2-FA | [BC-8752](https://linear.app/brite-nites/issue/BC-8752) | GTM T2-FA: Wire σ3 status-sync triggers (Linear status transitions → update_sf_campaign_status) | M |
 
 ## Dependency wiring summary
 
@@ -41,9 +44,11 @@ Dependencies are encoded as Linear `blockedBy` relations (per the Mermaid graph 
 
 ### Critical path
 
-Task 0 → T1-A → T2-E → T4-I → T6-O → T6-P → T7-Q
+Task 0 → T1-A → T2-E → T4-I → T6-O → T6-P → T2-FA → T7-Q
 
-`BC-8712 → BC-8713 → BC-8717 → BC-8724 → BC-8727 → BC-8729 → BC-8731`
+`BC-8712 → BC-8713 → BC-8717 → BC-8724 → BC-8727 → BC-8729 → BC-8752 → BC-8731`
+
+BC-8752 (T2-FA σ3 trigger automation) was added 2026-05-13 as an audit-fix per pre-implementation audit P1#1 — without it, the σ3 `update_sf_campaign_status` MCP tool (BC-8723) only fires on manual operator invocation, defeating σ3's auto-sync design intent. T7-Q (portfolio-snapshot) reads SF status which must be accurate via the trigger wiring.
 
 ### Full blockedBy map
 
@@ -73,6 +78,9 @@ Task 0 → T1-A → T2-E → T4-I → T6-O → T6-P → T7-Q
 | BC-8733 (T8-S) | BC-8729, BC-8732 |
 | BC-8734 (T8-T) | BC-8729, BC-8714 |
 | BC-8735 (T8-U) | BC-8714, BC-8715, BC-8716, BC-8729 |
+| BC-8752 (T2-FA) | BC-8723, BC-8724 |
+
+(BC-8731 (T7-Q) updated 2026-05-13 to add BC-8752 to blockedBy. Final BC-8731 blockedBy: BC-8715, BC-8716, BC-8717, BC-8723, BC-8719, BC-8727, BC-8729, BC-8752.)
 
 ## Priority assignment
 
@@ -89,7 +97,7 @@ Each issue carries its complexity label (`S` / `M` / `L`) only. The plan's `tier
 
 ## Validation
 
-- All 22 issues created in team **Brite Company**, project **Brite Plugin Marketplace** — confirmed via Linear save_issue response.
+- All 25 issues created in team **Brite Company**, project **Brite Plugin Marketplace**, milestone **GTM Campaign Orchestration v1.0** — confirmed via Linear save_issue response + 2026-05-14 independent audit.
 - Each issue body contains the required Context / Implementation Steps / Validation Criteria / Dependencies sections.
 - Dependencies wired via `blockedBy` (append-only) at issue-create time; no post-create patching required.
 - Source plan file (`docs/project-plan-refined.md`) updated with:
