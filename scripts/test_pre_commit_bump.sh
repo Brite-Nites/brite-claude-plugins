@@ -26,6 +26,17 @@
 
 set -u  # do NOT set -e — we expect non-zero exits
 
+# ── Defuse caller's git env ──────────────────────────────────────────
+# When this harness is invoked from inside a git hook (e.g., pre-push via
+# validate.sh), git presets GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE in
+# the environment to point at the CALLER's repo. Those env vars override
+# the cwd-based discovery that `git init` / `git add` / `git commit` would
+# otherwise use — so the synthetic baseline commit would land on the
+# caller's branch and `git config user.email t@t` would clobber the
+# caller's .git/config. Unset them so all subsequent git commands resolve
+# the scenario's own .git directory by cwd, as intended.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+
 # ── Locate script-under-test ─────────────────────────────────────────
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT_UNDER_TEST="${1:-$script_dir/pre-commit.sh}"
