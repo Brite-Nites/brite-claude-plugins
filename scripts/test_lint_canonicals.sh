@@ -1376,6 +1376,20 @@ YAML
   assert_exit_and_substring "BO: indented line outside a block" 1 "unexpected indented line outside a block"
 }
 
+# ── Scenario BO2: slug: true (bool subclass of int — hint branch) ──────
+run_bo2() {
+  local dir
+  dir="$(mkdir_scenario BO2)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: true
+display: "Alpha"
+personas: []
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BO2: slug bool yields bool hint" 1 "is the value \`true\`/\`false\`"
+}
+
 # ── Scenario BP: manifest missing required key ──────────────────────────
 run_bp() {
   local dir
