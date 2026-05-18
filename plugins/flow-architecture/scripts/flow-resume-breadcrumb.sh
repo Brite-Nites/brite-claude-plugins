@@ -20,6 +20,12 @@ set -euo pipefail
 #                                        like `python3 <<'PY' | bash $HELPER write ...`
 #                                        trip the workflows security-hook classifier.
 #
+# Exit codes:
+#   0   Success.
+#   2   Usage error — missing or extra positional args.
+#   3   I/O or validation error — input file not found, input failed JSON
+#       parse, mv failed, or post-rename content-match mismatch.
+#
 # bash 3.2+ compatible (Q32). python3 3.6+ for JSON parse (no jq).
 
 # Q31.3 stale window in seconds (7 days).
@@ -138,10 +144,11 @@ cmd_write() {
   mkdir -p "$dir"
 
   # Use mktemp for symlink-attack safety: a hostile pre-staged
-  # `<path>.tmp` symlink to /etc/passwd would be followed by a naive
-  # `cp` otherwise. mktemp creates with mode 600 + O_EXCL semantics,
-  # picks a unique 6-char suffix, and lives in the same directory as
-  # $path so the subsequent `mv` is a same-filesystem (atomic) rename.
+  # `<path>.tmp` symlink to /etc/passwd would be opened by an unchecked
+  # `>"$path.tmp"` redirect otherwise. mktemp creates with mode 600 +
+  # O_EXCL semantics, picks a unique 6-char suffix, and lives in the
+  # same directory as $path so the subsequent `mv` is a same-filesystem
+  # (atomic) rename.
   local tmp
   if ! tmp="$(mktemp "${path}.tmp.XXXXXX")"; then
     echo "flow-resume-breadcrumb: mktemp failed for $path" >&2

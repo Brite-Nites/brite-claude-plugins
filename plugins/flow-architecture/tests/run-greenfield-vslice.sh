@@ -85,8 +85,9 @@ expect_kv() {
 # by Section 5b negative-path tests) is always removed.
 #
 # Section 5 mktemp'd input files (BREADCRUMB_INPUT, etc., set later in script)
-# are always removed when present — `${var:-}` guards `set -u` for the
-# pre-set window. Defense against python3-heredoc-failure leaks (BC-9027 P2).
+# are listed here so the cleanup helpers don't have to track them at use-site.
+# `${var:-}` guard: helpers may fire before Section 5 sets these vars, and
+# `rm -f ""` is a safe no-op under `set -u` (BC-9027 P2 review-fix sweep).
 cleanup_on_success() {
   rm -f "$BREADCRUMB" "$SCRATCH_BREADCRUMB" "${BREADCRUMB_INPUT:-}" "${BREADCRUMB_INPUT_2:-}"
 }
@@ -289,9 +290,11 @@ else
   fail "flow-resume-breadcrumb.sh write exit non-zero"
   printf '%s\n' "$WRITE_OUT" | sed 's/^/    | /'
 fi
-# Sticky cleanup via cleanup_on_success/cleanup_scratch_only handles
-# BREADCRUMB_INPUT — no explicit rm here so the input survives for inspection
-# on early failure (BC-9027 P3 diagnostic-leak finding).
+# BREADCRUMB_INPUT cleanup is centralized in cleanup_on_success /
+# cleanup_scratch_only (both wipe it) — no use-site rm keeps the cleanup
+# contract single-sourced. On a `set -e` early-abort between mktemp and
+# the cleanup-helper call, the tmp leaks under TMPDIR — minor, mktemp
+# guarantees a unique name so it doesn't collide.
 
 if printf '%s\n' "$WRITE_OUT" | grep -q '^WRITE=ok$'; then
   pass "write emits WRITE=ok"
@@ -361,7 +364,11 @@ else
   fail "second write at same <state-path> exits non-zero"
   printf '%s\n' "$WRITE_2_OUT" | sed 's/^/    | /'
 fi
-if grep -q '"current_phase": "3"' "$BREADCRUMB"; then
+# Parse via python to stay whitespace-agnostic — a future producer switch to
+# json.dumps(indent=...) or separators=... would silently break a literal-string
+# grep, and the "second write did not replace" failure mode would conceal the
+# real cause.
+if [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["current_phase"])' "$BREADCRUMB" 2>/dev/null)" = "3" ]; then
   pass "second write replaced breadcrumb content (current_phase advanced to 3)"
 else
   fail "second write did not replace breadcrumb content (expected current_phase: 3)"

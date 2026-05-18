@@ -19,9 +19,21 @@ Future amendments (e.g. Q44 `retro_state`, Q53 `ship_state`) follow the same pre
 
 ## Write-then-verify
 
-Every breadcrumb write goes through `scripts/flow-resume-breadcrumb.sh write <state-path> <input-path>` per Q31.5 (`:321`) as amended by BC-9027 (file-arg refactor; `<input-path>` replaces the prior stdin-pipe shape). Caller assembles the new JSON via single-quoted python3 heredoc into a `mktemp` file, then passes both paths to the helper. Internal pipeline: `cat <"$input" >"$tmp"` (preserves mktemp'd `<state-path>.tmp.XXXXXX` perms) → python3 `json.load(<tmp>)` parse-verify → atomic `mv` → content-match check. Atomic rename guarantees no partial-write corruption (POSIX-guaranteed atomic on the same filesystem).
+Call signature (per Q31.5 (`:321`) as amended by BC-9027 file-arg refactor):
 
-Canonical worked example: see any orchestrator's Phase 1 breadcrumb-write block (e.g., `commands/start-project.md` Phase 1) — `python3 > "$TMP_JSON" <<'PY' ... PY; bash $HELPER write "$BREADCRUMB_PATH" "$TMP_JSON"; rm -f "$TMP_JSON"`. The previous canonical pattern `python3 <<'PY' | bash $HELPER write "$PATH"` was retired because the stdin pipe tripped the workflows security-hook classifier as a "piped download/execution" false-positive (BC-9027 root cause). Callers running the helper from a `set -e` parent script should add `trap 'rm -f "$TMP_JSON"' EXIT` after the mktemp; LLM-orchestrated step-by-step execution (the canonical FDA orchestrator pattern) runs the explicit `rm -f` line unconditionally and does not require the trap.
+```
+bash $CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh write <state-path> <input-path>
+```
+
+Caller pattern (see `commands/start-project.md` Phase 1 for the canonical worked example):
+
+1. Assemble the new JSON via single-quoted python3 heredoc into a `mktemp` file: `python3 > "$TMP_JSON" <<'PY' ... PY`.
+2. Invoke the helper: `bash $HELPER write "$BREADCRUMB_PATH" "$TMP_JSON"`.
+3. Clean up: `rm -f "$TMP_JSON"` — or `trap 'rm -f "$TMP_JSON"' EXIT` immediately after the mktemp if the caller is a `set -e` parent script. LLM-orchestrated step-by-step execution (the canonical FDA orchestrator pattern) runs the explicit `rm -f` unconditionally and does not need the trap.
+
+Internal pipeline (helper-side): shell-copy `<input-path>` into the same-directory mktemp'd `<state-path>.tmp.XXXXXX` (preserves mode 600) → python3 `json.load(<tmp>)` parse-verify → atomic `mv` → content-match check. Atomic rename guarantees no partial-write corruption (POSIX-guaranteed atomic on the same filesystem).
+
+Historical note: the previous canonical pattern `python3 <<'PY' | bash $HELPER write "$PATH"` was retired because the stdin pipe tripped the workflows security-hook classifier as a "piped download/execution" false-positive — BC-9027 root cause + fix.
 
 ## Stale-breadcrumb policy
 
