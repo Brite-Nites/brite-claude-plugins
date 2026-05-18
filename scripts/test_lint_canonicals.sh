@@ -54,6 +54,10 @@
 #   AO schema_version: true (bool/int subclass gotcha)               expect 1
 #   AP editor swap dotfile silently skipped                          expect 0
 #   AQ UTF-8 BOM tolerated (utf-8-sig)                               expect 0
+#   AR manifest duplicate top-level key                              expect 1
+#   AS manifest duplicate vertical slug                              expect 1
+#   AT 4-space dict-list indent (happy path)                         expect 0
+#   AU directory named `<slug>.yaml` rejected as non-regular         expect 1
 #
 # Usage:
 #   bash scripts/test_lint_canonicals.sh
@@ -921,14 +925,101 @@ YAML
   assert_exit_and_substring "AQ: UTF-8 BOM tolerated" 0 "Canonicals lint OK"
 }
 
+# ── Scenario AR: manifest duplicate top-level key ───────────────────────
+run_ar() {
+  local dir
+  dir="$(mkdir_scenario AR)"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: 1
+schema_version: 2
+verticals:
+  - alpha
+  - bravo
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AR: manifest duplicate top-level key" 1 "_manifest.yaml:2: duplicate top-level key 'schema_version'"
+}
+
+# ── Scenario AS: manifest duplicate vertical slug ────────────────────────
+run_as() {
+  local dir
+  dir="$(mkdir_scenario AS)"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: 1
+verticals:
+  - alpha
+  - alpha
+  - bravo
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AS: manifest duplicate vertical slug" 1 "duplicate vertical slug 'alpha'"
+}
+
+# ── Scenario AT: 4-space dict-list indent (P2 fix verification) ──────────
+run_at() {
+  local dir
+  dir="$(mkdir_scenario AT)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+    - slug: persona-one
+      display: "Persona One"
+      titles:
+          - "Title One"
+offers:
+    - slug: offer-one
+      display: "Offer One"
+      status: active
+      posture: free-asset
+      target_personas:
+          - persona-one
+      target_postures:
+          - free-asset
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AT: 4-space dict-list indent (happy path)" 0 "Canonicals lint OK"
+}
+
+# ── Scenario AU: directory named `<slug>.yaml` rejected as non-regular ──
+run_au() {
+  local dir
+  dir="$(mkdir_scenario AU)"
+  # A directory ending in .yaml is not a regular file; the lint rejects with
+  # a clear "not a regular file" error rather than hanging or emitting a
+  # confusing manifest-mismatch message.
+  mkdir "$dir/charlie.yaml"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: 1
+verticals:
+  - alpha
+  - bravo
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AU: directory named .yaml rejected" 1 "charlie.yaml: not a regular file"
+}
+
 # ── Run all scenarios ────────────────────────────────────────────────────
-# Discover every `run_*` function and invoke in name order. Adding a new
-# scenario only requires defining a `run_<letter>` function — no second
-# invocation list to keep in sync.
+# Discover every `run_<letter>` function and invoke in document order:
+# single-letter (A-Z) first, then double-letter (AA-AZ), tripled-letter, etc.
+# Adding a new scenario only requires defining a `run_<letter>` function — no
+# second invocation list to keep in sync.
+# Bash-only feature (compgen is a bash builtin); the script's shebang pins this.
 scenarios=()
 while IFS= read -r fn; do
   scenarios+=("$fn")
-done < <(compgen -A function | grep '^run_[a-z]' | sort)
+done < <(
+  compgen -A function \
+    | grep '^run_[a-z]' \
+    | awk '{ print length($0), $0 }' \
+    | sort -k1,1n -k2,2 \
+    | awk '{ print $2 }'
+)
+
+if [ "${#scenarios[@]}" -eq 0 ]; then
+  echo "FATAL: no scenarios discovered (compgen returned empty — wrong shell?)" >&2
+  exit 2
+fi
 
 echo ""
 echo "Running lint_canonicals.py regression harness (${#scenarios[@]} scenarios)..."

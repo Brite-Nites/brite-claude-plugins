@@ -264,6 +264,7 @@ def parse_yaml(path: Path) -> dict[str, object]:
     cur_list_key: str | None = None
     cur_list_kind: str | None = None  # "strings" | "dicts"
     cur_list: list[object] | None = None
+    cur_list_indent: int = -1  # Indent of dict-list items in the current block.
     cur_dict: dict[str, object] | None = None
     cur_dict_seen: set[str] | None = None
     sub_list_key: str | None = None
@@ -285,6 +286,7 @@ def parse_yaml(path: Path) -> dict[str, object]:
             cur_list_key = None
             cur_list_kind = None
             cur_list = None
+            cur_list_indent = -1
             cur_dict = None
             cur_dict_seen = None
             sub_list_key = None
@@ -318,14 +320,22 @@ def parse_yaml(path: Path) -> dict[str, object]:
         # outer dict-list entry. Skip the dict-start branch in two cases:
         #   - cur_list_kind is "strings" (block locked to strings)
         #   - sub_list is open AND this line is at deeper indent than the
-        #     dict-list's items (typically indent > 2)
-        in_sub_list_context = sub_list is not None and indent > 2
+        #     dict-list's items (cur_list_indent — locked when the list opens)
+        in_sub_list_context = (
+            sub_list is not None
+            and cur_list_indent >= 0
+            and indent > cur_list_indent
+        )
         m = (
             None
             if cur_list_kind == "strings" or in_sub_list_context
             else RE_LIST_DICT_START.match(content)
         )
         if m:
+            # Lock the dict-list indent on the FIRST item; subsequent items
+            # must appear at the same indent. Sub-list items live deeper.
+            if cur_list_indent < 0:
+                cur_list_indent = indent
             cur_list_kind = "dicts"
             cur_dict = {}
             cur_dict_seen = set()
@@ -347,8 +357,13 @@ def parse_yaml(path: Path) -> dict[str, object]:
         if m:
             value = m.group(1).strip()
             if cur_list_kind == "dicts":
-                # May be a sub-list item under sub_list_key (deeper indent).
-                if sub_list is not None and indent > 2:
+                # May be a sub-list item under sub_list_key (deeper indent
+                # than the dict-list's items).
+                if (
+                    sub_list is not None
+                    and cur_list_indent >= 0
+                    and indent > cur_list_indent
+                ):
                     sub_list.append(parse_scalar(value))
                     continue
                 raise LintError(
@@ -360,21 +375,24 @@ def parse_yaml(path: Path) -> dict[str, object]:
             cur_list.append(parse_scalar(value))
             continue
 
-        # Continuation of current dict item: `    key: value` (indent >= 4).
-        # Sibling block-form keys ARE supported — each opens a fresh sub_list
-        # under its own key. Authoring typos surface via the duplicate-key
-        # detection above, not via a blanket "nested dict" rejection.
-        # When a NEW sibling key arrives with a scalar value (rest != ""), we
-        # MUST reset sub_list_key/sub_list so a stale sub-list pointer can't
-        # silently absorb later malformed `- value` lines into the prior block
-        # (P2 from iter-4 code review).
+        # Continuation of current dict item: `<deeper>key: value`. Sibling
+        # block-form keys ARE supported — each opens a fresh sub_list under
+        # its own key. Authoring typos surface via the duplicate-key detection
+        # above, not via a blanket "nested dict" rejection. When a NEW sibling
+        # key arrives with a scalar value (rest != ""), we MUST reset
+        # sub_list_key/sub_list so a stale sub-list pointer can't silently
+        # absorb later malformed `- value` lines into the prior block (P2 from
+        # iter-4 code review). The required-indent threshold is derived from
+        # cur_list_indent so the parser accepts any consistent author convention
+        # (2/4-space outer-list indents both work — P2 from iter-5 python review).
         m = RE_DICT_CONT.match(content)
         if (
             m
             and cur_list_kind == "dicts"
             and cur_dict is not None
             and cur_dict_seen is not None
-            and indent >= 4
+            and cur_list_indent >= 0
+            and indent > cur_list_indent
         ):
             key, rest = m.group(1), m.group(2)
             if key in cur_dict_seen:
@@ -401,7 +419,7 @@ def parse_yaml(path: Path) -> dict[str, object]:
 
 
 def _check_unknown_keys(
-    data: dict, allowed: frozenset[str], where: str
+    data: dict[str, object], allowed: frozenset[str], where: str
 ) -> list[str]:
     unknown = sorted(set(data.keys()) - allowed)
     return [f"{where}: unknown key '{k}'" for k in unknown]
@@ -416,7 +434,7 @@ def _check_non_empty_string(value: object, where: str, field: str) -> list[str]:
     return []
 
 
-def validate_persona(persona: dict, vertical_slug: str, idx: int) -> list[str]:
+def validate_persona(persona: dict[str, object], vertical_slug: str, idx: int) -> list[str]:
     where = f"{vertical_slug}.yaml personas[{idx}]"
     errs: list[str] = _check_unknown_keys(persona, PERSONA_KEYS, where)
     for required in ("slug", "display", "titles"):
@@ -437,7 +455,7 @@ def validate_persona(persona: dict, vertical_slug: str, idx: int) -> list[str]:
 
 
 def validate_offer(
-    offer: dict,
+    offer: dict[str, object],
     vertical_slug: str,
     idx: int,
     persona_slug_set: frozenset[str],
@@ -534,7 +552,7 @@ def validate_offer(
     return errs
 
 
-def validate_vertical(path: Path) -> tuple[list[str], dict | None]:
+def validate_vertical(path: Path) -> tuple[list[str], dict[str, object] | None]:
     """Validate one vertical YAML. Returns (errors, parsed_data_or_None).
 
     Returns parsed_data so main() can run cross-file checks (alias collisions,
@@ -677,7 +695,7 @@ def _emit(errs: list[str]) -> int:
     return 0
 
 
-def _validate_manifest(manifest: dict, where: str) -> tuple[list[str], list[str]]:
+def _validate_manifest(manifest: dict[str, object], where: str) -> tuple[list[str], list[str]]:
     """Return (errors, manifest_verticals). manifest_verticals is [] on hard failure."""
     errs: list[str] = _check_unknown_keys(manifest, MANIFEST_KEYS, where)
     for required in ("schema_version", "verticals"):
@@ -709,7 +727,10 @@ def _validate_manifest(manifest: dict, where: str) -> tuple[list[str], list[str]
         if not SLUG_RE.match(v):
             errs.append(f"{where}: verticals[{j}] {v!r} is not kebab-case")
         string_items.append(v)
-    if len(string_items) == 0:
+    # Only flag "empty" when verticals[] is *actually* empty. If entries exist
+    # but failed per-item type checks (e.g., non-string), the per-item errors
+    # already explain the failure — don't pile on a misleading "empty" error.
+    if len(raw) == 0:
         errs.append(
             f"{where}: verticals[] is empty — manifest must list at least one vertical"
         )
@@ -763,25 +784,41 @@ def main(argv: list[str] | None = None) -> int:
     # Symlinks are rejected — the canonicals contract is one regular file per
     # vertical (P2 from iter-3 data review).
     file_slugs: set[str] = set()
+    # Track slugs whose corresponding file failed a pre-parse check (symlink,
+    # non-regular file). These are accounted for in the 1:1 manifest-to-file
+    # cross-check so we don't emit a duplicate "manifest lists X but no
+    # X.yaml found" error for the same slug we already rejected.
+    invalid_slugs: set[str] = set()
     for p in sorted(cdir.iterdir(), key=lambda x: x.name):
-        if p.is_symlink():
-            all_errs.append(
-                f"{p.name}: symlinks not allowed in canonicals dir"
-            )
-            continue
         entry = p.name
-        # Reserved prefixes: `_` for `_manifest.yaml`-style infra, `.` for
-        # editor swap files / OS metadata (.DS_Store, .alpha.yaml.swp, etc).
         if (
             entry.startswith("_")
             or entry.startswith(".")
             or not entry.endswith(".yaml")
         ):
             continue
-        file_slugs.add(entry[:-5])
+        slug = entry[:-5]
+        if p.is_symlink():
+            all_errs.append(
+                f"{entry}: symlinks not allowed in canonicals dir"
+            )
+            invalid_slugs.add(slug)
+            continue
+        # Reject non-regular files (directories named *.yaml, FIFOs, sockets).
+        # Without this guard, read_text() on a FIFO would hang the lint, and
+        # a directory would surface a confusing "manifest mismatch" error.
+        if not p.is_file():
+            all_errs.append(
+                f"{entry}: not a regular file (directory/FIFO/socket rejected)"
+            )
+            invalid_slugs.add(slug)
+            continue
+        file_slugs.add(slug)
 
     manifest_set = set(manifest_verticals)
-    for slug in sorted(manifest_set - file_slugs):
+    # Skip slugs we already rejected (symlink, non-regular file) so we don't
+    # double-report them via the missing-file cross-check.
+    for slug in sorted(manifest_set - file_slugs - invalid_slugs):
         all_errs.append(f"manifest lists '{slug}' but no {slug}.yaml found")
     for slug in sorted(file_slugs - manifest_set):
         all_errs.append(f"file {slug}.yaml present but '{slug}' not in manifest")
