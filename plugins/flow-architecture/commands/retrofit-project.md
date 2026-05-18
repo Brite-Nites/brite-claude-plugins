@@ -215,7 +215,7 @@ Phases 6/7/8 run without further orchestrator gates per Q15.6 / Q16.6 / Q18.8 lo
 
 **Pre-flow-preflight setup:** the orchestrator owns the `LINEAR_ISSUE_COUNT` env-var per flow-preflight Section 6.4 ownership note. Before dispatching the skill:
 
-1. Parse `.flow/config.json` (written by flow-preflight Section 4.3) and bind the three field values to local identifiers used in step 2 — JSON keys on disk are lowercase, identifiers below are uppercase per FDA orchestrator convention for env-var-shaped identifiers (`LINEAR_PROJECT_ID` and `LINEAR_PROJECT_NAME` also match the flow-preflight Section 5 10-field preamble exactly; `LINEAR_TEAM_KEY` follows the same convention by analogy — it is locally derived from `.flow/config.json` per the "Capture from preamble" block further down this phase, not emitted by the Section 5 preamble):
+1. Parse `.flow/config.json` (written by flow-preflight Section 4.4's atomic-rename per the 5-field v1 schema defined in Section 4.3) and bind the three field values to local identifiers used in step 2 — JSON keys on disk are lowercase, identifiers below are uppercase per FDA orchestrator convention for env-var-shaped identifiers:
    - `linear_project_id` → `LINEAR_PROJECT_ID`
    - `linear_project_name` → `LINEAR_PROJECT_NAME`
    - `linear_team_key` → `LINEAR_TEAM_KEY`
