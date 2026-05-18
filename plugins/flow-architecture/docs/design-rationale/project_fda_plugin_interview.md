@@ -2362,14 +2362,17 @@ Memory file → `docs/plans/fda-plugin-interview.md` bit-for-bit verification vi
    - 5 user-confirmation gates fire as expected (Q10 retrofit gate budget)
    - Outputs match locked schemas:
      - docs/product/intent.md per Q41 template
-     - docs/product/master-flow-inventory.md per Q11 codebase-scan output
+     - docs/product/master-flow-inventory.md per Q11 codebase-scan output (Brand Hub
+       determines its own FDA-domain count at runtime per memory:1758 — NOT pinned to
+       BriteBase's 28 nor legacy-milestone count of 27)
      - docs/product/flows/<domain>/<flow-id>.md per Q27 (one per sub-flow)
      - docs/product/journeys/<domain>.md per Q26 (one per domain)
      - docs/product/flows/INDEX.md per Q25
      - Linear milestones + parents + 5N children chain per Q22-Q24 + Q13 scaffold
      - Cross-reference appendices on legacy milestones per Q14 + Q9
    - /flow:audit against retrofitted Brand Hub returns exit 0 (all hard gates pass per Q38 sub-decision 6)
-   - npm run build && npm run lint && npm test pass on Brand Hub repo
+   - npm run build && npm run lint && npm test pass on Brand Hub repo (FDA shouldn't break
+     consumer builds)
    - Failure modes encountered during dogfood are documented at
      plugins/flow-architecture/docs/design-rationale.md (memory archive) for v1.1+ refinement
 ```
@@ -2387,6 +2390,8 @@ Memory file → `docs/plans/fda-plugin-interview.md` bit-for-bit verification vi
 | AC7 — Failure modes documented | **PASS** | `brand-hub-dogfood-findings.md` exists with full iter-1 + iter-2 log + bug enumeration |
 
 **Methodology lesson preserved:** the iter-2 mid-run scope reduction (10 domains → 1) should have been a user-authorized AskUserQuestion gate per [[feedback_no_unauthorized_scope_reduction]] (locked 2026-05-15) rather than an orchestrator-side auto-descope rationalized in audit-trail. Q56 retroactively legitimizes the scope choice with audit trail; the discipline going forward is unchanged — mid-orchestrator scope reductions require user gates, not after-the-fact Q-locks.
+
+**Q56 sub-decision 1 — forward-looking discipline commitment (LOCKED 2026-05-18 per independent code-review feedback on PR #322).** Q56 is being authored AS retroactive paperwork for an already-occurred descope. To prevent this pattern from becoming routine, future Q56-style scope-amendment Q-locks **must be authored before the violating action, not after**, when the action is foreseeable. Concretely: if an orchestrator is mid-run and detects that a locked AC cannot be met under current scope (e.g., iter-2 detected at Phase 5 that scaffolding all 52 sub-flows would exceed the dogfood session budget), the orchestrator must (1) halt at the next user-confirmation gate, (2) surface the AC-conflict via AskUserQuestion with options [continue full scope / amend AC via new Q-lock / abort], (3) only proceed after explicit user authorization. Retroactive Q-locks are reserved for cases where the descope was genuinely unforeseeable (e.g., dogfood revealed a parking-lot item is v1.0-blocking — Q40 sub-decision 6's literal intent). Q56 itself violates this discipline; the discipline lock prevents the second occurrence. **Q56 sub-decision 1 promotion criterion:** if any future Q56+-style retroactive AC amendment is authored without an antecedent user-authorized gate, file as a NEW Q-lock with explicit reference to this sub-decision and re-evaluate whether the escalation pattern is being abused.
 
 **Audit trail:** Q56 authored 2026-05-18 by orchestrator post-state-audit (sequential-thinking + Linear MCP re-verification + brand-hub-dogfood-findings.md re-read). Triggered by user instruction "continue work on the Flow-Driven Architecture Plugin v1.0" 2026-05-18; BC-6998 confirmed live `In Progress` (not `Done` as findings doc § "Iteration 2 outcome summary" line 191 prematurely claimed — likely auto-reverted on PR #316 merge per [[gotcha_github_auto_close_linear_state]]). Q56 unblocks BC-6998 close → BC-6999 release sequence (version bump 0.2.24 → 1.0.0 + handbook CDR-023 Proposed → Accepted flip + memory archive + Triage Event #2 + git tag `flow-architecture@v1.0.0`).
 
