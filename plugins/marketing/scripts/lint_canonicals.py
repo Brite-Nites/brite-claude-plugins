@@ -590,6 +590,9 @@ def validate_vertical(path: Path) -> tuple[list[str], dict[str, object] | None]:
         # unquoted digits like `slug: 42` (parses to int).
         if isinstance(slug, list):
             hint = "did the value get parsed as an empty list (bare `slug:` with no value)?"
+        elif isinstance(slug, bool):
+            # bool is a subclass of int in Python — check before the int arm.
+            hint = "is the value `true`/`false`? slug must be a quoted kebab-case string."
         elif isinstance(slug, int):
             hint = "is the value an unquoted integer? slug must be a quoted kebab-case string."
         else:
