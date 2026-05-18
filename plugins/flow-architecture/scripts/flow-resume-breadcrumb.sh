@@ -8,11 +8,17 @@ set -euo pipefail
 # (Q31.4, memory:308).
 #
 # Subcommands:
-#   read [path]      Emit EXISTS/STATUS/LAST_UPDATED/STALE/STALE_REASON to stdout.
-#                    `path` defaults to <REPO_ROOT>/docs/plans/.flow-phase-state.json.
+#   read [path]                          Emit EXISTS/STATUS/LAST_UPDATED/STALE/STALE_REASON
+#                                        to stdout. `path` defaults to
+#                                        <REPO_ROOT>/docs/plans/.flow-phase-state.json.
 #
-#   write <path>     Read JSON from stdin, atomic-rename + parse-verify + content-match.
-#                    On failure: leave <path> untouched, remove .tmp, exit non-zero.
+#   write <state-path> <input-path>      Read JSON from <input-path> file, atomic-rename +
+#                                        parse-verify + content-match into <state-path>.
+#                                        On failure: leave <state-path> untouched, remove
+#                                        .tmp, exit non-zero. File-arg only (BC-9027);
+#                                        stdin pipe is no longer accepted — pipe patterns
+#                                        like `python3 <<'PY' | bash $HELPER write ...`
+#                                        trip the workflows security-hook classifier.
 #
 # bash 3.2+ compatible (Q32). python3 3.6+ for JSON parse (no jq).
 
@@ -23,7 +29,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage:
   flow-resume-breadcrumb.sh read [path]
-  flow-resume-breadcrumb.sh write <path>   (JSON on stdin)
+  flow-resume-breadcrumb.sh write <state-path> <input-path>   (JSON read from <input-path>)
 EOF
   exit 2
 }
@@ -117,9 +123,14 @@ PY
 
 cmd_write() {
   local path="${1:-}"
-  if [ -z "$path" ]; then
-    echo "flow-resume-breadcrumb write: <path> required" >&2
+  local input="${2:-}"
+  if [ -z "$path" ] || [ -z "$input" ]; then
+    echo "flow-resume-breadcrumb write: <state-path> and <input-path> required" >&2
     usage
+  fi
+  if [ ! -f "$input" ]; then
+    echo "flow-resume-breadcrumb: input file not found: $input" >&2
+    exit 3
   fi
 
   local dir
@@ -127,10 +138,10 @@ cmd_write() {
   mkdir -p "$dir"
 
   # Use mktemp for symlink-attack safety: a hostile pre-staged
-  # `<path>.tmp` symlink to /etc/passwd would be followed by `cat > $tmp`
-  # otherwise. mktemp creates with mode 600 + O_EXCL semantics, picks a
-  # unique 6-char suffix, and lives in the same directory as $path so the
-  # subsequent `mv` is a same-filesystem (atomic) rename.
+  # `<path>.tmp` symlink to /etc/passwd would be followed by a naive
+  # `cp` otherwise. mktemp creates with mode 600 + O_EXCL semantics,
+  # picks a unique 6-char suffix, and lives in the same directory as
+  # $path so the subsequent `mv` is a same-filesystem (atomic) rename.
   local tmp
   if ! tmp="$(mktemp "${path}.tmp.XXXXXX")"; then
     echo "flow-resume-breadcrumb: mktemp failed for $path" >&2
@@ -141,14 +152,18 @@ cmd_write() {
   # exiting. Explicit if-checks keep failure modes auditable (preferred
   # over a trap, which would obscure which step triggered the abort).
 
-  # Capture stdin → tmp.
-  if ! cat > "$tmp"; then
+  # Copy input → tmp. Use `cat <"$input" >"$tmp"` so the existing mktemp'd
+  # file (with secure perms) is preserved as the write target — `cp` would
+  # replace it with the source file's perms, and `cp -p` would still follow
+  # symlinks at the source. The shell redirect respects the open() on $tmp
+  # mktemp already established.
+  if ! cat <"$input" >"$tmp"; then
     rm -f "$tmp"
-    echo "flow-resume-breadcrumb: stdin capture failed for $path" >&2
+    echo "flow-resume-breadcrumb: input copy failed for $path (input: $input)" >&2
     exit 3
   fi
 
-  # Parse-verify before promoting (caller may have piped malformed JSON).
+  # Parse-verify before promoting (caller may have written malformed JSON).
   if ! python3 - "$tmp" <<'PY'
 import json, sys
 with open(sys.argv[1], "r", encoding="utf-8") as fh:
@@ -156,7 +171,7 @@ with open(sys.argv[1], "r", encoding="utf-8") as fh:
 PY
   then
     rm -f "$tmp"
-    echo "flow-resume-breadcrumb: stdin failed JSON parse — $path not updated" >&2
+    echo "flow-resume-breadcrumb: input failed JSON parse — $path not updated" >&2
     exit 3
   fi
 

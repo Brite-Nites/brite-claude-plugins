@@ -258,9 +258,12 @@ fi
 # ── Section 5: flow-resume-breadcrumb.sh write/read round-trip ──────
 section "5/6" "flow-resume-breadcrumb.sh write/read round-trip"
 
-# Synthesize a Phase-1-complete breadcrumb on stdin to the write subcommand.
+# Synthesize a Phase-1-complete breadcrumb into a mktemp input file, then call
+# the helper with both <state-path> and <input-path> (BC-9027 file-arg refactor;
+# the old stdin-pipe pattern tripped the workflows security-hook classifier).
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-BREADCRUMB_JSON="$(python3 - "$NOW" <<'PY'
+BREADCRUMB_INPUT="$(mktemp -t flow-breadcrumb-vslice.XXXXXX)"
+python3 - "$NOW" > "$BREADCRUMB_INPUT" <<'PY'
 import json, sys
 print(json.dumps({
     "version": "1",
@@ -273,16 +276,16 @@ print(json.dumps({
     "domains": [],
 }))
 PY
-)"
 
 WRITE_OUT=""
-if WRITE_OUT="$(printf '%s' "$BREADCRUMB_JSON" | \
-                "$SCRIPTS_DIR/flow-resume-breadcrumb.sh" write "$BREADCRUMB" 2>&1)"; then
+if WRITE_OUT="$("$SCRIPTS_DIR/flow-resume-breadcrumb.sh" \
+                write "$BREADCRUMB" "$BREADCRUMB_INPUT" 2>&1)"; then
   pass "flow-resume-breadcrumb.sh write exits 0"
 else
   fail "flow-resume-breadcrumb.sh write exit non-zero"
   printf '%s\n' "$WRITE_OUT" | sed 's/^/    | /'
 fi
+rm -f "$BREADCRUMB_INPUT"
 
 if printf '%s\n' "$WRITE_OUT" | grep -q '^WRITE=ok$'; then
   pass "write emits WRITE=ok"
