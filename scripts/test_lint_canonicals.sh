@@ -44,7 +44,16 @@
 #   AE unterminated inline list bracket                              expect 1
 #   AF cycle in iterates_from chain                                  expect 1
 #   AG 3-node cycle emits exactly one error message (dedup)          expect 1
-#   AH symlink rejected from canonicals dir                          expect 1
+#   AH symlink rejected from canonicals dir (isolated)               expect 1
+#   AI iterates_from self-reference (symmetric to V)                 expect 1
+#   AJ target_personas duplicate item (symmetric to AD)              expect 1
+#   AK file present but absent from manifest (symmetric to L)        expect 1
+#   AL empty manifest verticals[]                                    expect 1
+#   AM --canonicals-dir /nonexistent                                 expect 2
+#   AN missing _manifest.yaml in canonicals dir                      expect 2
+#   AO schema_version: true (bool/int subclass gotcha)               expect 1
+#   AP editor swap dotfile silently skipped                          expect 0
+#   AQ UTF-8 BOM tolerated (utf-8-sig)                               expect 0
 #
 # Usage:
 #   bash scripts/test_lint_canonicals.sh
@@ -99,7 +108,7 @@ assert_exit_and_substring() {
   pass=$((pass + 1))
 }
 
-run_lint() {
+invoke_lint() {
   local dir="$1"
   LAST_OUTPUT="$(python3 "$LINT" --canonicals-dir "$dir" 2>&1)"
   LAST_RC=$?
@@ -150,7 +159,7 @@ mkdir_scenario() {
 run_a() {
   local dir
   dir="$(mkdir_scenario A)"
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "A: happy path" 0 "Canonicals lint OK"
 }
 
@@ -163,7 +172,7 @@ slug: alpha
 personas: []
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "B: missing required display" 1 "alpha.yaml: missing required key 'display'"
 }
 
@@ -174,7 +183,7 @@ run_c() {
   cat >> "$dir/alpha.yaml" <<'YAML'
 rogue_key: "should be rejected"
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "C: unknown top-level key" 1 "alpha.yaml: unknown key 'rogue_key'"
 }
 
@@ -197,7 +206,7 @@ offers:
     posture: free-asset
     rogue_offer_key: "should be rejected"
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "D: unknown offer key" 1 "offers\\[0\\]: unknown key 'rogue_offer_key'"
 }
 
@@ -207,7 +216,7 @@ run_e() {
   dir="$(mkdir_scenario E)"
   sed -i.bak "s/status: active/status: pending/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "E: bad status enum" 1 "offers\\[0\\]: status 'pending'"
 }
 
@@ -217,7 +226,7 @@ run_f() {
   dir="$(mkdir_scenario F)"
   sed -i.bak "s/posture: free-asset/posture: unknown-posture/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "F: bad posture enum" 1 "offers\\[0\\]: posture 'unknown-posture'"
 }
 
@@ -227,7 +236,7 @@ run_g() {
   dir="$(mkdir_scenario G)"
   sed -i.bak "s/slug: persona-one/slug: personaOne/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "G: non-kebab persona slug" 1 "personas\\[0\\]: slug 'personaOne' is not kebab-case"
 }
 
@@ -249,7 +258,7 @@ personas:
       - "Title Two"
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "H: duplicate persona slug" 1 "alpha.yaml: duplicate persona slug 'dup'"
 }
 
@@ -259,7 +268,7 @@ run_i() {
   dir="$(mkdir_scenario I)"
   sed -i.bak "s/target_personas: \[persona-one\]/target_personas: [orphan-persona]/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "I: target_personas orphan ref" 1 "target_personas\\[0\\] 'orphan-persona' not defined in personas"
 }
 
@@ -269,7 +278,7 @@ run_j() {
   dir="$(mkdir_scenario J)"
   sed -i.bak "s/target_personas: \[persona-one\]/target_personas: [NotKebabCase]/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "J: target_personas non-kebab item" 1 "target_personas\\[0\\] 'NotKebabCase' is not kebab-case"
 }
 
@@ -283,7 +292,7 @@ verticals:
   - bravo
   - alpha
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "K: manifest not alphabetized" 1 "_manifest.yaml: verticals\\[\\] not alphabetized"
 }
 
@@ -298,7 +307,7 @@ verticals:
   - bravo
   - charlie
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "L: manifest entry without file" 1 "manifest lists 'charlie' but no charlie.yaml found"
 }
 
@@ -314,7 +323,7 @@ aliases:
 personas: []
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "M: alias collides with canonical" 1 "alpha.yaml: alias 'bravo' collides with canonical vertical slug"
 }
 
@@ -328,7 +337,7 @@ verticals:
   - alpha
   - bravo
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "N: schema_version mismatch" 1 "_manifest.yaml: schema_version 99"
 }
 
@@ -337,7 +346,7 @@ run_o() {
   local dir
   dir="$(mkdir_scenario O)"
   printf 'slug: alpha\ndisplay: "Alpha"\npersonas:\n\t- slug: persona-one\n\t  display: "Persona One"\n\t  titles:\n\t    - "Title One"\noffers: []\n' > "$dir/alpha.yaml"
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "O: tabs in indent" 1 "tabs not allowed in indent"
 }
 
@@ -360,7 +369,7 @@ offers:
     posture: free-asset
     target_postures: [bogus-posture]
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "P: bad target_postures enum" 1 "target_postures\\[0\\] 'bogus-posture' not in"
 }
 
@@ -383,7 +392,7 @@ offers:
     posture: free-asset
     replaced_by: nonexistent-offer
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "Q: replaced_by orphan ref" 1 "offers\\[0\\]: replaced_by 'nonexistent-offer' not defined in offers\\[\\]"
 }
 
@@ -407,7 +416,7 @@ aliases:
 personas: []
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "R: alias-alias collision across verticals" 1 "alias 'shared-alias' already owned by alpha.yaml"
 }
 
@@ -433,7 +442,7 @@ offers:
     status: active
     posture: knowledge
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "S: duplicate offer slug" 1 "alpha.yaml: duplicate offer slug 'offer-dup'"
 }
 
@@ -447,7 +456,7 @@ display: "Not Alpha"
 personas: []
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "T: filename stem mismatch" 1 "alpha.yaml: filename stem 'alpha' does not match slug 'not-alpha'"
 }
 
@@ -475,7 +484,7 @@ offers:
     posture: free-asset
     replaced_by: offer-a
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "U: cycle in replaced_by chain" 1 "alpha.yaml: cycle in replaced_by chain"
 }
 
@@ -498,7 +507,7 @@ offers:
     posture: free-asset
     replaced_by: offer-self
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "V: self-reference on replaced_by" 1 "replaced_by 'offer-self' is a self-reference"
 }
 
@@ -512,7 +521,7 @@ display: ""
 personas: []
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "W: empty display string" 1 "alpha.yaml: display must be a non-empty string"
 }
 
@@ -529,7 +538,7 @@ aliases:
 personas: []
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "X: duplicate alias within file" 1 "alpha.yaml: duplicate alias 'dup-alias' within file"
 }
 
@@ -551,7 +560,7 @@ offers:
     status: active
     posture: free-asset
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "Y: non-kebab offer slug" 1 "offers\\[0\\]: slug 'BadOfferSlug' is not kebab-case"
 }
 
@@ -573,7 +582,7 @@ offers:
     status:
     posture: free-asset
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "Z: empty status scalar" 1 "offers\\[0\\]: status must be a string"
 }
 
@@ -588,7 +597,7 @@ display: "Second"
 personas: []
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "AA: duplicate top-level key" 1 "duplicate top-level key 'display'"
 }
 
@@ -607,7 +616,7 @@ personas:
       - "Title One"
 offers: []
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "AB: duplicate key in list item" 1 "duplicate key 'display' in list item"
 }
 
@@ -634,7 +643,7 @@ offers:
       - free-asset
       - knowledge
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "AC: sibling block-list keys" 0 "Canonicals lint OK"
 }
 
@@ -657,7 +666,7 @@ offers:
     posture: free-asset
     target_postures: [knowledge, knowledge]
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "AD: target_postures duplicate" 1 "target_postures\\[1\\] 'knowledge' duplicated in same offer"
 }
 
@@ -680,7 +689,7 @@ offers:
     posture: free-asset
     target_personas: [persona-one
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "AE: unterminated inline list" 1 "unterminated inline list bracket"
 }
 
@@ -708,7 +717,7 @@ offers:
     posture: free-asset
     iterates_from: offer-a
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   assert_exit_and_substring "AF: cycle in iterates_from" 1 "cycle in iterates_from chain"
 }
 
@@ -741,7 +750,7 @@ offers:
     posture: free-asset
     replaced_by: offer-a
 YAML
-  run_lint "$dir"
+  invoke_lint "$dir"
   # Exactly one cycle line should appear; assert single occurrence.
   local cycle_count
   cycle_count=$(printf '%s' "$LAST_OUTPUT" | grep -cE "cycle in replaced_by chain")
@@ -755,63 +764,179 @@ YAML
   fi
 }
 
-# ── Scenario AH: symlink rejected ────────────────────────────────────────
+# ── Scenario AH: symlink rejected (isolated — no other failures) ─────────
 run_ah() {
   local dir
   dir="$(mkdir_scenario AH)"
-  # Add a symlink to an existing real vertical; lint should reject the symlink
-  # while still validating the real files.
-  ln -sf alpha.yaml "$dir/charlie.yaml"
+  # Add a symlink at a slug NOT in the manifest; lint should reject the
+  # symlink without coupling to a manifest-missing-file error.
+  ln -sf alpha.yaml "$dir/rogue.yaml"
+  invoke_lint "$dir"
+  assert_exit_and_substring "AH: symlink rejection (isolated)" 1 "rogue.yaml: symlinks not allowed in canonicals dir"
+}
+
+# ── Scenario AI: iterates_from self-reference (symmetric to V) ───────────
+run_ai() {
+  local dir
+  dir="$(mkdir_scenario AI)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-self
+    display: "Self-Iterator"
+    status: active
+    posture: free-asset
+    iterates_from: offer-self
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AI: self-reference on iterates_from" 1 "iterates_from 'offer-self' is a self-reference"
+}
+
+# ── Scenario AJ: target_personas duplicate item (symmetric to AD) ────────
+run_aj() {
+  local dir
+  dir="$(mkdir_scenario AJ)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_personas: [persona-one, persona-one]
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AJ: target_personas duplicate" 1 "target_personas\\[1\\] 'persona-one' duplicated in same offer"
+}
+
+# ── Scenario AK: file present but not in manifest (symmetric to L) ───────
+run_ak() {
+  local dir
+  dir="$(mkdir_scenario AK)"
+  # Drop bravo from manifest while leaving bravo.yaml on disk.
   cat > "$dir/_manifest.yaml" <<'YAML'
 schema_version: 1
 verticals:
   - alpha
-  - bravo
-  - charlie
 YAML
-  run_lint "$dir"
-  assert_exit_and_substring "AH: symlink rejection" 1 "charlie.yaml: symlinks not allowed in canonicals dir"
+  invoke_lint "$dir"
+  assert_exit_and_substring "AK: file without manifest entry" 1 "file bravo.yaml present but 'bravo' not in manifest"
+}
+
+# ── Scenario AL: empty manifest verticals[] ──────────────────────────────
+run_al() {
+  local dir
+  dir="$(mkdir_scenario AL)"
+  rm "$dir/alpha.yaml" "$dir/bravo.yaml"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: 1
+verticals: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AL: empty verticals[]" 1 "verticals\\[\\] is empty"
+}
+
+# ── Scenario AM: --canonicals-dir /nonexistent (exit 2) ──────────────────
+run_am() {
+  local nonexistent="$tmproot/AM-does-not-exist"
+  invoke_lint "$nonexistent"
+  assert_exit_and_substring "AM: nonexistent canonicals dir (exit 2)" 2 "canonicals dir not found"
+}
+
+# ── Scenario AN: missing _manifest.yaml (exit 2) ─────────────────────────
+run_an() {
+  local dir="$tmproot/AN"
+  mkdir -p "$dir"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas: []
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AN: missing _manifest.yaml (exit 2)" 2 "missing _manifest.yaml"
+}
+
+# ── Scenario AO: schema_version: true (bool/int gotcha) ──────────────────
+run_ao() {
+  local dir
+  dir="$(mkdir_scenario AO)"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: true
+verticals:
+  - alpha
+  - bravo
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AO: schema_version: true rejected" 1 "schema_version must be an integer"
+}
+
+# ── Scenario AP: dotfile (e.g., editor swap) skipped, not treated as vertical ──
+run_ap() {
+  local dir
+  dir="$(mkdir_scenario AP)"
+  # Editor swap file ending in .yaml. Should be silently skipped, not surfaced
+  # as a manifest-missing-file error. Happy path expected.
+  printf 'slug: rogue\ndisplay: "Rogue"\npersonas: []\noffers: []\n' > "$dir/.editor.yaml"
+  invoke_lint "$dir"
+  assert_exit_and_substring "AP: dotfile skipped" 0 "Canonicals lint OK"
+}
+
+# ── Scenario AQ: UTF-8 BOM tolerated ─────────────────────────────────────
+run_aq() {
+  local dir
+  dir="$(mkdir_scenario AQ)"
+  # Re-write alpha.yaml with a leading UTF-8 BOM and verify lint stays clean.
+  {
+    printf '\xef\xbb\xbf'
+    cat <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_personas: [persona-one]
+YAML
+  } > "$dir/alpha.yaml"
+  invoke_lint "$dir"
+  assert_exit_and_substring "AQ: UTF-8 BOM tolerated" 0 "Canonicals lint OK"
 }
 
 # ── Run all scenarios ────────────────────────────────────────────────────
+# Discover every `run_*` function and invoke in name order. Adding a new
+# scenario only requires defining a `run_<letter>` function — no second
+# invocation list to keep in sync.
+scenarios=()
+while IFS= read -r fn; do
+  scenarios+=("$fn")
+done < <(compgen -A function | grep '^run_[a-z]' | sort)
+
 echo ""
-echo "Running lint_canonicals.py regression harness (34 scenarios)..."
+echo "Running lint_canonicals.py regression harness (${#scenarios[@]} scenarios)..."
 echo ""
 
-run_a
-run_b
-run_c
-run_d
-run_e
-run_f
-run_g
-run_h
-run_i
-run_j
-run_k
-run_l
-run_m
-run_n
-run_o
-run_p
-run_q
-run_r
-run_s
-run_t
-run_u
-run_v
-run_w
-run_x
-run_y
-run_z
-run_aa
-run_ab
-run_ac
-run_ad
-run_ae
-run_af
-run_ag
-run_ah
+for fn in "${scenarios[@]}"; do
+  "$fn"
+done
 
 echo ""
 echo "Summary: $pass passed, $fail failed"

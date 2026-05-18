@@ -253,7 +253,12 @@ def parse_yaml(path: Path) -> dict[str, object]:
       - UTF-8 BOM tolerance via `encoding="utf-8-sig"` so editor-saved files
         with a BOM lint cleanly (P3 from iter-3 data review).
     """
-    text = path.read_text(encoding="utf-8-sig")
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except (UnicodeDecodeError, OSError) as e:
+        # Wrap decode/read failures in LintError so they surface as clean
+        # lint output instead of a Python traceback (P3 from iter-4).
+        raise LintError(f"{path}: cannot read file ({type(e).__name__}: {e})") from e
     result: dict[str, object] = {}
     top_seen: set[str] = set()
     cur_list_key: str | None = None
@@ -308,10 +313,18 @@ def parse_yaml(path: Path) -> dict[str, object]:
                 f"{path}:{lineno}: unexpected indented line outside a block: {content!r}"
             )
 
-        # When the current block is established as a string-list, a `- key: value`
-        # shape is a string-list item that happens to contain a colon (e.g., an
-        # unquoted title with a colon). Skip the dict-start branch.
-        m = None if cur_list_kind == "strings" else RE_LIST_DICT_START.match(content)
+        # When a sub-list is currently open, a deeper-indent `- value` (even
+        # if the value contains a colon) must be a sub-list item, not a new
+        # outer dict-list entry. Skip the dict-start branch in two cases:
+        #   - cur_list_kind is "strings" (block locked to strings)
+        #   - sub_list is open AND this line is at deeper indent than the
+        #     dict-list's items (typically indent > 2)
+        in_sub_list_context = sub_list is not None and indent > 2
+        m = (
+            None
+            if cur_list_kind == "strings" or in_sub_list_context
+            else RE_LIST_DICT_START.match(content)
+        )
         if m:
             cur_list_kind = "dicts"
             cur_dict = {}
@@ -340,7 +353,8 @@ def parse_yaml(path: Path) -> dict[str, object]:
                     continue
                 raise LintError(
                     f"{path}:{lineno}: string list item in dict list "
-                    f"(did a prior list item contain an unquoted colon?): {content!r}"
+                    f"(is this list intended as dict-of or list-of-strings? "
+                    f"did a prior list item contain an unquoted colon?): {content!r}"
                 )
             cur_list_kind = "strings"
             cur_list.append(parse_scalar(value))
@@ -350,6 +364,10 @@ def parse_yaml(path: Path) -> dict[str, object]:
         # Sibling block-form keys ARE supported — each opens a fresh sub_list
         # under its own key. Authoring typos surface via the duplicate-key
         # detection above, not via a blanket "nested dict" rejection.
+        # When a NEW sibling key arrives with a scalar value (rest != ""), we
+        # MUST reset sub_list_key/sub_list so a stale sub-list pointer can't
+        # silently absorb later malformed `- value` lines into the prior block
+        # (P2 from iter-4 code review).
         m = RE_DICT_CONT.match(content)
         if (
             m
@@ -369,6 +387,8 @@ def parse_yaml(path: Path) -> dict[str, object]:
                 sub_list = []
                 cur_dict[key] = sub_list
             else:
+                sub_list_key = None
+                sub_list = None
                 cur_dict[key] = parse_scalar(rest)
             continue
 
@@ -532,9 +552,14 @@ def validate_vertical(path: Path) -> tuple[list[str], dict | None]:
     if any("missing required" in e for e in errs):
         return (errs, data)
     slug = data["slug"]
-    if not isinstance(slug, str) or not SLUG_RE.match(slug):
+    if not isinstance(slug, str):
+        errs.append(
+            f"{where}: slug must be a string (got {type(slug).__name__}; "
+            f"did the value get parsed as an empty list?)"
+        )
+    elif not SLUG_RE.match(slug):
         errs.append(f"{where}: vertical slug {slug!r} is not kebab-case")
-    if path.stem != slug:
+    if isinstance(slug, str) and path.stem != slug:
         errs.append(
             f"{where}: filename stem {path.stem!r} does not match slug {slug!r}"
         )
@@ -613,7 +638,7 @@ def validate_vertical(path: Path) -> tuple[list[str], dict | None]:
     # Cycle detection: walk each edge map. A cycle is reported ONCE per
     # distinct loop — every node touched during a walk (whether cyclic or
     # acyclic) gets added to `done` so we skip re-walks from any of its
-    # members. Visited tracking inside a walk uses a set for O(1) lookups.
+    # members. visited_index gives O(1) cycle-entry lookup.
     for edges, label in (
         (replaces_edges, "replaced_by"),
         (iterates_edges, "iterates_from"),
@@ -623,20 +648,19 @@ def validate_vertical(path: Path) -> tuple[list[str], dict | None]:
             if start in done:
                 continue
             visited_order: list[str] = []
-            visited_set: set[str] = set()
+            visited_index: dict[str, int] = {}
             cur: str | None = start
-            while cur is not None and cur not in visited_set:
+            while cur is not None and cur not in visited_index:
+                visited_index[cur] = len(visited_order)
                 visited_order.append(cur)
-                visited_set.add(cur)
                 cur = edges.get(cur)
             if cur is not None:
-                # Canonicalize: trim the prefix before the cycle entry point.
-                entry = visited_order.index(cur)
+                entry = visited_index[cur]
                 cycle_nodes = visited_order[entry:] + [cur]
                 errs.append(
                     f"{where}: cycle in {label} chain: {' -> '.join(cycle_nodes)}"
                 )
-            done.update(visited_set)
+            done.update(visited_index)
 
     return (errs, data)
 
@@ -661,7 +685,15 @@ def _validate_manifest(manifest: dict, where: str) -> tuple[list[str], list[str]
             errs.append(f"{where}: missing required key '{required}'")
     if "schema_version" in manifest:
         sv = manifest["schema_version"]
-        if sv != SCHEMA_VERSION:
+        # Python's `bool` is a subclass of `int`, so `True == 1` silently equates
+        # `schema_version: true` to SCHEMA_VERSION=1. Reject non-int explicitly
+        # (P2 from iter-4 data review).
+        if not isinstance(sv, int) or isinstance(sv, bool):
+            errs.append(
+                f"{where}: schema_version must be an integer "
+                f"(got {type(sv).__name__})"
+            )
+        elif sv != SCHEMA_VERSION:
             errs.append(
                 f"{where}: schema_version {sv!r} != linter SCHEMA_VERSION {SCHEMA_VERSION}"
             )
@@ -738,7 +770,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             continue
         entry = p.name
-        if entry.startswith("_") or not entry.endswith(".yaml"):
+        # Reserved prefixes: `_` for `_manifest.yaml`-style infra, `.` for
+        # editor swap files / OS metadata (.DS_Store, .alpha.yaml.swp, etc).
+        if (
+            entry.startswith("_")
+            or entry.startswith(".")
+            or not entry.endswith(".yaml")
+        ):
             continue
         file_slugs.add(entry[:-5])
 
@@ -748,7 +786,7 @@ def main(argv: list[str] | None = None) -> int:
     for slug in sorted(file_slugs - manifest_set):
         all_errs.append(f"file {slug}.yaml present but '{slug}' not in manifest")
 
-    parsed_by_slug: dict[str, dict] = {}
+    parsed_by_slug: dict[str, dict[str, object]] = {}
     for slug in sorted(file_slugs & manifest_set):
         v_errs, data = validate_vertical(cdir / f"{slug}.yaml")
         all_errs.extend(v_errs)
