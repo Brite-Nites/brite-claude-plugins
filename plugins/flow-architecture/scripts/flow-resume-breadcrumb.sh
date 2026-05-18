@@ -152,11 +152,9 @@ cmd_write() {
   # exiting. Explicit if-checks keep failure modes auditable (preferred
   # over a trap, which would obscure which step triggered the abort).
 
-  # Copy input → tmp. Use `cat <"$input" >"$tmp"` so the existing mktemp'd
-  # file (with secure perms) is preserved as the write target — `cp` would
-  # replace it with the source file's perms, and `cp -p` would still follow
-  # symlinks at the source. The shell redirect respects the open() on $tmp
-  # mktemp already established.
+  # Copy input → tmp via shell redirect. `>"$tmp"` opens with O_TRUNC on the
+  # existing mktemp'd inode (mode 600), so $tmp's perms survive the write.
+  # Same-directory tmp is what makes the subsequent `mv` an atomic rename.
   if ! cat <"$input" >"$tmp"; then
     rm -f "$tmp"
     echo "flow-resume-breadcrumb: input copy failed for $path (input: $input)" >&2
@@ -175,9 +173,10 @@ PY
     exit 3
   fi
 
-  # Snapshot tmp content for the post-rename content-match check.
+  # Snapshot tmp content for the post-rename content-match check. Use the
+  # builtin `$(< "$tmp")` form (bash 3.2+) — avoids forking `cat`.
   local pre
-  pre="$(cat "$tmp")"
+  pre=$(< "$tmp")
 
   # Atomic rename — POSIX-guaranteed on same filesystem.
   if ! mv "$tmp" "$path"; then
@@ -192,7 +191,7 @@ PY
   # `json.load` is redundant. On mismatch the corrupted file is left in
   # place by design — exit 3 signals the caller to investigate.
   local post
-  post="$(cat "$path")"
+  post=$(< "$path")
   if [ "$pre" != "$post" ]; then
     echo "flow-resume-breadcrumb: content-match detected pre ≠ post-rename for $path" >&2
     exit 3
