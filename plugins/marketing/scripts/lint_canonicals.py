@@ -332,10 +332,18 @@ def parse_yaml(path: Path) -> dict[str, object]:
             else RE_LIST_DICT_START.match(content)
         )
         if m:
-            # Lock the dict-list indent on the FIRST item; subsequent items
-            # must appear at the same indent. Sub-list items live deeper.
+            # Lock the dict-list indent on the FIRST item; subsequent dict-list
+            # items MUST appear at exactly the same indent. A deeper-indent
+            # `- key: value` would otherwise be silently treated as a new
+            # sibling persona/offer when a real YAML parser would reject it as
+            # a malformed mapping/sequence (P2 from iter-6 data review).
             if cur_list_indent < 0:
                 cur_list_indent = indent
+            elif indent != cur_list_indent:
+                raise LintError(
+                    f"{path}:{lineno}: list item at unexpected indent "
+                    f"{indent} (locked to {cur_list_indent}): {content!r}"
+                )
             cur_list_kind = "dicts"
             cur_dict = {}
             cur_dict_seen = set()
@@ -549,6 +557,12 @@ def validate_offer(
                 errs.append(f"{where}: {ref_key} {ref!r} is not kebab-case")
             elif ref == offer.get("slug"):
                 errs.append(f"{where}: {ref_key} '{ref}' is a self-reference")
+    prose_path = offer.get("prose_path")
+    if prose_path is not None and not isinstance(prose_path, str):
+        errs.append(
+            f"{where}: prose_path must be a string "
+            f"(got {type(prose_path).__name__})"
+        )
     return errs
 
 
@@ -593,6 +607,13 @@ def validate_vertical(path: Path) -> tuple[list[str], dict[str, object] | None]:
                     errs.append(
                         f"{where}: aliases[{j}] {alias!r} is not kebab-case"
                     )
+
+    playbook_path = data.get("playbook_path")
+    if playbook_path is not None and not isinstance(playbook_path, str):
+        errs.append(
+            f"{where}: playbook_path must be a string "
+            f"(got {type(playbook_path).__name__})"
+        )
 
     personas = data["personas"]
     persona_slugs: list[str] = []
@@ -720,13 +741,17 @@ def _validate_manifest(manifest: dict[str, object], where: str) -> tuple[list[st
         errs.append(f"{where}: verticals must be a list")
         return (errs, [])
     string_items: list[str] = []
+    valid_for_order: list[str] = []
     for j, v in enumerate(raw):
         if not isinstance(v, str):
             errs.append(f"{where}: verticals[{j}] {v!r} is not a string")
             continue
         if not SLUG_RE.match(v):
             errs.append(f"{where}: verticals[{j}] {v!r} is not kebab-case")
+            string_items.append(v)
+            continue
         string_items.append(v)
+        valid_for_order.append(v)
     # Only flag "empty" when verticals[] is *actually* empty. If entries exist
     # but failed per-item type checks (e.g., non-string), the per-item errors
     # already explain the failure — don't pile on a misleading "empty" error.
@@ -734,9 +759,12 @@ def _validate_manifest(manifest: dict[str, object], where: str) -> tuple[list[st
         errs.append(
             f"{where}: verticals[] is empty — manifest must list at least one vertical"
         )
-    if string_items != sorted(string_items):
+    # Run alphabetization check on the kebab-valid subset only — including
+    # invalid items would emit a confusing "expected [...]" list that
+    # contradicts the separate non-kebab errors (P3 from iter-6 python review).
+    if valid_for_order != sorted(valid_for_order):
         errs.append(
-            f"{where}: verticals[] not alphabetized — expected {sorted(string_items)!r}"
+            f"{where}: verticals[] not alphabetized — expected {sorted(valid_for_order)!r}"
         )
     seen: set[str] = set()
     for v in string_items:

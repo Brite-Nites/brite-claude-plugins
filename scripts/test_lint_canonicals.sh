@@ -58,6 +58,19 @@
 #   AS manifest duplicate vertical slug                              expect 1
 #   AT 4-space dict-list indent (happy path)                         expect 0
 #   AU directory named `<slug>.yaml` rejected as non-regular         expect 1
+#   AV deeper-indent sibling list item rejected (strict indent)      expect 1
+#   AW aliases scalar (not list) rejected                            expect 1
+#   AX manifest verticals scalar (not list) rejected                 expect 1
+#   AY manifest unknown key rejected                                 expect 1
+#   AZ empty titles list rejected                                    expect 1
+#   BA empty-string title rejected                                   expect 1
+#   BB prose_path non-string rejected                                expect 1
+#   BC playbook_path non-string rejected                             expect 1
+#   BD trailing comma in inline list rejected                        expect 1
+#   BE unterminated quoted string in inline list rejected            expect 1
+#   BF aliases item non-kebab rejected                               expect 1
+#   BG manifest verticals item non-kebab rejected                    expect 1
+#   BH personas item must be a mapping                               expect 1
 #
 # Usage:
 #   bash scripts/test_lint_canonicals.sh
@@ -997,6 +1010,234 @@ verticals:
 YAML
   invoke_lint "$dir"
   assert_exit_and_substring "AU: directory named .yaml rejected" 1 "charlie.yaml: not a regular file"
+}
+
+# ── Scenario AV: deeper-indent sibling list item rejected ──────────────
+run_av() {
+  local dir
+  dir="$(mkdir_scenario AV)"
+  # Second persona indented deeper than the first — should fail loud
+  # (P2 from iter-6 data review). Real YAML parsers reject this shape;
+  # our parser now enforces consistent dict-list indent.
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles: ["Title One"]
+    - slug: persona-two
+      display: "Persona Two"
+      titles: ["Title Two"]
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AV: deeper-indent sibling rejected" 1 "list item at unexpected indent"
+}
+
+# ── Scenario AW: aliases scalar (not list) rejected ─────────────────────
+run_aw() {
+  local dir
+  dir="$(mkdir_scenario AW)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+aliases: scalar-not-list
+personas: []
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AW: aliases scalar (not list)" 1 "alpha.yaml: aliases must be a list"
+}
+
+# ── Scenario AX: manifest verticals scalar (not list) rejected ──────────
+run_ax() {
+  local dir
+  dir="$(mkdir_scenario AX)"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: 1
+verticals: scalar-not-list
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AX: manifest verticals scalar" 1 "_manifest.yaml: verticals must be a list"
+}
+
+# ── Scenario AY: manifest unknown key rejected ──────────────────────────
+run_ay() {
+  local dir
+  dir="$(mkdir_scenario AY)"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: 1
+verticals:
+  - alpha
+  - bravo
+rogue_manifest_key: should-be-rejected
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AY: manifest unknown key" 1 "_manifest.yaml: unknown key 'rogue_manifest_key'"
+}
+
+# ── Scenario AZ: empty titles list rejected ─────────────────────────────
+run_az() {
+  local dir
+  dir="$(mkdir_scenario AZ)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles: []
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "AZ: empty titles list" 1 "personas\\[0\\]: titles must be a non-empty list"
+}
+
+# ── Scenario BA: empty-string title rejected ────────────────────────────
+run_ba() {
+  local dir
+  dir="$(mkdir_scenario BA)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles: [""]
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BA: empty-string title" 1 "every title must be a non-empty string"
+}
+
+# ── Scenario BB: prose_path non-string (int) rejected ───────────────────
+run_bb() {
+  local dir
+  dir="$(mkdir_scenario BB)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    prose_path: 42
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BB: prose_path non-string" 1 "prose_path must be a string"
+}
+
+# ── Scenario BC: playbook_path non-string (int) rejected ────────────────
+run_bc() {
+  local dir
+  dir="$(mkdir_scenario BC)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+playbook_path: 42
+personas: []
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BC: playbook_path non-string" 1 "playbook_path must be a string"
+}
+
+# ── Scenario BD: trailing comma in inline list rejected ─────────────────
+run_bd() {
+  local dir
+  dir="$(mkdir_scenario BD)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_personas: [persona-one,]
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BD: trailing comma in inline list" 1 "trailing comma"
+}
+
+# ── Scenario BE: unterminated quoted string in inline list rejected ─────
+run_be() {
+  local dir
+  dir="$(mkdir_scenario BE)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_personas: ["persona-one]
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BE: unterminated quoted string in inline list" 1 "unterminated quoted string"
+}
+
+# ── Scenario BF: aliases item non-kebab rejected ────────────────────────
+run_bf() {
+  local dir
+  dir="$(mkdir_scenario BF)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+aliases:
+  - NotKebab
+personas: []
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BF: aliases item non-kebab" 1 "aliases\\[0\\] 'NotKebab' is not kebab-case"
+}
+
+# ── Scenario BG: manifest verticals item non-kebab rejected ─────────────
+run_bg() {
+  local dir
+  dir="$(mkdir_scenario BG)"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: 1
+verticals:
+  - NotKebab
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BG: manifest item non-kebab" 1 "verticals\\[0\\] 'NotKebab' is not kebab-case"
+}
+
+# ── Scenario BH: personas as list of strings (must be mapping) ──────────
+run_bh() {
+  local dir
+  dir="$(mkdir_scenario BH)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - persona-one
+  - persona-two
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BH: personas item must be a mapping" 1 "personas\\[0\\] must be a mapping"
 }
 
 # ── Run all scenarios ────────────────────────────────────────────────────
