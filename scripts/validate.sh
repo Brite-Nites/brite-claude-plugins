@@ -1133,6 +1133,58 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a — GTM Canonicals Lint (BC-8718 / ADR-016)
+# ──────────────────────────────────────────────────────────────────────
+# TODO: generalize when a 2nd plugin adopts the canonicals pattern —
+# detect any plugins/*/data/canonicals/ and run the linter on each
+# (matches Section 13 TODO at line 813).
+# ══════════════════════════════════════════════════════════════════════
+section "GTM Canonicals Lint"
+
+canonicals_lint="$REPO_ROOT/plugins/marketing/scripts/lint_canonicals.py"
+canonicals_dir="$REPO_ROOT/plugins/marketing/data/canonicals"
+canonicals_tests="$REPO_ROOT/scripts/test_lint_canonicals.sh"
+# python3 presence is enforced at the top of validate.sh (line 19-22) — the
+# script exits 2 if it's missing — so a python3-availability check here would
+# be unreachable.
+if [ ! -f "$canonicals_lint" ]; then
+  warn "lint_canonicals.py not found — canonicals lint skipped"
+elif [ ! -d "$canonicals_dir" ]; then
+  warn "canonicals dir not found — canonicals lint skipped"
+else
+  if canonicals_output=$(python3 "$canonicals_lint" --canonicals-dir "$canonicals_dir" 2>&1); then
+    # Success output is single-line by contract ("Canonicals lint OK — N
+    # verticals validated."). Emit as a single pass message.
+    pass "$canonicals_output"
+  else
+    fail "Canonicals lint failed:"
+    while IFS= read -r line; do
+      [ -n "$line" ] && printf "          %s\n" "$line"
+    done <<< "$canonicals_output"
+  fi
+
+  if [ -f "$canonicals_tests" ]; then
+    if tests_output=$(bash "$canonicals_tests" "$canonicals_lint" 2>&1); then
+      # Parse the harness's machine-readable RESULT line so the count stays
+      # in sync as scenarios are added/removed (matches Section 2c pattern).
+      tests_pass_count=$(printf '%s\n' "$tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+      if [ -n "$tests_pass_count" ]; then
+        pass "lint_canonicals regression harness — $tests_pass_count scenarios"
+      else
+        pass "lint_canonicals regression harness — passed (count unparsed)"
+      fi
+    else
+      fail "Canonicals lint regression harness failed:"
+      while IFS= read -r line; do
+        [ -n "$line" ] && printf "          %s\n" "$line"
+      done <<< "$tests_output"
+    fi
+  else
+    warn "test_lint_canonicals.sh not found — regression harness skipped"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"

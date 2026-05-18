@@ -1,0 +1,10 @@
+# Canonical entry for the Amusement Parks vertical (skeleton).
+# Source: handbook@main:marketing/go-to-market/verticals/amusement-parks/README.md
+# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
+# Personas and offers will be promoted via /marketing:new-persona +
+# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+slug: amusement-parks
+display: "Amusement Parks"
+playbook_path: "marketing/go-to-market/verticals/amusement-parks/README.md"
+personas: []
+offers: []

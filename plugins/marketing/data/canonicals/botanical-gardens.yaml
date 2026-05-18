@@ -1,0 +1,10 @@
+# Canonical entry for the Botanical Gardens / Arboretums vertical (skeleton).
+# Source: handbook@main:marketing/go-to-market/verticals/botanical-gardens/README.md
+# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
+# Personas and offers will be promoted via /marketing:new-persona +
+# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+slug: botanical-gardens
+display: "Botanical Gardens / Arboretums"
+playbook_path: "marketing/go-to-market/verticals/botanical-gardens/README.md"
+personas: []
+offers: []

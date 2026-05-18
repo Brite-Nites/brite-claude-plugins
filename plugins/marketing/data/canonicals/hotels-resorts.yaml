@@ -1,0 +1,14 @@
+# Canonical entry for the Hotels & Resorts vertical (skeleton).
+# Source: handbook@main:marketing/go-to-market/verticals/hotels-resorts/README.md
+# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
+# Personas and offers will be promoted via /marketing:new-persona +
+# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# BC-8727 (T6-O first dogfood) will promote `director-of-resort-experience`
+# persona + `holiday-anchor-audit` offer per the Cohort-1 lock in README §3.6;
+# kept skeleton here intentionally so the BC-8727 walk exercises Path A end-to-
+# end (canonicality-gate-fails-first → new-persona → new-offer → plan-campaign).
+slug: hotels-resorts
+display: "Hotels & Resorts"
+playbook_path: "marketing/go-to-market/verticals/hotels-resorts/README.md"
+personas: []
+offers: []
