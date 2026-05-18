@@ -245,9 +245,9 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
 - `MODE=incremental-add` → `"Project already has FDA shape. Use /flow:add-domain (new domain) or /flow:add-sub-flow (new flow under existing domain)."`
 - `MODE=resume` → orchestrator dispatches at breadcrumb's `current_phase` per the Resume contract section above.
 
-**Capture from preamble** (10 KEY=VALUE fields per flow-preflight Section 5):
+**Capture (10 fields):** 9 from the flow-preflight Section 5 preamble + `LINEAR_TEAM_KEY` local-derived from `.flow/config.json` (`MODE` was already consumed by the mode-guard above):
 
-- `LINEAR_PROJECT_ID`, `LINEAR_PROJECT_NAME`, `LINEAR_TEAM_KEY` (last derived from `.flow/config.json`)
+- `LINEAR_PROJECT_ID` and `LINEAR_PROJECT_NAME` (both from preamble); `LINEAR_TEAM_KEY` (local-derived from `.flow/config.json`)
 - `REPO_ROOT`
 - `INTENT_EXISTS` — drives the Phase 2 conditional. If `yes`, set `state.intent_existed_at_start = true`; orchestrator will skip Phase 2 + G2 below.
 - `INVENTORY_EXISTS`, `FLOWS_DIR_EXISTS`, `BREADCRUMB_EXISTS`
