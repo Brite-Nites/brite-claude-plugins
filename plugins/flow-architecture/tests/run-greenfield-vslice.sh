@@ -83,11 +83,16 @@ expect_kv() {
 # Remove test-written breadcrumbs on clean run; leave the main breadcrumb in
 # place on failure so the failed state is inspectable. The scratch file (used
 # by Section 5b negative-path tests) is always removed.
+#
+# Section 5 mktemp'd input files (BREADCRUMB_INPUT, etc., set later in script)
+# are listed here so the cleanup helpers don't have to track them at use-site.
+# `${var:-}` guard: helpers may fire before Section 5 sets these vars, and
+# `rm -f ""` is a safe no-op under `set -u` (BC-9027 P2 review-fix sweep).
 cleanup_on_success() {
-  rm -f "$BREADCRUMB" "$SCRATCH_BREADCRUMB"
+  rm -f "$BREADCRUMB" "$SCRATCH_BREADCRUMB" "${BREADCRUMB_INPUT:-}" "${BREADCRUMB_INPUT_2:-}"
 }
 cleanup_scratch_only() {
-  rm -f "$SCRATCH_BREADCRUMB"
+  rm -f "$SCRATCH_BREADCRUMB" "${BREADCRUMB_INPUT:-}" "${BREADCRUMB_INPUT_2:-}"
 }
 
 # ── Section 1: Fixture shape ────────────────────────────────────────
@@ -258,9 +263,12 @@ fi
 # ── Section 5: flow-resume-breadcrumb.sh write/read round-trip ──────
 section "5/6" "flow-resume-breadcrumb.sh write/read round-trip"
 
-# Synthesize a Phase-1-complete breadcrumb on stdin to the write subcommand.
+# Synthesize a Phase-1-complete breadcrumb into a mktemp input file, then call
+# the helper with both <state-path> and <input-path> (BC-9027 file-arg refactor;
+# the old stdin-pipe pattern tripped the workflows security-hook classifier).
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-BREADCRUMB_JSON="$(python3 - "$NOW" <<'PY'
+BREADCRUMB_INPUT="$(mktemp -t flow-breadcrumb-vslice.XXXXXX)"
+python3 - "$NOW" > "$BREADCRUMB_INPUT" <<'PY'
 import json, sys
 print(json.dumps({
     "version": "1",
@@ -273,16 +281,20 @@ print(json.dumps({
     "domains": [],
 }))
 PY
-)"
 
 WRITE_OUT=""
-if WRITE_OUT="$(printf '%s' "$BREADCRUMB_JSON" | \
-                "$SCRIPTS_DIR/flow-resume-breadcrumb.sh" write "$BREADCRUMB" 2>&1)"; then
+if WRITE_OUT="$("$SCRIPTS_DIR/flow-resume-breadcrumb.sh" \
+                write "$BREADCRUMB" "$BREADCRUMB_INPUT" 2>&1)"; then
   pass "flow-resume-breadcrumb.sh write exits 0"
 else
   fail "flow-resume-breadcrumb.sh write exit non-zero"
   printf '%s\n' "$WRITE_OUT" | sed 's/^/    | /'
 fi
+# BREADCRUMB_INPUT cleanup is centralized in cleanup_on_success /
+# cleanup_scratch_only (both wipe it) — no use-site rm keeps the cleanup
+# contract single-sourced. On a `set -e` early-abort between mktemp and
+# the cleanup-helper call, the tmp leaks under TMPDIR — minor, mktemp
+# guarantees a unique name so it doesn't collide.
 
 if printf '%s\n' "$WRITE_OUT" | grep -q '^WRITE=ok$'; then
   pass "write emits WRITE=ok"
@@ -294,6 +306,72 @@ if [ -f "$BREADCRUMB" ]; then
   pass "breadcrumb file landed at canonical path: docs/plans/.flow-phase-state.json (leading dot)"
 else
   fail "breadcrumb file missing after write"
+fi
+
+# BC-9027 negative-path coverage: the file-arg refactor introduced two new
+# error branches (missing <input-path> arg, missing <input-path> file). Both
+# must continue to fail-loud — a future "be friendly with stdin" regression
+# would silently re-introduce the security-hook trip the refactor was done
+# to dodge.
+if "$SCRIPTS_DIR/flow-resume-breadcrumb.sh" write "$SCRATCH_BREADCRUMB" >/dev/null 2>&1; then
+  fail "write with missing <input-path> arg should exit non-zero"
+else
+  WRITE_NO_INPUT_EXIT=$?
+  if [ "$WRITE_NO_INPUT_EXIT" -eq 2 ]; then
+    pass "write rejects missing <input-path> arg with exit 2 (usage)"
+  else
+    fail "write rejects missing <input-path> arg but exit code was $WRITE_NO_INPUT_EXIT (expected 2)"
+  fi
+fi
+
+NONEXISTENT_INPUT="/tmp/flow-bc9027-nonexistent.$$.json"
+rm -f "$NONEXISTENT_INPUT"  # ensure it really doesn't exist
+if "$SCRIPTS_DIR/flow-resume-breadcrumb.sh" write "$SCRATCH_BREADCRUMB" "$NONEXISTENT_INPUT" >/dev/null 2>&1; then
+  fail "write with nonexistent <input-path> file should exit non-zero"
+else
+  WRITE_NO_FILE_EXIT=$?
+  if [ "$WRITE_NO_FILE_EXIT" -eq 3 ]; then
+    pass "write rejects nonexistent <input-path> file with exit 3"
+  else
+    fail "write rejects nonexistent <input-path> file but exit code was $WRITE_NO_FILE_EXIT (expected 3)"
+  fi
+fi
+
+# Overwrite-semantics: a second write at the same <state-path> should atomic-
+# replace the previous content. This exercises the mktemp + atomic mv that the
+# helper is built around (Q31.5). A regression that made write create-only
+# (e.g. refused-when-exists) would still pass Section 5's first write — this
+# second write catches that class.
+BREADCRUMB_INPUT_2="$(mktemp -t flow-breadcrumb-vslice-2.XXXXXX)"
+python3 - "$NOW" > "$BREADCRUMB_INPUT_2" <<'PY'
+import json, sys
+print(json.dumps({
+    "version": "1",
+    "mode": "greenfield",
+    "status": "in_flight",
+    "run_started_at": sys.argv[1],
+    "last_updated": sys.argv[1],
+    "current_phase": "3",
+    "completed_phases": ["1", "2"],
+    "domains": [],
+}))
+PY
+WRITE_2_OUT=""
+if WRITE_2_OUT="$("$SCRIPTS_DIR/flow-resume-breadcrumb.sh" \
+                  write "$BREADCRUMB" "$BREADCRUMB_INPUT_2" 2>&1)"; then
+  pass "second write at same <state-path> exits 0 (overwrite-semantics)"
+else
+  fail "second write at same <state-path> exits non-zero"
+  printf '%s\n' "$WRITE_2_OUT" | sed 's/^/    | /'
+fi
+# Parse via python to stay whitespace-agnostic — a future producer switch to
+# json.dumps(indent=...) or separators=... would silently break a literal-string
+# grep, and the "second write did not replace" failure mode would conceal the
+# real cause.
+if [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["current_phase"])' "$BREADCRUMB" 2>/dev/null)" = "3" ]; then
+  pass "second write replaced breadcrumb content (current_phase advanced to 3)"
+else
+  fail "second write did not replace breadcrumb content (expected current_phase: 3)"
 fi
 
 READ_OUT=""

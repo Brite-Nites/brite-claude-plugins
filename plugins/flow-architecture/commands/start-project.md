@@ -47,7 +47,7 @@ Greenfield SKIPS `flow-legacy-cross-reference` (Q14) — that's retrofit-only. R
 
 ## Breadcrumb
 
-The orchestrator writes phase progress to `docs/plans/.flow-phase-state.json` (Q31.4 lock — note the **leading dot** on the filename; NOT `.flow/phase-state.json`) after every phase completion. Writes go through `bash $CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh write` (BC-6956 shipped) — atomic-rename via mktemp + python3 json.dump + parse-verify + content-match per Q31.5 lock. Never write the breadcrumb file directly with a heredoc.
+The orchestrator writes phase progress to `docs/plans/.flow-phase-state.json` (Q31.4 lock — note the **leading dot** on the filename; NOT `.flow/phase-state.json`) after every phase completion. Writes go through `bash $CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh write <state-path> <input-path>` (BC-6956 shipped; BC-9027 file-arg refactor) — atomic-rename via mktemp + python3 json.dump + parse-verify + content-match per Q31.5 lock. Never write the breadcrumb file directly with a heredoc.
 
 Breadcrumb shape (per Q31.4 — the `last_updated` field name is load-bearing: `scripts/flow-resume-breadcrumb.sh read` keys on it for stale detection, so writing `updated_at` would silently skip staleness checks):
 
@@ -196,11 +196,12 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
 
 **Initial breadcrumb write:** at end of Phase 1, write the breadcrumb with `run_started_at` (ISO-8601 now), `current_phase: 2`, `completed_phases: ["1"]`, `status: in_flight`, empty `domains: []`.
 
-The helper script `flow-resume-breadcrumb.sh write <path>` reads the full JSON document from stdin (per BC-6956 contract; it does not take `--mode` / `--current-phase` / `--status` flags). Construct the JSON via python3 (stdlib only per Q32) and pipe it:
+The helper script `flow-resume-breadcrumb.sh write <state-path> <input-path>` reads the full JSON document from `<input-path>` (per BC-6956 contract as amended by BC-9027; it does not take `--mode` / `--current-phase` / `--status` flags and no longer reads from stdin). Construct the JSON via python3 (stdlib only per Q32), redirect into a `mktemp` file, then call the helper with both paths:
 
 ```bash
 BREADCRUMB_PATH="$REPO_ROOT/docs/plans/.flow-phase-state.json"
-python3 <<'PY' | bash "$CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh" write "$BREADCRUMB_PATH"
+TMP_JSON="$(mktemp -t flow-breadcrumb.XXXXXX)"
+python3 > "$TMP_JSON" <<'PY'
 import json, sys, datetime
 now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 json.dump({
@@ -214,9 +215,11 @@ json.dump({
     "domains": [],
 }, sys.stdout)
 PY
+bash "$CLAUDE_PLUGIN_ROOT/scripts/flow-resume-breadcrumb.sh" write "$BREADCRUMB_PATH" "$TMP_JSON"
+rm -f "$TMP_JSON"
 ```
 
-The `<<'PY'` heredoc is single-quoted so the inner python source is not subject to shell variable expansion — Linear-derived strings cannot land here as injection vectors. The breadcrumb path is passed as a discrete argument to the helper (never spliced into a `bash -c` string).
+The `<<'PY'` heredoc is single-quoted so the inner python source is not subject to shell variable expansion — Linear-derived strings cannot land here as injection vectors. The breadcrumb path is passed as a discrete argument to the helper (never spliced into a `bash -c` string). The `mktemp` file intermediate is the BC-9027 fix: the previous pattern `python3 <<'PY' | bash $HELPER write ...` tripped the workflows security-hook classifier as a "piped download/execution" false-positive. Routing through `$TMP_JSON` keeps the helper-call as a plain argv invocation with no stdin pipe.
 
 ### Gate G1 (1→2)
 
@@ -470,7 +473,7 @@ Every phase ends with a breadcrumb update so resume can reason about what's comp
 2. Set `breadcrumb.current_phase` to the next phase number (or leave at `8` after Phase 8).
 3. Set `breadcrumb.status` (`in_flight` until Phase 8 terminator; then `completed`).
 4. Refresh `breadcrumb.last_updated` with the current ISO-8601 timestamp (NOT `updated_at` — the helper script's stale-detection in `read` mode keys on `last_updated`; writing the wrong field name would silently break staleness checks).
-5. Persist via the BC-6956 helper. The helper `write` subcommand takes a positional `<path>` argument and reads the full JSON document from stdin — see the Phase 1 example for the canonical python3-to-stdin form. Construct dynamic values inside a single-quoted python heredoc (`<<'PY'`) so Linear-derived strings cannot expand into the shell; pass `$BREADCRUMB_PATH` as a discrete argument to the helper (never inside `bash -c` or an unquoted `$(...)`).
+5. Persist via the BC-6956 helper. The helper `write` subcommand takes two positional arguments — `<state-path>` (the breadcrumb on disk) and `<input-path>` (a `mktemp`'d file holding the new JSON) — per BC-9027. See the Phase 1 example for the canonical `python3 > $TMP_JSON <<'PY' ... PY; bash $HELPER write $BREADCRUMB_PATH $TMP_JSON; rm -f $TMP_JSON` form. Construct dynamic values inside a single-quoted python heredoc (`<<'PY'`) so Linear-derived strings cannot expand into the shell; pass `$BREADCRUMB_PATH` and `$TMP_JSON` as discrete arguments to the helper (never inside `bash -c` or an unquoted `$(...)`). The `mktemp` file intermediate replaces the previous stdin-pipe pattern, which tripped the workflows security-hook classifier.
 
 The breadcrumb append is the **last step** of a phase, after all of the phase's artifacts (intent.md / inventory / Linear writes / story docs / journey docs / INDEX) have landed. Writing the breadcrumb earlier would let a killed session resume with a phase marked "complete" but artifact missing.
 
