@@ -2,15 +2,15 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://brite.nites/schemas/canonicals/vertical.json",
   "title": "GTM Canonicals — Vertical Entry",
-  "description": "Thin schema per ADR-016 (D7). One file per vertical under plugins/marketing/data/canonicals/{slug}.yaml. _manifest.yaml is the index, with schema_version + verticals[].",
+  "description": "Thin schema per ADR-016 (D7). One file per vertical under plugins/marketing/data/canonicals/{slug}.yaml. _manifest.yaml shape is documented in #/definitions/manifest. Brite repo is stdlib-only — this schema is the declarative contract; plugins/marketing/scripts/lint_canonicals.py is the runtime enforcement (it mirrors the constraints below).",
   "type": "object",
   "required": ["slug", "display", "personas", "offers"],
   "additionalProperties": false,
   "properties": {
     "slug": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9-]*$",
-      "description": "Kebab-case canonical slug. Matches filename ({slug}.yaml)."
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Strict kebab-case canonical slug. Matches filename ({slug}.yaml). No trailing or doubled hyphens."
     },
     "display": {
       "type": "string",
@@ -21,9 +21,9 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9-]*$"
+        "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
       },
-      "description": "Optional. Kebab-case slugs that should resolve to this vertical (for renames)."
+      "description": "Optional. Kebab-case slugs that should resolve to this vertical (for renames). Must not collide with any canonical vertical slug or another vertical's alias."
     },
     "playbook_path": {
       "type": "string",
@@ -48,7 +48,7 @@
       "properties": {
         "slug": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9-]*$"
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
         },
         "display": {
           "type": "string",
@@ -58,7 +58,7 @@
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 },
-          "description": "≥1 required (drives list-building title cascade per ADR-016)."
+          "description": ">=1 required (drives list-building title cascade per ADR-016)."
         }
       }
     },
@@ -69,7 +69,7 @@
       "properties": {
         "slug": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9-]*$"
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
         },
         "display": {
           "type": "string",
@@ -86,11 +86,56 @@
         },
         "target_personas": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          },
+          "description": "Each entry must resolve to a persona.slug in the same vertical (enforced by lint_canonicals.py)."
         },
-        "replaced_by": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "iterates_from": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "prose_path": { "type": "string" }
+        "target_postures": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["knowledge", "free-asset", "pilot", "risk-reversal"]
+          },
+          "description": "Optional advisory per ADR-017 §57-62. Each campaign-instance posture may override."
+        },
+        "replaced_by": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Forward-pointer to the offer slug that supersedes this one (must reference a sibling offer.slug in the same vertical)."
+        },
+        "iterates_from": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Reverse-pointer to the offer slug this one iterates on (must reference a sibling offer.slug in the same vertical)."
+        },
+        "prose_path": {
+          "type": "string",
+          "description": "Optional. Path to handbook offer prose, relative to handbook root."
+        }
+      }
+    },
+    "manifest": {
+      "$comment": "Shape of _manifest.yaml. Enforced by plugins/marketing/scripts/lint_canonicals.py (Brite repo has no jsonschema runtime dependency).",
+      "type": "object",
+      "required": ["schema_version", "verticals"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "const": 1,
+          "description": "Pinned to the linter's SCHEMA_VERSION constant. Bump in lockstep with the linter + data shape."
+        },
+        "verticals": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          },
+          "description": "Alphabetized + duplicate-free list of canonical vertical slugs."
+        }
       }
     }
   }

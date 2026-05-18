@@ -1,5 +1,9 @@
 # Canonical entry for the Universities vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/universities/README.md
+# Handbook lists 5 personas; canonicals carry the 4 first-call targets. The
+# "Coordinator / Event Manager (Fallback Entry Point)" persona is intentionally
+# omitted — handbook frames it as a fallback warm-intro path, not a list-building
+# target. Add via /marketing:new-persona if explicit list-build coverage is needed.
 slug: universities
 display: "Universities"
 playbook_path: "marketing/go-to-market/verticals/universities/README.md"

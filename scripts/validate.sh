@@ -1134,11 +1134,16 @@ fi
 
 # ══════════════════════════════════════════════════════════════════════
 # Section 15a — GTM Canonicals Lint (BC-8718 / ADR-016)
+# ──────────────────────────────────────────────────────────────────────
+# TODO: generalize when a 2nd plugin adopts the canonicals pattern —
+# detect any plugins/*/data/canonicals/ and run the linter on each
+# (matches Section 13 TODO at line 813).
 # ══════════════════════════════════════════════════════════════════════
 section "GTM Canonicals Lint"
 
 canonicals_lint="$REPO_ROOT/plugins/marketing/scripts/lint_canonicals.py"
 canonicals_dir="$REPO_ROOT/plugins/marketing/data/canonicals"
+canonicals_tests="$REPO_ROOT/scripts/test_lint_canonicals.sh"
 if [ ! -f "$canonicals_lint" ]; then
   warn "lint_canonicals.py not found — canonicals lint skipped"
 elif [ ! -d "$canonicals_dir" ]; then
@@ -1146,13 +1151,28 @@ elif [ ! -d "$canonicals_dir" ]; then
 elif ! command -v python3 &>/dev/null; then
   warn "python3 not found — canonicals lint skipped"
 else
-  if canonicals_output=$(python3 "$canonicals_lint" 2>&1); then
-    pass "$canonicals_output"
+  if canonicals_output=$(python3 "$canonicals_lint" --canonicals-dir "$canonicals_dir" 2>&1); then
+    while IFS= read -r line; do
+      [ -n "$line" ] && pass "$line"
+    done <<< "$canonicals_output"
   else
     fail "Canonicals lint failed:"
     while IFS= read -r line; do
       [ -n "$line" ] && printf "          %s\n" "$line"
     done <<< "$canonicals_output"
+  fi
+
+  if [ -f "$canonicals_tests" ]; then
+    if tests_output=$(bash "$canonicals_tests" "$canonicals_lint" 2>&1); then
+      pass "lint_canonicals regression harness — 15 scenarios"
+    else
+      fail "Canonicals lint regression harness failed:"
+      while IFS= read -r line; do
+        [ -n "$line" ] && printf "          %s\n" "$line"
+      done <<< "$tests_output"
+    fi
+  else
+    warn "test_lint_canonicals.sh not found — regression harness skipped"
   fi
 fi
 

@@ -4,6 +4,10 @@
 # Tier-3 (CEO, CFO) and Tier-4 (Child Life, Donor Stewardship) personas are
 # intentionally omitted from canonicals — handbook hard-rule "NEVER first-call"
 # means they aren't list-building targets.
+# Tier-2 System CMO / CXO is also deferred until the first multi-hospital-system
+# engagement validates the System-CMO motion (per handbook: first-call only "when
+# Multi-hospital private systems with brand-consistency mandates"). Add via
+# /marketing:new-persona on first such engagement.
 slug: hospitals
 display: "Hospitals"
 playbook_path: "marketing/go-to-market/verticals/hospitals/README.md"

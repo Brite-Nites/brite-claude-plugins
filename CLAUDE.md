@@ -73,6 +73,8 @@ plugins/
     skills/*/SKILL.md              # Domain skills (context-skill pattern)
     tools/integrations/*.md        # Tool integration guides (see pattern)
     references/                    # Shared reference content read by skills (MIT upstream port, see UPSTREAM.md)
+    data/canonicals/               # GTM canonicals (slug+display+personas+offers per ADR-016; lint at plugins/marketing/scripts/lint_canonicals.py)
+    scripts/                       # Plugin-owned scripts (bw-run.sh secret broker, tam-map/, lint_canonicals.py)
     hooks/hooks.json
     .mcp.json
   revops/                          # SF dev + CRM data (subtree from Jaganpro/sf-skills, MIT — see UPSTREAM.md)
