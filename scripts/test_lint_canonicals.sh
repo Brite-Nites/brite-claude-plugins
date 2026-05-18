@@ -36,6 +36,15 @@
 #   W  empty display string                                         expect 1
 #   X  duplicate alias within a single file                         expect 1
 #   Y  non-kebab offer slug                                         expect 1
+#   Z  empty status scalar (TypeError-prevention guard)              expect 1
+#   AA duplicate top-level key                                       expect 1
+#   AB duplicate key in list item                                    expect 1
+#   AC sibling block-list keys on one offer (happy path)             expect 0
+#   AD target_postures duplicate item                                expect 1
+#   AE unterminated inline list bracket                              expect 1
+#   AF cycle in iterates_from chain                                  expect 1
+#   AG 3-node cycle emits exactly one error message (dedup)          expect 1
+#   AH symlink rejected from canonicals dir                          expect 1
 #
 # Usage:
 #   bash scripts/test_lint_canonicals.sh
@@ -546,9 +555,227 @@ YAML
   assert_exit_and_substring "Y: non-kebab offer slug" 1 "offers\\[0\\]: slug 'BadOfferSlug' is not kebab-case"
 }
 
+# ── Scenario Z: empty status scalar (TypeError-prevention) ──────────────
+run_z() {
+  local dir
+  dir="$(mkdir_scenario Z)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status:
+    posture: free-asset
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "Z: empty status scalar" 1 "offers\\[0\\]: status must be a string"
+}
+
+# ── Scenario AA: duplicate top-level key ─────────────────────────────────
+run_aa() {
+  local dir
+  dir="$(mkdir_scenario AA)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "First"
+display: "Second"
+personas: []
+offers: []
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "AA: duplicate top-level key" 1 "duplicate top-level key 'display'"
+}
+
+# ── Scenario AB: duplicate key in list item ──────────────────────────────
+run_ab() {
+  local dir
+  dir="$(mkdir_scenario AB)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    display: "Persona One Repeat"
+    titles:
+      - "Title One"
+offers: []
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "AB: duplicate key in list item" 1 "duplicate key 'display' in list item"
+}
+
+# ── Scenario AC: sibling block-list keys (happy path) ────────────────────
+run_ac() {
+  local dir
+  dir="$(mkdir_scenario AC)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_personas:
+      - persona-one
+    target_postures:
+      - free-asset
+      - knowledge
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "AC: sibling block-list keys" 0 "Canonicals lint OK"
+}
+
+# ── Scenario AD: target_postures duplicate ───────────────────────────────
+run_ad() {
+  local dir
+  dir="$(mkdir_scenario AD)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_postures: [knowledge, knowledge]
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "AD: target_postures duplicate" 1 "target_postures\\[1\\] 'knowledge' duplicated in same offer"
+}
+
+# ── Scenario AE: unterminated inline list bracket ────────────────────────
+run_ae() {
+  local dir
+  dir="$(mkdir_scenario AE)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_personas: [persona-one
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "AE: unterminated inline list" 1 "unterminated inline list bracket"
+}
+
+# ── Scenario AF: cycle in iterates_from ──────────────────────────────────
+run_af() {
+  local dir
+  dir="$(mkdir_scenario AF)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-a
+    display: "Offer A"
+    status: active
+    posture: free-asset
+    iterates_from: offer-b
+  - slug: offer-b
+    display: "Offer B"
+    status: active
+    posture: free-asset
+    iterates_from: offer-a
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "AF: cycle in iterates_from" 1 "cycle in iterates_from chain"
+}
+
+# ── Scenario AG: 3-node cycle emits ONE message (dedup verification) ─────
+run_ag() {
+  local dir
+  dir="$(mkdir_scenario AG)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-a
+    display: "A"
+    status: active
+    posture: free-asset
+    replaced_by: offer-b
+  - slug: offer-b
+    display: "B"
+    status: active
+    posture: free-asset
+    replaced_by: offer-c
+  - slug: offer-c
+    display: "C"
+    status: active
+    posture: free-asset
+    replaced_by: offer-a
+YAML
+  run_lint "$dir"
+  # Exactly one cycle line should appear; assert single occurrence.
+  local cycle_count
+  cycle_count=$(printf '%s' "$LAST_OUTPUT" | grep -cE "cycle in replaced_by chain")
+  if [ "$LAST_RC" -eq 1 ] && [ "$cycle_count" -eq 1 ]; then
+    echo "  PASS  AG: 3-node cycle dedup (exit=$LAST_RC, 1 cycle msg)"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  AG: 3-node cycle dedup — exit=$LAST_RC cycle_count=$cycle_count"
+    echo "    output: $LAST_OUTPUT"
+    fail=$((fail + 1))
+  fi
+}
+
+# ── Scenario AH: symlink rejected ────────────────────────────────────────
+run_ah() {
+  local dir
+  dir="$(mkdir_scenario AH)"
+  # Add a symlink to an existing real vertical; lint should reject the symlink
+  # while still validating the real files.
+  ln -sf alpha.yaml "$dir/charlie.yaml"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+schema_version: 1
+verticals:
+  - alpha
+  - bravo
+  - charlie
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "AH: symlink rejection" 1 "charlie.yaml: symlinks not allowed in canonicals dir"
+}
+
 # ── Run all scenarios ────────────────────────────────────────────────────
 echo ""
-echo "Running lint_canonicals.py regression harness (25 scenarios)..."
+echo "Running lint_canonicals.py regression harness (34 scenarios)..."
 echo ""
 
 run_a
@@ -576,6 +803,15 @@ run_v
 run_w
 run_x
 run_y
+run_z
+run_aa
+run_ab
+run_ac
+run_ad
+run_ae
+run_af
+run_ag
+run_ah
 
 echo ""
 echo "Summary: $pass passed, $fail failed"

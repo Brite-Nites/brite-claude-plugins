@@ -198,7 +198,7 @@ def parse_inline_list_of_strings(raw: str) -> list[str]:
     return out
 
 
-_INT_RE = re.compile(r"^-?(0|[1-9][0-9]*)$")
+_INT_RE = re.compile(r"^(0|-?[1-9][0-9]*)$")  # canonical decimal; rejects -0, 01
 
 
 def parse_scalar(raw: str) -> object:
@@ -238,15 +238,31 @@ def parse_scalar(raw: str) -> object:
 
 
 def parse_yaml(path: Path) -> dict[str, object]:
-    """Parse a canonicals YAML file. Raises LintError on unrecognized shape."""
-    text = path.read_text(encoding="utf-8")
+    """Parse a canonicals YAML file. Raises LintError on unrecognized shape.
+
+    Iter-3 hardening:
+      - Duplicate-key detection: every dict scope (top-level + each list-item
+        dict) tracks its seen keys; a repeat raises LintError instead of
+        silent last-wins (P1 from iter-3 data review).
+      - Sibling block-list keys: an offer with TWO block-form list children
+        (e.g., `target_personas:` followed by `target_postures:`) parses
+        correctly — each opens a fresh sub_list under its own key. The
+        prior over-broad "nested dict" rejection has been replaced by the
+        duplicate-key check, which catches authoring typos without the
+        false positive (P1 from iter-3 python review).
+      - UTF-8 BOM tolerance via `encoding="utf-8-sig"` so editor-saved files
+        with a BOM lint cleanly (P3 from iter-3 data review).
+    """
+    text = path.read_text(encoding="utf-8-sig")
     result: dict[str, object] = {}
+    top_seen: set[str] = set()
     cur_list_key: str | None = None
     cur_list_kind: str | None = None  # "strings" | "dicts"
-    cur_list: list | None = None
-    cur_dict: dict | None = None
+    cur_list: list[object] | None = None
+    cur_dict: dict[str, object] | None = None
+    cur_dict_seen: set[str] | None = None
     sub_list_key: str | None = None
-    sub_list: list | None = None
+    sub_list: list[object] | None = None
 
     for lineno, raw_line in enumerate(text.splitlines(), start=1):
         line = raw_line.rstrip()
@@ -265,6 +281,7 @@ def parse_yaml(path: Path) -> dict[str, object]:
             cur_list_kind = None
             cur_list = None
             cur_dict = None
+            cur_dict_seen = None
             sub_list_key = None
             sub_list = None
 
@@ -272,6 +289,11 @@ def parse_yaml(path: Path) -> dict[str, object]:
             if not m:
                 raise LintError(f"{path}:{lineno}: cannot parse: {content!r}")
             key, rest = m.group(1), m.group(2)
+            if key in top_seen:
+                raise LintError(
+                    f"{path}:{lineno}: duplicate top-level key '{key}'"
+                )
+            top_seen.add(key)
             if rest == "":
                 cur_list_key = key
                 cur_list = []
@@ -281,7 +303,7 @@ def parse_yaml(path: Path) -> dict[str, object]:
                 result[key] = parse_scalar(rest)
             continue
 
-        if cur_list_key is None:
+        if cur_list_key is None or cur_list is None:
             raise LintError(
                 f"{path}:{lineno}: unexpected indented line outside a block: {content!r}"
             )
@@ -293,10 +315,12 @@ def parse_yaml(path: Path) -> dict[str, object]:
         if m:
             cur_list_kind = "dicts"
             cur_dict = {}
+            cur_dict_seen = set()
             cur_list.append(cur_dict)
             sub_list_key = None
             sub_list = None
             key, rest = m.group(1), m.group(2)
+            cur_dict_seen.add(key)
             if rest == "":
                 sub_list_key = key
                 sub_list = []
@@ -315,25 +339,32 @@ def parse_yaml(path: Path) -> dict[str, object]:
                     sub_list.append(parse_scalar(value))
                     continue
                 raise LintError(
-                    f"{path}:{lineno}: string list item in dict list: {content!r}"
+                    f"{path}:{lineno}: string list item in dict list "
+                    f"(did a prior list item contain an unquoted colon?): {content!r}"
                 )
             cur_list_kind = "strings"
             cur_list.append(parse_scalar(value))
             continue
 
         # Continuation of current dict item: `    key: value` (indent >= 4).
-        # Nested dicts inside list items are NOT supported — if a dict-continuation
-        # opens a block (empty `rest`) and we already have a sub_list pending, the
-        # author is trying to nest a dict; reject loudly per the supported-subset
-        # contract.
+        # Sibling block-form keys ARE supported — each opens a fresh sub_list
+        # under its own key. Authoring typos surface via the duplicate-key
+        # detection above, not via a blanket "nested dict" rejection.
         m = RE_DICT_CONT.match(content)
-        if m and cur_list_kind == "dicts" and cur_dict is not None and indent >= 4:
+        if (
+            m
+            and cur_list_kind == "dicts"
+            and cur_dict is not None
+            and cur_dict_seen is not None
+            and indent >= 4
+        ):
             key, rest = m.group(1), m.group(2)
+            if key in cur_dict_seen:
+                raise LintError(
+                    f"{path}:{lineno}: duplicate key '{key}' in list item"
+                )
+            cur_dict_seen.add(key)
             if rest == "":
-                if sub_list is not None:
-                    raise LintError(
-                        f"{path}:{lineno}: nested dict inside list item not supported (key {key!r})"
-                    )
                 sub_list_key = key
                 sub_list = []
                 cur_dict[key] = sub_list
@@ -342,13 +373,6 @@ def parse_yaml(path: Path) -> dict[str, object]:
             continue
 
         raise LintError(f"{path}:{lineno}: cannot parse: {content!r}")
-
-    # Detect unresolved top-level empty-value: a top-level key with no value AND
-    # no list items followed it. Currently rendered as an empty list, which is
-    # legitimate (`personas: []` style). To distinguish, we'd need a 2-pass; for
-    # now the validator catches type mismatches downstream and emits a clear
-    # "must be a list / must be a string" message. Documented in the supported-
-    # subset contract.
 
     return result
 
@@ -409,13 +433,27 @@ def validate_offer(
     if not isinstance(slug, str) or not SLUG_RE.match(slug):
         errs.append(f"{where}: slug {slug!r} is not kebab-case")
     errs.extend(_check_non_empty_string(offer["display"], where, "display"))
-    if offer["status"] not in ALLOWED_STATUS:
+    # Type-guard enum membership: `[] in frozenset` raises TypeError on
+    # unhashable values, which leaks a Python traceback into stderr (P1 from
+    # iter-3 data review — empty `status:` / `posture:` scalar parses as
+    # empty list). Validate string-shape first, then enum membership.
+    status = offer["status"]
+    if not isinstance(status, str):
         errs.append(
-            f"{where}: status {offer['status']!r} not in {sorted(ALLOWED_STATUS)}"
+            f"{where}: status must be a string (got {type(status).__name__})"
         )
-    if offer["posture"] not in ALLOWED_POSTURE:
+    elif status not in ALLOWED_STATUS:
         errs.append(
-            f"{where}: posture {offer['posture']!r} not in {sorted(ALLOWED_POSTURE)}"
+            f"{where}: status {status!r} not in {sorted(ALLOWED_STATUS)}"
+        )
+    posture = offer["posture"]
+    if not isinstance(posture, str):
+        errs.append(
+            f"{where}: posture must be a string (got {type(posture).__name__})"
+        )
+    elif posture not in ALLOWED_POSTURE:
+        errs.append(
+            f"{where}: posture {posture!r} not in {sorted(ALLOWED_POSTURE)}"
         )
     tp = offer.get("target_personas")
     if tp is not None:
@@ -449,7 +487,19 @@ def validate_offer(
                 f"(got {type(tpo).__name__})"
             )
         else:
+            seen_postures: set[str] = set()
             for j, ref in enumerate(tpo):
+                if not isinstance(ref, str):
+                    errs.append(
+                        f"{where}: target_postures[{j}] must be a string "
+                        f"(got {type(ref).__name__})"
+                    )
+                    continue
+                if ref in seen_postures:
+                    errs.append(
+                        f"{where}: target_postures[{j}] {ref!r} duplicated in same offer"
+                    )
+                seen_postures.add(ref)
                 if ref not in ALLOWED_POSTURE:
                     errs.append(
                         f"{where}: target_postures[{j}] {ref!r} not in {sorted(ALLOWED_POSTURE)}"
@@ -560,18 +610,33 @@ def validate_vertical(path: Path) -> tuple[list[str], dict | None]:
                         else:
                             iterates_edges[o_slug] = ref
 
-    # Cycle detection: walk each edge map; if we revisit a slug, a cycle exists.
-    for edges, label in ((replaces_edges, "replaced_by"), (iterates_edges, "iterates_from")):
+    # Cycle detection: walk each edge map. A cycle is reported ONCE per
+    # distinct loop — every node touched during a walk (whether cyclic or
+    # acyclic) gets added to `done` so we skip re-walks from any of its
+    # members. Visited tracking inside a walk uses a set for O(1) lookups.
+    for edges, label in (
+        (replaces_edges, "replaced_by"),
+        (iterates_edges, "iterates_from"),
+    ):
+        done: set[str] = set()
         for start in list(edges):
-            visited = [start]
-            cur = edges.get(start)
-            while cur is not None:
-                if cur in visited:
-                    cycle = " -> ".join(visited + [cur])
-                    errs.append(f"{where}: cycle in {label} chain: {cycle}")
-                    break
-                visited.append(cur)
+            if start in done:
+                continue
+            visited_order: list[str] = []
+            visited_set: set[str] = set()
+            cur: str | None = start
+            while cur is not None and cur not in visited_set:
+                visited_order.append(cur)
+                visited_set.add(cur)
                 cur = edges.get(cur)
+            if cur is not None:
+                # Canonicalize: trim the prefix before the cycle entry point.
+                entry = visited_order.index(cur)
+                cycle_nodes = visited_order[entry:] + [cur]
+                errs.append(
+                    f"{where}: cycle in {label} chain: {' -> '.join(cycle_nodes)}"
+                )
+            done.update(visited_set)
 
     return (errs, data)
 
@@ -612,6 +677,10 @@ def _validate_manifest(manifest: dict, where: str) -> tuple[list[str], list[str]
         if not SLUG_RE.match(v):
             errs.append(f"{where}: verticals[{j}] {v!r} is not kebab-case")
         string_items.append(v)
+    if len(string_items) == 0:
+        errs.append(
+            f"{where}: verticals[] is empty — manifest must list at least one vertical"
+        )
     if string_items != sorted(string_items):
         errs.append(
             f"{where}: verticals[] not alphabetized — expected {sorted(string_items)!r}"
@@ -659,8 +728,16 @@ def main(argv: list[str] | None = None) -> int:
 
     # 1:1 manifest-to-file mapping. Reserved-prefix convention: files starting
     # with `_` (e.g., _manifest.yaml) and non-`.yaml` (schema.json) are skipped.
+    # Symlinks are rejected — the canonicals contract is one regular file per
+    # vertical (P2 from iter-3 data review).
     file_slugs: set[str] = set()
-    for entry in sorted(p.name for p in cdir.iterdir()):
+    for p in sorted(cdir.iterdir(), key=lambda x: x.name):
+        if p.is_symlink():
+            all_errs.append(
+                f"{p.name}: symlinks not allowed in canonicals dir"
+            )
+            continue
+        entry = p.name
         if entry.startswith("_") or not entry.endswith(".yaml"):
             continue
         file_slugs.add(entry[:-5])

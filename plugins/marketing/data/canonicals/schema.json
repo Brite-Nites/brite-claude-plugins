@@ -20,6 +20,7 @@
     },
     "aliases": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
@@ -87,6 +88,7 @@
         },
         "target_personas": {
           "type": "array",
+          "uniqueItems": true,
           "items": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
@@ -95,6 +97,7 @@
         },
         "target_postures": {
           "type": "array",
+          "uniqueItems": true,
           "items": {
             "type": "string",
             "enum": ["knowledge", "free-asset", "pilot", "risk-reversal"]
@@ -131,11 +134,12 @@
         "verticals": {
           "type": "array",
           "uniqueItems": true,
+          "minItems": 1,
           "items": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
           },
-          "description": "Alphabetized + duplicate-free list of canonical vertical slugs."
+          "description": "Alphabetized + duplicate-free list of canonical vertical slugs (>=1 required)."
         }
       }
     }

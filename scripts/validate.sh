@@ -1144,17 +1144,18 @@ section "GTM Canonicals Lint"
 canonicals_lint="$REPO_ROOT/plugins/marketing/scripts/lint_canonicals.py"
 canonicals_dir="$REPO_ROOT/plugins/marketing/data/canonicals"
 canonicals_tests="$REPO_ROOT/scripts/test_lint_canonicals.sh"
+# python3 presence is enforced at the top of validate.sh (line 19-22) — the
+# script exits 2 if it's missing — so a python3-availability check here would
+# be unreachable.
 if [ ! -f "$canonicals_lint" ]; then
   warn "lint_canonicals.py not found — canonicals lint skipped"
 elif [ ! -d "$canonicals_dir" ]; then
   warn "canonicals dir not found — canonicals lint skipped"
-elif ! command -v python3 &>/dev/null; then
-  warn "python3 not found — canonicals lint skipped"
 else
   if canonicals_output=$(python3 "$canonicals_lint" --canonicals-dir "$canonicals_dir" 2>&1); then
-    while IFS= read -r line; do
-      [ -n "$line" ] && pass "$line"
-    done <<< "$canonicals_output"
+    # Success output is single-line by contract ("Canonicals lint OK — N
+    # verticals validated."). Emit as a single pass message.
+    pass "$canonicals_output"
   else
     fail "Canonicals lint failed:"
     while IFS= read -r line; do
