@@ -1164,7 +1164,14 @@ else
 
   if [ -f "$canonicals_tests" ]; then
     if tests_output=$(bash "$canonicals_tests" "$canonicals_lint" 2>&1); then
-      pass "lint_canonicals regression harness — 15 scenarios"
+      # Parse the harness's machine-readable RESULT line so the count stays
+      # in sync as scenarios are added/removed (matches Section 2c pattern).
+      tests_pass_count=$(printf '%s\n' "$tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+      if [ -n "$tests_pass_count" ]; then
+        pass "lint_canonicals regression harness — $tests_pass_count scenarios"
+      else
+        pass "lint_canonicals regression harness — passed (count unparsed)"
+      fi
     else
       fail "Canonicals lint regression harness failed:"
       while IFS= read -r line; do

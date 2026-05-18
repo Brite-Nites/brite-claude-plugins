@@ -95,6 +95,7 @@ OFFER_KEYS = frozenset(
         "prose_path",
     }
 )
+# Mirrors schema.json#/definitions/manifest.
 MANIFEST_KEYS = frozenset({"schema_version", "verticals"})
 
 # Pre-compiled parse_yaml regexes (hot loop).
@@ -120,22 +121,31 @@ class LintError(Exception):
 
 
 def strip_inline_comment(value: str) -> str:
-    """Drop ' # ...' inline comments while keeping '#' inside quotes intact."""
+    """Drop ' # ...' inline comments while keeping '#' inside quotes intact.
+
+    Per YAML 1.2 §6.6, a `#` starts a comment only when preceded by whitespace
+    (or appears at line start). Bare `#` inside a non-quoted token (e.g.,
+    `value#nocomment`) is part of the scalar.
+    """
     in_quote: str | None = None
     out_chars: list[str] = []
+    prev_is_space = True  # treat "start of string" as if preceded by whitespace
     for ch in value:
         if in_quote:
             if ch == in_quote:
                 in_quote = None
             out_chars.append(ch)
+            prev_is_space = False
             continue
         if ch in ('"', "'"):
             in_quote = ch
             out_chars.append(ch)
+            prev_is_space = False
             continue
-        if ch == "#":
+        if ch == "#" and prev_is_space:
             break
         out_chars.append(ch)
+        prev_is_space = ch.isspace()
     return "".join(out_chars).rstrip()
 
 
@@ -188,20 +198,29 @@ def parse_inline_list_of_strings(raw: str) -> list[str]:
     return out
 
 
+_INT_RE = re.compile(r"^-?(0|[1-9][0-9]*)$")
+
+
 def parse_scalar(raw: str) -> object:
     """Parse a YAML scalar (strict YAML 1.2 subset).
 
     Order matters: inline-list dispatch must precede the bare-string fallback.
     Only `true`/`false` are coerced to bool (not `yes`/`no`/`YES`/`NO` — those
-    stay strings in YAML 1.2). Integers are coerced for `schema_version`-style
-    fields; nothing else is numeric in the canonicals shape, so float coercion
-    is intentionally absent.
+    stay strings in YAML 1.2). Integers are coerced ONLY when the raw form has
+    no leading zero (canonical decimal — `0`, `1`, `42`, `-3`), to keep slugs
+    like `01-foo`-shaped values unambiguously strings. Float coercion is
+    intentionally absent.
+
+    Raises LintError on unterminated bracket forms (`[a, b` or `a, b]`) so
+    authoring typos surface loudly instead of silently parsing as strings.
     """
     s = strip_inline_comment(raw).strip()
     if not s:
         return ""
     if s.startswith("[") and s.endswith("]"):
         return parse_inline_list_of_strings(s)
+    if s.startswith("[") or s.endswith("]"):
+        raise LintError(f"unterminated inline list bracket: {raw!r}")
     if (s.startswith('"') and s.endswith('"')) or (
         s.startswith("'") and s.endswith("'")
     ):
@@ -210,10 +229,9 @@ def parse_scalar(raw: str) -> object:
         return True
     if s == "false":
         return False
-    try:
+    if _INT_RE.match(s):
         return int(s)
-    except ValueError:
-        return s
+    return s
 
 
 # ── YAML parser (subset, stdlib only) ─────────────────────────────────────
@@ -268,13 +286,11 @@ def parse_yaml(path: Path) -> dict[str, object]:
                 f"{path}:{lineno}: unexpected indented line outside a block: {content!r}"
             )
 
-        # Dict-list item start: `  - key: value` or `  - key:`
-        m = RE_LIST_DICT_START.match(content)
+        # When the current block is established as a string-list, a `- key: value`
+        # shape is a string-list item that happens to contain a colon (e.g., an
+        # unquoted title with a colon). Skip the dict-start branch.
+        m = None if cur_list_kind == "strings" else RE_LIST_DICT_START.match(content)
         if m:
-            if cur_list_kind == "strings":
-                raise LintError(
-                    f"{path}:{lineno}: dict list item in string list: {content!r}"
-                )
             cur_list_kind = "dicts"
             cur_dict = {}
             cur_list.append(cur_dict)
@@ -305,11 +321,19 @@ def parse_yaml(path: Path) -> dict[str, object]:
             cur_list.append(parse_scalar(value))
             continue
 
-        # Continuation of current dict item: `    key: value` (indent >= 4)
+        # Continuation of current dict item: `    key: value` (indent >= 4).
+        # Nested dicts inside list items are NOT supported — if a dict-continuation
+        # opens a block (empty `rest`) and we already have a sub_list pending, the
+        # author is trying to nest a dict; reject loudly per the supported-subset
+        # contract.
         m = RE_DICT_CONT.match(content)
         if m and cur_list_kind == "dicts" and cur_dict is not None and indent >= 4:
             key, rest = m.group(1), m.group(2)
             if rest == "":
+                if sub_list is not None:
+                    raise LintError(
+                        f"{path}:{lineno}: nested dict inside list item not supported (key {key!r})"
+                    )
                 sub_list_key = key
                 sub_list = []
                 cur_dict[key] = sub_list
@@ -318,6 +342,13 @@ def parse_yaml(path: Path) -> dict[str, object]:
             continue
 
         raise LintError(f"{path}:{lineno}: cannot parse: {content!r}")
+
+    # Detect unresolved top-level empty-value: a top-level key with no value AND
+    # no list items followed it. Currently rendered as an empty list, which is
+    # legitimate (`personas: []` style). To distinguish, we'd need a 2-pass; for
+    # now the validator catches type mismatches downstream and emits a clear
+    # "must be a list / must be a string" message. Documented in the supported-
+    # subset contract.
 
     return result
 
@@ -332,21 +363,31 @@ def _check_unknown_keys(
     return [f"{where}: unknown key '{k}'" for k in unknown]
 
 
+def _check_non_empty_string(value: object, where: str, field: str) -> list[str]:
+    """Mirror schema.json `type: string, minLength: 1` for required string fields."""
+    if not isinstance(value, str):
+        return [f"{where}: {field} must be a string (got {type(value).__name__})"]
+    if not value.strip():
+        return [f"{where}: {field} must be a non-empty string"]
+    return []
+
+
 def validate_persona(persona: dict, vertical_slug: str, idx: int) -> list[str]:
     where = f"{vertical_slug}.yaml personas[{idx}]"
     errs: list[str] = _check_unknown_keys(persona, PERSONA_KEYS, where)
     for required in ("slug", "display", "titles"):
         if required not in persona:
             errs.append(f"{where}: missing required key '{required}'")
-    if errs:
+    if any("missing required" in e for e in errs):
         return errs
     slug = persona["slug"]
     if not isinstance(slug, str) or not SLUG_RE.match(slug):
         errs.append(f"{where}: slug {slug!r} is not kebab-case")
+    errs.extend(_check_non_empty_string(persona["display"], where, "display"))
     titles = persona["titles"]
     if not isinstance(titles, list) or len(titles) < 1:
         errs.append(f"{where}: titles must be a non-empty list (got {titles!r})")
-    elif not all(isinstance(t, str) and t for t in titles):
+    elif not all(isinstance(t, str) and t.strip() for t in titles):
         errs.append(f"{where}: every title must be a non-empty string")
     return errs
 
@@ -362,11 +403,12 @@ def validate_offer(
     for required in ("slug", "display", "status", "posture"):
         if required not in offer:
             errs.append(f"{where}: missing required key '{required}'")
-    if errs:
+    if any("missing required" in e for e in errs):
         return errs
     slug = offer["slug"]
     if not isinstance(slug, str) or not SLUG_RE.match(slug):
         errs.append(f"{where}: slug {slug!r} is not kebab-case")
+    errs.extend(_check_non_empty_string(offer["display"], where, "display"))
     if offer["status"] not in ALLOWED_STATUS:
         errs.append(
             f"{where}: status {offer['status']!r} not in {sorted(ALLOWED_STATUS)}"
@@ -383,12 +425,19 @@ def validate_offer(
                 f"(got {type(tp).__name__})"
             )
         else:
+            seen_refs: set[str] = set()
             for j, ref in enumerate(tp):
                 if not isinstance(ref, str) or not SLUG_RE.match(ref):
                     errs.append(
                         f"{where}: target_personas[{j}] {ref!r} is not kebab-case"
                     )
-                elif ref not in persona_slug_set:
+                    continue
+                if ref in seen_refs:
+                    errs.append(
+                        f"{where}: target_personas[{j}] '{ref}' duplicated in same offer"
+                    )
+                seen_refs.add(ref)
+                if ref not in persona_slug_set:
                     errs.append(
                         f"{where}: target_personas[{j}] '{ref}' not defined in personas[]"
                     )
@@ -407,8 +456,11 @@ def validate_offer(
                     )
     for ref_key in ("replaced_by", "iterates_from"):
         ref = offer.get(ref_key)
-        if ref is not None and (not isinstance(ref, str) or not SLUG_RE.match(ref)):
-            errs.append(f"{where}: {ref_key} {ref!r} is not kebab-case")
+        if ref is not None:
+            if not isinstance(ref, str) or not SLUG_RE.match(ref):
+                errs.append(f"{where}: {ref_key} {ref!r} is not kebab-case")
+            elif ref == offer.get("slug"):
+                errs.append(f"{where}: {ref_key} '{ref}' is a self-reference")
     return errs
 
 
@@ -436,6 +488,7 @@ def validate_vertical(path: Path) -> tuple[list[str], dict | None]:
         errs.append(
             f"{where}: filename stem {path.stem!r} does not match slug {slug!r}"
         )
+    errs.extend(_check_non_empty_string(data["display"], where, "display"))
 
     aliases = data.get("aliases")
     if aliases is not None:
@@ -486,11 +539,14 @@ def validate_vertical(path: Path) -> tuple[list[str], dict | None]:
             errs.append(f"{where}: duplicate offer slug '{s}'")
         seen.add(s)
 
-    # Sibling-offer references (replaced_by / iterates_from)
+    # Sibling-offer references (replaced_by / iterates_from): existence check.
+    replaces_edges: dict[str, str] = {}
+    iterates_edges: dict[str, str] = {}
     if isinstance(offers, list):
         for i, o in enumerate(offers):
             if not isinstance(o, dict):
                 continue
+            o_slug = o.get("slug")
             for ref_key in ("replaced_by", "iterates_from"):
                 ref = o.get(ref_key)
                 if isinstance(ref, str) and SLUG_RE.match(ref):
@@ -498,6 +554,24 @@ def validate_vertical(path: Path) -> tuple[list[str], dict | None]:
                         errs.append(
                             f"{where} offers[{i}]: {ref_key} '{ref}' not defined in offers[]"
                         )
+                    elif isinstance(o_slug, str) and o_slug != ref:
+                        if ref_key == "replaced_by":
+                            replaces_edges[o_slug] = ref
+                        else:
+                            iterates_edges[o_slug] = ref
+
+    # Cycle detection: walk each edge map; if we revisit a slug, a cycle exists.
+    for edges, label in ((replaces_edges, "replaced_by"), (iterates_edges, "iterates_from")):
+        for start in list(edges):
+            visited = [start]
+            cur = edges.get(start)
+            while cur is not None:
+                if cur in visited:
+                    cycle = " -> ".join(visited + [cur])
+                    errs.append(f"{where}: cycle in {label} chain: {cycle}")
+                    break
+                visited.append(cur)
+                cur = edges.get(cur)
 
     return (errs, data)
 
@@ -605,6 +679,12 @@ def main(argv: list[str] | None = None) -> int:
             parsed_by_slug[slug] = data
 
     # Cross-vertical alias collision check.
+    # Two failure modes are reported with distinct messages so authors can tell
+    # them apart at a glance:
+    #   - intra-file duplicate (`aliases: [foo, foo]` in one file)
+    #   - cross-file collision (different files claim the same alias)
+    # The cross-file message names the OTHER owner explicitly, never the
+    # reporter, so an "owned by self" diagnostic is impossible.
     all_canonical_slugs = set(parsed_by_slug)
     alias_to_owner: dict[str, str] = {}
     for slug in sorted(parsed_by_slug):
@@ -612,14 +692,21 @@ def main(argv: list[str] | None = None) -> int:
         aliases = data.get("aliases") or []
         if not isinstance(aliases, list):
             continue
+        seen_in_file: set[str] = set()
         for alias in aliases:
             if not isinstance(alias, str):
                 continue
+            if alias in seen_in_file:
+                all_errs.append(
+                    f"{slug}.yaml: duplicate alias '{alias}' within file"
+                )
+                continue
+            seen_in_file.add(alias)
             if alias in all_canonical_slugs:
                 all_errs.append(
                     f"{slug}.yaml: alias '{alias}' collides with canonical vertical slug"
                 )
-            if alias in alias_to_owner:
+            elif alias in alias_to_owner:
                 all_errs.append(
                     f"{slug}.yaml: alias '{alias}' already owned by "
                     f"{alias_to_owner[alias]}.yaml"

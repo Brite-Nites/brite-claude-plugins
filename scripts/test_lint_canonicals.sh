@@ -8,22 +8,34 @@
 # a different code path than the scenario targets, per BC-8712 follow-up
 # discipline).
 #
-# Scenarios:
-#   A  happy path (minimal accept fixture)                          expect 0
-#   B  vertical missing required `display`                          expect 1 — "missing required key 'display'"
-#   C  unknown top-level key (additionalProperties violation)       expect 1 — "unknown key 'rogue_key'"
-#   D  unknown offer key                                            expect 1 — "unknown key 'rogue_offer_key'"
-#   E  bad offer.status enum                                        expect 1 — "status 'pending'"
-#   F  bad offer.posture enum                                       expect 1 — "posture 'unknown-posture'"
-#   G  non-kebab persona slug (camelCase)                           expect 1 — "is not kebab-case"
-#   H  duplicate persona slug within a vertical                     expect 1 — "duplicate persona slug 'dup'"
-#   I  target_personas references undefined persona                 expect 1 — "not defined in personas[]"
-#   J  target_personas item is not kebab-case                       expect 1 — "is not kebab-case"
-#   K  _manifest.yaml verticals[] not alphabetized                  expect 1 — "not alphabetized"
-#   L  manifest entry has no matching {slug}.yaml file              expect 1 — "but no .*yaml found"
-#   M  alias collides with another vertical's canonical slug        expect 1 — "alias 'bravo' collides"
-#   N  _manifest.yaml schema_version != linter SCHEMA_VERSION       expect 1 — "schema_version"
-#   O  tab character in indent                                      expect 1 — "tabs not allowed in indent"
+# Scenarios (anchored substrings include the `where:` qualifier where useful,
+# to prevent cross-scenario substring overlap from masking regressions):
+#
+#   A  happy path                                                   expect 0
+#   B  vertical missing required `display`                          expect 1
+#   C  unknown top-level key                                        expect 1
+#   D  unknown offer key                                            expect 1
+#   E  bad offer.status enum                                        expect 1
+#   F  bad offer.posture enum                                       expect 1
+#   G  non-kebab persona slug                                       expect 1
+#   H  duplicate persona slug within a vertical                     expect 1
+#   I  target_personas references undefined persona                 expect 1
+#   J  target_personas item is not kebab-case                       expect 1
+#   K  _manifest.yaml verticals[] not alphabetized                  expect 1
+#   L  manifest entry has no matching {slug}.yaml file              expect 1
+#   M  alias collides with another vertical's canonical slug        expect 1
+#   N  _manifest.yaml schema_version != linter SCHEMA_VERSION       expect 1
+#   O  tab character in indent                                      expect 1
+#   P  bad offer.target_postures enum                               expect 1
+#   Q  replaced_by orphan reference                                 expect 1
+#   R  alias collides with another vertical's alias                 expect 1
+#   S  duplicate offer slug within a vertical                       expect 1
+#   T  filename stem does not match inner slug                      expect 1
+#   U  cycle in replaced_by chain                                   expect 1
+#   V  self-reference on replaced_by                                expect 1
+#   W  empty display string                                         expect 1
+#   X  duplicate alias within a single file                         expect 1
+#   Y  non-kebab offer slug                                         expect 1
 #
 # Usage:
 #   bash scripts/test_lint_canonicals.sh
@@ -86,7 +98,6 @@ run_lint() {
 
 # ── Fixture builders ─────────────────────────────────────────────────────
 
-# Minimal accept fixture: 1 manifest + 1 populated vertical + 1 skeleton.
 build_accept_base() {
   local dir="$1"
   mkdir -p "$dir"
@@ -119,8 +130,6 @@ offers: []
 YAML
 }
 
-# Scenarios overlay on top of accept_base; each mutates one aspect.
-
 mkdir_scenario() {
   local name="$1"
   local dir="$tmproot/$name"
@@ -146,7 +155,7 @@ personas: []
 offers: []
 YAML
   run_lint "$dir"
-  assert_exit_and_substring "B: missing required display" 1 "missing required key 'display'"
+  assert_exit_and_substring "B: missing required display" 1 "alpha.yaml: missing required key 'display'"
 }
 
 # ── Scenario C: unknown top-level key ────────────────────────────────────
@@ -157,7 +166,7 @@ run_c() {
 rogue_key: "should be rejected"
 YAML
   run_lint "$dir"
-  assert_exit_and_substring "C: unknown top-level key" 1 "unknown key 'rogue_key'"
+  assert_exit_and_substring "C: unknown top-level key" 1 "alpha.yaml: unknown key 'rogue_key'"
 }
 
 # ── Scenario D: unknown offer key ────────────────────────────────────────
@@ -180,7 +189,7 @@ offers:
     rogue_offer_key: "should be rejected"
 YAML
   run_lint "$dir"
-  assert_exit_and_substring "D: unknown offer key" 1 "unknown key 'rogue_offer_key'"
+  assert_exit_and_substring "D: unknown offer key" 1 "offers\\[0\\]: unknown key 'rogue_offer_key'"
 }
 
 # ── Scenario E: bad status enum ──────────────────────────────────────────
@@ -190,7 +199,7 @@ run_e() {
   sed -i.bak "s/status: active/status: pending/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
   run_lint "$dir"
-  assert_exit_and_substring "E: bad status enum" 1 "status 'pending'"
+  assert_exit_and_substring "E: bad status enum" 1 "offers\\[0\\]: status 'pending'"
 }
 
 # ── Scenario F: bad posture enum ─────────────────────────────────────────
@@ -200,7 +209,7 @@ run_f() {
   sed -i.bak "s/posture: free-asset/posture: unknown-posture/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
   run_lint "$dir"
-  assert_exit_and_substring "F: bad posture enum" 1 "posture 'unknown-posture'"
+  assert_exit_and_substring "F: bad posture enum" 1 "offers\\[0\\]: posture 'unknown-posture'"
 }
 
 # ── Scenario G: non-kebab persona slug ───────────────────────────────────
@@ -210,7 +219,7 @@ run_g() {
   sed -i.bak "s/slug: persona-one/slug: personaOne/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
   run_lint "$dir"
-  assert_exit_and_substring "G: non-kebab persona slug" 1 "is not kebab-case"
+  assert_exit_and_substring "G: non-kebab persona slug" 1 "personas\\[0\\]: slug 'personaOne' is not kebab-case"
 }
 
 # ── Scenario H: duplicate persona slug ───────────────────────────────────
@@ -232,7 +241,7 @@ personas:
 offers: []
 YAML
   run_lint "$dir"
-  assert_exit_and_substring "H: duplicate persona slug" 1 "duplicate persona slug 'dup'"
+  assert_exit_and_substring "H: duplicate persona slug" 1 "alpha.yaml: duplicate persona slug 'dup'"
 }
 
 # ── Scenario I: target_personas references undefined persona ─────────────
@@ -242,7 +251,7 @@ run_i() {
   sed -i.bak "s/target_personas: \[persona-one\]/target_personas: [orphan-persona]/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
   run_lint "$dir"
-  assert_exit_and_substring "I: target_personas orphan ref" 1 "not defined in personas"
+  assert_exit_and_substring "I: target_personas orphan ref" 1 "target_personas\\[0\\] 'orphan-persona' not defined in personas"
 }
 
 # ── Scenario J: target_personas item is not kebab-case ───────────────────
@@ -252,7 +261,7 @@ run_j() {
   sed -i.bak "s/target_personas: \[persona-one\]/target_personas: [NotKebabCase]/" "$dir/alpha.yaml"
   rm -f "$dir/alpha.yaml.bak"
   run_lint "$dir"
-  assert_exit_and_substring "J: target_personas non-kebab item" 1 "is not kebab-case"
+  assert_exit_and_substring "J: target_personas non-kebab item" 1 "target_personas\\[0\\] 'NotKebabCase' is not kebab-case"
 }
 
 # ── Scenario K: manifest verticals not alphabetized ──────────────────────
@@ -266,7 +275,7 @@ verticals:
   - alpha
 YAML
   run_lint "$dir"
-  assert_exit_and_substring "K: manifest not alphabetized" 1 "not alphabetized"
+  assert_exit_and_substring "K: manifest not alphabetized" 1 "_manifest.yaml: verticals\\[\\] not alphabetized"
 }
 
 # ── Scenario L: manifest entry has no matching file ──────────────────────
@@ -297,7 +306,7 @@ personas: []
 offers: []
 YAML
   run_lint "$dir"
-  assert_exit_and_substring "M: alias collides with canonical" 1 "alias 'bravo' collides with canonical vertical slug"
+  assert_exit_and_substring "M: alias collides with canonical" 1 "alpha.yaml: alias 'bravo' collides with canonical vertical slug"
 }
 
 # ── Scenario N: schema_version mismatch ──────────────────────────────────
@@ -311,22 +320,235 @@ verticals:
   - bravo
 YAML
   run_lint "$dir"
-  assert_exit_and_substring "N: schema_version mismatch" 1 "schema_version 99"
+  assert_exit_and_substring "N: schema_version mismatch" 1 "_manifest.yaml: schema_version 99"
 }
 
 # ── Scenario O: tabs in indent ───────────────────────────────────────────
 run_o() {
   local dir
   dir="$(mkdir_scenario O)"
-  # Emit a vertical YAML with a tab character in the persona indent.
   printf 'slug: alpha\ndisplay: "Alpha"\npersonas:\n\t- slug: persona-one\n\t  display: "Persona One"\n\t  titles:\n\t    - "Title One"\noffers: []\n' > "$dir/alpha.yaml"
   run_lint "$dir"
   assert_exit_and_substring "O: tabs in indent" 1 "tabs not allowed in indent"
 }
 
+# ── Scenario P: bad target_postures enum ─────────────────────────────────
+run_p() {
+  local dir
+  dir="$(mkdir_scenario P)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_postures: [bogus-posture]
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "P: bad target_postures enum" 1 "target_postures\\[0\\] 'bogus-posture' not in"
+}
+
+# ── Scenario Q: replaced_by orphan reference ─────────────────────────────
+run_q() {
+  local dir
+  dir="$(mkdir_scenario Q)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    replaced_by: nonexistent-offer
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "Q: replaced_by orphan ref" 1 "offers\\[0\\]: replaced_by 'nonexistent-offer' not defined in offers\\[\\]"
+}
+
+# ── Scenario R: alias collides with another vertical's alias ─────────────
+run_r() {
+  local dir
+  dir="$(mkdir_scenario R)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+aliases:
+  - shared-alias
+personas: []
+offers: []
+YAML
+  cat > "$dir/bravo.yaml" <<'YAML'
+slug: bravo
+display: "Bravo"
+aliases:
+  - shared-alias
+personas: []
+offers: []
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "R: alias-alias collision across verticals" 1 "alias 'shared-alias' already owned by alpha.yaml"
+}
+
+# ── Scenario S: duplicate offer slug within vertical ─────────────────────
+run_s() {
+  local dir
+  dir="$(mkdir_scenario S)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-dup
+    display: "Offer A"
+    status: active
+    posture: free-asset
+  - slug: offer-dup
+    display: "Offer B"
+    status: active
+    posture: knowledge
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "S: duplicate offer slug" 1 "alpha.yaml: duplicate offer slug 'offer-dup'"
+}
+
+# ── Scenario T: filename stem does not match inner slug ──────────────────
+run_t() {
+  local dir
+  dir="$(mkdir_scenario T)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: not-alpha
+display: "Not Alpha"
+personas: []
+offers: []
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "T: filename stem mismatch" 1 "alpha.yaml: filename stem 'alpha' does not match slug 'not-alpha'"
+}
+
+# ── Scenario U: cycle in replaced_by chain ───────────────────────────────
+run_u() {
+  local dir
+  dir="$(mkdir_scenario U)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-a
+    display: "Offer A"
+    status: active
+    posture: free-asset
+    replaced_by: offer-b
+  - slug: offer-b
+    display: "Offer B"
+    status: active
+    posture: free-asset
+    replaced_by: offer-a
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "U: cycle in replaced_by chain" 1 "alpha.yaml: cycle in replaced_by chain"
+}
+
+# ── Scenario V: self-reference on replaced_by ────────────────────────────
+run_v() {
+  local dir
+  dir="$(mkdir_scenario V)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-self
+    display: "Self-Replacer"
+    status: active
+    posture: free-asset
+    replaced_by: offer-self
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "V: self-reference on replaced_by" 1 "replaced_by 'offer-self' is a self-reference"
+}
+
+# ── Scenario W: empty display string ─────────────────────────────────────
+run_w() {
+  local dir
+  dir="$(mkdir_scenario W)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: ""
+personas: []
+offers: []
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "W: empty display string" 1 "alpha.yaml: display must be a non-empty string"
+}
+
+# ── Scenario X: duplicate alias within a single file ─────────────────────
+run_x() {
+  local dir
+  dir="$(mkdir_scenario X)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+aliases:
+  - dup-alias
+  - dup-alias
+personas: []
+offers: []
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "X: duplicate alias within file" 1 "alpha.yaml: duplicate alias 'dup-alias' within file"
+}
+
+# ── Scenario Y: non-kebab offer slug ─────────────────────────────────────
+run_y() {
+  local dir
+  dir="$(mkdir_scenario Y)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: BadOfferSlug
+    display: "Bad Offer Slug"
+    status: active
+    posture: free-asset
+YAML
+  run_lint "$dir"
+  assert_exit_and_substring "Y: non-kebab offer slug" 1 "offers\\[0\\]: slug 'BadOfferSlug' is not kebab-case"
+}
+
 # ── Run all scenarios ────────────────────────────────────────────────────
 echo ""
-echo "Running lint_canonicals.py regression harness (15 scenarios)..."
+echo "Running lint_canonicals.py regression harness (25 scenarios)..."
 echo ""
 
 run_a
@@ -344,9 +566,21 @@ run_l
 run_m
 run_n
 run_o
+run_p
+run_q
+run_r
+run_s
+run_t
+run_u
+run_v
+run_w
+run_x
+run_y
 
 echo ""
 echo "Summary: $pass passed, $fail failed"
+# Machine-readable result line for validate.sh ingestion (must be the last line).
+printf 'RESULT pass=%d fail=%d\n' "$pass" "$fail"
 if [ "$fail" -gt 0 ]; then
   exit 1
 fi

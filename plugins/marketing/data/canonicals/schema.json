@@ -2,6 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://brite.nites/schemas/canonicals/vertical.json",
   "title": "GTM Canonicals — Vertical Entry",
+  "$comment": "Schema scope — the top-level shape describes a VERTICAL entry; #/definitions/manifest describes _manifest.yaml. Editor tooling (e.g., yaml-language-server) MUST NOT validate _manifest.yaml against the top-level vertical shape; reference #/definitions/manifest explicitly via a yaml-language-server directive at the top of _manifest.yaml when IDE support is added.",
   "description": "Thin schema per ADR-016 (D7). One file per vertical under plugins/marketing/data/canonicals/{slug}.yaml. _manifest.yaml shape is documented in #/definitions/manifest. Brite repo is stdlib-only — this schema is the declarative contract; plugins/marketing/scripts/lint_canonicals.py is the runtime enforcement (it mirrors the constraints below).",
   "type": "object",
   "required": ["slug", "display", "personas", "offers"],
