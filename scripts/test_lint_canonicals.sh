@@ -71,6 +71,14 @@
 #   BF aliases item non-kebab rejected                               expect 1
 #   BG manifest verticals item non-kebab rejected                    expect 1
 #   BH personas item must be a mapping                               expect 1
+#   BI personas scalar (not list) rejected                           expect 1
+#   BJ offers scalar (not list) rejected                             expect 1
+#   BK offers item must be a mapping (string-list shape)             expect 1
+#   BL target_personas scalar (not list) rejected                    expect 1
+#   BM iterates_from orphan reference (symmetric to Q)               expect 1
+#   BN string-list item appearing in a locked dict-list (parser)     expect 1
+#   BO indented line outside any block (parser orphan)               expect 1
+#   BP manifest missing required key                                 expect 1
 #
 # Usage:
 #   bash scripts/test_lint_canonicals.sh
@@ -1238,6 +1246,147 @@ offers: []
 YAML
   invoke_lint "$dir"
   assert_exit_and_substring "BH: personas item must be a mapping" 1 "personas\\[0\\] must be a mapping"
+}
+
+# ── Scenario BI: personas scalar (not list) ─────────────────────────────
+run_bi() {
+  local dir
+  dir="$(mkdir_scenario BI)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas: scalar-not-list
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BI: personas scalar (not list)" 1 "alpha.yaml: personas must be a list"
+}
+
+# ── Scenario BJ: offers scalar (not list) ───────────────────────────────
+run_bj() {
+  local dir
+  dir="$(mkdir_scenario BJ)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas: []
+offers: scalar-not-list
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BJ: offers scalar (not list)" 1 "alpha.yaml: offers must be a list"
+}
+
+# ── Scenario BK: offers item must be a mapping (string-list shape) ──────
+run_bk() {
+  local dir
+  dir="$(mkdir_scenario BK)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas: []
+offers:
+  - offer-one
+  - offer-two
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BK: offers item must be a mapping" 1 "offers\\[0\\] must be a mapping"
+}
+
+# ── Scenario BL: target_personas scalar (not list) ──────────────────────
+run_bl() {
+  local dir
+  dir="$(mkdir_scenario BL)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    target_personas: persona-one
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BL: target_personas scalar (not list)" 1 "target_personas must be a list"
+}
+
+# ── Scenario BM: iterates_from orphan reference (symmetric to Q) ────────
+run_bm() {
+  local dir
+  dir="$(mkdir_scenario BM)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers:
+  - slug: offer-one
+    display: "Offer One"
+    status: active
+    posture: free-asset
+    iterates_from: nonexistent-offer
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BM: iterates_from orphan ref" 1 "offers\\[0\\]: iterates_from 'nonexistent-offer' not defined in offers\\[\\]"
+}
+
+# ── Scenario BN: string-list item appears after dict-list locks (parser) ──
+run_bn() {
+  local dir
+  dir="$(mkdir_scenario BN)"
+  # personas opens as dict-list (first item is `- slug: ...`), then a bare
+  # string item appears at the same indent — parser must reject this.
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+  - "bare-string-item"
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BN: string-list item in dict-list" 1 "string list item in dict list"
+}
+
+# ── Scenario BO: indented line outside any block (parser) ───────────────
+run_bo() {
+  local dir
+  dir="$(mkdir_scenario BO)"
+  # An indented `- foo` line appears right after a top-level scalar with no
+  # preceding block-opening key. Parser raises "unexpected indented line".
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+  - orphan-line
+personas: []
+offers: []
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BO: indented line outside a block" 1 "unexpected indented line outside a block"
+}
+
+# ── Scenario BP: manifest missing required key ──────────────────────────
+run_bp() {
+  local dir
+  dir="$(mkdir_scenario BP)"
+  cat > "$dir/_manifest.yaml" <<'YAML'
+verticals:
+  - alpha
+  - bravo
+YAML
+  invoke_lint "$dir"
+  assert_exit_and_substring "BP: manifest missing schema_version" 1 "_manifest.yaml: missing required key 'schema_version'"
 }
 
 # ── Run all scenarios ────────────────────────────────────────────────────
