@@ -585,9 +585,17 @@ def validate_vertical(path: Path) -> tuple[list[str], dict[str, object] | None]:
         return (errs, data)
     slug = data["slug"]
     if not isinstance(slug, str):
+        # The hint surfaces the two known authoring footguns that produce
+        # non-string slug values: bare `slug:` (parses to empty list) or
+        # unquoted digits like `slug: 42` (parses to int).
+        if isinstance(slug, list):
+            hint = "did the value get parsed as an empty list (bare `slug:` with no value)?"
+        elif isinstance(slug, int):
+            hint = "is the value an unquoted integer? slug must be a quoted kebab-case string."
+        else:
+            hint = "slug must be a quoted kebab-case string."
         errs.append(
-            f"{where}: slug must be a string (got {type(slug).__name__}; "
-            f"did the value get parsed as an empty list?)"
+            f"{where}: slug must be a string (got {type(slug).__name__}; {hint})"
         )
     elif not SLUG_RE.match(slug):
         errs.append(f"{where}: vertical slug {slug!r} is not kebab-case")
