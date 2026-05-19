@@ -2,7 +2,7 @@
 name: campaign-debrief
 description: Structured 5-question post-campaign learning capture (Q1 hypothesis, Q2 result, Q3 what-worked, Q4 surprise, Q5 transferable) that assigns one of four objective verdicts (SCALE / ITERATE / PAUSE / KILL) against concrete numeric thresholds and appends an entry to `docs/campaigns/{entity}/learnings.md`. Serves BDRs, RevOps, and marketing operators closing the loop between campaign execution and campaign intelligence. Triggers on debrief, campaign debrief, retro, log campaign, capture learnings. Receives primary input from `campaign-analysis` via `analysis-*.md`; retroactive path pulls metrics standalone from Email Bison when no analysis artifact exists. Hands off transferable learnings to `message-market-fit` (ITERATE Notes column), `product-marketing-context` (cross-entity propagation proposals), and `/workflows:handbook-drift-check` (handbook-contradiction signals). Append-only, forever. Under 5 minutes per debrief. Adapted from Revgrowth1/ai-gtm-workflows workflow 12 (MIT).
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep
+allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep, Skill
 metadata:
   version: 0.1.0
   upstream: Revgrowth1/ai-gtm-workflows
@@ -19,7 +19,7 @@ You are the debrief facilitator for Brite's marketing flywheel — the keystone 
 
 Four gates resolve in order before any append to `docs/campaigns/{entity}/learnings.md`. Cross-references elsewhere in this skill (e.g. "§2 Gate 2" in §6 Procedure preconditions) point to the numbered gates below.
 
-**Input validation.** Two tokens reach `Write` destinations and `Glob` patterns: `{entity}` (from operator confirmation at Gate 3) and `{campaign-name}` (from Gate 4 or the matched `analysis-*.md` filename at Gate 2). Both must pass the rules below before any `Write`, `Glob`, or MCP tool interpolation — a poisoned token must not reach any tool call.
+**Input validation.** Two tokens reach `Write` destinations and `Glob` patterns: `{entity}` (from operator confirmation at Gate 3) and `{campaign-name}` (from Gate 4 or the matched `analysis-*.md` filename at Gate 2). Both must pass the rules below before any `Read`, `Write`, `Glob`, or MCP tool interpolation — a poisoned token must not reach any tool call. `Read` is gated because Workflow 4 Step 5 (BC-8752) interpolates both tokens into the σ3 manifest read path.
 
 - **`{entity}`** — must match `^(brite-nites|brite-supply|brite-labs)$`. Long-form slugs only; reject `nites`, `supply`, `labs`, or any other form. Gates every `Write` path under `docs/campaigns/{entity}/` and the workspace-routing dispatch at Gate 3.
 - **`{campaign-name}`** — must match `^[a-z0-9-]{1,80}$`. Reject spaces, path separators (`/`, `\`), `..`, single quotes, semicolons, NUL, or any value longer than 80 characters (a 5,000-char hyphen-only value would pass character-class but breach SOQL length limits and produce oversized learnings.md entries). Gates the `analysis-*.md` `Glob` pattern at Gate 2 and the `Write` destination for learnings.md entries.
@@ -136,6 +136,7 @@ Three vocabularies exist because each skill owns a different decision surface: `
 | Pull campaign metrics standalone (retroactive path) | EB MCP (`get_active_workspace_info`, `get_campaign_stats`, `get_replies_analytics`) | Entity-routed EB workspace | §6 Procedure 2; workspace routing per Gate 3 |
 | Read prior `learnings.md` (cross-entity lookup) | `Read` + `Glob` | Local `docs/campaigns/{*}/learnings.md` | §6 Procedure 3 — novelty check before transferable-insight propagation |
 | Append to or create `learnings.md` | `Write` | Local `docs/campaigns/{entity}/learnings.md` | §3 Append-only invariant; §6 Procedure 1/2 final step |
+| Sync SF Campaign status to `Completed` (σ3 trigger on sub-issue 8 close) | `Skill` → `/revops:update-sf-campaign-status` | Local plugin (soft-fail; no halt on missing manifest / missing SF record) | BC-8752 — Workflow 4 Step 5 post-append sync |
 
 **EB namespace (load-bearing).** All Email Bison calls use the **short form** — `mcp__emailbison-b2b__*` and `mcp__emailbison-personal__*` — NOT `mcp__plugin_marketing_emailbison-*__*`. The EB MCP servers are registered at the repo-root `.mcp.json`, not inside `plugins/marketing/.mcp.json`. This matches `campaign-analysis` line 5 and `message-market-fit` line 5; the plugin-scoped namespace form will silent-fail at runtime per the CLAUDE.md gotcha ("listing a server that isn't registered fails silently").
 
@@ -310,6 +311,24 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 2. **Regenerate summary sections** — rewrite `## Summary stats` counters; re-extract `## What works` bullets from entries where `verdict: SCALE` or `verdict: ITERATE` AND `transferable: true`; re-extract `## What doesn't` bullets from entries where `verdict: KILL`.
 3. **Append new entry** — insert the new entry at the TOP of the `## Campaign log` section (reverse-chronological), with the existing entries below.
 4. **Write full file** — single `Write` call overwrites the file with the regenerated summary sections plus the full Campaign log. The regenerate-in-place carve-out (§3 Append-only invariant) makes this a single-Write operation — no separate mutation call per section.
+5. **Sync Salesforce Campaign status to `Completed` (BC-8752, soft-fail).** After the learnings.md append succeeds, mirror the closed state into SF via the σ3 trigger per the BC-8752 design (Linear sub-issue 8 close → SF `Completed`). Fires on every successful append — repeated debriefs against the same campaign land on the underlying `/revops:update-sf-campaign-status` Phase 5 idempotency noop, so re-runs are cheap.
+   1. **Resolve the GTM slug from the manifest.** Try `Read` `docs/campaigns/{entity}/{campaign-name}/manifest.json` (both `{entity}` and `{campaign-name}` are already regex-gated by the Before-Starting Input-validation block above — `{entity}` matches `^(brite-nites|brite-supply|brite-labs)$` and `{campaign-name}` matches `^[a-z0-9-]{1,80}$`, blocking `..` / `/` / `\` traversal characters). If the file does not exist OR JSON parse fails OR `.slug` is absent, log to stderr `[BC-8752] No GTM manifest at "docs/campaigns/{entity}/{campaign-name}/manifest.json"; skipping σ3 SF sync. If /marketing:plan-campaign was used to scaffold, {campaign-name} must equal the strict-kebab slug it produced. Otherwise this is a retroactive debrief — expected.` and exit Workflow 4 normally. The learnings.md append already landed — that's the marketing-flywheel source of truth; SF mirroring is downstream cosmetic state.
+   2. **Re-validate the manifest slug** (defense-in-depth against manifest tampering). After extracting `<slug>` from `manifest.slug`, check it against the canonical regex `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$` (same regex as `/revops:update-sf-campaign-status` Phase 1 and ADR-012 canonicals lint). Apply the regex without the multiline (`m`) flag — `^` and `$` must match input boundaries, not line boundaries; a manifest slug containing an embedded newline must FAIL the check. On regex mismatch, log `[BC-8752] Manifest slug failed canonical regex — refusing σ3 SF sync. Manifest at "docs/campaigns/{entity}/{campaign-name}/manifest.json" may be tampered or out-of-date.` (the slug VALUE is intentionally omitted from this log to avoid echoing potentially poisoned content into the agent context) and exit Workflow 4 normally. Without this guard a whitespace-bearing manifest slug could inject an extra `--linear-status` flag into the args string constructed in step 3.
+   3. **Invoke the sibling slash command** (BC-8717 / BC-8723 respec pattern):
+
+      ```
+      Skill(
+        skill: "revops:update-sf-campaign-status",
+        args: "--slug=<manifest.slug> --linear-status=completed"
+      )
+      ```
+
+   4. **Parse the single-line JSON response.** Branch in this exact order — the first matching case wins (mirrors `/marketing:launch-campaign` Phase 11 step 7 fan-out for consistency):
+      - **`error: <kind>`** (any `error` key) → log `[BC-8752] σ3 SF sync soft-fail: <kind>. Detail: <stringified error>. Debrief succeeded; SF status is stale until reconciliation.`
+      - **`warning: campaign_not_found`** (warning key, no `campaign_id`) → log `[BC-8752] SF Campaign for slug "<slug>" not found — σ3 auto-create at plan-campaign Step 8b may have failed. Reconcile manually via /revops:create-sf-campaign + /marketing:sync-campaign-status --slug=<slug> --status=completed.`
+      - **Success with degradation** (`campaign_id` AND `warning` key both present — typically `warning: "instance_url_unknown"` or `warning: "updated_at_unavailable"` per the underlying command's Phase 7 / Phase 6 fall-through) → log `[BC-8752] SF Campaign synced with degradation: <slug> → Completed (campaign_id=<id>, warning=<kind>).`
+      - **Success or noop** (`campaign_id` present, no `warning` key) → log `[BC-8752] SF Campaign synced: <slug> → Completed (campaign_id=<id>).`
+   5. **Soft-fail invariant.** No SF response halts the debrief. The learnings.md entry IS the marketing flywheel's source of truth; SF mirroring is downstream effect. This matches the philosophy in `/marketing:launch-campaign` Phase 11 step 7 and `/marketing:plan-campaign` Step 8b.
 
 ---
 
