@@ -454,7 +454,7 @@ In `<brief-template>`, replace these slots (literal string-replace, in order):
 | `{{launch_date}}` | `<launch-date>` |
 | `{{owner_email}}` | `<owner-email>` |
 | `{{year}}` | `<year>` |
-| `{{month_display}}` | `<month>` formatted as the full month name + year (e.g. "May 2026"). macOS-portable derivation: `date -j -f "%Y-%m-%d" "<year>-<month:02d>-01" "+%B %Y"` (BSD date); GNU-Linux equivalent: `date -d "<year>-<month:02d>-01" +"%B %Y"`. Detect via `date --version 2>/dev/null \| grep -q GNU` and branch. |
+| `{{month_display}}` | `<month>` formatted as the full month name + year (e.g. "May 2026"). One-shot derivation via Python (portable across macOS/Linux; sidesteps BSD-vs-GNU `date` divergence + locale dependence): `python3 -c "import datetime; print(datetime.date(<year>, <month>, 1).strftime('%B %Y'))"`. `<year>` and `<month>` are pre-validated integers per Step 1b — safe to interpolate. |
 | `{{eb_workspace}}` | `<eb-workspace>` resolved at Step 4.1 (`emailbison-personal` for nites, `emailbison-b2b` for supply/labs, operator-picked for cross-entity) |
 
 Unsubstituted slots (slot present in template but no value in this table) remain literally `{{slot_name}}` for the brief author to fill at sub-issue #1.

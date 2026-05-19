@@ -52,23 +52,17 @@ _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
 
 
 @lru_cache(maxsize=1)
-def split_frontmatter_cached() -> tuple[str, str]:
-    """Cached parse of (frontmatter, body) for read_command()'s output."""
-    match = _FRONTMATTER_RE.match(read_command())
-    assert match, "Expected YAML frontmatter wrapped in --- markers"
-    return match.group(1), match.group(2)
+def split_frontmatter() -> tuple[str, str]:
+    """Cached parse of (frontmatter, body) for read_command()'s output.
 
-
-def split_frontmatter(text: str | None = None) -> tuple[str, str]:
-    """Public API: returns the parsed (frontmatter, body) tuple.
-
-    Defaults to the cached canonical read_command() output. Pass an explicit
-    text argument only when testing against mocked content (none currently).
+    Always returns the cached parse of the canonical read_command() output.
+    Use `if not X: raise AssertionError(...)` rather than `assert X` so the
+    invariant survives `python -O` execution (test runners typically don't
+    strip asserts, but helper modules might be imported by code that does).
     """
-    if text is None or text == read_command():
-        return split_frontmatter_cached()
-    match = _FRONTMATTER_RE.match(text)
-    assert match, "Expected YAML frontmatter wrapped in --- markers"
+    match = _FRONTMATTER_RE.match(read_command())
+    if not match:
+        raise AssertionError("Expected YAML frontmatter wrapped in --- markers")
     return match.group(1), match.group(2)
 
 
@@ -85,7 +79,8 @@ def parse_allowed_tools_set() -> set[str]:
         (line for line in frontmatter.splitlines() if line.startswith("allowed-tools:")),
         None,
     )
-    assert tools_line, "allowed-tools line not found in frontmatter"
+    if tools_line is None:
+        raise AssertionError("allowed-tools line not found in frontmatter")
     return {t.strip() for t in tools_line.split(":", 1)[1].split(",") if t.strip()}
 
 
@@ -95,13 +90,25 @@ def extract_section(body: str, start_marker: str, end_marker: str | None = None)
     Used to scope substring assertions to a specific section block — e.g.,
     the Step 8b error-catalog table — so a string mention elsewhere in prose
     doesn't false-positive the assertion.
+
+    BOTH markers MUST be found when provided — a silent fall-through to
+    `body[start:]` on a missing end_marker would quietly widen the scope to
+    the rest of the document, defeating the purpose of scoping.
+
+    Uses explicit if/raise rather than `assert` so the guards survive `-O`.
     """
     start = body.find(start_marker)
-    assert start >= 0, f"Section marker not found: {start_marker!r}"
+    if start < 0:
+        raise AssertionError(f"Section start marker not found: {start_marker!r}")
     if end_marker is None:
         return body[start:]
     end = body.find(end_marker, start + len(start_marker))
-    return body[start:end] if end >= 0 else body[start:]
+    if end < 0:
+        raise AssertionError(
+            f"Section end marker not found: {end_marker!r} (after start {start_marker!r}). "
+            f"Section assertions need both markers to scope correctly."
+        )
+    return body[start:end]
 
 
 # --- File existence + frontmatter shape ------------------------------------
@@ -112,7 +119,7 @@ def test_command_file_exists() -> None:
 
 
 def test_frontmatter_has_description_argument_hint_and_allowed_tools() -> None:
-    frontmatter, _ = split_frontmatter(read_command())
+    frontmatter, _ = split_frontmatter()
     assert re.search(r"^description: ", frontmatter, re.MULTILINE), \
         "Frontmatter must declare a `description` field"
     assert re.search(r"^argument-hint: ", frontmatter, re.MULTILINE), \
@@ -417,11 +424,18 @@ def test_blocked_by_chain_documented() -> None:
 
 
 def test_eb_workspace_map_documented() -> None:
-    body = read_command()
-    assert "emailbison-personal" in body, "EB workspace personal must be in entity map"
-    assert "emailbison-b2b" in body, "EB workspace b2b must be in entity map"
+    """The entity ↔ EB workspace map at Step 4.1 must enumerate all 4 entities
+    + both EB workspaces. SCOPED to the Step 4.1 section — without scoping,
+    these substrings appear all over the body (`Labs-gated`, `cross-entity-
+    {theme}`, etc.) and the assertion would pass even if the map were
+    deleted (test-quality-reviewer P3 fix, confidence 8/10).
+    """
+    _, body = split_frontmatter()
+    section = extract_section(body, "### 4.1 — Entity → EB workspace map", "### 4.2 ")
+    assert "emailbison-personal" in section, "EB workspace personal must be in §4.1 entity map"
+    assert "emailbison-b2b" in section, "EB workspace b2b must be in §4.1 entity map"
     for entity in ["nites", "supply", "labs", "cross-entity"]:
-        assert entity in body, f"Entity '{entity}' must appear in the entity ↔ EB workspace map"
+        assert entity in section, f"Entity '{entity}' must appear in the §4.1 EB workspace map"
 
 
 # --- Two-call confirm gate -------------------------------------------------
@@ -447,18 +461,33 @@ def test_brite_gtm_project_referenced() -> None:
 # --- Plugin version bump (CLAUDE.md plugin-cache gotcha) -------------------
 
 
+def _parse_semver(version: str) -> tuple[int, ...]:
+    """Parse a dotted version string into an integer tuple for ordered comparison.
+
+    Accepts standard semver (1.2.3) — does NOT handle pre-release/build metadata,
+    which this repo doesn't use.
+    """
+    return tuple(int(part) for part in version.split("."))
+
+
 def test_plugin_json_version_bumped() -> None:
-    """BC-8724 adds a new command — version MUST be > 0.3.38 in plugin.json."""
-    plugin_data = json.loads(PLUGIN_JSON.read_text())
-    assert plugin_data["version"] != "0.3.38", (
-        "plugin.json marketing version must be bumped from 0.3.38 — BC-8724 adds a new command "
-        "and clients' plugin cache is keyed by version (CLAUDE.md plugin-cache gotcha)."
+    """BC-8724 adds a new command — version MUST be STRICTLY GREATER than 0.3.38
+    in plugin.json. A simple `!=` check would let an accidental downgrade pass
+    (e.g., 0.3.37) — semver-tuple comparison catches that (python-reviewer P3).
+    """
+    plugin_data = json.loads(PLUGIN_JSON.read_text(encoding="utf-8"))
+    actual = _parse_semver(plugin_data["version"])
+    baseline = _parse_semver("0.3.38")
+    assert actual > baseline, (
+        f"plugin.json marketing version ({plugin_data['version']}) must be > 0.3.38 — "
+        f"BC-8724 adds a new command and clients' plugin cache is keyed by version "
+        f"(CLAUDE.md plugin-cache gotcha). An accidental downgrade fails this check."
     )
 
 
 def test_marketplace_json_version_mirrors_plugin_json() -> None:
-    plugin_data = json.loads(PLUGIN_JSON.read_text())
-    marketplace_data = json.loads(MARKETPLACE_JSON.read_text())
+    plugin_data = json.loads(PLUGIN_JSON.read_text(encoding="utf-8"))
+    marketplace_data = json.loads(MARKETPLACE_JSON.read_text(encoding="utf-8"))
 
     marketing_entry = next(
         (p for p in marketplace_data["plugins"] if p["name"] == "marketing"),
@@ -486,7 +515,7 @@ def test_municipalities_canonical_exists_for_dogfood_validation() -> None:
     assert municipalities_path.is_file(), \
         "municipalities.yaml must exist for plan-campaign's dry-run validation example"
 
-    muni_text = municipalities_path.read_text()
+    muni_text = municipalities_path.read_text(encoding="utf-8")
     assert "parks-rec-director" in muni_text, \
         "municipalities.yaml must define `parks-rec-director` persona (used in test fixtures)"
     assert "parks-bond" in muni_text, \
