@@ -229,7 +229,7 @@ Bump in the SAME commit (per CLAUDE.md plugin-cache gotcha):
 
 ### Task 15 — Validation harness
 
-Add a fixture-driven shell test that exercises the dry-run path. File: `plugins/marketing/tests/test_plan_campaign_dry_run.sh`. Pattern modeled on `plugins/marketing/scripts/bw-run.test.sh` (existing in-repo precedent).
+Add a Python contract test mirroring the `plugins/revops/tests/test_create_sf_campaign_contracts.py` pattern (28-scenario file-shape assertion suite). File: `plugins/marketing/tests/test_plan_campaign_contracts.py`. Pivoted from the originally-planned shell harness (`test_plan_campaign_dry_run.sh`) during execution because (a) the sibling revops contract tests had already established the Python pytest pattern as the in-repo standard for slash-command spec assertions, (b) Brite CI doesn't run pytest per `.github/dependabot.yml` comment — both shell and Python harnesses are dev-runnable only, so Python's stdlib-only contract-assertion approach (regex over file content) provides cleaner failure messages.
 
 Cover these scenarios:
 

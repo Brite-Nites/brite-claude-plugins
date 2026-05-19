@@ -1,7 +1,7 @@
 ---
 description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 8 standard sub-issues (with up to 2 optional) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
 argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--situation-mining] [--creative-angles] [--dry-run]
-allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_revops_salesforce__get_username, mcp__plugin_revops_salesforce__run_soql_query
+allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_workflows_linear-server__create_issue_label, mcp__plugin_revops_salesforce__get_username
 ---
 
 # /marketing:plan-campaign
@@ -87,7 +87,24 @@ Same pattern for `--offer` (filter by `target_personas` containing the chosen pe
 
 ### Non-interactive mode
 
-If all required flags are provided, skip prompts and proceed directly to Step 2.
+If all required flags are provided, skip prompts and proceed directly to Step 1b (parse-time validation).
+
+### Step 1b — Parse-time input validation (HARD-FAIL invariants)
+
+Before any downstream step, validate every operator-controlled flag value. These are mechanical safety invariants — non-interactive invocations skip the Step 1 prompts entirely, so these checks are the only barrier between operator input and shell/MCP/path interpolation. HARD-FAIL on any violation; do NOT auto-sanitize.
+
+| Flag | Validator | HARD-FAIL message on miss |
+|---|---|---|
+| `--entity` | Must be one of `nites` / `supply` / `labs` / `cross-entity` (closed set; case-sensitive) | `ERROR: --entity must be one of [nites, supply, labs, cross-entity]; got '<value>'. Path-traversal guard.` |
+| `--theme` | If `--entity=cross-entity` AND `--theme` is provided, must match `^[a-z0-9]+(-[a-z0-9]+)*$` (strict kebab-case, no leading/trailing/doubled hyphens). Applied here at parse time so the theme value is safe before it flows into slug compute (Step 3.1) and from there into `mkdir`/`Write`/`Skill args`. | `ERROR: --theme must be strict kebab-case (^[a-z0-9]+(-[a-z0-9]+)*$); got '<value>'. Theme flows into slug, filesystem paths, and SF Campaign Name — must be safe for all three surfaces.` |
+| `--month` | Integer 1-12 | `ERROR: --month must be 1-12; got '<value>'` |
+| `--year` | 4-digit integer 2020-2099 (cap is arbitrary; widen via PR as needed) | `ERROR: --year must be 4-digit 2020-2099; got '<value>'` |
+| `--launch-date` | Matches `^\d{4}-\d{2}-\d{2}$` (ISO YYYY-MM-DD format) | `ERROR: --launch-date must be ISO YYYY-MM-DD; got '<value>'` |
+| `--owner-email` | If provided, matches `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` | `ERROR: --owner-email failed regex; got '<value>'` |
+| `--vertical` / `--persona` / `--offer` | Strict kebab-case `^[a-z0-9]+(-[a-z0-9]+)*$` (canonicality membership checked in Step 2; this is the SHAPE check) | `ERROR: --<flag> must be strict kebab-case; got '<value>'` |
+| `--eb-workspace` | If provided, must be one of `emailbison-personal` / `emailbison-b2b` | `ERROR: --eb-workspace must be emailbison-personal or emailbison-b2b; got '<value>'` |
+
+The validator runs unconditionally, regardless of interactive vs non-interactive mode. Interactive prompts in Step 1 use AskUserQuestion which constrains the operator's input to a closed set + Other; the regex on the Other free-text path is the only place where prompt output could otherwise leak into downstream interpolation.
 
 ---
 
@@ -109,7 +126,9 @@ Current canonical verticals: <comma-separated verticals[]>
 
 ### 2.2 — Persona existence within vertical
 
-`Read` `plugins/marketing/data/canonicals/{vertical}.yaml`. Assert `--persona` ∈ `personas[].slug`.
+`Read` `plugins/marketing/data/canonicals/{vertical}.yaml` ONCE and cache the parsed content as `<vertical-doc>` for reuse across Steps 2.3, 2.4, and 8a.3 — every downstream slot-substitution + membership-check needs this file, so a single Read tool invocation per plan-campaign run is the budget.
+
+Assert `--persona` ∈ `personas[].slug`.
 
 On miss, HARD-FAIL:
 
@@ -167,7 +186,7 @@ Where `YY = year % 100` (zero-padded if needed) and `MM = month` zero-padded to 
 cross-entity-{theme}-fy{YY}-m{MM}
 ```
 
-Where `--theme` is required and validated against `^[a-z0-9-]+$` (kebab-case). On `--entity=cross-entity` with empty `--theme`, HARD-FAIL:
+Where `--theme` is required. The strict kebab-case shape was already validated at Step 1b; here we only check presence:
 
 ```
 ERROR: --entity=cross-entity requires --theme (e.g. --theme=america-250).
@@ -201,14 +220,31 @@ Then check for slug collision:
 mcp__plugin_workflows_linear-server__list_milestones(projectId=<gtm-project-id>, query=<slug>)
 ```
 
-If any returned milestone's `name === <slug>`, prompt the operator:
+If any returned milestone's `name === <slug>`, enter the collision-resolution loop:
 
-> AskUserQuestion: "Slug '<slug>' already exists as a Linear milestone. Append `-v2` and proceed?"
-> Options: `Append -v2 and proceed` / `Cancel scaffold`
+```
+loop attempt = 2, 3, 4, ..., 9:
+  candidate = <base-slug>-v<attempt>
+  re-call list_milestones(projectId=<gtm-project-id>, query=<candidate>)
+  if no collision:
+    prompt operator with AskUserQuestion:
+      Question: "Slug collision detected. Use candidate '<candidate>' instead?"
+      Options: ["Use <candidate>", "Cancel scaffold"]
+    if operator picks "Use <candidate>": <slug> := <candidate>; exit loop
+    if operator picks "Cancel scaffold": halt with exit 0 and no writes
+  if collision: continue to next attempt
+end loop
 
-On `Append -v2`, retry the collision check with the new slug (recursively up to `-v9`; abort with an explicit message past that). On `Cancel scaffold`, halt cleanly with exit code 0 and no writes.
+if loop exhausted without resolution (attempt > 9):
+  HARD-FAIL:
+    ERROR: Slug '<base-slug>' has 9+ same-month variants (v2..v9 all taken).
+    This indicates a slug-naming or month-targeting bug in upstream invocation.
+    Either pass an explicit --slug override, OR re-scope to a different month/persona.
+```
 
-Per [ADR-016] + the design doc O5: collision auto-suffixing is operator-explicit (NOT silent auto-increment) — every `-v2`, `-v3` requires the prompt.
+Per [ADR-016] + the design doc O5: collision auto-suffixing is operator-explicit (NOT silent auto-increment) — every candidate requires the prompt. The loop prompts ONCE per non-colliding candidate (not at every attempt), keeping operator UX bounded.
+
+The `-v9` cap is a sanity bound; a campaign with 10+ same-month variants almost certainly indicates an upstream slug-generation bug, not a legitimate scheduling pattern.
 
 ---
 
@@ -232,13 +268,19 @@ Store the resolved workspace as `<eb-workspace>` for Step 7 (manifest write).
 
 ### 4.2 — Owner email resolution chain
 
-Resolve `<owner-email>` in order; first success wins:
+Resolve `<owner-email>` in order; first success wins. The explicit-flag path is checked FIRST because operators who pass `--owner-email` know what they want, and the SF probe is a network round-trip we should skip when the answer is already provided.
 
-1. **SF authed username probe**: call `mcp__plugin_revops_salesforce__get_username` (returns `{username, version, ...}`). If the returned `username` matches the email regex `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` (most SF usernames are emails), use it. Otherwise skip to (2).
-2. **Explicit `--owner-email` flag**: if provided, use it.
+Define the email regex once for reuse below: `EMAIL_REGEX = ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`. EVERY path that yields a candidate `<owner-email>` MUST re-apply EMAIL_REGEX before accepting the value — defense-in-depth against an upstream resolution returning a malformed string that then flows into the Step 8b `Skill` args.
+
+1. **Explicit `--owner-email` flag**: if provided AND matches EMAIL_REGEX, use it. Skip the rest of the chain. (Step 1b already validated this regex; the re-check here is the single-point-of-trust for downstream Steps.)
+2. **SF authed username probe** (only when `--owner-email` was NOT provided): call `mcp__plugin_revops_salesforce__get_username` (returns `{username, version, ...}`). If the returned `username` matches EMAIL_REGEX (most SF usernames are emails), use it. If the username is set but does NOT match the regex, skip silently to (3) — do NOT pass a non-email string downstream.
 3. **AskUserQuestion fallback**:
    > "Resolve SF Campaign owner email."
-   > Options: `marketingadmin@britenites.com (GTM service account)` / `<the resolved authed SF user from step 1 if available, else skip this option>` / `Other`
+   > Options: `marketingadmin@britenites.com (GTM service account)` / `<the resolved authed SF user from step 2 if available, else skip this option>` / `Other`
+
+   If the operator selects the GTM service-account option, that literal value already matches EMAIL_REGEX (verified at spec-write time). If the operator selects `Other`, validate the typed value against EMAIL_REGEX BEFORE accepting it — on regex miss, re-prompt with: "That value isn't a valid email format. Try again or cancel." The `Other` free-text path is the highest-risk surface in this chain (per [`memory/gotcha_askuserquestion_no_free_text.md`](../../../memory/gotcha_askuserquestion_no_free_text.md) — `Other` IS the free-text escape hatch).
+
+4. **Final pre-Step-8b guard**: regardless of which path produced `<owner-email>`, re-apply EMAIL_REGEX one more time at the boundary into the `Skill` invocation. On miss, HARD-FAIL with: `ERROR: <owner-email> failed final email-format guard before /revops:create-sf-campaign invocation. Internal bug — please file an issue.` This guard should never fire if paths 1-3 are correct; it exists as a tripwire for future regressions.
 
 The default option `marketingadmin@britenites.com` is the GTM service account that owns all SF Campaigns by convention (per `docs/gtm-campaign-orchestration-README.md` § 3.6.7). The `Other` AskUserQuestion fallback gives operators a free-text override for one-off cases.
 
@@ -312,7 +354,7 @@ Issue the gate via `AskUserQuestion`:
 
 Treat clear affirmatives as proceed. Ambiguous responses ("maybe", silence, off-topic) → re-prompt with the same question and a tightened "Yes or No?" framing. The anti-pattern this gate blocks is the orchestrator issuing the Linear + SF + manifest writes in the same turn without a real operator turn between this question and the Step 7 write.
 
-On `Cancel`, halt cleanly with no writes and a summary of what would have been created.
+On `Cancel`, halt cleanly with no writes and re-print the Step 5 dry-run preview block (without the leading "Dry-run preview" header — adapt to "Cancelled — would have created:"). This gives the operator the full plan they declined, in case they want to copy-paste flags for a corrected re-run.
 
 ---
 
@@ -412,7 +454,8 @@ In `<brief-template>`, replace these slots (literal string-replace, in order):
 | `{{launch_date}}` | `<launch-date>` |
 | `{{owner_email}}` | `<owner-email>` |
 | `{{year}}` | `<year>` |
-| `{{month_display}}` | `<month>` formatted as the month name + year (e.g. "May 2026") |
+| `{{month_display}}` | `<month>` formatted as the full month name + year (e.g. "May 2026"). macOS-portable derivation: `date -j -f "%Y-%m-%d" "<year>-<month:02d>-01" "+%B %Y"` (BSD date); GNU-Linux equivalent: `date -d "<year>-<month:02d>-01" +"%B %Y"`. Detect via `date --version 2>/dev/null \| grep -q GNU` and branch. |
+| `{{eb_workspace}}` | `<eb-workspace>` resolved at Step 4.1 (`emailbison-personal` for nites, `emailbison-b2b` for supply/labs, operator-picked for cross-entity) |
 
 Unsubstituted slots (slot present in template but no value in this table) remain literally `{{slot_name}}` for the brief author to fill at sub-issue #1.
 
@@ -502,19 +545,18 @@ Capture the returned `id` + `url` into `<milestone-id>` + `<milestone-url>`. Upd
 
 via `Read` → JSON-mutate → `Write` (atomic per-file rewrite — Edit's not available for JSON nesting at the depth we need without risk).
 
-#### 8a.6 — Note on label application
+#### 8a.6 — Label-existence pre-check + create-on-miss
 
-Linear's project-milestone API does NOT accept labels (verified BC-8718 era + observed in `mcp__plugin_workflows_linear-server__save_milestone` shape). The 8-label set (`slug:`, `entity:`, `vertical:`, `persona:`, `offer:`, `year:`, `month:`, `status:planning`) gets applied to each child sub-issue in Step 9 (sub-issues DO take labels via `save_issue`).
+Linear's project-milestone API does NOT accept labels (verified BC-8718 era + observed in `mcp__plugin_workflows_linear-server__save_milestone` shape). The 8-label set (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`) gets applied to each child sub-issue in Step 9 (sub-issues DO take labels via `save_issue`).
 
-Before Step 9, ensure all 8 label values exist as `IssueLabel` records in the Brite Company team. Use `list_issue_labels` to enumerate existing labels:
+**The same 8-label set is the canonical CONSTANT for this orchestrator.** Whenever you see "the 8 labels", "the label set", or label-applying logic referenced from Step 9 / Step 10 / dry-run preview, the membership IS exactly these 8: `slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`. Drift between this enumeration and Step 9's `labels:` field is a defect — the contract test at `plugins/marketing/tests/test_plan_campaign_contracts.py` verifies the two stay in lockstep.
 
-```
-mcp__plugin_workflows_linear-server__list_issue_labels(team="Brite Company")
-```
+Before Step 9, ensure all 8 label values exist as `IssueLabel` records in the Brite Company team:
 
-For any of the 8 labels missing, create them via the labels API (NOT via `save_issue` — labels must exist before they can be applied). If `create_issue_label` is not in `allowed-tools` (it isn't, per the frontmatter — only `list_issue_labels` is exposed), prompt the operator to create the missing labels manually via the Linear UI BEFORE Step 9. This is a one-time setup per workspace; once the 8 label categories exist, future invocations reuse them.
+1. Enumerate existing labels via `mcp__plugin_workflows_linear-server__list_issue_labels(team="Brite Company")` and build a set of label names already in the workspace. **Bound advisory**: the team's total label count grows monotonically (~8 labels per new campaign-defining tuple). At ~200 campaigns, the unfiltered enumeration returns ~1,600 labels per call. If the Linear MCP exposes a prefix filter, prefer that. Otherwise, accept the linear-growth cost and revisit when label count > 1,000 (track via follow-up if observed).
+2. For each of the 8 label names that's NOT in the existing set, create it via `mcp__plugin_workflows_linear-server__create_issue_label(team="Brite Company", name="<label>")`. The 7 fixed-prefix labels (`slug:`, `entity:`, `vertical:`, etc.) accumulate over time — after the first few plan-campaign runs, almost all subsequent invocations will find every label already present and create none.
 
-In dogfood (BC-8727), if the labels don't exist, fall back to encoding the label values into each sub-issue's description (e.g., `<!-- gtm-labels: slug=..., entity=..., ... -->`) and file a follow-up to set up the label taxonomy properly.
+This step is idempotent (no-op if all 8 already exist) and incurs at most 9 MCP calls per plan-campaign invocation (1 list + up to 8 creates). Both `list_issue_labels` and `create_issue_label` are in `allowed-tools` per the frontmatter; no operator prompt is required.
 
 ---
 
@@ -556,6 +598,7 @@ Continue to Step 9.
 | `sf_cli_error` | `salesforce.campaign_id` ← `null` | WARN: "SF auto-create failed: SF CLI error. Detail: `<error.detail>`. Common causes: missing `Substatus__c` field deploy (BC-8713), permset gap, FLS on custom field. Reconcile via `/revops:create-sf-campaign ...` after resolving." | |
 | `invalid_slug_format` | `salesforce.campaign_id` ← `null` | WARN: "SF auto-create rejected slug `<slug>` as invalid format. This should have been caught upstream — file an issue against canonicals lint." | Sanity-check; shouldn't happen given Step 3.2's regex pre-check. |
 | `missing_required_flag` | `salesforce.campaign_id` ← `null` | WARN: "SF auto-create missing required flag `<flag>`. This is an orchestrator bug — file an issue against plan-campaign." | Internal contract failure; should never fire if Step 4 resolved `<owner-email>` correctly. |
+| **`<any other error kind>`** (unknown future kind added by /revops:create-sf-campaign) | `salesforce.campaign_id` ← `null` | WARN: "SF auto-create returned unknown error kind `<error.error>`. Manifest gets null campaign_id; reconcile manually via `/revops:create-sf-campaign` after diagnosing. Update plan-campaign's error catalog to handle this kind explicitly in a follow-up PR." | Default branch — prevents silent no-op when sibling adds new error kinds. The canonical kind list lives at `plugins/revops/commands/create-sf-campaign.md` § "Error path catalog"; this orchestrator's table is downstream-consumer text that may drift. The default branch ensures behavior remains soft-fail even on drift. |
 
 Per the soft-fail philosophy: even on these errors, **continue to Step 9** (sub-issues still get created; the orchestrator's job is to scaffold the Linear surface even when SF is temporarily unhealthy).
 
@@ -579,21 +622,31 @@ For each of the 8 sub-issues, call `save_issue` with:
 - `assignee`: omit (sub-issues are assigned at sub-issue start time, not scaffold time)
 - `dueDate`: per the schedule (back-filled from `<launch-date>` — see per-issue spec)
 
-After all 8 creates succeed, do a second pass to wire `blockedBy` relations (the Linear MCP `save_issue` may or may not support setting `blockedBy` on create — verify at impl time; if not, use a follow-up `save_issue` call per child with `blockedById`).
+After all 8 creates succeed, do a second pass to wire `blockedBy` relations. The Linear MCP `save_issue` shape for the second pass is **MINIMAL** — `save_issue(id=<sub-issue-id>, blockedById=<id>)` ONLY. Do NOT replay the full field set on the second call; that risks blanking out labels, descriptions, or parentId depending on MCP merge-vs-replace semantics. If the MCP rejects the minimal partial update, file a follow-up — do NOT silently retry with the full field set.
 
-### 9.0 — `parentId` resolution at impl time
+If at dogfood (BC-8727) we verify the Linear MCP `save_issue` accepts `blockedById` on the FIRST create call (which would collapse Step 9 to a single pass and halve the MCP round-trip count), update this spec to single-pass and remove the second-pass paragraph.
 
-Linear's project-milestones are project-scoped, NOT issue-scoped — they don't accept child issues directly. The 8 sub-issues need an issue parent. Two patterns to choose from at impl time:
+### 9.0 — `parentId` resolution: container-issue pattern
 
-**Pattern A** (preferred — clean Linear UI): Create a "Container" parent issue first via `save_issue`:
-- Title: `<slug>` (matches milestone name)
-- Description: link to milestone URL
-- `projectMilestoneId`: `<milestone-id>`
-- Then `parentId` for each of the 8 sub-issues = the container issue's ID.
+Linear's project-milestones are project-scoped, NOT issue-scoped — they don't accept child issues directly. The 8 sub-issues need an issue parent. Use the **container-issue pattern** (this orchestrator-level design decision should be cross-referenced from `docs/decisions/013-gtm-three-layer-split.md` or promoted to a dedicated ADR when the second consumer adopts it):
 
-**Pattern B** (no container — flatter): Each of the 8 sub-issues has `parentId: null` and is queryable via `projectMilestoneId`.
+1. Create a "Container" parent issue first via `save_issue`:
+   - `team`: "Brite Company"
+   - `title`: `<slug>` (matches milestone name)
+   - `description`: link to `<milestone-url>` + brief "campaign rollup — see milestone for brief content" pointer
+   - `projectId`: `<gtm-project-id>`
+   - `projectMilestoneId`: `<milestone-id>`
+   - `labels`: the 8-label set (Step 8a.6)
+2. Capture the returned issue ID as `<container-issue-id>`.
+3. Pass `parentId: <container-issue-id>` on every subsequent sub-issue `save_issue` call in § 9.1.
 
-Pattern A gives the marketing operator a single "campaign" issue to track in their Linear inbox; Pattern B keeps the issue tree shallow. Default: **Pattern A**. If save_issue rejects the container-issue + projectMilestoneId combo, fall through to Pattern B and file a follow-up.
+Rationale: gives the marketing operator a single "campaign" issue to track in their Linear inbox + a clean parent → 8-children tree that aligns with the worked example in README §3.6. If `save_issue` rejects the container-issue + `projectMilestoneId` combo at dogfood (BC-8727):
+
+1. HALT before creating the 8 sub-issues.
+2. Surface the partial state to the operator: "Container-issue create failed. Linear milestone `<milestone-url>` was created at Step 8a; manifest.json was written at Step 7. To clean up: delete the milestone via Linear UI, then delete `docs/campaigns/<entity>/<slug>/` and re-invoke plan-campaign once the underlying issue is resolved. Do NOT proceed manually with a flat structure."
+3. File a follow-up issue tracking the Linear MCP-shape gap.
+
+Explicit rollback guidance prevents the orchestrator from leaving an orphan milestone + manifest hanging in inconsistent state.
 
 ### 9.1 — Sub-issue specs
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,16 +24,84 @@ COMMAND_PATH = ROOT / "commands" / "plan-campaign.md"
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 CANONICALS_DIR = ROOT / "data" / "canonicals"
+# Sibling skill that plan-campaign composes via Skill tool — used for cross-file
+# parity assertions (slug regex, error catalog) so the two surfaces don't drift.
+REVOPS_CREATE_PATH = (
+    ROOT.parents[0] / "revops" / "commands" / "create-sf-campaign.md"
+)
 
 
+@lru_cache(maxsize=1)
 def read_command() -> str:
-    return COMMAND_PATH.read_text()
+    """Read the command body once per session.
+
+    Cached because 30+ tests call this and the file is ~30KB — without caching
+    the suite re-reads ~900KB of disk content per run, all to assert against
+    the same content. Explicit UTF-8 encoding to avoid locale-dependent decoding.
+    """
+    return COMMAND_PATH.read_text(encoding="utf-8")
 
 
-def split_frontmatter(text: str) -> tuple[str, str]:
-    match = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.DOTALL)
+@lru_cache(maxsize=1)
+def read_sibling_create_sf_campaign() -> str:
+    """Read plugins/revops/commands/create-sf-campaign.md once per session."""
+    return REVOPS_CREATE_PATH.read_text(encoding="utf-8")
+
+
+_FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
+
+
+@lru_cache(maxsize=1)
+def split_frontmatter_cached() -> tuple[str, str]:
+    """Cached parse of (frontmatter, body) for read_command()'s output."""
+    match = _FRONTMATTER_RE.match(read_command())
     assert match, "Expected YAML frontmatter wrapped in --- markers"
     return match.group(1), match.group(2)
+
+
+def split_frontmatter(text: str | None = None) -> tuple[str, str]:
+    """Public API: returns the parsed (frontmatter, body) tuple.
+
+    Defaults to the cached canonical read_command() output. Pass an explicit
+    text argument only when testing against mocked content (none currently).
+    """
+    if text is None or text == read_command():
+        return split_frontmatter_cached()
+    match = _FRONTMATTER_RE.match(text)
+    assert match, "Expected YAML frontmatter wrapped in --- markers"
+    return match.group(1), match.group(2)
+
+
+def parse_allowed_tools_set() -> set[str]:
+    """Tokenize the allowed-tools line into a clean set of tool names.
+
+    Substring-match against the raw frontmatter has two false-positive modes:
+    (a) tool name appears in the `description:` prose, (b) tool name appears
+    in a YAML comment. This parser scopes to the allowed-tools line ONLY,
+    splits on commas, and strips whitespace.
+    """
+    frontmatter, _ = split_frontmatter()
+    tools_line = next(
+        (line for line in frontmatter.splitlines() if line.startswith("allowed-tools:")),
+        None,
+    )
+    assert tools_line, "allowed-tools line not found in frontmatter"
+    return {t.strip() for t in tools_line.split(":", 1)[1].split(",") if t.strip()}
+
+
+def extract_section(body: str, start_marker: str, end_marker: str | None = None) -> str:
+    """Extract the substring between two markdown markers (e.g., ##/### headings).
+
+    Used to scope substring assertions to a specific section block — e.g.,
+    the Step 8b error-catalog table — so a string mention elsewhere in prose
+    doesn't false-positive the assertion.
+    """
+    start = body.find(start_marker)
+    assert start >= 0, f"Section marker not found: {start_marker!r}"
+    if end_marker is None:
+        return body[start:]
+    end = body.find(end_marker, start + len(start_marker))
+    return body[start:end] if end >= 0 else body[start:]
 
 
 # --- File existence + frontmatter shape ------------------------------------
@@ -56,14 +125,12 @@ def test_allowed_tools_includes_skill_for_revops_composition() -> None:
     """BC-8717 respec contract: this orchestrator composes /revops:create-sf-campaign
     via the Skill tool. The Skill tool MUST be in allowed-tools or composition fails
     silently with `tool not found` at runtime.
+
+    Uses tokenized parse to avoid false-positive from `Skill` substring matching
+    inside a different tool name or description text.
     """
-    frontmatter, _ = split_frontmatter(read_command())
-    tools_line = next(
-        (line for line in frontmatter.splitlines() if line.startswith("allowed-tools:")),
-        None,
-    )
-    assert tools_line, "allowed-tools line not found"
-    assert "Skill" in tools_line, (
+    tools = parse_allowed_tools_set()
+    assert "Skill" in tools, (
         "allowed-tools must include `Skill` — the orchestrator composes /revops:create-sf-campaign "
         "(BC-8717) via the Skill tool, not via a direct MCP write tool (which doesn't exist)."
     )
@@ -74,34 +141,53 @@ def test_allowed_tools_excludes_nonexistent_mcp_write_tools() -> None:
     in allowed-tools — but that MCP write tool does NOT exist (BC-8717 was respec'd
     from MCP tool to slash command on 2026-05-19, PR #329). Listing a non-existent
     MCP tool fails silently at runtime (per CLAUDE.md gotcha on allowed-tools).
+
+    Uses tokenized parse so a documentation mention in `description:` doesn't
+    false-trigger this assertion.
     """
-    frontmatter, _ = split_frontmatter(read_command())
-    forbidden = [
+    tools = parse_allowed_tools_set()
+    forbidden = {
         "mcp__plugin_revops_salesforce__create_sf_campaign",
         "mcp__plugin_revops_salesforce__update_sf_campaign_status",
-    ]
-    for tool in forbidden:
-        assert tool not in frontmatter, (
-            f"allowed-tools must NOT include {tool} — that MCP write tool does not exist "
-            f"(BC-8717/BC-8723 respec'd 2026-05-19). Use Skill tool to compose the sibling slash command."
-        )
+    }
+    illegal = tools & forbidden
+    assert not illegal, (
+        f"allowed-tools must NOT include {sorted(illegal)} — those MCP write tools do not exist "
+        f"(BC-8717/BC-8723 respec'd 2026-05-19). Use Skill tool to compose the sibling slash command."
+    )
+
+
+def test_allowed_tools_excludes_unused_sf_soql_read() -> None:
+    """run_soql_query was in the initial frontmatter but is never invoked in the
+    body — plan-campaign delegates SOQL to /revops:create-sf-campaign which has its
+    own SOQL declarations. Keeping an unused MCP tool in allowed-tools is dead
+    surface area (architecture-reviewer P2, simplify pass).
+    """
+    tools = parse_allowed_tools_set()
+    assert "mcp__plugin_revops_salesforce__run_soql_query" not in tools, (
+        "run_soql_query is not invoked anywhere in plan-campaign.md — drop it from "
+        "allowed-tools to minimize the cross-plugin MCP surface."
+    )
 
 
 def test_allowed_tools_includes_linear_and_sf_read_tools() -> None:
-    frontmatter, _ = split_frontmatter(read_command())
-    expected = [
+    """All required tools are PRESENT in the tokenized allowed-tools set."""
+    tools = parse_allowed_tools_set()
+    expected = {
         "mcp__plugin_workflows_linear-server__list_projects",
         "mcp__plugin_workflows_linear-server__list_milestones",
         "mcp__plugin_workflows_linear-server__save_milestone",
         "mcp__plugin_workflows_linear-server__save_issue",
+        "mcp__plugin_workflows_linear-server__list_issue_labels",
+        "mcp__plugin_workflows_linear-server__create_issue_label",
         "mcp__plugin_revops_salesforce__get_username",
         "AskUserQuestion",
         "Bash",
         "Read",
         "Write",
-    ]
-    missing = [tool for tool in expected if tool not in frontmatter]
-    assert not missing, f"allowed-tools missing required tools: {missing}"
+    }
+    missing = expected - tools
+    assert not missing, f"allowed-tools missing required tools: {sorted(missing)}"
 
 
 # --- Flag table coverage ---------------------------------------------------
@@ -142,11 +228,15 @@ def test_soft_fail_philosophy_documented() -> None:
         "Body must reference the manifest field that captures null on SF soft-fail"
 
 
-def test_all_soft_fail_error_keys_handled() -> None:
+def test_all_soft_fail_error_keys_handled_in_8b_catalog() -> None:
     """The 5 error kinds emitted by /revops:create-sf-campaign (BC-8717) must
-    each have a documented manifest action + Step 11 reminder in this orchestrator.
+    each appear in plan-campaign's Step 8b.1 error-catalog block — NOT just
+    anywhere in the body. Scope the assertion to the catalog so a stray
+    mention in prose elsewhere doesn't false-confirm coverage.
     """
-    body = read_command()
+    _, body = split_frontmatter()
+    # 8b.1 catalog extends from "#### 8b.1" until the next top-level "###" or "##"
+    catalog = extract_section(body, "#### 8b.1", "### ")
     error_keys = [
         "duplicate_slug",
         "missing_owner",
@@ -154,22 +244,51 @@ def test_all_soft_fail_error_keys_handled() -> None:
         "invalid_slug_format",
         "missing_required_flag",
     ]
-    missing = [key for key in error_keys if key not in body]
-    assert not missing, f"Error keys from /revops:create-sf-campaign not handled here: {missing}"
+    missing = [key for key in error_keys if key not in catalog]
+    assert not missing, (
+        f"Error keys missing from Step 8b.1 catalog block: {missing}. "
+        f"Each /revops:create-sf-campaign error kind must have a documented manifest "
+        f"action + Step 11 reminder row in 8b.1, not just an incidental mention."
+    )
+
+
+def test_soft_fail_catalog_has_unknown_kind_default_branch() -> None:
+    """The Step 8b.1 catalog must have a default-branch row for unknown error
+    kinds — otherwise a 6th error kind added by /revops:create-sf-campaign in
+    a future release would silently no-op here (architecture-reviewer P2:
+    consumer-redeclares-producer-enum coupling).
+    """
+    _, body = split_frontmatter()
+    catalog = extract_section(body, "#### 8b.1", "### ")
+    # Default branch marker — keep flexible but pinned to a substantive phrase
+    assert "unknown" in catalog.lower() and "error kind" in catalog.lower(), (
+        "Step 8b.1 catalog must document a default branch for unknown error kinds "
+        "(architecture-reviewer P2 fix: prevents silent no-op when sibling adds new kinds)."
+    )
 
 
 # --- Slug + canonicality contract ------------------------------------------
 
 
 def test_slug_regex_matches_create_sf_campaign() -> None:
-    """The slug regex must match /revops:create-sf-campaign's Phase 1 regex
-    EXACTLY — otherwise plan-campaign could compute a slug that the sibling
-    skill rejects at the boundary.
+    """The slug regex must appear verbatim in plan-campaign.md AND match
+    /revops:create-sf-campaign's Phase 1 regex byte-for-byte. The substring
+    presence check alone isn't enough — drift between the two files would
+    let plan-campaign compute slugs that the sibling skill rejects at the
+    Skill-tool boundary (test-quality-reviewer P2 fix).
     """
     body = read_command()
     expected = r"^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$"
     assert expected in body, (
-        f"Slug regex must appear verbatim and match BC-8717's regex. Expected: {expected!r}"
+        f"Slug regex must appear verbatim in plan-campaign.md. Expected: {expected!r}"
+    )
+    # Cross-file parity check: assert the same regex is in the sibling skill
+    sibling = read_sibling_create_sf_campaign()
+    assert expected in sibling, (
+        f"Slug regex parity broken — {REVOPS_CREATE_PATH} does not contain "
+        f"the regex {expected!r}. If /revops:create-sf-campaign changed its slug "
+        f"regex, plan-campaign must be updated in lockstep or the Skill-tool "
+        f"boundary will reject slugs that plan-campaign computes."
     )
 
 
@@ -389,6 +508,154 @@ def test_known_gotchas_cited() -> None:
     ]
     missing = [g for g in gotchas if g not in body]
     assert not missing, f"Memory gotchas not cited in body: {missing}"
+
+
+def test_gotcha_citation_link_shape_is_consistent() -> None:
+    """Gotcha/memory citations follow the project convention of relative-path
+    links from the command file to a `memory/<gotcha-slug>.md` anchor. The
+    targets don't physically exist in the repo (memory is auto-memory at
+    ~/.claude/.../memory/, not committed to the repo) — they're conceptual
+    anchors for human readability + greppability.
+
+    What we CAN verify: every memory link uses the same relative-path depth
+    that the file requires to reach the conceptual `memory/` root. For
+    plan-campaign.md at plugins/marketing/commands/, that's 3 levels up.
+    """
+    body = read_command()
+    link_pattern = re.compile(
+        r"\]\((\.\./[^)]*memory/(?:gotcha|feedback|project|session|reference)_[^)]+\.md)\)"
+    )
+    targets = link_pattern.findall(body)
+    assert targets, (
+        "Expected at least one memory/* link in the body — citation test is "
+        "vacuously passing if no links are present."
+    )
+    wrong_depth = [t for t in targets if not t.startswith("../../../memory/")]
+    assert not wrong_depth, (
+        f"memory/* citations must use 3-ups relative path (../../../memory/...) "
+        f"from plugins/marketing/commands/ — found inconsistent depths: {wrong_depth}"
+    )
+
+
+# --- Container-issue pattern (Step 9.0) ------------------------------------
+
+
+def test_container_issue_pattern_documented() -> None:
+    """Step 9.0 introduced the container-issue parent pattern (Linear milestones
+    can't take child issues directly). This is a load-bearing design decision
+    that every downstream consumer (launch-campaign, campaign-debrief, σ3 status
+    sync) must agree on. The spec MUST document the pattern explicitly so
+    consumers can locate it (test-quality-reviewer P3 coverage gap).
+    """
+    body = read_command()
+    assert "container-issue pattern" in body.lower(), (
+        "Step 9.0 must document the container-issue pattern by name — load-bearing "
+        "for downstream consumers."
+    )
+    assert "projectMilestoneId" in body, (
+        "Spec must reference projectMilestoneId — the field that ties the container "
+        "issue to the milestone."
+    )
+
+
+def test_container_issue_rollback_path_documented() -> None:
+    """If the container-issue create fails at runtime, the orchestrator MUST
+    document a rollback path so the operator isn't left with an orphan
+    milestone + manifest in inconsistent state (cdr-compliance P3 fix).
+    """
+    body = read_command()
+    assert "delete the milestone" in body.lower() or "manual-cleanup" in body.lower(), (
+        "Step 9.0 must document explicit rollback guidance for container-issue create failure."
+    )
+
+
+# --- Label set parity (Step 8a.6 ↔ Step 9 sub-issues) ----------------------
+
+
+_EXPECTED_LABELS = [
+    "slug:",
+    "entity:",
+    "vertical:",
+    "persona:",
+    "offer:",
+    "year:",
+    "month:",
+    "status:planning",
+]
+
+
+def test_8label_set_canonical_definition_present() -> None:
+    """The 8-label canonical set must be enumerated as a CONSTANT statement
+    in Step 8a.6 — drift between this enumeration and Step 9's labels: field
+    is a silent defect (test-quality-reviewer P3 coverage gap).
+    """
+    body = read_command()
+    section = extract_section(body, "#### 8a.6", "### ")
+    missing = [label for label in _EXPECTED_LABELS if label not in section]
+    assert not missing, (
+        f"Step 8a.6 must enumerate all 8 canonical label prefixes. Missing: {missing}"
+    )
+
+
+def test_8label_set_referenced_in_step_9() -> None:
+    """Step 9 must reference the 8-label set (either by listing all 8 again, or
+    by citing § Step 8a.6). Without this anchor, a future edit to Step 9's
+    labels: field could drift from the canonical without test detection.
+    """
+    body = read_command()
+    section = extract_section(body, "## Step 9 — Create 8 standard sub-issues", "## Step 10")
+    # Either explicit re-enumeration OR cross-reference to 8a.6 satisfies the contract
+    has_reference = "8a.6" in section or all(label in section for label in _EXPECTED_LABELS)
+    assert has_reference, (
+        "Step 9 must either re-list the 8 canonical labels OR cite § Step 8a.6 — "
+        "otherwise sub-issue label-application can silently drift from canonical."
+    )
+
+
+# --- Owner-email regex appears verbatim ------------------------------------
+
+
+def test_email_regex_verbatim_in_step_4_2() -> None:
+    """Step 4.2 owner-email resolution depends on a specific email regex for
+    re-validation across all three resolution paths (security-reviewer P2 fix).
+    The regex must appear verbatim so a future regex change is auditable in
+    diffs.
+    """
+    body = read_command()
+    expected = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+    assert expected in body, (
+        f"Owner-email regex must appear verbatim in Step 4.2 (or Step 1.5 input "
+        f"validation). Expected: {expected!r}"
+    )
+
+
+# --- Parse-time input validation (Step 1.5) --------------------------------
+
+
+def test_step_1b_input_validation_documented() -> None:
+    """Step 1b enforces parse-time HARD-FAIL invariants on every operator-
+    controlled flag (security-reviewer P1 fix). Without it, --entity could
+    flow into mkdir as `../../../etc` and --theme could inject shell
+    metacharacters into the SF Campaign Name via the slug.
+
+    Named "Step 1b" rather than "Step 1.5" because validate.sh's step-sequence
+    lint treats a decimal as a duplicate integer Step 1 (its regex extracts
+    the leading integer); "Step 1b" matches the sub-step exclusion rule.
+    """
+    body = read_command()
+    assert "Step 1b" in body, (
+        "Spec must define a parse-time input-validation sub-step (Step 1b)."
+    )
+    section = extract_section(body, "### Step 1b", "## Step 2")
+    # Closed-set validators must be present for --entity
+    for value in ["nites", "supply", "labs", "cross-entity"]:
+        assert value in section, (
+            f"Step 1b --entity validator must enumerate closed-set value '{value}'."
+        )
+    # --theme validator must be present
+    assert "--theme" in section, "Step 1b must document --theme validator"
+    # --owner-email validator must be present
+    assert "--owner-email" in section, "Step 1b must document --owner-email validator"
 
 
 # --- Idempotency contract --------------------------------------------------
