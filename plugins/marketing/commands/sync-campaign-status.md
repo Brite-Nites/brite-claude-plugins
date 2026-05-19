@@ -55,9 +55,18 @@ The actual mapping lives in `/revops:update-sf-campaign-status` § Mapping table
    ```
 
    Omit the `--linear-substatus` segment when `--substatus` was not provided — this produces a mapped target of `Substatus__c=null` per the mapping table. If SF state is currently `(In Progress, Paused)` and you omit `--substatus`, Phase 5 of the underlying command does NOT noop (mapped null differs from current `Paused`) — Phase 6 then issues an UPDATE that clears `Substatus__c` (per the underlying command's `Substatus__c=''` clear-field semantics). The "noop" mention in [ADR-015](../../../docs/decisions/015-gtm-sigma3-sf-campaign-sync.md) applies to repeated invocations against the SAME target state, not to omitted vs paused.
-3. **Parse the single-line JSON response on stdout.** The underlying command emits exactly one JSON object on stdout with one of these shapes:
+3. **Parse the single-line JSON response on stdout.** The underlying command emits exactly one JSON object on stdout. Branch in this exact order — the first matching case wins (the degraded shapes carry `campaign_id` like the plain-success shape, so the success-or-noop branch MUST be checked last to avoid swallowing degradation signal):
 
-   - **Success or noop**: `{"campaign_id":"...", "campaign_url":"...", "campaign_name":"<slug>", "status":"...", "substatus":"..." | "", "updated_at":"..." [, "noop":true]}` — render to the operator as:
+   - **`{"error":"<kind>", ...}`** (any `error` key, regardless of other fields) — render: `ERROR: σ3 SF sync failed — <kind>. Detail: <stringified payload>.` Always exit 0.
+   - **`{"warning":"campaign_not_found", "slug":"..."}`** (warning key, no `campaign_id`) — render:
+
+     ```
+     WARN: SF Campaign for slug "<slug>" not found. σ3 auto-create at /marketing:plan-campaign Step 8b may have failed earlier.
+           To reconcile: /revops:create-sf-campaign --slug=<slug> ... then re-run this command.
+     ```
+   - **`{"warning":"instance_url_unknown", "campaign_id":..., ...}`** (warning key AND `campaign_id`) — render as success with a degradation note: `OK (degraded): UPDATE landed; instance URL fallback in use. Inspect via SF web UI.`
+   - **`{"warning":"updated_at_unavailable", "campaign_id":..., ...}`** (warning key AND `campaign_id`) — render as success with: `OK (degraded): UPDATE landed; updated_at re-read failed (transient SF error).` (Render-form parity note: both degraded shapes now use the `OK (degraded):` prefix so the documented caller-contract grep predicate at § Soft-fail philosophy catches them with a single substring match — Round 3 doc-asymmetry fix.)
+   - **Success or noop** (`campaign_id` present AND no `warning` key — i.e., reached only when all branches above did not match): `{"campaign_id":"...", "campaign_url":"...", "campaign_name":"<slug>", "status":"...", "substatus":"..." | "", "updated_at":"..." [, "noop":true]}` — render to the operator as:
 
      ```
      OK: SF Campaign <slug> → Status=<status>, Substatus=<substatus-or-"(none)"> (campaign_id=<id>)
@@ -65,15 +74,6 @@ The actual mapping lives in `/revops:update-sf-campaign-status` § Mapping table
      ```
 
      If `noop: true` was present, prefix with `(no-op — already at target state)`.
-   - **`{"warning":"campaign_not_found", "slug":"..."}`** — render:
-
-     ```
-     WARN: SF Campaign for slug "<slug>" not found. σ3 auto-create at /marketing:plan-campaign Step 8b may have failed earlier.
-           To reconcile: /revops:create-sf-campaign --slug=<slug> ... then re-run this command.
-     ```
-   - **`{"warning":"instance_url_unknown", ...}`** — render as success with a degradation note: `OK (degraded): UPDATE landed; instance URL fallback in use. Inspect via SF web UI.`
-   - **`{"warning":"updated_at_unavailable", ...}`** — render as success with: `OK: UPDATE landed; updated_at re-read failed (transient SF error).`
-   - **`{"error":"<kind>", ...}`** — render: `ERROR: σ3 SF sync failed — <kind>. Detail: <stringified payload>.` Always exit 0.
 
 4. **Exit 0 in every case.** The underlying command is exit-0-always; this wrapper preserves that contract. Parse-time errors (Behavior step 1) DO exit non-zero — those are operator-correctable invocation errors, not soft-fail business-logic errors.
 
@@ -113,7 +113,7 @@ This command has two error tiers, deliberately distinct:
 - **Parse-time errors** (invalid flag combination, missing required flag, `--slug` regex mismatch) — hard-fail with a non-zero exit. These are operator-correctable invocation mistakes; halting forces the operator to fix the command line.
 - **Runtime errors** (SF Campaign not found, SF CLI failure, transient SF errors) — soft-fail per the underlying command's exit-0-always contract. The operator sees a clear `WARN:` / `ERROR:` line on stdout but the command exits 0 so it's safe to script.
 
-**Caller contract — grep stdout, do NOT rely on `$?` for runtime errors.** Because every runtime path exits 0, an automated caller that only checks the exit status will silently miss `WARN: campaign_not_found`, `ERROR: sf_cli_error`, and the two degraded-success warnings (`instance_url_unknown`, `updated_at_unavailable` — rendered as `OK (degraded):` and `OK:`-with-degradation-note respectively per Behavior step 3). Scripts wrapping this command MUST parse stdout matching `^(WARN:|ERROR:|OK \(degraded\):)` AND additionally inspect any `OK:` line whose body contains `degraded` / `transient SF error` / `re-read failed` substrings. The parse-time error path (non-zero exit) is the only signal that `$?` carries meaningful information.
+**Caller contract — grep stdout, do NOT rely on `$?` for runtime errors.** Because every runtime path exits 0, an automated caller that only checks the exit status will silently miss `WARN: campaign_not_found`, `ERROR: sf_cli_error`, and the two degraded-success warnings (`instance_url_unknown`, `updated_at_unavailable` — both rendered as `OK (degraded):` per Behavior step 3 for grep-friendliness). Scripts wrapping this command MUST parse stdout matching `^(WARN:|ERROR:|OK \(degraded\):)`. A plain `OK:` (no `(degraded)`) is the only unambiguous success signal. The parse-time error path (non-zero exit) is the only signal that `$?` carries meaningful information.
 
 ## Gotchas
 
