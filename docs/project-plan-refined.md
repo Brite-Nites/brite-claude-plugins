@@ -69,7 +69,7 @@ graph TD
 
   subgraph "Tier 2 — revops:salesforce MCP writes"
     T2E[T2-E: create_sf_campaign tool]
-    T2F[T2-F: update_sf_campaign_status tool]
+    T2F[T2-F: /revops:update-sf-campaign-status]
   end
 
   subgraph "Tier 3 — canonicals data layer"
@@ -308,38 +308,48 @@ Critical path: **T0 → T1-A → T2-E → T4-I → T6-O → T6-P → T7-Q** (7 n
 
 ---
 
-### Task T2-F: Add `update_sf_campaign_status` write tool to revops:salesforce MCP — [BC-8723](https://linear.app/brite-nites/issue/BC-8723)
+### Task T2-F: Add `/revops:update-sf-campaign-status` slash command — [BC-8723](https://linear.app/brite-nites/issue/BC-8723)
 
-- **Context**: Second write tool, called on Linear status transitions to keep SF Campaign Status in sync. Critical for portfolio rollup (T1-B/C/D) showing accurate state. Same MCP server as T2-E. Soft-fail when SF Campaign not found (e.g., earlier auto-create failed) — log warning, continue. **Linear → SF status mapping table is locked** (per O6.Q1).
+- **Context**: Second per-record SF write path in the revops plugin. Called by σ3 trigger automation (T2-FA, BC-8752) on Linear status transitions, and by `/marketing:sync-campaign-status` for manual paused/killed triggers. **Respec'd 2026-05-19 — was originally an MCP write tool.** Same root cause as T2-E: `mcp__plugin_revops_salesforce__*` is served by upstream `@salesforce/mcp@0.30.5` (Salesforce-published npm package), so Brite cannot add tools to it. Path 3 (slash command at `plugins/revops/commands/update-sf-campaign-status.md`) mirrors T2-E's respec'd structure. **Soft-fail behavior is load-bearing** — σ3 webhook can fire repeatedly and must never halt: every error path exits 0 with structured JSON. **Linear → SF status mapping table is locked** (per O6.Q1). **Idempotency rule** added in brainstorm (not in original spec): no-op when current SF state already matches target, saves API calls + prevents `LastModifiedDate` churn on σ3 webhook re-fires.
 - **Steps**:
-  1. Add tool definition `update_sf_campaign_status` with input schema:
+  1. Author `plugins/revops/commands/update-sf-campaign-status.md` with frontmatter declaring `description` + `allowed-tools: Bash, mcp__plugin_revops_salesforce__run_soql_query` (upstream MCP — read-only SOQL for Phase 2 lookup + current-state read).
+  2. Input flags (all parsed from invocation, missing-flag emits `{ error: "missing_required_flag", flag: "<name>" }` exit 0):
      ```
-     { slug, linear_status, linear_substatus }
+     --slug --linear-status [--linear-substatus] [--target-org=brite-prod] [--dry-run]
      ```
-     `linear_status` ∈ {`planning`, `active`, `completed`, `killed`}; `linear_substatus` ∈ {null, `paused`}.
-  2. Implementation:
-     - SOQL lookup: `SELECT Id, Status, Substatus__c FROM Campaign WHERE Name = :slug LIMIT 1`. If 0 rows, return `{ warning: "campaign_not_found", slug }` and exit 0 (soft-fail).
-     - Apply mapping table:
-       | linear_status | linear_substatus | SF Status | SF Substatus__c |
-       |---|---|---|---|
-       | planning | * | Planned | null |
-       | active | null | In Progress | null |
-       | active | paused | In Progress | Paused |
-       | completed | * | Completed | null |
-       | killed | * | Aborted | null |
-     - Update Campaign with mapped values.
-     - Return updated Campaign record `{ campaign_id, status, substatus, updated_at }`.
-  3. Unit tests: each mapping row, soft-fail not-found, invalid status combination.
-  4. Bump MCP + plugin versions.
+     `--linear-status` ∈ `{planning, active, completed, killed}`; `--linear-substatus` ∈ `{empty, paused}`.
+  3. Mapping table (locked per O6.Q1):
+     | `linear-status` | `linear-substatus` | SF `Status` | SF `Substatus__c` |
+     |---|---|---|---|
+     | `planning` | (any) | `Planned` | (null) |
+     | `active` | (null/empty) | `In Progress` | (null) |
+     | `active` | `paused` | `In Progress` | `Paused` |
+     | `completed` | (any) | `Completed` | (null) |
+     | `killed` | (any) | `Aborted` | (null) |
+  4. Implementation phases:
+     - Phase 1 — Validate input. Slug regex `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$` (mirrors BC-8717; doubles as SOQL-injection guard). Mismatch → `{ error: "invalid_slug_format", slug: "<v>" }` exit 0. Bad status → `{ error: "invalid_status", value: "<v>" }` exit 0.
+     - Phase 2 — Lookup + current-state read via `mcp__plugin_revops_salesforce__run_soql_query`: `SELECT Id, Status, Substatus__c, LastModifiedDate FROM Campaign WHERE Name = '<slug>' LIMIT 1`. 0 rows → `{ warning: "campaign_not_found", slug }` exit 0 (soft-fail; `warning` not `error` because the state is not caller-correctable from this code path). `LastModifiedDate` fetched here so the noop path can echo `updated_at` without an extra round-trip.
+     - Phase 3 — Compute mapped target state from the table.
+     - Phase 4 — Idempotency no-op pre-check. If `current.Status == mapped.Status` AND `current.Substatus__c == mapped.Substatus__c`, return success with `noop: true` without issuing UPDATE.
+     - Phase 5 — Dry-run preview if `--dry-run`. Emit mapping + UPDATE preview JSON, no write.
+     - Phase 6 — UPDATE via `Bash` shell-out: `sf data update record --sobject Campaign --record-id <id> --values "Status='<mapped>' Substatus__c='<mapped-or-empty>'" --target-org <org> --json`. Empty-string clears Substatus__c (verify in dry-run; fallback to Composite REST `{Substatus__c: null}` if empty-string doesn't clear). Errors → `{ error: "sf_cli_error", detail: <upstream JSON> }` exit 0. Post-UPDATE: re-SELECT `LastModifiedDate` via the same MCP run_soql_query for the success payload's `updated_at` field.
+     - Phase 7 — Construct URL via `sf org display` (`warning: "instance_url_unknown"` fallback).
+     - Phase 8 — Success: single-line JSON `{ campaign_id, campaign_url, campaign_name, status, substatus, updated_at }` (union of T2-E's surface + T2-F spec's confirmation fields).
+  5. Add contract tests at `plugins/revops/tests/test_update_sf_campaign_status_contracts.py` covering: command file presence, frontmatter shape, all 5 input flags documented, all 5 mapping rows present verbatim, all 5 soft-fail keys (`missing_required_flag`, `invalid_slug_format`, `invalid_status`, `campaign_not_found`, `sf_cli_error`), Phase 2 SOQL verbatim, slug regex verbatim, soft-fail term greppable, idempotency `noop` documented, Substatus__c clearing convention documented, version bumps.
+  6. Doc sweep: this section (T2-F), `docs/gtm-campaign-orchestration-README.md` (replace remaining `update_sf_campaign_status MCP tool` references with slash-command framing at lines ~626, ~748, ~791, ~945, ~1098; verify ~960/~1130/~1210/~1257/~1330 already correct), `docs/decisions/015-gtm-sigma3-sf-campaign-sync.md` (already amended 2026-05-19 — cross-check only).
+  7. Bump revops plugin.json version + marketplace.json entry (0.2.7 → 0.2.8) per CLAUDE.md gotcha.
 - **Validation**:
-  - All 5 mapping table rows produce expected SF state when invoked.
-  - Not-found slug returns `{ warning, slug }` and exits 0 (no exception).
-  - Invalid `linear_status` returns clear error.
-  - Tool appears in MCP tool listing.
-  - Unit tests pass.
+  - `/revops:update-sf-campaign-status --dry-run --slug=... --linear-status=...` returns mapping preview JSON, no SF mutation.
+  - Real invocation against an existing campaign produces SF UPDATE with mapped Status + Substatus__c. Stdout JSON matches `{ campaign_id, campaign_url, campaign_name, status, substatus, updated_at }`.
+  - No-op pre-check: re-invocation with same target status returns `{ ..., noop: true }` exit 0 without UPDATE.
+  - Campaign-not-found: bogus `--slug` returns `{ warning: "campaign_not_found" }` exit 0.
+  - Invalid status: `--linear-status=frozen` returns `{ error: "invalid_status" }` exit 0.
+  - All 5 mapping table rows verified against a throwaway slug.
+  - `pytest plugins/revops/tests/test_update_sf_campaign_status_contracts.py` passes.
+  - Plugin version bumped in both `plugins/revops/.claude-plugin/plugin.json` and the matching `.claude-plugin/marketplace.json` entry.
 - **Complexity**: S
-- **Dependencies**: T2-E
-- **Repo**: revops MCP server repo + britenites-claude-plugins
+- **Dependencies**: T2-E (BC-8717 ✅ shipped 2026-05-19)
+- **Repo**: britenites-claude-plugins (plugin work only — no `brite-salesforce` edits, no upstream `@salesforce/mcp` edits)
 
 ---
 
