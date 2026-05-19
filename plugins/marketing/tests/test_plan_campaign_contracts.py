@@ -177,6 +177,25 @@ def test_allowed_tools_excludes_unused_sf_soql_read() -> None:
     )
 
 
+def test_allowed_tools_excludes_unused_linear_get_issue() -> None:
+    """get_issue is not invoked in the body — plan-campaign uses save_issue,
+    list_milestones, list_projects, list_issue_labels but never reads back an
+    individual issue. Independent PR review flagged this as dead surface area
+    (parallel to test_allowed_tools_excludes_unused_sf_soql_read).
+    """
+    tools = parse_allowed_tools_set()
+    if "mcp__plugin_workflows_linear-server__get_issue" in tools:
+        # Confirm by grepping the body — if a future change DOES use get_issue,
+        # the tool should be re-added and this test relaxed.
+        body = read_command()
+        # Strip the frontmatter so the allowed-tools listing isn't a self-hit.
+        _, doc_body = split_frontmatter()
+        assert "get_issue" in doc_body, (
+            "get_issue is in allowed-tools but never invoked in the spec body. "
+            "Drop it from allowed-tools, or add an explicit invocation to the body."
+        )
+
+
 def test_allowed_tools_includes_linear_and_sf_read_tools() -> None:
     """All required tools are PRESENT in the tokenized allowed-tools set."""
     tools = parse_allowed_tools_set()
