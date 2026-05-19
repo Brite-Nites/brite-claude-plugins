@@ -623,8 +623,9 @@ Each `save_issue` call sets parentId=milestone_id, title prefixed by stand-up ph
    the campaign lifecycle, run:
      /marketing:sync-campaign-status --slug=hotels-resorts-...
        --status=paused  (or killed)
-   This calls the σ3 update_sf_campaign_status MCP tool (BC-8752 /
-   T2-FA) to keep SF Campaign Status in sync with Linear labels.
+   This calls the σ3 /revops:update-sf-campaign-status slash command
+   (BC-8723) wired by BC-8752 / T2-FA to keep SF Campaign Status in
+   sync with Linear labels.
 ```
 
 ### Phase 5 — Execution lifecycle T-21d → T+40d
@@ -745,8 +746,9 @@ The scaffolded campaign now lives across all 4 layers. Roles execute against it 
        - Reads tam-mapping-output.json (target list)
        - Creates EB campaign in emailbison-b2b workspace with the
          locked variant split (80% Angle A / 20% challenger)
-       - Triggers σ3 status sync: update_sf_campaign_status(slug,
-         "active", null) via BC-8752 trigger automation
+       - Triggers σ3 status sync: /revops:update-sf-campaign-status
+         --slug=<slug> --linear-status=active via BC-8752 trigger
+         automation
        - SF Campaign Status flips: Planned → In Progress
        - Linear status:planning label removed; status:active added
        - manifest.email_bison.campaign_id populated
@@ -788,7 +790,8 @@ The scaffolded campaign now lives across all 4 layers. Roles execute against it 
      Output appended to docs/campaigns/labs/learnings.md (existing
      file for Labs entity — append-only forever).
      Sub-issue #8 close triggers σ3 status sync:
-       update_sf_campaign_status(slug, "completed", null) via BC-8752
+       /revops:update-sf-campaign-status --slug=<slug>
+         --linear-status=completed via BC-8752
        SF Campaign Status flips: In Progress → Completed
        Linear status:active label removed; status:completed added.
 
@@ -942,7 +945,7 @@ Used by `/marketing:plan-campaign` Step 4 (BC-8724) + `/marketing:launch-campaig
 | When | What's expected | What happens | Recovery |
 |---|---|---|---|
 | `/marketing:plan-campaign` Step 7b SF auto-create returns `{ error: "..." }` (sf_cli_error, duplicate_slug, missing_owner, invalid_slug_format) | SF Campaign created with `campaign_id` populated in manifest | Manifest gets `campaign_id: null` + warning logged; plan-campaign exits 0 (caller detects failure by parsing the `error` JSON key from `/revops:create-sf-campaign` stdout, NOT by exit code — soft-fail contract per BC-8717) | Operator runs `/marketing:sync-campaign-status --slug=... --status=planning` after SF available |
-| `update_sf_campaign_status` called on slug that doesn't exist in SF | Status updated | Returns `{warning: "campaign_not_found"}` + caller continues | Operator manually runs sync-campaign-status to retry |
+| `/revops:update-sf-campaign-status` called on slug that doesn't exist in SF | Status updated | Returns `{warning: "campaign_not_found"}` + caller continues | Operator manually runs sync-campaign-status to retry |
 | Canonicality validation fails (missing vertical/persona/offer in canonicals.yaml) | plan-campaign scaffolds | Hard-fail with pointer to `/marketing:new-vertical \| new-offer \| new-persona` (BC-8725) | Operator runs the sibling command + retries plan-campaign |
 | `campaign-debrief` Workflow 4 status-sync call fails | SF Status flips to Completed | Soft-fail; learnings.md append still succeeds | Operator runs sync-campaign-status to reconcile |
 | Two-call confirm interrupted | Nothing written | Plan-campaign exits cleanly with no artifacts | Operator re-runs; no cleanup needed |
@@ -1095,7 +1098,7 @@ V3 ratification (BC-8729) determines the outcome. The decision shapes what 5 BCs
    ✓ Performance Dashboard (BC-8715)          ✓ Performance Dashboard (BC-8715)
    ✓ Pipeline-by-Offer-Family Dash (BC-8716)  ✗ Pipeline-by-Offer-Family DROPPED
    ✓ /revops:create-sf-campaign (BC-8717)     ✓ /revops:create-sf-campaign (BC-8717)
-   ✓ update_sf_campaign_status MCP (BC-8723)  ✓ update_sf_campaign_status MCP (BC-8723)
+   ✓ /revops:update-sf-campaign-status (BC-8723) ✓ /revops:update-sf-campaign-status (BC-8723)
    ✓ σ3 trigger automation (BC-8752)          ✓ σ3 trigger automation (BC-8752)
    ✓ portfolio-snapshot --monthly|--quarterly ✗ portfolio-snapshot DROPPED
    ✓ Handbook PR: vocabulary.md (BC-8732)     ? Handbook PRs MAYBE — depends on
