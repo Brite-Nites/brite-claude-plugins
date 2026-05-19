@@ -215,7 +215,22 @@ Acceptance gate: [BC-10321](https://linear.app/brite-nites/issue/BC-10321) (v1.1
 
 **Linear/GitHub workflow gotchas surfaced during iter-3 batch 2:**
 
-- **Linear "Magic Issue ID" PR-title / branch-name auto-close**: PR #254 (brand-hub batch 1 squash) and PR #330 (plugins batch 1 dogfood findings append) both auto-closed BC-10321 on merge — even though the PR bodies had no explicit `Closes BC-10321` line. Cause: Linear's auto-close fires on the PR title *prefix* and branch-name prefix; both PRs led with `BC-10321 ...`. The acceptance gate BC-10321 is multi-batch (3 batches), so the auto-close cycle required tracker-session manual reopens twice (most recent reopen at 2026-05-19T15:34Z). New gotcha filed in user auto-memory as `[[gotcha_linear_pr_title_magic_id_auto_close]]`. Mitigation for batch 2 PRs: lead title with `iter-3 batch 2: ...` or `Brand Hub FDA iter-3 batch 2 — ...` (domain identifier first, NOT BC-10321). Body markdown links like `[BC-10321](https://...)` are safe — auto-close fires on the prefix, not body links. Branch renamed locally from `holden/bc-10321-fda-iter-3-batch-2` to `holden/fda-iter-3-batch-2` before any push. Standing convention going forward for multi-batch "gate" issues: NEVER prefix PR title or branch with the gate issue ID; do prefix the closing per-batch *children* (e.g., `Closes BC-9565 Closes BC-9566`).
+- **Linear "Magic Issue ID" auto-close — three trigger surfaces** (Stage 1 discovered batch 1, Stage 2 discovered batch 2). Linear's auto-close fires on a PR merge when the gate issue ID appears in ANY of three places: (1) PR title prefix, (2) branch-name prefix, OR (3) bare text reference in the squash commit body. Markdown links like `[BC-10321](https://linear.app/...)` appear safe. The acceptance gate [BC-10321](https://linear.app/brite-nites/issue/BC-10321) is multi-batch (3 batches), so any of the three triggers forces a manual reopen until iter-3 is fully done. Cumulative discovery across batches:
+
+  | PR | Title prefix | Branch prefix | Body bare-text ref | Gate result on merge |
+  |---|---|---|---|---|
+  | [#254](https://github.com/Brite-Nites/brand-hub/pull/254) (batch 1, brand-hub) | leading gate ID | leading gate ID | n/a | gate auto-closed |
+  | [#330](https://github.com/Brite-Nites/brite-claude-plugins/pull/330) (batch 1, plugins) | leading gate ID | leading gate ID | n/a | gate auto-closed |
+  | [#255](https://github.com/Brite-Nites/brand-hub/pull/255) (batch 2, brand-hub) | `iter-3 batch 2: ...` ✓ | `holden/fda-iter-3-batch-2` ✓ | none (only markdown links) ✓ | gate stayed In Progress ✓ |
+  | [#332](https://github.com/Brite-Nites/brite-claude-plugins/pull/332) (batch 2, plugins) | `iter-3 batch 2: ...` ✓ | `holden/fda-iter-3-batch-2-dogfood-findings` ✓ | `per BC-NNNNN § AC #7` bare text in body ✗ | gate auto-closed |
+
+  PR [#332](https://github.com/Brite-Nites/brite-claude-plugins/pull/332) was the load-bearing evidence for Stage 2: title + branch were both correctly sanitized, but the PR body — which becomes the squash commit body verbatim — contained a single bare text reference (`per BC-NNNNN § AC #7`), and the gate auto-closed at `17:41:26.036Z` exactly 3 seconds after merge at `17:41:23Z`. Markdown-linked references throughout PR [#255](https://github.com/Brite-Nites/brand-hub/pull/255)'s body did NOT trigger the close — confirming markdown wrapping is the mitigation, not removal of all references. Standing convention for multi-batch gate issues, refined from batch 1's two-axis form:
+
+  1. PR title: NEVER lead with the gate issue ID. Lead with `iter-N batch M: ...` or domain identifier.
+  2. Branch name: NEVER prefix with the gate issue ID.
+  3. PR body / squash commit body: every reference to the gate issue must be a markdown link `[BC-NNNNN](https://...)`. NEVER bare text. Pre-merge audit: `grep "BC-<gate-id>" <body draft>` — every hit must be a markdown link or a `Closes BC-<child>` line for the per-batch children you DO want closed.
+
+  Gotcha tracked in user auto-memory under `gotcha_linear_pr_title_magic_id_auto_close.md` with the 3-axis trigger model. **Open question (not yet tested):** whether body references inside fenced code blocks also trigger. Until tested, treat all body text as a trigger surface.
 
 **Operational notes:**
 
