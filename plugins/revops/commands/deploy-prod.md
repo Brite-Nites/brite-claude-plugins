@@ -252,10 +252,10 @@ Report any field expected in the deploy but missing from the query result.
 If any successes have `componentType: "Flow"`, collect their `fullName` values into `{names}`. The Tooling API `Flow` sObject is per-**version** (one row per version, not per definition) — filter to current states only, excluding historical `Obsolete` versions that would skew Phase 6.4's denominator:
 
 ```bash
-sf data query --use-tooling-api --query "SELECT Id, DeveloperName, Status FROM Flow WHERE DeveloperName IN ({names}) AND Status IN ('Active','Draft')" --target-org brite-prod --json
+sf data query --use-tooling-api --query "SELECT Id, Status, Definition.DeveloperName FROM Flow WHERE Definition.DeveloperName IN ({names}) AND Status IN ('Active','Draft')" --target-org brite-prod --json
 ```
 
-For each returned record: confirm `Status = 'Active'`. **Flag any Flow with `Status = 'Draft'`** — these deployed but require manual activation (this is a known Salesforce platform behavior for Screen Flows via metadata API). Report the full list:
+Each returned record exposes the Flow name at `Definition.DeveloperName` (the Tooling API `Flow` entity itself does not have a `DeveloperName` field — only `FlowDefinition` does, traversed via the `Definition` relationship). For each returned record: confirm `Status = 'Active'`. **Flag any Flow with `Status = 'Draft'`** — these deployed but require manual activation (this is a known Salesforce platform behavior for Screen Flows via metadata API). Report the full list:
 
 > ⚠️ Flow(s) deployed as Draft — require manual activation in Setup → Flows. Affected: `{names}`. Run `/revops:post-deploy-runbook` to walk the activation steps.
 
