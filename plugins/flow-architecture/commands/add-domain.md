@@ -106,7 +106,7 @@ The `domains[]` array always has exactly one entry — the new domain being adde
 | Resume phase | Behavior |
 |---|---|
 | 1 | re-run Phase 1 (preflight + bootstrap is idempotent). |
-| 2 | re-invoke `flow-inventory-add` (domain-add mode) with the stored `target_domain`. Q20.4 idempotency hard-rejects if the domain section already landed; if so, the breadcrumb advances to `current_phase: 3`. |
+| 2 | re-run the § 2.0 classifier against `domains[0].slug` (the persisted target domain code) + Linear MCP overlay. If the classifier returns `inventory-only` AND `domains[0].inventory_only_rescaffold == true`, Branch B (§ 2.B) resumes — re-dispatch `flow-inventory-add` in `inventory-read` mode + re-fire L2 (in-memory) + re-fire Q20.6 with the Branch-B preview surface. Otherwise re-invoke `flow-inventory-add` in `domain-add` mode (Branch A) with `domains[0].slug` as the target; Q20.4 idempotency hard-rejects if the domain section already landed AND `inventory_only_rescaffold` is unset/false; if so, breadcrumb advances to `current_phase: 3`. Branches C / D were terminal on first run if the user picked Cancel (breadcrumb `status: abandoned` → preflight stale-policy offers discard, never re-enters Phase 2); a non-Cancel Branch C/D choice routes through Branch B's resume path on subsequent re-entry. |
 | 3 | re-invoke `flow-linear-scaffold` for the single new domain (N sub-flows inside). Q13.5 sub-flow-atomic recovery applies inside Q13 across the N sub-flows; the milestone-create step is idempotent against the stored `milestone_id`. L3 review state not persisted (re-runs per parking lot #31 v1). |
 | 4 | re-run Phase 4 (`flow-doc-author` for the new domain's N sub-flows). Q15's skip-if-exists per Q15.3 keeps already-written story docs from being clobbered without `--force`. |
 | 5 | re-run Phase 5 (`flow-journey-author` for the new domain). Q16's skip-if-exists per Q16.3 likewise gates the journey-doc clobber. The L2 review state is in-memory only (parking lot #31 v1) — Phase 5 reads its L2 stash from `state.l2_review_<domain>` and re-fires inside the inventory-add step if Phase 2 re-runs first. |
@@ -182,7 +182,7 @@ Q20.6 + Q13.4 do **NOT collapse** — they serve different review purposes (inve
 | Phase | Failure semantics |
 |---|---|
 | 1 | preflight fail-closed per Q36.5. No partial `.flow/config.json` on disk — atomic-rename guarantees absent-or-complete. |
-| 2 | Q20 hard-reject on duplicate per Q20.4 (memory:232 — domain code already exists): write breadcrumb at phase 2 entry → on hard-reject, mark `status: abandoned` with `reason: 'duplicate detected (Q20.4)'` for audit trail (per user lock 2026-05-07, memory:780). Consistent with Q31 lifecycle (Q31.3 accommodates abandoned status — future preflight offers discard); diverges from Q36.5's "no partial state" (which applies to bootstrap config-json, NOT breadcrumbs — different concerns). |
+| 2 | Branch A (classifier=`absent`): Q20 hard-reject on duplicate per Q20.4 (memory:232 — domain code already exists) is now a race-condition signal (the classifier should have routed away from Branch A); write breadcrumb at phase 2 entry → on hard-reject, mark `status: abandoned` with `reason: 'duplicate detected (Q20.4)'` for audit trail (per user lock 2026-05-07, memory:780). Branch B (classifier=`inventory-only`, Q20 amendment 1): user Cancel at the Q20.6 preview → `status: abandoned` with synthetic override `reason: 'inventory-only-rescaffold cancelled at Q20.6 (Q20 amendment 1)'`. Branch C / D failure semantics carry through the user's `AskUserQuestion` choice — Cancel paths write `status: abandoned` with override rows tagging the declined-state reason. Consistent with Q31 lifecycle (Q31.3 accommodates abandoned status — future preflight offers discard); diverges from Q36.5's "no partial state" (which applies to bootstrap config-json, NOT breadcrumbs — different concerns). |
 | 3 | per Q13.5 sub-flow-atomic recovery — failure isolated to one sub-flow inside the N-many. Orchestrator pauses inner loop for user adjudication (`AskUserQuestion`: retry / skip-sub-flow / abort). On user choice "retry" or "skip", inner loop resumes with the next pending sub-flow. |
 | 4 | per Q15.5 log + continue. Per-sub-flow failures within the N-doc batch surface in batch summary; orchestrator does NOT roll back since outputs are filesystem writes reviewable via `git diff` + `verify-docs.sh`. |
 | 5 | per Q16.5 log + continue. Single-domain journey author failure surfaces in batch summary. |
@@ -255,12 +255,59 @@ The `mktemp` file intermediate is the BC-9027 fix: the previous pattern `python3
 
 **Sub-skill:** `flow-inventory-add` (Q20; not yet shipped — orchestrator references by name).
 
-**Inputs handed to the sub-skill:**
+> **Q20 amendment 1 (BC-9971) note.** Phase 2 runs a 4-outcome pre-dispatch classifier (filesystem + Linear MCP) BEFORE dispatching `flow-inventory-add`. The historical "always-dispatch-domain-add" path is preserved only on the `absent` classifier outcome; three additional branches (`inventory-only`, `journey-exists`, `fully-scaffolded-fs`) route differently. See § 2.0 Pre-dispatch classifier (below) and `docs/design-rationale/project_fda_plugin_interview.md` § "Q20 amendment 1" for the canonical rationale + four-outcome table.
+
+**Inputs handed to the sub-skill** (Branch A — when classifier returns `absent`, the only dispatch path):
 
 - `mode: domain-add` — dispatches the heavier mode per Q20 sub-decision 1 (memory:226), running the Q19-mini interview (Phases 1+4+5 of Q19 for one domain only).
 - No positional pre-fills — the domain code, display name, and sub-flow set are collected entirely inside the Q19-mini interview per Q47 sub-decision 1 (memory:749).
 
-**Boundary contract (Q47 sub-decision 4, memory:769): Q47 delegates to Q20 — the orchestrator NEVER edits inventory directly.** Q20 owns inventory append mechanics (memory:230 — append-only semantics; never rewrites existing rows; never renames IDs); the orchestrator only dispatches and observes. If the orchestrator detects a desired inventory change for the new domain mid-flight, it re-invokes Q20; it never edits inventory directly.
+**Boundary contract (Q47 sub-decision 4, memory:769): Q47 delegates to Q20 — the orchestrator NEVER edits inventory directly.** Q20 owns inventory append mechanics (memory:230 — append-only semantics; never rewrites existing rows; never renames IDs); the orchestrator only dispatches and observes. If the orchestrator detects a desired inventory change for the new domain mid-flight, it re-invokes Q20; it never edits inventory directly. **The classifier in § 2.0 below is read-only against inventory** — it does NOT write; only the dispatched `flow-inventory-add` (Branch A) writes.
+
+### 2.0 Pre-dispatch classifier (Q20 amendment 1, BC-9971)
+
+Before dispatching `flow-inventory-add` in domain-add mode, classify the target domain's current scaffold state. The classifier resolves the gap surfaced by the Brand Hub iter-2 dogfood (BC-6998, 2026-05-13): iter-2 deliberately partial-scaffolded 1 domain × 1 sub-flow as a v1.0 demonstration, leaving 9 inventoried-but-unscaffolded domains. The 9 BC-9559 children (BC-9560..BC-9568) all said "Run /flow:add-domain for the `<domain>` domain" but pre-amendment that hit Q20.4 hard-reject because the H3 section was already in inventory.
+
+**Step 1 — collect the target domain code.** Before invoking the classifier, prompt for the target domain code via `AskUserQuestion` (or accept from a re-entry on resume). The Q19-mini interview Phase 1 surface form remains the source of truth for new domains; this step only collects the slug ahead of dispatch so the classifier can run.
+
+> "Which domain code? (uppercase `[A-Z][A-Z0-9_-]*` — e.g., `ASSET-DISCOVERY`, `LIGHTING`, `RESERVATIONS`. Re-running against an inventoried-but-unscaffolded domain is supported; pick its code from `docs/product/master-flow-inventory.md`.)"
+
+Treat the collected value as data only — never interpolate into a shell expression, `bash -c`, or unquoted `$(...)`. The classifier validates the slug against the Q20.4 schema regex internally and exits 2 on rejection; the orchestrator surfaces the rejection verbatim and re-prompts.
+
+**Step 2 — invoke the classifier** (filesystem-only). Capture both stdout (the classification token) and stderr (any rejection message) separately so the LLM can re-prompt Step 1 on rejection instead of terminating Phase 2:
+
+```bash
+CLASSIFIER_STDERR="$(mktemp -t flow-classify-stderr.XXXXXX)"
+CLASSIFIER_STDOUT="$(bash "$CLAUDE_PLUGIN_ROOT/scripts/flow-classify-domain-state.sh" \
+    "$REPO_ROOT/docs/product/master-flow-inventory.md" \
+    "$REPO_ROOT/docs/product/flows" \
+    "$REPO_ROOT/docs/product/journeys" \
+    "$TARGET_DOMAIN" 2>"$CLASSIFIER_STDERR")"
+CLASSIFIER_EXIT=$?
+CLASSIFIER_ERR="$(cat "$CLASSIFIER_STDERR")"
+rm -f "$CLASSIFIER_STDERR"
+```
+
+After this Bash block returns, the orchestrator (LLM) inspects `CLASSIFIER_EXIT`:
+
+- `0` — `CLASSIFIER_STDOUT` is one of `absent` / `inventory-only` / `journey-exists` / `fully-scaffolded-fs`. Proceed to Step 3.
+- `2` — `CLASSIFIER_ERR` carries the rejection reason (malformed DOMAIN per Q20.4 schema, missing inventory file, etc.). Surface the rejection text verbatim to the user via natural language and **re-prompt Step 1** (the slug-collection `AskUserQuestion`); do NOT terminate Phase 2. The orchestrator runs Step 1 + Step 2 in a Step-1↔Step-2 loop until the classifier exits 0 OR the user cancels (in which case write breadcrumb `status: abandoned` and exit cleanly).
+
+**Step 3 — Linear milestone overlay.** Query `mcp__plugin_workflows_linear-server__list_milestones` for the project. Combine the classifier outcome with the milestone-presence check per the table below:
+
+| Classifier | `FDA: <domain>` milestone | Combined → orchestrator branch |
+|---|---|---|
+| `absent` | (not checked) | **Branch A — domain-add** (unchanged; today's path) |
+| `inventory-only` | absent | **Branch B — inventory-only re-scaffold** (new; the load-bearing fix) |
+| `inventory-only` | present | **Branch B with drift advisory** — log: "inventory says inventory-only but Linear milestone exists — possible drift; proceeding with idempotent re-scaffold (milestone-create step is idempotent against stored `milestone_id`)". Then proceed as Branch B. |
+| `journey-exists` | (not checked) | **Branch C — journey-already-authored** |
+| `fully-scaffolded-fs` | (not checked) | **Branch D — fully-scaffolded no-op** |
+
+**Step 4 — dispatch to the appropriate branch** (rest of Phase 2 + Phase 3 ingestion path differ per branch; see § 2.A-D below).
+
+### 2.A Branch A — domain-add (classifier returned `absent`)
+
+This is today's path. Proceed exactly as before this amendment:
 
 **Pre-write breadcrumb stub (two writes inside Phase 2):** the helper script reads `<input-path>` as a **complete** JSON document — it does NOT merge with the on-disk state — so each python3 heredoc MUST include every canonical field per § Phase-exit breadcrumb update. Two distinct writes inside Phase 2:
 
@@ -284,13 +331,82 @@ The `mktemp` file intermediate is the BC-9027 fix: the previous pattern `python3
 
 **Breadcrumb update (end of Phase 2):** per § Phase-exit; next phase is `3`. Phase 3 will flip `domains[0].scaffold_state` from `pending` → `in_progress` → `completed` and populate `milestone_id` + `parent_issue_ids`.
 
-**Failure semantics (Phase 2):** Q20 hard-reject on duplicate per Q20.4 (memory:232 — domain code already has a section). If proposed `<DOMAIN>` already exists as an H3 section, Q20 surfaces a clear error citing line number + redirecting to `/flow:add-sub-flow` (per Q20.4 lock text: "use /flow:add-sub-flow instead") + aborts.
+**Failure semantics (Branch A):** Q20 hard-reject on duplicate per Q20.4 (memory:232 — domain code already has a section). Pre-amendment this fired whenever the H3 section existed; post-amendment the classifier routes such cases away from Branch A, so a Q20.4 hard-reject reaching the user here means the classifier saw `absent` but `flow-inventory-add` saw an H3 — a race condition (a concurrent inventory edit between § 2.0 Step 2 and § 2.A dispatch) or a classifier-vs-skill regex mismatch. Either way, surface the Q20.4 error verbatim (which still includes the canonical hint "use `/flow:add-sub-flow` if you intended to add a sub-flow under an existing domain"), and capture the diagnostic in the breadcrumb's synthetic override row so the operator can distinguish race / regex-drift from genuine user error.
 
 Per Q47 sub-decision 7 + user lock 2026-05-07: on Q20.4 hard-reject, write breadcrumb `status: abandoned` with `reason: 'duplicate detected (Q20.4)'` for audit trail. (Note: the `reason` field referenced here is on the breadcrumb `overrides[]` entry pattern from Q29.5, not a top-level breadcrumb field — append a synthetic override row tagging the duplicate-detect event rather than adding a new top-level field. This preserves Q31.1's schema discipline.) Q31.3 stale-breadcrumb policy will offer discard naturally on the next `/flow:add-domain` invocation.
 
 Inventory parse failure (malformed table, missing grouping section) → Q20 aborts + surfaces line number; orchestrator does NOT auto-repair (would risk silent data loss per Q20 sub-decision 5).
 
 User-cancel at Q20.6 → no write; clean exit; breadcrumb `status: abandoned` (top-level `status` change — no synthetic override row needed for user-cancel).
+
+### 2.B Branch B — inventory-only re-scaffold (classifier returned `inventory-only`)
+
+The new load-bearing path. Unblocks BC-9559 + its 9 children (BC-9560..BC-9568). Do NOT dispatch `flow-inventory-add` — the existing H3 section + sub-flow rows + status tags + persona column ARE the canonical record per Q20 amendment 1.
+
+**Step 1 — log the detected mode.** Surface to stdout:
+
+> "Detected inventory-only domain `<target_domain>` — proceeding to Phase 3 scaffold using existing inventory section as canonical."
+
+**Step 2 — dispatch `flow-inventory-add` in `inventory-read` mode** (Q20 amendment 1 new mode; the orchestrator does NOT re-implement the H3 parser per Q47 sub-decision 4). The sub-skill returns structured metadata that the orchestrator captures into session-state:
+
+- `state.target_domain` — the H3 domain code (echoed back).
+- `state.target_domain_display` — extracted by Q20 from the H3 line.
+- `state.new_sub_flow_ids[]` — every `<DOMAIN>-NN` ID Q20 read from the sub-flow table rows.
+- `state.new_sub_flow_count` — count of sub-flow rows Q20 returned.
+- Per-sub-flow metadata (title, primary persona, Notes / status tag) — Q20-returned row tuples; carried through into the Q13 preview content for Phase 3.
+- `state.inventory_changed = false` — IMPORTANT: this branch does NOT modify inventory, so Phase 6 INDEX regen does not need a fresh trigger from this run; the existing INDEX may already render the inventory section correctly (post-Phase-6 audit will verify).
+- `domains[0].inventory_only_rescaffold = true` — per-domain flag for resume + breadcrumb persistence. Q31.7 forward-tolerance (`v1.x reader is forward-tolerant within major — ignores unknown fields`) covers the new optional `domains[0].inventory_only_rescaffold: bool` breadcrumb field without a Q31 amendment; extending the rule established by `milestone_id` + `new_sub_flow_count` on the same `domains[0]` shape (Q47 sub-decision 7 schema note). A Q31 amendment 3 to formalize the field is a v1.1 candidate.
+
+Q20.5 parse-failure semantics apply at this step exactly as in Branch A: malformed table / missing column header → Q20 aborts + surfaces line number; do NOT auto-repair.
+
+**Step 3 — fire L2 review for the new domain** (CEO + Design parallel, per Q54). Stash headlines in `state.l2_review_<target_domain>` exactly as Branch A does. L2 reviewers read the same inputs they would have read in Branch A — `intent.md` + the existing inventory H3 section. On crash-resume, re-running Branch B re-fires L2.
+
+**Step 4 — fire the Q20.6 confirmation gate with a Branch-B-specific preview surface.** The orchestrator does NOT call `flow-inventory-add` (which owns the Branch-A Q20.6 surface); instead, surface the gate directly:
+
+> "Detected inventory-only domain `<DOMAIN>`. Inventory section at `<H3 line>` (preserves status tags + sub-flow rows verbatim):
+>
+> ```
+> <render of the H3 section + table>
+> ```
+>
+> Proceed to Phase 3 scaffold using this inventory section as canonical?
+>
+> - Approve — proceed to Phase 3 with existing inventory section as canonical.
+> - Cancel — write breadcrumb `status: abandoned` with synthetic override `reason: 'inventory-only-rescaffold cancelled at Q20.6 (Q20 amendment 1)'` and exit cleanly."
+
+Q20 amendment 1 deliberately omits "Edit inline" — editing the inventory section while running Branch B would re-introduce the boundary-contract violation Q47 sub-decision 4 forbids. If the user wants to edit inventory, they cancel here and run `/flow:add-sub-flow` for sub-flow additions, or hand-edit the inventory file + re-run `/flow:add-domain`.
+
+**Step 5 — breadcrumb update.** Write the per-§-Phase-exit breadcrumb with `domains[0]` populated from Step 2 + the new optional field `domains[0].inventory_only_rescaffold: true`.
+
+**Failure semantics (Branch B):**
+
+- Classifier-vs-Linear-milestone drift advisory (per § 2.0 Step 3 table row) — log + continue; Phase 3's milestone-create step is idempotent against any stored `milestone_id`.
+- L2 review failures — log + continue; the journey doc's `## L2 review summary` section becomes empty if L2 produced no headlines (parking lot #31 v1 acceptance).
+- Inventory parse failure (malformed table, missing column header) — abort + surface line number; do NOT auto-repair (same Q20.5 discipline as Branch A).
+- User Cancel at Q20.6 — no write; clean exit; breadcrumb `status: abandoned` per the synthetic override pattern above.
+
+### 2.C Branch C — journey-already-authored (classifier returned `journey-exists`)
+
+This intermediate state usually means Phase 5 (journey author) succeeded but Phase 4 (story docs) failed or was deferred. Surface an `AskUserQuestion`:
+
+> "Domain `<DOMAIN>` has a journey doc at `docs/product/journeys/<domain>.md` but no story docs at `docs/product/flows/<domain>/`. How should I proceed?
+>
+> - Re-run Phase 4 only — invoke `flow-doc-author` for the N sub-flows in the inventory section; skip Phase 5 (journey doc preserved per Q16.3).
+> - Re-run Phases 3-6 with `--force` — clobbers the existing journey doc; treat as Branch B with `--force` propagated to Q15 + Q16.
+> - Cancel — write breadcrumb `status: abandoned` with synthetic override `reason: 'journey-exists state declined at Q20 amendment 1'`."
+
+Capture the user's choice into `state.branch_c_choice` and route Phase 3 entry accordingly.
+
+### 2.D Branch D — fully-scaffolded no-op (classifier returned `fully-scaffolded-fs`)
+
+Surface an `AskUserQuestion`:
+
+> "Domain `<DOMAIN>` already has an inventory section, a journey doc, and at least one story doc on filesystem. Re-scaffolding requires `--force` (clobbers existing journey doc + any story docs whose Q15.3 / Q16.3 skip-if-exists is bypassed). How should I proceed?
+>
+> - Cancel (Recommended) — write breadcrumb `status: abandoned` with synthetic override `reason: 'already-scaffolded (Q20 amendment 1)'` and exit cleanly.
+> - Re-scaffold via `--force` — proceed as Branch B + `--force` on Q15 + Q16."
+
+Default-Recommended is Cancel to mirror Q15.3 / Q16.3 skip-if-exists discipline at the orchestrator scope.
 
 ---
 
@@ -401,7 +517,9 @@ This phase invokes `flow-journey-author` ONCE for the new domain. This is the su
 
 **Sub-skill:** `flow-regen-index` (Q18; not yet shipped — orchestrator references by name).
 
-`state.inventory_changed = true` was set by Q20.7 at the end of Phase 2 — this is the Q47 sub-decision 4 boundary signal that `flow-regen-index` should run. Dispatch `flow-regen-index`. The skill regenerates `docs/product/flows/INDEX.md` from `master-flow-inventory.md` + per-domain story doc presence. Idempotent — re-running yields the same INDEX content for the same input.
+`state.inventory_changed = true` was set by Q20.7 at the end of Phase 2 (Branch A only) — this is the Q47 sub-decision 4 boundary signal that `flow-regen-index` should run. Dispatch `flow-regen-index`. The skill regenerates `docs/product/flows/INDEX.md` from `master-flow-inventory.md` + per-domain story doc presence. Idempotent — re-running yields the same INDEX content for the same input.
+
+> **Q20 amendment 1 note (BC-9971):** on Branch B (`inventory-only` re-scaffold), `state.inventory_changed = false` because the existing inventory section is the canonical record (no append happens). Phase 6 still runs `flow-regen-index` so that the INDEX picks up the new per-sub-flow story doc rows authored in Phase 4 + the journey doc row authored in Phase 5; regen-index is idempotent so a no-op-regen against an already-correct INDEX is also safe. Branches C / D inherit whichever Q15.3 / Q16.3 path their `AskUserQuestion` choice selected.
 
 **Capture into state:** `state.ship_artifacts.index_path = "docs/product/flows/INDEX.md"`.
 
@@ -453,7 +571,8 @@ The breadcrumb append is the **last step** of a phase, after all of the phase's 
 ## See also
 
 - `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:745` — Q47 lock (canonical source; seven sub-decisions + refinement audit trail at line 782). Sub-decision 1 at line 747-749 locks the interactive-only invocation form; sub-decision 4 at line 766-769 locks the `delegates to Q20 — never edits inventory` boundary.
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:224` — Q20 lock (sub-skill ownership boundary; sub-flow-add vs domain-add modes; Q19-mini interview; Q20.4 hard-reject; Q20.6 within-skill gate; Q20.7 `inventory_changed` flag).
+- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:224` — Q20 lock (sub-skill ownership boundary; sub-flow-add vs domain-add modes; Q19-mini interview; Q20.4 hard-reject; Q20.6 within-skill gate; Q20.7 `inventory_changed` flag) + Q20 amendment 1 (BC-9971; inventory-only-domain re-scaffold branch — the four-outcome classifier table is the canonical source for § 2.0 in this file).
+- `plugins/flow-architecture/scripts/flow-classify-domain-state.sh` — Q20 amendment 1 filesystem classifier (BC-9971; emits `absent` / `inventory-only` / `journey-exists` / `fully-scaffolded-fs`).
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` §3c — plugin command surface (where this command sits in the ~17-command catalog).
 - `plugins/flow-architecture/commands/add-sub-flow.md` — sibling incremental-add orchestrator (BC-6965; 5 phases / 2 gates / skips journey-author; this command is the heavier 6-phase variant that authors the new journey doc).
 - `plugins/flow-architecture/commands/start-project.md` — sibling greenfield orchestrator (BC-6962; 8 phases / 4 gates / hybrid control flow; this command's per-sub-flow inner loop is the N=1-domain degenerate case of start-project's per-domain inner loop).

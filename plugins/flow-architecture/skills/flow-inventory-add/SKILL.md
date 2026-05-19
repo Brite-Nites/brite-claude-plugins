@@ -32,14 +32,17 @@ The full design rationale lives in `docs/design-rationale/project_fda_plugin_int
 
 ---
 
-## 1. Two modes dispatched by caller (Q20.1)
+## 1. Modes dispatched by caller (Q20.1)
 
-| Mode | Caller | Inputs | Output |
-|---|---|---|---|
-| `sub-flow-add` | `/flow:add-sub-flow` | target `<DOMAIN>`, optional `flow_id` (auto-suggested), `title`, `primary persona`, `related_flows`, Notes | one new row appended to the domain section |
-| `domain-add` | `/flow:add-domain` | proposed `<DOMAIN>` code + display name | new domain section appended under the appropriate grouping |
+| Mode | Caller | Inputs | Output | Writes? |
+|---|---|---|---|---|
+| `sub-flow-add` | `/flow:add-sub-flow` | target `<DOMAIN>`, optional `flow_id` (auto-suggested), `title`, `primary persona`, `related_flows`, Notes | one new row appended to the domain section | yes |
+| `domain-add` | `/flow:add-domain` (Branch A) | proposed `<DOMAIN>` code + display name | new domain section appended under the appropriate grouping | yes |
+| `inventory-read` (Q20 amendment 1, BC-9971) | `/flow:add-domain` (Branch B) | existing `<DOMAIN>` code already present in inventory | structured H3-section metadata returned to caller (display name, sub-flow rows with `id` / `title` / `primary persona` / `Notes` / status tag, top-level grouping) | **no** |
 
-Mode is determined by the caller. If the skill is somehow invoked standalone without mode context, present an `AskUserQuestion` to pick between the two; do not infer.
+Mode is determined by the caller. If the skill is somehow invoked standalone without mode context, present an `AskUserQuestion` to pick between the three; do not infer.
+
+The `inventory-read` mode preserves Q47 sub-decision 4's boundary (the orchestrator never edits — and never re-parses — inventory directly): when `/flow:add-domain` Phase 2 routes to Branch B per Q20 amendment 1, the orchestrator dispatches this skill in `inventory-read` mode rather than implementing its own H3-section parser. Q20.5 failure recovery applies identically (parse failure → abort + surface line number; do NOT auto-repair).
 
 ---
 
@@ -70,6 +73,33 @@ All unrelated content is preserved verbatim.
 3. Determine the top-level grouping per Q19.4 derivation (PLATFORM FOUNDATIONS / CORE WORKFLOWS / OPERATIONS / single-group fallback).
 4. Insert the new domain block at the end of its grouping (before the next `## ` heading OR `---`).
 
+### Inventory-read (Q20 amendment 1, BC-9971)
+
+1. Regex-locate the target domain section by H3 header: `^### <DOMAIN>[[:space:]]` (whitespace boundary; matches the canonical `### <DOMAIN> --- <display> (N flows)` form AND tolerates legacy em-dash variants per Q20.3 spec divergence).
+2. Parse the H3 line to extract `display` (the `--- <display>` portion) and the flow count (`(N flows)`).
+3. Parse the table immediately following the H3 row-by-row: each row yields `{id, title, primary_persona, notes_or_status_tag}`. Determine the top-level grouping by walking BACKWARD from the H3 line to the nearest `^## ` heading.
+4. Return the structured metadata to the caller — do NOT write. The Q20.4 hard-reject does NOT fire in this mode (the H3 IS expected to exist).
+5. Q20.5 parse-failure semantics apply: malformed table / missing column header / sub-flow ID not matching `<DOMAIN>-NN` → abort + surface line number; do NOT auto-repair.
+
+Return shape (consumed by `/flow:add-domain` § 2.B Step 2):
+
+```
+{
+  "slug":          "<DOMAIN>",                 // echoed from input for round-trip safety
+  "display":       "<display name>",           // parsed from `--- <display>` portion of H3
+  "grouping":      "<PLATFORM FOUNDATIONS|CORE WORKFLOWS|OPERATIONS|...>",  // backward-walk from H3 to nearest `^## ` heading
+  "flow_count":    <integer>,                  // parsed from `(N flows)`; orchestrator may cross-check against `len(sub_flows)`
+  "sub_flows":     [                            // one entry per table row, insertion order preserved
+    { "id": "<DOMAIN>-01", "title": "...", "primary_persona": "...", "notes_or_status_tag": "..." },
+    ...
+  ]
+}
+```
+
+The `grouping` field is returned for forward-compatibility with v1.1 Q19.4-driven routing (e.g., if Phase 3 needs the top-level group for milestone-description population per Q22 schema); v1 orchestrator may discard it.
+
+This mode is purely read-only and reuses Section 3 sub-flow-add's grammar predicates (H3 regex, table-terminator detection, ID-pattern check) — the same parser is the single source of truth across all three modes.
+
 ---
 
 ## 4. Idempotency --- hard-reject on duplicate (Q20.4)
@@ -78,6 +108,16 @@ All unrelated content is preserved verbatim.
 - **Domain-add.** Proposed `<DOMAIN>` code already has a section -> reject with `"<DOMAIN> already exists; use /flow:add-sub-flow instead"`, abort.
 
 Re-run safety: a same-input re-run aborts identically. No half-state ever lands on disk.
+
+### Caller-side guard (Q20 amendment 1, BC-9971)
+
+`/flow:add-domain` Phase 2 now runs a pre-dispatch classifier (`plugins/flow-architecture/scripts/flow-classify-domain-state.sh` + Linear `list_milestones` overlay) BEFORE calling this skill. The classifier returns one of `absent` / `inventory-only` / `journey-exists` / `fully-scaffolded-fs`; routing per outcome:
+
+- `absent` → orchestrator dispatches this skill in `domain-add` mode (the binary Q20.4-applies case).
+- `inventory-only` → orchestrator dispatches this skill in `inventory-read` mode (the new read-only mode in Section 1 above; Q20.4 hard-reject is suppressed in this mode because the H3 IS expected to exist).
+- `journey-exists` / `fully-scaffolded-fs` → orchestrator surfaces an `AskUserQuestion` and does not dispatch this skill at all in v1; user choice may re-route to `inventory-read` + `--force` propagation in subsequent phases.
+
+The Q20.4 hard-reject text above remains the binding safety net for any caller that bypasses the classifier and invokes `domain-add` directly against an already-inventoried `<DOMAIN>` — direct standalone invocation, third-party orchestrators in v1.1+, etc. The Q20.4 contract on `domain-add` mode is unchanged. Cross-link: `commands/add-domain.md` § Phase 2 carries the orchestrator-side implementation; `docs/design-rationale/project_fda_plugin_interview.md` § "Q20 amendment 1" carries the canonical rationale + four-outcome table.
 
 ---
 
@@ -107,6 +147,10 @@ Notes: <notes>
 
 Matches Q19 Phase 5 surface — preview the proposed section + flows; user picks `Approve as-is` / `Edit inline` (slug overrides per Q11 pushback) / `Reject` (exit; user refines intent).
 
+### Inventory-read (0 within-skill confirmations)
+
+Inventory-read is a pure read — no Q20.6 gate fires inside the skill. The caller (`/flow:add-domain` Branch B) owns the Q20.6 confirmation surface using the returned structured metadata as the preview content (see `commands/add-domain.md` § 2.B Step 4). This keeps Q47 sub-decision 4's boundary intact: the orchestrator does not parse inventory, but it does own caller-side UX for read-only flows.
+
 **Gate-budget accounting.** Incremental-add mode is outside Q10's 5/4 retrofit/greenfield gate budget per Q12 mode classification. Q47 governs whether the orchestrator adds gates beyond Q20's.
 
 ---
@@ -115,7 +159,9 @@ Matches Q19 Phase 5 surface — preview the proposed section + flows; user picks
 
 Q20 ends at the master-inventory edit. Per Q18's v1 surface, the `flow-regen-index` skill is auto-invoked at the END of `/flow:add-domain` and `/flow:add-sub-flow` — that's the **orchestrator's** responsibility, not this skill's.
 
-This skill sets a `state.inventory_changed = true` flag in the orchestrator's state object so downstream `flow-regen-index` (and `flow-linear-scaffold`, if applicable) can dispatch. The orchestrator owns the dispatch decision; this skill owns only the write semantics.
+This skill sets a `state.inventory_changed = true` flag in the orchestrator's state object after a successful `sub-flow-add` or `domain-add` write, so downstream `flow-regen-index` (and `flow-linear-scaffold`, if applicable) can dispatch. The orchestrator owns the dispatch decision; this skill owns only the write semantics.
+
+In `inventory-read` mode (Q20 amendment 1), the skill sets `state.inventory_changed = false` because no write occurred — the existing inventory section is consumed verbatim. The orchestrator's Branch B (`commands/add-domain.md` § 2.B) reads this flag to suppress the redundant Phase 6 INDEX-regen trigger that would otherwise fire on `state.inventory_changed = true`.
 
 ---
 
