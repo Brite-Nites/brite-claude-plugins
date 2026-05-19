@@ -273,35 +273,38 @@ Critical path: **T0 → T1-A → T2-E → T4-I → T6-O → T6-P → T7-Q** (7 n
 
 ---
 
-### Task T2-E: Add `create_sf_campaign` write tool to revops:salesforce MCP — [BC-8717](https://linear.app/brite-nites/issue/BC-8717)
+### Task T2-E: Add `/revops:create-sf-campaign` slash command — [BC-8717](https://linear.app/brite-nites/issue/BC-8717)
 
-- **Context**: First per-record write path through the revops:salesforce MCP (existing surface is read-heavy + metadata-deploy). Called by `/marketing:plan-campaign` Step 7b (T4-I) at scaffold time. Soft-fail behavior is load-bearing: plan-campaign MUST proceed even if SF create fails, leaving `manifest.json.salesforce.campaign_id` null for manual reconciliation. **Lookup the MCP source repo**: the `mcp__plugin_revops_salesforce__*` tools are served by an MCP server registered in `plugins/revops/.mcp.json`; the actual server code lives in a sibling repo (likely `brite-salesforce` or a dedicated MCP repo — verify via `cat plugins/revops/.mcp.json` as Step 0). **Idempotency rule**: rejecting on duplicate Name=slug is critical so plan-campaign re-runs are safe.
+- **Context**: First per-record SF write path in the revops plugin. Called by `/marketing:plan-campaign` Step 7b (T4-I) at scaffold time. **Respec'd 2026-05-19 — was originally an MCP write tool.** The `mcp__plugin_revops_salesforce__*` namespace is served by upstream `@salesforce/mcp@0.30.5` (Salesforce-published npm package), so Brite cannot add tools to it. Path 3 (slash command at `plugins/revops/commands/create-sf-campaign.md`) was chosen over Path 1 (stand up a new Brite-owned MCP server) — only two SF write surfaces in GTM v1.0 (T2-E + T2-F), below the threshold where a fresh MCP earns its boilerplate. Skills-compose-skills via the Skill tool is natural composition with `/marketing:plan-campaign`. **Soft-fail behavior is load-bearing**: plan-campaign MUST proceed even if SF create fails, leaving `manifest.json.salesforce.campaign_id` null for manual reconciliation — so every error path exits 0 with structured JSON. **Idempotency rule**: rejecting on duplicate Name=slug is critical so plan-campaign re-runs are safe.
 - **Steps**:
-  1. Read `plugins/revops/.mcp.json` to locate the MCP server source. Read its existing tool definitions to understand the pattern for writes (likely none exist yet; this is the first).
-  2. Add new tool definition `create_sf_campaign` with input schema:
+  1. Author `plugins/revops/commands/create-sf-campaign.md` with frontmatter declaring `description` + `allowed-tools: Bash, mcp__plugin_revops_salesforce__run_soql_query` (upstream MCP — read-only SOQL surface, used for duplicate-slug + owner-lookup prechecks).
+  2. Input flags (all parsed from invocation, missing-flag emits `{ error: "missing_required_flag", flag: "<name>" }` exit 0):
      ```
-     { slug, entity, vertical, persona, offer, year, month, owner_email, launch_date }
+     --slug --entity --vertical --persona --offer --year --month
+     --owner-email --launch-date [--target-org=brite-prod] [--dry-run]
      ```
-     All required. `slug` is the canonical campaign slug (regex `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$`).
-  3. Implementation:
-     - SOQL pre-check: `SELECT Id FROM Campaign WHERE Name = :slug LIMIT 1`. If a row exists, return `{ error: "duplicate_slug", existing_id: <Id> }` and exit (idempotency).
-     - Owner lookup: `SELECT Id FROM User WHERE Email = :owner_email LIMIT 1`. If 0 rows, return error.
-     - Insert Campaign with: `Name = slug`, `Vertical__c = vertical`, `Persona__c = persona`, `Offer__c = offer`, `Entity__c = entity`, `StartDate = launch_date`, `OwnerId = <looked-up Id>`, `Status = "Planned"`.
-     - Construct Campaign URL: `https://<instance>.lightning.force.com/lightning/r/Campaign/<Id>/view`.
-     - Return `{ campaign_id, campaign_url }` on success.
-  4. Add unit tests covering: success, duplicate slug, missing owner, missing required field, SF API error.
-  5. Document in the MCP server's README (or skill `references/`).
-  6. Bump MCP server version. Bump revops plugin.json version + marketplace.json entry (per CLAUDE.md gotcha).
+     `slug` regex `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$`.
+  3. Implementation phases:
+     - Phase 1 — Slug regex validation. Mismatch → `{ error: "invalid_slug_format", slug: "<v>" }` exit 0.
+     - Phase 2 — Idempotency precheck via `mcp__plugin_revops_salesforce__run_soql_query`: `SELECT Id FROM Campaign WHERE Name = '<slug>' LIMIT 1`. Row exists → `{ error: "duplicate_slug", existing_id: "<Id>" }` exit 0.
+     - Phase 3 — Owner lookup: `SELECT Id FROM User WHERE Email = '<owner-email>' AND IsActive = TRUE LIMIT 1`. Empty → `{ error: "missing_owner", email: "<email>" }` exit 0.
+     - Phase 4 — Dry-run: if `--dry-run`, emit preview JSON + exit. No insert attempted.
+     - Phase 5 — Insert via `Bash` shell-out: `sf data create record --sobject Campaign --values "Name='<slug>' Vertical__c='<vertical>' Persona__c='<persona>' Offer__c='<offer>' Entity__c='<entity>' StartDate=<launch-date> OwnerId='<owner-id>' Status='Planned'" --target-org <target-org> --json`. Errors → `{ error: "sf_cli_error", detail: <upstream JSON> }` exit 0 (NOT exit 1).
+     - Phase 6 — Construct URL: `sf org display --target-org <target-org> --json | jq -r .result.instanceUrl` → `<instanceUrl>/lightning/r/Campaign/<id>/view`.
+     - Phase 7 — Success: single-line `{ "campaign_id": "<id>", "campaign_url": "<url>", "campaign_name": "<slug>" }` on stdout.
+  4. Add contract tests at `plugins/revops/tests/test_create_sf_campaign_contracts.py` covering: command file presence, frontmatter shape, all input flags documented, all 5 error keys present, idempotency + owner-lookup SOQL verbatim, soft-fail contract greppable, slug regex verbatim, version bumps.
+  5. Update docs: this section (T2-E), `docs/gtm-campaign-orchestration-README.md` §3.6/§3.7/§5/§7/§7.5 (replace MCP-tool framing with slash-command framing), and `docs/decisions/015-gtm-sigma3-sf-campaign-sync.md` (Decision section). Plugin README is upstream Jaganpro content — no Brite-specific commands listing to extend.
+  6. Bump revops plugin.json version + marketplace.json entry (per CLAUDE.md gotcha).
 - **Validation**:
-  - Tool callable via `mcp__plugin_revops_salesforce__create_sf_campaign(...)` with valid args; returns `{ campaign_id, campaign_url }`.
-  - Duplicate-slug call returns `{ error: "duplicate_slug", existing_id }`.
-  - Missing-owner call returns clear error.
-  - Tool definition appears in `mcp__plugin_revops_salesforce__discover_tools` (or equivalent listing).
-  - Unit test suite passes.
+  - `/revops:create-sf-campaign --dry-run --slug=... ...` returns preview JSON on stdout, no SF mutation.
+  - Real-mode invocation against a throwaway slug + `brite-prod` produces a Campaign record with all custom fields mapped (Vertical/Persona/Offer/Entity/StartDate/OwnerId/Status=Planned). Stdout JSON matches `{ campaign_id, campaign_url, campaign_name }`.
+  - Re-invocation with the same `--slug` returns `{ error: "duplicate_slug", existing_id }` exit 0.
+  - Invocation with bogus `--owner-email` returns `{ error: "missing_owner", email }` exit 0.
+  - `pytest plugins/revops/tests/test_create_sf_campaign_contracts.py` passes.
   - Plugin version bumped in both `plugins/revops/.claude-plugin/plugin.json` and the matching `.claude-plugin/marketplace.json` entry.
 - **Complexity**: M
 - **Dependencies**: T1-A
-- **Repo**: revops MCP server repo + britenites-claude-plugins (plugin.json bump)
+- **Repo**: britenites-claude-plugins (plugin work only — no `brite-salesforce` edits, no upstream `@salesforce/mcp` edits)
 
 ---
 

@@ -1,8 +1,8 @@
-# 015. GTM σ3 — Salesforce Campaign auto-create + status sync via revops MCP
+# 015. GTM σ3 — Salesforce Campaign auto-create + status sync via revops plugin commands
 
-**Status:** Accepted
-**Date:** 2026-05-13
-**Linear:** [BC-8717](https://linear.app/brite-nites/issue/BC-8717) (create_sf_campaign), [BC-8723](https://linear.app/brite-nites/issue/BC-8723) (update_sf_campaign_status), [BC-8752](https://linear.app/brite-nites/issue/BC-8752) (trigger automation)
+**Status:** Accepted (2026-05-13); **amended 2026-05-19** — implementation surface respec'd from MCP write tools to slash commands; design intent unchanged.
+**Date:** 2026-05-13 / amended 2026-05-19
+**Linear:** [BC-8717](https://linear.app/brite-nites/issue/BC-8717) (`/revops:create-sf-campaign`), [BC-8723](https://linear.app/brite-nites/issue/BC-8723) (`/revops:update-sf-campaign-status`), [BC-8752](https://linear.app/brite-nites/issue/BC-8752) (trigger automation)
 **Related ADRs:** [ADR-007](007-revops-plugin-design.md), [ADR-013](013-gtm-three-layer-split.md), [ADR-014](014-gtm-salesforce-portfolio-rollup.md)
 **Companion docs:** [`docs/gtm-campaign-orchestration-README.md`](../gtm-campaign-orchestration-README.md) §3 (SF box) + §3.6 (worked example Step 7), [`docs/designs/gtm-campaign-orchestration-design.md`](../designs/gtm-campaign-orchestration-design.md) §7.5 + §7.8
 
@@ -15,20 +15,20 @@ After ADR-014 (SF = portfolio rollup home), accurate SF state became load-bearin
 ## Decision Drivers
 
 - **Manual sub-issue #4 was high-defect** — every forgotten SF Campaign created portfolio rollup gaps.
-- **revops:salesforce MCP** (per ADR-007) already exists with metadata-deploy + run_soql_query + run_apex_test. Adding write tools is on-pattern.
-- **Soft-fail required** — SF MCP unavailability cannot halt `/marketing:plan-campaign` (BC-8724); operator must be able to scaffold even when SF is down (manifest gets `campaign_id: null`).
+- **revops:salesforce MCP** (per ADR-007) already exists with run_soql_query + metadata-deploy + run_apex_test (read-only / metadata surfaces). Per-record writes are NOT served by upstream `@salesforce/mcp@0.30.5` (Salesforce-published npm package) — adding write tools to that namespace would require a new Brite-owned MCP server. With only two write surfaces in scope (T2-E + T2-F), slash commands sit below the threshold where a fresh MCP server earns its boilerplate.
+- **Soft-fail required** — SF write failure cannot halt `/marketing:plan-campaign` (BC-8724); operator must be able to scaffold even when SF is down (manifest gets `campaign_id: null`).
 - **Status transitions must auto-fire** — sub-issue 6 close → SF "In Progress"; sub-issue 8 close → SF "Completed". Operators forget manual status flips; portfolio rollup needs accurate state.
 - **`paused` overlay** doesn't fit in SF's single-valued Status field — requires a custom `Substatus__c` field.
 
 ## Decision
 
-**σ3 = auto-create SF Campaign at scaffold time + auto-sync status on Linear transitions**, via two new revops:salesforce MCP write tools:
+**σ3 = auto-create SF Campaign at scaffold time + auto-sync status on Linear transitions**, via two new slash commands in the revops plugin (each calling upstream `mcp__plugin_revops_salesforce__run_soql_query` for prechecks + `sf` CLI via Bash for the write):
 
-### 1. `create_sf_campaign(slug, entity, vertical, persona, offer, year, month, owner_email, launch_date)`
+### 1. `/revops:create-sf-campaign --slug --entity --vertical --persona --offer --year --month --owner-email --launch-date [--target-org] [--dry-run]`
 
-Creates SF Campaign with `Name=slug`, `Vertical__c`, `Persona__c`, `Offer__c`, `Entity__c`, `Status="Planned"`, `StartDate=launch_date`, `OwnerId` from owner_email lookup. Called by `/marketing:plan-campaign` Step 7b (BC-8724). Returns `campaign_id` for manifest.json. Soft-fails on duplicate slug or missing owner.
+Creates SF Campaign with `Name=slug`, `Vertical__c`, `Persona__c`, `Offer__c`, `Entity__c`, `Status="Planned"`, `StartDate=launch_date`, `OwnerId` from owner_email lookup. Called by `/marketing:plan-campaign` Step 7b (BC-8724) via the Skill tool. Returns single-line `{ campaign_id, campaign_url, campaign_name }` JSON on stdout for manifest.json. Soft-fails (exit 0 with structured `{ error: "..." }` JSON) on duplicate slug, missing owner, invalid slug format, missing required flag, or `sf` CLI error.
 
-### 2. `update_sf_campaign_status(slug, linear_status, linear_substatus)`
+### 2. `/revops:update-sf-campaign-status --slug --linear-status --linear-substatus`
 
 Looks up SF Campaign by `Name=slug`. Maps Linear status → SF Campaign Status per the locked table:
 
@@ -44,10 +44,10 @@ Soft-fails (returns `warning: campaign_not_found`) when SF Campaign doesn't exis
 
 ### 3. Trigger automation (BC-8752 / T2-FA, audit-fix)
 
-Without trigger wiring, the MCP tool from #2 only fires on manual operator invocation — defeating σ3's intent. BC-8752 wires:
+Without trigger wiring, the slash command from #2 only fires on manual operator invocation — defeating σ3's intent. BC-8752 wires:
 
-- `launch-campaign` final phase → `update_sf_campaign_status(slug, "active", null)` after EB launch
-- `campaign-debrief` Workflow 4 (post-append) → `update_sf_campaign_status(slug, "completed", null)`
+- `launch-campaign` final phase → `/revops:update-sf-campaign-status --slug=<slug> --linear-status=active` after EB launch
+- `campaign-debrief` Workflow 4 (post-append) → `/revops:update-sf-campaign-status --slug=<slug> --linear-status=completed`
 - `/marketing:sync-campaign-status` new command for manual `paused` / `killed` triggers (which don't auto-fire from sub-issue closes)
 
 ### 4. New SF custom field
@@ -68,8 +68,10 @@ Without trigger wiring, the MCP tool from #2 only fires on manual operator invoc
 |---|---|
 | Keep sub-issue #4 manual (no σ3) | Manual step is high-defect; missing SF Campaigns break ADR-014 rollup |
 | Linear webhook → SF status sync (no plugin call sites) | Webhook infrastructure doesn't exist; adds runtime dep that's harder to reason about than skill-call-site triggers |
-| Single mega-tool `sync_sf_campaign(slug, payload)` instead of create + update separately | Creates ambiguity about idempotency (insert vs update); two tools have crisper semantics |
+| Single mega-command `/revops:sync-sf-campaign` instead of create + update separately | Creates ambiguity about idempotency (insert vs update); two commands have crisper semantics |
 | Skip Substatus__c, use prose in Description field | Not filterable in SF list views; ADR-014's "include paused, exclude killed" filter would have no field to query |
+| **Add `create_sf_campaign` + `update_sf_campaign_status` as MCP write tools** (original ADR-015 framing, 2026-05-13) | `mcp__plugin_revops_salesforce__*` is upstream `@salesforce/mcp@0.30.5` (Salesforce-published npm package) — Brite cannot extend it without forking. Two write surfaces is below the ~5-tool threshold where a Brite-owned MCP server earns its boilerplate. Slash commands compose naturally with `/marketing:plan-campaign` via the Skill tool. Respec'd 2026-05-19. |
+| Stand up a new Brite-owned `revops:campaign` MCP server | L-sized + rename cascade for two write tools; below the threshold. Path 1 above. |
 
 ## Cross-references
 
