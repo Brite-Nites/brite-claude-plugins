@@ -135,14 +135,14 @@ Sequential `AskUserQuestion`, **one section at a time** (matches the user-feedba
 5. `## Out of scope` (3–5 bullets; explicit non-goals)
 6. `## Constraints` (technical / business / regulatory; "None material" body acceptable per Q41 lock)
 
-**Per-section UX** (each AskUserQuestion turn):
+**Per-section UX** (each AskUserQuestion turn). The per-section interview uses `AskUserQuestion`'s **free-text-via-`Other`** shape per Q42 amendment 1 (LOCKED 2026-05-18 per BC-9028 — see `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` Q42 amendment 1). `AskUserQuestion` is multi-choice with an automatic `Other` free-text fallback (no pure free-text mode); the canonical pattern is `Other`-as-primary-content-path with 1-2 low-cost drafted options visible:
 
-1. **Display** the Q41 section description as context (verbatim from the template's section-prompt comments — "How we'll know we delivered" for Success criteria, "~50–100 words / one paragraph" for Mission, etc.).
+1. **Display** the Q41 section description as context (verbatim from the template's section-prompt comments — "How we'll know we delivered" for Success criteria, "~50–100 words / one paragraph" for Mission, etc.). The Q41 length guidance (e.g., `~50–100 words`, `3–5 bullets`) renders in the prompt body so it is visible alongside both the drafted options and the `Other` free-text slot.
 2. **If pre-fill present** (per § Hybrid input contract), show the pre-fill content as a starting draft alongside three options:
    - **Approve** — accept the pre-fill as-is and move to the next section.
-   - **Edit** — re-prompt this section with the pre-fill content as a starting value; user revises.
-   - **Replace** — discard the pre-fill, free-text input from scratch with Q41 length guidance shown.
-3. Otherwise (no pre-fill), free-text input prompt with the Q41 length guidance shown inline.
+   - **Edit** — re-prompt this section with the pre-fill content as a starting value; user revises via `Other`.
+   - **Replace** — discard the pre-fill, drop into the free-text-via-`Other` shape below.
+3. **Otherwise (no pre-fill)**, present a single `AskUserQuestion` with 1-2 representative drafted options scoped to common low-cost actions the user might legitimately pick — e.g., `Skip this section (use template default)`, `Use the linked PRD content as-is`, `Match the Linear Build Brief snapshot` — plus the automatic `Other` fallback for free-text capture. **Do not fabricate drafted options that hallucinate the user's project intent** — the drafted options exist as escape hatches, not as anchored boilerplate. Mark exactly one drafted option as `(Recommended)` only when the section legitimately admits a no-content default (e.g., Constraints' Q41-locked `None material` body); otherwise leave drafted options unmarked and let the user reach `Other` for free-text entry. Per-section validation (the soft-warn loop below) fires identically against whichever path the user takes — drafted-option pick OR `Other` free-text.
 
 **Per-section validation (Q42 sub-decision 3 refinement 5 lock).** After each section's input lands, evaluate shape guidance:
 
