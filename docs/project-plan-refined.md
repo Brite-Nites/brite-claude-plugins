@@ -69,7 +69,7 @@ graph TD
 
   subgraph "Tier 2 — revops:salesforce MCP writes"
     T2E[T2-E: create_sf_campaign tool]
-    T2F[T2-F: update_sf_campaign_status tool]
+    T2F[T2-F: /revops:update-sf-campaign-status]
   end
 
   subgraph "Tier 3 — canonicals data layer"
