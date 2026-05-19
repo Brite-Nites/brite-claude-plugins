@@ -555,23 +555,23 @@ Writes `docs/campaigns/labs/hotels-resorts-director-of-resort-experience-holiday
 
 Manifest `linear.milestone_id` + `linear.milestone_url` updated.
 
-**Step 8b** — SF Campaign auto-create (σ3 / via revops MCP):
+**Step 8b** — SF Campaign auto-create (σ3 / via `/revops:create-sf-campaign` slash command, BC-8717):
 
 ```
-   mcp__plugin_revops_salesforce__create_sf_campaign(
-     slug="hotels-resorts-...-fy26-m02",
-     entity="labs",
-     vertical="hotels-resorts",
-     persona="director-of-resort-experience",
-     offer="holiday-anchor-audit",
-     year=2026, month=2,
-     owner_email="marketingadmin@britenites.com",
-     launch_date="2026-02-03"
-   )
+   /revops:create-sf-campaign \
+     --slug=hotels-resorts-...-fy26-m02 \
+     --entity=labs \
+     --vertical=hotels-resorts \
+     --persona=director-of-resort-experience \
+     --offer=holiday-anchor-audit \
+     --year=2026 --month=2 \
+     --owner-email=marketingadmin@britenites.com \
+     --launch-date=2026-02-03
 
-   SF Campaign created. Returns:
-     campaign_id: 701Xx00000ABCDE
-     campaign_url: https://britenites.lightning.force.com/...
+   SF Campaign created. Returns (single-line JSON on stdout):
+     {"campaign_id":"701Xx00000ABCDE",
+      "campaign_url":"https://britenites.lightning.force.com/...",
+      "campaign_name":"hotels-resorts-...-fy26-m02"}
 ```
 
 Manifest `salesforce.campaign_id` + `salesforce.campaign_name` updated. Custom fields written: `Vertical__c`, `Persona__c`, `Offer__c`, `Entity__c`, `Status="Planned"`, `StartDate=2026-02-03`.
@@ -941,7 +941,7 @@ Used by `/marketing:plan-campaign` Step 4 (BC-8724) + `/marketing:launch-campaig
 
 | When | What's expected | What happens | Recovery |
 |---|---|---|---|
-| `/marketing:plan-campaign` Step 7b SF auto-create fails (MCP down, dup slug, missing owner) | SF Campaign created with `campaign_id` populated in manifest | Manifest gets `campaign_id: null` + warning logged; plan-campaign exits 0 | Operator runs `/marketing:sync-campaign-status --slug=... --status=planning` after SF available |
+| `/marketing:plan-campaign` Step 7b SF auto-create returns `{ error: "..." }` (sf_cli_error, duplicate_slug, missing_owner, invalid_slug_format) | SF Campaign created with `campaign_id` populated in manifest | Manifest gets `campaign_id: null` + warning logged; plan-campaign exits 0 (caller detects failure by parsing the `error` JSON key from `/revops:create-sf-campaign` stdout, NOT by exit code — soft-fail contract per BC-8717) | Operator runs `/marketing:sync-campaign-status --slug=... --status=planning` after SF available |
 | `update_sf_campaign_status` called on slug that doesn't exist in SF | Status updated | Returns `{warning: "campaign_not_found"}` + caller continues | Operator manually runs sync-campaign-status to retry |
 | Canonicality validation fails (missing vertical/persona/offer in canonicals.yaml) | plan-campaign scaffolds | Hard-fail with pointer to `/marketing:new-vertical \| new-offer \| new-persona` (BC-8725) | Operator runs the sibling command + retries plan-campaign |
 | `campaign-debrief` Workflow 4 status-sync call fails | SF Status flips to Completed | Soft-fail; learnings.md append still succeeds | Operator runs sync-campaign-status to reconcile |
@@ -956,13 +956,16 @@ Used by `/marketing:plan-campaign` Step 4 (BC-8724) + `/marketing:launch-campaig
                 + Tier 5 migrations independent of Tier 1/2 (BC-8719,
                 BC-8720, BC-8721, BC-8722) → all parallelizable
 
-   Sprint 2-3   Tier 2 revops MCP write tools (BC-8717, BC-8723)
+   Sprint 2-3   Tier 2 SF write commands (BC-8717 /revops:create-sf-campaign,
+                BC-8723 /revops:update-sf-campaign-status — both slash commands
+                per 2026-05-19 respec; upstream @salesforce/mcp is not Brite-owned
+                so write surfaces live as plugin commands, not MCP tools)
                 → depends on Tier 1.A fields
 
    Sprint 3-4   Tier 4 plan-campaign (BC-8724)
                 → depends on Tier 1 + Tier 2 + Tier 3-G
                 Tier 2-FA σ3 trigger automation (BC-8752)
-                → depends on Tier 2 MCPs + Tier 4 command
+                → depends on Tier 2 SF write commands + Tier 4 command
 
    Sprint 4-5   Tier 6 first dogfood + V3 ratification (BC-8727, BC-8729)
                 → depends on Tier 4 + Tier 2-FA + Tier 5-K (slug migration)
@@ -1091,7 +1094,7 @@ V3 ratification (BC-8729) determines the outcome. The decision shapes what 5 BCs
    ✓ 4 SF saved list views (BC-8714)          ✓ 4 SF saved list views (BC-8714)
    ✓ Performance Dashboard (BC-8715)          ✓ Performance Dashboard (BC-8715)
    ✓ Pipeline-by-Offer-Family Dash (BC-8716)  ✗ Pipeline-by-Offer-Family DROPPED
-   ✓ create_sf_campaign MCP (BC-8717)         ✓ create_sf_campaign MCP (BC-8717)
+   ✓ /revops:create-sf-campaign (BC-8717)     ✓ /revops:create-sf-campaign (BC-8717)
    ✓ update_sf_campaign_status MCP (BC-8723)  ✓ update_sf_campaign_status MCP (BC-8723)
    ✓ σ3 trigger automation (BC-8752)          ✓ σ3 trigger automation (BC-8752)
    ✓ portfolio-snapshot --monthly|--quarterly ✗ portfolio-snapshot DROPPED
@@ -1123,8 +1126,8 @@ V3 happens against a **populated dogfood snapshot** (T6-O / BC-8727 first; T7-Q 
 
 | ID | Decision | Locked because |
 |---|---|---|
-| **σ3 (O11)** | Auto-create SF Campaign at scaffold via NEW revops:salesforce MCP `create_sf_campaign` write tool | Linear is orchestration; SF is attribution; keep D2 unchanged; soft-fail path if MCP unavailable |
-| **σ3 scope expansion** | Same MCP also exposes `update_sf_campaign_status` | Status syncs on sub-issue 6/8 closes + status:paused toggle + status:killed transition |
+| **σ3 (O11)** | Auto-create SF Campaign at scaffold via NEW `/revops:create-sf-campaign` slash command (BC-8717 respec'd 2026-05-19 — originally framed as an MCP write tool; the `mcp__plugin_revops_salesforce__*` namespace is upstream `@salesforce/mcp@0.30.5` and not Brite-owned, so write surfaces live as plugin commands instead) | Linear is orchestration; SF is attribution; keep D2 unchanged; soft-fail contract (exit 0 with `{ error }` JSON) preserves plan-campaign forward progress when SF write fails |
+| **σ3 scope expansion** | Sibling `/revops:update-sf-campaign-status` slash command (BC-8723, same architectural pattern) | Status syncs on sub-issue 6/8 closes + status:paused toggle + status:killed transition |
 
 ### Vocabulary canon (5 categories, all locked)
 
@@ -1204,7 +1207,7 @@ The shared vocabulary across all artifacts and Linear issues.
 
 | Term | Definition |
 |---|---|
-| **σ3** | The Salesforce-integration lock from O11. Auto-create SF Campaign via revops:salesforce MCP at plan-campaign scaffold time. Scope expanded by O6.Q1 to include status sync. |
+| **σ3** | The Salesforce-integration lock from O11. Auto-create SF Campaign via `/revops:create-sf-campaign` slash command (BC-8717) at plan-campaign scaffold time. Scope expanded by O6.Q1 to include status sync via `/revops:update-sf-campaign-status` (BC-8723). |
 | **V3** | Marketing buy-in ratification meeting (BC-8729 / T6-P). Load-bearing M2/M3 gate. |
 | **M2 vs M3** | M2 = ship portfolio-snapshot + Pipeline-by-Offer-Family Dashboard + handbook PRs. M3 = drop these; SF Dashboard + Coverage view still ship. V3 decides. |
 
@@ -1250,8 +1253,8 @@ Status legend: `[done]` = shipped + Linear Done; `[wip]` = in flight; `[blocked]
 |  | [BC-8714](https://linear.app/brite-nites/issue/BC-8714) | T1-B | 4 SF saved list views | 1 | S |
 |  | [BC-8715](https://linear.app/brite-nites/issue/BC-8715) | T1-C | Performance Dashboard | 1 | M |
 |  | [BC-8716](https://linear.app/brite-nites/issue/BC-8716) | T1-D | Pipeline by Offer Family Dashboard | 1 | M |
-|  | [BC-8717](https://linear.app/brite-nites/issue/BC-8717) | T2-E | create_sf_campaign MCP tool | 2 | M |
-|  | [BC-8723](https://linear.app/brite-nites/issue/BC-8723) | T2-F | update_sf_campaign_status MCP tool | 2 | S |
+|  | [BC-8717](https://linear.app/brite-nites/issue/BC-8717) | T2-E | `/revops:create-sf-campaign` slash command (respec'd from MCP tool 2026-05-19) | 2 | M |
+|  | [BC-8723](https://linear.app/brite-nites/issue/BC-8723) | T2-F | `/revops:update-sf-campaign-status` slash command (respec'd from MCP tool 2026-05-19) | 2 | S |
 |  | [BC-8752](https://linear.app/brite-nites/issue/BC-8752) | T2-FA | σ3 trigger automation (audit-fix) | 2 | M |
 |  | [BC-8718](https://linear.app/brite-nites/issue/BC-8718) | T3-G | canonicals.yaml backfill (27 verticals) | 3 | M |
 |  | [BC-8730](https://linear.app/brite-nites/issue/BC-8730) | T3-H | D8 persona authorship process doc | 3 | S |
@@ -1323,8 +1326,8 @@ Every locked decision maps to at least one BC, an ADR, or an explicit out-of-sco
 | **O6.Q4** Retro subsumed by D4 + Q3 | — | — | No BC (implicit; handbook PR may reference) |
 | **O6.Q5** portfolio-snapshot ships | BC-8731, BC-8729 | [ADR-014](decisions/014-gtm-salesforce-portfolio-rollup.md) | Command + V3 gate |
 | **O7** brite-gtm = pre-Linear queue | — | — | Out of scope (no plugin work needed) |
-| **O11/σ3** SF auto-create | BC-8717 | [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md) | `create_sf_campaign` MCP tool |
-| **σ3 scope expansion** | BC-8723, BC-8752 | [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md) | `update_sf_campaign_status` + trigger wiring |
+| **O11/σ3** SF auto-create | BC-8717 | [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md) | `/revops:create-sf-campaign` slash command (respec'd 2026-05-19 — upstream `@salesforce/mcp` is not Brite-owned, so write surface lives as a plugin command, not an MCP tool) |
+| **σ3 scope expansion** | BC-8723, BC-8752 | [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md) | `/revops:update-sf-campaign-status` slash command (same architectural pattern as BC-8717) + trigger wiring |
 | **Vocab Identity Q1** Vertical / Market | — | — | No BC; canonical (handbook prose) |
 | **Vocab Identity Q2** ICP / Segment | — | — | No BC; canonical (handbook prose) |
 | **Vocab Identity Q3** 4-layer offer model | BC-8720 | [ADR-017](decisions/017-gtm-offer-posture-rename.md) | Family / Posture / Angle / Specific Instance |
@@ -1364,7 +1367,7 @@ Defensibility surface. For each lock: what we chose, what we rejected, why we re
 | 11 | Status labels (O1) | 4 primary (planning/active/completed/killed) + paused overlay | Single timeline status with paused as fifth primary value | Paused is stackable — campaign can be "active + paused"; overlay model preserves this |
 | 12 | Multi-wave handling (O5) | `-v2` suffix for same-month + new copy | Automatic numeric suffix on any collision | Operator-explicit decision better than silent auto-increment |
 | 13 | brite-gtm future role (O7) | Pre-Linear ideation queue | Regenerated nightly from Linear as snapshot; or retire entirely | Snapshot regeneration introduces stale-vs-live confusion; retiring loses the informal ideation tier |
-| 14 | SF auto-create (σ3 / O11) | NEW revops:salesforce MCP write tool at plan-campaign scaffold | Manual SF Campaign creation as sub-issue 4 | Manual step often forgotten; auto-create closes sub-issue 4 gap |
+| 14 | SF auto-create (σ3 / O11) | NEW `/revops:create-sf-campaign` slash command (BC-8717) at plan-campaign scaffold | Manual SF Campaign creation as sub-issue 4 | Manual step often forgotten; auto-create closes sub-issue 4 gap |
 | 15 | Portfolio rollup home (O6.Q1) | Salesforce list view | Linear native project view; or brite-gtm regen; or plugin-emitted aggregate report | Linear can't aggregate pipeline/revenue; brite-gtm regen recreates stale-vs-live problem; plugin report lives elsewhere from where the data is |
 | 16 | Default view spec (O6.Q2) | Status-grouped, 7 columns, exclude Completed+Killed | Vertical-grouped; or Month-grouped; or 10-column dense default | Status grouping puts funnel-shape visible immediately; lean columns protect Monday scan density |
 | 17 | Cadence map (O6.Q3) | Daily=none / Weekly=2 views / Monthly=Coverage+Dashboard+snapshot / Quarterly=Coverage(FY)+2 Dashboards+snapshot+brite-gtm | Same rollup at all cadences | Different cadences answer different questions; daily glance bloats standup; monthly needs qualitative merge that SF alone can't provide |
