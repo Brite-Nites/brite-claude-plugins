@@ -60,6 +60,23 @@ jobs:
       - name: Run clone-drift classifier regression (BC-7060)
         run: bash plugins/flow-architecture/tests/test-clone-drift.sh
 
+  vslice-inventory-only-rescaffold:
+    # BC-9971 v-slice for the inventory-only-domain re-scaffold classifier
+    # (flow-classify-domain-state.sh) — exercises the four classification
+    # outcomes + input validation against three new fixtures. Advisory
+    # (continue-on-error) per vslice-greenfield precedent.
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 3
+    continue-on-error: true
+    permissions:
+      contents: read  # least-privilege — harness only reads fixture + script
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run BC-9971 inventory-only-rescaffold harness
+        run: bash plugins/flow-architecture/tests/run-inventory-only-rescaffold-vslice.sh
+
   audit-smoke-test:
     # BC-7059 /flow:audit smoke test: exercises the Phase B (deterministic
     # filesystem) gate subset against clean + broken FDA-shape fixtures.
