@@ -1,14 +1,35 @@
-# Canonical entry for the Hotels & Resorts vertical (skeleton).
+# Canonical entry for the Hotels & Resorts vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/hotels-resorts/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
-# BC-8727 (T6-O first dogfood) will promote `director-of-resort-experience`
-# persona + `holiday-anchor-audit` offer per the Cohort-1 lock in README §3.6;
-# kept skeleton here intentionally so the BC-8727 walk exercises Path A end-to-
-# end (canonicality-gate-fails-first → new-persona → new-offer → plan-campaign).
+# Status (handbook taxonomy): Exploring → first Active offer being promoted via
+# BC-8727 (T6-O first dogfood). Per the Cohort-1 lock in README § 3.6.
+#
+# History:
+#   2026-05-13 — skeleton authored (BC-8718 backfill, intentionally kept empty
+#                so the BC-8727 walk would exercise Path A end-to-end).
+#   2026-05-19 — BC-8727 hand-patched persona `director-of-resort-experience`
+#                + offer `holiday-anchor-audit` per the Cohort-1 spec. This is
+#                the workaround for BC-8725 (sibling /marketing:new-persona +
+#                /marketing:new-offer commands not yet shipped). See
+#                docs/plans/gtm-campaign-orchestration-friction-log.md F1.
 slug: hotels-resorts
 display: "Hotels & Resorts"
 playbook_path: "marketing/go-to-market/verticals/hotels-resorts/README.md"
-personas: []
-offers: []
+personas:
+  - slug: director-of-resort-experience
+    display: "Director of Resort Experience"
+    titles:
+      - "Director of Resort Experience"
+      - "Director of Guest Experience"
+      - "Director of Resort Activations"
+      - "Director of Recreation & Resort Activations"
+      - "Director of Guest Experiences"
+      - "VP Resort Experience"
+      - "VP Guest Experience"
+offers:
+  - slug: holiday-anchor-audit
+    display: "Resort Holiday Anchor Audit"
+    status: draft
+    posture: free-asset
+    target_personas:
+      - director-of-resort-experience
+    prose_path: "marketing/go-to-market/verticals/hotels-resorts/offers/holiday-anchor-audit.md"

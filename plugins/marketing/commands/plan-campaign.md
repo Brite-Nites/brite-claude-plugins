@@ -6,6 +6,8 @@ allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_
 
 # /marketing:plan-campaign
 
+> **How this command runs**: When invoked, the model reads this spec and executes each Step (1, 1b, 2, 3, ...) in order using its tool palette (Read, Write, Bash, Skill, the Linear MCP, etc.). There is no separate "runner" or background process — the spec IS the program. To debug a partial run, re-invoke from the failure point with corrected flags or apply hot-patches inline; expect a procedural, multi-turn execution. (Dogfood-surfaced 2026-05-19 BC-8727 / friction-log F2.)
+
 The campaign-scaffolding orchestrator. One invocation creates one campaign across all four layers of Brite's GTM stack:
 
 | Layer | What lands | Source-of-truth |
@@ -130,24 +132,29 @@ Current canonical verticals: <comma-separated verticals[]>
 
 Assert `--persona` ∈ `personas[].slug`.
 
-On miss, HARD-FAIL:
+On miss, HARD-FAIL. When `personas[]` is empty, render `<empty>` for the list (do NOT emit a trailing empty string):
 
 ```
 ERROR: Persona '<--persona>' is not defined for vertical '<--vertical>' in {vertical}.yaml.
 Either correct the slug, OR add it via /marketing:new-persona (BC-8725).
-Current canonical personas: <comma-separated personas[].slug>
+If BC-8725 is not yet shipped, hand-edit plugins/marketing/data/canonicals/{vertical}.yaml per the schema
+(append to personas[] with slug + display + titles[]) and run `python3 plugins/marketing/scripts/lint_canonicals.py`
+to verify before re-invoking. See BC-8727 friction-log F1.
+Current canonical personas: <comma-separated personas[].slug, OR "<empty — vertical has no personas; Path A required>">
 ```
 
 ### 2.3 — Offer existence within vertical
 
 In the same `{vertical}.yaml` content from 2.2, assert `--offer` ∈ `offers[].slug`.
 
-On miss, HARD-FAIL:
+On miss, HARD-FAIL. When `offers[]` is empty, render `<empty>` for the list (do NOT emit a trailing empty string):
 
 ```
 ERROR: Offer '<--offer>' is not defined for vertical '<--vertical>' in {vertical}.yaml.
 Either correct the slug, OR add it via /marketing:new-offer (BC-8725).
-Current canonical offers: <comma-separated offers[].slug>
+If BC-8725 is not yet shipped, hand-edit plugins/marketing/data/canonicals/{vertical}.yaml per the schema
+(append to offers[] with slug + display + posture + status + target_personas) and re-run lint_canonicals.py.
+Current canonical offers: <comma-separated offers[].slug, OR "<empty — vertical has no offers; Path A required>">
 ```
 
 ### 2.4 — Persona ↔ offer compatibility (runtime target_personas check)
@@ -206,26 +213,34 @@ This is upstream-canonicals-lint territory — file an issue against plugins/mar
 
 ### 3.3 — Collision check via Linear
 
-Look up the "Brite GTM" project ID (cached for re-use in Step 8a):
+Look up the "Brite GTM" project (cached for re-use in Steps 8a + 9.0):
 
 ```
 mcp__plugin_workflows_linear-server__list_projects(query="Brite GTM")
 ```
 
-Capture `<gtm-project-id>`. If `list_projects` returns 0 matches, HARD-FAIL — the "Brite GTM" project is a Phase 0 dependency (BC-8712 Task 0) and is meant to exist before plan-campaign ships.
+From the response, capture three values (the response shape includes `id`, `url`, and `teams[]`):
 
-Then check for slug collision:
+- `<gtm-project-id>` ← `projects[0].id`
+- `<project-url>` ← `projects[0].url` (used as the milestone-pointer URL — see Step 8a.5 F8 hot-patch)
+- `<brite-company-team-id>` ← `projects[0].teams[]` filtered to `name === "Brite Company"`, then `.id` (used in Step 8a.6 for the `teamId` arg on `create_issue_label`, which requires a UUID. § 9.0's container-issue + Step 9.1's sub-issue creates use `team: "Brite Company"` by-name on `save_issue` and do NOT need the captured UUID.)
+
+If `list_projects` returns 0 matches, HARD-FAIL — the "Brite GTM" project is a Phase 0 dependency (BC-8712 Task 0) and is meant to exist before plan-campaign ships. If `Brite Company` is absent from `teams[]`, HARD-FAIL — the project must be cross-team-shared with Brite Company (the team that owns all GTM sub-issues).
+
+Then check for slug collision. Note the MCP-tool shape uses `project` (not `projectId`) and accepts NO `query` filter as of 2026-05-19 (BC-8727 friction-log F5/F6 — verified shape):
 
 ```
-mcp__plugin_workflows_linear-server__list_milestones(projectId=<gtm-project-id>, query=<slug>)
+mcp__plugin_workflows_linear-server__list_milestones(project=<gtm-project-id>)
 ```
+
+If the response exceeds the tool-response token limit (~69KB / 200+ milestones), the wrapper writes the full response to a temp file and returns the path. In that case, grep the temp file for `"name":"<slug>"` to detect collision. Otherwise iterate the returned `milestones[]` array and compare `name === <slug>`.
 
 If any returned milestone's `name === <slug>`, enter the collision-resolution loop:
 
 ```
 loop attempt = 2, 3, 4, ..., 9:
   candidate = <base-slug>-v<attempt>
-  re-call list_milestones(projectId=<gtm-project-id>, query=<candidate>)
+  re-call list_milestones(project=<gtm-project-id>)  # same shape as above — no query filter; re-grep the response (or temp file) for "name":"<candidate>"
   if no collision:
     prompt operator with AskUserQuestion:
       Question: "Slug collision detected. Use candidate '<candidate>' instead?"
@@ -433,7 +448,11 @@ gh api repos/brite-nites/handbook/contents/marketing/go-to-market/templates/camp
   -H "Accept: application/vnd.github.v3.raw" 2>/dev/null
 ```
 
-If `gh api` fails (missing auth, file not found, network error), fall back to the inline template in Step 8a.4 below. Capture the template body as `<brief-template>`.
+If `gh api` fails (missing auth, file not found, network error), fall back to the inline template in Step 8a.4 below.
+
+**Slot-availability check** (BC-8727 friction-log F7 — verified 2026-05-19): the handbook template at the path above is gitbook-prose-style and does NOT carry `{{slug}}` / `{{vertical}}` etc. placeholders that the spec at 8a.3 substitutes. If the fetched template lacks any of the slot tokens listed in Step 8a.3, USE THE INLINE FALLBACK at Step 8a.4 — substituting against the handbook template would silently no-op every slot. Detection: `grep -c '{{slug}}' <(echo "$brief_template")` returns 0 → use fallback. The handbook PR to add slot placeholders is a separate follow-up.
+
+Capture the template body as `<brief-template>`.
 
 #### 8a.3 — Slot-substitute the template
 
@@ -538,10 +557,18 @@ mcp__plugin_workflows_linear-server__save_milestone(
 )
 ```
 
-Capture the returned `id` + `url` into `<milestone-id>` + `<milestone-url>`. Update `manifest.json`:
+Capture the returned `id` into `<milestone-id>`. The MCP response shape does NOT include a `url` field (BC-8727 friction-log F8 — verified 2026-05-19). Use the `<project-url>` already captured at Step 3.3 as the milestone pointer (the operator clicks through to the milestone from the project view), and bind it as an alias so downstream sub-steps (§ 9.0 container description, § 9.0 rollback, Step 11 summary, Step 11.3 hand-off) read naturally:
+
+```
+<milestone-url> := <project-url>  # alias — same string; "milestone-url" framing kept for operator semantic clarity downstream
+```
+
+A more specific deep-link format (e.g. with `?selectedMilestone=<id>` or fragment) MAY work but is unverified across Linear UI versions — defer to the project URL as the safe canonical pointer.
+
+Update `manifest.json`:
 
 - `linear.milestone_id` ← `<milestone-id>`
-- `linear.milestone_url` ← `<milestone-url>`
+- `linear.milestone_url` ← `<project-url>` (until Linear MCP exposes a per-milestone URL)
 
 via `Read` → JSON-mutate → `Write` (atomic per-file rewrite — Edit's not available for JSON nesting at the depth we need without risk).
 
@@ -551,12 +578,26 @@ Linear's project-milestone API does NOT accept labels (verified BC-8718 era + ob
 
 **The same 8-label set is the canonical CONSTANT for this orchestrator.** Whenever you see "the 8 labels", "the label set", or label-applying logic referenced from Step 9 / Step 10 / dry-run preview, the membership IS exactly these 8: `slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`. Drift between this enumeration and Step 9's `labels:` field is a defect — the contract test at `plugins/marketing/tests/test_plan_campaign_contracts.py` verifies the two stay in lockstep.
 
-Before Step 9, ensure all 8 label values exist as `IssueLabel` records in the Brite Company team:
+Before Step 9, ensure all 8 label values exist as `IssueLabel` records in the Brite Company team.
 
-1. Enumerate existing labels via `mcp__plugin_workflows_linear-server__list_issue_labels(team="Brite Company")` and build a set of label names already in the workspace. **Bound advisory**: the team's total label count grows monotonically (~8 labels per new campaign-defining tuple). At ~200 campaigns, the unfiltered enumeration returns ~1,600 labels per call. If the Linear MCP exposes a prefix filter, prefer that. Otherwise, accept the linear-growth cost and revisit when label count > 1,000 (track via follow-up if observed).
-2. For each of the 8 label names that's NOT in the existing set, create it via `mcp__plugin_workflows_linear-server__create_issue_label(team="Brite Company", name="<label>")`. The 7 fixed-prefix labels (`slug:`, `entity:`, `vertical:`, etc.) accumulate over time — after the first few plan-campaign runs, almost all subsequent invocations will find every label already present and create none.
+**Filtered lookup (BC-8727 dogfood-verified, 2026-05-19, friction-log F10)**: the Linear MCP `list_issue_labels` accepts a `name:` filter param. Use it per-label to cap each call's response size. Use the `<brite-company-team-id>` captured at Step 3.3 from the project's `teams[]` array:
 
-This step is idempotent (no-op if all 8 already exist) and incurs at most 9 MCP calls per plan-campaign invocation (1 list + up to 8 creates). Both `list_issue_labels` and `create_issue_label` are in `allowed-tools` per the frontmatter; no operator prompt is required.
+```
+for label_name in [slug:<slug>, entity:<entity>, vertical:<vertical>, persona:<persona>,
+                    offer:<offer>, year:<year>, month:<month:02d>, status:planning]:
+  result = mcp__plugin_workflows_linear-server__list_issue_labels(team="Brite Company", name=label_name)
+  if result.labels is empty:
+    mcp__plugin_workflows_linear-server__create_issue_label(name=label_name,
+                                                             teamId=<brite-company-team-id>)
+```
+
+This issues at most 8 list calls + up to 8 create calls = 16 MCP round-trips worst-case (every label missing — i.e. first-ever campaign). Subsequent campaigns hit fewer create branches as the workspace's fixed-prefix label set accumulates.
+
+**Tradeoff note** (per perf-reviewer 2026-05-19): although call count rises vs an unfiltered dump (16 vs 9 worst-case), each filtered call returns O(1) payload — the unfiltered alternative grows O(workspace_labels) and at ~1,600 labels hits the tool-response token cap, triggering the temp-file fallback path. Filtered lookup wins on both context budget + tail latency.
+
+**Pre-filtered alternative** (deferred): when most labels are static across campaigns (`entity:`, `vertical:`, `persona:`, `offer:`, `year:`, `month:`, `status:`), a cached canonical-label set per Brite Company team — refreshed weekly — could collapse 8 list calls to 0. Out of v1 scope; track if profiling shows label pre-check is a measurable hot spot.
+
+Both `list_issue_labels` and `create_issue_label` are in `allowed-tools` per the frontmatter; no operator prompt is required. The step is idempotent (no-op if all 8 already exist).
 
 ---
 
@@ -570,6 +611,8 @@ Skill(
   args: "--slug=<slug> --entity=<entity> --vertical=<vertical> --persona=<persona> --offer=<offer> --year=<year> --month=<month> --owner-email=<owner-email> --launch-date=<launch-date>"
 )
 ```
+
+**Target-org behavior** (BC-8727 friction-log F11, 2026-05-19): the Skill invocation does NOT pass `--target-org` — it relies on the sibling's default of `brite-prod`. In dev environments where `~/.sf/config.json`'s default differs (e.g. `marketing-claude-prod`), the sibling's SOQL calls will hit the operator's session default instead of `brite-prod`, surfacing as `sf_cli_error` per Phase 2/3 (which the soft-fail philosophy handles cleanly). Operators in mixed-org envs should either (a) run `sf config set target-org brite-prod` before invoking, OR (b) pass `--target-org=brite-prod` explicitly by modifying this Skill args string at invocation time. Future v2 of this orchestrator may auto-resolve via `get_username` and propagate; out of v1 scope.
 
 The skill emits a single-line JSON object on stdout per its `Phase 7` / `Phase 6` contracts (success or error).
 
@@ -622,9 +665,9 @@ For each of the 8 sub-issues, call `save_issue` with:
 - `assignee`: omit (sub-issues are assigned at sub-issue start time, not scaffold time)
 - `dueDate`: per the schedule (back-filled from `<launch-date>` — see per-issue spec)
 
-After all 8 creates succeed, do a second pass to wire `blockedBy` relations. The Linear MCP `save_issue` shape for the second pass is **MINIMAL** — `save_issue(id=<sub-issue-id>, blockedById=<id>)` ONLY. Do NOT replay the full field set on the second call; that risks blanking out labels, descriptions, or parentId depending on MCP merge-vs-replace semantics. If the MCP rejects the minimal partial update, file a follow-up — do NOT silently retry with the full field set.
+After all 8 creates succeed, do a second pass to wire `blockedBy` relations. The Linear MCP `save_issue` shape for the second pass is **MINIMAL** — `save_issue(id=<sub-issue-id>, blockedBy=[<id>])` ONLY. The field is `blockedBy` (plural, array of issue IDs/identifiers; append-only per MCP schema), NOT `blockedById`.
 
-If at dogfood (BC-8727) we verify the Linear MCP `save_issue` accepts `blockedById` on the FIRST create call (which would collapse Step 9 to a single pass and halve the MCP round-trip count), update this spec to single-pass and remove the second-pass paragraph.
+**DOGFOOD-VERIFIED 2026-05-19 (BC-8727 friction-log F15)**: the minimal partial update is SAFE — labels, descriptions, parentId, projectMilestone all preserved on the second pass. Spec's earlier worry about merge-vs-replace blanking is unfounded at this MCP version. Keep the two-pass shape for robustness (single-pass would require `blockedBy` to accept forward-references to not-yet-created IDs in the same batch — untested and unlikely).
 
 ### 9.0 — `parentId` resolution: container-issue pattern
 
