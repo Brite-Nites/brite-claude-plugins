@@ -18,6 +18,7 @@ No pytest installed locally? Run as a plain script:
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 from pathlib import Path
@@ -28,7 +29,10 @@ PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 
 
+@functools.lru_cache(maxsize=1)
 def read_command() -> str:
+    # Cached: the command file is immutable for the duration of a test run,
+    # and every test reads it — one disk read instead of one per assertion.
     return COMMAND_PATH.read_text()
 
 
@@ -87,9 +91,9 @@ def test_seven_phase_topics_present() -> None:
         "first-login handoff": ["new-user-first-login.md"],
     }
     missing = {
-        topic: [s for s in needles if s not in body]
+        topic: absent
         for topic, needles in topics.items()
-        if any(s not in body for s in needles)
+        if (absent := [s for s in needles if s not in body])
     }
     assert not missing, f"Phase topics missing from command body: {missing}"
 
@@ -115,21 +119,25 @@ def test_idempotent_early_exit_documented() -> None:
     body = read_command().lower()
     assert "already set up" in body, \
         "Phase 1 must early-exit with an 'already set up' message"
-    assert "zero mutation" in body or "no mutation" in body or "without mutating" in body, (
-        "Phase 1 early-exit must explicitly promise zero mutations"
+    assert "zero mutations" in body, (
+        "Phase 1 early-exit must explicitly promise 'zero mutations'"
     )
 
 
 def test_askuserquestion_at_each_gate() -> None:
-    """One AskUserQuestion per gate (no batched questions). The command has
-    gated phases; AskUserQuestion must appear at least once per non-terminal gate.
+    """Exactly one gate prompt per non-terminal phase (no batched questions).
+
+    Count the literal gate marker the command uses, not raw "AskUserQuestion"
+    substrings (which are inflated by the frontmatter, intro prose, and Rules
+    mentions). Pinning to the 6 gated phases (Phase 7 is the terminal summary)
+    means the assertion breaks if a gate is added, removed, or two are batched
+    into one — which is exactly the AC this test names.
     """
     body = read_command()
-    count = body.count("AskUserQuestion")
-    # 7 phases; Phase 1 may early-exit but still gates. Require >= 6 (terminal
-    # completion phase needs no question). Mirrors deploy-sandbox's per-gate rule.
-    assert count >= 6, (
-        f"Expected >= 6 AskUserQuestion gates (one per gate, no batching); found {count}"
+    gate_prompts = body.count("Ask via `AskUserQuestion`:")
+    assert gate_prompts == 6, (
+        "Expected exactly 6 gate prompts (one per non-terminal phase, Phases 1-6); "
+        f"found {gate_prompts}. A batched or dropped gate would change this count."
     )
 
 
@@ -146,18 +154,48 @@ def test_no_sfdx_legacy_invocations() -> None:
     )
 
 
+def test_no_auto_retry_and_halt_rules_present() -> None:
+    """Two load-bearing safety rules a future edit could silently drop while
+    every other test stays green: 'do not auto-retry' and 'halt on non-proceed'.
+    """
+    body = read_command().lower()
+    assert "auto-retry" in body, \
+        "Command must document the no-auto-retry rule (greppable as 'auto-retry')"
+    assert "halt" in body, \
+        "Command must document halting on a non-proceed gate answer ('halt')"
+
+
+def test_command_has_no_emoji() -> None:
+    """User convention: no emojis in generated content. Check emoji codepoint
+    ranges specifically — NOT a blanket non-ASCII check, which would wrongly
+    reject the command's legitimate typographic `->`-style arrows (U+2192),
+    em-dashes (U+2014), and section signs (U+00A7).
+    """
+    body = read_command()
+    emoji = sorted({
+        c for c in body
+        if 0x1F000 <= ord(c) <= 0x1FAFF      # emoji & pictographs (incl. supplemental)
+        or 0x2600 <= ord(c) <= 0x27BF        # misc symbols + dingbats
+        or 0x2B00 <= ord(c) <= 0x2BFF        # misc symbols & decorative arrows
+        or ord(c) in (0x2122, 0x2139, 0xFE0F, 0x20E3)  # tm, info, VS16, keycap
+    })
+    assert not emoji, (
+        f"Command must contain no emoji (no-emoji convention); found: "
+        f"{[(c, hex(ord(c))) for c in emoji]}"
+    )
+
+
 def test_plugin_json_version_bumped() -> None:
     """plugin-cache gotcha: BC-10657 adds a new command, so revops version MUST
-    be bumped from 0.2.9 and be > 0.2.8 in plugin.json.
+    be bumped above the 0.2.9 baseline on main in plugin.json.
     """
     plugin_data = json.loads(PLUGIN_JSON.read_text())
     version = plugin_data["version"]
-    assert version != "0.2.9", (
-        "plugin.json revops version must be bumped from 0.2.9 — BC-10657 adds a "
-        "new command and clients' plugin cache is keyed by version"
-    )
     parts = tuple(int(p) for p in version.split("."))
-    assert parts > (0, 2, 8), f"revops version {version} must be > 0.2.8"
+    assert parts > (0, 2, 9), (
+        f"revops version {version} must be bumped above the 0.2.9 baseline on main "
+        "— BC-10657 adds a new command and clients' plugin cache is keyed by version"
+    )
 
 
 def test_marketplace_json_version_mirrors_plugin_json() -> None:

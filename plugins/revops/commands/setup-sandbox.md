@@ -28,9 +28,16 @@ Narrate: `Phase 1/7: Detecting current state...`
 Run:
 
 ```bash
-echo "sf:   $(sf --version 2>/dev/null | head -1 || echo MISSING)"
-echo "node: $(node --version 2>/dev/null || echo MISSING)"
-echo "gh:   $(gh auth status 2>&1 | head -1 || echo MISSING)"
+# Probe install state with `command -v` (NOT `cmd | head`: a pipeline's exit
+# status is the last command's, so `cmd | head || echo MISSING` never reports
+# MISSING when `cmd` is absent).
+if command -v sf   >/dev/null 2>&1; then echo "sf:   $(sf --version 2>/dev/null | head -1)"; else echo "sf:   MISSING"; fi
+if command -v node >/dev/null 2>&1; then echo "node: $(node --version 2>/dev/null)"; else echo "node: MISSING"; fi
+if command -v gh   >/dev/null 2>&1; then
+  gh auth status >/dev/null 2>&1 && echo "gh:   OK (authenticated)" || echo "gh:   PRESENT (not authenticated)"
+else
+  echo "gh:   MISSING"
+fi
 echo "--- sf org list ---"
 sf org list --json 2>/dev/null || echo "SF_ORG_LIST_FAILED"
 echo "--- default target-org ---"
@@ -41,7 +48,7 @@ Interpret:
 
 - **`sf` MISSING** → halt. Tell the user: *"The Salesforce CLI (`sf`) is not installed. Install it (`npm install -g @salesforce/cli`, needs Node 18+), open a fresh terminal, then re-run `/revops:setup-sandbox`."* Do not continue.
 - **`node` MISSING** → halt with the equivalent Node install guidance.
-- **`gh` MISSING** → note it as a warning (the revops flow needs `gh` later for shipping, but it does not block sandbox auth). Continue.
+- **`gh` MISSING** or **`gh: PRESENT (not authenticated)`** → note it as a warning (the revops flow needs an authenticated `gh` later for shipping, but it does not block sandbox auth). If present-but-unauthenticated, suggest `gh auth login`. Continue.
 - **Already set up** — `sf org list` shows a `brite-sandbox` alias whose `connectedStatus` is `Connected` AND `sf config get target-org` resolves to `brite-sandbox` → print:
 
   > OK: brite-sandbox is already authenticated and set as your default target-org. Nothing to do.
@@ -106,11 +113,23 @@ Tell the user:
 After the user says they have logged in, verify:
 
 ```bash
-sf org list --json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); orgs=[o for o in (d.get('result',{}).get('nonScratchOrgs',[]) + d.get('result',{}).get('sandboxes',[])) if o.get('alias')=='brite-sandbox' or o.get('username','').find('brite-sandbox')>=0]; print('CONNECTED' if any(o.get('connectedStatus')=='Connected' for o in orgs) else 'NOT_CONNECTED')" 2>/dev/null || sf org list 2>/dev/null | grep -i brite-sandbox || echo "NOT_FOUND"
+sf org list --json 2>/dev/null | python3 -c "
+import json, sys
+try:
+    result = json.load(sys.stdin).get('result', {})
+except Exception:
+    print('PARSE_FAILED'); sys.exit(0)
+orgs = result.get('nonScratchOrgs', []) + result.get('sandboxes', [])
+match = [o for o in orgs if o.get('alias') == 'brite-sandbox']
+print('CONNECTED' if any(o.get('connectedStatus') == 'Connected' for o in match) else 'NOT_CONNECTED')
+" 2>/dev/null || echo "PYTHON_MISSING"
 ```
 
-- `Connected` / a `brite-sandbox` line present → continue.
-- `NOT_CONNECTED` / `NOT_FOUND` → the login did not complete. Surface `sf org list` verbatim, do not auto-retry, and re-ask the gate below after the user retries the login.
+This is a single, local `sf org list` read (no network callout — the deeper probe is Phase 5). Interpret the printed token:
+
+- `CONNECTED` → continue.
+- `NOT_CONNECTED` → the login did not complete. Surface `sf org list` verbatim, do not auto-retry, and re-ask the gate below after the user retries the login.
+- `PARSE_FAILED` / `PYTHON_MISSING` → fall back to reading `sf org list` (plain, not `--json`) yourself and confirm a `brite-sandbox` row shows `Connected`; do not auto-retry.
 
 Ask via `AskUserQuestion`:
 
@@ -135,9 +154,9 @@ Run:
 sf config set target-org brite-sandbox --json
 ```
 
-Parse the JSON via `status === 0`:
+Parse the JSON via `status === 0` (the `set` response already echoes the resolved value — no separate `sf config get` round-trip needed):
 
-- `status: 0` → confirm with `sf config get target-org` and report the resolved value. Continue.
+- `status: 0` → report the value from `result.successes[0].value` (should be `brite-sandbox`). Continue.
 - Any other `status` → surface the error verbatim and halt; do not auto-retry.
 
 Ask via `AskUserQuestion`:
@@ -166,7 +185,7 @@ sf data query --target-org brite-sandbox --query "SELECT Id FROM Organization LI
 
 Parse each via `status === 0`:
 
-- Both `status: 0` and the query returns one record → print the resolved username and instance URL from `sf org display`, and confirm the SOQL returned a row. Continue.
+- Both `status: 0` and the query returns one record → print the resolved username and instance URL from `sf org display`, and confirm the SOQL returned a row. **Note the username** — Phase 6 reuses it (no need to re-run `sf org display`). Continue.
 - Any other `status` → surface the error verbatim and halt. Common causes: session expired (re-run Phase 3), or the org has no API access for this user (escalate to a Brite SF admin). Do not auto-retry.
 
 Ask via `AskUserQuestion`:
@@ -186,12 +205,10 @@ Narrate: `Phase 6/7: Permission self-probe...`
 
 Check whether the authenticated user holds a dev-grade permission set group. This is read-only and never blocks — it only reports what to request.
 
-First get the authenticated username, then query its permission-set-group assignments:
+Reuse the username Phase 5 already resolved (don't re-run `sf org display`). Substitute it for `<sandbox-username>` below — it is the developer's own org username (email-format, so no SOQL-quote hazard). If for some reason you don't have it, fall back to `sf org display --target-org brite-sandbox --json` to fetch `result.username`.
 
 ```bash
-SF_USER="$(sf org display --target-org brite-sandbox --json 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['username'])" 2>/dev/null)"
-echo "Authenticated user: ${SF_USER:-UNKNOWN}"
-sf data query --target-org brite-sandbox --query "SELECT PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '${SF_USER}' AND PermissionSetGroupId != null" --json
+sf data query --target-org brite-sandbox --query "SELECT PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '<sandbox-username>' AND PermissionSetGroupId != null" --json
 ```
 
 Interpret the returned `PermissionSetGroup.DeveloperName` values:
