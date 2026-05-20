@@ -1,5 +1,5 @@
 ---
-description: Sandbox deploy orchestration for brite-salesforce — pre-flight, dry-run, deploy, Apex tests, manual browser verification. Use when you've completed SF metadata changes and want to validate in `brite-sandbox` before opening a PR. Fills the gap between `/workflows:review` and `/workflows:ship` that SF-specific ship discipline requires.
+description: Sandbox deploy orchestration for brite-salesforce — pre-flight, dry-run, deploy, Apex tests, manual browser verification. Use when you've completed SF metadata changes and want to validate in `brite-staging` before opening a PR. Fills the gap between `/workflows:review` and `/workflows:ship` that SF-specific ship discipline requires.
 allowed-tools: Bash, AskUserQuestion
 ---
 
@@ -9,7 +9,7 @@ Execute the phases below sequentially. Use `AskUserQuestion` at each numbered ga
 
 **One question at a time.** Never batch gate questions.
 
-Canonical invocation pattern comes from `brite-salesforce/CLAUDE.md` §Commands + §Development Flow §2. Sandbox alias is `brite-sandbox`. Always pass `--target-org` explicitly — never rely on a default org. Always use `sf`, never legacy `sfdx`.
+Canonical invocation pattern comes from `brite-salesforce/CLAUDE.md` §Commands + §Development Flow §2. Sandbox alias is `brite-staging`. Always pass `--target-org` explicitly — never rely on a default org. Always use `sf`, never legacy `sfdx`.
 
 Out of scope for this command: prod deploy (use `/revops:deploy-prod`), post-deploy manual runbook (use `/revops:post-deploy-runbook`), automating browser verification.
 
@@ -38,10 +38,10 @@ test -f sfdx-project.json && echo "SFDX_PROJECT_OK" || echo "NOT_SFDX"
 
 Ask via `AskUserQuestion`:
 
-- Question: `Deploy to brite-sandbox?`
+- Question: `Deploy to brite-staging?`
 - Options:
-  - `Yes, brite-sandbox` — proceed to Phase 2.
-  - `No, pick a different alias` — halt. Tell the user: *"This command pins `brite-sandbox` by design (from `brite-salesforce/CLAUDE.md` §Development Flow). If you need a different sandbox, run the `sf` commands manually or open an issue to parameterize this command."*
+  - `Yes, brite-staging` — proceed to Phase 2.
+  - `No, pick a different alias` — halt. Tell the user: *"This command pins `brite-staging` by design (from `brite-salesforce/CLAUDE.md` §Development Flow). If you need a different sandbox, run the `sf` commands manually or open an issue to parameterize this command."*
 
 Narrate: `Phase 1/6: Pre-flight checks... done`
 
@@ -54,7 +54,7 @@ Narrate: `Phase 2/6: Dry-run deploy...`
 Run:
 
 ```bash
-sf project deploy start --source-dir force-app --dry-run --target-org brite-sandbox --json
+sf project deploy start --source-dir force-app --dry-run --target-org brite-staging --json
 ```
 
 Parse the JSON response. Treat top-level `status === 0` as success (the stable cross-version exit-code field):
@@ -62,7 +62,7 @@ Parse the JSON response. Treat top-level `status === 0` as success (the stable c
 - `status: 0` → dry-run passed. Extract `result.numberComponentsTotal`, `result.numberComponentsDeployed`, `result.numberTestsTotal` (if present). Report counts to the user.
 - Any other `status` → dry-run failed. Print `result.details.componentFailures[*].problem` for each failure (or the raw JSON if the shape is unexpected). **Halt** with:
 
-  > Dry-run failed in `brite-sandbox`. Fix the errors above locally, then re-run `/revops:deploy-sandbox`. No actual deploy was attempted.
+  > Dry-run failed in `brite-staging`. Fix the errors above locally, then re-run `/revops:deploy-sandbox`. No actual deploy was attempted.
 
   Do **not** continue to Phase 3 under any circumstances.
 
@@ -71,7 +71,7 @@ If dry-run passed, ask via `AskUserQuestion`:
 - Question: `Dry-run passed ({N} components). Proceed to actual sandbox deploy?`
   - Substitute `{N}` with `numberComponentsTotal` from the dry-run response.
 - Options:
-  - `Yes, deploy to brite-sandbox` — proceed to Phase 3.
+  - `Yes, deploy to brite-staging` — proceed to Phase 3.
   - `No, stop here` — **halt** cleanly. Print: *"Stopped after dry-run. No deploy was attempted. Re-run `/revops:deploy-sandbox` when ready."* Exit.
 
 Narrate: `Phase 2/6: Dry-run deploy... done`
@@ -85,7 +85,7 @@ Narrate: `Phase 3/6: Actual sandbox deploy...`
 Run (same command as Phase 2, without `--dry-run`):
 
 ```bash
-sf project deploy start --source-dir force-app --target-org brite-sandbox --json
+sf project deploy start --source-dir force-app --target-org brite-staging --json
 ```
 
 Parse the JSON (same `status === 0` check as Phase 2):
@@ -93,7 +93,7 @@ Parse the JSON (same `status === 0` check as Phase 2):
 - `status: 0` → deploy succeeded. Print `result.numberComponentsDeployed` and `result.id` (the AsyncResult Id, useful for Setup > Deployment Status lookups).
 - Any other `status` → deploy failed after dry-run passed. This is unusual (dry-run normally catches failures) but can happen with rollbacks or race conditions. Print `result.details.componentFailures[*]` verbatim. **Halt** with:
 
-  > Deploy failed in `brite-sandbox` despite dry-run passing. Inspect the errors above and check `Setup > Deployment Status` in the sandbox. Apex tests were not attempted.
+  > Deploy failed in `brite-staging` despite dry-run passing. Inspect the errors above and check `Setup > Deployment Status` in the sandbox. Apex tests were not attempted.
 
   Do **not** continue to Phase 4.
 
@@ -108,7 +108,7 @@ Narrate: `Phase 4/6: Running Apex tests...`
 Run:
 
 ```bash
-sf apex run test --target-org brite-sandbox --wait 10 --json
+sf apex run test --target-org brite-staging --wait 10 --json
 ```
 
 Parse the JSON. Report to the user:
@@ -166,7 +166,7 @@ Tell the user:
 > 1. In the sandbox: **Setup → Object Manager → [Object] → Page Layouts → [any layout] → Edit**.
 > 2. Drag the new picklist field onto the layout anywhere (it doesn't need to stay there permanently).
 > 3. **Save** the layout.
-> 4. Re-deploy: `sf project deploy start --source-dir force-app --target-org brite-sandbox --json`
+> 4. Re-deploy: `sf project deploy start --source-dir force-app --target-org brite-staging --json`
 > 5. Return to the Kanban view — the field should now appear in Group By.
 >
 > ---
@@ -247,7 +247,7 @@ Narrate: `Phase 6/6: Completion... done`
 ## Rules
 
 - **Never skip a gate.** Every mutating phase (2, 3) is preceded by an explicit `AskUserQuestion` confirm. A user response other than the "proceed" option halts the command.
-- **Always pass `--target-org brite-sandbox`.** Never rely on the default org for this command — behavior must be reproducible across machines.
+- **Always pass `--target-org brite-staging`.** Never rely on the default org for this command — behavior must be reproducible across machines.
 - **Parse `--json` output, not stdout strings.** Parsing the human-readable text is fragile; Salesforce CLI's JSON envelope is stable across 2.x versions.
 - **`sf`, not `sfdx`.** Legacy `sfdx` subcommands are deprecated per `brite-salesforce/CLAUDE.md`.
 - **Do not retry on failure.** If any `sf` invocation fails, surface the raw output and halt. Silent retries mask real issues.

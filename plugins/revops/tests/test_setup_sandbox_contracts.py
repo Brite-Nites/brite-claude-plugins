@@ -4,7 +4,7 @@ Slash commands are Claude-orchestrated markdown, not executable code, so these
 tests verify the markdown's contract (frontmatter, declared tools, the seven
 gated phases, key verbatim commands, idempotent early-exit, version bump)
 rather than runtime execution. The live walk (a dev not currently authed to
-brite-sandbox reaching "connected + trivial SOQL returns a row") is recorded
+brite-staging reaching "connected + trivial SOQL returns a row") is recorded
 as a Linear comment on BC-10657, not asserted here.
 
 Pattern mirrors test_create_sf_campaign_contracts.py: read the artifact, assert
@@ -84,8 +84,8 @@ def test_seven_phase_topics_present() -> None:
     topics = {
         "tool detect (sf/node/gh)": ["sf --version", "node --version", "gh auth status"],
         "plugin-installed check": ["claude plugin list"],
-        "authenticate": ["sf org login web --alias brite-sandbox"],
-        "default target-org": ["sf config set target-org brite-sandbox"],
+        "authenticate": ["sf org login web --alias brite-staging"],
+        "default target-org": ["sf config set target-org brite-staging"],
         "connectivity probe": ["select id from organization limit 1"],
         "permission self-probe": ["permissionsetassignment"],
         "first-login handoff": ["new-user-first-login.md"],
@@ -101,11 +101,11 @@ def test_seven_phase_topics_present() -> None:
 def test_key_commands_present_verbatim() -> None:
     body = read_command()
     expected = [
-        "sf org login web --alias brite-sandbox",
-        "sf config set target-org brite-sandbox",
+        "sf org login web --alias brite-staging",
+        "sf config set target-org brite-staging",
         "claude plugin list",
         "sf org list",
-        "sf org display --target-org brite-sandbox",
+        "sf org display --target-org brite-staging",
         "SELECT Id FROM Organization LIMIT 1",
     ]
     missing = [cmd for cmd in expected if cmd not in body]

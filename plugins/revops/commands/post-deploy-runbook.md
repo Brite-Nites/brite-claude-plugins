@@ -218,7 +218,7 @@ Print the list:
 
 For each target org, the update path is:
 
-> **`brite-sandbox`:** `Setup → Security → Named Credentials → {Name} → Edit → set URL to the real sandbox endpoint → Save`
+> **`brite-staging`:** `Setup → Security → Named Credentials → {Name} → Edit → set URL to the real sandbox endpoint → Save`
 >
 > **`brite-prod`:** `Setup → Security → Named Credentials → {Name} → Edit → set URL to the real production endpoint → Save`
 

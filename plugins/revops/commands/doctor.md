@@ -1,5 +1,5 @@
 ---
-description: Re-runnable, zero-mutation Salesforce environment health check for the revops plugin — the SF-specific analogue of /workflows:smoke-test. Verifies the sf CLI, node, gh auth, revops plugin install, revops MCP connectivity, brite-sandbox authentication, default target-org, a trivial SOQL probe, and dev-grade permission-set membership, then prints a PASS/FAIL/WARN/SKIP table with targeted remediation. Run it when /revops:deploy-sandbox mysteriously fails, after a laptop change, or to confirm a teammate is ready before pairing. Triggers on "revops doctor", "salesforce health check", "is my sf environment ok", "diagnose sf".
+description: Re-runnable, zero-mutation Salesforce environment health check for the revops plugin — the SF-specific analogue of /workflows:smoke-test. Verifies the sf CLI, node, gh auth, revops plugin install, revops MCP connectivity, brite-staging authentication, default target-org, a trivial SOQL probe, and dev-grade permission-set membership, then prints a PASS/FAIL/WARN/SKIP table with targeted remediation. Run it when /revops:deploy-sandbox mysteriously fails, after a laptop change, or to confirm a teammate is ready before pairing. Triggers on "revops doctor", "salesforce health check", "is my sf environment ok", "diagnose sf".
 allowed-tools: Bash
 ---
 
@@ -11,10 +11,10 @@ This command **performs no mutations and asks no questions** — it has no gates
 
 Conventions (shared with `/revops:setup-sandbox` and `/revops:deploy-sandbox`):
 
-- Sandbox alias is `brite-sandbox`. Org-scoped probes always pass `--target-org brite-sandbox` explicitly — never rely on an ambient default.
+- Sandbox alias is `brite-staging`. Org-scoped probes always pass `--target-org brite-staging` explicitly — never rely on an ambient default.
 - Use `sf`, never legacy `sfdx`.
 - Parse `--json` output via top-level `status === 0`, not human-readable stdout strings.
-- Probe with the `sf` CLI, **not** the MCP `run_soql_query`: the MCP requires a literal username per call (it rejects an alias), whereas the `sf` CLI accepts `--target-org brite-sandbox` directly.
+- Probe with the `sf` CLI, **not** the MCP `run_soql_query`: the MCP requires a literal username per call (it rejects an alias), whereas the `sf` CLI accepts `--target-org brite-staging` directly.
 
 Out of scope: anything mutating (use `/revops:setup-sandbox`), the first deploy (use `/revops:deploy-sandbox`), and SF org-side user/permission provisioning (admin work).
 
@@ -70,7 +70,7 @@ else
   emit SKIP "revops MCP" "claude CLI not on PATH — cannot check MCP state"
 fi
 
-# 6. brite-sandbox authenticated (Connected)
+# 6. brite-staging authenticated (Connected)
 SB_OK=0
 if [ "${SF_OK:-0}" = "1" ] && [ "$PY_OK" = "1" ]; then
   sb="$(sf org list --json 2>/dev/null | python3 -c "
@@ -78,19 +78,19 @@ import json,sys
 try: r=json.load(sys.stdin).get('result',{})
 except Exception: print('PARSE_FAILED'); sys.exit(0)
 orgs=r.get('nonScratchOrgs',[])+r.get('sandboxes',[])
-m=[o for o in orgs if o.get('alias')=='brite-sandbox']
+m=[o for o in orgs if o.get('alias')=='brite-staging']
 print('CONNECTED' if any(o.get('connectedStatus')=='Connected' for o in m) else ('NOT_CONNECTED' if m else 'ABSENT'))
 " 2>/dev/null || echo PY_FAIL)"
   case "$sb" in
-    CONNECTED) emit PASS "brite-sandbox auth" "Connected"; SB_OK=1;;
-    NOT_CONNECTED) emit FAIL "brite-sandbox auth" "present but not Connected — run /revops:setup-sandbox";;
-    ABSENT) emit FAIL "brite-sandbox auth" "no brite-sandbox alias — run /revops:setup-sandbox";;
-    *) emit FAIL "brite-sandbox auth" "could not parse 'sf org list' ($sb) — run /revops:setup-sandbox";;
+    CONNECTED) emit PASS "brite-staging auth" "Connected"; SB_OK=1;;
+    NOT_CONNECTED) emit FAIL "brite-staging auth" "present but not Connected — run /revops:setup-sandbox";;
+    ABSENT) emit FAIL "brite-staging auth" "no brite-staging alias — run /revops:setup-sandbox";;
+    *) emit FAIL "brite-staging auth" "could not parse 'sf org list' ($sb) — run /revops:setup-sandbox";;
   esac
-elif [ "${SF_OK:-0}" != "1" ]; then emit SKIP "brite-sandbox auth" "sf CLI unavailable"
-else emit SKIP "brite-sandbox auth" "python3 unavailable — cannot parse sf --json"; fi
+elif [ "${SF_OK:-0}" != "1" ]; then emit SKIP "brite-staging auth" "sf CLI unavailable"
+else emit SKIP "brite-staging auth" "python3 unavailable — cannot parse sf --json"; fi
 
-# 7. default target-org == brite-sandbox (WARN, not FAIL, on a different/unset org)
+# 7. default target-org == brite-staging (WARN, not FAIL, on a different/unset org)
 if [ "${SF_OK:-0}" = "1" ] && [ "$PY_OK" = "1" ]; then
   tgt="$(sf config get target-org --json 2>/dev/null | python3 -c "
 import json,sys
@@ -99,8 +99,8 @@ except Exception: print(''); sys.exit(0)
 v=[x.get('value') for x in r if x.get('name')=='target-org']
 print(v[0] if v and v[0] else '')
 " 2>/dev/null)"
-  if [ "$tgt" = "brite-sandbox" ]; then emit PASS "default target-org" "brite-sandbox"
-  elif [ -n "$tgt" ]; then emit WARN "default target-org" "set to '$tgt', not brite-sandbox — run /revops:setup-sandbox or pass --target-org explicitly"
+  if [ "$tgt" = "brite-staging" ]; then emit PASS "default target-org" "brite-staging"
+  elif [ -n "$tgt" ]; then emit WARN "default target-org" "set to '$tgt', not brite-staging — run /revops:setup-sandbox or pass --target-org explicitly"
   else emit WARN "default target-org" "unset — run /revops:setup-sandbox or pass --target-org explicitly"; fi
 elif [ "${SF_OK:-0}" != "1" ]; then emit SKIP "default target-org" "sf CLI unavailable"
 else emit SKIP "default target-org" "python3 unavailable — cannot parse sf --json"; fi
@@ -108,7 +108,7 @@ else emit SKIP "default target-org" "python3 unavailable — cannot parse sf --j
 # 8. trivial SOQL via the sf CLI (proves auth works against the org)
 SOQL_OK=0
 if [ "$SB_OK" = "1" ]; then
-  q="$(sf data query --target-org brite-sandbox --query "SELECT Id FROM Organization LIMIT 1" --json 2>/dev/null | python3 -c "
+  q="$(sf data query --target-org brite-staging --query "SELECT Id FROM Organization LIMIT 1" --json 2>/dev/null | python3 -c "
 import json,sys
 try: d=json.load(sys.stdin)
 except Exception: print('PARSE_FAILED'); sys.exit(0)
@@ -117,18 +117,18 @@ print('ROW' if d.get('status')==0 and d.get('result',{}).get('records') else 'NO
   if [ "$q" = "ROW" ]; then emit PASS "trivial SOQL" "SELECT Id FROM Organization returned a row"; SOQL_OK=1
   else emit FAIL "trivial SOQL" "query failed ($q) — session may be expired (re-run /revops:setup-sandbox) or API access missing (escalate to a Brite SF admin)"; fi
 else
-  emit SKIP "trivial SOQL" "brite-sandbox not Connected"
+  emit SKIP "trivial SOQL" "brite-staging not Connected"
 fi
 
 # 9. PermissionSetAssignment self-probe (informational — never blocks)
 if [ "$SOQL_OK" = "1" ]; then
-  uname="$(sf org display --target-org brite-sandbox --json 2>/dev/null | python3 -c "
+  uname="$(sf org display --target-org brite-staging --json 2>/dev/null | python3 -c "
 import json,sys
 try: print(json.load(sys.stdin).get('result',{}).get('username',''))
 except Exception: print('')
 " 2>/dev/null)"
   if [ -n "$uname" ]; then
-    grp="$(sf data query --target-org brite-sandbox --query "SELECT PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '$uname' AND PermissionSetGroupId != null" --json 2>/dev/null | python3 -c "
+    grp="$(sf data query --target-org brite-staging --query "SELECT PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '$uname' AND PermissionSetGroupId != null" --json 2>/dev/null | python3 -c "
 import json,sys
 try: r=json.load(sys.stdin).get('result',{}).get('records',[])
 except Exception: print(''); sys.exit(0)
@@ -160,8 +160,8 @@ From the emitted `STATUS<TAB>CHECK<TAB>NOTE` lines, render a results table (mirr
 | gh auth             | PASS   | authenticated                                    |
 | revops plugin       | PASS   | installed                                        |
 | revops MCP          | PASS   | salesforce connected                             |
-| brite-sandbox auth  | PASS   | Connected                                        |
-| default target-org  | PASS   | brite-sandbox                                    |
+| brite-staging auth  | PASS   | Connected                                        |
+| default target-org  | PASS   | brite-staging                                    |
 | trivial SOQL        | PASS   | SELECT Id FROM Organization returned a row       |
 | permset self-probe  | PASS   | dev-grade group present (Admin_Group)            |
 
@@ -186,7 +186,7 @@ If there is any `FAIL` or `WARN`, add a **Remediation** section below the table 
 - **No retry.** If a probe fails, surface its status and note; never silently re-run it — silent retries mask real issues.
 - **`sf`, not `sfdx`.** Legacy `sfdx` subcommands are deprecated per `brite-salesforce/CLAUDE.md`.
 - **Parse `--json` via `status === 0`,** not human-readable stdout — the JSON envelope is stable across CLI 2.x versions.
-- **Probe with the `sf` CLI, not the MCP `run_soql_query`.** The MCP rejects an alias and needs a literal username per call; the CLI accepts `--target-org brite-sandbox`.
-- **Always pass `--target-org brite-sandbox`** for org-scoped probes — never rely on an ambient default.
+- **Probe with the `sf` CLI, not the MCP `run_soql_query`.** The MCP rejects an alias and needs a literal username per call; the CLI accepts `--target-org brite-staging`.
+- **Always pass `--target-org brite-staging`** for org-scoped probes — never rely on an ambient default.
 - **Plugin install is distinct from registration.** The plugin check reads `claude plugin list`, not marketplace.json.
 - **WARN never blocks.** A wrong/unset default target-org and a missing permset group are advisory (WARN), not FAIL — the environment may still be usable with explicit `--target-org`.

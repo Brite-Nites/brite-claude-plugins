@@ -4,7 +4,7 @@ Slash commands are Claude-orchestrated markdown, not executable code, so these
 tests verify the markdown's contract (frontmatter, declared tools, the nine
 required checks, the table+Overall+remediation reporting shape, zero-gate /
 zero-mutation / no-retry rules, version bump) rather than runtime execution.
-The live walk (zero-mutation diff + idempotent re-run against brite-sandbox) is
+The live walk (zero-mutation diff + idempotent re-run against brite-staging) is
 recorded as a Linear comment on BC-10660, not asserted here.
 
 Pattern mirrors test_setup_sandbox_contracts.py: read the artifact, assert the
@@ -106,7 +106,7 @@ def test_all_check_topics_present() -> None:
         "gh auth": ["gh auth status"],
         "plugin-installed": ["claude plugin list"],
         "mcp-connected": ["claude mcp list"],
-        "brite-sandbox authed": ["sf org list", "connectedstatus"],
+        "brite-staging authed": ["sf org list", "connectedstatus"],
         "default target-org": ["sf config get target-org"],
         "trivial SOQL": ["select id from organization limit 1"],
         "permset self-probe": ["permissionsetassignment"],
@@ -132,7 +132,7 @@ def test_nine_emit_labels_present() -> None:
     labels = set(re.findall(r'emit (?:PASS|FAIL|WARN|SKIP) "([^"]+)"', body))
     expected = {
         "sf CLI", "node", "gh auth", "revops plugin", "revops MCP",
-        "brite-sandbox auth", "default target-org", "trivial SOQL",
+        "brite-staging auth", "default target-org", "trivial SOQL",
         "permset self-probe",
     }
     assert labels == expected, (
@@ -149,7 +149,7 @@ def test_key_commands_present_verbatim() -> None:
         "claude mcp list",
         "sf org list",
         "sf config get target-org",
-        "sf data query --target-org brite-sandbox",
+        "sf data query --target-org brite-staging",
         "SELECT Id FROM Organization LIMIT 1",
         "PermissionSetAssignment",
     ]
@@ -179,7 +179,7 @@ def test_warn_and_skip_severity_routing() -> None:
     required = [
         r'emit WARN "default target-org"',
         r'emit WARN "permset self-probe"',
-        r'emit SKIP "brite-sandbox auth"',
+        r'emit SKIP "brite-staging auth"',
         r'emit SKIP "trivial SOQL"',
     ]
     missing = [pat for pat in required if not re.search(pat, body)]

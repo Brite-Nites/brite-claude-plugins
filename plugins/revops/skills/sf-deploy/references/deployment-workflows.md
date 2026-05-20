@@ -175,7 +175,7 @@ Full architecture: brite-salesforce/`docs/ci-architecture.md`. Scratch preproces
    ```bash
    sf project deploy start \
      --source-dir force-app/main/default/lwc \
-     --target-org brite-sandbox \
+     --target-org brite-staging \
      --test-level NoTestRun \
      --wait 15
    ```

@@ -1,21 +1,21 @@
 ---
-description: Guided, gated setup that gets a developer authenticated to the brite-sandbox Salesforce org and ready to use the revops plugin end-to-end. Detects current state, then walks one step at a time through sf CLI / plugin-install checks, browser login, default target-org, a connectivity SOQL probe, and a permission self-check. Use on first-time Salesforce onboarding, when you need sandbox access, when "sf org display" fails, or when revops commands error because no org is authenticated. Triggers on "set up salesforce", "sandbox access", "revops onboarding", "first time salesforce", "setup sandbox".
+description: Guided, gated setup that gets a developer authenticated to the brite-staging Salesforce org and ready to use the revops plugin end-to-end. Detects current state, then walks one step at a time through sf CLI / plugin-install checks, browser login, default target-org, a connectivity SOQL probe, and a permission self-check. Use on first-time Salesforce onboarding, when you need sandbox access, when "sf org display" fails, or when revops commands error because no org is authenticated. Triggers on "set up salesforce", "sandbox access", "revops onboarding", "first time salesforce", "setup sandbox".
 allowed-tools: Bash, Read, AskUserQuestion
 ---
 
 # /revops:setup-sandbox
 
-Get a developer from "no Salesforce auth" to "connected to `brite-sandbox`, default target-org set, and a trivial SOQL returns a row" — the laptop-side prerequisites every other revops command (`/revops:deploy-sandbox`, `/revops:deploy-prod`, `/revops:post-deploy-runbook`) silently assumes.
+Get a developer from "no Salesforce auth" to "connected to `brite-staging`, default target-org set, and a trivial SOQL returns a row" — the laptop-side prerequisites every other revops command (`/revops:deploy-sandbox`, `/revops:deploy-prod`, `/revops:post-deploy-runbook`) silently assumes.
 
 Execute the phases below sequentially. Use `AskUserQuestion` at each numbered gate so the user explicitly acknowledges the state before any mutating step. **One question at a time — never batch gate questions.** If the user answers anything other than the proceed option, halt and help with their blocker before re-asking; do not re-run earlier phases silently.
 
 Conventions (from `brite-salesforce/CLAUDE.md` §Development Flow and `plugins/revops/.mcp.json`):
 
-- Sandbox alias is `brite-sandbox`. Always pass `--target-org brite-sandbox` explicitly — never rely on an ambient default.
+- Sandbox alias is `brite-staging`. Always pass `--target-org brite-staging` explicitly — never rely on an ambient default.
 - Use `sf`, never legacy `sfdx`.
 - Parse `--json` output via top-level `status === 0`, not human-readable stdout strings.
 - The revops MCP runs `@salesforce/mcp --orgs DEFAULT_TARGET_ORG`, so it follows whatever the default target-org resolves to — that is why Phase 4 sets it.
-- This command performs the connectivity probe with the `sf` CLI, **not** the MCP `run_soql_query`: the MCP requires a literal username per call (it rejects an alias), whereas the `sf` CLI accepts `--target-org brite-sandbox` directly.
+- This command performs the connectivity probe with the `sf` CLI, **not** the MCP `run_soql_query`: the MCP requires a literal username per call (it rejects an alias), whereas the `sf` CLI accepts `--target-org brite-staging` directly.
 
 Out of scope: SF org-side user/permission provisioning (admin work), Kells' email de-scramble (BC-10658), the re-runnable health check (use `/revops:doctor`, BC-10660), and the first deploy (use `/revops:deploy-sandbox`).
 
@@ -49,17 +49,17 @@ Interpret:
 - **`sf` MISSING** → halt. Tell the user: *"The Salesforce CLI (`sf`) is not installed. Install it (`npm install -g @salesforce/cli`, needs Node 18+), open a fresh terminal, then re-run `/revops:setup-sandbox`."* Do not continue.
 - **`node` MISSING** → halt with the equivalent Node install guidance.
 - **`gh` MISSING** or **`gh: PRESENT (not authenticated)`** → note it as a warning (the revops flow needs an authenticated `gh` later for shipping, but it does not block sandbox auth). If present-but-unauthenticated, suggest `gh auth login`. Continue.
-- **Already set up** — `sf org list` shows a `brite-sandbox` alias whose `connectedStatus` is `Connected` AND `sf config get target-org` resolves to `brite-sandbox` → print:
+- **Already set up** — `sf org list` shows a `brite-staging` alias whose `connectedStatus` is `Connected` AND `sf config get target-org` resolves to `brite-staging` → print:
 
-  > OK: brite-sandbox is already authenticated and set as your default target-org. Nothing to do.
+  > OK: brite-staging is already authenticated and set as your default target-org. Nothing to do.
   > Next: `/revops:doctor` (re-check health) or `/revops:deploy-sandbox` (first deploy).
 
   Then **exit immediately**. This early-exit path performs **zero mutations** — no `sf org login`, no `sf config set`.
-- **Not yet set up** (no `brite-sandbox` entry, or it is not Connected, or the default target-org is something else) → summarize what is present vs. missing, then proceed.
+- **Not yet set up** (no `brite-staging` entry, or it is not Connected, or the default target-org is something else) → summarize what is present vs. missing, then proceed.
 
 Ask via `AskUserQuestion`:
 
-- Question: `sf and node detected. Continue setting up brite-sandbox access?`
+- Question: `sf and node detected. Continue setting up brite-staging access?`
 - Options:
   - `Yes, continue` — proceed to Phase 2.
   - `No, stop` — halt cleanly. Print: *"Stopped at detection. Nothing was changed. Re-run `/revops:setup-sandbox` when ready."* Exit.
@@ -96,9 +96,9 @@ Narrate: `Phase 2/7: Plugin-install check... done`
 
 ---
 
-## Phase 3 — Authenticate to brite-sandbox
+## Phase 3 — Authenticate to brite-staging
 
-Narrate: `Phase 3/7: Authenticating to brite-sandbox...`
+Narrate: `Phase 3/7: Authenticating to brite-staging...`
 
 Tell the user:
 
@@ -112,10 +112,10 @@ Tell the user:
 >
 > **Step 2 — run the login command** (substituting your URL):
 > ```bash
-> sf org login web --alias brite-sandbox --instance-url https://<instance>--<sandbox>.sandbox.my.salesforce.com
+> sf org login web --alias brite-staging --instance-url https://<instance>--<sandbox>.sandbox.my.salesforce.com
 > ```
 >
-> A browser tab opens at the sandbox login page. Use your **sandbox** credentials (sandbox usernames carry a suffix such as `.bndev` after your normal username). After the browser shows "successfully authorized," return here.
+> A browser tab opens at the sandbox login page. Use your **sandbox** credentials (sandbox usernames carry a suffix such as `.britstag` after your normal username). After the browser shows "successfully authorized," return here.
 
 After the user says they have logged in, verify:
 
@@ -127,7 +127,7 @@ try:
 except Exception:
     print('PARSE_FAILED'); sys.exit(0)
 orgs = result.get('nonScratchOrgs', []) + result.get('sandboxes', [])
-match = [o for o in orgs if o.get('alias') == 'brite-sandbox']
+match = [o for o in orgs if o.get('alias') == 'brite-staging']
 print('CONNECTED' if any(o.get('connectedStatus') == 'Connected' for o in match) else 'NOT_CONNECTED')
 " 2>/dev/null || echo "PYTHON_MISSING"
 ```
@@ -136,16 +136,16 @@ This is a single, local `sf org list` read (no network callout — the deeper pr
 
 - `CONNECTED` → continue.
 - `NOT_CONNECTED` → the login did not complete. Surface `sf org list` verbatim, do not auto-retry, and re-ask the gate below after the user retries the login.
-- `PARSE_FAILED` / `PYTHON_MISSING` → fall back to reading `sf org list` (plain, not `--json`) yourself and confirm a `brite-sandbox` row shows `Connected`; do not auto-retry.
+- `PARSE_FAILED` / `PYTHON_MISSING` → fall back to reading `sf org list` (plain, not `--json`) yourself and confirm a `brite-staging` row shows `Connected`; do not auto-retry.
 
 Ask via `AskUserQuestion`:
 
-- Question: `Does 'sf org list' show brite-sandbox as Connected?`
+- Question: `Does 'sf org list' show brite-staging as Connected?`
 - Options:
   - `Yes, Connected` — proceed to Phase 4.
   - `No, login failed` — halt and help: confirm they used sandbox (not production) credentials and the correct sandbox-suffixed username, then re-run the login and re-ask. Do not proceed.
 
-Narrate: `Phase 3/7: Authenticating to brite-sandbox... done`
+Narrate: `Phase 3/7: Authenticating to brite-staging... done`
 
 ---
 
@@ -153,24 +153,24 @@ Narrate: `Phase 3/7: Authenticating to brite-sandbox... done`
 
 Narrate: `Phase 4/7: Setting default target-org...`
 
-Explain: the revops MCP and skills resolve `DEFAULT_TARGET_ORG` (see `plugins/revops/.mcp.json`) to whatever your default target-org is. Setting it to `brite-sandbox` makes the MCP point at the sandbox without per-call org flags.
+Explain: the revops MCP and skills resolve `DEFAULT_TARGET_ORG` (see `plugins/revops/.mcp.json`) to whatever your default target-org is. Setting it to `brite-staging` makes the MCP point at the sandbox without per-call org flags.
 
 Run:
 
 ```bash
-sf config set target-org brite-sandbox --global --json
+sf config set target-org brite-staging --global --json
 ```
 
 The `--global` flag is required when the working directory is not an SFDX project (e.g. `~/.claude/plugins/...`). Without it, `sf` throws `InvalidProjectWorkspaceError`. `--global` writes to `~/.sf/config.json` and applies across all directories.
 
 Parse the JSON via `status === 0` (the `set` response already echoes the resolved value — no separate `sf config get` round-trip needed):
 
-- `status: 0` → report the value from `result.successes[0].value` (should be `brite-sandbox`). Continue.
+- `status: 0` → report the value from `result.successes[0].value` (should be `brite-staging`). Continue.
 - Any other `status` → surface the error verbatim and halt; do not auto-retry.
 
 Ask via `AskUserQuestion`:
 
-- Question: `Default target-org now set to brite-sandbox?`
+- Question: `Default target-org now set to brite-staging?`
 - Options:
   - `Yes` — proceed to Phase 5.
   - `No / errored` — halt, surface the error, help, and re-ask. Do not proceed.
@@ -188,8 +188,8 @@ Prove the auth actually works against the org — using the `sf` CLI (not the MC
 Run:
 
 ```bash
-sf org display --target-org brite-sandbox --json
-sf data query --target-org brite-sandbox --query "SELECT Id FROM Organization LIMIT 1" --json
+sf org display --target-org brite-staging --json
+sf data query --target-org brite-staging --query "SELECT Id FROM Organization LIMIT 1" --json
 ```
 
 Parse each via `status === 0`:
@@ -199,7 +199,7 @@ Parse each via `status === 0`:
 
 Ask via `AskUserQuestion`:
 
-- Question: `Did the connectivity probe return a row from brite-sandbox?`
+- Question: `Did the connectivity probe return a row from brite-staging?`
 - Options:
   - `Yes, a row came back` — proceed to Phase 6.
   - `No, it failed` — halt and surface the error; help diagnose (re-auth vs. API-access escalation), then re-ask. Do not proceed.
@@ -214,10 +214,10 @@ Narrate: `Phase 6/7: Permission self-probe...`
 
 Check whether the authenticated user holds a dev-grade permission set group. This is read-only and never blocks — it only reports what to request.
 
-Reuse the username Phase 5 already resolved (don't re-run `sf org display`). Substitute it for `<sandbox-username>` below — it is the developer's own org username (email-format, so no SOQL-quote hazard). If for some reason you don't have it, fall back to `sf org display --target-org brite-sandbox --json` to fetch `result.username`.
+Reuse the username Phase 5 already resolved (don't re-run `sf org display`). Substitute it for `<sandbox-username>` below — it is the developer's own org username (email-format, so no SOQL-quote hazard). If for some reason you don't have it, fall back to `sf org display --target-org brite-staging --json` to fetch `result.username`.
 
 ```bash
-sf data query --target-org brite-sandbox --query "SELECT PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '<sandbox-username>' AND PermissionSetGroupId != null" --json
+sf data query --target-org brite-staging --query "SELECT PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '<sandbox-username>' AND PermissionSetGroupId != null" --json
 ```
 
 Interpret the returned `PermissionSetGroup.DeveloperName` values:
@@ -253,14 +253,14 @@ Print the completion summary (ASCII markers only):
 
 - `OK: sf + node detected`
 - `OK: revops plugin installed`
-- `OK: brite-sandbox authenticated (Connected)`
-- `OK: default target-org = brite-sandbox`
+- `OK: brite-staging authenticated (Connected)`
+- `OK: default target-org = brite-staging`
 - `OK: connectivity probe returned a row`
 - `<OK|MISSING>: dev-grade permission group` (from Phase 6)
 
 Then the next-step hint:
 
-> You are set up for brite-sandbox. Next:
+> You are set up for brite-staging. Next:
 >
 > - `/revops:doctor` — re-runnable health check that re-verifies all of the above.
 > - `/revops:deploy-sandbox` — your first sandbox deploy.
@@ -274,10 +274,10 @@ This phase asks no question — it is the terminal summary.
 ## Rules
 
 - **Never skip a gate.** Every phase ends with one `AskUserQuestion`; a non-proceed answer halts the command. One question at a time — never batch.
-- **Idempotent.** If `brite-sandbox` is already authenticated and the default target-org, Phase 1 early-exits with zero mutations (no `sf org login`, no `sf config set`).
-- **Always pass `--target-org brite-sandbox`** for org-scoped commands. Never rely on an ambient default for the probes.
+- **Idempotent.** If `brite-staging` is already authenticated and the default target-org, Phase 1 early-exits with zero mutations (no `sf org login`, no `sf config set`).
+- **Always pass `--target-org brite-staging`** for org-scoped commands. Never rely on an ambient default for the probes.
 - **`sf`, not `sfdx`.** Legacy `sfdx` subcommands are deprecated per `brite-salesforce/CLAUDE.md`.
 - **Parse `--json` via `status === 0`,** not human-readable stdout strings — the JSON envelope is stable across CLI 2.x versions.
-- **Probe with the `sf` CLI, not the MCP `run_soql_query`.** The MCP rejects an alias and needs a literal username per call; the CLI accepts `--target-org brite-sandbox`.
+- **Probe with the `sf` CLI, not the MCP `run_soql_query`.** The MCP rejects an alias and needs a literal username per call; the CLI accepts `--target-org brite-staging`.
 - **Plugin install is distinct from registration.** Phase 2 checks `claude plugin list`, not marketplace.json.
 - **Do not auto-retry on failure.** Surface raw output and halt; silent retries mask real issues.
