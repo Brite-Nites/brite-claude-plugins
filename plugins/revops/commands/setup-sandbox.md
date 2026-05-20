@@ -102,13 +102,20 @@ Narrate: `Phase 3/7: Authenticating to brite-sandbox...`
 
 Tell the user:
 
-> Log in to the sandbox in your browser. Run this in a terminal — you can run it directly in this Claude Code session with the `!` prefix, or in your own terminal:
+> Log in to the sandbox in your browser. Because Brite's sandbox uses a custom My Domain, you must pass `--instance-url` — without it `sf` sends the OAuth flow to the generic `https://test.salesforce.com` page, you end up authenticated in the browser but `sf` never captures the token.
 >
+> **Step 1 — find your sandbox My Domain URL:**
+> Navigate to the sandbox in your browser. The URL bar will show something like:
+> `https://<instance>--<sandbox>.sandbox.lightning.force.com/lightning/page/home`
+> Drop `lightning.` from the host and change the path to get the API URL:
+> `https://<instance>--<sandbox>.sandbox.my.salesforce.com`
+>
+> **Step 2 — run the login command** (substituting your URL):
 > ```bash
-> sf org login web --alias brite-sandbox
+> sf org login web --alias brite-sandbox --instance-url https://<instance>--<sandbox>.sandbox.my.salesforce.com
 > ```
 >
-> A browser tab opens at the Salesforce login page. Use your **sandbox** credentials (sandbox usernames carry a suffix such as `.bndev` after your normal username). After the browser shows "successfully authorized," return here.
+> A browser tab opens at the sandbox login page. Use your **sandbox** credentials (sandbox usernames carry a suffix such as `.bndev` after your normal username). After the browser shows "successfully authorized," return here.
 
 After the user says they have logged in, verify:
 
@@ -151,8 +158,10 @@ Explain: the revops MCP and skills resolve `DEFAULT_TARGET_ORG` (see `plugins/re
 Run:
 
 ```bash
-sf config set target-org brite-sandbox --json
+sf config set target-org brite-sandbox --global --json
 ```
+
+The `--global` flag is required when the working directory is not an SFDX project (e.g. `~/.claude/plugins/...`). Without it, `sf` throws `InvalidProjectWorkspaceError`. `--global` writes to `~/.sf/config.json` and applies across all directories.
 
 Parse the JSON via `status === 0` (the `set` response already echoes the resolved value — no separate `sf config get` round-trip needed):
 
