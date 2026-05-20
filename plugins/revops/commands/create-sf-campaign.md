@@ -1,5 +1,5 @@
 ---
-description: Create a Salesforce Campaign record from canonical GTM slug + persona/offer/vertical/entity inputs. Idempotent (refuses duplicate slugs), soft-fail (all errors exit 0 with structured JSON), and orchestrator-friendly (single-line JSON on stdout). Called by `/marketing:plan-campaign` Step 7b (BC-8724) at scaffold time; can also be invoked manually for SF reconciliation when an earlier auto-create failed. Triggers on "create sf campaign", "scaffold sf campaign", "sigma3 auto-create", or direct `/revops:create-sf-campaign` invocation.
+description: Create a Salesforce Campaign record from canonical GTM slug + persona/offer/vertical/entity inputs. Idempotent (refuses duplicate slugs), soft-fail (all errors exit 0 with structured JSON), and orchestrator-friendly (single-line JSON on stdout). Called by `/marketing:plan-campaign` Step 8b (BC-8724) at scaffold time; can also be invoked manually for SF reconciliation when an earlier auto-create failed. Triggers on "create sf campaign", "scaffold sf campaign", "sigma3 auto-create", or direct `/revops:create-sf-campaign` invocation.
 allowed-tools: Bash, mcp__plugin_revops_salesforce__run_soql_query
 ---
 
@@ -26,7 +26,7 @@ Parse from the invocation (e.g. `/revops:create-sf-campaign --slug=... --entity=
 | `--month` | yes | Integer 1-12. |
 | `--owner-email` | yes | SF user email (literal username, NOT alias — per `gotcha_sf_mcp_username_not_alias.md`). |
 | `--launch-date` | yes | ISO `YYYY-MM-DD`. Maps to `Campaign.StartDate`. |
-| `--target-org` | no | Defaults to `brite-prod`. |
+| `--target-org` | no | Defaults to `brite-prod` (SF prod-org canonical alias). NOTE: This default does NOT auto-read `~/.sf/config.json`'s `target-org`. If the caller wants the SF MCP's session default, they MUST resolve it via `mcp__plugin_revops_salesforce__get_username(defaultTargetOrg=true).value` and pass that as `--target-org` explicitly. BC-8727 friction-log F11. |
 | `--dry-run` | no | Boolean. If present, print preview JSON and exit without inserting. |
 
 If any required flag is missing, emit `{"error":"missing_required_flag","flag":"<name>"}` exit 0 and stop. Do NOT prompt the user — orchestrators expect non-interactive behavior.
@@ -48,13 +48,19 @@ Call `mcp__plugin_revops_salesforce__run_soql_query` with:
 - `usernameOrAlias`: the literal username for `--target-org` (see § Gotchas — `gotcha_sf_mcp_username_not_alias.md`; do NOT pass `DEFAULT_TARGET_ORG`).
 - `query`: `SELECT Id FROM Campaign WHERE Name = '<slug>' LIMIT 1`
 
-If the result contains any record, emit and exit:
+If the SOQL call ITSELF fails (auth refresh, network, permset, FLS), emit and exit (BC-8727 friction-log F13):
+
+```json
+{"error":"sf_cli_error","phase":"idempotency_precheck","detail":"<message from MCP>"}
+```
+
+Otherwise, if the result contains any record, emit and exit:
 
 ```json
 {"error":"duplicate_slug","existing_id":"<Id from response>"}
 ```
 
-This is the load-bearing safety property: `/marketing:plan-campaign` re-runs MUST be no-ops when the slug already exists.
+The idempotency check is the load-bearing safety property: `/marketing:plan-campaign` re-runs MUST be no-ops when the slug already exists.
 
 ## Phase 3 — Owner lookup
 
@@ -63,7 +69,13 @@ Call `mcp__plugin_revops_salesforce__run_soql_query` with:
 - `usernameOrAlias`: as in Phase 2.
 - `query`: `SELECT Id FROM User WHERE Email = '<owner-email>' AND IsActive = TRUE LIMIT 1`
 
-If the result is empty, emit and exit:
+If the SOQL call ITSELF fails (auth, network, permset), emit and exit (BC-8727 friction-log F13):
+
+```json
+{"error":"sf_cli_error","phase":"owner_lookup","detail":"<message from MCP>"}
+```
+
+Otherwise, if the result is empty, emit and exit:
 
 ```json
 {"error":"missing_owner","email":"<owner-email>"}
@@ -142,7 +154,7 @@ This is the canonical success shape. Orchestrators capture `campaign_id` into `m
 | `invalid_slug_format` | `--slug` fails regex | Caller normalizes slug (per ADR-012 + canonicals lint) |
 | `duplicate_slug` | Phase 2 SOQL found existing Campaign | Caller treats as idempotent success; the existing `Id` is in `existing_id` |
 | `missing_owner` | Phase 3 returned 0 rows | Caller verifies `--owner-email` is an active SF user, OR provisions the user |
-| `sf_cli_error` | Phase 5 returned non-zero status | Caller inspects `detail` field; common causes: missing `Substatus__c` field deploy, permset gap, FLS on custom field |
+| `sf_cli_error` | Phase 2 SOQL failure (auth/network/permset) OR Phase 3 SOQL failure OR Phase 5 returned non-zero status | Caller inspects `detail` field; common causes: SF JWT refresh failure (re-auth `sf`), missing `Substatus__c` field deploy, permset gap, FLS on custom field. Optional `phase` field (`idempotency_precheck` / `owner_lookup` / `insert`) signals which phase failed; absent for Phase 5 backward-compat. |
 
 ## Gotchas
 
