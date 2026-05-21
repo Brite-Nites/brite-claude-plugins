@@ -207,36 +207,47 @@ def test_deploy_prod_captures_git_diff_exit_status() -> None:
     """The deploy bash must check `git diff` exit status BEFORE filtering with
     grep, or a git failure (shallow clone, unresolvable ref) silently
     propagates as an empty diff and the script mis-routes the operator to
-    --reconcile. Lock the exit-status capture pattern so it can't quietly
-    revert to the original `git diff ... | grep ... || true` shape.
+    --reconcile. Lock the exit-status capture pattern in BOTH phases —
+    a `re.search` (matches anywhere) would miss a Phase-4-only revert,
+    which is the exact regression iter-1 round-1 review caught.
     """
     body = read(PROD_PATH)
-    # The fixed pattern checks the exit status before filtering. The simplest
-    # observable marker: `if ! RAW_CHANGED=$(git diff` followed (within a few
-    # lines) by ERROR: ... git diff ... failed.
-    assert re.search(
+    count = len(re.findall(
         r'if ! RAW_CHANGED=\$\(git diff "\$RANGE" --name-only --diff-filter=ACMRT',
         body,
-    ), "deploy-prod must capture `git diff` exit status before filtering with grep"
+    ))
+    assert count >= 2, (
+        "deploy-prod must capture `git diff` exit status in BOTH Phase 2 (dry-run) "
+        f"and Phase 4 (real deploy) — found {count} occurrences"
+    )
 
 
 def test_deploy_sandbox_captures_git_diff_exit_status() -> None:
     body = read(SANDBOX_PATH)
-    assert re.search(
+    count = len(re.findall(
         r'if ! RAW_CHANGED=\$\(git diff "\$RANGE" --name-only --diff-filter=ACMRT',
         body,
-    ), "deploy-sandbox must capture `git diff` exit status before filtering with grep"
+    ))
+    assert count >= 2, (
+        "deploy-sandbox must capture `git diff` exit status in BOTH Phase 2 (dry-run) "
+        f"and Phase 3 (real deploy) — found {count} occurrences"
+    )
 
 
 def test_deploy_sandbox_captures_merge_base_exit_status() -> None:
     """`RANGE="$(git merge-base origin/main HEAD)..HEAD"` swallows merge-base
-    failures into a malformed `..HEAD` range. Lock the exit-status capture.
+    failures into a malformed `..HEAD` range. Lock the exit-status capture
+    in BOTH Phase 2 + Phase 3 (sandbox computes the branch-diff range twice).
     """
     body = read(SANDBOX_PATH)
-    assert re.search(
+    count = len(re.findall(
         r'if ! MERGE_BASE=\$\(git merge-base origin/main HEAD',
         body,
-    ), "deploy-sandbox must capture `git merge-base` exit status before assigning RANGE"
+    ))
+    assert count >= 2, (
+        "deploy-sandbox must capture `git merge-base` exit status in BOTH "
+        f"Phase 2 and Phase 3 — found {count} occurrences"
+    )
 
 
 # ── Multi-file LWC/Aura coalescing ───────────────────────────────────────
