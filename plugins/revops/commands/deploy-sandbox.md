@@ -1,5 +1,6 @@
 ---
 description: Sandbox deploy orchestration for brite-salesforce — pre-flight, dry-run, deploy, Apex tests, manual browser verification. Use when you've completed SF metadata changes and want to validate in `brite-sandbox` before opening a PR. Fills the gap between `/workflows:review` and `/workflows:ship` that SF-specific ship discipline requires.
+argument-hint: [--reconcile]
 allowed-tools: Bash, AskUserQuestion
 ---
 
@@ -11,7 +12,27 @@ Execute the phases below sequentially. Use `AskUserQuestion` at each numbered ga
 
 Canonical invocation pattern comes from `brite-salesforce/CLAUDE.md` §Commands + §Development Flow §2. Sandbox alias is `brite-sandbox`. Always pass `--target-org` explicitly — never rely on a default org. Always use `sf`, never legacy `sfdx`.
 
+**Deploy scope.** Defaults to feature-branch-diff-scoped `--source-dir` (computed from `git diff $(git merge-base origin/main HEAD)..HEAD`) to avoid Flow Draft pile-up and unrelated drift surprises — see [BC-11030](https://linear.app/brite-nites/issue/BC-11030). Pass `--reconcile` to opt into full-tree behavior for explicit drift sync (sandbox-refresh hydration, first-run on a long-paused feature branch, mass drift audit). When run from `main` itself the diff range falls back to `main~1..main`.
+
 Out of scope for this command: prod deploy (use `/revops:deploy-prod`), post-deploy manual runbook (use `/revops:post-deploy-runbook`), automating browser verification.
+
+---
+
+## Phase 0 — Deploy-mode resolution
+
+Inspect the invocation arguments. The command supports one optional positional flag:
+
+- `--reconcile` — opt into the legacy full-tree deploy (`--source-dir force-app`). Documented use cases: sandbox-refresh hydration, drift mass-fix, first-time deploy of a long-paused feature branch where you genuinely want every component re-evaluated.
+
+If `--reconcile` is in the invocation, set deploy mode to `reconcile` for the rest of the run and skip the diff resolution in Phase 2.1. Otherwise the deploy mode is `branch-diff`, and the bash blocks in Phase 2 / Phase 3 compute the `--source-dir` set from the feature branch diff vs `origin/main`.
+
+Tell the user which mode is active before Phase 1 starts:
+
+> Mode: `branch-diff` — deploying only paths changed on this branch since `origin/main`. Pass `--reconcile` to deploy the full tree.
+
+or, if `--reconcile` was passed:
+
+> Mode: `reconcile` — deploying the full `force-app/` tree to `brite-sandbox`. This will create Draft versions of every Flow in source and may incidentally redeploy any source-vs-sandbox drift. Use only when you intend exactly that.
 
 ---
 
@@ -51,11 +72,84 @@ Narrate: `Phase 1/6: Pre-flight checks... done`
 
 Narrate: `Phase 2/6: Dry-run deploy...`
 
-Run:
+### 2.1 Resolve deploy scope
+
+The deploy invocation is assembled from the Phase 0 mode. Run **one** of the two blocks below.
+
+**Mode `reconcile`** (full-tree, opt-in):
 
 ```bash
 sf project deploy start --source-dir force-app --dry-run --target-org brite-sandbox --json
 ```
+
+**Mode `branch-diff`** (default — compute `--source-dir` set from this branch's diff vs `origin/main`):
+
+```bash
+set -e
+
+# Resolve diff range. On a feature branch (the normal case), use the
+# merge-base with origin/main so we capture every commit the branch added.
+# If we somehow run from main itself (e.g., post-merge sanity re-deploy),
+# fall back to the single squash commit on main.
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" = "main" ]; then
+  RANGE="main~1..main"
+else
+  # origin/main must be reachable. If the user hasn't fetched recently,
+  # this could be stale — surface that.
+  if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+    echo "ERROR: origin/main not found in this clone — run \`git fetch origin main\` first."
+    exit 2
+  fi
+  RANGE="$(git merge-base origin/main HEAD)..HEAD"
+fi
+
+# --diff-filter=ACMRT excludes deletions (D) — sf can't deploy a path
+# that no longer exists. True deletions must be handled via
+# destructiveChanges.xml — surface them but don't try to deploy them.
+CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT \
+  | grep '^force-app/' || true)
+DELETED=$(git diff "$RANGE" --name-only --diff-filter=D \
+  | grep '^force-app/' || true)
+
+if [ -z "$CHANGED" ]; then
+  echo "ERROR: No force-app/** files changed in $RANGE — nothing to deploy."
+  echo "If you intended to reconcile drift, re-run: /revops:deploy-sandbox --reconcile"
+  exit 2
+fi
+
+# Coalesce multi-file LWC and Aura bundles to their bundle root —
+# sf project deploy start --source-dir on a single LWC file fails because
+# the metadata API treats the bundle as the deployable unit. Custom-object
+# sub-files (objects/Foo__c/fields/Bar__c.field-meta.xml) are file-level
+# deployable, so we leave them as-is.
+COALESCED=$(printf '%s\n' "$CHANGED" | awk -F/ '
+  NF>=5 && $1=="force-app" && $2=="main" && $3=="default" && ($4=="lwc" || $4=="aura") {
+    print $1"/"$2"/"$3"/"$4"/"$5; next
+  }
+  { print $0 }
+' | sort -u)
+
+echo "Resolved deploy targets from $RANGE ($(printf '%s\n' "$COALESCED" | wc -l | tr -d ' ') paths):"
+printf '  %s\n' $COALESCED
+
+if [ -n "$DELETED" ]; then
+  echo
+  echo "WARNING: $(printf '%s\n' "$DELETED" | wc -l | tr -d ' ') deletion(s) detected — NOT included in --source-dir."
+  echo "Metadata deletions must be expressed via destructiveChanges.xml in the PR."
+  echo "Deleted paths:"
+  printf '  %s\n' $DELETED
+fi
+
+ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
+
+# shellcheck disable=SC2086  # word-splitting is intentional here
+sf project deploy start $ARGS --dry-run --target-org brite-sandbox --json
+```
+
+If any deletions were surfaced above, decide before continuing: do they belong in this deploy via `destructiveChanges.xml`? If yes, fold the destructive manifest in and re-run. If no (e.g., the file was moved/renamed and the new path is in the deploy set), continue.
+
+### 2.2 Parse response
 
 Parse the JSON response. Treat top-level `status === 0` as success (the stable cross-version exit-code field):
 
@@ -82,10 +176,50 @@ Narrate: `Phase 2/6: Dry-run deploy... done`
 
 Narrate: `Phase 3/6: Actual sandbox deploy...`
 
-Run (same command as Phase 2, without `--dry-run`):
+Use the same deploy-mode branch chosen at Phase 0. Re-compute the `--source-dir` set in this phase (do not cache state across the Phase 2 confirmation gate — re-resolving from `git diff` keeps the deploy honest if the working tree changed unexpectedly).
+
+**Mode `reconcile`** (same as Phase 2.1, without `--dry-run`):
 
 ```bash
 sf project deploy start --source-dir force-app --target-org brite-sandbox --json
+```
+
+**Mode `branch-diff`** (same logic as Phase 2.1, without `--dry-run`):
+
+```bash
+set -e
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" = "main" ]; then
+  RANGE="main~1..main"
+else
+  if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+    echo "ERROR: origin/main not found in this clone — run \`git fetch origin main\` first."
+    exit 2
+  fi
+  RANGE="$(git merge-base origin/main HEAD)..HEAD"
+fi
+
+CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT \
+  | grep '^force-app/' || true)
+
+if [ -z "$CHANGED" ]; then
+  echo "ERROR: Re-resolved diff is empty at Phase 3 — refusing to deploy."
+  echo "This indicates the working tree changed between Phase 2 and Phase 3."
+  exit 2
+fi
+
+COALESCED=$(printf '%s\n' "$CHANGED" | awk -F/ '
+  NF>=5 && $1=="force-app" && $2=="main" && $3=="default" && ($4=="lwc" || $4=="aura") {
+    print $1"/"$2"/"$3"/"$4"/"$5; next
+  }
+  { print $0 }
+' | sort -u)
+
+ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
+
+# shellcheck disable=SC2086  # word-splitting is intentional here
+sf project deploy start $ARGS --target-org brite-sandbox --json
 ```
 
 Parse the JSON (same `status === 0` check as Phase 2):
@@ -166,7 +300,7 @@ Tell the user:
 > 1. In the sandbox: **Setup → Object Manager → [Object] → Page Layouts → [any layout] → Edit**.
 > 2. Drag the new picklist field onto the layout anywhere (it doesn't need to stay there permanently).
 > 3. **Save** the layout.
-> 4. Re-deploy: `sf project deploy start --source-dir force-app --target-org brite-sandbox --json`
+> 4. Re-deploy the affected layout to flush the cache (scope to just the changed layout — Brite default is PR-diff-scoped, see [BC-11030](https://linear.app/brite-nites/issue/BC-11030)): `sf project deploy start --source-dir force-app/main/default/layouts/<Object>-<Layout>.layout-meta.xml --target-org brite-sandbox --json`
 > 5. Return to the Kanban view — the field should now appear in Group By.
 >
 > ---
