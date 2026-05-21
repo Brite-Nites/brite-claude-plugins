@@ -171,10 +171,20 @@ def test_deploy_prod_filters_deletions_via_diff_filter() -> None:
     exists; sf fails). The bash must use --diff-filter=ACMRT (added/copied/
     modified/renamed/type-changed) to exclude deletions, and must surface
     detected deletions for operator awareness (destructiveChanges.xml path).
+
+    The filter must appear at least once per re-resolution phase (Phase 2
+    dry-run + Phase 4 real deploy). The `awk_count` test below locks "we
+    compute the deploy scope in BOTH phases"; this test independently locks
+    "the deletion-safe filter is used in BOTH". Without this, a regression
+    could drop --diff-filter from Phase 4 while keeping it in Phase 2 and
+    the awk count would still match — but Phase 4 would crash trying to
+    deploy a deleted path.
     """
     body = read(PROD_PATH)
-    assert "--diff-filter=ACMRT" in body, (
-        "deploy-prod must use --diff-filter=ACMRT to exclude deletions"
+    count = body.count("--diff-filter=ACMRT")
+    assert count >= 2, (
+        "deploy-prod must use --diff-filter=ACMRT in BOTH Phase 2 (dry-run) and "
+        f"Phase 4 (real deploy); found {count} occurrences"
     )
     assert "destructiveChanges.xml" in body, (
         "deploy-prod must mention destructiveChanges.xml as the deletion path"
@@ -183,12 +193,50 @@ def test_deploy_prod_filters_deletions_via_diff_filter() -> None:
 
 def test_deploy_sandbox_filters_deletions_via_diff_filter() -> None:
     body = read(SANDBOX_PATH)
-    assert "--diff-filter=ACMRT" in body, (
-        "deploy-sandbox must use --diff-filter=ACMRT to exclude deletions"
+    count = body.count("--diff-filter=ACMRT")
+    assert count >= 2, (
+        "deploy-sandbox must use --diff-filter=ACMRT in BOTH Phase 2 (dry-run) and "
+        f"Phase 3 (real deploy); found {count} occurrences"
     )
     assert "destructiveChanges.xml" in body, (
         "deploy-sandbox must mention destructiveChanges.xml as the deletion path"
     )
+
+
+def test_deploy_prod_captures_git_diff_exit_status() -> None:
+    """The deploy bash must check `git diff` exit status BEFORE filtering with
+    grep, or a git failure (shallow clone, unresolvable ref) silently
+    propagates as an empty diff and the script mis-routes the operator to
+    --reconcile. Lock the exit-status capture pattern so it can't quietly
+    revert to the original `git diff ... | grep ... || true` shape.
+    """
+    body = read(PROD_PATH)
+    # The fixed pattern checks the exit status before filtering. The simplest
+    # observable marker: `if ! RAW_CHANGED=$(git diff` followed (within a few
+    # lines) by ERROR: ... git diff ... failed.
+    assert re.search(
+        r'if ! RAW_CHANGED=\$\(git diff "\$RANGE" --name-only --diff-filter=ACMRT',
+        body,
+    ), "deploy-prod must capture `git diff` exit status before filtering with grep"
+
+
+def test_deploy_sandbox_captures_git_diff_exit_status() -> None:
+    body = read(SANDBOX_PATH)
+    assert re.search(
+        r'if ! RAW_CHANGED=\$\(git diff "\$RANGE" --name-only --diff-filter=ACMRT',
+        body,
+    ), "deploy-sandbox must capture `git diff` exit status before filtering with grep"
+
+
+def test_deploy_sandbox_captures_merge_base_exit_status() -> None:
+    """`RANGE="$(git merge-base origin/main HEAD)..HEAD"` swallows merge-base
+    failures into a malformed `..HEAD` range. Lock the exit-status capture.
+    """
+    body = read(SANDBOX_PATH)
+    assert re.search(
+        r'if ! MERGE_BASE=\$\(git merge-base origin/main HEAD',
+        body,
+    ), "deploy-sandbox must capture `git merge-base` exit status before assigning RANGE"
 
 
 # ── Multi-file LWC/Aura coalescing ───────────────────────────────────────
@@ -200,16 +248,20 @@ def test_deploy_prod_coalesces_lwc_aura_bundles() -> None:
     by name so it doesn't silently miss one.
     """
     body = read(PROD_PATH)
-    assert re.search(r'\$4=="lwc".*\$4=="aura"|\$4=="aura".*\$4=="lwc"', body), (
-        "deploy-prod must coalesce both LWC and Aura bundle directories"
-    )
+    # Wrap alternation in non-capturing groups so a future edit that adds a
+    # third literal can't accidentally regroup the precedence.
+    assert re.search(
+        r'(?:\$4=="lwc".*\$4=="aura")|(?:\$4=="aura".*\$4=="lwc")',
+        body,
+    ), "deploy-prod must coalesce both LWC and Aura bundle directories"
 
 
 def test_deploy_sandbox_coalesces_lwc_aura_bundles() -> None:
     body = read(SANDBOX_PATH)
-    assert re.search(r'\$4=="lwc".*\$4=="aura"|\$4=="aura".*\$4=="lwc"', body), (
-        "deploy-sandbox must coalesce both LWC and Aura bundle directories"
-    )
+    assert re.search(
+        r'(?:\$4=="lwc".*\$4=="aura")|(?:\$4=="aura".*\$4=="lwc")',
+        body,
+    ), "deploy-sandbox must coalesce both LWC and Aura bundle directories"
 
 
 # ── Branch-range detection ───────────────────────────────────────────────
@@ -255,22 +307,28 @@ def test_deploy_sandbox_detects_branch_vs_main() -> None:
 def test_deploy_prod_reconcile_keeps_full_tree() -> None:
     """The --reconcile escape hatch must still emit --source-dir force-app
     (the legacy path). Without this, --reconcile would be a no-op.
+
+    Lock `force-app` followed by a whitespace boundary so the assertion
+    can't pass on something like `--source-dir force-app/main/something`,
+    which would be a scoped path, not the full-tree fallback.
     """
     body = read(PROD_PATH)
     # Match the reconcile-mode bash block: a fenced bash block containing
-    # the verbatim full-tree invocation, scoped to brite-prod.
+    # the verbatim full-tree invocation, scoped to brite-prod. The
+    # `force-app\s+` requires whitespace after force-app — not a `/` —
+    # so a path extension can't satisfy the lock.
     assert re.search(
-        r'```bash\s*\n\s*sf project deploy start --source-dir force-app[^\n]*--target-org brite-prod',
+        r'```bash\s*\n\s*sf project deploy start --source-dir force-app\s+[^\n]*--target-org brite-prod',
         body,
-    ), "deploy-prod --reconcile mode must still emit --source-dir force-app for brite-prod"
+    ), "deploy-prod --reconcile mode must still emit --source-dir force-app (bare) for brite-prod"
 
 
 def test_deploy_sandbox_reconcile_keeps_full_tree() -> None:
     body = read(SANDBOX_PATH)
     assert re.search(
-        r'```bash\s*\n\s*sf project deploy start --source-dir force-app[^\n]*--target-org brite-sandbox',
+        r'```bash\s*\n\s*sf project deploy start --source-dir force-app\s+[^\n]*--target-org brite-sandbox',
         body,
-    ), "deploy-sandbox --reconcile mode must still emit --source-dir force-app for brite-sandbox"
+    ), "deploy-sandbox --reconcile mode must still emit --source-dir force-app (bare) for brite-sandbox"
 
 
 # ── Re-resolution at the actual-deploy phase ─────────────────────────────

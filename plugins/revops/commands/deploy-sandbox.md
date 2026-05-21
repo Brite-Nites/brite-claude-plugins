@@ -101,16 +101,39 @@ else
     echo "ERROR: origin/main not found in this clone — run \`git fetch origin main\` first."
     exit 2
   fi
-  RANGE="$(git merge-base origin/main HEAD)..HEAD"
+  # Capture merge-base exit status separately. If there's no common
+  # ancestor (orphaned branch, shallow clone where ancestor isn't fetched),
+  # bare command substitution would leave RANGE="..HEAD" — a malformed
+  # range that silently behaves like an empty diff downstream.
+  if ! MERGE_BASE=$(git merge-base origin/main HEAD 2>&1); then
+    echo "ERROR: \`git merge-base origin/main HEAD\` failed — output below."
+    printf '%s\n' "$MERGE_BASE"
+    echo "Is origin/main fetched and reachable from HEAD? (A shallow clone"
+    echo "may need \`git fetch --unshallow origin main\`.)"
+    exit 2
+  fi
+  RANGE="${MERGE_BASE}..HEAD"
+fi
+
+# Capture `git diff` exit status separately from the grep filter — without
+# this split, a git failure would propagate as an empty diff and the script
+# would mis-route the operator to --reconcile.
+if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
+  echo "ERROR: \`git diff $RANGE\` failed — output below."
+  printf '%s\n' "$RAW_CHANGED"
+  exit 2
+fi
+if ! RAW_DELETED=$(git diff "$RANGE" --name-only --diff-filter=D 2>&1); then
+  echo "ERROR: \`git diff $RANGE --diff-filter=D\` failed — output below."
+  printf '%s\n' "$RAW_DELETED"
+  exit 2
 fi
 
 # --diff-filter=ACMRT excludes deletions (D) — sf can't deploy a path
 # that no longer exists. True deletions must be handled via
 # destructiveChanges.xml — surface them but don't try to deploy them.
-CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT \
-  | grep '^force-app/' || true)
-DELETED=$(git diff "$RANGE" --name-only --diff-filter=D \
-  | grep '^force-app/' || true)
+CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
+DELETED=$(printf '%s\n' "$RAW_DELETED" | grep '^force-app/' || true)
 
 if [ -z "$CHANGED" ]; then
   echo "ERROR: No force-app/** files changed in $RANGE — nothing to deploy."
@@ -131,14 +154,14 @@ COALESCED=$(printf '%s\n' "$CHANGED" | awk -F/ '
 ' | sort -u)
 
 echo "Resolved deploy targets from $RANGE ($(printf '%s\n' "$COALESCED" | wc -l | tr -d ' ') paths):"
-printf '  %s\n' $COALESCED
+printf '%s\n' "$COALESCED" | sed 's/^/  /'
 
 if [ -n "$DELETED" ]; then
   echo
   echo "WARNING: $(printf '%s\n' "$DELETED" | wc -l | tr -d ' ') deletion(s) detected — NOT included in --source-dir."
   echo "Metadata deletions must be expressed via destructiveChanges.xml in the PR."
   echo "Deleted paths:"
-  printf '  %s\n' $DELETED
+  printf '%s\n' "$DELETED" | sed 's/^/  /'
 fi
 
 ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
@@ -197,11 +220,20 @@ else
     echo "ERROR: origin/main not found in this clone — run \`git fetch origin main\` first."
     exit 2
   fi
-  RANGE="$(git merge-base origin/main HEAD)..HEAD"
+  if ! MERGE_BASE=$(git merge-base origin/main HEAD 2>&1); then
+    echo "ERROR: \`git merge-base origin/main HEAD\` failed at Phase 3 — output below."
+    printf '%s\n' "$MERGE_BASE"
+    exit 2
+  fi
+  RANGE="${MERGE_BASE}..HEAD"
 fi
 
-CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT \
-  | grep '^force-app/' || true)
+if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
+  echo "ERROR: \`git diff $RANGE\` failed at Phase 3 — output below."
+  printf '%s\n' "$RAW_CHANGED"
+  exit 2
+fi
+CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
 
 if [ -z "$CHANGED" ]; then
   echo "ERROR: Re-resolved diff is empty at Phase 3 — refusing to deploy."

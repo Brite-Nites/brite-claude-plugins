@@ -141,13 +141,29 @@ set -e
 # just landed. Phase 1.2 already pinned branch=main.
 RANGE="main~1..main"
 
+# Capture `git diff` exit status separately from the grep filter — without
+# this split, a git failure (shallow clone, unresolvable ref) would propagate
+# as an empty diff and the script would mis-route the operator to --reconcile.
+# Run `git diff` first, check $?, then filter.
+if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
+  echo "ERROR: \`git diff $RANGE\` failed — output below."
+  printf '%s\n' "$RAW_CHANGED"
+  echo "Is main~1 reachable in this clone? (A shallow clone or fresh single-commit"
+  echo "main would fail here.) Re-fetch with \`git fetch --unshallow origin main\`"
+  echo "if shallow, or investigate the working tree state."
+  exit 2
+fi
+if ! RAW_DELETED=$(git diff "$RANGE" --name-only --diff-filter=D 2>&1); then
+  echo "ERROR: \`git diff $RANGE --diff-filter=D\` failed — output below."
+  printf '%s\n' "$RAW_DELETED"
+  exit 2
+fi
+
 # --diff-filter=ACMRT excludes deletions (D) — sf can't deploy a path
 # that no longer exists. True deletions must be handled via
 # destructiveChanges.xml — surface them but don't try to deploy them.
-CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT \
-  | grep '^force-app/' || true)
-DELETED=$(git diff "$RANGE" --name-only --diff-filter=D \
-  | grep '^force-app/' || true)
+CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
+DELETED=$(printf '%s\n' "$RAW_DELETED" | grep '^force-app/' || true)
 
 if [ -z "$CHANGED" ]; then
   echo "ERROR: No force-app/** files changed in $RANGE — nothing to deploy."
@@ -168,19 +184,20 @@ COALESCED=$(printf '%s\n' "$CHANGED" | awk -F/ '
 ' | sort -u)
 
 echo "Resolved deploy targets from $RANGE ($(printf '%s\n' "$COALESCED" | wc -l | tr -d ' ') paths):"
-printf '  %s\n' $COALESCED
+printf '%s\n' "$COALESCED" | sed 's/^/  /'
 
 if [ -n "$DELETED" ]; then
   echo
   echo "WARNING: $(printf '%s\n' "$DELETED" | wc -l | tr -d ' ') deletion(s) detected — NOT included in --source-dir."
   echo "Metadata deletions must be expressed via destructiveChanges.xml in the PR."
   echo "Deleted paths:"
-  printf '  %s\n' $DELETED
+  printf '%s\n' "$DELETED" | sed 's/^/  /'
 fi
 
-# Build --source-dir argv. Use printf-fed xargs so paths with spaces would
-# fail loudly rather than silently splitting; force-app paths are
-# whitespace-free in practice but the invariant is worth documenting.
+# Build --source-dir argv. Force-app paths are whitespace-free in practice
+# (Salesforce metadata API forbids it) and the bash word-split below is
+# acceptable. If a future SF release allowed spaces, this would need to
+# move to a "$@"-array form.
 ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
 
 # shellcheck disable=SC2086  # word-splitting is intentional here
@@ -252,8 +269,12 @@ set -e
 
 RANGE="main~1..main"
 
-CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT \
-  | grep '^force-app/' || true)
+if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
+  echo "ERROR: \`git diff $RANGE\` failed at Phase 4 — output below."
+  printf '%s\n' "$RAW_CHANGED"
+  exit 2
+fi
+CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
 
 if [ -z "$CHANGED" ]; then
   echo "ERROR: Re-resolved diff is empty at Phase 4 — refusing to deploy."
