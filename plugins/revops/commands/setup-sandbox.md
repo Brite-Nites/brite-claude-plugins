@@ -212,20 +212,22 @@ Narrate: `Phase 5/7: Connectivity probe... done`
 
 Narrate: `Phase 6/7: Permission self-probe...`
 
-Check whether the authenticated user holds a dev-grade permission set group. This is read-only and never blocks — it only reports what to request.
+Check whether the authenticated user holds effective deploy/admin rights — either via permission-set capability flags (`ModifyAllData` / `ModifyMetadata`, which also catch System Administrator profile users via the profile-owned permset row, and the `Dev_Sandbox_Access` permset from BC-10727) or via a dev-grade group (`Admin_Group` / `Near_Admin_Group`). This is read-only and never blocks — it only reports what to request.
 
 Reuse the username Phase 5 already resolved (don't re-run `sf org display`). Substitute it for `<sandbox-username>` below — it is the developer's own org username (email-format, so no SOQL-quote hazard). If for some reason you don't have it, fall back to `sf org display --target-org brite-sandbox --json` to fetch `result.username`.
 
 ```bash
-sf data query --target-org brite-sandbox --query "SELECT PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '<sandbox-username>' AND PermissionSetGroupId != null" --json
+sf data query --target-org brite-sandbox --query "SELECT PermissionSet.PermissionsModifyAllData, PermissionSet.PermissionsModifyMetadata, PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '<sandbox-username>'" --json
 ```
 
-Interpret the returned `PermissionSetGroup.DeveloperName` values:
+Interpret the returned records (one row per permset assignment — both profile-owned permsets and standalone permsets like `Dev_Sandbox_Access` appear):
 
-- Includes `Admin_Group` or `Near_Admin_Group` → print `OK: dev-grade permission group present (<group>).` Continue.
-- Neither present → print:
+- Any row with `PermissionSet.PermissionsModifyAllData = true` → print `OK: ModifyAllData granted (effective admin).` Continue.
+- Else, any row with `PermissionSet.PermissionsModifyMetadata = true` → print `OK: ModifyMetadata granted (dev-sandbox-capable — e.g. Dev_Sandbox_Access).` Continue.
+- Else, any row with `PermissionSetGroup.DeveloperName` in `Admin_Group` / `Near_Admin_Group` → print `OK: dev-grade permission group present (<group>).` Continue.
+- None of the above → print:
 
-  > MISSING: no dev-grade permission group found for this user. You can authenticate and read, but deploys/edits may be blocked. Request `Admin_Group` (or `Near_Admin_Group`) from your Brite Salesforce admin, then re-check with `/revops:doctor`.
+  > MISSING: no effective `ModifyAllData`/`ModifyMetadata` and no `Admin_Group`/`Near_Admin_Group` found for this user. You can authenticate and read, but deploys/edits may be blocked. Request `Dev_Sandbox_Access` (BC-10727's sanctioned dev-sandbox-access permset) — or `Admin_Group` if you need broader rights — from your Brite Salesforce admin, then re-check with `/revops:doctor`.
 
   This is a reportable state, not a halt — continue.
 - Query errored → surface verbatim and continue (the self-probe is advisory; do not halt the onboarding on it).

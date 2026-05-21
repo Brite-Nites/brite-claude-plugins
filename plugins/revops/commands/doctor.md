@@ -128,14 +128,24 @@ try: print(json.load(sys.stdin).get('result',{}).get('username',''))
 except Exception: print('')
 " 2>/dev/null)"
   if [ -n "$uname" ]; then
-    grp="$(sf data query --target-org brite-sandbox --query "SELECT PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '$uname' AND PermissionSetGroupId != null" --json 2>/dev/null | python3 -c "
+    # Query both capability flags (ModifyAllData / ModifyMetadata — picks up
+    # profile-owned permsets like SysAdmin AND standalone permsets like
+    # Dev_Sandbox_Access from BC-10727) and group developer names in one shot.
+    psp="$(sf data query --target-org brite-sandbox --query "SELECT PermissionSet.PermissionsModifyAllData, PermissionSet.PermissionsModifyMetadata, PermissionSetGroup.DeveloperName FROM PermissionSetAssignment WHERE Assignee.Username = '$uname'" --json 2>/dev/null | python3 -c "
 import json,sys
 try: r=json.load(sys.stdin).get('result',{}).get('records',[])
-except Exception: print(''); sys.exit(0)
-print(','.join(g for g in [(rec.get('PermissionSetGroup') or {}).get('DeveloperName') for rec in r] if g))
+except Exception: print('0|0|'); sys.exit(0)
+mad = any((rec.get('PermissionSet') or {}).get('PermissionsModifyAllData') for rec in r)
+mmd = any((rec.get('PermissionSet') or {}).get('PermissionsModifyMetadata') for rec in r)
+grps = [g for g in [(rec.get('PermissionSetGroup') or {}).get('DeveloperName') for rec in r] if g]
+dev_grp = next((g for g in grps if g in ('Admin_Group','Near_Admin_Group')), '')
+print(f'{int(mad)}|{int(mmd)}|{dev_grp}')
 " 2>/dev/null)"
-    if printf '%s' "$grp" | grep -qE '(^|,)(Admin_Group|Near_Admin_Group)(,|$)'; then emit PASS "permset self-probe" "dev-grade group present (${grp})"
-    else emit WARN "permset self-probe" "no Admin_Group/Near_Admin_Group — read works but deploys/edits may be blocked; request from a Brite SF admin, then re-check with /revops:doctor"; fi
+    IFS='|' read -r mad mmd dev_grp <<<"$psp"
+    if [ "$mad" = "1" ]; then emit PASS "permset self-probe" "ModifyAllData granted (effective admin)"
+    elif [ "$mmd" = "1" ]; then emit PASS "permset self-probe" "ModifyMetadata granted (dev-sandbox-capable, e.g. Dev_Sandbox_Access)"
+    elif [ -n "$dev_grp" ]; then emit PASS "permset self-probe" "dev-grade group present (${dev_grp})"
+    else emit WARN "permset self-probe" "no effective ModifyAllData/ModifyMetadata and no Admin_Group/Near_Admin_Group — read works but deploys/edits may be blocked; request Dev_Sandbox_Access (or Admin_Group) from a Brite SF admin, then re-check with /revops:doctor"; fi
   else
     emit SKIP "permset self-probe" "could not resolve username from 'sf org display'"
   fi
@@ -174,7 +184,7 @@ Compute the Overall counts from the emitted statuses, then a one-word verdict:
 - **ready, with advisories** — 0 FAIL, at least one WARN.
 - **not ready** — at least one FAIL.
 
-If there is any `FAIL` or `WARN`, add a **Remediation** section below the table — one line per failing/warning check, taken from its `NOTE`. Auth / default-org gaps route to `run /revops:setup-sandbox`; the permset gap routes to a Brite SF admin + re-run. Do not invent fixes beyond what the `NOTE` states.
+If there is any `FAIL` or `WARN`, add a **Remediation** section below the table — one line per failing/warning check, taken from its `NOTE`. Auth / default-org gaps route to `run /revops:setup-sandbox`; the permset gap routes to a Brite SF admin (request `Dev_Sandbox_Access` per BC-10727, or `Admin_Group`) + re-run. Do not invent fixes beyond what the `NOTE` states.
 
 ---
 

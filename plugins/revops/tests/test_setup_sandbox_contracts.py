@@ -210,3 +210,69 @@ def test_marketplace_json_version_mirrors_plugin_json() -> None:
         f"marketplace.json revops version ({revops_entry['version']}) must match "
         f"plugin.json ({plugin_data['version']}) — per CLAUDE.md plugin-cache gotcha"
     )
+
+
+def test_permset_probe_covers_capability_flags() -> None:
+    """BC-10722: Phase 6 must PASS on effective admin (ModifyAllData) or dev
+    rights (ModifyMetadata, the path Dev_Sandbox_Access uses), not just
+    dev-grade groups. setup-sandbox.md got the same root-cause fix as doctor.md
+    (BC-10722) — this test mirrors test_doctor_contracts.py's coverage so the
+    parallel fix can't silently regress here. Locks: both SOQL capability
+    fields, absence of the old row-filtering predicate (in any case-equivalent
+    form), and all three OK-branch prose lines.
+    """
+    body = read_command()
+    # SOQL must select both capability flags
+    assert "PermissionsModifyAllData" in body, \
+        "Phase 6 SOQL must select PermissionSet.PermissionsModifyAllData (BC-10722)"
+    assert "PermissionsModifyMetadata" in body, \
+        "Phase 6 SOQL must select PermissionSet.PermissionsModifyMetadata (BC-10722)"
+    # The old row-filtering predicate must be gone (in any case-equivalent form) —
+    # it excluded standalone permsets (including Dev_Sandbox_Access) from the
+    # result set. SOQL accepts `!=`/`<>` and is keyword-case-insensitive.
+    forbidden_filter_re = re.compile(
+        r"PermissionSetGroupId\s*(?:!=|<>)\s*null"
+        r"|NOT\s*\(\s*PermissionSetGroupId\s*=\s*null\s*\)",
+        re.IGNORECASE,
+    )
+    match = forbidden_filter_re.search(body)
+    assert not match, (
+        "Phase 6 SOQL must not filter out standalone PermissionSetAssignments — "
+        "the BC-10722 root-cause filter (or an equivalent form) has reappeared: "
+        f"{match.group(0)!r}"
+    )
+    # All three OK-branch prose lines must exist (this command is LLM-driven
+    # prose, not bash emit lines — the operator-readable instructions ARE the
+    # contract).
+    ok_patterns = [
+        r"OK: ModifyAllData granted",
+        r"OK: ModifyMetadata granted",
+        r"OK: dev-grade permission group present",
+    ]
+    missing = [p for p in ok_patterns if not re.search(p, body)]
+    assert not missing, f"Phase 6 OK-branch prose missing (BC-10722): {missing}"
+
+
+def test_permset_missing_mentions_dev_sandbox_access() -> None:
+    """BC-10722: the MISSING block must point users at the sanctioned BC-10727
+    path (Dev_Sandbox_Access), not just Admin_Group — otherwise we're still
+    telling sysadmins and capability-permset holders to request the older
+    coarser group.
+    """
+    body = read_command()
+    # Find the MISSING block. Anchor on the `> ` blockquote marker — only Phase 6's
+    # remediation prose uses it; other MISSING occurrences in the file are either
+    # bash output strings (no colon, no blockquote) or sentinel labels like
+    # PYTHON_MISSING. Use re.findall to lock "exactly one match" semantics so a
+    # future MISSING blockquote added earlier in the file would fail loudly
+    # instead of silently stealing the match.
+    missing_lines = re.findall(r"^\s*>\s*MISSING:[^\n]+", body, re.MULTILINE)
+    assert len(missing_lines) == 1, (
+        "Phase 6 must contain exactly one `> MISSING:` blockquote line; "
+        f"found {len(missing_lines)}: {missing_lines!r}"
+    )
+    note = missing_lines[0]
+    assert "Dev_Sandbox_Access" in note, (
+        "Phase 6 MISSING copy must mention Dev_Sandbox_Access "
+        f"(BC-10727's sanctioned path), got: {note!r}"
+    )

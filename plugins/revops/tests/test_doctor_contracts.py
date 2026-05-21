@@ -302,3 +302,61 @@ def test_marketplace_json_version_mirrors_plugin_json() -> None:
         f"marketplace.json revops version ({revops_entry['version']}) must match "
         f"plugin.json ({plugin_data['version']}) — per CLAUDE.md plugin-cache gotcha"
     )
+
+
+def test_permset_probe_covers_capability_flags() -> None:
+    """BC-10722: probe must PASS on effective admin (ModifyAllData) or dev rights
+    (ModifyMetadata, the path Dev_Sandbox_Access uses), not just dev-grade groups.
+    Lock the SOQL fields AND all three PASS emit branches so a future edit that
+    silently narrows the probe back to group-only fails this test. Also lock
+    the absence of the BC-10722 root-cause filter — `PermissionSetGroupId != null`
+    or any case-insensitive equivalent (`!= NULL`, `<> null`, `NOT (= null)`) —
+    via regex so a future SOQL re-narrowing via an equivalent form cannot slip
+    past the substring check.
+    """
+    body = read_command()
+    _, script_body = split_frontmatter(body)
+    # SOQL must select both capability flags (script, not frontmatter prose).
+    assert "PermissionsModifyAllData" in script_body, \
+        "permset probe must select PermissionSet.PermissionsModifyAllData (BC-10722)"
+    assert "PermissionsModifyMetadata" in script_body, \
+        "permset probe must select PermissionSet.PermissionsModifyMetadata (BC-10722)"
+    # The old row-filtering predicate must be gone (in any case-equivalent form) —
+    # it excluded standalone permsets (including Dev_Sandbox_Access) from the result
+    # set. SOQL accepts `!=`/`<>` and is keyword-case-insensitive, so cover all forms.
+    # Scope to script_body so a future prose comment referencing the old filter
+    # (e.g., changelog entry "removed PermissionSetGroupId != null") can't trip it.
+    forbidden_filter_re = re.compile(
+        r"PermissionSetGroupId\s*(?:!=|<>)\s*null"
+        r"|NOT\s*\(\s*PermissionSetGroupId\s*=\s*null\s*\)",
+        re.IGNORECASE,
+    )
+    match = forbidden_filter_re.search(script_body)
+    assert not match, (
+        "permset probe must not filter out standalone PermissionSetAssignments — "
+        "the BC-10722 root-cause filter (or an equivalent form) has reappeared: "
+        f"{match.group(0)!r}"
+    )
+    # All three PASS branches must exist for the permset self-probe
+    pass_patterns = [
+        r'emit PASS "permset self-probe" "ModifyAllData',
+        r'emit PASS "permset self-probe" "ModifyMetadata',
+        r'emit PASS "permset self-probe" "dev-grade group',
+    ]
+    missing = [p for p in pass_patterns if not re.search(p, script_body)]
+    assert not missing, f"permset PASS branches missing (BC-10722): {missing}"
+
+
+def test_permset_warn_mentions_dev_sandbox_access() -> None:
+    """BC-10722: the WARN copy must point users at the sanctioned BC-10727 path
+    (Dev_Sandbox_Access), not just Admin_Group — otherwise we're still telling
+    sysadmins and capability-permset holders to request the older coarser group.
+    """
+    _, body = split_frontmatter(read_command())
+    warn_match = re.search(r'emit WARN "permset self-probe" "([^"]+)"', body)
+    assert warn_match, "permset WARN emit line not found"
+    note = warn_match.group(1)
+    assert "Dev_Sandbox_Access" in note, (
+        "WARN copy must mention Dev_Sandbox_Access (BC-10727's sanctioned path), "
+        f"got: {note!r}"
+    )
