@@ -43,6 +43,13 @@
         "node",
         "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js"
       ]
+    },
+    "gbrain-team": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gbrain-team-broker.sh",
+      "args": [
+        "https://brite-team-gbrain-serve-production.up.railway.app/mcp"
+      ]
     }
   }
 }
