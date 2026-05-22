@@ -105,9 +105,38 @@ for needle in "${FORBIDDEN_STRINGS[@]}"; do
     pass "no '$needle' in substitution-target files"
   else
     fail "forbidden string '$needle' leaks into substitution-target files:"
-    printf '    %s\n' $hits
+    printf '    %s\n' "$hits"
   fi
 done
+
+# ── §3b: Extra-file detection — actual count matches EXPECTED_FILES ─
+section "3b" "no extra files in templates/ beyond EXPECTED_FILES (drift detection)"
+
+actual_count=$(find "$TEMPLATES_DIR" -type f \
+                \( -name '*.sh' -o -name '*.mts' -o -name '*.mjs' -o -name '*.json' -o -name '*.md' \) \
+                2>/dev/null | wc -l | tr -d ' ')
+expected_count="${#EXPECTED_FILES[@]}"
+
+if [ "$actual_count" = "$expected_count" ]; then
+  pass "templates/ contains exactly $expected_count files (matches EXPECTED_FILES)"
+else
+  fail "templates/ has $actual_count files but EXPECTED_FILES lists $expected_count — drift detected"
+  find "$TEMPLATES_DIR" -type f \
+    \( -name '*.sh' -o -name '*.mts' -o -name '*.mjs' -o -name '*.json' -o -name '*.md' \) \
+    2>/dev/null | sed "s|$TEMPLATES_DIR/||" | sed 's/^/    /'
+fi
+
+# ── §3c: verify-docs.sh is syntactically valid bash ─────────────────
+section "3c" "verify-docs.sh passes bash -n syntactic-validity check"
+
+if [ -f "$VD" ]; then
+  if bash -n "$VD" 2>/dev/null; then
+    pass "verify-docs.sh: bash -n exits 0 (no syntax errors)"
+  else
+    fail "verify-docs.sh: bash -n reports syntax errors:"
+    bash -n "$VD" 2>&1 | head -5 | sed 's/^/    /'
+  fi
+fi
 
 # ── §4: Documented placeholders actually appear in templates ───────
 section "4" "README-documented placeholders present in template files"
@@ -132,28 +161,44 @@ for ph in "${DOCUMENTED_PLACEHOLDERS[@]}"; do
   fi
 done
 
-# ── §5: Placeholder discipline — templates substitute, prose may reference ──
-section "5" "placeholders appear correctly inside templates/"
+# ── §5: Orchestrator ↔ template placeholder coherence ──────────────
+section "5" "orchestrator (retrofit-project.md) substitution table matches templates"
 
-# The strict "no placeholders outside templates/" check is unworkable —
-# the design-rationale archive + retrofit-project.md + start-project.md +
-# regen SKILL.md all reference `<PROJECT_NAME>` (etc.) in prose context
-# (e.g., "Substitute <PROJECT_NAME> from .flow/config.json" — a
-# legitimate design-doc reference). The substitution discipline that
-# matters: every placeholder that the orchestrator substitutes (§4 above)
-# appears in at least one substitution-target file under templates/.
-# That's what §4 checks. This section is a duplicate placeholder fixedly
-# in templates/ to keep the test count > 0 and signal that the check is
-# intentionally narrower than a tempting global grep.
+# Q58 § Sub-decision 1 requires that the 4 documented placeholders in
+# retrofit-project.md's Phase 1 templates-scaffold table EXACTLY MATCH
+# the placeholders actually present in template files. Without this
+# check, an orchestrator amendment that adds a 5th placeholder (or
+# removes one of the 4) silently desynchronizes from the templates.
+RETROFIT_MD="$PLUGIN_ROOT/commands/retrofit-project.md"
 
-placeholders_in_templates=$(grep -rlE '<(LINEAR_PROJECT_ID|LINEAR_ORG_SLUG|PROJECT_NAME|EXPECTED_FDA_ISSUE_COUNT)>' \
-                              --include='*.sh' --include='*.mts' --include='*.mjs' --include='*.json' \
-                              "$TEMPLATES_DIR" 2>/dev/null | wc -l | tr -d ' ')
-
-if [ "$placeholders_in_templates" -ge 4 ]; then
-  pass "$placeholders_in_templates substitution-target file(s) carry placeholders (≥4 required)"
+if [ ! -f "$RETROFIT_MD" ]; then
+  fail "retrofit-project.md not found at $RETROFIT_MD"
 else
-  fail "expected ≥4 substitution-target files with placeholders; found $placeholders_in_templates"
+  # Extract placeholders from the substitution table in retrofit-project.md.
+  # The table is constrained to the Phase 1 § Templates scaffold subsection;
+  # restrict by surrounding the grep with the section markers. Pattern:
+  # `<UPPERCASE_WITH_UNDERSCORES>` is the placeholder shape.
+  retrofit_placeholders=$(grep -oE '<[A-Z_]+>' "$RETROFIT_MD" \
+                          | grep -E '^<(LINEAR_PROJECT_ID|LINEAR_ORG_SLUG|PROJECT_NAME|EXPECTED_FDA_ISSUE_COUNT)>$' \
+                          | sort -u || true)
+
+  # Extract placeholders from template files.
+  template_placeholders=$(grep -rhoE '<(LINEAR_PROJECT_ID|LINEAR_ORG_SLUG|PROJECT_NAME|EXPECTED_FDA_ISSUE_COUNT)>' \
+                            --include='*.sh' --include='*.mts' --include='*.mjs' --include='*.json' \
+                            "$TEMPLATES_DIR" 2>/dev/null | sort -u || true)
+
+  retrofit_count=$(printf '%s\n' "$retrofit_placeholders" | grep -c '<' || true)
+  template_count=$(printf '%s\n' "$template_placeholders" | grep -c '<' || true)
+
+  if [ "$retrofit_placeholders" = "$template_placeholders" ] && [ "$retrofit_count" = "4" ]; then
+    pass "orchestrator-table placeholders = template placeholders ($retrofit_count each, exact set match)"
+  else
+    fail "orchestrator-template placeholder drift detected:"
+    printf '    retrofit-project.md placeholders:\n'
+    printf '%s\n' "$retrofit_placeholders" | sed 's/^/      /'
+    printf '    templates/ placeholders:\n'
+    printf '%s\n' "$template_placeholders" | sed 's/^/      /'
+  fi
 fi
 
 # ── §6: scaffold-log SCHEMA.md has frontmatter ─────────────────────

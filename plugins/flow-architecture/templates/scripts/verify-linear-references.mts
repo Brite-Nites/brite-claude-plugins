@@ -30,8 +30,14 @@ import { PROJECT_ID, paginate } from "./lib/linear-graphql.mts";
 // A value of 0 disables the count gate (no-op); set to your project's expected
 // count once your FDA scope is known (parents + children with `type:*` labels).
 //
-// Example for a 40-parent / 200-child project: EXPECTED_FDA_ISSUE_COUNT = 240.
-export const EXPECTED_FDA_ISSUE_COUNT = <EXPECTED_FDA_ISSUE_COUNT>;
+// The placeholder is wrapped in `Number.parseInt("...", 10)` so the file is
+// syntactically valid TypeScript both pre-substitution and post-substitution:
+// pre-substitution the file parses (Number.parseInt of a non-numeric string
+// resolves to NaN at runtime; the file is never executed pre-substitution);
+// post-substitution to "0" / "240" / etc, the parse yields the intended number.
+//
+// Example for a 40-parent / 200-child project: substitute "240".
+export const EXPECTED_FDA_ISSUE_COUNT = Number.parseInt("<EXPECTED_FDA_ISSUE_COUNT>", 10);
 
 // ---------- types ----------
 
