@@ -27,9 +27,10 @@ The 4-category lock is intentional. A 5th category (e.g., `vertical-discovery`) 
 ┌─ EMIT ─────────────────────────────────────────────────────────────────┐
 │                                                                        │
 │  Producer skill (list-building / campaign-debrief)                     │
-│      AskUserQuestion 2-call gate ─→  append signal to                  │
-│                                       discoveries.json                 │
-│                                       (promotion_status: pending)      │
+│      Confirm gate (AskUserQuestion + Write) ─→ append signal to        │
+│                                                 discoveries.json       │
+│                                                 (promotion_status:     │
+│                                                 pending)               │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
                                   │
