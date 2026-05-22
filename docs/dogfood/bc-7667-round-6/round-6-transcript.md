@@ -34,9 +34,9 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-2   | 3 VARIABLES | regression | ✅ | meta.per_page=15 confirmed |
 | R-3   | 3 VARIABLES | regression | ⚠️ | +1 net-new var (`territory` id 16, 2026-05-19) — out-of-band drift |
 | R-4   | 3 VARIABLES | regression | ✅ | 8 artifact UPPERCASE → 8 EB-stored lowercase matches; BC-6780 holds |
-| R-5   | 4 UPLOAD | regression | _pending_ | |
-| R-6   | 4 UPLOAD | regression | _pending_ | |
-| R-7   | 4 UPLOAD | spec-read | _pending_ | |
+| R-5   | 4 UPLOAD | regression | ✅ | 9 leads created IDs 15143-15151; id+uuid both present; lowercase names accepted |
+| R-6   | 4 UPLOAD | regression | ✅ | re-POST existing 422 confirmed; **2 side-findings** for loop close |
+| R-7   | 4 UPLOAD | spec-read | ✅ | wrapper-vs-API gate clarity intact at all 4 gate sites |
 | R-8 ★ | 5 CAMPAIGN CREATE | regression keystone | _pending_ | |
 | R-9   | 5 CAMPAIGN CREATE | regression | _pending_ | |
 | R-10  | 5 CAMPAIGN CREATE | regression | _pending_ | |
@@ -177,6 +177,69 @@ Spec confirmation at `launch-campaign.md:414`: lowercase compare → existing �
 ---
 
 **Phase 3 close:** R-2 ✅, R-3 ⚠️ (workspace drift, non-blocking), R-4 ✅. Workspace 13 has 16 vars (was 15 in round-5 baseline; `territory` added out-of-band). All copy-artifact UPPERCASE vars resolve to existing lowercase storage; no mutations needed in Phase 3.
+
+**Workspace context note (operator-clarified 2026-05-22):** `emailbison-personal` (workspace 13) is the live production EB instance for BriteNites, **not** an isolated dogfood sandbox — operator uses it for both real campaign sending and dogfood testing. The BC-7667 issue body's "0 leads, 0 campaigns" pre-state assumption was aspirational at file-time and is **not** representative of how this workspace actually operates. Live counts at round-6 start: **15,073 leads, 21 campaigns** (1 active: campaign 52 FY26 M05 Brite Recruiting Trade Companies; 1 completed: campaign 21 FY26 M3 Restaurants 250; 18 archived FY25 M11; plus the round-5-era residue). R-3 ⚠️ ratifies state drift since round-5; framing widened from "+1 var" to "production-workspace evolution including a new campaign launch."
+
+**Round-6 discipline going forward:**
+- Round-6 leads upload as `dogfood-test-*@gmail.com / outlook.com / brite.co / dogfoodtest.com` per the test CSV — distinct from production lead emails.
+- Round-6 campaigns to be tagged or named with a `BC-7667 R6` marker for cleanup precision at loop close.
+- Loop-close lead+campaign cleanup will use the round-6 tag/prefix; production state is untouched.
+
+---
+
+## Phase 4 — UPLOAD
+
+### R-5 — Phase 4 happy-path bulk-create (regression)
+
+**Hypothesis:** POST `/api/leads/multiple` accepts title/company; response includes both id (int) and uuid (str); per-lead `custom_variables[].name` lowercased per BC-6780; happy-path bulk-create succeeds.
+
+**Evidence (live POST, 9 leads, 1 chunk):**
+- 9 leads created IDs 15143–15151 (consecutive); all `status: unverified`; all uuids share `a1d779e0-` prefix (per-batch identifier).
+- Each lead carries both `id` (int) and `uuid` (str) — confirms BC-6515 forward-compat doc claim at runtime.
+- `title` populated from CSV `job_title`; `company` populated from CSV `company_name`.
+- 8 custom_variables per lead, all stored lowercase (recency_anchor..sender_first_name) — BC-6780 lowercase-at-body-build rule holds.
+- Side-observation: `overall_stats.replies` returns `[]` (array) for never-replied leads; spec example showed scalar `replies: 1`. Permissive runtime schema; no follow-up.
+
+**Verdict:** ✅ Expected. All 4 primary sub-claims hold. BC-6515 + BC-6780 fix-validations both ratified at runtime.
+
+### R-6 — Phase 4 atomic 422 on duplicate (regression) + 2 side-findings
+
+**Hypothesis (round-5):** forced duplicate-email in chunk → all-or-nothing 422 (Sx-8 atomic rejection).
+
+**Two scenarios run:**
+
+| Scenario | Test | Actual result |
+|----------|------|---------------|
+| (a) Within-chunk duplicate | 2 rows with same email `bc7667r6-dup-test@dogfoodtest.com` in 1 POST | HTTP 201 success, **1 lead created** (id 15152), 2nd occurrence silently dropped |
+| (b) Re-POST existing | 1 row with `dogfood-test-01@gmail.com` (= existing id 15143) | `{"error":"HTTP 422 Error"}` — atomic 422 |
+
+**Round-5 transcript cross-ref** (`docs/dogfood/bc-6554-round-5/round-5-transcript.md:225–228`): round-5's R-6 tested scenario (b), not (a). The "in chunk" phrasing was ambiguous but their actual test was re-POST.
+
+**Verdict on the round-5 R-6 hypothesis (b variant):** ✅ Expected. Atomic 422 on re-POST behavior confirmed.
+
+**Side-finding A — within-chunk dedup undocumented (for loop close).** EB silently deduplicates within-chunk row duplicates: first occurrence created, subsequent dropped silently. Not in `email-bison.md § Known gotchas` (not in current Sx-1..Sx-15 set). 🟡 doc-gap, not a bug. Worth a gotcha doc add similar to BC-7598's pattern. File at loop close.
+
+**Side-finding B — `launch-campaign.md:454` contradiction (for loop close).** Spec text reads: *"re-POST to POST /api/leads/multiple to merge against existing leads (server upserts in place by email match; verified BC-6785 round-5 R-28)"*. Two problems: (1) cited evidence misattributed — R-28 verified upsert-VARIANT endpoints don't exist, NOT that `/api/leads/multiple` upserts existing; (2) behavioral claim is wrong — re-POST returns HTTP 422 (verified live + round-5 R-6), not upsert. 🟡 spec correctness gap. File at loop close.
+
+### R-7 — Phase 4 spec-read (BC-6304 wrapper-vs-API gate clarity)
+
+**Hypothesis:** spec text differentiates wrapper-tool layer vs API-direct layer; two-call gate is agent-side, not vendor-side; identical shape at all gate sites.
+
+**Evidence (4 gate sites grep-walked):**
+
+| Site | Line | Wrapper-vs-API distinction |
+|------|------|----------------------------|
+| § Vendor confirmation gates via call_api (general principle) | 57 | ✅ Sx-9 + BC-6439 + BC-2707 |
+| Phase 4 § Two-call gate (agent-side) | 438 | ✅ |
+| Phase 6 § Two-call gate (agent-side) | 592 | ✅ + BC-6545 allow_parallel branch noted as a real vendor gate |
+| Phase 11 step 2 § Agent-side per-campaign turn-structure | 928–954 | ✅ |
+
+**Verdict:** ✅ Expected. BC-6304 task-1 fix from round-3 + BC-6439 closure (no migration path) ratified at all 4 sites.
+
+---
+
+**Phase 4 close:** R-5 ✅, R-6 ✅ (with 2 side-findings deferred to loop close), R-7 ✅. Workspace delta: +10 leads (9 from R-5 + 1 from R-6's within-chunk dedup probe) = 15,083 total. Zero blocking findings; 2 loop-close follow-ups queued.
+
 
 
 
