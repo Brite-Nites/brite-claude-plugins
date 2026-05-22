@@ -19,7 +19,7 @@ Retrofit-only sub-skill. Walks the consumer project's existing Linear milestones
 
 This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q14 (memory:94-106). Q9 (the additive-only lock) and Q22 (milestone schema) are upstream constraints this skill honors.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q14 (memory:94-106). Q9 (the additive-only lock) and Q22 (milestone schema) are upstream constraints this skill honors.
 
 ---
 
@@ -169,9 +169,9 @@ Brand Hub retrofit, M=27 legacy milestones:
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q14 --- canonical 6-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q9 --- additive-only retrofit lock.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q22 --- milestone schema (Sub-flows table this skill does NOT touch).
+- `docs/design-rationale/fda-plugin-interview.md` Q14 --- canonical 6-sub-decision spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q9 --- additive-only retrofit lock.
+- `docs/design-rationale/fda-plugin-interview.md` Q22 --- milestone schema (Sub-flows table this skill does NOT touch).
 - `memory/gotcha_linear_markdown_mangling.md` --- Prosemirror mangling patterns this skill spot-checks against.
 - `skills/flow-linear-scaffold/SKILL.md` --- sibling sub-skill that creates net-new FDA milestones; runs after this skill in retrofit mode.
 - `skills/flow-preflight/SKILL.md` --- preceding sub-skill; preamble's `MODE=retrofit` gates this skill's invocation.

@@ -19,7 +19,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **Ordering constraint.** Runs AFTER `flow-doc-author` (Q15). Even greenfield `NOT_STARTED` stubs confirm flow IDs + personas + related_flows for journey authoring. Uniform ordering simplifies the orchestrator --- the ~60s parallelism savings on greenfield doesn't justify conditional ordering against ~5min/gate human review time on retrofit.
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q16 (memory:126-145). Q26 defines the journey-doc template; Q15 (memory:108-124) defines the upstream story-doc author this skill reads from.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q16 (memory:126-145). Q26 defines the journey-doc template; Q15 (memory:108-124) defines the upstream story-doc author this skill reads from.
 
 ---
 
@@ -174,9 +174,9 @@ Even greenfield `NOT_STARTED` stubs confirm flow IDs + personas + related_flows 
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q16 --- canonical 8-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q26 --- journey-doc template.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q15 --- upstream story-doc author.
+- `docs/design-rationale/fda-plugin-interview.md` Q16 --- canonical 8-sub-decision spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q26 --- journey-doc template.
+- `docs/design-rationale/fda-plugin-interview.md` Q15 --- upstream story-doc author.
 - `skills/flow-doc-author/SKILL.md` --- preceding sub-skill (provides story docs as authoring context).
 - `skills/flow-linear-scaffold/SKILL.md` --- preceding sub-skill (provides milestone BC for the `milestone` front-matter field).
 - `skills/flow-regen-index/SKILL.md` --- downstream sub-skill (consumes the journey doc's `milestone:` field for INDEX header).

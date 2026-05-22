@@ -20,7 +20,7 @@ Q8 sub-criteria are sourced verbatim from `plugins/flow-architecture/docs/design
 
 ## Legacy-milestone mapping
 
-**Source:** `mcp__plugin_workflows_linear-server__get_project` against slug `brand-hub-beb1f3e9de7f` (project ID `61d8cd9b-67ba-4e62-b474-81d9ccf36d31`) at 2026-05-11. Memory-drift correction: `project_fda_plugin_interview.md:24` and downstream design-rationale docs say "27 milestones"; the live count is **26**.
+**Source:** `mcp__plugin_workflows_linear-server__get_project` against slug `brand-hub-beb1f3e9de7f` (project ID `61d8cd9b-67ba-4e62-b474-81d9ccf36d31`) at 2026-05-11. Memory-drift correction: `fda-plugin-interview.md:24` and downstream design-rationale docs say "27 milestones"; the live count is **26**.
 
 **Critical anti-pattern reminder (drafter B catch, memory:1810; preserved in `fda-plugin-architecture-overview.md` Pre-existing-vs-FDA-output mapping):** Brand Hub's legacy-milestone count is NOT the FDA-domain count. The runtime FDA-domain count emerges from `flow-inventory-codebase-scan` (Q11) at dogfood execution time. This table is a risk-surfacing estimate, NOT a binding commitment.
 
@@ -106,7 +106,7 @@ Inventory of pre-FDA narrative content `office-hours` (Q42) can pre-fill `intent
 
 | # | Risk | Scope | Severity | Mitigation |
 |---|---|---|---|---|
-| R1 | Memory-drift in plugin design-rationale docs: "27 milestones" assertion is stale by 1 (actual: 26). | flow-architecture plugin | Low | Update `project_fda_plugin_interview.md:24` + `fda-plugin-drafter-e-revision-2.md:1107` to "26" with a memory-drift dated note. **Filed as plugin follow-up: covered inline in BC-6998 dogfood findings doc; no separate issue needed.** |
+| R1 | Memory-drift in plugin design-rationale docs: "27 milestones" assertion is stale by 1 (actual: 26). | flow-architecture plugin | Low | Update `fda-plugin-interview.md:24` + `fda-plugin-drafter-e-revision-2.md:1107` to "26" with a memory-drift dated note. **Filed as plugin follow-up: covered inline in BC-6998 dogfood findings doc; no separate issue needed.** |
 | R2 | Brand Hub target date 2026-05-19 (~1 week from this audit). BC-6998 dogfood execution window is tight; if dogfood requires Brand Hub repo changes (e.g., Q11 inventory-scan edge cases), Brand Hub team is mid-release. | cross-team | Medium | Sarah Cullen (project lead) aligned per § Team alignment. If dogfood surfaces Brand Hub fixes, file in Brand Hub Linear project (not BC-6998 blocker chain) and triage post-2026-05-19 release. **No separate mitigation issue filed — already covered by team alignment.** |
 | R3 | Linear MCP `project` filter on `list_issues` returns 0 reliably (see `gotcha_linear_list_issues_milestone_filter.md`). In-flight scan compensated via `team` + `query` text-search. One real Brand Hub in-flight issue surfaced: BC-1512 (image labeling, Chelsea Young, content-curation not code). | audit methodology | Low | Methodology limit recorded here. The known gotcha is fixed at the MCP level by upstream; not BC-7058's problem to solve. |
 | R4 | Droidor (external partner) holds Eng + QA DRI roles. Cross-team coordination for dogfood-surfaced fixes may have higher latency than internal-only iteration. | dogfood execution | Medium | Sarah Cullen (Design + Docs DRI) + Jaime Lyons (Story DRI) are internal Brite — they backstop the dogfood loop. Wasiq Ghaznavi consulted as needed. Document in `brand-hub-dogfood-findings.md` if Droidor coordination friction materializes. |
@@ -140,5 +140,5 @@ This audit surfaced 5 risks (R1-R5 above), all Low / Medium with in-line mitigat
 - [BC-6998](https://linear.app/brite-nites/issue/BC-6998) — Brand Hub dogfood, v1.0 acceptance gate.
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-drafter-e-revision-2.md:1117-1133` — Q8 7 sub-criteria (verbatim source).
 - `plugins/flow-architecture/CLAUDE.md` § Pre-existing-vs-FDA-output mapping — Brand Hub-greenfield-for-docs framing.
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:24` — memory-drift origin ("27 milestones"); correct count is 26.
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:24` — memory-drift origin ("27 milestones"); correct count is 26.
 - `gotcha_linear_list_issues_milestone_filter.md` (memory) — known Linear MCP filter unreliability invoked at R3.

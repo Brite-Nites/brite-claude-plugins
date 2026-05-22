@@ -19,7 +19,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **Heaviest-mutation skill in the plugin.** All Linear writes go through `skills/_shared/linear-writeback-pattern.md` (Q46 layer). Preview-all -> one-approval -> execute -> log + pre-flight reads is the load-bearing pattern (cadence linear-housekeeping precedent).
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q13 (memory:80-93). Q22 (milestone schema), Q23 (parent-issue template), Q24 (discipline-child templates) are the upstream content contracts.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q13 (memory:80-93). Q22 (milestone schema), Q23 (parent-issue template), Q24 (discipline-child templates) are the upstream content contracts.
 
 ---
 
@@ -203,11 +203,11 @@ This skill depends on three `_shared/` utilities (BC-6955):
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q13 --- canonical 5-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q22 --- milestone schema (Sub-flows table this skill writes + refreshes).
-- `docs/design-rationale/project_fda_plugin_interview.md` Q23 --- parent-issue template + `## L3 review summary` (mod 2).
-- `docs/design-rationale/project_fda_plugin_interview.md` Q24 --- discipline-child templates ([Story]/[Eng]/[Design]/[QA]/[Docs]).
-- `docs/design-rationale/project_fda_plugin_interview.md` Q46 --- linear-writeback layer (executor-side double-layer safety).
+- `docs/design-rationale/fda-plugin-interview.md` Q13 --- canonical 5-sub-decision spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q22 --- milestone schema (Sub-flows table this skill writes + refreshes).
+- `docs/design-rationale/fda-plugin-interview.md` Q23 --- parent-issue template + `## L3 review summary` (mod 2).
+- `docs/design-rationale/fda-plugin-interview.md` Q24 --- discipline-child templates ([Story]/[Eng]/[Design]/[QA]/[Docs]).
+- `docs/design-rationale/fda-plugin-interview.md` Q46 --- linear-writeback layer (executor-side double-layer safety).
 - `skills/_shared/linear-writeback-pattern.md` --- Q46 implementation.
 - `skills/flow-doc-author/SKILL.md` --- downstream sub-skill that consumes `state.scaffold_log.<domain>` for parent + children BC numbers.
 - `skills/flow-journey-author/SKILL.md` --- downstream sub-skill that consumes the milestone BC for journey-doc front-matter.

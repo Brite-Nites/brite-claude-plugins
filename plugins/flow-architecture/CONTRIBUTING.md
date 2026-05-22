@@ -4,7 +4,7 @@ This plugin is part of the [britenites-claude-plugins](https://github.com/Brite-
 
 ## Source of truth
 
-The canonical design record is the multi-session interview at `docs/design-rationale/project_fda_plugin_interview.md` (2,306 lines, 54 Q-locks, 16 amendments). Before changing plugin behavior, **find the relevant Q-lock and read it**. The architecture overview (`fda-plugin-architecture-overview.md`) is a reading aid — the interview is authoritative.
+The canonical design record is the multi-session interview at `docs/design-rationale/fda-plugin-interview.md` (2,306 lines, 54 Q-locks, 16 amendments). Before changing plugin behavior, **find the relevant Q-lock and read it**. The architecture overview (`fda-plugin-architecture-overview.md`) is a reading aid — the interview is authoritative.
 
 For session bootstrap, paste the bridging prompt at `docs/design-rationale/00-resume-bridge.md` as the first user message in a fresh Claude Code session. That file is a **living artifact** — update it as state drifts (e.g., when a phase closes, a new editorial fix lands, or a cross-repo PR's status changes). The other 4 files in `docs/design-rationale/` are frozen Phase-3 output and should not be edited after merge.
 
@@ -31,7 +31,7 @@ All FDA plugin work tracks under milestone **Flow-Driven Architecture Plugin v1.
 Most milestone issue bodies open with a `> Memory:` blockquote citing exact Q-lock line refs. Before touching any code:
 
 1. Run `mcp__plugin_workflows_linear-server__get_issue` on the issue ID.
-2. Open the cited Q-lock(s) in `docs/design-rationale/project_fda_plugin_interview.md`.
+2. Open the cited Q-lock(s) in `docs/design-rationale/fda-plugin-interview.md`.
 3. If the issue cites the architecture overview or other docs, read those too.
 4. Cross-check via `get_issue` against any cross-referenced issues (`<issue id="...">BC-NNNN</issue>` tags in the body).
 

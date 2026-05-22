@@ -34,4 +34,4 @@ The plugin is distributed through the `britenites-claude-plugins` marketplace.
 
 ## For contributors
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for working in this plugin. The canonical design record is `docs/design-rationale/project_fda_plugin_interview.md` (2,306 lines, 54 Q-locks). For session bootstrap, paste `docs/design-rationale/00-resume-bridge.md` as the first user message in a fresh Claude Code session.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for working in this plugin. The canonical design record is `docs/design-rationale/fda-plugin-interview.md` (2,306 lines, 54 Q-locks). For session bootstrap, paste `docs/design-rationale/00-resume-bridge.md` as the first user message in a fresh Claude Code session.

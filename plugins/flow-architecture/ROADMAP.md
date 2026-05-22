@@ -15,7 +15,7 @@ The FDA plugin ships in **6 phases** spanning design, org-prerequisites, scoping
 
 ## Phase 1 — Design close (done 2026-05-08)
 
-54 active Q-numbers locked across the multi-session design interview, 16 amendments, 55 parking-lot entries. Canonical record at `docs/design-rationale/project_fda_plugin_interview.md` (2,306 lines). Synthesis at `docs/design-rationale/fda-plugin-architecture-overview.md`.
+54 active Q-numbers locked across the multi-session design interview, 16 amendments, 55 parking-lot entries. Canonical record at `docs/design-rationale/fda-plugin-interview.md` (2,306 lines). Synthesis at `docs/design-rationale/fda-plugin-architecture-overview.md`.
 
 ## Phase 2 — Org PRs landed (done 2026-05-10)
 
@@ -54,7 +54,7 @@ Tracked at [BC-6999](https://linear.app/brite-nites/issue/BC-6999).
 
 ## Reference
 
-- Canonical design rationale: `docs/design-rationale/project_fda_plugin_interview.md` (2,306 lines, 54 Q-locks)
+- Canonical design rationale: `docs/design-rationale/fda-plugin-interview.md` (2,306 lines, 54 Q-locks)
 - Architecture synthesis: `docs/design-rationale/fda-plugin-architecture-overview.md`
 - Resume bridge: `docs/design-rationale/00-resume-bridge.md`
 - Handbook CDR: [CDR-023 Flow-Driven Architecture](https://github.com/Brite-Nites/handbook/blob/main/decisions/CDR-023-flow-driven-architecture.md)

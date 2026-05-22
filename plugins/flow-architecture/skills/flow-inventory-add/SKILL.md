@@ -19,7 +19,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **Append-only contract.** Existing rows are never rewritten. Existing IDs are never renamed (CLAUDE.md "never rename existing IDs" guardrail + master-flow-inventory.md schema lock). Silent overwrites are not a v1 behaviour — duplicate IDs hard-reject.
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q20 (memory:224-238). Q19 (memory:208-222) defines the parent 5-phase greenfield interview. `domain-add` mode invokes the Q19-mini subset — Phases 1+4+5, scoped to one domain — sourced from two layers:
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q20 (memory:224-238). Q19 (memory:208-222) defines the parent 5-phase greenfield interview. `domain-add` mode invokes the Q19-mini subset — Phases 1+4+5, scoped to one domain — sourced from two layers:
 
 | Phase | Sourced from | Content |
 |---|---|---|
@@ -117,7 +117,7 @@ Re-run safety: a same-input re-run aborts identically. No half-state ever lands 
 - `inventory-only` → orchestrator dispatches this skill in `inventory-read` mode (the new read-only mode in Section 1 above; Q20.4 hard-reject is suppressed in this mode because the H3 IS expected to exist).
 - `journey-exists` / `fully-scaffolded-fs` → orchestrator surfaces an `AskUserQuestion` and does not dispatch this skill at all in v1; user choice may re-route to `inventory-read` + `--force` propagation in subsequent phases.
 
-The Q20.4 hard-reject text above remains the binding safety net for any caller that bypasses the classifier and invokes `domain-add` directly against an already-inventoried `<DOMAIN>` — direct standalone invocation, third-party orchestrators in v1.1+, etc. The Q20.4 contract on `domain-add` mode is unchanged. Cross-link: `commands/add-domain.md` § Phase 2 carries the orchestrator-side implementation; `docs/design-rationale/project_fda_plugin_interview.md` § "Q20 amendment 1" carries the canonical rationale + four-outcome table.
+The Q20.4 hard-reject text above remains the binding safety net for any caller that bypasses the classifier and invokes `domain-add` directly against an already-inventoried `<DOMAIN>` — direct standalone invocation, third-party orchestrators in v1.1+, etc. The Q20.4 contract on `domain-add` mode is unchanged. Cross-link: `commands/add-domain.md` § Phase 2 carries the orchestrator-side implementation; `docs/design-rationale/fda-plugin-interview.md` § "Q20 amendment 1" carries the canonical rationale + four-outcome table.
 
 ---
 
@@ -181,8 +181,8 @@ If the same call re-fires (user re-runs `/flow:add-sub-flow` with identical inpu
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q20 --- canonical 7-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q19 --- parent 5-phase greenfield interview; `domain-add` invokes the Phases 1+4+5 Q19-mini subset.
+- `docs/design-rationale/fda-plugin-interview.md` Q20 --- canonical 7-sub-decision spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q19 --- parent 5-phase greenfield interview; `domain-add` invokes the Phases 1+4+5 Q19-mini subset.
 - `skills/_shared/app-classifier-pattern.md` --- the shared interview utility (BC-6955 deliverable) consumed by `domain-add`.
 - `skills/flow-regen-index/SKILL.md` --- downstream auto-dispatched by the orchestrator after this skill emits `inventory_changed=true`.
 - `skills/flow-preflight/SKILL.md` --- preceding sub-skill; emits the structured preamble this skill's caller passes through.

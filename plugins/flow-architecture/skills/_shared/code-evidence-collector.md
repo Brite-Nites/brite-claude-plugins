@@ -4,7 +4,7 @@ Deterministic code-scan contract shared by three FDA locks — Q11 Phase 3 (retr
 
 ## Why
 
-Three different sub-skills used to ask "what does the code say?" through three slightly different prompts. That triple authorship invited drift — three definitions of "BUILT", three guesses at the sandbox URL, three opinions on whether `<FeaturePage>` exists. Q15.7 (`docs/design-rationale/project_fda_plugin_interview.md:122`) and Q17.2 (`:150`) both lock onto the same evidence vocabulary; this file is the single derivation point. A change to the status taxonomy or mode-determination rule lands here once and propagates to all three consumers.
+Three different sub-skills used to ask "what does the code say?" through three slightly different prompts. That triple authorship invited drift — three definitions of "BUILT", three guesses at the sandbox URL, three opinions on whether `<FeaturePage>` exists. Q15.7 (`docs/design-rationale/fda-plugin-interview.md:122`) and Q17.2 (`:150`) both lock onto the same evidence vocabulary; this file is the single derivation point. A change to the status taxonomy or mode-determination rule lands here once and propagates to all three consumers.
 
 ## What it scans
 
@@ -50,8 +50,8 @@ Status-to-mode mapping:
 
 ## References
 
-- `docs/design-rationale/project_fda_plugin_interview.md:68` — Q11 `/flow:inventory` 6-phase architecture; Phase 3 is the deterministic code scan.
-- `docs/design-rationale/project_fda_plugin_interview.md:122` — Q15.7 status taxonomy with the BUILT cap (verbatim source).
-- `docs/design-rationale/project_fda_plugin_interview.md:150` — Q17.2 EXTRACT / WRAP / STUB mode determination (verbatim source).
-- `docs/design-rationale/project_fda_plugin_interview.md:292` — Q30.2 file-location lock.
+- `docs/design-rationale/fda-plugin-interview.md:68` — Q11 `/flow:inventory` 6-phase architecture; Phase 3 is the deterministic code scan.
+- `docs/design-rationale/fda-plugin-interview.md:122` — Q15.7 status taxonomy with the BUILT cap (verbatim source).
+- `docs/design-rationale/fda-plugin-interview.md:150` — Q17.2 EXTRACT / WRAP / STUB mode determination (verbatim source).
+- `docs/design-rationale/fda-plugin-interview.md:292` — Q30.2 file-location lock.
 - Cross-verified in consumer projects at `docs/product/master-flow-inventory.md:22-27`, `docs/product/flows/INDEX.md:15-20`, `docs/templates/job-story.md:4` (all five canonical states + BLOCKED orthogonal; no `PARTIALLY_BUILT`).

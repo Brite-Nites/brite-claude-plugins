@@ -4,7 +4,7 @@ description: Retrofit Flow-Driven Architecture orchestrator — 9 phases / 5 gat
 
 # /flow:retrofit-project
 
-Retrofit UI-bearing FDA build orchestrator for projects that already carry legacy Phase-Pattern work. Runs **9 phases / 5 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:682`). Differs from `/flow:start-project` by inserting Phase 3 `flow-legacy-cross-reference` (Q14, retrofit-only) + a Phase 3→4 review-document gate (G3 per Q14.6) + using Phase 4 `flow-inventory-codebase-scan` (Q11) instead of greenfield's interview-driven Q19. Phase 5 stays a per-domain inner loop preserving Q13.5 atomic recovery; Phases 6+7 are globally batched activating Q15.2 + Q16.2 internal parallelism. Wall ≈ depends on legacy-milestone count and FDA-domain count discovered at scan time.
+Retrofit UI-bearing FDA build orchestrator for projects that already carry legacy Phase-Pattern work. Runs **9 phases / 5 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:682`). Differs from `/flow:start-project` by inserting Phase 3 `flow-legacy-cross-reference` (Q14, retrofit-only) + a Phase 3→4 review-document gate (G3 per Q14.6) + using Phase 4 `flow-inventory-codebase-scan` (Q11) instead of greenfield's interview-driven Q19. Phase 5 stays a per-domain inner loop preserving Q13.5 atomic recovery; Phases 6+7 are globally batched activating Q15.2 + Q16.2 internal parallelism. Wall ≈ depends on legacy-milestone count and FDA-domain count discovered at scan time.
 
 > **Scope:** UI-bearing retrofits only (CDR-023 partition). Non-UI-bearing work uses CDR-014's Phase Pattern with `/workflows:fix-milestone --migrate ...`, not FDA. `flow-preflight` performs upstream mode classification — `/flow:retrofit-project` runs only when mode resolves to `retrofit` (FDA artifacts absent + legacy-work signal present per Q12.3).
 
@@ -709,10 +709,10 @@ Phase 2's no-op skip (when `intent_existed_at_start: true`) still writes the bre
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:682` — Q37 lock (canonical source; seven sub-decisions + refinement audit trail at line 698; sub-decision 7 covers the retrofit comparison).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:94` — Q14 lock (Q14.2 marker form; Q14.5 log + continue; Q14.6 review-doc gate).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:896` — Q42 lock (sub-decision 1 conditional invocation when intent.md absent).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:64` — Q9 retrofit additive-only policy.
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:682` — Q37 lock (canonical source; seven sub-decisions + refinement audit trail at line 698; sub-decision 7 covers the retrofit comparison).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:94` — Q14 lock (Q14.2 marker form; Q14.5 log + continue; Q14.6 review-doc gate).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:896` — Q42 lock (sub-decision 1 conditional invocation when intent.md absent).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:64` — Q9 retrofit additive-only policy.
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` §3f — Retrofit Orchestrator Phase Flow (synthesis view; note the "Cutover timestamp recorded in .flow-phase-state.json" line is stale per Q31 lock — trust this orchestrator).
 - `plugins/flow-architecture/commands/start-project.md` — sibling greenfield orchestrator (BC-6962 shipped; 8 phases / 4 gates).
 - `plugins/flow-architecture/skills/flow-preflight/SKILL.md` — Phase 1 sub-skill (BC-6957 shipped).

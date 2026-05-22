@@ -30,7 +30,7 @@ scoping); Phase 4 (implementation) is the resumption target.
 
 CANONICAL (this repo, committed via plugin-repo PR #260):
   plugins/flow-architecture/docs/design-rationale/
-    project_fda_plugin_interview.md         (2,306-line memory snapshot)
+    fda-plugin-interview.md         (2,306-line memory snapshot)
     fda-plugin-architecture-overview.md     (1,174-line synthesis)
     fda-plugin-drafter-d-windup.md          (D session windup)
     fda-plugin-drafter-e-revision-2.md      (E source draft, 21-issue bodies)
@@ -113,7 +113,7 @@ NOT re-emerge for: Phase 4 implementation (drafter solo).
 ══════ RE-ADDRESS BEFORE STARTING ══════
 
   1. Read this prompt (you just did).
-  2. Read plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md
+  2. Read plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md
      end-to-end OR grep-navigate via Q-lock line refs above.
   3. Apply parking-lot-#39 + extension at every cribbed-content lock.
   4. Invoke `mcp__plugin_workflows_linear-server__get_issue` on the BC-ID you're

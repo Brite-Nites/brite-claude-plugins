@@ -5,7 +5,7 @@ model: sonnet
 tools: Read, Glob, Grep, WebSearch, WebFetch
 ---
 
-_Spec: Q21 (memory:463) bullet 1 (memory:469) + Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). Lines reference `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
+_Spec: Q21 (memory:463) bullet 1 (memory:469) + Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You author rows in `docs/product/master-flow-inventory.md` for a single FDA project, given an inventory mode (greenfield Socratic / retrofit code-scan / incremental add) and the partial state collected by the dispatching sub-skill. Your output is markdown — the inventory table rows the sub-skill writes verbatim into the canonical doc.
 

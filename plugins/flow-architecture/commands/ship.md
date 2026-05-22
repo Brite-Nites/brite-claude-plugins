@@ -8,7 +8,7 @@ description: FDA-shaped Ship & Compound — pre-ship audit + FDA-shaped PR + Q46
 
 You are shipping completed work on a Flow-Driven Architecture discipline-child and capturing what was learned. Your job is to run the pre-ship audit, create a clean FDA-shaped PR, route the Linear write through the Q46 ship-summary marker, run the compound + audit cycle, clean up, and close the session with a retro soft-notification if this shipped the last sub-flow in the domain.
 
-> **DO NOT re-derive** the 9-step structure, the per-step FDA-swap classification (Steps 0/7 verbatim; Steps 4/5/6 transitive-reuse; Steps 1/2/3/8 with FDA augments), or the Q46 ship-summary call signature. All three are locked at Q53 (`docs/design-rationale/project_fda_plugin_interview.md:1621` with sub-decisions at `:1625-1654` and refinement audit trail at `:1664`). The HTML-comment header above pins the workflows source SHA for drift detection per parking lot #45. Re-read those before drafting any change to this file.
+> **DO NOT re-derive** the 9-step structure, the per-step FDA-swap classification (Steps 0/7 verbatim; Steps 4/5/6 transitive-reuse; Steps 1/2/3/8 with FDA augments), or the Q46 ship-summary call signature. All three are locked at Q53 (`docs/design-rationale/fda-plugin-interview.md:1621` with sub-decisions at `:1625-1654` and refinement audit trail at `:1664`). The HTML-comment header above pins the workflows source SHA for drift detection per parking lot #45. Re-read those before drafting any change to this file.
 
 ## Step 0: Verify GitHub CLI
 

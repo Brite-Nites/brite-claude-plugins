@@ -166,13 +166,13 @@ If you need to fan out (e.g., scaffolding several domains in parallel), run them
 
 Four operational disciplines load-bearing for v1.1+ Q-locks inside the plugin's own evolution: **validation-first cycle**, **parking-lot-#39 + extension**, **three-way cribbing taxonomy**, **schema-discipline amendment pattern**.
 
-1. **validation-first cycle.** Orchestrator → drafter → orchestrator → drafter's-own-prior-work. Surface contradictions at the first downstream consumer, re-verify at the source, escalate to the user only when consensus + drafter judgement converge. ~20 distinct catches across the B + C + D interview sessions are preserved in `docs/design-rationale/project_fda_plugin_interview.md` audit trails — that file is the source.
+1. **validation-first cycle.** Orchestrator → drafter → orchestrator → drafter's-own-prior-work. Surface contradictions at the first downstream consumer, re-verify at the source, escalate to the user only when consensus + drafter judgement converge. ~20 distinct catches across the B + C + D interview sessions are preserved in `docs/design-rationale/fda-plugin-interview.md` audit trails — that file is the source.
 2. **parking-lot-#39 + extension.** Before drafting any new cribbed content, `gh api` re-fetch the cribbed source and grep for the structural elements you intend to crib. Re-verify at EACH downstream lock that consumes the source — heavily-cited foundation locks accumulate errors at downstream consumer drafting (Q51 and Q53 each caught Q50 errors via this discipline; Q50 amendments 1 and 2 are the audit trail). Apply even without a formal cribbing relationship (e.g., the cadence/CLAUDE.md link-convention divergence preserved in § See also).
 3. **three-way cribbing taxonomy (Q50 sub-decision 7; cross-cutting requirement #4).** Three patterns govern every new cribbing decision:
    - **FDA-native** — no external source crib. Examples: Q37 orchestrator phase flows, Q38 audit, Q47 add-domain / add-sub-flow, Q43 plan-X dispatcher, the Q11-Q20 sub-skills.
    - **gstack-inspired** — loose transfer; structural inspiration, not directly cribbable. Source = `repos/garrytan/gstack`. Examples: Q42 `office-hours` (adapts heavily), Q44 `retro` (cribs 5 verbatim section headers, adapts time-windowed → scope-bounded), Q48 `four-mode-framework` (cribs the `plan-ceo-review` scope-axis taxonomy verbatim).
    - **workflows-cloned** — full clone with FDA-swap per the 7-axis framework. Source = `plugins/workflows/`. Examples: Q51 `/flow:session-start`, Q52 `/flow:review`, Q53 `/flow:ship`. Each cloned file carries an HTML-comment header recording the source SHA and clone date (drift-detection baseline per Q40 sub-decision 7; consumed by parking-lot #45 runtime tooling in v1.1).
-4. **schema-discipline amendment pattern.** Schema changes propagate through both the originating Q-lock and the target Q-lock with an audit trail preserved in `project_fda_plugin_interview.md`; original incorrect text preserved when applicable. Precedents: Q31 amendments 1 and 2 (office-hours-state, linear-writeback-state); Q24 amendment 1 (Plan-section Q46 markers in discipline-child templates); Q21 amendment 1 (adjustments[] reframed); Q50 amendments 1 and 2 (workflows-cloned classification + TRANSITIVE REUSE).
+4. **schema-discipline amendment pattern.** Schema changes propagate through both the originating Q-lock and the target Q-lock with an audit trail preserved in `fda-plugin-interview.md`; original incorrect text preserved when applicable. Precedents: Q31 amendments 1 and 2 (office-hours-state, linear-writeback-state); Q24 amendment 1 (Plan-section Q46 markers in discipline-child templates); Q21 amendment 1 (adjustments[] reframed); Q50 amendments 1 and 2 (workflows-cloned classification + TRANSITIVE REUSE).
 
 ## Pre-existing-vs-FDA-output mapping
 
@@ -181,7 +181,7 @@ What FDA creates vs what already exists in the consuming project. Use this when 
 | Artifact | Created by FDA | Pre-existing in BriteBase | Pre-existing in Brand Hub (v1 dogfood target) |
 |---|---|---|---|
 | `docs/product/intent.md` | yes (Q42) | yes (legacy) — Q42 overwrites or augments per office-hours flow | no |
-| `docs/product/master-flow-inventory.md` | yes (Q11 retrofit / Q19 greenfield) | yes (28-domain canonical) — slug schema pre-dates Q20 amendment 2 (BC-10352); BriteBase's UPPERCASE legacy slugs (`TEAM`, `AUTH`, `QUO`, etc.) would require slug-case migration before FDA scaffolding ran against them (BriteBase stays on Phase Pattern, so this is presently inapplicable) | no; Brand Hub picks its own domain count at runtime (see `project_fda_plugin_interview.md` line 1951, Q34 disambiguation #10), not pinned to BriteBase's 28 nor the legacy-milestone count of 27 |
+| `docs/product/master-flow-inventory.md` | yes (Q11 retrofit / Q19 greenfield) | yes (28-domain canonical) — slug schema pre-dates Q20 amendment 2 (BC-10352); BriteBase's UPPERCASE legacy slugs (`TEAM`, `AUTH`, `QUO`, etc.) would require slug-case migration before FDA scaffolding ran against them (BriteBase stays on Phase Pattern, so this is presently inapplicable) | no; Brand Hub picks its own domain count at runtime (see `fda-plugin-interview.md` line 1951, Q34 disambiguation #10), not pinned to BriteBase's 28 nor the legacy-milestone count of 27 |
 | `docs/product/flows/<domain>/<flow-id>.md` | yes (Q15 author) | partial (some flows pre-authored) | no |
 | `docs/product/journeys/<domain>.md` | yes (Q16 author) | partial | no |
 | `docs/product/flows/INDEX.md` | yes (Q18 regen) | yes | no |
@@ -200,12 +200,12 @@ What FDA creates vs what already exists in the consuming project. Use this when 
 - [operating-standards/flow-driven-architecture.md][ops-fda] — practitioner-facing operating standard (Q34 lock).
 - [CDR-014 (amended by CDR-023, 2026-05-07)](https://github.com/Brite-Nites/handbook/blob/main/decisions/CDR-014-milestone-standards.md) + [milestones.md](https://github.com/Brite-Nites/handbook/blob/main/how-we-work/operating-standards/milestones.md) — Phase Pattern scoped to non-product surfaces (Q35 lock).
 - [about-handbook/style-guide/templates/](https://github.com/Brite-Nites/handbook/tree/main/about-handbook/style-guide/templates/) — Q22-Q28 + Q41 promoted templates (issue templates, journey template, story-doc template, INDEX schema, PROJECT-INTENT template).
-- `docs/design-rationale/project_fda_plugin_interview.md` — canonical Q-lock record (Q1-Q55, multiple amendments). When in doubt, read the Q-lock entry, not this file.
+- `docs/design-rationale/fda-plugin-interview.md` — canonical Q-lock record (Q1-Q55, multiple amendments). When in doubt, read the Q-lock entry, not this file.
 - `docs/design-rationale/fda-plugin-architecture-overview.md` — visual architecture overview (4-tier hierarchy, command surface diagrams, phase flows, quality-gate stack diagram, state substrate map).
 - `docs/design-rationale/00-resume-bridge.md` — paste this as the first user message in a fresh Claude Code session to restore plugin-design context.
 - `../workflows/` — required dependency.
 - `../cadence/CLAUDE.md` — structural precedent for this file (intentional divergence on link convention: cadence uses no markdown links at all; this file uses inline + reference-style links because the 5 cross-cutting documentation requirements need cross-refs).
-- Parking lot: `project_fda_plugin_interview.md` § "Parking Lot" — v1.1+ candidates. Re-triage post-Brand-Hub-dogfood per Q40 sub-decision 3.
+- Parking lot: `fda-plugin-interview.md` § "Parking Lot" — v1.1+ candidates. Re-triage post-Brand-Hub-dogfood per Q40 sub-decision 3.
 
 [cdr-023]: https://github.com/Brite-Nites/handbook/blob/main/decisions/CDR-023-flow-driven-architecture.md
 [ops-fda]: https://github.com/Brite-Nites/handbook/blob/main/how-we-work/operating-standards/flow-driven-architecture.md

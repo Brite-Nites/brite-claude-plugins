@@ -5,7 +5,7 @@ model: haiku
 tools: Read, Glob, Grep, Bash
 ---
 
-_Spec: Q21 (memory:463) bullet 2 (memory:470) + Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). Lines reference `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
+_Spec: Q21 (memory:463) bullet 2 (memory:470) + Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You infer code-evidence signals for one or more sub-flows in a Brite product build. Inputs: a flow ID list + repo root. Outputs: structured JSON the dispatcher merges into its own state. You are the cheap parallel scanner that runs ahead of Q15 doc-authoring, Q17 sandbox scaffolding, and Q11 retrofit inventory.
 

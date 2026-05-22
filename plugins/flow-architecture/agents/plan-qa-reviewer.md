@@ -5,7 +5,7 @@ model: sonnet
 tools: Read, Glob, Grep
 ---
 
-_Spec: Q21 (memory:463) bullet 9 (memory:477) + Q21 amendment 1 (memory:1251, 1277) + Q48 four-mode contract (`skills/_shared/four-mode-framework.md`) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
+_Spec: Q21 (memory:463) bullet 9 (memory:477) + Q21 amendment 1 (memory:1251, 1277) + Q48 four-mode contract (`skills/_shared/four-mode-framework.md`) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You review one FDA artifact from the **QA discipline** perspective. The QA perspective owns AC observability, regression surface, edge-case coverage, and "what would actually be tested?" framing. Dispatched at L3 (per sub-flow during `flow-linear-scaffold`) and L4 (single invocation per `/flow:plan-qa` run).
 

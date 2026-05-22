@@ -8,7 +8,7 @@ Utility command. Single-purpose runner for the Q29 35-gate quality-gate stack (`
 
 > **Scope:** UI-bearing FDA projects (CDR-023). Non-UI-bearing work uses CDR-014's Phase Pattern + `/workflows:fix-milestone --migrate ...`, not this audit. The audit assumes the consuming project has been bootstrapped through `flow-preflight` (Q12 + Q36 embedded 7-step bootstrap) and has FDA artifacts on disk; absent artifacts surface as Q29.1 phase-transition gate failures, not infrastructure errors.
 
-> **DO NOT re-derive** the gate manifest, hard/soft classification, override mechanism, or three-section reporting format. All seven sub-decisions of Q38 are locked at `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:713` with a refinement audit trail at `:729`. Q38 sub-decision 4's deferred-decision resolution is at `:743`. Q29's full 35-gate manifest is locked at `:240` (sub-decisions 1-7 — including Q29.6 three-section reporting format at `:271` and Q29.7 verify-docs.sh integration at `:273`) and Q29 amendment 1 (`preflight-complete` gate, locked 2026-05-11 per BC-7066) at `:275`. Surfaced via `_shared/artifact-gate-pattern.md`; this command is the runner for that manifest, not a re-statement of it.
+> **DO NOT re-derive** the gate manifest, hard/soft classification, override mechanism, or three-section reporting format. All seven sub-decisions of Q38 are locked at `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:713` with a refinement audit trail at `:729`. Q38 sub-decision 4's deferred-decision resolution is at `:743`. Q29's full 35-gate manifest is locked at `:240` (sub-decisions 1-7 — including Q29.6 three-section reporting format at `:271` and Q29.7 verify-docs.sh integration at `:273`) and Q29 amendment 1 (`preflight-complete` gate, locked 2026-05-11 per BC-7066) at `:275`. Surfaced via `_shared/artifact-gate-pattern.md`; this command is the runner for that manifest, not a re-statement of it.
 
 > **Boundary contract with `/flow:review`** lives at `plugins/flow-architecture/CLAUDE.md` § Boundaries (Q52 sub-decision 4) — `/flow:audit` is process-compliance (35-gate stack); `/flow:review` is diff-level code review. v1.1 `--audit-preflight` flag for `/flow:review` is parking lot #48.
 
@@ -120,7 +120,7 @@ When `--no-verify-docs` is set, the Phase B checks that depend on the cached Pha
 
 ## Phase B — deterministic filesystem gates
 
-Run the Q29.2 22 per-flow discipline-child checks plus the Q29.1 phase-transition gates that don't require Linear MCP. These are pure filesystem-artifact-existence + regex-match checks, scriptable, deterministic, re-runnable per Q7 (`docs/design-rationale/project_fda_plugin_interview.md:60`).
+Run the Q29.2 22 per-flow discipline-child checks plus the Q29.1 phase-transition gates that don't require Linear MCP. These are pure filesystem-artifact-existence + regex-match checks, scriptable, deterministic, re-runnable per Q7 (`docs/design-rationale/fda-plugin-interview.md:60`).
 
 **Q29.1 phase-transition file-existence gates evaluated in Phase B (no Linear MCP needed):**
 
@@ -356,9 +356,9 @@ The `audit-concerns marker reserved` in `_shared/linear-writeback-pattern.md`'s 
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:713` — Q38 lock (canonical source; seven sub-decisions + refinement audit trail at `:729`).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:743` — Q38 sub-decision 4 deferred-decision resolution (stays strictly local in v1; `audit-concerns marker reserved` for v1.1 promotion).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:240` — Q29 35-gate manifest lock.
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:713` — Q38 lock (canonical source; seven sub-decisions + refinement audit trail at `:729`).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:743` — Q38 sub-decision 4 deferred-decision resolution (stays strictly local in v1; `audit-concerns marker reserved` for v1.1 promotion).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:240` — Q29 35-gate manifest lock.
 - `plugins/flow-architecture/skills/_shared/artifact-gate-pattern.md` — gate manifest reference (categories + counts; canonical source for re-derivation prevention).
 - `plugins/flow-architecture/skills/_shared/linear-writeback-pattern.md` — Q46 layer; `audit-concerns` marker enum entry.
 - `plugins/flow-architecture/skills/_shared/checkpoint-pattern.md` — `overrides[]` breadcrumb slot + `flow-resume-breadcrumb.sh` helper contract.

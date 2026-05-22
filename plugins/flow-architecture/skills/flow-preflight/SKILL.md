@@ -19,7 +19,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **Read-only contract** with two narrow exceptions, both governed by the same Q31.5 atomic-rename pattern (Section 4.4): (a) successful first-run bootstrap via Section 6 writes `.flow/config.json`; (b) stale-config detection in Path A (Section 4.1) re-enters the bootstrap and replaces `.flow/config.json` via the same atomic-rename. Nothing else mutates filesystem or Linear state.
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md`. Specifically: Q12 (memory:70-78) locks the 5 responsibilities; Q31.5 (memory:310) locks the atomic-rename mechanism; Q32 (memory:344) amends Q12 with explicit dependency-version checks; Q36 (memory:346) locks the 7-step embedded bootstrap and its 6-refinement audit trail at memory:370. **DO NOT re-derive from these locks** — re-litigation already resolved at lock time.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md`. Specifically: Q12 (memory:70-78) locks the 5 responsibilities; Q31.5 (memory:310) locks the atomic-rename mechanism; Q32 (memory:344) amends Q12 with explicit dependency-version checks; Q36 (memory:346) locks the 7-step embedded bootstrap and its 6-refinement audit trail at memory:370. **DO NOT re-derive from these locks** — re-litigation already resolved at lock time.
 
 ## Helper scripts
 
@@ -388,7 +388,7 @@ flow-preflight exits cleanly after the suggestion — orchestrator dispatch is t
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` — canonical 2,306-line interview record. Q12 / Q31.5 / Q32 / Q36 are the locks this skill implements.
+- `docs/design-rationale/fda-plugin-interview.md` — canonical 2,306-line interview record. Q12 / Q31.5 / Q32 / Q36 are the locks this skill implements.
 - `docs/design-rationale/fda-plugin-architecture-overview.md` — synthesis overview (reading aid).
 - `plugins/flow-architecture/scripts/` — the four BC-6956 helpers this skill orchestrates.
 - `plugins/flow-architecture/CONTRIBUTING.md` — plugin-specific conventions (bash 3.2 floor, empty `.mcp.json`, source-of-truth pointer).

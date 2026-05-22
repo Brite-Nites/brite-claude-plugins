@@ -133,7 +133,7 @@ Locked at Q44; do not re-introduce without an amendment:
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:1297` — Q44 lock (canonical source). Sub-decisions at memory:1300 (positional fallback), memory:1322-1340 (8-section structure + 7-pattern non-transfer audit trail), memory:1346-1361 (Q46 call signature). Refinement audit trail at memory:1363.
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:1297` — Q44 lock (canonical source). Sub-decisions at memory:1300 (positional fallback), memory:1322-1340 (8-section structure + 7-pattern non-transfer audit trail), memory:1346-1361 (Q46 call signature). Refinement audit trail at memory:1363.
 - `plugins/flow-architecture/skills/_shared/linear-writeback-pattern.md` — Q46 writeback layer (BC-6955 shipped). Type registry, idempotency markers, double-layer safety, batching convention.
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` § 3c — command surface map (where this utility sits relative to orchestrators + cloned commands).
 - `plugins/flow-architecture/commands/add-sub-flow.md` + `start-project.md` + `retrofit-project.md` + `add-domain.md` — full set of FDA orchestrators. This command's lighter utility shape (single phase, no breadcrumb, no gates) intentionally diverges from those.

@@ -4,7 +4,7 @@ description: Incremental-add Flow-Driven Architecture orchestrator (whole new do
 
 # /flow:add-domain
 
-Heavier of the two incremental-add FDA orchestrators. Adds a whole new domain (1 milestone + N sub-flows + N story docs + 1 journey doc) under an existing FDA-shaped project. Runs **6 phases / 2 user-confirmation gates** per Q47 lock (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:745`): Phase 3 is a per-domain inner loop with `N=1` domain but N sub-flows inside, mirroring the Q37 hybrid control flow degenerated to N=1 domain (memory:756); Phases 4-5 are globally batched with N=1 domain (degenerate but consistent with the start-project sibling). Wall ≈ 10-30 min depending on sub-flow count.
+Heavier of the two incremental-add FDA orchestrators. Adds a whole new domain (1 milestone + N sub-flows + N story docs + 1 journey doc) under an existing FDA-shaped project. Runs **6 phases / 2 user-confirmation gates** per Q47 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:745`): Phase 3 is a per-domain inner loop with `N=1` domain but N sub-flows inside, mirroring the Q37 hybrid control flow degenerated to N=1 domain (memory:756); Phases 4-5 are globally batched with N=1 domain (degenerate but consistent with the start-project sibling). Wall ≈ 10-30 min depending on sub-flow count.
 
 > **Scope:** UI-bearing builds only (CDR-023 partition). Non-UI-bearing work uses CDR-014's Phase Pattern, not FDA. `flow-preflight` performs upstream mode classification — `/flow:add-domain` runs only when mode resolves to `incremental-add`.
 
@@ -255,7 +255,7 @@ The `mktemp` file intermediate is the BC-9027 fix: the previous pattern `python3
 
 **Sub-skill:** `flow-inventory-add` (Q20; not yet shipped — orchestrator references by name).
 
-> **Q20 amendment 1 (BC-9971) note.** Phase 2 runs a 4-outcome pre-dispatch classifier (filesystem + Linear MCP) BEFORE dispatching `flow-inventory-add`. The historical "always-dispatch-domain-add" path is preserved only on the `absent` classifier outcome; three additional branches (`inventory-only`, `journey-exists`, `fully-scaffolded-fs`) route differently. See § 2.0 Pre-dispatch classifier (below) and `docs/design-rationale/project_fda_plugin_interview.md` § "Q20 amendment 1" for the canonical rationale + four-outcome table.
+> **Q20 amendment 1 (BC-9971) note.** Phase 2 runs a 4-outcome pre-dispatch classifier (filesystem + Linear MCP) BEFORE dispatching `flow-inventory-add`. The historical "always-dispatch-domain-add" path is preserved only on the `absent` classifier outcome; three additional branches (`inventory-only`, `journey-exists`, `fully-scaffolded-fs`) route differently. See § 2.0 Pre-dispatch classifier (below) and `docs/design-rationale/fda-plugin-interview.md` § "Q20 amendment 1" for the canonical rationale + four-outcome table.
 
 **Inputs handed to the sub-skill** (Branch A — when classifier returns `absent`, the only dispatch path):
 
@@ -570,8 +570,8 @@ The breadcrumb append is the **last step** of a phase, after all of the phase's 
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:745` — Q47 lock (canonical source; seven sub-decisions + refinement audit trail at line 782). Sub-decision 1 at line 747-749 locks the interactive-only invocation form; sub-decision 4 at line 766-769 locks the `delegates to Q20 — never edits inventory` boundary.
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:224` — Q20 lock (sub-skill ownership boundary; sub-flow-add vs domain-add modes; Q19-mini interview; Q20.4 hard-reject; Q20.6 within-skill gate; Q20.7 `inventory_changed` flag) + Q20 amendment 1 (BC-9971; inventory-only-domain re-scaffold branch — the four-outcome classifier table is the canonical source for § 2.0 in this file).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:745` — Q47 lock (canonical source; seven sub-decisions + refinement audit trail at line 782). Sub-decision 1 at line 747-749 locks the interactive-only invocation form; sub-decision 4 at line 766-769 locks the `delegates to Q20 — never edits inventory` boundary.
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:224` — Q20 lock (sub-skill ownership boundary; sub-flow-add vs domain-add modes; Q19-mini interview; Q20.4 hard-reject; Q20.6 within-skill gate; Q20.7 `inventory_changed` flag) + Q20 amendment 1 (BC-9971; inventory-only-domain re-scaffold branch — the four-outcome classifier table is the canonical source for § 2.0 in this file).
 - `plugins/flow-architecture/scripts/flow-classify-domain-state.sh` — Q20 amendment 1 filesystem classifier (BC-9971; emits `absent` / `inventory-only` / `journey-exists` / `fully-scaffolded-fs`).
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` §3c — plugin command surface (where this command sits in the ~17-command catalog).
 - `plugins/flow-architecture/commands/add-sub-flow.md` — sibling incremental-add orchestrator (BC-6965; 5 phases / 2 gates / skips journey-author; this command is the heavier 6-phase variant that authors the new journey doc).

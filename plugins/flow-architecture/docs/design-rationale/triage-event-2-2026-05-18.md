@@ -1,6 +1,6 @@
 # Triage Event #2 — Post-v1.0 parking-lot re-triage
 
-> **Per Q40 sub-decision 5 step 9 + sub-decision 6** ([`project_fda_plugin_interview.md`](project_fda_plugin_interview.md)). Walks all parking-lot entries (#1–#55 at file lines 1998–2099) after Brand Hub dogfood (BC-6998) under Q56 representative-demonstration interpretation. Distinct from **Triage Event #1** (pre-implementation, Phase 1 close, fired 2026-05-08, OUTSIDE Q40 release sequence). Triage Event #2 fires INSIDE the Q40 release sequence as the final step before the `flow-architecture@v1.0.0` git tag.
+> **Per Q40 sub-decision 5 step 9 + sub-decision 6** ([`fda-plugin-interview.md`](fda-plugin-interview.md)). Walks all parking-lot entries (#1–#55 at file lines 1998–2099) after Brand Hub dogfood (BC-6998) under Q56 representative-demonstration interpretation. Distinct from **Triage Event #1** (pre-implementation, Phase 1 close, fired 2026-05-08, OUTSIDE Q40 release sequence). Triage Event #2 fires INSIDE the Q40 release sequence as the final step before the `flow-architecture@v1.0.0` git tag.
 >
 > Inputs: parking lot (55 entries), BC-6998 iter-2 dogfood findings ([`brand-hub-dogfood-findings.md`](brand-hub-dogfood-findings.md)), feedback memories captured during iter-2 + post-iter-2 sessions ([[feedback_retroactive_fda_scaffold_per_domain_validation]], [[feedback_no_unauthorized_scope_reduction]], [[feedback_manual_orchestration_fallback]], [[feedback_review_agent_factual_verification]], [[feedback_re_verify_linear_state]], [[feedback_manual_orchestration_story_doc_id_backfill]]), and the 3 plugin-bug issues filed during dogfood (BC-9026 P1, BC-9027 P2, BC-9028 P3) + the post-dogfood orchestrator-gap issue BC-9971 P2.
 
@@ -8,7 +8,7 @@
 
 - **0 promotions** of existing parking-lot entries to v1.0 blockers.
 - **0 retirements** of parking-lot entries (none revealed as not-actually-needed).
-- **1 NEW Q-lock authored** during this release window: **Q56** (Brand Hub dogfood representative-demonstration scope amendment) — locked 2026-05-18 per Q40 sub-decision 6 escalation pattern; recorded inline in [`project_fda_plugin_interview.md` § Q56](project_fda_plugin_interview.md).
+- **1 NEW Q-lock authored** during this release window: **Q56** (Brand Hub dogfood representative-demonstration scope amendment) — locked 2026-05-18 per Q40 sub-decision 6 escalation pattern; recorded inline in [`fda-plugin-interview.md` § Q56](fda-plugin-interview.md).
 - **4 NEW plugin-bug issues** filed during dogfood, tracked as v1.1 backlog (NOT parking lot — separate from the design-time deferral list): BC-9026 (P1 list_issues project filter), BC-9027 (P2 security hook blocks heredoc), BC-9028 (P3 AskUserQuestion shape mismatch), BC-9971 (P2 `/flow:add-domain` inventory-only re-scaffold gap). All have proven manual-orchestration workarounds per [[feedback_manual_orchestration_fallback]]; none are v1.0 blockers under the Q56 representative-demonstration acceptance threshold.
 - **1 already-promoted parking-lot entry** acknowledged as DONE inline: #45 (drift-detection runtime tooling) — promoted to advisory CI guard via BC-7060 on 2026-05-12 (`scripts/check-clone-drift.sh` + GitHub Actions advisory `clone-drift-check` job).
 
@@ -105,8 +105,8 @@ Triage Event #2 produced a short outcome: 0 promotions, 0 retirements. (Q56 is c
 
 ## Cross-reference
 
-- [`project_fda_plugin_interview.md` § Parking lot follow-ups](project_fda_plugin_interview.md) — source-of-truth for entries #1–#55.
-- [`project_fda_plugin_interview.md` § Q56](project_fda_plugin_interview.md) — first post-v1.0 Q-lock (representative-demonstration scope amendment).
+- [`fda-plugin-interview.md` § Parking lot follow-ups](fda-plugin-interview.md) — source-of-truth for entries #1–#55.
+- [`fda-plugin-interview.md` § Q56](fda-plugin-interview.md) — first post-v1.0 Q-lock (representative-demonstration scope amendment).
 - [`brand-hub-dogfood-findings.md`](brand-hub-dogfood-findings.md) — iter-2 evidence base for this Triage.
 - [`production-readiness.md`](../production-readiness.md) — Q40 sub-decision 3 checklist; Category D item 12 is satisfied by this artifact.
 - BC-6997 (production-readiness doc) — Done 2026-05-18.

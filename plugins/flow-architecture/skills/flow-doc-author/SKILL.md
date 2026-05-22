@@ -19,7 +19,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **Ordering constraint.** Runs AFTER `flow-linear-scaffold` (Q13) so the parent + children BC numbers are available for substitution. The orchestrator owns this ordering; this skill assumes scaffold-log output is available in the run state.
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q15 (memory:108-124). Q27 defines the story-doc template; Q13 (memory:80) defines the upstream scaffold; Q22-Q28 define the substitution sources.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q15 (memory:108-124). Q27 defines the story-doc template; Q13 (memory:80) defines the upstream scaffold; Q22-Q28 define the substitution sources.
 
 ---
 
@@ -190,9 +190,9 @@ Greenfield `/flow:start-project` for the AUTH domain with N=8 sub-flows after Q1
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q15 --- canonical 7-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q27 --- story-doc template.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q13 --- upstream scaffold (provides parent + children BCs).
+- `docs/design-rationale/fda-plugin-interview.md` Q15 --- canonical 7-sub-decision spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q27 --- story-doc template.
+- `docs/design-rationale/fda-plugin-interview.md` Q13 --- upstream scaffold (provides parent + children BCs).
 - `skills/flow-linear-scaffold/SKILL.md` --- preceding sub-skill.
 - `skills/flow-journey-author/SKILL.md` --- downstream sub-skill that consumes these story docs as authoring context.
 - `skills/flow-preflight/SKILL.md` --- preceding sub-skill; preamble's `MODE` signal drives whether Q15.7 code-evidence fires (retrofit) or skips (greenfield).

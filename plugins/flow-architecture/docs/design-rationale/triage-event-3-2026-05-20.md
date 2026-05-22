@@ -1,6 +1,6 @@
 # Triage Event #3 — Post-v1.1 parking-lot re-triage
 
-> **Per Q40 sub-decision 5 step 9 + sub-decision 6, applied to the v1.1 release cycle** ([`project_fda_plugin_interview.md`](project_fda_plugin_interview.md)). Re-walks all parking-lot entries (#1–#55 at file lines ~2035–2135) after the **full Brand Hub iter-3 dogfood** (BC-10321: 10 domains / 51 sub-flows / 255 discipline children, AC met EXACTLY). Distinct from **Triage Event #2** (post-v1.0, 2026-05-18), which ran under the 1.9% scope-cap (1 domain × 1 sub-flow) and reached 0 promotions / HOLD-by-default because the cap could not exercise cross-domain signals. Triage Event #3 fires INSIDE the v1.1 release sequence (BC-10652 step 4), authored alongside the Q57 scope lock and the v1.1 production-readiness checklist.
+> **Per Q40 sub-decision 5 step 9 + sub-decision 6, applied to the v1.1 release cycle** ([`fda-plugin-interview.md`](fda-plugin-interview.md)). Re-walks all parking-lot entries (#1–#55 at file lines ~2035–2135) after the **full Brand Hub iter-3 dogfood** (BC-10321: 10 domains / 51 sub-flows / 255 discipline children, AC met EXACTLY). Distinct from **Triage Event #2** (post-v1.0, 2026-05-18), which ran under the 1.9% scope-cap (1 domain × 1 sub-flow) and reached 0 promotions / HOLD-by-default because the cap could not exercise cross-domain signals. Triage Event #3 fires INSIDE the v1.1 release sequence (BC-10652 step 4), authored alongside the Q57 scope lock and the v1.1 production-readiness checklist.
 >
 > **Why this re-triage is substantive, not a rubber-stamp.** Triage Event #2's own closing note predicted: "the next Triage Event would naturally fire after Brand Hub fan-out completes (BC-9559 children, 9 remaining domains) — at that point, cross-domain signals become measurable and several HOLD entries should re-evaluate (#26, #41, #43, #44, #50)." That fan-out is exactly what iter-3 delivered. This event walks those entries against real cross-domain evidence — and reaches **non-HOLD verdicts**, including one HOLD that is a deliberate *reversal* of the naive at-scale read.
 >
@@ -16,7 +16,7 @@
 - **Cross-domain retro entries (#41, #43, #44, #50) remain HOLD** — iter-3 *scaffolded* domains but shipped/completed none, so the "completed domains" + "/flow:review-at-depth" signals these gate on are still absent. Explicit rationale below (this is not a default HOLD — it is a verified "the gating signal still hasn't fired").
 - **All remaining entries hold at their Triage Event #2 disposition** unless listed below.
 - **1 NEW candidate** surfaced by iter-3, not currently a parking-lot entry: an **inventory-"BUILT" criterion tightening** (BUILT = operator can consume through the intended surface, not merely API-callable) — recommend filing fresh, see "New candidates" below.
-- **1 NEW Q-lock authored this release window**: **Q57** (v1.1 release-gate scope deferral — defer /flow:deprecate-legacy to v1.2). Recorded in [`project_fda_plugin_interview.md` § Q57](project_fda_plugin_interview.md). Q57 is a scope lock, not a parking-lot promotion.
+- **1 NEW Q-lock authored this release window**: **Q57** (v1.1 release-gate scope deferral — defer /flow:deprecate-legacy to v1.2). Recorded in [`fda-plugin-interview.md` § Q57](fda-plugin-interview.md). Q57 is a scope lock, not a parking-lot promotion.
 
 ## Entries whose disposition CHANGED vs Triage Event #2
 
@@ -71,8 +71,8 @@ Triage Event #2 was a short, honest HOLD-by-default outcome *because the dogfood
 
 ## Cross-reference
 
-- [`project_fda_plugin_interview.md` § Parking lot follow-ups](project_fda_plugin_interview.md) — source-of-truth for entries #1–#55.
-- [`project_fda_plugin_interview.md` § Q57](project_fda_plugin_interview.md) — the v1.1 scope lock authored this release window.
+- [`fda-plugin-interview.md` § Parking lot follow-ups](fda-plugin-interview.md) — source-of-truth for entries #1–#55.
+- [`fda-plugin-interview.md` § Q57](fda-plugin-interview.md) — the v1.1 scope lock authored this release window.
 - [`brand-hub-dogfood-findings.md`](brand-hub-dogfood-findings.md) § Iter-3 + § Post-iter-3 crm-sync close — iter-3 evidence base for this Triage.
 - [`triage-event-2-2026-05-18.md`](triage-event-2-2026-05-18.md) — the prior (post-v1.0, scope-capped) re-triage this one supersedes for the v1.1 cycle.
 - [`production-readiness.md`](../production-readiness.md) § v1.1 — the lightweight 4-category v1.1 checklist; Category D Triage-Event-#3 item is satisfied by this artifact.

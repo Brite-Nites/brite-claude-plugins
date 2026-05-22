@@ -1,6 +1,6 @@
 # Artifact-Existence Gate Pattern
 
-Quality gates in FDA are **filesystem-artifact-existence checks**, NOT LLM self-report. Per Q7 (`docs/design-rationale/project_fda_plugin_interview.md:60`): deterministic, re-runnable, scriptable. A gate either reads a file (or queries the Linear API), matches a predicate, and passes — or it fails. Self-reports like "the agent says it ran" are not gates.
+Quality gates in FDA are **filesystem-artifact-existence checks**, NOT LLM self-report. Per Q7 (`docs/design-rationale/fda-plugin-interview.md:60`): deterministic, re-runnable, scriptable. A gate either reads a file (or queries the Linear API), matches a predicate, and passes — or it fails. Self-reports like "the agent says it ran" are not gates.
 
 ## Why
 
@@ -8,7 +8,7 @@ LLM self-report drifts. An agent can say "phase 2 complete" while the artifact i
 
 ## Gate categories
 
-Q29 manifests **35 distinct gate types** across three categories. Full per-gate definitions are locked at `docs/design-rationale/project_fda_plugin_interview.md` lines 240-273; this file names the categories and counts and points at the canonical source.
+Q29 manifests **35 distinct gate types** across three categories. Full per-gate definitions are locked at `docs/design-rationale/fda-plugin-interview.md` lines 240-273; this file names the categories and counts and points at the canonical source.
 
 ### Phase-transition gates (8)
 
@@ -70,10 +70,10 @@ Overrides persist for the phase invocation; they are NOT re-prompted within the 
 
 ## References
 
-- `docs/design-rationale/project_fda_plugin_interview.md:60` — Q7 gate philosophy (filesystem-artifact-existence, not LLM self-report).
-- `docs/design-rationale/project_fda_plugin_interview.md:240-273` — Q29 full gate manifest (sub-decisions 1-7).
-- `docs/design-rationale/project_fda_plugin_interview.md:275-283` — Q29 amendment 1 (names the 8th phase-transition gate `preflight-complete`, LOCKED 2026-05-11 per BC-7066).
+- `docs/design-rationale/fda-plugin-interview.md:60` — Q7 gate philosophy (filesystem-artifact-existence, not LLM self-report).
+- `docs/design-rationale/fda-plugin-interview.md:240-273` — Q29 full gate manifest (sub-decisions 1-7).
+- `docs/design-rationale/fda-plugin-interview.md:275-283` — Q29 amendment 1 (names the 8th phase-transition gate `preflight-complete`, LOCKED 2026-05-11 per BC-7066).
 - Q38 (pending) — `/flow:audit` runner lock; see Q38 sub-decision 4 (`:1057`) for the `--linear-surface` parking-lot resolution.
 - `checkpoint-pattern.md` — `overrides[]` breadcrumb slot.
 - `linear-writeback-pattern.md` — `audit-concerns` v1.1 promotion path.
-- `docs/design-rationale/project_fda_plugin_interview.md:292` — Q30.2 file-location lock.
+- `docs/design-rationale/fda-plugin-interview.md:292` — Q30.2 file-location lock.
