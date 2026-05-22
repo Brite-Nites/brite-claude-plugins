@@ -253,6 +253,81 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
 - `INVENTORY_EXISTS`, `FLOWS_DIR_EXISTS`, `BREADCRUMB_EXISTS`
 - `GH_AUTH`, `LINEAR_MCP` (orchestrator already probed Linear in flow-preflight Section 1.1)
 
+**Templates scaffold (BC-11029, Q58):** after `.flow/config.json` is written and the 10 fields are captured, but BEFORE the Phase 1 terminal breadcrumb write, the orchestrator copies the project-side verify-docs.sh ecosystem from `$CLAUDE_PLUGIN_ROOT/templates/scripts/` into the consumer project's `scripts/` directory and substitutes the 4 placeholders via a python3-built sed script file. Q58 locks the canonical source + substitution flow.
+
+1. **Resolve LINEAR_ORG_SLUG.** Call `mcp__plugin_workflows_linear-server__get_project({id: <LINEAR_PROJECT_ID>})` and parse `LINEAR_ORG_SLUG` from the `url` field (`https://linear.app/<slug>/project/...`). The MCP response is the trust boundary — Linear-derived strings (`LINEAR_PROJECT_NAME`, `LINEAR_ORG_SLUG`) MUST NOT cross into shell as `$VAR` inside a double-quoted argument (a backtick or `$(...)` in a malicious project name would execute on the developer's machine at sed-time). Step 4 below builds the sed script via a single-quoted python heredoc, mirroring the protection pattern the breadcrumb write uses below.
+
+2. **Determine the 9 template-source → target-path pairs:**
+
+   | Template source | Target path in project |
+   |---|---|
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/verify-docs.sh` | `$REPO_ROOT/scripts/verify-docs.sh` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/regenerate-flow-index.sh` | `$REPO_ROOT/scripts/regenerate-flow-index.sh` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/regenerate-flow-index.mts` | `$REPO_ROOT/scripts/regenerate-flow-index.mts` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/verify-linear-references.mts` | `$REPO_ROOT/scripts/verify-linear-references.mts` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/normalize-fda-frontmatter.mjs` | `$REPO_ROOT/scripts/normalize-fda-frontmatter.mjs` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/lib/fda-title.mts` | `$REPO_ROOT/scripts/lib/fda-title.mts` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/lib/linear-graphql.mts` | `$REPO_ROOT/scripts/lib/linear-graphql.mts` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/.flow/scaffold-log/SCHEMA.md` | `$REPO_ROOT/.flow/scaffold-log/SCHEMA.md` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/README.md` | `$REPO_ROOT/scripts/FDA-TEMPLATES-README.md` |
+
+   The `.flow/config.json` template is schema-reference only and is NOT copied — `flow-preflight` Section 4.4 owns the runtime `.flow/config.json` write per Q12.4 lock. The 10th file in the plugin's `templates/` directory (`.flow/config.json`, the schema reference) stays plugin-side; only the 9 above land in the consumer project.
+
+3. **Idempotency check** (default behavior — no `--overwrite-scripts`): probe each of the 9 target paths via `test -f`. If ANY exists, surface the conflict list and HALT Phase 1 with: `"Templates already present in project (paths listed) — re-run with --overwrite-scripts to replace."`. Recovery semantics differ from Q36.5's atomic-rename (which guarantees absent-or-complete): templates-scaffold's per-file loop CAN leave partial state on crash. That partial state is recoverable but NOT atomic — the next retrofit re-run halts on this idempotency check before any further mutation, surfacing the conflict to the operator. See § Failure semantics below.
+
+4. **Copy + substitute + chmod** (python3-built sed script + per-file loop): copy templates into target paths, then run a single sed pass per target using a sed script file built by python3 with properly-escaped values. Placeholder mappings:
+
+   | Placeholder | Value source |
+   |---|---|
+   | `<LINEAR_PROJECT_ID>` | captured `LINEAR_PROJECT_ID` |
+   | `<LINEAR_ORG_SLUG>` | parsed from `get_project` `url` (step 1) |
+   | `<PROJECT_NAME>` | captured `LINEAR_PROJECT_NAME` |
+   | `<EXPECTED_FDA_ISSUE_COUNT>` | literal `0` (count gate disabled by default; consumer opts in by editing) |
+
+   Substitution recipe — uses the single-quoted python heredoc + `mktemp` sed-script-file pattern, mirroring the BC-9027 breadcrumb-write protection (same trust-boundary semantics: Linear-derived strings stay inside the python source as input, never interpolated into shell):
+
+   ```bash
+   SED_SCRIPT="$(mktemp -t flow-sed.XXXXXX)"
+   LINEAR_PROJECT_ID_IN="$LINEAR_PROJECT_ID" \
+   LINEAR_ORG_SLUG_IN="$LINEAR_ORG_SLUG" \
+   PROJECT_NAME_IN="$LINEAR_PROJECT_NAME" \
+   EXPECTED_COUNT_IN="0" \
+     python3 > "$SED_SCRIPT" <<'PY'
+   import os
+   def esc(s):
+       # sed replacement-string metacharacters: \, &, the chosen delimiter |
+       return s.replace("\\", "\\\\").replace("|", "\\|").replace("&", "\\&").replace("\n", "\\n")
+   for ph, env in [
+       ("<LINEAR_PROJECT_ID>", "LINEAR_PROJECT_ID_IN"),
+       ("<LINEAR_ORG_SLUG>", "LINEAR_ORG_SLUG_IN"),
+       ("<PROJECT_NAME>", "PROJECT_NAME_IN"),
+       ("<EXPECTED_FDA_ISSUE_COUNT>", "EXPECTED_COUNT_IN"),
+   ]:
+       value = os.environ.get(env, "")
+       print(f"s|{ph}|{esc(value)}|g")
+   PY
+
+   # Cross-platform sed -i: -i.bak works on both BSD (macOS default) and
+   # GNU sed; the .bak file is removed after the substitution succeeds.
+   # The previous `-i ''` form is BSD-only — `sed -i '' ...` on GNU sed
+   # treats `''` as the input filename and silently fails substitution.
+   for tgt in "${TARGET_PATHS[@]}"; do
+     sed -i.bak -f "$SED_SCRIPT" "$tgt"
+     rm -f "$tgt.bak"
+   done
+   rm -f "$SED_SCRIPT"
+   ```
+
+   Then `chmod +x` on the two `.sh` files (`verify-docs.sh` + `regenerate-flow-index.sh`). The `mjs` + `mts` files are invoked via `npx tsx` and don't require the executable bit.
+
+   Trust boundary discipline: Linear-derived strings enter the python source via env-vars (passed as discrete process-environment entries, never spliced into a shell expression), get escaped for sed-replacement-string metacharacters (`\`, `&`, `|`), then land in the sed script file as literal-text replacements. No path from MCP response → shell command line; no command-substitution surface.
+
+5. **Emit confirmation line:** `"Templates scaffolded: 9 files written under scripts/ + .flow/scaffold-log/. Required dev dependencies: gray-matter + tsx (add to package.json if absent). Run \`bash scripts/verify-docs.sh --no-linear\` to verify."`
+
+**`--overwrite-scripts` flag.** Orchestrator-level flag; default off. When set, step 3's idempotency check is bypassed and step 4 runs unconditionally — every target path is overwritten with the freshly-substituted template. Use this when consumer's `scripts/verify-docs.sh` has fallen out of sync with the canonical template and the consumer wants the latest. Hand-edits in target files are LOST when this flag is set — there is no per-file diff prompt. Re-runs without the flag preserve existing copies.
+
+**Failure semantics (templates scaffold):** any failure in steps 1-4 aborts Phase 1 before the terminal breadcrumb write. The 9-file `cp` + sed + chmod loop is NOT atomic — a crash between file 3 and file 4 leaves a partial filesystem state. This differs from Q36.5's atomic-rename invariant for `.flow/config.json` (absent-or-complete); templates-scaffold's recovery contract is fail-loud-on-next-run: the next retrofit re-run halts on the per-file `test -f` idempotency check before mutating anything further. The operator recovers by either `rm`-ing the partially-copied files OR passing `--overwrite-scripts` to replace them en masse. No silent partial state — every partial state surfaces at the next retrofit invocation's idempotency check.
+
 **Initial breadcrumb write:** at end of Phase 1, write the breadcrumb with `run_started_at` (ISO-8601 now), `current_phase: 2` **always** (the Phase 2 path — executed OR no-op skip — is responsible for advancing `current_phase` to 3; advancing here would open a crash-resume inconsistency window where the breadcrumb claims Phase 3 while `completed_phases` lacks "2"), `completed_phases: ["1"]`, `status: in_flight`, empty `domains: []`.
 
 The helper script `flow-resume-breadcrumb.sh write <state-path> <input-path>` reads the full JSON document from `<input-path>` (per BC-6956 contract as amended by BC-9027; it does not take `--mode` / `--current-phase` / `--status` flags and no longer reads from stdin). Construct the JSON via python3 (stdlib only per Q32), redirect into a `mktemp` file, then call the helper with both paths:

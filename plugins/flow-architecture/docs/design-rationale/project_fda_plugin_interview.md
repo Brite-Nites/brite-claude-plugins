@@ -2486,3 +2486,89 @@ Memory file → `docs/plans/fda-plugin-interview.md` bit-for-bit verification vi
 **Schema-discipline / lock-canon note.** Q57 follows the Q56 new-Q-lock precedent (a fresh Q-number for a scope decision the original gate did not anticipate) rather than the amendment-with-audit-trail pattern (which extends an existing Q-lock). It is the second post-v1.0 Q-lock and the 22nd+ entry in the FDA interview lock/amendment canon (Q56 was the most recent at v1.0 ship). The two v1.1 schema amendments shipped earlier in the cycle — **Q42 amendment 1** (BC-9028, AskUserQuestion free-text-via-Other shape; this file § Q42 amendment 1) and **Q20 amendment 1** (BC-9971, inventory-only-domain re-scaffold branch; this file § Q20 amendment 1) — were authored under the amendment-with-audit-trail pattern at PR #326 / #327 respectively and are already recorded above. Q57 does not renumber or supersede them.
 
 **Audit trail:** Q57 authored 2026-05-20 transcribing the user-decision comment on BC-10651 (Open question RESOLVED 2026-05-20). Triggered by the v1.1 release cut (BC-10652). Q57 records the scope deferral that lets BC-10652 ship without BC-10219; BC-10219 (/flow:deprecate-legacy) re-homed to the v1.2 milestone. Companion artifacts: `production-readiness.md` § v1.1 (lightweight 4-category checklist) + `triage-event-3-2026-05-20.md` (post-v1.1 parking-lot re-triage).
+
+## Q58 — Project-side verify-docs.sh ecosystem ships as plugin templates copied at `/flow:retrofit-project` Phase 1 (LOCKED 2026-05-22, per BC-11029 iter-2 dogfood gap; A/B/C decision with Option C as planned end-state)
+
+**Third post-v1.0 Q-lock + first authored inside the v1.2 release cycle.** Q57 was the v1.1 release-gate scope deferral; Q58 is the next sequential Q-number and the first authored against v1.2 work. Triggered by [BC-11029](https://linear.app/brite-nites/issue/BC-11029) (filed 2026-05-21) recording the verify-docs.sh-ecosystem gap surfaced during the **second-ever** `/flow:retrofit-project` dogfood — brite-roster [PR #8](https://github.com/Brite-Nites/brite-roster/pull/8) (merged 2026-05-20). PR #8's title literally framed the gap: "FDA retrofit + verify-docs.sh ecosystem foundation." Iter-1 (Brand Hub) did not surface this because brite-base already had the toolchain in place; the gap only shows up on a first-time retrofit into a project without brite-base-style scaffolding.
+
+### Canonical lock text
+
+> **Q58 — Project-side verify-docs.sh ecosystem ships as plugin templates copied at `/flow:retrofit-project` Phase 1.**
+>
+> **Context.** The `flow-architecture` plugin owns the FDA doc-tree authoring layer (`docs/product/intent.md`, `master-flow-inventory.md`, `flows/`, `journeys/`, `personas/`, per-domain scaffold logs) — `/flow:retrofit-project` produces these cleanly. The plugin did NOT own the verification toolchain consumer projects need to KEEP that doc tree maintainable (`scripts/verify-docs.sh` + `regenerate-flow-index.{sh,mts}` + `verify-linear-references.mts` + `lib/{fda-title,linear-graphql}.mts` + `normalize-fda-frontmatter.mjs` + `.flow/scaffold-log/<domain>.md`). The iter-2 dogfood proved that every future FDA adopter would re-author the same ~1,426 lines of bash + .mts; brite-roster did it by hand, modeled on brite-base.
+>
+> **Decision (2026-05-22).** The plugin now ships `plugins/flow-architecture/templates/{scripts,.flow}/` carrying the canonical reference impl of the verify-docs.sh ecosystem. `/flow:retrofit-project` Phase 1 grows a templates-scaffold step (between `.flow/config.json` write and the Phase 1 terminal breadcrumb write) that copies the templates into the consumer project + sed-substitutes 4 placeholders + `chmod +x`'s the `.sh` files.
+>
+> **Path A / B / C evaluation:**
+>
+> - **Option A — Templates + copy-on-retrofit (CHOSEN for v1.2).** Plugin ships canonical impl as `templates/`; orchestrator copies. Tracks the brite-base + brite-roster precedent. Simplest path; fastest to ship; consumer-owns the script post-copy per Q29.7. **Disadvantage:** bug fixes in the canonical impl require each consumer to re-run `/flow:retrofit-project --overwrite-scripts` (or hand-port).
+> - **Option B — Plugin-internal command (no project-side files).** Ship `/flow:verify-docs` as a plugin command that runs verification logic against the project's filesystem. **Rejected.** Loses npm-run-verify-docs integration (`bash scripts/verify-docs.sh` is hook-callable + CI-callable + dev-workflow-native; a slash command isn't); harder to customize per-project. Backwards step on `npm run` integration the brite-roster + brite-base precedent already established.
+> - **Option C — Hybrid (plugin-owned logic + thin project wrapper).** Plugin ships the actual logic in `plugins/flow-architecture/scripts/`; retrofit installs a 6-line `scripts/verify-docs.sh` wrapper in the project that `exec`s the plugin script. **Planned end-state; deferred to v1.x / v2.** When Option C ships, the migration cost is bounded: each project's `scripts/verify-docs.sh` becomes a 6-line `exec` wrapper around the plugin script; bug fixes propagate via plugin version bump rather than per-project edits. Option A is exercised by ≥2 retrofits before Option C migration; Q58 records the trigger.
+>
+> **Q29.7 reconciliation.** Q29.7 locks "verify-docs.sh is consumer-project-owned … leverage existing infrastructure rather than duplicating it." Q58 PRESERVES Q29.7's consumer-project-ownership semantics — the on-disk `scripts/verify-docs.sh` is still consumer-owned and consumer-editable after retrofit. Q58 specifies the canonical TEMPLATE SOURCE (where the consumer gets it from), not the OWNERSHIP (which stays with the consumer per Q29.7). The verify-docs.sh-is-not-duplicated semantics remain: the consumer has exactly one copy under their `scripts/`; the plugin ships the canonical template, never a runtime executable.
+>
+> **Placeholder substitution at scaffold-time.** Four placeholders are sed-substituted by the orchestrator during the Phase 1 templates-scaffold step:
+>
+> | Placeholder | Substituted from | Used in |
+> |---|---|---|
+> | `<LINEAR_PROJECT_ID>` | `.flow/config.json` `linear_project_id` | `scripts/lib/linear-graphql.mts` (`PROJECT_ID` export) |
+> | `<LINEAR_ORG_SLUG>` | parsed from Linear project URL via `mcp__plugin_workflows_linear-server__get_project` | `scripts/regenerate-flow-index.mts` (`LINEAR_ORG` constant — used for parent-cell link rendering) |
+> | `<PROJECT_NAME>` | `.flow/config.json` `linear_project_name` | `scripts/regenerate-flow-index.mts` (`HEADER_BODY` text) |
+> | `<EXPECTED_FDA_ISSUE_COUNT>` | literal `0` (count gate disabled by default) | `scripts/verify-linear-references.mts` (`EXPECTED_FDA_ISSUE_COUNT` constant; the count gate is a no-op when `0`) |
+>
+> Placeholder substitution avoids a Q12 `.flow/config.json` schema amendment to add new fields (e.g., `linear_workspace_slug`). Trust boundary: MCP responses + `.flow/config.json` values are treated as data; they cross into shell only via discrete `sed -e` argv arguments (never `bash -c` strings or unquoted `$(...)`).
+>
+> **Idempotency design.** Default behavior: per-file check (`test -f` each of the 9 target paths); HALT Phase 1 if ANY exists; orchestrator emits the conflict list and exits. `--overwrite-scripts` flag (orchestrator CLI) bypasses the check + writes all 9 unconditionally. No diff prompts in v1.2; v1.3 candidate.
+>
+> **Brite-roster vs brite-base divergences observed at template authoring time** (the canonical template resolves these as follows):
+>
+> 1. `LINEAR_ORG = "brite-nites"` (brite-roster + brite-base both hardcode) → `<LINEAR_ORG_SLUG>` placeholder.
+> 2. `BRITE_ROSTER_PROJECT_ID = "9c305022-..."` (brite-roster) vs equivalent constant in brite-base → `<LINEAR_PROJECT_ID>` placeholder.
+> 3. `EXPECTED_PHASE_4_COUNT = 240` (brite-roster) → `<EXPECTED_FDA_ISSUE_COUNT>` placeholder with default `0` (gate disabled). Consumer bumps to their expected count once known.
+> 4. `FDA_DOMAINS = new Set(["IDN", "LSM", ...])` 12-domain brite-roster set → empty set + comment block instructing population per project's `master-flow-inventory.md`. Empty set = label-hygiene gate disabled (no-op).
+> 5. `normalize-fda-frontmatter.mjs` 219 lines of brite-roster-specific parent-issue / display-name / status-override tables → ~80-line TODO skeleton with empty data tables; ships as opt-in one-shot migration tooling, not a runtime ecosystem dependency. Exits with `status: "no-op"` when tables are empty.
+> 6. `HEADER_BODY` brite-roster narrative + 14-domain order in `regenerate-flow-index.mts` → `<PROJECT_NAME>` substitution + neutral 3-line section-order paragraph that reads correctly for any project.
+> 7. Cross-repo path exclusion in `verify-docs.sh`'s internal-link check (brite-roster excludes 9 specific sibling-repo names) → generic `\.\./` cross-repo exclusion suitable for any project; consumer tightens if they cross-link into specific sibling repos.
+>
+> **Out-of-scope for v1.2 (deferred):**
+>
+> - **`/flow:start-project` parity.** Greenfield orchestrator does not get the templates-scaffold step in v1.2. File sibling BC after Q58 ships. Rationale: BC-11029 surfaced during retrofit; greenfield has not been dogfooded against this gap; doubling integration surface in one PR is unwarranted.
+> - **brite-roster + brite-base swap to plugin-provided versions.** Both stay on their hand-authored copies until ≥1 more retrofit dogfoods the templates path. Sibling BCs filed post-Q58 ship.
+> - **Option C migration.** Trigger: Option A exercised by ≥2 retrofits + the documented consumer pain (re-running `--overwrite-scripts` after a plugin bug fix is not ergonomic). v1.x or v2 candidate.
+> - **Pre-commit hook integration.** Per-project concern; the `verify-docs.sh` script is hook-callable today, wiring via husky/lefthook is consumer-side.
+> - **Adding new checks to `verify-docs.sh` itself.** Q58 ships the EXISTING impl. New checks (decision-trace freshness, ADR cross-references, etc.) are separate v1.x feature issues.
+
+### Sub-decision 1 — `templates/` schema discipline
+
+The 9 template files under `plugins/flow-architecture/templates/` are the canonical schema reference for the verify-docs.sh ecosystem. Changes to the templates require:
+
+1. **Bump plugin version** in the same commit (BC-6000 same-commit discipline) — both `plugins/flow-architecture/.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json`.
+2. **Re-run the `tests/run-verify-docs-ecosystem-vslice.sh` harness** before merging — asserts no `<PLACEHOLDER>` strings appear outside `templates/`, no `brite-roster` / `brite-nites` references leak into the templates, all 9 files have canonical homes.
+3. **Document divergence** if amending one template-side file requires amending the orchestrator's substitution flow in `commands/retrofit-project.md` Phase 1 — schema-discipline amendment pattern (cf. Q31 amendment precedents).
+
+### Sub-decision 2 — Idempotency reversibility
+
+Re-running `/flow:retrofit-project` on a project that already has the templates is THE expected steady state once a project has been retrofitted. The default error-if-exists semantics intentionally bias toward consumer-side modification preservation. The `--overwrite-scripts` flag is the ONLY in-orchestrator path to re-install templates; a consumer wanting a per-file diff or selective overwrite is expected to `git checkout` the relevant files locally + re-run.
+
+### Sub-decision 3 — Migration trigger for Option C (planned end-state)
+
+Q58 commits to Option A for v1.2; Option C remains planned end-state. The migration trigger for Option C lands a new Q-lock (future) when ANY of the following becomes true:
+
+1. **≥2 plugin bug fixes** require coordinated per-consumer re-runs of `/flow:retrofit-project --overwrite-scripts` to propagate; consumer report friction.
+2. **≥3 retrofits** have run against the templates without operator-driven hand-editing of the substitution output — confirms the templates are mature enough for plugin-side ownership.
+3. **A consumer explicitly requests** the Option C wrapper-call pattern in a BC.
+
+When the trigger fires, the Q58-successor Q-lock captures: (1) the migration recipe (each consumer's `scripts/verify-docs.sh` becomes a 6-line `exec` wrapper); (2) deprecation of the templates directory (or its retention as schema reference); (3) backwards-compatibility window for consumers still on the Option A copy.
+
+### Version + milestone
+
+- **Plugin version:** 1.1.1 → 1.2.0 (minor bump). Q57 locked v1.1 = maintenance-only; shipping a substantive new feature (templates + Phase 1 integration) inside v1.1 would violate that scope discipline. The minor bump signals the new capability to consumers.
+- **Milestone:** BC-11029 moves from v1.1 milestone → v1.2 milestone (`aac7eb53-4636-4e13-898d-b72375ddc5a9`). Joins [BC-10219](https://linear.app/brite-nites/issue/BC-10219) (`/flow:deprecate-legacy` orchestrator).
+
+### Schema-discipline / lock-canon note
+
+Q58 follows the Q56 / Q57 new-Q-lock precedent (a fresh Q-number for a scope decision the original gate did not anticipate) rather than the amendment-with-audit-trail pattern. It is the 3rd post-v1.0 Q-lock and the 23rd+ entry in the FDA interview lock/amendment canon (Q57 was the most recent at v1.2 cycle entry). Q58 does not renumber or supersede Q29.7 — see § Q29.7 reconciliation above.
+
+### Audit trail
+
+Q58 authored 2026-05-22 by orchestrator session-start synthesizing the BC-11029 handoff prompt + brite-roster PR #8 reference impl read + `commands/retrofit-project.md` Phase 1 structural analysis. Triggered by BC-11029 scoping (filed 2026-05-21). Sibling BCs to file post-ship: (a) `/flow:start-project` templates-scaffold parity; (b) brite-roster swap to plugin-provided scripts (low priority — current code works); (c) brite-base swap to plugin-provided scripts (defer until ≥2 more dogfood iterations). Companion artifacts: `plugins/flow-architecture/templates/README.md` (consumer-facing install + Option C migration plan) + `tests/run-verify-docs-ecosystem-vslice.sh` (harness asserting template fidelity) + BC-6956 description amendment (layer-boundary note: BC-6956 = plugin-internal helpers under `plugins/flow-architecture/scripts/`; BC-11029 = project-side toolchain templates under `plugins/flow-architecture/templates/`).

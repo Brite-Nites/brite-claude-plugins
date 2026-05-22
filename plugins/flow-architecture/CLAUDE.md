@@ -191,6 +191,8 @@ What FDA creates vs what already exists in the consuming project. Use this when 
 | `.flow/config.json` | yes (Q12 preflight) | no | no |
 | `docs/plans/.flow-phase-state.json` | yes (Q31 breadcrumb) | no | no |
 | `## FDA migration` legacy-milestone appendix | yes (Q14 retrofit-only) | yes (added at retrofit time) | n/a (no legacy milestones) |
+| `scripts/verify-docs.sh` + ecosystem (`regenerate-flow-index.{sh,mts}`, `verify-linear-references.mts`, `lib/{fda-title,linear-graphql}.mts`, `normalize-fda-frontmatter.mjs`) | yes (Q58, BC-11029) — plugin ships canonical impl at `plugins/flow-architecture/templates/scripts/`; copied into consumer's `scripts/` at retrofit Phase 1 with 4 placeholder substitutions; consumer-owned + editable after copy per Q29.7 | yes (pre-existing hand-authored) — Q58 templates are a sibling source; brite-base swap deferred per Q58 § Out-of-scope | n/a (Brand Hub iter-3 ran before Q58 shipped; Brand Hub got hand-authored copies) |
+| `.flow/scaffold-log/<domain>.md` | yes (Q13 scaffold, written per-domain during Phase 5 / `/flow:add-domain` Phase 4); schema documented in `templates/.flow/scaffold-log/SCHEMA.md` (Q58) | yes (legacy `/flow:retrofit-project` runs already produce these) | yes (BC-9559 Brand Hub iter-3 produced 9 per-domain logs under `.flow/scaffold-log/`) |
 
 ## See also
 
