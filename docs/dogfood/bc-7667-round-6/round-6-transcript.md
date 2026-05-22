@@ -41,8 +41,8 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-9   | 5 CAMPAIGN CREATE | regression | ✅ | pre-list returns 4 matches; branched gate-5 path would fire |
 | R-10  | 5 CAMPAIGN CREATE | regression | ✅ | plain_text=true PATCHed on all 4 campaigns |
 | R-11  | 5 CAMPAIGN CREATE | regression | ✅ | BC-6544 omit-resets-bool fires; restored via re-PATCH |
-| R-12  | 6 ATTACH LEADS | regression | _pending_ | |
-| R-13  | 6 ATTACH LEADS | DEFERRED | ⏭️ | per round-4/5 carryover |
+| R-12  | 6 ATTACH LEADS | regression | ✅ | 9 leads attached to 4 campaigns; counts 2/3/2/2 match R-1 grid |
+| R-13  | 6 ATTACH LEADS | DEFERRED | ⏭️ | per round-4/5 carryover (spec-read suffices) |
 | R-14  | 7 ATTACH SENDERS | regression | _pending_ | |
 | R-15  | 7 ATTACH SENDERS | regression | _pending_ | |
 | R-16  | 7 ATTACH SENDERS | regression | _pending_ | |
@@ -319,6 +319,52 @@ Empty cells (5 of 9) absent per F12 prune.
 ---
 
 **Phase 5 close:** R-8 ★ ✅ keystone (4 campaigns 53–56), R-9 ✅, R-10 ✅, R-11 ✅. Workspace state: +4 campaigns (21 → 25 total; 4 round-6 + 21 production). Zero blocking findings.
+
+---
+
+## Phase 6 — ATTACH LEADS
+
+### R-12 — lead bucket mapping (F21/BC-6303 regression)
+
+**Hypothesis:** F21/BC-6303 lead bucket mapping; metadata `lead_ids_by_bucket` + `lead_attach_counts` populate per cell key.
+
+**Evidence (4 POSTs to `/api/campaigns/{id}/leads/attach-leads`):**
+
+| Cell key | Campaign ID | Lead IDs | Response | list_campaigns lead count |
+|----------|-------------|----------|----------|----------------------------|
+| `professional\|Google` | 53 | [15147, 15148] | success | 2 ✅ |
+| `role\|Other` | 54 | [15149, 15150, 15151] | success | 3 ✅ |
+| `personal\|Google` | 55 | [15143, 15144] | success | 2 ✅ |
+| `personal\|Microsoft` | 56 | [15145, 15146] | success | 2 ✅ |
+
+Total: 9 leads attached across 4 campaigns. Counts match R-1 grid cell counts exactly.
+
+**Metadata projection (would write at step 7):**
+```json
+"lead_ids_by_bucket": {
+  "professional|Google": [15147, 15148],
+  "role|Other":          [15149, 15150, 15151],
+  "personal|Google":     [15143, 15144],
+  "personal|Microsoft":  [15145, 15146]
+},
+"lead_attach_counts": {
+  "professional|Google": 2, "role|Other": 3,
+  "personal|Google": 2,     "personal|Microsoft": 2
+}
+```
+
+**Side-observation:** All 4 responses include `"Existing leads were not added"` suffix. Informational — EB checks for in-campaign duplicates pre-attach. No collisions hit here (fresh leads).
+
+**Verdict:** ✅ Expected. F21/BC-6303 bucket map intact at runtime.
+
+### R-13 — F22/BC-6545 `allow_parallel_sending` ⏭️ DEFERRED
+
+Per issue body + round-4/5 carryover: spec-read suffices; live-fire requires pre-poison setup not justified for institutional-memory-only check. Spec at `email-bison.md:270` encodes BC-6545 behavior. Not counted as a verdict.
+
+---
+
+**Phase 6 close:** R-12 ✅, R-13 ⏭️ deferred. Workspace state: 10 dogfood leads (9 attached + 1 dup-probe orphan), 4 round-6 campaigns each with their assigned bucket leads. No senders, no schedule, no sequence yet.
+
 
 
 
