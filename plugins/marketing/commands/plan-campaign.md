@@ -450,7 +450,9 @@ gh api repos/brite-nites/handbook/contents/marketing/go-to-market/templates/camp
 
 If `gh api` fails (missing auth, file not found, network error), fall back to the inline template in Step 8a.4 below.
 
-**Slot-availability check** (BC-8727 friction-log F7 — verified 2026-05-19): the handbook template at the path above is gitbook-prose-style and does NOT carry `{{slug}}` / `{{vertical}}` etc. placeholders that the spec at 8a.3 substitutes. If the fetched template lacks any of the slot tokens listed in Step 8a.3, USE THE INLINE FALLBACK at Step 8a.4 — substituting against the handbook template would silently no-op every slot. Detection: `grep -c '{{slug}}' <(echo "$brief_template")` returns 0 → use fallback. The handbook PR to add slot placeholders is a separate follow-up.
+**Slot-availability check** (BC-8727 friction-log F7 originally surfaced 2026-05-19; handbook slot placeholders shipped via [BC-10654](https://linear.app/brite-nites/issue/BC-10654) on 2026-05-22): the canonical handbook template now carries the 14 named `{{slot}}` tokens enumerated in Step 8a.3, so the slot-fill is deterministic against the handbook template (no inference needed). The detection probe below stays as the backward-compat shim for older handbook checkouts pinned to a pre-BC-10654 commit — substituting against an un-slotted template would silently no-op every slot, so falling back to the inline skeleton at Step 8a.4 keeps un-slotted pins working.
+
+Detection (unchanged from F7's original gate): `grep -c '{{slug}}' <(echo "$brief_template")` returns 0 → use the inline fallback at Step 8a.4. Returns ≥1 → use the handbook template + run the substitution map at Step 8a.3.
 
 Capture the template body as `<brief-template>`.
 
@@ -477,6 +479,8 @@ In `<brief-template>`, replace these slots (literal string-replace, in order):
 | `{{eb_workspace}}` | `<eb-workspace>` resolved at Step 4.1 (`emailbison-personal` for nites, `emailbison-b2b` for supply/labs, operator-picked for cross-entity) |
 
 Unsubstituted slots (slot present in template but no value in this table) remain literally `{{slot_name}}` for the brief author to fill at sub-issue #1.
+
+The handbook template at `marketing/go-to-market/templates/campaign-brief-template.md` references 14 of the 15 slots above (every slot except `{{year}}`, which is redundant with `{{month_display}}`'s "Month Year" rendering). Slot names are load-bearing: the handbook side and this substitution map MUST stay in lockstep. Any new slot added here REQUIRES a paired handbook PR that adds the token at the right point in the template; any slot rename here REQUIRES the handbook half before this lands. See BC-10654 PR description for the original cross-repo coordination pattern.
 
 #### 8a.4 — Inline fallback brief template
 
