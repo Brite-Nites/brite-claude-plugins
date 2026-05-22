@@ -52,8 +52,8 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-20  | 10 PREVIEW | regression | ✅ | Mode 1 local render, 5 sanity checks pass |
 | R-21 ★ | 10 PREVIEW | regression + BC-7599 live-fire | ✅ | 4th keystone — test-send fired w/o marketing-context.md |
 | R-21b | 10 PREVIEW | BC-7598 doc-claim live-val | ✅ | spec doc-claim intact; 1 side-finding (test-copy-liquid.json stale) |
-| R-22  | 11 ACTIVATE | regression | _pending_ | |
-| R-23 ★ | 11 ACTIVATE | regression keystone | _pending_ | round-6 closes here |
+| R-22  | 11 ACTIVATE | regression | ✅ | single-lead test campaign 57 fully provisioned |
+| R-23 ★ | 11 ACTIVATE | regression keystone | ✅ | 5th keystone — resume_campaign queued→active confirmed |
 | R-24  | side-flow | BC-6556 sad-path | _pending_ | |
 | R-25 ★ | side-flow | BC-6781 keystone | _pending_ | |
 | R-26  | side-flow | BC-6548 sad-path | _pending_ | |
@@ -550,6 +550,63 @@ All 4 sequences: `variant: false` accepted on both steps; step_2 submitted bare;
 ---
 
 **Phase 10 close:** R-20 ✅, R-21 ★ ✅ (4th keystone), R-21b ✅. Workspace state: 4 fully-provisioned draft campaigns + 1 test email en route. Round-6 progress: 22/27 R-rows done (R-13 deferred). 5 R-rows remain: R-22 + R-23 ★ (Phase 11) + R-24, R-25 ★, R-26, R-27 (side-flows).
+
+---
+
+## Phase 11 — ACTIVATE
+
+### R-22 — single-lead test campaign build (regression)
+
+**Hypothesis:** build single-lead test campaign; Phases 3-9 walked for this campaign before activation.
+
+**Evidence (campaign 57 provisioning sequence):**
+
+| Step | Endpoint | Result |
+|------|----------|--------|
+| Create campaign | `create_campaign` | id 57, draft, outbound |
+| Create lead | `POST /api/leads/multiple` | id 15153 (corinne@britenites.com), uuid populated |
+| PATCH plain_text | `PATCH /api/campaigns/57/update` | plain_text: true |
+| Attach lead | `POST /api/campaigns/57/leads/attach-leads [15153]` | success |
+| Attach senders | `POST /api/campaigns/57/attach-sender-emails [981..995]` | 15 senders attached |
+| Schedule | `POST /api/campaigns/57/create-schedule-from-template {schedule_id: 3}` | clone id 32, M-F 08-20 America/Denver |
+| Sequence | `POST /api/campaigns/v1.1/57/sequence-steps` | sequence id 32, steps 58/59 (step 2 auto-Re: ✅) |
+
+**Verdict:** ✅ Expected. Single-lead test campaign fully provisioned through Phases 3-9 equivalent.
+
+### R-23 ★ — Phase 11 ACTIVATE (KEYSTONE regression)
+
+**Hypothesis:** call `resume_campaign` on the single-lead test; verify queued state via `get_campaign`; capture response.
+
+**Evidence (`PATCH /api/campaigns/57/resume`):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 57, "status": "queued", "total_leads": 1,
+    "sequence_id": 32, "plain_text": true,
+    "updated_at": "2026-05-22T17:27:39.000000Z"
+  }
+}
+```
+
+**State machine progression** (per BC-7598 F-Queued-Transient doc claim, confirmed at runtime):
+
+| Time | Source | status |
+|------|--------|--------|
+| T+0 (resume response) | `PATCH /api/campaigns/57/resume` | `queued` |
+| T+~10s (`get_campaign(57)`) | `GET /api/campaigns/57` | `active` |
+
+Confirms documented `draft → queued → launching → active` state machine. Both `queued` (immediate) and `active` (post-progression) are valid post-resume states.
+
+**Verdict:** ✅ Expected — 5th KEYSTONE ✅. BC-7598 F-Queued-Transient gotcha behavior intact. Campaign 57 actively sending (step 1 fires ~Tue 2026-05-26 from Denver schedule, step 2 ~Sat 2026-05-30 with auto-Re: prepend).
+
+**Round-6 closes here per session decision.** Delivery verification is post-close investigation surface.
+
+---
+
+**Phase 11 close:** R-22 ✅, R-23 ★ ✅. **5 of 6 keystones ✅** (R-A, R-B, R-8, R-21, R-23). Only R-25 remains in side-flows. Workspace state: 5 round-6 campaigns (4 main draft + 1 single-lead active), 11 dogfood leads + 1 dup-probe orphan.
+
 
 
 
