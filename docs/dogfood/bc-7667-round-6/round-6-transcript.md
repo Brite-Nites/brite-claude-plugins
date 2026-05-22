@@ -30,7 +30,7 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 |-------|-------|------|---------|-------|
 | R-A ★ | 1 PRE-FLIGHT | BC-7599 fix-val | ✅ | spec-read; live-fire at R-21 |
 | R-B ★ | 1 PRE-FLIGHT | BC-7597 fix-val | ✅ | spec-read; live-fire on metadata write |
-| R-1   | 2 grid construction | regression | _pending_ | |
+| R-1   | 2 grid construction | regression | ✅ | 4P/2P/3R; brite.co=Google via dig; 5 empty cells |
 | R-2   | 3 VARIABLES | regression | _pending_ | |
 | R-3   | 3 VARIABLES | regression | _pending_ | |
 | R-4   | 3 VARIABLES | regression | _pending_ | |
@@ -94,4 +94,39 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 ---
 
 **Phase 1 PRE-FLIGHT close:** 2 keystones ✅ (R-A, R-B). Both spec-reads pass. Live-fire surfaces deferred to R-21 (BC-7599) and Phase 1 step 10 metadata write (BC-7597).
+
+---
+
+## Phase 2 — HOST LOOKUP
+
+### R-1 — multiplicative grid construction (regression)
+
+**Hypothesis:** 4 personal + 2 professional + 3 role; 9-cell grid built; F12 drops 5 empty cells under `include_all`.
+
+**Step 1 evidence — per-lead email-type tags:**
+- 4 personal: leads 1,2 (gmail.com), leads 3,4 (outlook.com) — domain-in-free-list match
+- 2 professional: leads 5,6 (brite.co) — neither role-prefix nor free-domain
+- 3 role: leads 7 (info@), 8 (sales@), 9 (contact@) — all on dogfoodtest.com (non-free) with role-prefix local-parts
+
+**Step 2 evidence — live `dig MX` per unique domain:**
+- gmail.com → `gmail-smtp-in.l.google.com` → **Google** (literal)
+- outlook.com → `outlook-com.olc.protection.outlook.com` → **Microsoft** (literal + `*.protection.outlook.com` MX pattern)
+- brite.co → `aspmx.l.google.com` + `aspmx2/3.googlemail.com` → **Google** (matches `aspmx.l.google.com` MX pattern)
+- dogfoodtest.com → _no MX records_ → **Unknown** → rolls to **Other** in 3-bucket plan
+
+**Step 3 grid (pre-gate-2, 9 cells, raw counts):**
+
+|              | Google | Microsoft | Other |
+|--------------|--------|-----------|-------|
+| professional | 2      | 0         | 0     |
+| role         | 0      | 0         | 3     |
+| personal     | 2      | 2         | 0     |
+
+Non-empty: 4 cells. Empty: 5 cells.
+
+**Step 4b F12 (post-gate, projected):** under `include_all` → drops 5 empty cells, 4 campaigns. Under `default` → drops 8 cells, 1 campaign (`professional|Google`=2).
+
+**Verdict:** ✅ Expected. All three step-1/step-2/step-3 sub-claims match round-5 regression baseline. F12 5-empty-cell count holds under `include_all`. Metadata write (step 4d) verified later at R-8.
+
+
 
