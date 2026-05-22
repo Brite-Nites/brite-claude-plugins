@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://brite.nites/schemas/discoveries.json",
+  "title": "GTM Discoveries — Category-Tagged Signals",
+  "$comment": "Per Phase 2 architectural pivot (memory/project_gtm_campaign_architecture.md) + BC-8722. Skills emit category-tagged signals to docs/campaigns/{entity}/{slug}/discoveries.json; humans promote to handbook canonicals (plugins/marketing/data/canonicals/) or to handbook prose via PR. BC-8726 (T9-X icp-refinement-review) operationalizes the review step downstream. Brite repo is stdlib-only — this schema is the declarative contract; plugins/marketing/scripts/lint_discoveries.py is the runtime enforcement (it mirrors the constraints below).",
+  "description": "A discoveries.json file is a per-campaign-run signal log. One file per campaign at docs/campaigns/{entity}/{slug}/discoveries.json. Append-only by convention (operator workflow); each signal carries a category from the locked 4-category enum (title-discovery / icp-refinement / offer-retirement / persona-discovery), a timestamp, the emitting skill, a free-shape payload, and a promotion lifecycle status (pending / promoted / rejected).",
+  "type": "object",
+  "required": ["schema_version", "signals"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Pinned to the linter's SCHEMA_VERSION constant. Bump in lockstep with the linter + data shape."
+    },
+    "signals": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/signal" },
+      "description": "Append-only signal list. May be empty for a freshly-initialized file."
+    }
+  },
+  "definitions": {
+    "signal": {
+      "type": "object",
+      "required": ["category", "emitted_at", "emitted_by_skill", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": ["title-discovery", "icp-refinement", "offer-retirement", "persona-discovery"],
+          "description": "Load-bearing identifier; BC-8726 (icp-refinement-review) reads these strings. Keep stable. The 4 categories lock at BC-8722; a 5th (e.g. vertical-discovery) is V3-gated and would ship as a follow-up BC."
+        },
+        "emitted_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 timestamp (e.g., 2026-05-22T14:30:00Z). Producer-stamped at emit time; not re-stamped on review."
+        },
+        "emitted_by_skill": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short skill identifier (e.g., 'list-building', 'campaign-debrief')."
+        },
+        "payload": {
+          "type": "object",
+          "description": "Free-shape, category-specific. Skills name expected fields in their SKILL.md Discoveries sections; the schema does not constrain payload contents."
+        },
+        "promotion_status": {
+          "type": "string",
+          "enum": ["pending", "promoted", "rejected"],
+          "default": "pending",
+          "description": "Lifecycle: pending (default — awaiting human review) → promoted (incorporated into handbook canonicals / prose via PR) → rejected (operator declined). The lint does not enforce a default at the data layer — absence is treated as pending by consumers."
+        }
+      }
+    }
+  }
+}
