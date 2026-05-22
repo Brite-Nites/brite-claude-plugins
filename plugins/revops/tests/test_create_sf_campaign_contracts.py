@@ -12,6 +12,7 @@ the contract is met. No mocks, no subprocess, no SF org dependency.
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 from pathlib import Path
@@ -23,6 +24,7 @@ PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 
 
+@functools.cache
 def read_command() -> str:
     return COMMAND_PATH.read_text()
 
@@ -257,27 +259,21 @@ def test_target_org_regex_byte_identical_to_sibling() -> None:
     regex character class — divergent regexes would let a value accepted by
     one command fail in the other, breaking orchestrator portability.
 
-    Source: `/revops:update-sf-campaign-status` Phase 1 (BC-8723). This test
-    extracts the regex from both files and asserts byte-identity, so a future
-    edit to the sibling that BC-10511 doesn't backport surfaces immediately.
+    Source: `/revops:update-sf-campaign-status` Phase 1 (BC-8723). Both
+    command bodies must contain the canonical regex string verbatim — if
+    either side drifts to a different character class, the substring check
+    on the canonical form fails on the drifted file.
     """
+    canonical_regex = "^[a-zA-Z0-9._@-]+$"
     create_body = read_command()
     update_body = SIBLING_COMMAND_PATH.read_text()
-    regex_pattern = r"\^\[a-zA-Z0-9\._@-\]\+\$"
-    create_matches = re.findall(regex_pattern, create_body)
-    update_matches = re.findall(regex_pattern, update_body)
-    assert create_matches, (
-        "BC-10511: --target-org regex character class not found in "
-        "create-sf-campaign.md"
+    assert canonical_regex in create_body, (
+        f"BC-10511: canonical --target-org regex {canonical_regex!r} not "
+        f"found verbatim in create-sf-campaign.md"
     )
-    assert update_matches, (
-        "BC-10511: --target-org regex character class not found in sibling "
-        "update-sf-campaign-status.md — sibling source-of-truth may have "
-        "drifted, re-sync required"
-    )
-    assert create_matches[0] == update_matches[0], (
-        f"BC-10511: --target-org regex diverged from sibling. "
-        f"create-sf-campaign: {create_matches[0]!r}; "
-        f"update-sf-campaign-status: {update_matches[0]!r}. Both must be "
-        f"byte-identical per ADR-015 amendment."
+    assert canonical_regex in update_body, (
+        f"BC-10511: canonical --target-org regex {canonical_regex!r} not "
+        f"found verbatim in sibling update-sf-campaign-status.md — sibling "
+        f"source-of-truth may have drifted, re-sync required per ADR-015 "
+        f"amendment."
     )
