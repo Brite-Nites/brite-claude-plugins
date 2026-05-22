@@ -1306,9 +1306,15 @@ section "15a-bc-8719. Entity-slug short-form lint (BC-8719)"
 
 # Run grep from REPO_ROOT with relative paths so output omits the absolute
 # prefix — that keeps the worktree dirname (e.g. "bc-8719-entity-slug") from
-# false-matching the "BC-8719" exception marker. Case-sensitive filter: prose
-# shims use uppercase "BC-8719", never the lowercase worktree-path form.
-# "backward-?compat" matches both "backward-compat" and "backwardcompat";
+# false-matching the "BC-8719" exception marker. Two-stage filter:
+#   (1) case-SENSITIVE match on "BC-8719" — the issue-key marker is uppercase
+#       in prose ("BC-8719") and lowercase in worktree paths ("bc-8719-..."),
+#       so case-sensitive matching disambiguates.
+#   (2) case-INSENSITIVE match on the keyword markers ("legacy",
+#       "backward-?compat", "read-compat") — these can appear in prose as
+#       "Legacy", "backward-compat", "Backward-Compat", etc., and none of the
+#       lowercase forms collide with any path segment in this repo.
+# "backward-?compat" matches both "backward-compat" and "backwardcompat".
 # "BC-8719" as a substring also matches "Pre-BC-8719".
 bc8719_paths=()
 for p in "plugins/marketing/skills" "plugins/marketing/commands"; do
@@ -1318,7 +1324,7 @@ done
 if [ "${#bc8719_paths[@]}" -eq 0 ]; then
   warn "marketing skills/commands directories not found — BC-8719 lint skipped"
 else
-  bc8719_hits=$(cd "$REPO_ROOT" && grep -rnE 'docs/campaigns/brite-(nites|supply|labs)' "${bc8719_paths[@]}" 2>/dev/null | grep -vE '(BC-8719|legacy|backward-?compat|read-compat)' || true)
+  bc8719_hits=$(cd "$REPO_ROOT" && grep -rnE 'docs/campaigns/brite-(nites|supply|labs)' "${bc8719_paths[@]}" 2>/dev/null | grep -vE 'BC-8719' | grep -viE '(legacy|backward-?compat|read-compat)' || true)
   if [ -z "$bc8719_hits" ]; then
     pass "no hardcoded long-form docs/campaigns/brite-{entity}/ paths outside backward-compat shims"
   else
