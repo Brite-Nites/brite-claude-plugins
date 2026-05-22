@@ -11,7 +11,7 @@ metadata:
 
 # Email Copywriting
 
-You are the email copywriter for Brite's outbound motion — the translator from situation-mining's diagnostic angles into Email-Bison-ready sequence copy. This skill serves BDRs, RevOps, and marketing operators who have already run situation-mining (or have an offer-posture + entity in hand) and need subject + body drafts for a 2-step sequence. The problem: manual copywriting from a situation artifact is slow, inconsistent, and drifts into promotional tone. The outcome: one JSON artifact per campaign written to `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`, with Email Bison format compliance guaranteed by the §8 anti-slop guardrails, entity-aware tone by design (Nites residential vs Labs experiential vs Supply commercial), and diagnostic-over-promotional framing inherited from situation-mining's hypothesis rule.
+You are the email copywriter for Brite's outbound motion — the translator from situation-mining's diagnostic angles into Email-Bison-ready sequence copy. This skill serves BDRs, RevOps, and marketing operators who have already run situation-mining (or have an offer-posture + entity in hand) and need subject + body drafts for a 2-step sequence. The problem: manual copywriting from a situation artifact is slow, inconsistent, and drifts into promotional tone. The outcome: one JSON artifact per campaign written to `docs/campaigns/{short_entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`, with Email Bison format compliance guaranteed by the §8 anti-slop guardrails, entity-aware tone by design (Nites residential vs Labs experiential vs Supply commercial), and diagnostic-over-promotional framing inherited from situation-mining's hypothesis rule.
 
 ---
 
@@ -378,7 +378,7 @@ This section translates §3 Methodology into Brite's concrete stack — which to
 | What the skill needs to do | MCP / tool | Reaches | Reason (ADR / source) |
 |---|---|---|---|
 | Read marketing context + situation artifact + preset file | `Read` | Local repo | §2 Before Starting + §3 lazy-load pattern |
-| Write the output JSON artifact | `Write` | `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json` | Output contract per §4 JSON schema |
+| Write the output JSON artifact | `Write` | `docs/campaigns/{short_entity}/copy-{campaign-name}-{YYYY-MM-DD}.json` | Output contract per §4 JSON schema |
 | Discover available preset files for a vertical | `Glob` | `plugins/marketing/skills/email-copywriting/presets/` | Lazy-load pattern — check before Read |
 | Verify absence of preset file (before fallback) | `Grep` | `plugins/marketing/skills/email-copywriting/presets/` | Fallback path in §3 lazy-load |
 | Salesforce availability check (conditional) | Salesforce MCP (`run_soql_query` — `SELECT Id FROM User LIMIT 1`) | `brite-salesforce` | ADR 2c availability probe; `salesforce.md` §MCP Tool Reference |
@@ -393,7 +393,7 @@ This section translates §3 Methodology into Brite's concrete stack — which to
 - **Owns:** subject + body generation for step 1 + step 2, JSON artifact emit, offer-posture recommendation from the §3 matrix, value-equation application, recency-waterfall anchor choice, preset-file lookup + fallback.
 - **Does not own:** prospect research (that's `situation-mining`), sequence mechanics / inbox rotation / warmup (that's `campaign-orchestration`, BC-2718 shipped), launch execution (that's the `/marketing:launch-campaign` command, BC-5826, blocked by this skill), per-vertical preset file drafting beyond the 2 Municipalities seeds (that's BC-5879 / BC-5880 / BC-5881 — the Active / Exploring / Future tier fan-outs).
 - **Receives from:** `situation-mining` (situation artifact with `entity` + `vertical` + worldview rows + adjacent offering), `gtm-strategy` (optional messaging pillars when available), `icp-scoring` (BC-5831 — *indirect upstream*: the qualified prospect list (`*_qualified.csv` from `score_0_100` or `tier-a.csv` / `tier-b.csv` from `abc`) is the population from which per-prospect `situation-mining` runs feed this skill — icp-scoring's CSV is consumed by `/marketing:launch-campaign`, not directly by this skill).
-- **Hands off to:** `/marketing:launch-campaign` (BC-5826) via the JSON artifact at `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`. Also feeds `creative-angles` when the operator wants pattern-based variant angles on top of the base copy.
+- **Hands off to:** `/marketing:launch-campaign` (BC-5826) via the JSON artifact at `docs/campaigns/{short_entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`. Also feeds `creative-angles` when the operator wants pattern-based variant angles on top of the base copy.
 - **Competitive positioning (read-only reference):** when drafting for experiential-lighting prospects (Municipalities / Labs / event-production verticals), consult `plugins/marketing/references/experiential-lighting-vendor-landscape.md` for adjacent-not-competitive framing of named vendors (Illuminate Lights, Vincent Lighting, FAD, AWS Audio Visual, MK Illumination) — the reference's "adjacent, not competitive" guard applies verbatim to body copy.
 
 ### JSON artifact schema
@@ -446,7 +446,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
 - `situation_mining_source` — path to the input artifact when this campaign flowed from `situation-mining`. Omitted / empty when §6 Flow 2 (scratch path) ran.
 - `generated_at` — ISO-8601 timestamp. `/marketing:launch-campaign` checks this against a staleness threshold before launching.
 
-**Save path convention** — `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`. Operator supplies `{campaign-name}`; the skill slugifies it (lowercase, hyphen-separated). The `{entity}` subdir mirrors the entity slug (`brite-nites` / `brite-labs`).
+**Save path convention** — `docs/campaigns/{short_entity}/copy-{campaign-name}-{YYYY-MM-DD}.json` (short-form canonical post-[BC-8719](https://linear.app/brite-nites/issue/BC-8719) / O15 migration). Operator supplies `{campaign-name}`; the skill slugifies it (lowercase, hyphen-separated). `{short_entity}` is derived by stripping the `brite-` prefix from the artifact's `entity` field for path purposes only — `brite-nites` → `nites`, `brite-labs` → `labs`. The `entity` field in the JSON artifact itself remains the long-form slug (downstream `/marketing:launch-campaign` `--entity` consumer relies on the long-form enum).
 
 ### Architectural rules that apply
 
@@ -494,7 +494,7 @@ Six flows — the common paths operators actually run. Each flow states precondi
 5. Fill slots: `{RECENCY_ANCHOR}` from the situation artifact's top waterfall signal, `{PROOF_POINT_*}` from marketing-context.md case studies, `{SENDER_*}` from marketing-context.md or §5 Workflow 1 fallback, `{FREE_ASSET_NOUN}` / `{INITIATIVE_NOUN}` / `{GUARANTEE_TERMS}` from value-equation inputs.
 6. Validate draft against §8 anti-slop guardrails — auto-replace em-dashes, check for `{{TOKEN}}` EB-token typos (regex `\{\{\s*[A-Z_]+\s*\}\}`; Liquid output `{{ var }}` is allowed), check for `<p>` tags, confirm subject has no `{FIRST_NAME}`, confirm step count is exactly 2.
 7. Build the `custom_variables` array (every `{VARIABLE}` in body or subject must be declared).
-8. `Write` the JSON artifact to `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`.
+8. `Write` the JSON artifact to `docs/campaigns/{short_entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`.
 9. Report the artifact path + offer summary + tier + preset used to the operator.
 
 **Expected output:** artifact written; one-line summary like "Wrote copy-denver-downtown-2026-04-20.json — free-asset posture, list-building Municipalities preset, 7 custom variables."
@@ -558,7 +558,7 @@ Six flows — the common paths operators actually run. Each flow states precondi
 3. `Read` `presets/list-building-municipalities.md` — this is the seeded preset from this skill's shipping commit (BC-5825).
 4. Fill slots with demo values; confirm value-equation inputs are non-empty.
 5. Validate per §8.
-6. `Write` artifact to a demo path: `docs/campaigns/brite-labs/copy-demo-municipalities-{YYYY-MM-DD}.json`.
+6. `Write` artifact to a demo path: `docs/campaigns/labs/copy-demo-municipalities-{YYYY-MM-DD}.json` (short-form canonical per BC-8719).
 7. Report path + note that this is a dogfood / demo run.
 
 **Expected output:** artifact written; operator can inspect and grep for format compliance.

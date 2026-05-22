@@ -137,7 +137,7 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 
 ## Launch metadata schema
 
-The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is written progressively across the 11 phases. Each phase appends its result IDs when it completes. The partial JSON IS the breadcrumb on failure — re-running the command reads the file, shows `last_completed_phase`, and the operator picks up from the next phase manually.
+The file at `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json` is written progressively across the 11 phases. (`{short_entity}` derived from `--entity` by stripping the `brite-` prefix per BC-8719 path normalization.) Each phase appends its result IDs when it completes. The partial JSON IS the breadcrumb on failure — re-running the command reads the file, shows `last_completed_phase`, and the operator picks up from the next phase manually.
 
 ```json
 {
@@ -145,7 +145,7 @@ The file at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` is writt
   "entity": "brite-nites",
   "campaign_name_base": "denver-downtown-lighting",
   "workspace": "emailbison-b2b",
-  "copy_artifact_path": "docs/campaigns/brite-nites/copy-denver-downtown-lighting-2026-04-20.json",
+  "copy_artifact_path": "docs/campaigns/nites/copy-denver-downtown-lighting-2026-04-20.json",
   "csv_path": "lists/denver-downtown-2026-04-20.csv",
   "lead_count": 127,
   "segmented": true,
