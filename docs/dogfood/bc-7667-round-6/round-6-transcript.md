@@ -31,9 +31,9 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-A ★ | 1 PRE-FLIGHT | BC-7599 fix-val | ✅ | spec-read; live-fire at R-21 |
 | R-B ★ | 1 PRE-FLIGHT | BC-7597 fix-val | ✅ | spec-read; live-fire on metadata write |
 | R-1   | 2 grid construction | regression | ✅ | 4P/2P/3R; brite.co=Google via dig; 5 empty cells |
-| R-2   | 3 VARIABLES | regression | _pending_ | |
-| R-3   | 3 VARIABLES | regression | _pending_ | |
-| R-4   | 3 VARIABLES | regression | _pending_ | |
+| R-2   | 3 VARIABLES | regression | ✅ | meta.per_page=15 confirmed |
+| R-3   | 3 VARIABLES | regression | ⚠️ | +1 net-new var (`territory` id 16, 2026-05-19) — out-of-band drift |
+| R-4   | 3 VARIABLES | regression | ✅ | 8 artifact UPPERCASE → 8 EB-stored lowercase matches; BC-6780 holds |
 | R-5   | 4 UPLOAD | regression | _pending_ | |
 | R-6   | 4 UPLOAD | regression | _pending_ | |
 | R-7   | 4 UPLOAD | spec-read | _pending_ | |
@@ -127,6 +127,56 @@ Non-empty: 4 cells. Empty: 5 cells.
 **Step 4b F12 (post-gate, projected):** under `include_all` → drops 5 empty cells, 4 campaigns. Under `default` → drops 8 cells, 1 campaign (`professional|Google`=2).
 
 **Verdict:** ✅ Expected. All three step-1/step-2/step-3 sub-claims match round-5 regression baseline. F12 5-empty-cell count holds under `include_all`. Metadata write (step 4d) verified later at R-8.
+
+---
+
+## Phase 3 — VARIABLES
+
+### R-2 — `list_custom_variables` Laravel pagination (regression)
+
+**Hypothesis:** Laravel `?page=N` paginated meta with hardcoded `per_page: 15`.
+
+**Evidence (live `GET /api/custom-variables`):**
+- `meta.current_page: 1`, `meta.last_page: 2`, `meta.per_page: 15`, `meta.total: 16`, `meta.to: 15`
+- `meta.links[]` URL pattern: `https://personal.outbase.so/api/custom-variables?page=1` / `?page=2`
+- Page 2 fetched via `?page=2` query → returned 1 remaining var (vertical_descriptor id 8)
+
+**Verdict:** ✅ Expected. `per_page: 15` hardcoded; `?page=N` URL pattern; multi-page span when total >15.
+
+### R-3 — 15 permanent vars retention ⚠️ REFUTED (net-new: +1)
+
+**Hypothesis:** all 15 round-5 permanent vars present; net-new from round-5 = 0.
+
+**Evidence:** 16 total vars in workspace 13 across 2 pages — all 15 round-5 vars retained ✅, but **`territory` (id 16, created 2026-05-19)** is net-new since round-5 close (2026-05-11).
+
+**Verdict:** ⚠️ Unexpected, non-blocking.
+
+**Framing:** Out-of-band workspace state change (NOT spec drift, NOT EB behavior change, NOT round-6 agent error). 8-day window between rounds; some interim marketing activity created `territory`. Round-6 inherits live state — loop-close cleanup baseline shifts from 15 → 16 vars.
+
+### R-4 — Case-insensitive UPPERCASE→lowercase var matching (BC-6780 regression)
+
+**Hypothesis:** 8 artifact UPPERCASE vars → 8 "existing → reuse" classifications; zero POSTs; zero 422s.
+
+**Evidence:**
+
+| Artifact UPPERCASE | `.lower()` | EB-stored | classification |
+|--------------------|-----------|-----------|----------------|
+| RECENCY_ANCHOR | recency_anchor | id 7 ✅ | existing → reuse |
+| VERTICAL_DESCRIPTOR | vertical_descriptor | id 8 ✅ | existing → reuse |
+| SPECIFIC_FRICTION | specific_friction | id 9 ✅ | existing → reuse |
+| PROOF_POINT_COMPANY | proof_point_company | id 10 ✅ | existing → reuse |
+| PROOF_POINT_NUMBER | proof_point_number | id 11 ✅ | existing → reuse |
+| PROOF_POINT_TIMEFRAME | proof_point_timeframe | id 12 ✅ | existing → reuse |
+| FREE_ASSET_NOUN | free_asset_noun | id 13 ✅ | existing → reuse |
+| SENDER_FIRST_NAME | sender_first_name | id 14 ✅ | existing → reuse |
+
+Spec confirmation at `launch-campaign.md:414`: lowercase compare → existing → reuse, no POST attempted on match.
+
+**Verdict:** ✅ Expected. All 8 reuse cleanly. Zero POSTs needed. BC-6780 logic intact.
+
+---
+
+**Phase 3 close:** R-2 ✅, R-3 ⚠️ (workspace drift, non-blocking), R-4 ✅. Workspace 13 has 16 vars (was 15 in round-5 baseline; `territory` added out-of-band). All copy-artifact UPPERCASE vars resolve to existing lowercase storage; no mutations needed in Phase 3.
 
 
 
