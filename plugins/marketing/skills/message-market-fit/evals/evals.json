@@ -165,9 +165,9 @@
     {
       "id": "learnings-md-read-populates-transferable-insight",
       "tier": 2,
-      "description": "ITERATE on Nites with an existing learnings.md entry — Step 3.5 reads the transferable_note value and populates the appended Results Log row's Transferable Insight column with a [from debrief: ...] provenance marker; body matrix stays byte-for-byte unchanged.",
+      "description": "ITERATE on Nites with an existing learnings.md entry — Step 3.5 reads the transferable_note value and populates the appended Results Log row's Transferable Insight column with a [from debrief: ...] provenance marker; body matrix stays byte-for-byte unchanged. Post-BC-8719: learnings.md lives at the short-form path.",
       "preconditions": [
-        "docs/campaigns/brite-nites/learnings.md exists on disk (long-form path)",
+        "docs/campaigns/nites/learnings.md exists on disk (short-form canonical path per BC-8719)",
         "learnings.md contains one ## Campaign log entry with frontmatter: campaign: spring-promo-2026-04-15, transferable: true, transferable_note: \"tier-2 venue angle outperforms tier-1 by 1.8x at the same spend\", tags: [#entity/brite-nites, #vertical/venue, #persona/gm, #angle/ops-lift]",
         "docs/campaigns/nites/mmf-matrix.md body matrix has a row matching the triplet (Segment=venue, Persona=gm, Angle=ops-lift) — body row's Notes column is irrelevant to this scenario",
         "operator selects ITERATE at Gate 2 with entity=Nites and a batch-N reference naming the spring-promo-2026-04-15 campaign",
@@ -180,15 +180,16 @@
         "pulled text is byte-identical to the transferable_note value (no paraphrase, no truncation)",
         "the body matrix (rows above the Results Log) is byte-for-byte unchanged (append-only invariant preserved — satisfies matrix-append-not-replace co-invariant)",
         "the string '[from debrief:' does NOT appear in the body matrix's Notes column for any row",
-        "docs/campaigns/brite-nites/learnings.md is NOT modified by this run (byte-for-byte unchanged)"
+        "docs/campaigns/nites/learnings.md is NOT modified by this run (byte-for-byte unchanged — Step 3.5 is read-only on learnings.md)"
       ]
     },
     {
       "id": "learnings-md-absent-degrades-cleanly",
       "tier": 2,
-      "description": "ITERATE on Nites with no learnings.md on disk — Step 3.5 is skipped silently and Flow 2 completes all 8 steps without halt, warning, or [from debrief: ...] markers anywhere in the matrix.",
+      "description": "ITERATE on Nites with no learnings.md on disk at either canonical or legacy path — Step 3.5 is skipped silently and Flow 2 completes all 8 steps without halt, warning, or [from debrief: ...] markers anywhere in the matrix.",
       "preconditions": [
-        "no file at docs/campaigns/brite-nites/learnings.md (Glob returns empty)",
+        "no file at docs/campaigns/nites/learnings.md (short-form Glob returns empty)",
+        "no file at docs/campaigns/brite-nites/learnings.md (legacy long-form Glob also returns empty)",
         "docs/campaigns/nites/mmf-matrix.md exists with at least one row",
         "campaign-analysis artifact docs/campaigns/nites/analysis-*.md exists and is picked up by Gate 4",
         "operator selects ITERATE at Gate 2 with entity=Nites and a valid batch-N reference"
