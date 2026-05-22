@@ -16,7 +16,7 @@ Execute the 11 phases below sequentially. Use `AskUserQuestion` at every numbere
 
 **Outputs:**
 
-- **Launch metadata JSON** at `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` — written progressively, one phase at a time. On partial failure, the metadata file IS the breadcrumb — re-run picks up from `last_completed_phase + 1` manually.
+- **Launch metadata JSON** at `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json` — written progressively, one phase at a time. On partial failure, the metadata file IS the breadcrumb — re-run picks up from `last_completed_phase + 1` manually.
 - **EB workspace state** — one or more campaigns in `Draft` (default) or `Queued` (with `--activate`).
 
 **Precedent + upstream sources:**
@@ -68,7 +68,7 @@ Run this block before Phase 1. Every input that flows into `Bash`, the metadata 
 
 **IV-2. `--csv` path — normalize and confine to repo root.** Resolve the path via `realpath` (or `readlink -f`). The resolved path MUST begin with the output of `git rev-parse --show-toplevel`. This rejects any path that resolves outside the current repository via relative segments. Halt on any resolution mismatch.
 
-**IV-3. Dogfood-path detection (tightened).** The § Launch metadata schema "Dogfood write path" auto-override uses the **normalized** path from IV-2, not the raw `--csv` string. Match the normalized path against `<repo-root>/.claude/worktrees/<worktree-name>/` followed by any sub-path, where `<worktree-name>` matches `[A-Za-z0-9._-]+`. Extract `<worktree-name>` from the match, set metadata write directory to `<repo-root>/.claude/worktrees/<worktree-name>/dogfood/`. Any normalized path not matching this structured pattern uses the default `docs/campaigns/{entity}/` path. No prefix substring matching.
+**IV-3. Dogfood-path detection (tightened).** The § Launch metadata schema "Dogfood write path" auto-override uses the **normalized** path from IV-2, not the raw `--csv` string. Match the normalized path against `<repo-root>/.claude/worktrees/<worktree-name>/` followed by any sub-path, where `<worktree-name>` matches `[A-Za-z0-9._-]+`. Extract `<worktree-name>` from the match, set metadata write directory to `<repo-root>/.claude/worktrees/<worktree-name>/dogfood/`. Any normalized path not matching this structured pattern uses the default `docs/campaigns/{short_entity}/` path. No prefix substring matching.
 
 **IV-4. Extracted-domain safety (Phase 2 pre-dig filter).** Phase 2 parses the domain from each CSV email column. Before passing any domain value to `dig`, require it to match regex `^[A-Za-z0-9][A-Za-z0-9.-]{0,253}[A-Za-z0-9]$`. Drop anything that doesn't match with a warning logged per skipped row. Poisoned CSV rows whose email column contains characters outside this set cannot reach the `dig` invocation. Record dropped rows in Phase 2 metadata (`invalid_domain_rows: [<row-numbers>]`).
 
@@ -78,14 +78,14 @@ Run this block before Phase 1. Every input that flows into `Bash`, the metadata 
 
 **IV-7. Metadata JSON — no credential values.** The metadata write path documented in § Launch metadata schema writes only workspace labels, campaign IDs, lead counts, timestamps, and resolution-method tags. It **never writes** tokens, keys, session IDs, or any value sourced from a credential env var. When a phase needs to record the **source** of a credential (e.g., "sender auth came from the b2b workspace token"), log the source **name** (e.g., `"sender_auth_source": "workspace-token-env"`), not the value. Enforcement is by construction — the schema enumerates permitted fields; any phase that would write a credential value is a bug.
 
-**IV-8. `--campaign-name` validation + write-path confinement.** `--campaign-name` flows into two on-disk paths: the metadata JSON path (`docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`, written at Phase 1 step 10) and the Phase 2 sidecar CSV path (`docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}-skipped.csv`, written at Phase 2 step 4c). Both paths interpolate `{campaign-name}` directly. Without validation, a poisoned value like `../../../tmp/exfil` or `foo/../../etc/x` lets metadata + lead PII (sidecar) land outside the expected directory.
+**IV-8. `--campaign-name` validation + write-path confinement.** `--campaign-name` flows into two on-disk paths: the metadata JSON path (`docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json`, written at Phase 1 step 10) and the Phase 2 sidecar CSV path (`docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}-skipped.csv`, written at Phase 2 step 4c). Both paths interpolate `{campaign-name}` directly. Without validation, a poisoned value like `../../../tmp/exfil` or `foo/../../etc/x` lets metadata + lead PII (sidecar) land outside the expected directory.
 
 Two-step enforcement, applied once at Phase 1 pre-flight (before any path is interpolated):
 
 1. **Regex validation.** `--campaign-name` MUST match `^[A-Za-z0-9][A-Za-z0-9 _.-]{0,79}$`. Allows letters, digits, space, underscore, period, hyphen; first char must be alphanumeric (no leading dot to prevent hidden-file paths); cap at 80 chars. Reject `/`, `\`, `..`, quotes, shell metacharacters, control chars. No auto-sanitization — operator resubmits.
 
 2. **Realpath confinement of the resolved write path.** After constructing the metadata JSON path or sidecar CSV path, resolve via `realpath` (or `readlink -f`) and confirm the resolved absolute path begins with the resolved absolute path of the chosen write directory:
-   - Default path: must begin with `<repo-root>/docs/campaigns/{entity}/`
+   - Default path: must begin with `<repo-root>/docs/campaigns/{short_entity}/`
    - Dogfood path: must begin with `<repo-root>/.claude/worktrees/<worktree>/dogfood/` (with `<worktree>` already validated by IV-3)
 
    On mismatch, halt with a clear error; do NOT auto-correct. This is defense-in-depth against the regex missing an edge case (e.g., Unicode lookalikes, NFC-vs-NFD normalization differences).
@@ -114,7 +114,7 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 | `--workspace <id>` | yes | — | `emailbison-b2b` or `emailbison-personal`. Phase 1 cross-checks against entity. |
 | `--copy-artifact <path>` | yes | — | Path to the BC-5825 JSON artifact. Phase 1 loads + validates against schema v1.0. |
 | `--campaign-name <base>` | yes | — | Base name for created campaigns. Segmentation adds compound suffixes (`\| Professional \| Google`, `\| Role \| Microsoft`, etc. — one per non-empty (email-type × ESP) cell). |
-| `--entity <id>` | no | from copy artifact | `brite-nites` or `brite-labs`. Overrides `entity` in copy artifact — use only when intentionally re-targeting. Brite Supply is intentionally absent: Supply's marketing verticals are deferred per handbook `marketing/go-to-market/verticals/README.md`, and upstream `email-copywriting/SKILL.md` § 4 / § 8 enforces the same exclusion in the copy artifact. Do not re-add without coordinating with the handbook canon update. |
+| `--entity <id>` | no | from copy artifact | `brite-nites` or `brite-labs` (long-form). Overrides `entity` in copy artifact — use only when intentionally re-targeting. **Path normalization (BC-8719):** every `docs/campaigns/{short_entity}/...` token in this document interpolates `{short_entity}` from `--entity` by stripping the `brite-` prefix (`brite-nites` → `nites`, `brite-labs` → `labs`) — this is the canonical short-form layout. The `entity` field inside the launch metadata JSON itself stays long-form (downstream consumers depend on the enum). Brite Supply is intentionally absent: Supply's marketing verticals are deferred per handbook `marketing/go-to-market/verticals/README.md`, and upstream `email-copywriting/SKILL.md` § 4 / § 8 enforces the same exclusion in the copy artifact. Do not re-add without coordinating with the handbook canon update. |
 | `--no-host-lookup` | no | off (lookup ON) | Skip Phase 2 entirely. Single combined campaign with the base name. Sole opt-out from multiplicative segmentation — for tiny test launches where 9-cell setup overhead isn't justified. |
 | `--no-sequence` | no | off (sequence ON) | Skip Phase 9. Campaign has no sequence steps until added out-of-band. |
 | `--preview` | no | off | Full dry-run. Sample 3 leads through Phase 1 + Phase 10 local render. No mutations. Phases 3–9, 11 all skipped. |
@@ -203,7 +203,7 @@ The worked example uses a single email-type (`professional`) only because the op
 
 **Schema contract — no credential values.** This JSON writes labels, IDs, counts, timestamps, and resolution-method tags. It does NOT write credential values of any kind (tokens, keys, session IDs). When the resolution method is relevant (e.g., "sender resolved via workspace token"), log the source name, never the value. See Input validation § IV-7.
 
-**Dogfood write path (F6 convention).** For any dogfood, staging, or testing run — typically a run against `emailbison-personal` with a synthetic test CSV — write the metadata JSON to `.claude/worktrees/<worktree-name>/dogfood/` (gitignored) instead of `docs/campaigns/{entity}/`. Production metadata lives under `docs/campaigns/` because downstream consumers (campaign-debrief skill, launch-history audits) read from there; dogfood metadata pollutes that directory and should never be committed. Detection is structured, not substring-matched — see Input validation § IV-3 for the pattern. The detection fires at Phase 1 step 3 (flagging the cross-mapping) AND Phase 1 step 10 (selecting the write path).
+**Dogfood write path (F6 convention).** For any dogfood, staging, or testing run — typically a run against `emailbison-personal` with a synthetic test CSV — write the metadata JSON to `.claude/worktrees/<worktree-name>/dogfood/` (gitignored) instead of `docs/campaigns/{short_entity}/`. Production metadata lives under `docs/campaigns/` because downstream consumers (campaign-debrief skill, launch-history audits) read from there; dogfood metadata pollutes that directory and should never be committed. Detection is structured, not substring-matched — see Input validation § IV-3 for the pattern. The detection fires at Phase 1 step 3 (flagging the cross-mapping) AND Phase 1 step 10 (selecting the write path).
 
 ---
 
@@ -254,7 +254,7 @@ The worked example uses a single email-type (`professional`) only because the op
    **Liquid blocks are not evaluated in the local spot-check.** EmailBison evaluates Liquid (`{% assign %}`, `{% if %}`, `{{ var }}`) server-side at send time, after EB substitutes `{TOKEN}` references. The local spot-check renders only the EB-substitution layer — `{TOKEN}` references get replaced with CSV values, but Liquid blocks remain visible in the preview as raw text. To verify Liquid evaluation end-to-end, use `--test-send <your-email>` (Phase 10 Mode 2), which sends a real email through EB's render pipeline and lands in your inbox with the final rendered output. See `plugins/marketing/skills/email-copywriting/SKILL.md` § Liquid + spintax for graceful per-lead fallback for the canonical patterns.
 9. **Unique-per-lead auto-toggle.** If `lead_count < 500`, enable per-lead variable uniqueness (Josh Braun framework from Revgrowth 10 — each lead gets a slightly different variable value rendering). If `lead_count >= 500`, skip per-lead uniqueness for deliverability / sender-volume reasons. Log the decision.
 10. **Write initial metadata JSON.** Validate `--campaign-name` per IV-8 (regex + write-path realpath confinement) before constructing the path. Determine write path per § Launch metadata schema "Dogfood write path" note:
-    - Default: `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`
+    - Default: `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json`
     - Dogfood override (CSV path under `.claude/worktrees/`): `.claude/worktrees/<detected-worktree>/dogfood/{campaign-name}-{YYYY-MM-DD}.json`
     Populate `schema_version`, `entity`, `campaign_name_base`, `workspace`, `copy_artifact_path`, `csv_path`, `lead_count`, `launched_at`. Also record the scratch-state flags from steps 3–7: `workspace_mismatch` (if any), `sender_resolution_method`, `unique_per_lead_enabled`. Set `last_completed_phase: 1`. This is the first progressive write.
 
@@ -348,7 +348,7 @@ Without `--no-host-lookup` Phase 2 always runs and produces the multiplicative s
      - `Include all` → skip nothing (enum: `include_all`)
    - **(4b) Skip empty cells (F12).** With the surviving (post-filter) lead set, drop any cell in the 9-cell grid that has **0 leads** — do NOT create an empty campaign. Example: post-filter under `include_role` resolves to `(professional, Google): 84, (professional, Microsoft): 31, (professional, Other): 12, (role, Google): 3, (role, Microsoft): 0, (role, Other): 0` → create 4 campaigns (the 4 non-empty cells), skip the 2 empty role cells entirely. Record the skipped cells in scratch state so the metadata `segments` map reflects the actual (pruned) plan. If ALL cells are empty (either no leads survived the email-type filter, or every surviving lead's domain failed DNS), halt — the campaign has zero deliverable leads and Phase 3 cannot proceed.
    - **(4c) Sidecar CSV write for skipped leads (only if non-empty).** If the skipped-lead set is non-empty, write it to a sidecar CSV. Apply IV-8 (re-validate `--campaign-name` regex + realpath-confine the resolved path to the chosen write directory) and IV-9 (formula-injection neutralization on each cell value) before writing. Path convention mirrors the metadata JSON's dual-path rule from § Launch metadata schema "Dogfood write path" note:
-     - **Production path:** `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
+     - **Production path:** `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
      - **Dogfood path:** `.claude/worktrees/<detected-worktree>/dogfood/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
 
      CSV columns: original CSV columns verbatim (preserve order, then apply IV-9 per-cell) + one new trailing column `skip_reason` with values `role_address` or `personal_domain`. If a lead matches both lists (tiebreak case), `skip_reason` is `personal_domain` per the personal-beats-role rule. If the skipped set is empty, no file is created; `skipped_leads_csv_path` is `null`.
@@ -903,7 +903,7 @@ After Phase 10 completes, surface the final summary message and exit:
 > - `{campaign_ids["professional|Other"]}` — 12 leads, 2-step sequence, ready to activate
 > - `{campaign_ids["role|Google"]}` — 3 leads, 2-step sequence, ready to activate
 >
-> Metadata: `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`
+> Metadata: `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json`
 >
 > To activate, re-run this command with the same arguments plus `--activate`. Phases 1–10 are idempotent on re-run (read-only or detection-gated); Phase 11 only fires with the flag.
 
@@ -990,7 +990,7 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
    > - `{campaign-name} | Professional | Other` (id {id}) — Queued, 12 leads, same
    > - `{campaign-name} | Role | Google` (id {id}) — Queued, 3 leads, same
    >
-   > Metadata written to `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json`.
+   > Metadata written to `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json`.
    >
    > Monitor via `get_campaign_stats` or the Email Bison UI.
 
@@ -1049,7 +1049,7 @@ Before marking this command shipped, confirm:
 - [ ] All 4 required args + 8 flags documented (`--no-host-lookup`, `--no-sequence`, `--activate`, `--preview`, `--reference`, `--entity`, `--test-send`, `--test-send-sender`); `argument-hint` frontmatter lists all 8.
 - [ ] § Input validation section present with IV-1..IV-9 covering CSV-path safety (IV-1), path confinement (IV-2), dogfood path detection (IV-3), domain regex filter (IV-4), --test-send validation (IV-5), SOQL email regex (IV-6), metadata-no-credentials (IV-7), --campaign-name validation + write-path confinement (IV-8), and sidecar CSV formula-injection neutralization (IV-9).
 - [ ] Error recovery documented per phase (partial state + resume procedure).
-- [ ] Launch metadata write path `docs/campaigns/{entity}/{campaign-name}-{YYYY-MM-DD}.json` documented.
+- [ ] Launch metadata write path `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json` documented.
 - [ ] Dogfood transcript (test campaign on `emailbison-personal`, 5–10 leads) attached to BC-5826 as a comment — activated or draft-only. Phase 10 Mode 1 (local render) MUST succeed with all 5 sanity checks passing. Phase 10 Mode 2 (`--test-send`) is optional and only validated if the flag was passed.
 - [ ] `email-bison.md` §Consumed by / §Related skills lists this command as a consumer.
 - [ ] `./scripts/validate.sh` exits 0.

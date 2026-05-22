@@ -45,10 +45,10 @@ def migrate_entity(
     short_entity: str,
     *,
     dry_run: bool,
-) -> tuple[str, int]:
+) -> str:
     """Migrate one entity's long-form directory to short-form.
 
-    Returns a (status, moved_count) tuple where status is one of:
+    Returns a status string:
       "moved"  — long-form existed and was moved (or would be in dry-run)
       "noop"   — long-form did not exist; nothing to do
       "abort"  — long-form AND short-form both exist; conflict needs operator
@@ -57,7 +57,16 @@ def migrate_entity(
     short_dir = campaigns_root / short_entity
 
     if not long_dir.exists():
-        return ("noop", 0)
+        return "noop"
+
+    if long_dir.is_symlink():
+        print(
+            f"  ABORT  brite-{short_entity}/ → {short_entity}/ — long-form path is a symlink ({long_dir} → {long_dir.resolve()}).\n"
+            f"         Refusing to move: shutil.move would rename the symlink without touching its target.\n"
+            f"         Resolve manually: delete the symlink and either re-create the data at the short-form path, or re-run after replacing it with a real directory.",
+            file=sys.stderr,
+        )
+        return "abort"
 
     if short_dir.exists():
         print(
@@ -67,25 +76,28 @@ def migrate_entity(
             f"         Resolve manually: merge entries or delete one side, then re-run.",
             file=sys.stderr,
         )
-        return ("abort", 0)
+        return "abort"
 
-    if dry_run:
-        try:
-            child_count = sum(1 for _ in long_dir.iterdir())
-        except OSError:
-            child_count = 0
-        print(
-            f"  DRY    brite-{short_entity}/ → {short_entity}/  ({child_count} child entries would move)"
-        )
-        return ("moved", child_count)
-
-    shutil.move(str(long_dir), str(short_dir))
     try:
-        child_count = sum(1 for _ in short_dir.iterdir())
+        child_count = sum(1 for _ in long_dir.iterdir())
     except OSError:
         child_count = 0
+
+    if dry_run:
+        print(f"  DRY    brite-{short_entity}/ → {short_entity}/  ({child_count} child entries would move)")
+        return "moved"
+
+    try:
+        shutil.move(str(long_dir), str(short_dir))
+    except (OSError, shutil.Error) as exc:
+        print(
+            f"  ERROR  brite-{short_entity}/ → {short_entity}/ — move failed: {exc}\n"
+            f"         Partial state may exist at both paths. Inspect and resolve manually before re-running.",
+            file=sys.stderr,
+        )
+        return "abort"
     print(f"  MOVE   brite-{short_entity}/ → {short_entity}/  ({child_count} child entries moved)")
-    return ("moved", child_count)
+    return "moved"
 
 
 def main(argv: list[str]) -> int:
@@ -117,7 +129,7 @@ def main(argv: list[str]) -> int:
     moved = 0
     noops = 0
     for entity in ENTITIES:
-        status, _ = migrate_entity(campaigns_root, entity, dry_run=args.dry_run)
+        status = migrate_entity(campaigns_root, entity, dry_run=args.dry_run)
         if status == "abort":
             aborted += 1
         elif status == "moved":

@@ -1304,43 +1304,30 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 section "15a-bc-8719. Entity-slug short-form lint (BC-8719)"
 
-bc8719_paths=(
-  "plugins/marketing/skills/"
-  "plugins/marketing/commands/"
-)
-
-bc8719_hits=""
-for scan_dir in "${bc8719_paths[@]}"; do
-  full_scan="$REPO_ROOT/$scan_dir"
-  if [ ! -d "$full_scan" ]; then
-    continue
-  fi
-  # Grep for hardcoded long-form path references; filter to backward-compat
-  # exception markers on the same line. The exception markers are intentionally
-  # narrow — any new use of the long-form path must self-document as a
-  # backward-compat shim or fall under the lint.
-  # Strip the absolute REPO_ROOT prefix before matching the exception filter
-  # so the worktree-dirname (e.g. "bc-8719-entity-slug") doesn't false-match the
-  # "BC-8719" marker. Case-sensitive filter — exception markers must be uppercase
-  # "BC-8719" / "Pre-BC-8719" in prose, never the lowercase worktree-path form.
-  raw=$(grep -rnE 'docs/campaigns/brite-(nites|supply|labs)' "$full_scan" 2>/dev/null || true)
-  if [ -n "$raw" ]; then
-    rel=$(printf '%s\n' "$raw" | sed "s|$REPO_ROOT/||g")
-    filtered=$(printf '%s\n' "$rel" | grep -vE '(BC-8719|legacy|backward.?compat|read-compat)' || true)
-    if [ -n "$filtered" ]; then
-      bc8719_hits+="$filtered"$'\n'
-    fi
-  fi
+# Run grep from REPO_ROOT with relative paths so output omits the absolute
+# prefix — that keeps the worktree dirname (e.g. "bc-8719-entity-slug") from
+# false-matching the "BC-8719" exception marker. Case-sensitive filter: prose
+# shims use uppercase "BC-8719", never the lowercase worktree-path form.
+# "backward-?compat" matches both "backward-compat" and "backwardcompat";
+# "BC-8719" as a substring also matches "Pre-BC-8719".
+bc8719_paths=()
+for p in "plugins/marketing/skills" "plugins/marketing/commands"; do
+  [ -d "$REPO_ROOT/$p" ] && bc8719_paths+=("$p")
 done
 
-if [ -z "$bc8719_hits" ]; then
-  pass "no hardcoded long-form docs/campaigns/brite-{entity}/ paths outside backward-compat shims"
+if [ "${#bc8719_paths[@]}" -eq 0 ]; then
+  warn "marketing skills/commands directories not found — BC-8719 lint skipped"
 else
-  fail "hardcoded long-form docs/campaigns/brite-{entity}/ path(s) outside backward-compat shims (BC-8719):"
-  while IFS= read -r line; do
-    [ -n "$line" ] && printf "          %s\n" "$line"
-  done <<< "$bc8719_hits"
-  printf "          %s\n" "Fix: switch to short-form docs/campaigns/{entity}/ or annotate the line with one of: BC-8719, legacy, backward-compat, pre-BC-8719, read-compat."
+  bc8719_hits=$(cd "$REPO_ROOT" && grep -rnE 'docs/campaigns/brite-(nites|supply|labs)' "${bc8719_paths[@]}" 2>/dev/null | grep -vE '(BC-8719|legacy|backward-?compat|read-compat)' || true)
+  if [ -z "$bc8719_hits" ]; then
+    pass "no hardcoded long-form docs/campaigns/brite-{entity}/ paths outside backward-compat shims"
+  else
+    fail "hardcoded long-form docs/campaigns/brite-{entity}/ path(s) outside backward-compat shims (BC-8719):"
+    while IFS= read -r line; do
+      [ -n "$line" ] && printf "          %s\n" "$line"
+    done <<< "$bc8719_hits"
+    printf "          %s\n" "Fix: switch to short-form docs/campaigns/{entity}/ or annotate the line with one of: BC-8719, legacy, backward-compat, read-compat."
+  fi
 fi
 
 # ══════════════════════════════════════════════════════════════════════
