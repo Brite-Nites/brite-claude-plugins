@@ -47,8 +47,8 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-15  | 7 ATTACH SENDERS | regression | ✅ | 15 senders × 4 campaigns attached (page 1 only) |
 | R-16  | 7 ATTACH SENDERS | regression | ✅ | post-attach Δ visible sub-second via sender-emails endpoint |
 | R-17  | 8 SCHEDULE | regression | ✅ | template id 3 → clones 28-31, BC-6303 field naming intact |
-| R-18  | 9 SEQUENCE | regression | _pending_ | |
-| R-19  | 9 SEQUENCE | regression | _pending_ | |
+| R-18  | 9 SEQUENCE | regression | ✅ | bare step_2.subject → "Re: " auto-prepended; variant=false ok |
+| R-19  | 9 SEQUENCE | regression | ✅ | wait clamped 0→1; thread_reply bool; UPPERCASE tokens accepted |
 | R-20  | 10 PREVIEW | regression | _pending_ | |
 | R-21 ★ | 10 PREVIEW | regression + BC-7599 live-fire | _pending_ | keystone |
 | R-21b | 10 PREVIEW | BC-7598 doc-claim live-val | _pending_ | NEW |
@@ -447,6 +447,46 @@ Field naming honors BC-6303 — workspace-level `schedule_template_id` (singular
 ---
 
 **Phase 8 close:** R-17 ✅. Workspace state: 4 round-6 campaigns now provisioned with leads + senders + schedule clones (28-31). Missing only the sequence (Phase 9 next).
+
+---
+
+## Phase 9 — SEQUENCE
+
+### R-18 — BC-6301 variant boolean + auto-Re: prefix (regression)
+
+**Hypothesis:** `"variant": false` boolean; step_2.subject submitted bare; post-create stored subject has single `Re: ` prefix.
+
+**Evidence (4 sequences created via `POST /api/campaigns/v1.1/{id}/sequence-steps`):**
+
+| Campaign | Sequence ID | Step 1 ID | Step 2 ID | Step 1 stored subject | Step 2 stored subject |
+|----------|-------------|-----------|-----------|------------------------|------------------------|
+| 53 | 28 | 50 | 51 | `{Quick\|Fast\|30s} {question\|check\|idea}` | `Re: {Quick\|Fast\|30s} {question\|check\|idea}` |
+| 54 | 29 | 52 | 53 | (same as 53) | `Re: ` prepended |
+| 55 | 30 | 54 | 55 | (same) | `Re: ` prepended |
+| 56 | 31 | 56 | 57 | (same) | `Re: ` prepended |
+
+All 4 sequences: `variant: false` accepted on both steps; step_2 submitted bare; stored step_2 carries exactly one `Re: ` prefix (no double-prepend); step_1 unchanged.
+
+**Verdict:** ✅ Expected. BC-6301 variant fix + auto-Re: prefix behavior intact across all 4.
+
+### R-19 — F29/F30 + BC-6548 (wait_in_days clamp, thread_reply, UPPERCASE tokens)
+
+**Hypothesis:** `max(1, artifact.step_1.wait_in_days)` clamp; `thread_reply` boolean per v1.1 spec; UPPERCASE-only token rule passes happy path.
+
+**Sub-claim verification (across all 4 sequences):**
+
+| Sub-claim | Evidence | Verdict |
+|-----------|----------|---------|
+| wait_in_days clamp | artifact step_1 wait=0 → sent 1 (max(1,0)) → stored 1; step_2 wait=4 → stored 4 | ✅ F29 |
+| thread_reply boolean | step_1 false, step_2 true, both stored verbatim per v1.1 schema | ✅ F30 / v1.1 honored |
+| UPPERCASE tokens pass | Bodies contain {RECENCY_ANCHOR}, {COMPANY}, {FIRST_NAME}, {VERTICAL_DESCRIPTOR}, {SPECIFIC_FRICTION}, {PROOF_POINT_COMPANY}, {PROOF_POINT_NUMBER}, {PROOF_POINT_TIMEFRAME}, {FREE_ASSET_NOUN}, {SENDER_FIRST_NAME} all UPPERCASE; all 4 sequences created successfully with no 422 | ✅ BC-6548 happy path |
+
+**Verdict:** ✅ Expected. All three sub-claims verified across all 4 sequences.
+
+---
+
+**Phase 9 close:** R-18 ✅, R-19 ✅. Workspace state: 4 round-6 campaigns now FULLY provisioned (leads + senders + schedule + sequence) — all `status: draft`. Ready for Phase 10 PREVIEW + R-21 keystone live-fire.
+
 
 
 
