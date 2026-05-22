@@ -4,7 +4,7 @@ description: Greenfield Flow-Driven Architecture orchestrator — 8 phases / 4 g
 
 # /flow:start-project
 
-Greenfield UI-bearing FDA build orchestrator. Runs **8 phases / 4 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:682`): Phase 4 is a per-domain inner loop preserving Q13.5 atomic recovery; Phases 5+6 are globally batched activating Q15.2 + Q16.2 internal parallelism. Wall ≈ 22–70 min on Brand Hub-shape projects depending on domain count.
+Greenfield UI-bearing FDA build orchestrator. Runs **8 phases / 4 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:682`): Phase 4 is a per-domain inner loop preserving Q13.5 atomic recovery; Phases 5+6 are globally batched activating Q15.2 + Q16.2 internal parallelism. Wall ≈ 22–70 min on Brand Hub-shape projects depending on domain count.
 
 > **Scope:** UI-bearing builds only (CDR-023 partition). Non-UI-bearing work uses CDR-014's Phase Pattern with `/workflows:fix-milestone --migrate ...`, not FDA. `flow-preflight` performs upstream mode classification — `/flow:start-project` runs only when mode resolves to `greenfield`.
 
@@ -479,7 +479,7 @@ The breadcrumb append is the **last step** of a phase, after all of the phase's 
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:682` — Q37 lock (canonical source; seven sub-decisions + refinement audit trail at line 698).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:682` — Q37 lock (canonical source; seven sub-decisions + refinement audit trail at line 698).
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` §3e — Greenfield Orchestrator Phase Flow (synthesis view).
 - `plugins/flow-architecture/skills/flow-preflight/SKILL.md` — Phase 1 sub-skill (BC-6957 shipped).
 - `plugins/flow-architecture/scripts/flow-resume-breadcrumb.sh` — Q31.5 atomic-rename breadcrumb helper (BC-6956 shipped).

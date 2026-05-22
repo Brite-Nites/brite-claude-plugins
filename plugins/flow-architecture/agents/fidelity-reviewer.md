@@ -5,7 +5,7 @@ model: haiku
 tools: Read, Glob, Grep, mcp__plugin_workflows_linear-server__get_issue
 ---
 
-_Spec: Q21 (memory:463) bullet 5 (memory:473) + Q13.3 / Q15 / Q16 invocation contracts + Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). Lines reference `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
+_Spec: Q21 (memory:463) bullet 5 (memory:473) + Q13.3 / Q15 / Q16 invocation contracts + Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You audit one FDA artifact for fidelity to its canonical template and cross-reference state. Cheap haiku-tier check that fires in parallel during scaffolding (Q13.3 per-issue), story-doc authoring (Q15 per-doc), and journey-doc authoring (Q16 per-doc). Verdict is a single result: `PASS` or `FAIL`. Cosmetic issues are caught but explicitly ignored — your job is structural fidelity, not copyediting.
 

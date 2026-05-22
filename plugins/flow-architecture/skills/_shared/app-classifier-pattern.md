@@ -4,7 +4,7 @@ A short shared interview that two FDA inventory sub-skills run before they diver
 
 ## Why
 
-Q11 (`docs/design-rationale/project_fda_plugin_interview.md:68`) and Q19 (`:208`) both need the same prelude. Q19 explicitly states "shares Phases 0/1/2/5 verbatim via `_shared/app-classifier-pattern.md` shared utility" (`:208`). Holding the shared shape in one file keeps the two consumers from drifting on the base interview, and keeps the Phase-0 intent read, the Phase-2 pattern-catalog selectors, and the Phase-5 confirmation surface uniform across retrofit and greenfield.
+Q11 (`docs/design-rationale/fda-plugin-interview.md:68`) and Q19 (`:208`) both need the same prelude. Q19 explicitly states "shares Phases 0/1/2/5 verbatim via `_shared/app-classifier-pattern.md` shared utility" (`:208`). Holding the shared shape in one file keeps the two consumers from drifting on the base interview, and keeps the Phase-0 intent read, the Phase-2 pattern-catalog selectors, and the Phase-5 confirmation surface uniform across retrofit and greenfield.
 
 ## Shared phases
 
@@ -24,8 +24,8 @@ Both consumers own their non-shared phases in their own SKILL.md bodies. Adding 
 
 ## References
 
-- `docs/design-rationale/project_fda_plugin_interview.md:68` — Q11 `/flow:inventory` 6-phase architecture (shared phase set).
-- `docs/design-rationale/project_fda_plugin_interview.md:208` — Q19 `flow-inventory-interview` internals; names this file as the shared utility.
-- `docs/design-rationale/project_fda_plugin_interview.md:212` — Q19 greenfield-only Phase 1 follow-ups (live in consumer skill body).
-- `docs/design-rationale/project_fda_plugin_interview.md:214` — Q19 Phase 4 3-tag scope-priority taxonomy.
-- `docs/design-rationale/project_fda_plugin_interview.md:292` — Q30.2 file-location lock at `skills/_shared/app-classifier-pattern.md`.
+- `docs/design-rationale/fda-plugin-interview.md:68` — Q11 `/flow:inventory` 6-phase architecture (shared phase set).
+- `docs/design-rationale/fda-plugin-interview.md:208` — Q19 `flow-inventory-interview` internals; names this file as the shared utility.
+- `docs/design-rationale/fda-plugin-interview.md:212` — Q19 greenfield-only Phase 1 follow-ups (live in consumer skill body).
+- `docs/design-rationale/fda-plugin-interview.md:214` — Q19 Phase 4 3-tag scope-priority taxonomy.
+- `docs/design-rationale/fda-plugin-interview.md:292` — Q30.2 file-location lock at `skills/_shared/app-classifier-pattern.md`.

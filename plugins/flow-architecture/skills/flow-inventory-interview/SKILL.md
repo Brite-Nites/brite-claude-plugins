@@ -23,7 +23,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 - Phase 4 status taxonomy (3-tag scope-priority for greenfield vs. 4-tag implementation status for retrofit).
 - Heavier Phase 1 interview (4 greenfield-only follow-up questions).
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q19 (memory:208-222). Q11 (memory:68) is the retrofit twin; Q25 defines the master-inventory schema this skill writes.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q19 (memory:208-222). Q11 (memory:68) is the retrofit twin; Q25 defines the master-inventory schema this skill writes.
 
 ---
 
@@ -180,9 +180,9 @@ Brand Hub greenfield (runtime-determined domain count per Q34 disambiguation; ~5
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q19 --- canonical 7-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q11 --- retrofit twin (`flow-inventory-codebase-scan`).
-- `docs/design-rationale/project_fda_plugin_interview.md` Q25 --- master-inventory schema this skill writes.
+- `docs/design-rationale/fda-plugin-interview.md` Q19 --- canonical 7-sub-decision spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q11 --- retrofit twin (`flow-inventory-codebase-scan`).
+- `docs/design-rationale/fda-plugin-interview.md` Q25 --- master-inventory schema this skill writes.
 - `skills/_shared/app-classifier-pattern.md` --- BC-6955 shared utility (Phases 0/1/2/5).
 - `skills/flow-inventory-codebase-scan/SKILL.md` --- retrofit twin.
 - `skills/flow-preflight/SKILL.md` --- preceding sub-skill; `MODE=greenfield` gates this skill's invocation.

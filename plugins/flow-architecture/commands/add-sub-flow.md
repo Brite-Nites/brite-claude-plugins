@@ -4,7 +4,7 @@ description: Incremental-add Flow-Driven Architecture orchestrator (sub-flow) �
 
 # /flow:add-sub-flow
 
-Lightest FDA orchestrator. Adds a single new sub-flow under an existing domain. Runs **5 phases / 2 user-confirmation gates** per Q47 lock (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:743`): Phase 3 mirrors the sibling greenfield Phase-4 per-domain inner loop with N=1; Phases 4-5 are globally batched with N=1 (degenerate but consistent with the Q37 sibling shape). Wall ≈ 3-5 min on a typical sub-flow add. See § Architecture overview for the journey-author skip and journey-staleness warning that differentiate this command from `/flow:add-domain`.
+Lightest FDA orchestrator. Adds a single new sub-flow under an existing domain. Runs **5 phases / 2 user-confirmation gates** per Q47 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:743`): Phase 3 mirrors the sibling greenfield Phase-4 per-domain inner loop with N=1; Phases 4-5 are globally batched with N=1 (degenerate but consistent with the Q37 sibling shape). Wall ≈ 3-5 min on a typical sub-flow add. See § Architecture overview for the journey-author skip and journey-staleness warning that differentiate this command from `/flow:add-domain`.
 
 > **Scope:** UI-bearing builds only (CDR-023 partition). Non-UI-bearing work uses CDR-014's Phase Pattern, not FDA. `flow-preflight` performs upstream mode classification — `/flow:add-sub-flow` runs only when mode resolves to `incremental-add`.
 
@@ -439,8 +439,8 @@ The breadcrumb append is the **last step** of a phase, after all of the phase's 
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:743` — Q47 lock (canonical source; seven sub-decisions + refinement audit trail at line 780). Sub-decision 5.5 at line 771 holds the user-locked journey-staleness warning text.
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:224` — Q20 lock (sub-skill ownership boundary; sub-flow-add vs domain-add modes; Q20.2 auto-suggestion; Q20.4 hard-reject; Q20.6 within-skill gate; Q20.7 `inventory_changed` flag).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:743` — Q47 lock (canonical source; seven sub-decisions + refinement audit trail at line 780). Sub-decision 5.5 at line 771 holds the user-locked journey-staleness warning text.
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:224` — Q20 lock (sub-skill ownership boundary; sub-flow-add vs domain-add modes; Q20.2 auto-suggestion; Q20.4 hard-reject; Q20.6 within-skill gate; Q20.7 `inventory_changed` flag).
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` §3c — plugin command surface (where this command sits in the ~17-command catalog).
 - `plugins/flow-architecture/commands/start-project.md` — sibling greenfield orchestrator (BC-6962; 8 phases / 4 gates / hybrid control flow; this command's per-sub-flow N=1 inner loop is the degenerate case).
 - `plugins/flow-architecture/commands/retrofit-project.md` — sibling retrofit orchestrator (BC-6963; 9 phases / 5 gates; closer in shape to start-project than to this command).

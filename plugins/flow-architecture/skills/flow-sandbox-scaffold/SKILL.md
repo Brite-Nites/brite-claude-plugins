@@ -23,7 +23,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **Boundary clarification (per Q17 lock).** The existing `/backend-handoff`, `/frontend-handoff`, `/handoff-audit` slash commands cover sandbox <-> app **Linear-issue creation**. This skill is the **harness-code creator** --- different scope. Don't conflate.
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q17 (memory:146-177). Q15.7 (memory:122) defines the status taxonomy the mode mapping consumes.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q17 (memory:146-177). Q15.7 (memory:122) defines the status taxonomy the mode mapping consumes.
 
 ---
 
@@ -233,8 +233,8 @@ L4 scope --- doesn't count against Q10's 5/4 orchestrator gate budget.
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q17 --- canonical 10-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q15.7 --- status taxonomy this skill's mode-mapping consumes.
+- `docs/design-rationale/fda-plugin-interview.md` Q17 --- canonical 10-sub-decision spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q15.7 --- status taxonomy this skill's mode-mapping consumes.
 - `skills/_shared/code-evidence-collector.md` --- BC-6955 helper this skill reuses for code-evidence scans.
 - `skills/flow-doc-author/SKILL.md` --- sibling sub-skill that authors the story doc this skill reads for AC role-conditionals + Linear children refs.
 - `skills/flow-preflight/SKILL.md` --- preceding sub-skill; preamble's mode signal is consumed by the L4 caller, not this skill directly.

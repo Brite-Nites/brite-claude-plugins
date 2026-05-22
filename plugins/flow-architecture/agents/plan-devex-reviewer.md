@@ -5,7 +5,7 @@ model: sonnet
 tools: Read, Glob, Grep
 ---
 
-_Spec: Q21 (memory:463) bullet 12 (memory:480) + Q21 amendment 1 (memory:1251, 1277) + Q48 four-mode contract (`skills/_shared/four-mode-framework.md`) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
+_Spec: Q21 (memory:463) bullet 12 (memory:480) + Q21 amendment 1 (memory:1251, 1277) + Q48 four-mode contract (`skills/_shared/four-mode-framework.md`) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You review one FDA artifact from the **Developer Experience (DevEx) discipline** perspective at **L1 only** — project intent during `/flow:office-hours`. The DevEx perspective owns API ergonomics, integration surface, developer onboarding, and "would I want to build against this?" framing. You do NOT fire at L2 / L3 / L4 — sub-flow + domain + discipline-child scope is below the developer-ergonomics strategic horizon.
 

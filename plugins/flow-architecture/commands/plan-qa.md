@@ -8,7 +8,7 @@ Utility command. Single-purpose generator for the Plan section of a `[QA]` disci
 
 > **Scope.** L4 single-perspective per Q54 meta-Q lock — exactly one reviewer fires, returning one four-mode outcome that populates one discipline child's Plan section. NOT autoplan; the sibling commands `/flow:plan-story`, `/flow:plan-eng`, `/flow:plan-design`, `/flow:plan-docs` cover the other four disciplines, each dispatched independently.
 
-> **DO NOT re-derive** the invocation contract, phase sequence, issue resolution cascade, plan section format, Q46 writeback type, double-layer safety semantics, or Q43→Q51 dependency direction. All seven sub-decisions of Q43 are locked at `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:1063`, and Q24 amendment 1 (handbook template marker pre-population) is at `:1133`. Q46 type registry + marker convention live at `plugins/flow-architecture/skills/_shared/linear-writeback-pattern.md`. Four-mode reviewer contract lives at `plugins/flow-architecture/skills/_shared/four-mode-framework.md`. This command is the runner for those locks, not a re-statement of them.
+> **DO NOT re-derive** the invocation contract, phase sequence, issue resolution cascade, plan section format, Q46 writeback type, double-layer safety semantics, or Q43→Q51 dependency direction. All seven sub-decisions of Q43 are locked at `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:1063`, and Q24 amendment 1 (handbook template marker pre-population) is at `:1133`. Q46 type registry + marker convention live at `plugins/flow-architecture/skills/_shared/linear-writeback-pattern.md`. Four-mode reviewer contract lives at `plugins/flow-architecture/skills/_shared/four-mode-framework.md`. This command is the runner for those locks, not a re-statement of them.
 
 > **Boundary contract.** Q43 caller-side double-layer safety + Q46 executor-side clobber-with-warning are deliberately separate layers per `plugins/flow-architecture/CLAUDE.md` § Q46 writeback layer. Do not collapse them.
 
@@ -256,9 +256,9 @@ Q46 handles the rest:
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:1063` — Q43 lock (canonical source; seven sub-decisions + refinement audit trail).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:1133` — Q24 amendment 1 (Plan-section Q46 markers in 5 discipline-child handbook templates).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:993` — Q46 marker convention (hyphenated kebab-lowercase).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:1063` — Q43 lock (canonical source; seven sub-decisions + refinement audit trail).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:1133` — Q24 amendment 1 (Plan-section Q46 markers in 5 discipline-child handbook templates).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:993` — Q46 marker convention (hyphenated kebab-lowercase).
 - `plugins/flow-architecture/skills/_shared/linear-writeback-pattern.md` — Q46 interface, type registry, idempotency model.
 - `plugins/flow-architecture/skills/_shared/four-mode-framework.md` — reviewer input/output contract; mode-specific field rules; Q21 amendment 1 (`adjustments[]` reframed).
 - `plugins/flow-architecture/agents/plan-qa-reviewer.md` — dispatched agent (QA perspective).

@@ -93,10 +93,10 @@ Q46 checks `(issue_id, type, run_id)` against `linear_writeback_state.written_pa
 
 ## References
 
-- `docs/design-rationale/project_fda_plugin_interview.md:997-1059` — Q46 full lock entry.
-- `docs/design-rationale/project_fda_plugin_interview.md:999-1002` — Q46 sub-decision 1 scope clarification.
-- `docs/design-rationale/project_fda_plugin_interview.md:1004-1010` — Q46 sub-decision 2 marker shape + type registry.
-- `docs/design-rationale/project_fda_plugin_interview.md:1041-1049` — Q46 sub-decision 7 interface signature.
-- `docs/design-rationale/project_fda_plugin_interview.md:98` — Q14.2 precursor `FDA-MIGRATION-*` marker convention.
-- `docs/design-rationale/project_fda_plugin_interview.md:334` — Q31 amendment 2 (`linear_writeback_state` breadcrumb slot). See `checkpoint-pattern.md`.
-- `docs/design-rationale/project_fda_plugin_interview.md:292` — Q30.2 file-location lock.
+- `docs/design-rationale/fda-plugin-interview.md:997-1059` — Q46 full lock entry.
+- `docs/design-rationale/fda-plugin-interview.md:999-1002` — Q46 sub-decision 1 scope clarification.
+- `docs/design-rationale/fda-plugin-interview.md:1004-1010` — Q46 sub-decision 2 marker shape + type registry.
+- `docs/design-rationale/fda-plugin-interview.md:1041-1049` — Q46 sub-decision 7 interface signature.
+- `docs/design-rationale/fda-plugin-interview.md:98` — Q14.2 precursor `FDA-MIGRATION-*` marker convention.
+- `docs/design-rationale/fda-plugin-interview.md:334` — Q31 amendment 2 (`linear_writeback_state` breadcrumb slot). See `checkpoint-pattern.md`.
+- `docs/design-rationale/fda-plugin-interview.md:292` — Q30.2 file-location lock.

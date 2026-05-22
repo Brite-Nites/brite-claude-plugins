@@ -46,7 +46,7 @@ Total: **38 assertions** (sum at runtime via `RESULT pass=N` contract line).
 ## Cross-reference
 
 - `plugins/flow-architecture/scripts/` — the 4 helper scripts under test.
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` § Q20 amendment 2 — the BC-10352 schema lock these tests defend.
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` § Q20 amendment 2 — the BC-10352 schema lock these tests defend.
 - `scripts/validate.sh` Section 2b' — CI wiring.
 - BC-10728 — the parking-lot #54 promotion that authored this harness.
 - BC-10352 — the v1.1.x dogfood bug Section 4's fixture catches.

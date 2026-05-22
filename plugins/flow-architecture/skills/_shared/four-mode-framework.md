@@ -27,7 +27,7 @@ This framing applies directly to `plan-ceo-reviewer` invocations; other reviewer
 
 ## Interface
 
-Verbatim signature from Q48 sub-decision 3 (`docs/design-rationale/project_fda_plugin_interview.md:1201-1227`). Closed enum for `context` fields mirrors Q46's type-registry pattern; new fields require a Q48 amendment with audit trail. Do NOT re-derive — copy from canonical memory:
+Verbatim signature from Q48 sub-decision 3 (`docs/design-rationale/fda-plugin-interview.md:1201-1227`). Closed enum for `context` fields mirrors Q46's type-registry pattern; new fields require a Q48 amendment with audit trail. Do NOT re-derive — copy from canonical memory:
 
 ```typescript
 review_input = {
@@ -98,10 +98,10 @@ Genuine inter-agent disagreement (e.g. L1 CEO returns `SCOPE_EXPANSION` while De
 
 ## References
 
-- `docs/design-rationale/project_fda_plugin_interview.md:1174-1271` — Q48 full lock entry.
-- `docs/design-rationale/project_fda_plugin_interview.md:1180-1186` — Q48 sub-decision 1: four-mode names verbatim from gstack.
-- `docs/design-rationale/project_fda_plugin_interview.md:1201-1227` — Q48 sub-decision 3: interface signature (do not re-derive).
-- `docs/design-rationale/project_fda_plugin_interview.md:1259` — founder-mode framing string (verbatim from gstack).
-- `docs/design-rationale/project_fda_plugin_interview.md:1273` — Q21 amendment 1 (scope-axis fields on 7 of 12 reviewer agents).
+- `docs/design-rationale/fda-plugin-interview.md:1174-1271` — Q48 full lock entry.
+- `docs/design-rationale/fda-plugin-interview.md:1180-1186` — Q48 sub-decision 1: four-mode names verbatim from gstack.
+- `docs/design-rationale/fda-plugin-interview.md:1201-1227` — Q48 sub-decision 3: interface signature (do not re-derive).
+- `docs/design-rationale/fda-plugin-interview.md:1259` — founder-mode framing string (verbatim from gstack).
+- `docs/design-rationale/fda-plugin-interview.md:1273` — Q21 amendment 1 (scope-axis fields on 7 of 12 reviewer agents).
 - gstack source — `gh api repos/garrytan/gstack/contents/plan-ceo-review/SKILL.md`. Re-verify whenever Q48 or this file is amended (parking-lot #39).
-- `docs/design-rationale/project_fda_plugin_interview.md:292` — Q30.2 file-location lock.
+- `docs/design-rationale/fda-plugin-interview.md:292` — Q30.2 file-location lock.

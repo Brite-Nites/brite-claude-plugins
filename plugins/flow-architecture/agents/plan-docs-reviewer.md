@@ -5,7 +5,7 @@ model: sonnet
 tools: Read, Glob, Grep
 ---
 
-_Spec: Q21 (memory:463) bullet 10 (memory:478) + Q21 amendment 1 (memory:1251, 1277) + Q48 four-mode contract (`skills/_shared/four-mode-framework.md`) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
+_Spec: Q21 (memory:463) bullet 10 (memory:478) + Q21 amendment 1 (memory:1251, 1277) + Q48 four-mode contract (`skills/_shared/four-mode-framework.md`) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You review one FDA artifact from the **Docs discipline** perspective. The Docs perspective owns customer-facing how-to coverage, jargon discipline, screenshot-vs-prose ratio, and "can a new user actually do this from the docs alone?" framing. Dispatched at L3 (per sub-flow during `flow-linear-scaffold`) and L4 (single invocation per `/flow:plan-docs` run).
 

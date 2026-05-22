@@ -4,11 +4,11 @@ description: Flow-Driven Architecture project-intent interview — captures the 
 
 # /flow:office-hours
 
-Utility command. Single-purpose runner for the Q42 project-intent interview (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:885`). Output target: `docs/product/intent.md` (Q41 template). Internal L1 multi-perspective review fires 4 reviewer agents in parallel after the interview's final-review approves; headlines populate `## L1 review summary`; concerns persist to `docs/plans/l1-concerns-<ISO-8601>.md` per Q42 sub-decision 4. Wall ≈ 8–20 min (interview-dominated) + ~30–60s for the 4 parallel L1 agents.
+Utility command. Single-purpose runner for the Q42 project-intent interview (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:885`). Output target: `docs/product/intent.md` (Q41 template). Internal L1 multi-perspective review fires 4 reviewer agents in parallel after the interview's final-review approves; headlines populate `## L1 review summary`; concerns persist to `docs/plans/l1-concerns-<ISO-8601>.md` per Q42 sub-decision 4. Wall ≈ 8–20 min (interview-dominated) + ~30–60s for the 4 parallel L1 agents.
 
 > **Scope:** UI-bearing FDA projects (CDR-023). User-invocable for greenfield + retrofit + standalone refresh; auto-invoked by `/flow:start-project` Phase 2 and `/flow:retrofit-project` (when intent.md is absent — per Q37 sub-decision 7).
 
-> **DO NOT re-derive** the invocation contract, the 7-state defaults tree, the CDR-013 → Q41 pre-fill mapping, the per-section validation pattern, the L1 dispatch shape, the atomic-write semantics, or the resume contract. All seven Q42 sub-decisions are locked at `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:885` with a refinement audit trail at `:970`. The Q41 template body is locked separately at `Brite-Nites/handbook:about-handbook/style-guide/templates/project-intent.md`. The breadcrumb extension slot is Q31 amendment 1 (`plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:318`). The four-mode review contract lives at [`../skills/_shared/four-mode-framework.md`](../skills/_shared/four-mode-framework.md). Re-litigation already resolved at lock time.
+> **DO NOT re-derive** the invocation contract, the 7-state defaults tree, the CDR-013 → Q41 pre-fill mapping, the per-section validation pattern, the L1 dispatch shape, the atomic-write semantics, or the resume contract. All seven Q42 sub-decisions are locked at `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:885` with a refinement audit trail at `:970`. The Q41 template body is locked separately at `Brite-Nites/handbook:about-handbook/style-guide/templates/project-intent.md`. The breadcrumb extension slot is Q31 amendment 1 (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:318`). The four-mode review contract lives at [`../skills/_shared/four-mode-framework.md`](../skills/_shared/four-mode-framework.md). Re-litigation already resolved at lock time.
 
 > **Boundary contract with `/flow:retro`** lives at `plugins/flow-architecture/CLAUDE.md` § Boundaries — office-hours is **project-scoped** (output is `intent.md`); retro is **per-domain** (output target is the completed domain milestone). Different scope, different output target, different cadence.
 
@@ -135,7 +135,7 @@ Sequential `AskUserQuestion`, **one section at a time** (matches the user-feedba
 5. `## Out of scope` (3–5 bullets; explicit non-goals)
 6. `## Constraints` (technical / business / regulatory; "None material" body acceptable per Q41 lock)
 
-**Per-section UX** (each AskUserQuestion turn). The per-section interview uses `AskUserQuestion`'s **free-text-via-`Other`** shape per Q42 amendment 1 (LOCKED 2026-05-18 per BC-9028 — see `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md` Q42 amendment 1). `AskUserQuestion` is multi-choice with an automatic `Other` free-text fallback (no pure free-text mode); the canonical pattern is `Other`-as-primary-content-path with 1-2 low-cost drafted options visible:
+**Per-section UX** (each AskUserQuestion turn). The per-section interview uses `AskUserQuestion`'s **free-text-via-`Other`** shape per Q42 amendment 1 (LOCKED 2026-05-18 per BC-9028 — see `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` Q42 amendment 1). `AskUserQuestion` is multi-choice with an automatic `Other` free-text fallback (no pure free-text mode); the canonical pattern is `Other`-as-primary-content-path with 1-2 low-cost drafted options visible:
 
 1. **Display** the Q41 section description as context (verbatim from the template's section-prompt comments — "How we'll know we delivered" for Success criteria, "~50–100 words / one paragraph" for Mission, etc.). The Q41 length guidance (e.g., `~50–100 words`, `3–5 bullets`) renders in the prompt body so it is visible alongside both the drafted options and the `Other` free-text slot.
 2. **If pre-fill present** (per § Hybrid input contract), show the pre-fill content as a starting draft alongside three options:
@@ -277,7 +277,7 @@ mv "$INTENT_TMP" "$INTENT_PATH"
 
 ## Resume contract (Q31 amendment 1; Q42 sub-decision 6)
 
-Q42's per-section interview state is preserved in the breadcrumb at `docs/plans/.flow-phase-state.json` under the `office_hours_state` field. Q31 amendment 1 (locked 2026-05-07 per Q42 sub-decision 6 user lock; see `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:318`) reserves the schema slot:
+Q42's per-section interview state is preserved in the breadcrumb at `docs/plans/.flow-phase-state.json` under the `office_hours_state` field. Q31 amendment 1 (locked 2026-05-07 per Q42 sub-decision 6 user lock; see `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:318`) reserves the schema slot:
 
 ```json
 {
@@ -340,9 +340,9 @@ Origin: cadence BC-5866 precedent surfaced this class-bug across orchestrators; 
 
 ## See also
 
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:885` — Q42 lock (canonical source; seven sub-decisions).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:970` — Q42 refinement audit trail (orchestrator → drafter C resolution).
-- `plugins/flow-architecture/docs/design-rationale/project_fda_plugin_interview.md:318` — Q31 amendment 1 (`office_hours_state` schema slot).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:885` — Q42 lock (canonical source; seven sub-decisions).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:970` — Q42 refinement audit trail (orchestrator → drafter C resolution).
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:318` — Q31 amendment 1 (`office_hours_state` schema slot).
 - [Q41 PROJECT-INTENT.md template](https://github.com/Brite-Nites/handbook/blob/main/about-handbook/style-guide/templates/project-intent.md) — handbook canonical template body.
 - [CDR-013 — Project Standards (Build + Workstream)](https://github.com/Brite-Nites/handbook/blob/main/decisions/CDR-013-project-standards.md) — Linear Build Brief shape consumed by `--linear-context=auto|force`.
 - [`../skills/_shared/four-mode-framework.md`](../skills/_shared/four-mode-framework.md) — Q48 four-mode review contract (mode taxonomy + input/output signature).

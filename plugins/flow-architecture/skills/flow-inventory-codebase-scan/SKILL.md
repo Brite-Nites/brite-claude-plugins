@@ -25,7 +25,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 - Phase 4 status taxonomy (4-tag implementation-status for retrofit vs. 3-tag scope-priority for greenfield).
 - Phase 1 interview is lighter --- code signals dominate.
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q11 (memory:68). Q19 (memory:208) is the greenfield twin.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q11 (memory:68). Q19 (memory:208) is the greenfield twin.
 
 ---
 
@@ -166,9 +166,9 @@ BriteBase retrofit (28-domain consumer with ~400 candidate flows already present
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q11 --- canonical 6-phase architecture spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q19 --- greenfield twin (`flow-inventory-interview`).
-- `docs/design-rationale/project_fda_plugin_interview.md` Q25 --- master-inventory schema this skill writes.
+- `docs/design-rationale/fda-plugin-interview.md` Q11 --- canonical 6-phase architecture spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q19 --- greenfield twin (`flow-inventory-interview`).
+- `docs/design-rationale/fda-plugin-interview.md` Q25 --- master-inventory schema this skill writes.
 - `skills/_shared/app-classifier-pattern.md` --- BC-6955 shared utility (Phases 0/1/2/5).
 - `skills/_shared/code-evidence-collector.md` --- BC-6955 helper consumed by Phase 3 + Q15.7.
 - `skills/flow-inventory-interview/SKILL.md` --- greenfield twin.

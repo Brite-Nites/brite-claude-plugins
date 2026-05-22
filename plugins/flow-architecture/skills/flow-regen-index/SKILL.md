@@ -19,7 +19,7 @@ This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
 **No LLM dispatch.** Output is mechanical — column derivations are pure functions of (story-doc front-matter, master-flow-inventory rows, Linear issue state). No fidelity-review (the contract is "regenerate, don't narrate").
 
-The full design rationale lives in `docs/design-rationale/project_fda_plugin_interview.md` Q18 (memory:179-206). Q25 (INDEX schema) and Q27 (story-doc template) define the column/front-matter contracts this skill consumes. DO NOT re-derive — Q18's eight sub-decisions are the authoritative spec.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q18 (memory:179-206). Q25 (INDEX schema) and Q27 (story-doc template) define the column/front-matter contracts this skill consumes. DO NOT re-derive — Q18's eight sub-decisions are the authoritative spec.
 
 ---
 
@@ -168,8 +168,8 @@ If a second run fires within seconds with no story-doc changes, step 5 detects n
 
 ## See also
 
-- `docs/design-rationale/project_fda_plugin_interview.md` Q18 — canonical 8-sub-decision spec.
-- `docs/design-rationale/project_fda_plugin_interview.md` Q25 — INDEX.md schema (11-column header).
-- `docs/design-rationale/project_fda_plugin_interview.md` Q27 — story-doc front-matter schema this skill consumes.
+- `docs/design-rationale/fda-plugin-interview.md` Q18 — canonical 8-sub-decision spec.
+- `docs/design-rationale/fda-plugin-interview.md` Q25 — INDEX.md schema (11-column header).
+- `docs/design-rationale/fda-plugin-interview.md` Q27 — story-doc front-matter schema this skill consumes.
 - `skills/flow-preflight/SKILL.md` — preceding sub-skill; emits the structured preamble this skill's caller passes through.
 - `skills/_shared/linear-writeback-pattern.md` — not consumed by Q18 directly (this skill is read + filesystem-only) but consumed by Q13/Q15/Q16 siblings.

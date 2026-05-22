@@ -1,6 +1,6 @@
 # flow-architecture — Architecture
 
-This document is a **high-level pointer**. The canonical architecture record is the multi-session design interview at `docs/design-rationale/project_fda_plugin_interview.md` (2,306 lines, 54 Q-locks, 16 amendments). The synthesis overview is at `docs/design-rationale/fda-plugin-architecture-overview.md`.
+This document is a **high-level pointer**. The canonical architecture record is the multi-session design interview at `docs/design-rationale/fda-plugin-interview.md` (2,306 lines, 54 Q-locks, 16 amendments). The synthesis overview is at `docs/design-rationale/fda-plugin-architecture-overview.md`.
 
 ## What the plugin codifies
 
