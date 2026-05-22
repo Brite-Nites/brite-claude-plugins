@@ -5,12 +5,12 @@
     {
       "id": "happy-path-municipalities-seed",
       "tier": 2,
-      "description": "Situation artifact + municipalities vertical + offer_tier 2 produces a complete EB-format JSON artifact.",
+      "description": "Situation artifact + municipalities vertical + offer_posture free-asset produces a complete EB-format JSON artifact.",
       "input": {
         "company_name": "Denver Parks & Rec",
         "entity": "brite-nites",
         "vertical": "municipalities",
-        "offer_tier": 2,
+        "offer_posture": "free-asset",
         "situation_artifact_path": "docs/campaigns/brite-nites/situation-denver-parks.md",
         "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
       },
@@ -18,7 +18,7 @@
         "output artifact file written to path matching 'docs/campaigns/brite-(nites|labs)/copy-*.json'",
         "output.template_preset == 'list-building'",
         "output.vertical == 'municipalities'",
-        "output.offer_tier == 2",
+        "output.offer_posture == 'free-asset'",
         "output.step_1.body contains '<br><br>'",
         "output.step_1.body contains zero '—' characters",
         "output.step_2.body contains zero '—' characters",
@@ -52,7 +52,7 @@
         "company_name": "Any Prospect",
         "entity": "brite-nites",
         "vertical": "municipalities",
-        "offer_tier": 2,
+        "offer_posture": "free-asset",
         "situation_artifact_path": "docs/campaigns/brite-nites/situation-any.md",
         "operator_draft_body": "Hi {{firstname}}, I saw your downtown plan."
       },
@@ -70,7 +70,7 @@
         "company_name": "Any Prospect",
         "entity": "brite-nites",
         "vertical": "municipalities",
-        "offer_tier": 2,
+        "offer_posture": "free-asset",
         "situation_artifact_path": "docs/campaigns/brite-nites/situation-any.md",
         "operator_proof_point": "foot traffic rose — up 40% — year over year"
       },
@@ -83,7 +83,7 @@
     {
       "id": "entity-switching",
       "tier": 2,
-      "description": "Same situation artifact run once with entity=brite-nites and once with entity=brite-labs produces distinct offer_tier and messaging.",
+      "description": "Same situation artifact run once with entity=brite-nites and once with entity=brite-labs produces distinct offer_posture and messaging.",
       "input": {
         "company_name": "Midtown Municipality",
         "situation_artifact_path": "docs/campaigns/shared/situation-midtown.md",
@@ -94,8 +94,8 @@
         ]
       },
       "assertions": [
-        "run[entity=brite-nites].output.offer_tier == 2",
-        "run[entity=brite-labs].output.offer_tier IN [3, 4]",
+        "run[entity=brite-nites].output.offer_posture == 'free-asset'",
+        "run[entity=brite-labs].output.offer_posture IN ['pilot', 'risk-reversal']",
         "run[entity=brite-nites].output.step_1.subject != run[entity=brite-labs].output.step_1.subject",
         "run[entity=brite-nites].output.step_1.body CTA language differs from run[entity=brite-labs].output.step_1.body CTA language",
         "both runs produce output.step_1.body containing '<br><br>' and zero '—' characters"
@@ -109,7 +109,7 @@
         "company_name": "Any Prospect",
         "situation_artifact_path": "docs/campaigns/shared/situation-any.md",
         "vertical": "municipalities",
-        "offer_tier": 2,
+        "offer_posture": "free-asset",
         "mocked_marketing_context": "absent"
       },
       "assertions": [
@@ -127,7 +127,7 @@
         "company_name": "Cherry Creek HOA",
         "entity": "brite-nites",
         "vertical": "hoas",
-        "offer_tier": 2,
+        "offer_posture": "free-asset",
         "situation_artifact_path": "docs/campaigns/brite-nites/situation-cherry-creek.md",
         "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
       },
@@ -140,22 +140,40 @@
       ]
     },
     {
-      "id": "missing-offer-tier-gate",
+      "id": "missing-offer-posture-gate",
       "tier": 1,
-      "description": "Operator supplies situation + entity but omits offer_tier — skill must prompt with entity-aware recommendation before emitting.",
+      "description": "Operator supplies situation + entity but omits offer_posture — skill must prompt with entity-aware recommendation before emitting.",
       "input": {
         "company_name": "Denver Parks & Rec",
         "entity": "brite-nites",
         "vertical": "municipalities",
-        "offer_tier": null,
+        "offer_posture": null,
         "situation_artifact_path": "docs/campaigns/brite-nites/situation-denver-parks.md",
         "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
       },
       "assertions": [
-        "first_response contains 'tier'",
-        "first_response references entity-aware recommendation (e.g. 'brite-nites' maps to Tier 2, 'T2', or 'Tier 2')",
+        "first_response contains 'posture'",
+        "first_response references entity-aware recommendation (e.g. 'brite-nites' maps to 'free-asset')",
         "first_tool_calls does NOT contain Write of 'docs/campaigns/brite-nites/copy-*.json'",
-        "no JSON artifact emitted until operator confirms the tier"
+        "no JSON artifact emitted until operator confirms the posture"
+      ]
+    },
+    {
+      "id": "legacy-offer-tier-input-accepted",
+      "tier": 1,
+      "description": "Operator (or upstream skill) supplies legacy offer_tier integer 2 instead of offer_posture — skill MUST accept the legacy field (read-side backward-compat per ADR-017), map 2 → free-asset, emit a deprecation warning naming ADR-017 + the 6-month deprecation window, and write the artifact with offer_posture=free-asset on the new field.",
+      "input": {
+        "company_name": "Denver Parks & Rec",
+        "entity": "brite-nites",
+        "vertical": "municipalities",
+        "offer_tier": 2,
+        "situation_artifact_path": "docs/campaigns/brite-nites/situation-denver-parks.md",
+        "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
+      },
+      "assertions": [
+        "output.offer_posture == 'free-asset'",
+        "response log mentions 'offer_tier' AND 'deprecated' AND 'ADR-017'",
+        "output artifact written to expected path"
       ]
     }
   ]

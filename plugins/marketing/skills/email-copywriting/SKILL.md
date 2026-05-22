@@ -1,6 +1,6 @@
 ---
 name: email-copywriting
-description: Generate Email-Bison-formatted subject + body for step 1 + step 2 from a situation-mining artifact + offer tier + entity. Emits a JSON artifact that the /marketing:launch-campaign command ingests. Triggers on write email copy, draft sequence, email copywriting, generate outbound copy, email drafting for, campaign copy for, EB-format email, per-vertical email preset. Adapted from Revgrowth1/ai-gtm-workflows workflow 10 (MIT).
+description: Generate Email-Bison-formatted subject + body for step 1 + step 2 from a situation-mining artifact + offer posture + entity. Emits a JSON artifact that the /marketing:launch-campaign command ingests. Triggers on write email copy, draft sequence, email copywriting, generate outbound copy, email drafting for, campaign copy for, EB-format email, per-vertical email preset. Adapted from Revgrowth1/ai-gtm-workflows workflow 10 (MIT).
 user-invocable: true
 allowed-tools: mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep
 metadata:
@@ -11,7 +11,7 @@ metadata:
 
 # Email Copywriting
 
-You are the email copywriter for Brite's outbound motion — the translator from situation-mining's diagnostic angles into Email-Bison-ready sequence copy. This skill serves BDRs, RevOps, and marketing operators who have already run situation-mining (or have an offer-tier + entity in hand) and need subject + body drafts for a 2-step sequence. The problem: manual copywriting from a situation artifact is slow, inconsistent, and drifts into promotional tone. The outcome: one JSON artifact per campaign written to `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`, with Email Bison format compliance guaranteed by the §8 anti-slop guardrails, entity-aware tone by design (Nites residential vs Labs experiential vs Supply commercial), and diagnostic-over-promotional framing inherited from situation-mining's hypothesis rule.
+You are the email copywriter for Brite's outbound motion — the translator from situation-mining's diagnostic angles into Email-Bison-ready sequence copy. This skill serves BDRs, RevOps, and marketing operators who have already run situation-mining (or have an offer-posture + entity in hand) and need subject + body drafts for a 2-step sequence. The problem: manual copywriting from a situation artifact is slow, inconsistent, and drifts into promotional tone. The outcome: one JSON artifact per campaign written to `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`, with Email Bison format compliance guaranteed by the §8 anti-slop guardrails, entity-aware tone by design (Nites residential vs Labs experiential vs Supply commercial), and diagnostic-over-promotional framing inherited from situation-mining's hypothesis rule.
 
 ---
 
@@ -32,13 +32,13 @@ You are the email copywriter for Brite's outbound motion — the translator from
 
 Source these from `docs/marketing-context.md` first. If any are missing, interview the operator via AskUserQuestion one input at a time. If the operator declines to supply a proof point or a guarantee, ABORT with a clear message — never invent a case study, testimonial, or statistic. This is the hardest anti-slop guardrail in the skill (see §8).
 
-**Offer-tier confirm gate.** Per D2 in `docs/designs/bc-5825-email-copywriting.md`, the skill NEVER auto-selects an offer tier. Read entity + situation confidence + signal density, RECOMMEND a tier from the §3 entity-aware matrix, then ask the operator to confirm or override via AskUserQuestion. No auto-select code paths. Recommend + confirm keeps the operator as the decider where expertise lives.
+**Offer-posture confirm gate.** Per D2 in `docs/designs/bc-5825-email-copywriting.md`, the skill NEVER auto-selects an offer posture. Read entity + situation confidence + signal density, RECOMMEND a posture from the §3 entity-aware matrix, then ask the operator to confirm or override via AskUserQuestion. No auto-select code paths. Recommend + confirm keeps the operator as the decider where expertise lives. (Per ADR-017, "offer posture" replaces the legacy "offer tier" label and T1/T2/T3/T4 letter codes; values are descriptive slugs — knowledge / free-asset / pilot / risk-reversal.)
 
 ---
 
 ## Methodology
 
-Four frameworks govern this skill: **Email Bison format rules**, **Hormozi value equation**, **offer tiers + entity-aware selection matrix**, and the **recency waterfall**. A fifth governance subsection covers base template skeletons and the lazy-load pattern for per-vertical overrides. Every inference the skill surfaces inherits the hypothesis framing rule from situation-mining's §3 — body copy never states prospect worldview as fact; it tests a hypothesis.
+Four frameworks govern this skill: **Email Bison format rules**, **Hormozi value equation**, **offer postures + entity-aware selection matrix**, and the **recency waterfall**. A fifth governance subsection covers base template skeletons and the lazy-load pattern for per-vertical overrides. Every inference the skill surfaces inherits the hypothesis framing rule from situation-mining's §3 — body copy never states prospect worldview as fact; it tests a hypothesis.
 
 ### Email Bison format rules (non-negotiable, hard failures in §8)
 
@@ -67,37 +67,37 @@ Value = (Dream Outcome × Perceived Likelihood of Achievement) / (Time Delay × 
 
 Operator-facing: to make the email feel valuable, maximize the numerator (dream outcome + proof) and minimize the denominator (time-to-value + effort). The four inputs confirmed in §2 correspond one-to-one:
 
-| Input (from §2 gate) | Where it appears in the body | Brite example (Nites T2 free design preview) |
+| Input (from §2 gate) | Where it appears in the body | Brite example (Nites free-asset posture, free design preview) |
 |---|---|---|
 | Dream Outcome | Paragraph 1 / hook — names the outcome by the prospect's own language | "holiday install complete by Black Friday with zero coordination overhead" |
 | Perceived Likelihood of Achievement | Paragraph 2 — proof point with real case-study numbers | "Sugarloaf HOA ran 27 units in 2024 with the same architect-approved spec" |
 | Time Delay | Paragraph 2 or 3 — compresses the time-to-value | "design preview in 48 hours, install before Thanksgiving" |
 | Effort + Sacrifice | Paragraph 3 / CTA — the guarantee or free asset that shrinks perceived effort | "free architectural preview for {COMMUNITY_NAME} — review before any commitment" |
 
-Tier 1 (knowledge / helpful resource) skips the proof-point paragraph since the offer IS the proof. Tier 4 (risk reversal) makes the Effort + Sacrifice input the headline rather than the CTA.
+Knowledge posture (helpful resource) skips the proof-point paragraph since the offer IS the proof. Risk-reversal posture makes the Effort + Sacrifice input the headline rather than the CTA.
 
 Full framework reference: `plugins/marketing/references/offer-design-frameworks.md` — Hormozi value equation origin + Brunson Value Ladder + Abraham strategic layer (Brite-originated synthesis).
 
-### Offer tiers + entity-aware selection matrix
+### Offer postures + entity-aware selection matrix
 
-Four tiers, adapted from Revgrowth 10. Each tier maps to a different CTA architecture, proof-point posture, and value-equation emphasis.
+Four postures, adapted from Revgrowth 10 and renamed per ADR-017 (legacy label: "offer tier" with T1/T2/T3/T4 letter codes — see §JSON artifact schema for the backward-compat alias mapping). Each posture maps to a different CTA architecture, proof-point posture, and value-equation emphasis.
 
-**Tier definitions:**
+**Posture definitions:**
 
-- **T1 — Knowledge / Helpful Resource.** CTA = "here's a resource, no reply needed." Lowest friction. Use when signal density is LOW and the operator wants a warming touch before a harder ask.
-- **T2 — Free Asset.** CTA = "we'll prepare a specific asset for your context, no commitment." Example: free downtown lighting audit, free design preview, free deliverability audit. Most common outbound default for Nites.
-- **T3 — DFY Trial / Pilot.** CTA = "we'll run a small paid pilot; success pays for itself." Example: 3-home pilot install, single-night event lighting pilot. Use when prospect signal is HIGH and procurement signal is strong.
-- **T4 — Risk Reversal / Guarantee.** CTA = "first phase on us if it doesn't hit {measurable outcome} by {date}." Example: performance guarantee on festival install. Use for large-spend / committee-heavy procurement where the denominator (Effort + Sacrifice) is the prospect's biggest blocker.
+- **`knowledge` — Knowledge / Helpful Resource.** CTA = "here's a resource, no reply needed." Lowest friction. Use when signal density is LOW and the operator wants a warming touch before a harder ask. (Legacy: T1.)
+- **`free-asset` — Free Asset.** CTA = "we'll prepare a specific asset for your context, no commitment." Example: free downtown lighting audit, free design preview, free deliverability audit. Most common outbound default for Nites. (Legacy: T2.)
+- **`pilot` — DFY Trial / Pilot.** CTA = "we'll run a small paid pilot; success pays for itself." Example: 3-home pilot install, single-night event lighting pilot. Use when prospect signal is HIGH and procurement signal is strong. (Legacy: T3.)
+- **`risk-reversal` — Risk Reversal / Guarantee.** CTA = "first phase on us if it doesn't hit {measurable outcome} by {date}." Example: performance guarantee on festival install. Use for large-spend / committee-heavy procurement where the denominator (Effort + Sacrifice) is the prospect's biggest blocker. (Legacy: T4.)
 
 **Entity-aware selection matrix (3 rows, one per Brite entity):**
 
-| Entity | Typical signal density | Recommended tier | Tone marker | Example vertical anchor |
+| Entity | Typical signal density | Recommended posture | Tone marker | Example vertical anchor |
 |---|---|---|---|---|
-| Nites | MEDIUM-HIGH for seasonal signals (new board, new management, calendar RFP) | T2 (free asset) default; T3 when HIGH signal density | Seasonal, residential, warm-neighborhood | HOAs, Landscape Architects, Builders, Universities (Nites-side seasonal overlays) |
-| Supply | HIGH signal density required (commercial procurement cycle is long) | T3 (pilot) default; T4 when enterprise committee visible | Commercial, spec-driven, procurement-aware | *(Supply verticals are out of scope per handbook — see §4 architectural rules)* |
-| Labs | MEDIUM for capital-project signals (bond, master plan, capital campaign) | T3 (pilot) default; T4 when multi-year spend / committee-heavy | Experiential, capital, design-production | Municipalities, Universities (capital), Theme Parks, Botanical Gardens |
+| Nites | MEDIUM-HIGH for seasonal signals (new board, new management, calendar RFP) | `free-asset` default; `pilot` when HIGH signal density | Seasonal, residential, warm-neighborhood | HOAs, Landscape Architects, Builders, Universities (Nites-side seasonal overlays) |
+| Supply | HIGH signal density required (commercial procurement cycle is long) | `pilot` default; `risk-reversal` when enterprise committee visible | Commercial, spec-driven, procurement-aware | *(Supply verticals are out of scope per handbook — see §4 architectural rules)* |
+| Labs | MEDIUM for capital-project signals (bond, master plan, capital campaign) | `pilot` default; `risk-reversal` when multi-year spend / committee-heavy | Experiential, capital, design-production | Municipalities, Universities (capital), Theme Parks, Botanical Gardens |
 
-The skill RECOMMENDS the tier from this matrix then confirms with the operator per D2.
+The skill RECOMMENDS the posture from this matrix then confirms with the operator per D2.
 
 Per-vertical offer guidance: `plugins/marketing/references/vertical-playbooks/{vertical}.md` (produced by Phase 2 roadmap issues R-4 through R-9 — e.g. `zoos.md`, `hotels-resorts.md`, `ski-resorts.md`, `sports-stadiums.md`, `aquariums.md`, `casinos.md`).
 
@@ -120,7 +120,7 @@ Two base skeletons live inline per D3. Per-vertical overrides lazy-load from `pr
 
 #### Skeleton A — list-building base
 
-Used for T1 / T2 framing. Diagnostic hook + proof point + low-commitment free-asset CTA. Greeting-merged first sentence, `<br><br>` paragraph breaks, word-level spintax. The skeleton uses Liquid + filter-chain fallback for `{RECENCY_ANCHOR}` (the keystone per-lead failure variable per BC-6308 R-2b); preset authors and future generators inherit this pattern. Add additional `{%- assign -%}` lines for any other per-lead variable that needs graceful fallback — see § Liquid + spintax for graceful per-lead fallback for the full pattern reference.
+Used for `knowledge` / `free-asset` posture framing (legacy T1 / T2). Diagnostic hook + proof point + low-commitment free-asset CTA. Greeting-merged first sentence, `<br><br>` paragraph breaks, word-level spintax. The skeleton uses Liquid + filter-chain fallback for `{RECENCY_ANCHOR}` (the keystone per-lead failure variable per BC-6308 R-2b); preset authors and future generators inherit this pattern. Add additional `{%- assign -%}` lines for any other per-lead variable that needs graceful fallback — see § Liquid + spintax for graceful per-lead fallback for the full pattern reference.
 
 ```
 Subject: {Quick|Fast|30s} {question|check|idea}
@@ -141,7 +141,7 @@ Body:
 
 #### Skeleton B — risk-reversal base
 
-Used for T4 framing. Heavier commitment context, guarantee as the headline, pilot CTA. Same format rules as skeleton A, including Liquid + filter-chain fallback for `{RECENCY_ANCHOR}` — see § Liquid + spintax for graceful per-lead fallback to extend the pattern to additional variables.
+Used for `risk-reversal` posture framing (legacy T4). Heavier commitment context, guarantee as the headline, pilot CTA. Same format rules as skeleton A, including Liquid + filter-chain fallback for `{RECENCY_ANCHOR}` — see § Liquid + spintax for graceful per-lead fallback to extend the pattern to additional variables.
 
 ```
 Subject: {Guarantee|Pilot|On us}
@@ -390,7 +390,7 @@ This section translates §3 Methodology into Brite's concrete stack — which to
 
 ### Cross-skill boundaries
 
-- **Owns:** subject + body generation for step 1 + step 2, JSON artifact emit, offer-tier recommendation from the §3 matrix, value-equation application, recency-waterfall anchor choice, preset-file lookup + fallback.
+- **Owns:** subject + body generation for step 1 + step 2, JSON artifact emit, offer-posture recommendation from the §3 matrix, value-equation application, recency-waterfall anchor choice, preset-file lookup + fallback.
 - **Does not own:** prospect research (that's `situation-mining`), sequence mechanics / inbox rotation / warmup (that's `campaign-orchestration`, BC-2718 shipped), launch execution (that's the `/marketing:launch-campaign` command, BC-5826, blocked by this skill), per-vertical preset file drafting beyond the 2 Municipalities seeds (that's BC-5879 / BC-5880 / BC-5881 — the Active / Exploring / Future tier fan-outs).
 - **Receives from:** `situation-mining` (situation artifact with `entity` + `vertical` + worldview rows + adjacent offering), `gtm-strategy` (optional messaging pillars when available), `icp-scoring` (BC-5831 — *indirect upstream*: the qualified prospect list (`*_qualified.csv` from `score_0_100` or `tier-a.csv` / `tier-b.csv` from `abc`) is the population from which per-prospect `situation-mining` runs feed this skill — icp-scoring's CSV is consumed by `/marketing:launch-campaign`, not directly by this skill).
 - **Hands off to:** `/marketing:launch-campaign` (BC-5826) via the JSON artifact at `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`. Also feeds `creative-angles` when the operator wants pattern-based variant angles on top of the base copy.
@@ -406,7 +406,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
   "entity": "brite-nites",
   "template_preset": "list-building",
   "vertical": "municipalities",
-  "offer_tier": 2,
+  "offer_posture": "free-asset",
   "offer_summary": "Free architectural lighting preview for the downtown master-plan RFP response.",
   "custom_variables": [
     {"name": "COMPANY", "default": ""},
@@ -438,7 +438,8 @@ Every invocation that completes writes exactly one JSON file. Full shape:
 - `entity` — enum: `brite-nites` | `brite-labs`. Supply is out of scope per handbook canon (see architectural rules below).
 - `template_preset` — enum: `list-building` | `risk-reversal` | `custom`. `custom` reserved for future use; v0.1 emits only the first two.
 - `vertical` — string | null. Handbook-canonical slug (e.g. `municipalities`, `hoas`) when a preset file was read; `null` when the base inline skeleton was used per the §3 fallback.
-- `offer_tier` — integer 1-4. Confirmed by operator per D2.
+- `offer_posture` — string enum: `knowledge` | `free-asset` | `pilot` | `risk-reversal`. Confirmed by operator per D2. Replaces the legacy `offer_tier` field (integer 1-4) per ADR-017.
+- `offer_tier` — DEPRECATED alias for `offer_posture`. Per ADR-017, retained as a read-side backward-compat shim for one release cycle (6-month deprecation window from PR-merge). New artifacts MUST emit `offer_posture`; consumers reading old artifacts MAY fall back to `offer_tier` and map T1→knowledge, T2→free-asset, T3→pilot, T4→risk-reversal (also accepts integers 1-4 with the same mapping). Emit a deprecation warning on fallback. To be removed in a future release; remove this field from new emits but keep the read-side mapping until the deprecation window closes.
 - `offer_summary` — one-sentence operator-readable summary of the offer (for `/marketing:launch-campaign` to echo in its preflight confirmation).
 - `custom_variables` — array of `{name, default}` objects. The `/marketing:launch-campaign` command feeds this array into `create_custom_variable` before `bulk_create_leads` runs.
 - `step_1` + `step_2` — each has `subject` (EB format rules), `body` (EB format rules + spintax + `<br><br>`), `wait_in_days` (integer, 0 for step 1, typically 3-5 for step 2).
@@ -450,7 +451,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
 ### Architectural rules that apply
 
 - **`docs/marketing-context.md` is the entity-canon source.** Never hard-code an entity default in this skill. If marketing-context is missing and the operator declines to answer, ABORT — do not guess (D1).
-- **Offer tier is always recommend + confirm.** No auto-select code path. Even with HIGH signal density, surface the recommendation to the operator and wait for confirmation before drafting (D2).
+- **Offer posture is always recommend + confirm.** No auto-select code path. Even with HIGH signal density, surface the recommendation to the operator and wait for confirmation before drafting (D2).
 - **Preset files are lazy-loaded.** One preset file read per invocation, not the whole library. Use `Glob` + `Grep` to check existence before `Read`; on missing, fall back to base inline skeleton without halting (D3).
 - **Supply vertical triggers are out of scope.** The handbook 23-vertical taxonomy excludes professional installers + property management (see `Brite-Nites/handbook@main:marketing/go-to-market/verticals/README.md`). If an operator supplies a Supply-framed prospect, pause and clarify — do not produce a Supply-tone email. Inherited from BC-5824 precedent.
 - **Hypothesis framing is non-negotiable.** Inherited from situation-mining §3 — body copy never states worldview as fact. When incorporating inferred signals from the situation artifact, the copy must read as "we noticed X and thought {HYPOTHESIS}" — never "you are X."
@@ -478,7 +479,7 @@ All SF calls are read-only; no MCP confirmation gates apply. This skill has NO m
 
 Six flows — the common paths operators actually run. Each flow states preconditions, steps (referencing §5 Workflow 1 where applicable), expected output, error handling, and cross-skill handoff.
 
-### Flow 1 — Happy path (situation artifact + offer tier + vertical → copy using preset)
+### Flow 1 — Happy path (situation artifact + offer posture + vertical → copy using preset)
 
 **Preconditions:**
 - `docs/marketing-context.md` exists and identifies the Brite entity.
@@ -487,7 +488,7 @@ Six flows — the common paths operators actually run. Each flow states precondi
 
 **Steps:**
 1. Read the situation artifact; extract `entity`, `vertical`, worldview row, adjacent offering.
-2. Apply §3 entity-aware tier matrix to recommend an offer tier. Surface the recommendation + one-line rationale to the operator. Wait for confirmation (D2 confirm gate).
+2. Apply §3 entity-aware posture matrix to recommend an offer posture. Surface the recommendation + one-line rationale to the operator. Wait for confirmation (D2 confirm gate).
 3. Run §2 value-equation gate — confirm the 4 inputs resolve from marketing-context.md + situation artifact. If any missing, interview the operator one input at a time.
 4. `Glob` check `presets/{template_preset}-{vertical}.md`. If it exists, `Read` it. If not, flag the fallback path (Flow 6).
 5. Fill slots: `{RECENCY_ANCHOR}` from the situation artifact's top waterfall signal, `{PROOF_POINT_*}` from marketing-context.md case studies, `{SENDER_*}` from marketing-context.md or §5 Workflow 1 fallback, `{FREE_ASSET_NOUN}` / `{INITIATIVE_NOUN}` / `{GUARANTEE_TERMS}` from value-equation inputs.
@@ -496,7 +497,7 @@ Six flows — the common paths operators actually run. Each flow states precondi
 8. `Write` the JSON artifact to `docs/campaigns/{entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`.
 9. Report the artifact path + offer summary + tier + preset used to the operator.
 
-**Expected output:** artifact written; one-line summary like "Wrote copy-denver-downtown-2026-04-20.json — T2 free-asset, list-building Municipalities preset, 7 custom variables."
+**Expected output:** artifact written; one-line summary like "Wrote copy-denver-downtown-2026-04-20.json — free-asset posture, list-building Municipalities preset, 7 custom variables."
 
 **Error handling:** if §2 hard gate fails at step 3, abort with an operator-facing message naming the missing input. If §6 preset file missing, degrade to Flow 6 without halting.
 
@@ -511,8 +512,8 @@ Six flows — the common paths operators actually run. Each flow states precondi
 **Steps:**
 1. Ask the operator for entity (if not resolvable from marketing-context.md), vertical (optional), and campaign name.
 2. Interview the operator for the 4 §2 value-equation inputs — one question at a time. Do not batch.
-3. Recommend an offer tier from the §3 matrix based on the operator's answers + entity. Confirm per D2.
-4. Pick base skeleton (A = list-building if T1 / T2, B = risk-reversal if T4; T3 defaults to B with softer guarantee language).
+3. Recommend an offer posture from the §3 matrix based on the operator's answers + entity. Confirm per D2.
+4. Pick base skeleton (A = list-building if `knowledge` / `free-asset`, B = risk-reversal if `risk-reversal`; `pilot` defaults to B with softer guarantee language).
 5. Fill slots from operator-supplied inputs. `{RECENCY_ANCHOR}` defaults to the level-6 waterfall fallback ("most {VERTICAL_DESCRIPTOR} teams we work with are scoping ...") since no situation artifact was read.
 6. Validate per §8 anti-slop.
 7. `Write` artifact with `situation_mining_source: ""` (empty string, per schema).
@@ -531,7 +532,7 @@ Six flows — the common paths operators actually run. Each flow states precondi
 - Inputs may be partial — operator has entity + proof point but not a full situation.
 
 **Steps:**
-1. Confirm entity + offer tier per D2.
+1. Confirm entity + offer posture per D2.
 2. Skip the `Glob` preset-file check — operator requested base template explicitly.
 3. Load base skeleton (A or B) from §3 directly.
 4. Fill slots from operator-supplied inputs; any missing `{VARIABLE}` stays as a placeholder in the body and lands in the `custom_variables` array with empty `default`.
@@ -553,7 +554,7 @@ Six flows — the common paths operators actually run. Each flow states precondi
 
 **Steps:**
 1. Load `docs/research/situations/denvergov.org-sample.md` (or any Municipalities-vertical sample artifact) if available; if not, use in-memory demo values for Denver Parks & Rec.
-2. Recommend T2 per §3 entity-aware matrix (Labs for Municipalities, T3 also reasonable — operator picks).
+2. Recommend `free-asset` per §3 entity-aware matrix (Labs for Municipalities, `pilot` also reasonable — operator picks).
 3. `Read` `presets/list-building-municipalities.md` — this is the seeded preset from this skill's shipping commit (BC-5825).
 4. Fill slots with demo values; confirm value-equation inputs are non-empty.
 5. Validate per §8.
@@ -654,12 +655,12 @@ Eight scenarios covering the core paths. Structured assertions + expected-output
 - **`format-violation-self-correct`** — Given a draft (operator-supplied template or mid-generation text) containing `{{FIRST_NAME}}` (uppercase double-brace EB-token typo, matches regex `\{\{\s*[A-Z_]+\s*\}\}`), the skill self-corrects to `{FIRST_NAME}` before artifact emit. Output artifact body contains zero `\{\{\s*[A-Z_]+\s*\}\}` typo matches; lowercase Liquid output `{{ var }}` (e.g., `{{ recency }}` from a Liquid fallback assign) is allowed and preserved.
 - **`em-dash-auto-replace`** — Given operator-supplied proof-point text containing em-dashes, the skill auto-replaces all em-dashes with commas, periods, or hyphens before artifact emit. Output artifact body contains zero `—` characters.
 - **`unknown-vertical-fallback`** — Given `vertical: hoas` (preset file not yet shipped — expected pre-BC-5879), the skill falls back to base skeleton A + Nites tone and logs a one-line warning citing BC-5879. Output artifact has `vertical: null` and body matches base-template shape, not a vertical-override shape.
-- **`missing-offer-tier-gate`** — Given no `offer_tier` input, the skill's first response recommends a tier from the §3 matrix with one-line rationale AND asks for operator confirmation via AskUserQuestion. No JSON artifact is emitted until the operator confirms or overrides.
+- **`missing-offer-posture-gate`** — Given no `offer_posture` input (and no legacy `offer_tier` fallback), the skill's first response recommends a posture from the §3 matrix with one-line rationale AND asks for operator confirmation via AskUserQuestion. No JSON artifact is emitted until the operator confirms or overrides.
 
 ### Tier 2 — Tool-assisted (requires file read or MCP call)
 
-- **`happy-path-municipalities-seed`** — Given a situation artifact for Denver Parks & Rec at `docs/research/situations/denvergov.org-2026-04-20.md` + `vertical: municipalities` + `offer_tier: 2` + entity confirmed, the output JSON artifact (a) exists at the expected path, (b) has `template_preset == "list-building"`, (c) has `vertical == "municipalities"`, (d) has `situation_mining_source` populated, (e) body contains `<br><br>` paragraph breaks, (f) body contains zero `—` characters, (g) subject contains zero `{FIRST_NAME}` tokens. Preset file `list-building-municipalities.md` was `Read` during the flow.
-- **`entity-switching`** — Given the same situation artifact, run once with `entity: brite-nites` and once with `entity: brite-labs`. The two artifacts differ in (a) `offer_tier` (Nites → 2 typical, Labs → 3 or 4 typical per §3 matrix), (b) subject line word choices (Nites warmer / seasonal, Labs more capital / experiential), (c) CTA framing (Nites "free preview" vs Labs "scope a pilot"). Entity tone is sourced from `docs/marketing-context.md`.
+- **`happy-path-municipalities-seed`** — Given a situation artifact for Denver Parks & Rec at `docs/research/situations/denvergov.org-2026-04-20.md` + `vertical: municipalities` + `offer_posture: free-asset` + entity confirmed, the output JSON artifact (a) exists at the expected path, (b) has `template_preset == "list-building"`, (c) has `vertical == "municipalities"`, (d) has `situation_mining_source` populated, (e) body contains `<br><br>` paragraph breaks, (f) body contains zero `—` characters, (g) subject contains zero `{FIRST_NAME}` tokens. Preset file `list-building-municipalities.md` was `Read` during the flow.
+- **`entity-switching`** — Given the same situation artifact, run once with `entity: brite-nites` and once with `entity: brite-labs`. The two artifacts differ in (a) `offer_posture` (Nites → `free-asset` typical, Labs → `pilot` or `risk-reversal` typical per §3 matrix), (b) subject line word choices (Nites warmer / seasonal, Labs more capital / experiential), (c) CTA framing (Nites "free preview" vs Labs "scope a pilot"). Entity tone is sourced from `docs/marketing-context.md`.
 - **`missing-marketing-context-hard-gate`** — With `docs/marketing-context.md` absent from disk, the skill's first response does NOT contain any JSON artifact text and does NOT contain any "## Recommendations" section. It DOES contain the BC-5824 precedent warning message AND an entity prompt via AskUserQuestion. No Write tool call fires until the operator answers. (D1 hard gate.)
 
 ---

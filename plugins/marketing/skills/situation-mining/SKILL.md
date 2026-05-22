@@ -1,6 +1,6 @@
 ---
 name: situation-mining
-description: Gather public data on a prospect, infer their worldview, and generate 3-4 diagnostic outbound angles that demonstrate understanding instead of pitching. The "diagnostic over promotional" anchor of Brite outbound. Triggers on situation mine, research for outreach, find angles for, diagnostic messaging for, worldview inference, research this prospect, what's going on at this company, hidden signals for, adjacent offering for, entity-specific angles. Hands off to creative-angles Deep Mode (same situation in context), email-copywriting (situation + offer tier), and launch-campaign (via copy artifact). Adapted from Revgrowth1/ai-gtm-workflows workflow 05 (MIT).
+description: Gather public data on a prospect, infer their worldview, and generate 3-4 diagnostic outbound angles that demonstrate understanding instead of pitching. The "diagnostic over promotional" anchor of Brite outbound. Triggers on situation mine, research for outreach, find angles for, diagnostic messaging for, worldview inference, research this prospect, what's going on at this company, hidden signals for, adjacent offering for, entity-specific angles. Hands off to creative-angles Deep Mode (same situation in context), email-copywriting (situation + offer posture), and launch-campaign (via copy artifact). Adapted from Revgrowth1/ai-gtm-workflows workflow 05 (MIT).
 user-invocable: true
 allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__plugin_marketing_enrichment__*, WebSearch, WebFetch, Read, Write, Glob
 metadata:
@@ -225,7 +225,7 @@ This section translates the three methodology frameworks into Brite's concrete s
 ### Cross-skill boundaries
 
 - **Hands off to `creative-angles` Deep Mode** when the operator wants pattern-based angles on top of the diagnostic per-prospect angles — the situation artifact stays in the conversation context so `creative-angles` can read it without re-query.
-- **Hands off to `email-copywriting`** when the operator has chosen an offer tier and wants Email-Bison-formatted subject + body — pass the situation artifact plus the tier selection; `email-copywriting` emits the JSON artifact that `/marketing:launch-campaign` consumes.
+- **Hands off to `email-copywriting`** when the operator has chosen an offer posture and wants Email-Bison-formatted subject + body — pass the situation artifact plus the posture selection; `email-copywriting` emits the JSON artifact that `/marketing:launch-campaign` consumes.
 - **Hands off to [`message-market-fit`](../message-market-fit/SKILL.md) / MSPA ([BC-5829](https://linear.app/brite-nites/issue/BC-5829))** (optional) when an account-specific MAP run wants per-account worldview anchoring — MSPA §3 MAP Step 2 Lens 1 can read the situation artifact as a customer-worldview source for a single-account matrix fork.
 - **Receives from `list-building`** (optional) — the operator can invoke this skill on one domain from a list output; also invoked directly with `company_name` + `domain`.
 - **Does not own list-level operations** (that's `list-building`), **does not own pattern-based reusable angles** (that's `creative-angles`), **does not own email copy** (that's `email-copywriting`), **does not own launch execution** (that's the `/marketing:launch-campaign` command), **does not own experiment-matrix design** (that's `message-market-fit`).
@@ -365,7 +365,7 @@ Five flows — the common paths operators actually run. Each flow states precond
 **Steps:**
 1. Present the two handoff options to the operator:
    - **To `creative-angles` Deep Mode** — for pattern-based angles (inversion, adjacent transfer, timing arbitrage, specificity escalator, ecosystem gap) layered on top of these diagnostic angles. Situation artifact stays in context; `creative-angles` reads it and produces an Asymmetry-Scored angle list.
-   - **To `email-copywriting`** — for Email-Bison-formatted subject + body sequences. Pair the situation artifact with an offer tier (T1 Knowledge / T2 Free Asset / T3 DFY Trial / T4 Risk Reversal); `email-copywriting` emits the JSON artifact that `/marketing:launch-campaign` consumes.
+   - **To `email-copywriting`** — for Email-Bison-formatted subject + body sequences. Pair the situation artifact with an offer posture (`knowledge` / `free-asset` / `pilot` / `risk-reversal` per ADR-017; legacy T1/T2/T3/T4 codes still accepted); `email-copywriting` emits the JSON artifact that `/marketing:launch-campaign` consumes.
 2. If neither fits, the operator can save the artifact and invoke a downstream skill later — the file path is stable.
 
 **Expected output:** a one-sentence summary to the operator ("Situation artifact saved to {path}; handoff options are creative-angles Deep Mode or email-copywriting").
