@@ -300,6 +300,35 @@ The `crm-sync` domain was deferred through iter-1/2/3 on an unresolved CRM-targe
 
 **Retrofit complete.** [BC-9559](https://linear.app/brite-nites/issue/BC-9559) (Brand Hub FDA complete retrofit) reaches 9/9 domain children Done on this close (BC-9564 was the last). All 10 inventory domains are now FDA-scaffolded; `design-system` remains a cross-cutting Phase Pattern overlay (NOT an FDA domain proper) per the Q35 amendment. This addendum is markdown-only — no plugin code change, no version bump (crm-sync is consumer-product work, not a plugin-release gate).
 
+## Iter-3 cutover (BC-11099 post-iter-3 close, 2026-05-22) — manual-orchestration fallback retired
+
+Closes the loop on [BC-10352](https://linear.app/brite-nites/issue/BC-10352) AC #6 ("re-check iter-3 dogfood findings once fix ships"). The manual-orchestration fallback that was load-bearing across asset-discovery + iter-3 batches 1/2/3 + crm-sync (6 clean runs total) is retired going forward. [BC-10352](https://linear.app/brite-nites/issue/BC-10352) (Q20 amendment 2, Path A — lowercase + backtick-wrapped + em-dash canonical) shipped together with [BC-10728](https://linear.app/brite-nites/issue/BC-10728) (38-assertion bash test harness at `plugins/flow-architecture/tests/test-helper-scripts.sh`) in [PR #350](https://github.com/Brite-Nites/brite-claude-plugins/pull/350) at plugin 1.1.1 (current 1.2.0 after the Q58 verify-docs ecosystem ship at `eac2b0a`).
+
+**Dry-run cutover evidence** (BC-11099, 2026-05-22). Chose `ops-hardening` as the demonstrative target — the largest iter-3-scaffolded domain (8 sub-flows) and one of two iter-3 domains that surfaced zero inventory drift corrections (`data-quality-migration` was the alternate; tested and behaved identically). Both run from the current `main` checkout against this brand-hub repo:
+
+```bash
+bash plugins/flow-architecture/scripts/flow-classify-domain-state.sh \
+  "$BRAND_HUB/docs/product/master-flow-inventory.md" \
+  "$BRAND_HUB/docs/product/flows" \
+  "$BRAND_HUB/docs/product/journeys" \
+  "ops-hardening"
+# → fully-scaffolded-fs   (exit 0)
+
+bash plugins/flow-architecture/scripts/flow-classify-domain-state.sh \
+  ... "data-quality-migration"
+# → fully-scaffolded-fs   (exit 0)
+
+# Negative axis still rejects (validation still doing real work):
+bash plugins/flow-architecture/scripts/flow-classify-domain-state.sh \
+  ... "OPS-HARDENING"
+# → flow-classify-domain-state: DOMAIN 'OPS-HARDENING' fails [a-z][a-z0-9-]*
+#   (Q20 amendment 2 schema; BC-10352)   (exit 2)
+```
+
+The H3 form that pre-fix hard-rejected on all 3 axes — `` ### `ops-hardening` — Operational Hardening`` (lowercase slug, backtick-wrapped, em-dash separator) — now classifies cleanly to `fully-scaffolded-fs`, which routes to Branch D (fully-scaffolded no-op with cancel-recommended `AskUserQuestion`). That is the correct posture for a domain iter-3 already scaffolded end-to-end; the classifier-driven path now distinguishes "needs scaffolding" from "already scaffolded" without operator intervention. Branch B (`inventory-only` re-scaffold) was the originally-named target in BC-11099 brief; the actual classifier outcome is Branch D because iter-3 fully scaffolded each domain. Either branch demonstrates the same cutover — the classifier accepts the iter-2 inventory shape, exits 0, and routes deterministically.
+
+Memory flipped at `~/.claude/projects/.../memory/feedback_manual_orchestration_fallback.md` — historical guidance preserved under § "Historical note (pre-2026-05-22)" for audit trail; current posture is DEPRECATED with cutover evidence inline. No plugin code change in this BC; doc + memory only.
+
 ## Cross-reference
 
 - [BC-6998](https://linear.app/brite-nites/issue/BC-6998) — this milestone (Done 2026-05-13).
@@ -312,3 +341,6 @@ The `crm-sync` domain was deferred through iter-1/2/3 on an unresolved CRM-targe
 - [BC-9559](https://linear.app/brite-nites/issue/BC-9559) — Brand Hub FDA complete retrofit (remaining 9 domains parent); children BC-9560..BC-9568.
 - [BC-9561](https://linear.app/brite-nites/issue/BC-9561) — Deck Generator out-of-scope decision; sub-flow `asset-content-libraries-06` removed from scaffold.
 - [BC-9564](https://linear.app/brite-nites/issue/BC-9564) — HubSpot deprecation / Salesforce-only CRM target decision (resolved 2026-05-20); crm-sync scaffolded as the deferred 10th domain, completing the retrofit at the full with-crm-sync tier (10 milestones / 51 parents / 255 children). `crm-sync-01` re-purposed as SF integration PRD rewrite.
+- [BC-10352](https://linear.app/brite-nites/issue/BC-10352) — Q20 amendment 2 (Path A) classifier fix; shipped [PR #350](https://github.com/Brite-Nites/brite-claude-plugins/pull/350) at plugin 1.1.1 (2026-05-22). Unblocked the manual-orchestration fallback retirement.
+- [BC-10728](https://linear.app/brite-nites/issue/BC-10728) — 38-assertion bash test harness for the 4 helper scripts (same PR, cascade-close); negative-axis regression lock for BC-10352.
+- [BC-11099](https://linear.app/brite-nites/issue/BC-11099) — manual-orchestration fallback retirement gate (closed 2026-05-22); closes BC-10352 AC #6.
