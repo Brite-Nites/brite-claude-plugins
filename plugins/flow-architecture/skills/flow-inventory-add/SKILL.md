@@ -58,7 +58,7 @@ Parse the target domain section rows. Find the highest existing `<DOMAIN>-NN`. P
 
 ### Sub-flow-add
 
-1. Regex-locate the target domain section by H3 header: `^### <DOMAIN> ---.* \(\d+ flows\)$`.
+1. Regex-locate the target domain section by H3 header: `^### \`?<DOMAIN>\`? — .* \(\d+ flows\)$`. Per Q20 amendment 2 (BC-10352, 2026-05-22): em-dash `—` is the canonical separator (matches Q20.3 memory + Brand Hub iter-2 reality); backtick-wrap around `<DOMAIN>` is optional; `<DOMAIN>` is lowercase kebab-case (`^[a-z][a-z0-9-]*$`).
 2. Locate the table by column-header signature.
 3. Find the table terminator: next `### ` heading OR `---` boundary OR EOF.
 4. Insert the new row immediately before the terminator.
@@ -75,8 +75,8 @@ All unrelated content is preserved verbatim.
 
 ### Inventory-read (Q20 amendment 1, BC-9971)
 
-1. Regex-locate the target domain section by H3 header: `^### <DOMAIN>[[:space:]]` (whitespace boundary; matches the canonical `### <DOMAIN> --- <display> (N flows)` form AND tolerates legacy em-dash variants per Q20.3 spec divergence).
-2. Parse the H3 line to extract `display` (the `--- <display>` portion) and the flow count (`(N flows)`).
+1. Regex-locate the target domain section by H3 header: `^### \`?<DOMAIN>\`?[[:space:]]` (whitespace boundary, backtick-wrap optional; matches the canonical `### \`<DOMAIN>\` — <display> (N flows)` form per Q20 amendment 2 (BC-10352, 2026-05-22) AND tolerates the bare-no-backtick variant Brand Hub iter-2 occasionally used).
+2. Parse the H3 line to extract `display` (the ` — <display>` portion, em-dash canonical) and the flow count (`(N flows)`).
 3. Parse the table immediately following the H3 row-by-row: each row yields `{id, title, primary_persona, notes_or_status_tag}`. Determine the top-level grouping by walking BACKWARD from the H3 line to the nearest `^## ` heading.
 4. Return the structured metadata to the caller — do NOT write. The Q20.4 hard-reject does NOT fire in this mode (the H3 IS expected to exist).
 5. Q20.5 parse-failure semantics apply: malformed table / missing column header / sub-flow ID not matching `<DOMAIN>-NN` → abort + surface line number; do NOT auto-repair.
@@ -86,7 +86,7 @@ Return shape (consumed by `/flow:add-domain` § 2.B Step 2):
 ```
 {
   "slug":          "<DOMAIN>",                 // echoed from input for round-trip safety
-  "display":       "<display name>",           // parsed from `--- <display>` portion of H3
+  "display":       "<display name>",           // parsed from ` — <display>` portion of H3 (em-dash canonical per Q20 amendment 2)
   "grouping":      "<PLATFORM FOUNDATIONS|CORE WORKFLOWS|OPERATIONS|...>",  // backward-walk from H3 to nearest `^## ` heading
   "flow_count":    <integer>,                  // parsed from `(N flows)`; orchestrator may cross-check against `len(sub_flows)`
   "sub_flows":     [                            // one entry per table row, insertion order preserved

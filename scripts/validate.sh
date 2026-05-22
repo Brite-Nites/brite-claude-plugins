@@ -155,6 +155,35 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b' — flow-architecture helper-script unit tests (BC-10728)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/test-helper-scripts.sh — bash unit
+# tests for the 4 FDA helper scripts (flow-detect-mode, flow-detect-fda-shape,
+# flow-resume-breadcrumb, flow-classify-domain-state). Section 4 includes the
+# BC-10352 regression-lock fixture (lowercase + backtick-wrap + em-dash
+# inventory shape) per Q40 R3 promotion criterion (BC-10728 § AC#2 ship-order
+# coupling). Pass count auto-derived from the harness's RESULT contract line.
+#
+# TODO: when a 2nd plugin adopts the bash-harness pattern, generalize this
+# section to enumerate plugins/*/tests/test-*.sh (matches the Section 13
+# TODO at line 813 + Section 15a TODO).
+section "2b'. flow-architecture helper-script unit tests (BC-10728)"
+
+fda_helper_test="$REPO_ROOT/plugins/flow-architecture/tests/test-helper-scripts.sh"
+
+if [ ! -f "$fda_helper_test" ]; then
+  warn "plugins/flow-architecture/tests/test-helper-scripts.sh not found — skipped"
+else
+  if fda_helper_out=$(bash "$fda_helper_test" 2>&1); then
+    fda_pass_count=$(printf '%s\n' "$fda_helper_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture helper-script unit tests (${fda_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture helper-script unit tests failed — run plugins/flow-architecture/tests/test-helper-scripts.sh for details"
+    printf '%s\n' "$fda_helper_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a

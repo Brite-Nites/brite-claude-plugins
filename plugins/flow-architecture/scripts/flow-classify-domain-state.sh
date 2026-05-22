@@ -35,7 +35,12 @@ FLOWS_DIR="$2"
 JOURNEYS_DIR="$3"
 DOMAIN="$4"
 
-# Validate DOMAIN against the Q20.4 schema (uppercase slug). Defends against
+# Validate DOMAIN against the Q20.4 schema as amended by Q20 amendment 2
+# (BC-10352, 2026-05-22): lowercase kebab-case slug. Original Q20.4 spec used
+# UPPERCASE (implied via Q15/Q20 examples like TEAM-08 / AUTH-11 /
+# ASSET-DISCOVERY), but Brand Hub iter-2's shipped inventory (the canonical
+# dogfood reality) uses lowercase + backtick-wrapped + em-dash separator;
+# Path A locks iter-2's shape as canonical going forward. Defends against
 # injection via interview values passing through here unsanitized.
 case "$DOMAIN" in
   '' )
@@ -43,8 +48,8 @@ case "$DOMAIN" in
     exit 2
     ;;
 esac
-if ! printf '%s' "$DOMAIN" | grep -Eq '^[A-Z][A-Z0-9_-]*$'; then
-  echo "flow-classify-domain-state: DOMAIN '$DOMAIN' fails [A-Z][A-Z0-9_-]* (Q20.4 schema)" >&2
+if ! printf '%s' "$DOMAIN" | grep -Eq '^[a-z][a-z0-9-]*$'; then
+  echo "flow-classify-domain-state: DOMAIN '$DOMAIN' fails [a-z][a-z0-9-]* (Q20 amendment 2 schema; BC-10352)" >&2
   exit 2
 fi
 
@@ -53,15 +58,20 @@ if [ ! -f "$INVENTORY_PATH" ]; then
   exit 2
 fi
 
-# H3 match — case-sensitive (FDA H3s are uppercase per Q20.4 schema). The
-# canonical H3 form per `flow-inventory-add` Section 3 is
-# `^### <DOMAIN> --- <display> \(\d+ flows\)$` (triple-hyphen separator) and
-# per Q20.3 (memory:230) is `^### <DOMAIN> — .* \(\d+ flows\)$` (em-dash) —
-# the two surfaces disagree. Rather than gate on the separator + flow count,
-# require only a whitespace boundary after `<DOMAIN>`: that's sufficient for
-# presence detection, robust against minor schema drift, and prevents prefix
-# false-positives (`### FOO` does not match `### FOO-EXTENDED`).
-if grep -Eq "^### ${DOMAIN}[[:space:]]" "$INVENTORY_PATH"; then
+# H3 match — case-sensitive (DOMAIN is lowercase per Q20 amendment 2 schema).
+# The canonical H3 form per `flow-inventory-add` Section 3 (BC-10352 align)
+# is `^### [BACKTICK]?<DOMAIN>[BACKTICK]? — <display> (N flows)$` with em-dash
+# as the canonical separator (Q20.3 memory + iter-2 reality). Both
+# backtick-wrapped and bare H3s are matched — Brand Hub's iter-2 inventory
+# mixes the two and both are considered valid. Pattern built via printf so
+# the backtick metacharacter doesn't trip bash command-substitution inside a
+# double-quoted regex. The grep only requires a whitespace boundary after
+# the optionally-backtick-wrapped slug, so it stays separator-agnostic and
+# prevents prefix false-positives (`### asset-foundation` does not match
+# `### asset-foundation-extended`).
+BACKTICK='`'
+H3_REGEX="$(printf '^### [%s]?%s[%s]?[[:space:]]' "$BACKTICK" "$DOMAIN" "$BACKTICK")"
+if grep -Eq "$H3_REGEX" "$INVENTORY_PATH"; then
   HAS_H3="yes"
 else
   HAS_H3="no"
