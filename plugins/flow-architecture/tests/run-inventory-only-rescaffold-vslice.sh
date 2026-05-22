@@ -135,7 +135,7 @@ if [ -f "$FULLY_SCAFFOLDED_FIXTURE/docs/product/journeys/asset-discovery.md" ]; 
 else
   fail "synthetic-fully-scaffolded-domain missing journey doc"
 fi
-if [ -f "$FULLY_SCAFFOLDED_FIXTURE/docs/product/flows/asset-discovery/ASSET-DISCOVERY-01.md" ]; then
+if [ -f "$FULLY_SCAFFOLDED_FIXTURE/docs/product/flows/asset-discovery/asset-discovery-01.md" ]; then
   pass "synthetic-fully-scaffolded-domain has story doc (expected)"
 else
   fail "synthetic-fully-scaffolded-domain missing story doc"
@@ -154,37 +154,37 @@ assert_error_exit "greenfield (no inventory file) -> exit 2" \
   "$GREENFIELD_FIXTURE/docs/product/master-flow-inventory.md" \
   "$GREENFIELD_FIXTURE/docs/product/flows" \
   "$GREENFIELD_FIXTURE/docs/product/journeys" \
-  "ASSET-DISCOVERY"
+  "asset-discovery"
 
 # `absent` — inventory file present, but DOMAIN not in it.
 assert_classification \
-  "inventory-only fixture + NONEXISTENT domain -> absent" \
+  "inventory-only fixture + nonexistent domain -> absent" \
   "$INVENTORY_ONLY_FIXTURE" \
-  "NONEXISTENT" \
+  "nonexistent" \
   "absent" \
   0
 
 # `inventory-only` — H3 present, no journey doc, no story docs.
 assert_classification \
-  "synthetic-inventory-only-domain + ASSET-DISCOVERY -> inventory-only" \
+  "synthetic-inventory-only-domain + asset-discovery -> inventory-only" \
   "$INVENTORY_ONLY_FIXTURE" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "inventory-only" \
   0
 
 # `journey-exists` — H3 present, journey doc present, no story docs.
 assert_classification \
-  "synthetic-journey-exists-domain + ASSET-DISCOVERY -> journey-exists" \
+  "synthetic-journey-exists-domain + asset-discovery -> journey-exists" \
   "$JOURNEY_EXISTS_FIXTURE" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "journey-exists" \
   0
 
 # `fully-scaffolded-fs` — H3 present, journey doc present, story doc present.
 assert_classification \
-  "synthetic-fully-scaffolded-domain + ASSET-DISCOVERY -> fully-scaffolded-fs" \
+  "synthetic-fully-scaffolded-domain + asset-discovery -> fully-scaffolded-fs" \
   "$FULLY_SCAFFOLDED_FIXTURE" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "fully-scaffolded-fs" \
   0
 
@@ -202,9 +202,11 @@ assert_error_exit "empty DOMAIN -> exit 2" "DOMAIN" \
   "$INVENTORY_ONLY_FIXTURE/docs/product/journeys" \
   ""
 
-# Domain code violating Q20.4 schema (lowercase, slash, space, dot-dot).
-for bad in "asset-discovery" "ASSET DISCOVERY" "ASSET/DISCOVERY" "../ASSET" "lower" "9-START"; do
-  assert_error_exit "DOMAIN='$bad' rejected by Q20.4 schema -> exit 2" "Q20.4 schema" \
+# Domain code violating Q20 amendment 2 schema (UPPERCASE / space / slash /
+# dot-dot / underscore / leading-digit). Lowercase kebab-case is the only
+# valid form post-BC-10352.
+for bad in "ASSET-DISCOVERY" "asset discovery" "asset/discovery" "../asset" "asset_discovery" "9-startswith-digit"; do
+  assert_error_exit "DOMAIN='$bad' rejected by Q20 amendment 2 schema -> exit 2" "Q20 amendment 2 schema" \
     "$INVENTORY_ONLY_FIXTURE/docs/product/master-flow-inventory.md" \
     "$INVENTORY_ONLY_FIXTURE/docs/product/flows" \
     "$INVENTORY_ONLY_FIXTURE/docs/product/journeys" \
@@ -216,66 +218,69 @@ assert_error_exit "missing inventory file -> exit 2" "inventory-path" \
   "/tmp/flow-9971-does-not-exist.$$.md" \
   "$INVENTORY_ONLY_FIXTURE/docs/product/flows" \
   "$INVENTORY_ONLY_FIXTURE/docs/product/journeys" \
-  "ASSET-DISCOVERY"
+  "asset-discovery"
 
 # ── Section 5: H3 boundary precision ─────────────────────────────────
 section "5/5" "H3 boundary precision (no prefix-match false positives)"
 
 # Verify the H3 regex requires a whitespace boundary after DOMAIN. Build an
-# inline scratch fixture with a `### ASSET-DISCOVERY-EXTENDED` H3 (no
-# `### ASSET-DISCOVERY ` line); classifier should report `absent` for
-# ASSET-DISCOVERY rather than match the prefix line.
+# inline scratch fixture with a `### asset-discovery-extended` H3 (no
+# `### asset-discovery ` line); classifier should report `absent` for
+# asset-discovery rather than match the prefix line. Schema reflects Q20
+# amendment 2 (BC-10352): lowercase + backtick + em-dash.
 SCRATCH="$(mktemp -d -t flow-9971.XXXXXX)"
 trap 'rm -rf "$SCRATCH"' EXIT
 
 mkdir -p "$SCRATCH/docs/product/flows" "$SCRATCH/docs/product/journeys"
-printf '# Master Flow Inventory\n\n### ASSET-DISCOVERY-EXTENDED --- Extended (1 flows)\n\n| ID | Title |\n|---|---|\n| ASSET-DISCOVERY-EXTENDED-01 | Foo |\n' \
+printf '# Master Flow Inventory\n\n### `asset-discovery-extended` — Extended (1 flows)\n\n| ID | Title |\n|---|---|\n| asset-discovery-extended-01 | Foo |\n' \
   > "$SCRATCH/docs/product/master-flow-inventory.md"
 
 assert_classification \
-  "prefix-only H3 (ASSET-DISCOVERY-EXTENDED) does NOT match ASSET-DISCOVERY -> absent" \
+  "prefix-only H3 (asset-discovery-extended) does NOT match asset-discovery -> absent" \
   "$SCRATCH" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "absent" \
   0
 
 # And the reverse — searching for the actual H3 prefix returns inventory-only.
 assert_classification \
-  "ASSET-DISCOVERY-EXTENDED + matching DOMAIN -> inventory-only" \
+  "asset-discovery-extended + matching DOMAIN -> inventory-only" \
   "$SCRATCH" \
-  "ASSET-DISCOVERY-EXTENDED" \
+  "asset-discovery-extended" \
   "inventory-only" \
   0
 
-# Lowercase H3 must not match uppercase DOMAIN — grep is case-sensitive.
-printf '# Master Flow Inventory\n\n### asset-discovery --- foo (1 flows)\n' \
+# UPPERCASE H3 must not match lowercase DOMAIN — grep is case-sensitive.
+# Also: under Q20 amendment 2 the regex pre-rejects UPPERCASE DOMAIN before
+# the grep runs; this assertion targets the regex layer.
+printf '# Master Flow Inventory\n\n### `ASSET-DISCOVERY` — foo (1 flows)\n' \
   > "$SCRATCH/docs/product/master-flow-inventory.md"
 assert_classification \
-  "lowercase H3 does NOT match uppercase DOMAIN -> absent" \
+  "UPPERCASE H3 does NOT match lowercase DOMAIN -> absent" \
   "$SCRATCH" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "absent" \
   0
 
 # Trailing-hyphen-only DOMAIN H3 must not match because the regex requires a
 # whitespace boundary after the slug.
-printf '# Master Flow Inventory\n\n### ASSET-DISCOVERY-\n' \
+printf '# Master Flow Inventory\n\n### `asset-discovery-`\n' \
   > "$SCRATCH/docs/product/master-flow-inventory.md"
 assert_classification \
-  "trailing-hyphen-only H3 does NOT match ASSET-DISCOVERY -> absent" \
+  "trailing-hyphen-only H3 does NOT match asset-discovery -> absent" \
   "$SCRATCH" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "absent" \
   0
 
 # H3 at EOF with no terminal newline still matches — defends against LLM
 # authoring sub-skills that emit files without trailing \n.
-printf '# Master Flow Inventory\n\n### ASSET-DISCOVERY --- foo (1 flows)' \
+printf '# Master Flow Inventory\n\n### `asset-discovery` — foo (1 flows)' \
   > "$SCRATCH/docs/product/master-flow-inventory.md"
 assert_classification \
   "H3 at EOF without newline still matches -> inventory-only" \
   "$SCRATCH" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "inventory-only" \
   0
 
@@ -286,23 +291,23 @@ mkdir -p "$SCRATCH/docs/product/flows/asset-discovery"
 printf '# README\n' > "$SCRATCH/docs/product/flows/asset-discovery/README.md"
 printf '# Index\n' > "$SCRATCH/docs/product/flows/asset-discovery/INDEX.md"
 # Restore a valid inventory H3 (the prior writes left it short).
-printf '# Master Flow Inventory\n\n### ASSET-DISCOVERY --- foo (1 flows)\n' \
+printf '# Master Flow Inventory\n\n### `asset-discovery` — foo (1 flows)\n' \
   > "$SCRATCH/docs/product/master-flow-inventory.md"
 mkdir -p "$SCRATCH/docs/product/journeys"
 printf '# Stub\n' > "$SCRATCH/docs/product/journeys/asset-discovery.md"
 assert_classification \
   "README.md + INDEX.md in flows subdir do NOT count as stories -> journey-exists" \
   "$SCRATCH" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "journey-exists" \
   0
 
 # Adding a story-doc-shaped file flips to fully-scaffolded-fs.
-printf '# Story\n' > "$SCRATCH/docs/product/flows/asset-discovery/ASSET-DISCOVERY-01.md"
+printf '# Story\n' > "$SCRATCH/docs/product/flows/asset-discovery/asset-discovery-01.md"
 assert_classification \
-  "adding ASSET-DISCOVERY-01.md flips to fully-scaffolded-fs" \
+  "adding asset-discovery-01.md flips to fully-scaffolded-fs" \
   "$SCRATCH" \
-  "ASSET-DISCOVERY" \
+  "asset-discovery" \
   "fully-scaffolded-fs" \
   0
 

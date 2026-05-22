@@ -181,7 +181,7 @@ What FDA creates vs what already exists in the consuming project. Use this when 
 | Artifact | Created by FDA | Pre-existing in BriteBase | Pre-existing in Brand Hub (v1 dogfood target) |
 |---|---|---|---|
 | `docs/product/intent.md` | yes (Q42) | yes (legacy) — Q42 overwrites or augments per office-hours flow | no |
-| `docs/product/master-flow-inventory.md` | yes (Q11 retrofit / Q19 greenfield) | yes (28-domain canonical) | no; Brand Hub picks its own domain count at runtime (see `project_fda_plugin_interview.md` line 1951, Q34 disambiguation #10), not pinned to BriteBase's 28 nor the legacy-milestone count of 27 |
+| `docs/product/master-flow-inventory.md` | yes (Q11 retrofit / Q19 greenfield) | yes (28-domain canonical) — slug schema pre-dates Q20 amendment 2 (BC-10352); BriteBase's UPPERCASE legacy slugs (`TEAM`, `AUTH`, `QUO`, etc.) would require slug-case migration before FDA scaffolding ran against them (BriteBase stays on Phase Pattern, so this is presently inapplicable) | no; Brand Hub picks its own domain count at runtime (see `project_fda_plugin_interview.md` line 1951, Q34 disambiguation #10), not pinned to BriteBase's 28 nor the legacy-milestone count of 27 |
 | `docs/product/flows/<domain>/<flow-id>.md` | yes (Q15 author) | partial (some flows pre-authored) | no |
 | `docs/product/journeys/<domain>.md` | yes (Q16 author) | partial | no |
 | `docs/product/flows/INDEX.md` | yes (Q18 regen) | yes | no |
