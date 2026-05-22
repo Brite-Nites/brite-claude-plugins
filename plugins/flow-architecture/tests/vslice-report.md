@@ -16,9 +16,9 @@
 | 5b. `flow-resume-breadcrumb.sh` soft-fail paths | All 5 Q31.3-documented `STALE_REASON`s exercised: `parse-error` (malformed JSON), `status-completed`, `status-abandoned`, `timestamp-unparseable`, `age` (8-day-old timestamp); plus a positive 6-day-old "within-window" boundary case |
 | 6. Phase 2-8 skip-with-reason | 8 skip lines documenting pending coverage (see § Pending coverage matrix) |
 
-CI job: `vslice-greenfield` in `.github/workflows/validate-plugin.yml` (advisory; `continue-on-error: true` per BC-7057 spec "advisory job" framing). Runs on every PR to `main`.
+CI job: `vslice-greenfield` in `.github/workflows/validate-plugin.yml`. Runs on every PR to `main`. **Required (blocking)** as of 2026-05-22 ([BC-7713](https://linear.app/brite-nites/issue/BC-7713)) — see Follow-up note below.
 
-**Follow-up: advisory → blocking demotion.** Once the harness has accumulated 1-2 weeks of stable green runs, demote `continue-on-error: true` to `false` so regressions actually block PRs (rather than producing a green check despite a failed harness). Track as a separate Linear issue when the time arrives.
+**Follow-up: advisory → blocking demotion — COMPLETED 2026-05-22 ([BC-7713](https://linear.app/brite-nites/issue/BC-7713)).** Demoted `continue-on-error: true` to (removed) on the `vslice-greenfield` job stanza after the BC-7713 trigger condition cleared — 11+ calendar days since BC-7057 merge (2026-05-11) and a clean green-run survey (10/10 most-recent main runs showed `vslice-greenfield` job-level `success`, well past the ≥5-PR sample threshold). The job is now a hard gate; harness regressions block the PR rather than producing a decorative green check.
 
 **Hermeticity controls** (introduced in v0.2.8):
 - `unset` of all `LINEAR_ISSUE_COUNT` / `FLOW_GH_AUTH_CACHE` / `FLOW_SHAPE_CACHE` / `_FLOW_SHAPE_*` env-vars at script top — parent-shell state cannot influence helper behavior.
