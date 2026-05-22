@@ -43,9 +43,9 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-11  | 5 CAMPAIGN CREATE | regression | ✅ | BC-6544 omit-resets-bool fires; restored via re-PATCH |
 | R-12  | 6 ATTACH LEADS | regression | ✅ | 9 leads attached to 4 campaigns; counts 2/3/2/2 match R-1 grid |
 | R-13  | 6 ATTACH LEADS | DEFERRED | ⏭️ | per round-4/5 carryover (spec-read suffices) |
-| R-14  | 7 ATTACH SENDERS | regression | _pending_ | |
-| R-15  | 7 ATTACH SENDERS | regression | _pending_ | |
-| R-16  | 7 ATTACH SENDERS | regression | _pending_ | |
+| R-14  | 7 ATTACH SENDERS | regression | ✅ | 772 connected senders, 52 pages, per_page=15, lowercase filter |
+| R-15  | 7 ATTACH SENDERS | regression | ✅ | 15 senders × 4 campaigns attached (page 1 only) |
+| R-16  | 7 ATTACH SENDERS | regression | ✅ | post-attach Δ visible sub-second via sender-emails endpoint |
 | R-17  | 8 SCHEDULE | regression | _pending_ | |
 | R-18  | 9 SEQUENCE | regression | _pending_ | |
 | R-19  | 9 SEQUENCE | regression | _pending_ | |
@@ -364,6 +364,49 @@ Per issue body + round-4/5 carryover: spec-read suffices; live-fire requires pre
 ---
 
 **Phase 6 close:** R-12 ✅, R-13 ⏭️ deferred. Workspace state: 10 dogfood leads (9 attached + 1 dup-probe orphan), 4 round-6 campaigns each with their assigned bucket leads. No senders, no schedule, no sequence yet.
+
+---
+
+## Phase 7 — ATTACH SENDERS
+
+### R-14 — list_sender_emails pagination + lowercase status (F23/Sx-10/Sx-11 regression)
+
+**Evidence (`GET /api/sender-emails?status=connected`):**
+- `meta.per_page: 15` ✅ (Sx-10 hardcoded)
+- `meta.total: 772` connected senders across `meta.last_page: 52` pages
+- `meta.links[]` URL pattern `?page=N`
+- Lowercase `status=connected` accepted with HTTP 200 success (Sx-11)
+- Page 1 returns IDs 981–995, all `status: "Connected"`, all `type: microsoft_oauth`, all Outlook-tagged, all on `washington{festive|winter}lights.com` domains
+
+**Verdict:** ✅ Expected. Sx-10 + Sx-11 + F23 all intact at runtime.
+
+### R-15 — F24 partial-pool decision (15 senders × 4 campaigns)
+
+**Evidence (4 POSTs to `/api/campaigns/{id}/attach-sender-emails` with sender_email_ids=[981..995]):**
+
+| Campaign | Response |
+|----------|----------|
+| 53 (Professional\|Google) | success |
+| 54 (Role\|Other) | success |
+| 55 (Personal\|Google) | success |
+| 56 (Personal\|Microsoft) | success |
+
+All 4 attach calls returned `success: true` with "Sender emails successfully added to {campaign-name}".
+
+**Verdict:** ✅ Expected. F24 partial-pool — 15 senders from page 1 attached to all 4 campaigns. No pagination loop needed at dogfood scale.
+
+### R-16 — F26/R-15 eventual-consistency post-attach Δ (regression)
+
+**Evidence:**
+- `get_campaign(53)` returned `total_leads: 2` immediately (lead attach from R-12 visible).
+- `GET /api/campaigns/53/sender-emails` returned 15 senders (`meta.total: 15`, all IDs 981–995) immediately after the R-15 POST.
+
+**Verdict:** ✅ Expected. Both lead attach (R-12) and sender attach (R-15) Δ visible sub-second via read-back endpoints. F26 eventual-consistency intact.
+
+---
+
+**Phase 7 close:** R-14 ✅, R-15 ✅, R-16 ✅. Workspace state: 10 dogfood leads + 4 round-6 campaigns (each with 2-3 leads + 15 senders) + 21 production. No schedule, no sequence yet.
+
 
 
 
