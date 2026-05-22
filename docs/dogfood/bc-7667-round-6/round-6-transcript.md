@@ -46,7 +46,7 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-14  | 7 ATTACH SENDERS | regression | ✅ | 772 connected senders, 52 pages, per_page=15, lowercase filter |
 | R-15  | 7 ATTACH SENDERS | regression | ✅ | 15 senders × 4 campaigns attached (page 1 only) |
 | R-16  | 7 ATTACH SENDERS | regression | ✅ | post-attach Δ visible sub-second via sender-emails endpoint |
-| R-17  | 8 SCHEDULE | regression | _pending_ | |
+| R-17  | 8 SCHEDULE | regression | ✅ | template id 3 → clones 28-31, BC-6303 field naming intact |
 | R-18  | 9 SEQUENCE | regression | _pending_ | |
 | R-19  | 9 SEQUENCE | regression | _pending_ | |
 | R-20  | 10 PREVIEW | regression | _pending_ | |
@@ -406,6 +406,48 @@ All 4 attach calls returned `success: true` with "Sender emails successfully add
 ---
 
 **Phase 7 close:** R-14 ✅, R-15 ✅, R-16 ✅. Workspace state: 10 dogfood leads + 4 round-6 campaigns (each with 2-3 leads + 15 senders) + 21 production. No schedule, no sequence yet.
+
+---
+
+## Phase 8 — SCHEDULE
+
+### R-17 — schedule template apply (F27/BC-6303 regression)
+
+**Hypothesis:** workspace 13 has 1 template (id 3); template applied to all 4 campaigns; metadata field naming honors BC-6303 rename.
+
+**Evidence:**
+
+`GET /api/campaigns/schedule/templates` → 1 template:
+- id 3, M-F 08:00–20:00 America/Denver, type "Schedule template", status "Not Started"
+
+`POST /api/campaigns/{id}/create-schedule-from-template` × 4 with body `{"schedule_id": 3}`:
+
+| Campaign | Schedule clone | type |
+|----------|----------------|------|
+| 53 | 28 | Campaign Schedule |
+| 54 | 29 | Campaign Schedule |
+| 55 | 30 | Campaign Schedule |
+| 56 | 31 | Campaign Schedule |
+
+Schedule properties cloned verbatim from template 3 (M-F 08-20 America/Denver).
+
+**Metadata projection:**
+```json
+"schedule_template_id": 3,
+"campaign_schedule_ids": {
+  "professional|Google": 28, "role|Other": 29,
+  "personal|Google": 30,     "personal|Microsoft": 31
+}
+```
+
+Field naming honors BC-6303 — workspace-level `schedule_template_id` (singular, → template) vs per-campaign `campaign_schedule_ids` (plural, → clones). Distinct, no conflation.
+
+**Verdict:** ✅ Expected. F27/BC-6303 schedule_template_id rename intact at runtime.
+
+---
+
+**Phase 8 close:** R-17 ✅. Workspace state: 4 round-6 campaigns now provisioned with leads + senders + schedule clones (28-31). Missing only the sequence (Phase 9 next).
+
 
 
 
