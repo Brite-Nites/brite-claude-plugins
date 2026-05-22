@@ -48,7 +48,7 @@ The `inventory-read` mode preserves Q47 sub-decision 4's boundary (the orchestra
 
 ## 2. Flow ID auto-suggestion (sub-flow-add) (Q20.2)
 
-Parse the target domain section rows. Find the highest existing `<DOMAIN>-NN`. Propose `<DOMAIN>-(N+1)` zero-padded to 2 digits (matches `TEAM-08`, `AUTH-11` precedent).
+Parse the target domain section rows. Find the highest existing `<DOMAIN>-NN`. Propose `<DOMAIN>-(N+1)` zero-padded to 2 digits (matches `team-08`, `auth-11` precedent per Q20 amendment 2 lowercase-kebab-case schema).
 
 **Split-suffix support** per CLAUDE.md: if the user indicates "split of existing flow", offer `<DOMAIN>-NN-a` / `-b` instead of the next sequential. The suggested ID is rendered in the confirmation prompt; user can override.
 
@@ -167,15 +167,15 @@ In `inventory-read` mode (Q20 amendment 1), the skill sets `state.inventory_chan
 
 ## Worked example
 
-`/flow:add-sub-flow` invocation against a Brand-Hub-shaped project with the AUTH domain at 11 flows:
+`/flow:add-sub-flow` invocation against a Brand-Hub-shaped project with the `auth` domain at 11 flows (lowercase + backtick + em-dash per Q20 amendment 2):
 
-1. Caller passes mode=`sub-flow-add`, target=`AUTH`, title="Login with SAML SSO", primary_persona="Tenant admin".
-2. Skill parses the AUTH section, finds highest existing ID `AUTH-11`, proposes `AUTH-12`.
+1. Caller passes mode=`sub-flow-add`, target=`auth`, title="Login with SAML SSO", primary_persona="Tenant admin".
+2. Skill parses the `auth` section, finds highest existing ID `auth-11`, proposes `auth-12`.
 3. `AskUserQuestion` confirmation surfaces the proposed row; user Approves.
-4. Skill regex-locates the AUTH H3 (`### AUTH --- Authentication & Tenancy (11 flows)`), inserts the new row before the table terminator, updates the H3 to `(12 flows)`.
+4. Skill regex-locates the `auth` H3 (`` ### `auth` — Authentication & Tenancy (11 flows) ``), inserts the new row before the table terminator, updates the H3 to `(12 flows)`.
 5. Skill emits `state.inventory_changed = true`; orchestrator dispatches `flow-regen-index` next.
 
-If the same call re-fires (user re-runs `/flow:add-sub-flow` with identical inputs), Q20.4's pre-write check catches `AUTH-12` already exists and aborts with the duplicate-rejection message. No half-state.
+If the same call re-fires (user re-runs `/flow:add-sub-flow` with identical inputs), Q20.4's pre-write check catches `auth-12` already exists and aborts with the duplicate-rejection message. No half-state.
 
 ---
 

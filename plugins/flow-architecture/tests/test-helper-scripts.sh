@@ -219,12 +219,38 @@ else
   fail "write missing input: EXIT=$EXIT"
 fi
 
-# 2.8 — usage error: write with no args → exit 2.
+# 2.8 — usage error: write with no args → exit 2 WITH usage message.
+# Substring assertion guards against a future refactor that returns exit 2
+# for unrelated reasons (e.g., python3 missing) silently passing this test.
 run_capture "$BREADCRUMB" write
-if [ "$EXIT" -eq 2 ]; then
-  pass "write with no args → exit 2 (usage)"
+if [ "$EXIT" -eq 2 ] && printf '%s' "$STDERR" | grep -qiE 'usage|state-path|input-path'; then
+  pass "write with no args → exit 2 (usage message present)"
 else
-  fail "write no args: EXIT=$EXIT"
+  fail "write no args: EXIT=$EXIT stderr='${STDERR}'"
+fi
+
+# 2.9 — read breadcrumb with status=completed → STALE=yes, STALE_REASON=status-completed.
+SC_BC9="$(new_scratch)"
+printf '{"status":"completed","last_updated":"%s"}\n' "$NOW_ISO" \
+  > "$SC_BC9/docs/plans/.flow-phase-state.json"
+run_capture "$BREADCRUMB" read "$SC_BC9/docs/plans/.flow-phase-state.json"
+if printf '%s\n' "$STDOUT" | grep -q '^STALE=yes$' \
+   && printf '%s\n' "$STDOUT" | grep -q '^STALE_REASON=status-completed$'; then
+  pass "completed breadcrumb → STALE=yes, STALE_REASON=status-completed"
+else
+  fail "completed-status: stdout='${STDOUT}'"
+fi
+
+# 2.10 — read breadcrumb with status=abandoned → STALE=yes, STALE_REASON=status-abandoned.
+SC_BC10="$(new_scratch)"
+printf '{"status":"abandoned","last_updated":"%s"}\n' "$NOW_ISO" \
+  > "$SC_BC10/docs/plans/.flow-phase-state.json"
+run_capture "$BREADCRUMB" read "$SC_BC10/docs/plans/.flow-phase-state.json"
+if printf '%s\n' "$STDOUT" | grep -q '^STALE=yes$' \
+   && printf '%s\n' "$STDOUT" | grep -q '^STALE_REASON=status-abandoned$'; then
+  pass "abandoned breadcrumb → STALE=yes, STALE_REASON=status-abandoned"
+else
+  fail "abandoned-status: stdout='${STDOUT}'"
 fi
 
 # ──────────────────────────────────────────────────────────────────────
@@ -479,7 +505,10 @@ run_capture "$CLASSIFIER" \
   "$SC_C7/docs/product/flows" \
   "$SC_C7/docs/product/journeys" \
   "ASSET-FOUNDATION"
-if [ "$EXIT" -eq 2 ] && printf '%s' "$STDERR" | grep -q "schema"; then
+# Substring is anchored to the regex literal itself ([a-z][a-z0-9-]*) so a
+# future refactor that drops the word "schema" from the error string can't
+# silently pass this test. Guards against the review P2 noted on round 1.
+if [ "$EXIT" -eq 2 ] && printf '%s' "$STDERR" | grep -qE '\[a-z\]\[a-z0-9-\]|Q20'; then
   pass "UPPERCASE DOMAIN rejected by Q20 amendment 2 schema → exit 2"
 else
   fail "UPPERCASE rejection: EXIT=$EXIT stderr='${STDERR}'"

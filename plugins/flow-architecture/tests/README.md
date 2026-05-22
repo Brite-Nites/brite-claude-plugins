@@ -29,11 +29,11 @@ their fixtures.
 | Helper | Assertions | Coverage area |
 |---|---|---|
 | `flow-detect-fda-shape.sh` | 5 | pristine repo all-no, populated repo intent/inventory/flows yes, empty `flows/` dir → no, breadcrumb presence, invalid REPO_ROOT exit 1 |
-| `flow-resume-breadcrumb.sh` | 8 | read missing → EXISTS=no, fresh in_flight → STALE=no, aged → STALE=yes+age, malformed JSON → STALE=yes+parse-error, write happy-path, write malformed → exit 3, write missing input → exit 3, usage error → exit 2 |
+| `flow-resume-breadcrumb.sh` | 10 | read missing → EXISTS=no, fresh in_flight → STALE=no, aged → STALE=yes+age, malformed JSON → STALE=yes+parse-error, completed status → STALE=yes+status-completed, abandoned status → STALE=yes+status-abandoned, write happy-path, write malformed → exit 3, write missing input → exit 3, usage error → exit 2 with usage message |
 | `flow-detect-mode.sh` | 8 | pristine → greenfield, LINEAR_ISSUE_COUNT=42 → retrofit, =5 → greenfield, malformed count → graceful, intent+inventory → retrofit, full shape → incremental-add, fresh breadcrumb → resume, stale completed breadcrumb → fall-through |
-| `flow-classify-domain-state.sh` (BC-10352 lock) | 15 | axis-1 lowercase, axis-2 backtick-wrap, axis-3 em-dash, full four-outcome cycle on iter-2 shape, UPPERCASE rejection, schema injection guards (underscore, leading-digit, empty, slash, space, dot-dot), missing inventory diagnostic, prefix-match defense, EOF-no-newline, bare H3 still matches, usage error |
+| `flow-classify-domain-state.sh` (BC-10352 lock) | 15 | axis-1 lowercase, axis-2 backtick-wrap, axis-3 em-dash, full four-outcome cycle on iter-2 shape, UPPERCASE rejection (regex-literal-anchored), schema injection guards (underscore, leading-digit, empty, slash, space, dot-dot), missing inventory diagnostic, prefix-match defense, EOF-no-newline, bare H3 still matches, usage error |
 
-Total: **36 assertions** (sum at runtime via `RESULT pass=N` contract line).
+Total: **38 assertions** (sum at runtime via `RESULT pass=N` contract line).
 
 ## Adding a new test
 
