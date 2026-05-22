@@ -11,11 +11,11 @@
         "entity": "brite-nites",
         "vertical": "municipalities",
         "offer_posture": "free-asset",
-        "situation_artifact_path": "docs/campaigns/brite-nites/situation-denver-parks.md",
+        "situation_artifact_path": "docs/campaigns/nites/situation-denver-parks.md",
         "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
       },
       "assertions": [
-        "output artifact file written to path matching 'docs/campaigns/brite-(nites|labs)/copy-*.json'",
+        "output artifact file written to path matching 'docs/campaigns/(nites|labs)/copy-*.json' (short-form canonical per BC-8719)",
         "output.template_preset == 'list-building'",
         "output.vertical == 'municipalities'",
         "output.offer_posture == 'free-asset'",
@@ -40,7 +40,7 @@
       },
       "assertions": [
         "first_response mentions at least 3 of: 'Dream Outcome', 'Perceived Likelihood', 'Time Delay', 'Effort', 'Sacrifice'",
-        "first_tool_calls does NOT contain Write of 'docs/campaigns/brite-nites/copy-*.json'",
+        "first_tool_calls does NOT contain Write of 'docs/campaigns/nites/copy-*.json'",
         "no output artifact written until operator responds to the interview questions"
       ]
     },
@@ -53,7 +53,7 @@
         "entity": "brite-nites",
         "vertical": "municipalities",
         "offer_posture": "free-asset",
-        "situation_artifact_path": "docs/campaigns/brite-nites/situation-any.md",
+        "situation_artifact_path": "docs/campaigns/nites/situation-any.md",
         "operator_draft_body": "Hi {{firstname}}, I saw your downtown plan."
       },
       "assertions": [
@@ -71,7 +71,7 @@
         "entity": "brite-nites",
         "vertical": "municipalities",
         "offer_posture": "free-asset",
-        "situation_artifact_path": "docs/campaigns/brite-nites/situation-any.md",
+        "situation_artifact_path": "docs/campaigns/nites/situation-any.md",
         "operator_proof_point": "foot traffic rose — up 40% — year over year"
       },
       "assertions": [
@@ -128,7 +128,7 @@
         "entity": "brite-nites",
         "vertical": "hoas",
         "offer_posture": "free-asset",
-        "situation_artifact_path": "docs/campaigns/brite-nites/situation-cherry-creek.md",
+        "situation_artifact_path": "docs/campaigns/nites/situation-cherry-creek.md",
         "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
       },
       "assertions": [
@@ -148,13 +148,13 @@
         "entity": "brite-nites",
         "vertical": "municipalities",
         "offer_posture": null,
-        "situation_artifact_path": "docs/campaigns/brite-nites/situation-denver-parks.md",
+        "situation_artifact_path": "docs/campaigns/nites/situation-denver-parks.md",
         "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
       },
       "assertions": [
         "first_response contains 'posture'",
         "first_response references entity-aware recommendation (e.g. 'brite-nites' maps to 'free-asset')",
-        "first_tool_calls does NOT contain Write of 'docs/campaigns/brite-nites/copy-*.json'",
+        "first_tool_calls does NOT contain Write of 'docs/campaigns/nites/copy-*.json'",
         "no JSON artifact emitted until operator confirms the posture"
       ]
     },
@@ -167,7 +167,7 @@
         "entity": "brite-nites",
         "vertical": "municipalities",
         "offer_tier": 2,
-        "situation_artifact_path": "docs/campaigns/brite-nites/situation-denver-parks.md",
+        "situation_artifact_path": "docs/campaigns/nites/situation-denver-parks.md",
         "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
       },
       "assertions": [
