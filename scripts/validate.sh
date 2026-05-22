@@ -208,6 +208,31 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b''' — flow-architecture built-criterion fixture vslice (BC-10730)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-built-criterion-fixture-vslice.sh —
+# asserts the synthetic-built-criterion-drift fixture matches the
+# operator-consumable BUILT criterion locked in flow-inventory-codebase-scan
+# SKILL.md § 6.1 and flow-inventory-add SKILL.md § 7. Defends against
+# rubric-content drift (catchphrase + structural-clause + negative-case greps)
+# and against the API-present-no-UI fixture shape regressing.
+section "2b'''. flow-architecture built-criterion fixture vslice (BC-10730)"
+
+fda_built_test="$REPO_ROOT/plugins/flow-architecture/tests/run-built-criterion-fixture-vslice.sh"
+
+if [ ! -f "$fda_built_test" ]; then
+  warn "plugins/flow-architecture/tests/run-built-criterion-fixture-vslice.sh not found — skipped"
+else
+  if fda_built_out=$(bash "$fda_built_test" 2>&1); then
+    fda_built_pass_count=$(printf '%s\n' "$fda_built_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture built-criterion fixture vslice (${fda_built_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture built-criterion fixture vslice failed — run plugins/flow-architecture/tests/run-built-criterion-fixture-vslice.sh for details"
+    printf '%s\n' "$fda_built_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a

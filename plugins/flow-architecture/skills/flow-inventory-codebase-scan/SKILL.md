@@ -103,12 +103,38 @@ Glob/Grep/Read over the Next.js App Router conventions:
 
 | Tag | Definition |
 |---|---|
-| `implemented` (check) | Code exists + tests exist + sandbox URL exists. |
-| `partially-implemented` (warning) | Code exists but incomplete (no tests OR no sandbox). |
+| `implemented` (check) | **Operator can consume through intended surface.** Code exists + tests exist + sandbox URL exists + a user-facing entry point (page / dialog / menu item / scheduled-job UI) routes to the underlying primitive. API existence alone does NOT satisfy this tag (see § 6.1). |
+| `partially-implemented` (warning) | Code exists but operator cannot consume it through the intended surface (API present but no UI consumer; UI exists but missing tests or sandbox; planned upgrade mislabelled as current). |
 | `missing-but-recommended` (X) | No code, but pattern catalog says the flow is expected for this app shape. |
-| `implemented-no-pattern-match` (question) | Code exists but doesn't match any pattern catalog entry --- novel flow specific to this product. |
+| `implemented-no-pattern-match` (question) | Code exists, operator-consumable, but doesn't match any pattern catalog entry --- novel flow specific to this product. |
 
 Tag is rendered in the **Notes column** (NOT in Status column, which stays blank per `master-flow-inventory.md:18` lock).
+
+### 6.1 BUILT criterion --- operator-consumable, not just API-callable (BC-10730)
+
+> **BUILT** = an operator can consume the sub-flow through its intended surface, not merely that the API is callable.
+
+A sub-flow is `implemented` (✓ BUILT) only when ALL of (a) code exists, (b) tests exist, (c) sandbox URL exists, AND (d) a user-facing entry point routes to the underlying primitive. Drop (d) and the row downgrades to `partially-implemented` (⚠ PARTIAL). The criterion is symmetric for the three other tags: `partially-implemented` includes the "API present, no UI" case; `missing-but-recommended` means no code in any surface; `implemented-no-pattern-match` still requires operator-consumability.
+
+**Worked examples** --- cite `docs/design-rationale/brand-hub-dogfood-findings.md` § Iter-3 cumulative outcome summary for the source evidence. Iter-3 fan-out across 9 Brand Hub domains surfaced 6 drift corrections in batches 1+2 and 0 in batch 3; the tightened criterion is the projection of that evidence onto the rubric.
+
+| Sub-flow | Inventory said | Actual surface | Correct tag |
+|---|---|---|---|
+| `asset-content-libraries-03` | ✓ BUILT | Anchor pointed at `CreativeToolsClient.tsx` (creative-tools library management, not request pipeline) | ✗ NOT BUILT |
+| `creative-operations-03` | ⚠ PARTIAL | No request-level kanban view exists | ✗ NOT BUILT |
+| `creative-operations-05` | ⚠ PARTIAL | Anchor pointed at `/api/approval/route.ts` (image-level approval, not request-level QC) | ✗ NOT BUILT |
+| `analytics-dashboard-01` | ✓ BUILT | API present at `/api/search-logs/dashboard`, no `.tsx` consumer | ⚠ PARTIAL |
+| `access-governance-01` | ✓ BUILT ("Clerk upgrade") | Actual code is Payload native auth + Google OAuth `beforeLogin` hook --- planned vs current state | ⚠ PARTIAL |
+| `access-governance-05` | ✓ BUILT ("Feature flags") | Actually image-flagging triage; Brand Hub has no feature-flag system | ⚠ PARTIAL |
+| `data-quality-migration` (6 sub-flows) | mixed ✓ / ⚠ | All anchors verified clean; CLI-only `-05` backfill flagged honestly as deliberate design | unchanged --- **reference clean inventory** |
+| `ops-hardening` (8 sub-flows) | 1 ✓ + 4 ⚠ + 3 ✗ | All anchors verified clean; Droidor-implemented placeholders honestly tagged ✗ NOT BUILT for Brand Hub team's role | unchanged --- **reference clean inventory** |
+
+**Phase 5 confirmation interview is load-bearing.** Auto-accept of priors (parking-lot #7, `--auto-accept-priors`) is **contraindicated** until the tightened criterion + scan produce inventories whose ✓ BUILT rows consistently survive Phase 5 review --- silent acceptance would have shipped the 6 wrong rows above. Re-evaluation trigger: when the next 10-domain-scale fan-out drops the drift-correction rate to ~0 with this criterion in place, re-open parking-lot #7.
+
+**Cross-references.**
+
+- `skills/flow-inventory-add/SKILL.md` § 7 mirrors this criterion into the incremental-add path (the path where drift accumulates one row at a time without a Phase 5 wholesale-confirmation safety net).
+- `tests/fixtures/synthetic-built-criterion-drift/` --- worked-example fixture mirroring `analytics-dashboard-01`'s API-present-no-UI shape. Exercised by `tests/run-built-criterion-fixture-vslice.sh`.
 
 ### Value-priority
 

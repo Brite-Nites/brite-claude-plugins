@@ -11,6 +11,7 @@ their fixtures.
 | `run-greenfield-vslice.sh` (BC-7057) | bash v-slice | Phase 1 surface against `fixtures/synthetic-greenfield/`. CI advisory job `vslice-greenfield`. |
 | `run-inventory-only-rescaffold-vslice.sh` (BC-9971) | bash v-slice | Four-outcome classifier (`absent` / `inventory-only` / `journey-exists` / `fully-scaffolded-fs`) against `fixtures/synthetic-inventory-only-domain/` + sibling fixtures. Schema updated to Q20 amendment 2 (BC-10352) on 2026-05-22. |
 | `run-audit-smoke.sh` (BC-7059) | bash smoke | `/flow:audit` phase A/B/C smoke against `fixtures/audit-clean-shape/` + `fixtures/audit-broken-shape/`. |
+| `run-built-criterion-fixture-vslice.sh` (BC-10730) | bash v-slice | Operator-consumable BUILT criterion against `fixtures/synthetic-built-criterion-drift/`. Locks the rubric tightening in `flow-inventory-codebase-scan/SKILL.md` § 6.1 + `flow-inventory-add/SKILL.md` § 7. Section 4 uses a triad of catchphrase + structural-clause + negative-case greps against both SKILL.md files to defend against rubric-gutting edits. Wired into `scripts/validate.sh` Section 2b'''. |
 | `run-mode-classifier-eval.sh` (BC-7059) | bash eval | Mode-classifier evaluation against `fixtures/mode-classifier-eval.json`. |
 | `test-clone-drift.sh` (BC-7060) | bash regression | `scripts/check-clone-drift.sh` three-path classifier (match / trivial / substantive). |
 | `fixtures/` | dir | Synthetic project shapes + JSON eval datasets. |

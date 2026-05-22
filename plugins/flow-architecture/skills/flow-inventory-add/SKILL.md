@@ -155,7 +155,30 @@ Inventory-read is a pure read — no Q20.6 gate fires inside the skill. The call
 
 ---
 
-## 7. Downstream regen trigger (Q20.7)
+## 7. Status-tag selection --- operator-consumable criterion (BC-10730)
+
+`sub-flow-add` mode prompts the user for the `notes_or_status_tag` field of the new row. Apply the same operator-consumable criterion that `flow-inventory-codebase-scan` § 6.1 locks (canonical rubric lives there; this section restates it so the incremental-add path is self-contained).
+
+> **BUILT** = an operator can consume the sub-flow through its intended surface, not merely that the API is callable.
+
+A sub-flow is ✓ BUILT only when code exists, tests exist, sandbox URL exists, AND a user-facing entry point (page / dialog / menu item / scheduled-job UI) routes to the underlying primitive. API existence alone downgrades the row to ⚠ PARTIAL. ✗ NOT BUILT covers no-code rows.
+
+**Why this matters here.** Incremental-add is the path where drift accumulates **one row at a time** --- there is no Phase 5 wholesale-confirmation gate covering the full inventory (Q20.6 confirms a single row, not a domain-wide review). The criterion has to be applied at row-write time; the only safety net downstream of this skill is the operator's eye on a single row's `notes_or_status_tag`.
+
+Apply by mode:
+
+- **`sub-flow-add`**: the within-skill `AskUserQuestion` (§ 6) renders the proposed row; the operator should classify the row against the criterion before approving. The skill does not auto-classify; an autoclassifier is a parking-lot candidate.
+- **`domain-add`**: Phases 1+4+5 of the Q19-mini interview apply the criterion across all rows in the new domain at Phase 4 synthesis (same shape as the codebase-scan rubric).
+- **`inventory-read`**: read-only mode --- the criterion is not applied (no write occurs); the caller may surface the existing `notes_or_status_tag` value to downstream tooling unchanged.
+
+**Cross-references.**
+
+- `skills/flow-inventory-codebase-scan/SKILL.md` § 6.1 --- canonical worked-examples table (6 iter-3 dirty cases + 2 clean references).
+- `tests/fixtures/synthetic-built-criterion-drift/` --- shared fixture exercising the criterion against an API-present-no-UI sub-flow.
+
+---
+
+## 8. Downstream regen trigger (Q20.7)
 
 Q20 ends at the master-inventory edit. Per Q18's v1 surface, the `flow-regen-index` skill is auto-invoked at the END of `/flow:add-domain` and `/flow:add-sub-flow` — that's the **orchestrator's** responsibility, not this skill's.
 
