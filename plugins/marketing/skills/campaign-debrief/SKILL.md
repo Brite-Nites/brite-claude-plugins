@@ -284,6 +284,101 @@ This skill owns the **Campaign Verdict** (Gate 3, post-campaign — `SCALE` / `I
 
 ---
 
+## Discoveries — icp-refinement / offer-retirement / persona-discovery signals
+
+The post-campaign retro is the single richest moment for surfacing handbook-canonicals drift: ICP rules that no longer fit, offers that have aged out of the lineup, and entirely new personas that the campaign exposed. This skill emits three discovery categories to `docs/campaigns/{entity}/{slug}/discoveries.json` (per Phase 2 architectural pivot) so BC-8726 (`/marketing:icp-refinement-review`) and humans can later promote them to handbook canonicals + prose via PR. See [`plugins/marketing/references/discoveries-promotion.md`](../../references/discoveries-promotion.md) for the full signal → review → handbook PR flow; the schema lives at [`plugins/marketing/data/discoveries-schema.json`](../../data/discoveries-schema.json) and is enforced by `plugins/marketing/scripts/lint_discoveries.py` (wired into `scripts/validate.sh`).
+
+The list-building skill emits the fourth category (`title-discovery`) at contact-discovery time; the campaign-debrief skill owns the post-campaign three.
+
+**Common 2-call confirm gate.** All three categories use the same pattern: the skill surfaces the candidate via `AskUserQuestion` (1st call), and on `Yes` it `Read`s `docs/campaigns/{entity}/{slug}/discoveries.json` (file-not-found branches to a fresh `{schema_version: 1, signals: []}` shape), appends a single signal to `signals[]`, and `Write`s the file back (2nd call). Per-category payload shapes are spelled out below; `payload` is held open at the schema layer (`type: object`) so downstream consumers can evolve per category. `promotion_status` defaults to `"pending"` at emit time.
+
+The discovery-emission gates run **after** the learnings.md append (Workflow 4 Step 4) and **before** Procedure 3 (Transferable-insight cross-entity propagation) — discoveries are operationally distinct from the cross-entity propagation flow: discoveries route to handbook-canonicals refinement; Procedure 3 routes to `docs/marketing-context.md`. The two flows can both fire on the same debrief.
+
+### Category 1 — icp-refinement
+
+**When to emit.** The campaign's actual responders diverge from the segment / firmographic profile the ICP-template targeted. Examples: targeted "facility directors at 50k+ enrolment universities" but the responders were almost exclusively "ops directors at 10-30k enrolment" (firmographic mismatch); the persona slug + titles match canon but Reply Rate splits sharply along a sub-segment the ICP doesn't carve (e.g., Catholic vs. secular hospitals, or coastal vs. interior resorts).
+
+**Payload shape.**
+
+```jsonc
+{
+  "category": "icp-refinement",
+  "emitted_at": "<ISO-8601 datetime>",
+  "emitted_by_skill": "campaign-debrief",
+  "payload": {
+    "vertical": "<vertical-slug from #vertical/ tag>",
+    "persona": "<persona-slug from #persona/ tag>",
+    "current_icp_summary": "<one-line description of the ICP template the campaign used>",
+    "observed_pattern": "<one-line description of who actually responded / converted>",
+    "evidence_metric": "<numeric backing — e.g. 'Reply Rate 1.9% on N=480 sub-segment vs 0.4% on N=720 non-sub-segment'>",
+    "refinement_proposal": "<short prose — operator's proposed ICP carve, e.g. 'split persona into hoa-board-president-active-amenity vs hoa-board-president-passive-amenity'>"
+  },
+  "promotion_status": "pending"
+}
+```
+
+**Gate prompt.** "This campaign's responders diverged from the ICP template (`{summary}`). Log an `icp-refinement` signal for handbook review?" Options: `Yes, log refinement proposal` / `No, skip — within ICP noise` / `No, defer — need more campaigns before refining`.
+
+### Category 2 — offer-retirement
+
+**When to emit.** The campaign's offer earned a `KILL` campaign verdict, AND the same offer has earned `KILL` or `PAUSE` in at least one prior debrief on `docs/campaigns/{entity}/learnings.md` (cross-run pattern, not single-run noise). The signal recommends moving the offer from `status: active` to `status: retired` in `plugins/marketing/data/canonicals/{vertical}.yaml`.
+
+**Payload shape.**
+
+```jsonc
+{
+  "category": "offer-retirement",
+  "emitted_at": "<ISO-8601 datetime>",
+  "emitted_by_skill": "campaign-debrief",
+  "payload": {
+    "vertical": "<vertical-slug>",
+    "offer_slug": "<offer-slug from canonicals/{vertical}.yaml>",
+    "kill_count": <integer — count of KILL verdicts across learnings.md entries for this offer>,
+    "pause_count": <integer — count of PAUSE verdicts across learnings.md entries for this offer>,
+    "last_kill_at": "<YYYY-MM-DD — debrief_at of the most recent KILL>",
+    "recommended_replacement": "<optional offer-slug to set on canonicals replaced_by:; omit when no successor is ready>",
+    "rationale": "<one-line summary — e.g. 'asymmetric-anchor angle stalled; venue-partnerships pivot replaces value capture'>"
+  },
+  "promotion_status": "pending"
+}
+```
+
+**Gate prompt.** "Offer `{offer_slug}` has earned KILL on this debrief and {kill_count - 1} prior KILL(s) + {pause_count} PAUSE(s) on `docs/campaigns/{entity}/learnings.md`. Log an `offer-retirement` signal recommending `status: retired` for the handbook canonicals PR?" Options: `Yes, log retirement proposal` / `Yes, log with a proposed replacement (operator fills it in)` / `No, keep active — this run was an outlier`.
+
+### Category 3 — persona-discovery
+
+**When to emit.** The campaign exposed a buying contact whose title and decision authority do not fit any persona currently in `plugins/marketing/data/canonicals/{vertical}.yaml` for the vertical — and the pattern is not a title-discovery (which would be list-building's category, handling title aliases inside an existing persona). The signal proposes adding a NEW persona to canonicals.
+
+**When NOT to emit.** If the new title belongs inside an existing persona's `titles[]` array (e.g., "Director of Event Operations" added to an existing `venue-operations-manager` persona), that's a `title-discovery` signal at list-building time, not a `persona-discovery` here. Only emit `persona-discovery` when the decision authority is structurally different (e.g., a CFO-tier signoff layer that wasn't represented in any existing persona for the vertical).
+
+**Payload shape.**
+
+```jsonc
+{
+  "category": "persona-discovery",
+  "emitted_at": "<ISO-8601 datetime>",
+  "emitted_by_skill": "campaign-debrief",
+  "payload": {
+    "vertical": "<vertical-slug>",
+    "proposed_persona_slug": "<kebab-case slug for the new persona>",
+    "proposed_display_name": "<human-readable display name>",
+    "observed_titles": ["<title-1>", "<title-2>"],
+    "decision_authority": "<one-line description of what this persona controls — e.g. 'capex sign-off for installations >$50k'>",
+    "evidence_metric": "<numeric backing — e.g. 'Opportunity attribution: 3 of 4 Closed Won this cycle attributed to contacts in this role'>",
+    "differs_from_existing": "<one-line — name the closest existing persona and explain why this one isn't a sub-role of it>"
+  },
+  "promotion_status": "pending"
+}
+```
+
+**Gate prompt.** "This debrief surfaced a buying role that doesn't map to any persona in `canonicals/{vertical}.yaml` (`{proposed_display_name}` — controls `{decision_authority}`). Log a `persona-discovery` signal for handbook review?" Options: `Yes, log new persona proposal` / `No — this is a title variant of an existing persona (route to list-building's title-discovery instead)` / `No, skip — insufficient data`.
+
+### Where these signals land
+
+All three categories collect in the per-campaign-run `discoveries.json` under `docs/campaigns/{entity}/{slug}/`. Downstream, BC-8726 (`/marketing:icp-refinement-review`) reads signals across runs by category, groups them per `{vertical}/{persona}`, surfaces them as PR candidates, and produces the handbook-canonicals PR. Until BC-8726 ships, signals accumulate in `pending` status; the discoveries-promotion reference doc carries the full lifecycle.
+
+---
+
 ## MCP Tool Reference
 
 "When you need to X, call `tool_name`." Grouped by workflow, not by server. All calls are reads except the final learnings.md `Write` — no MCP confirmation gates apply to this skill.

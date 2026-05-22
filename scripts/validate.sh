@@ -1238,6 +1238,59 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a' — GTM Discoveries Lint (BC-8722)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/lint_discoveries.py against the empty-OK
+# campaigns tree + the regression harness against an isolated tmpdir per
+# scenario. The lint is empty-tolerant by contract — BC-8722 is the first
+# ship that introduces the schema; per-campaign-run artifacts arrive later.
+#
+# TODO: when a 2nd consumer of discoveries.json emerges, generalize this
+# section alongside the Section 15a canonicals TODO (line 1167).
+# ══════════════════════════════════════════════════════════════════════
+section "GTM Discoveries Lint"
+
+discoveries_lint="$REPO_ROOT/plugins/marketing/scripts/lint_discoveries.py"
+campaigns_dir="$REPO_ROOT/docs/campaigns"
+discoveries_tests="$REPO_ROOT/scripts/test_lint_discoveries.sh"
+
+if [ ! -f "$discoveries_lint" ]; then
+  warn "lint_discoveries.py not found — discoveries lint skipped"
+else
+  if discoveries_output=$(python3 "$discoveries_lint" --campaigns-dir "$campaigns_dir" 2>&1); then
+    # Success output is single-line by contract (either "Discoveries lint OK
+    # — N file(s) validated." or "Discoveries lint OK — no discoveries.json
+    # files found ...").
+    pass "$discoveries_output"
+  else
+    fail "Discoveries lint failed:"
+    while IFS= read -r line; do
+      [ -n "$line" ] && printf "          %s\n" "$line"
+    done <<< "$discoveries_output"
+  fi
+
+  if [ -f "$discoveries_tests" ]; then
+    if disc_tests_output=$(bash "$discoveries_tests" "$discoveries_lint" 2>&1); then
+      # Parse the harness's machine-readable RESULT line so the count stays
+      # in sync as scenarios are added/removed (matches Section 2c + 15a).
+      disc_tests_pass=$(printf '%s\n' "$disc_tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+      if [ -n "$disc_tests_pass" ]; then
+        pass "lint_discoveries regression harness — $disc_tests_pass scenarios"
+      else
+        pass "lint_discoveries regression harness — passed (count unparsed)"
+      fi
+    else
+      fail "Discoveries lint regression harness failed:"
+      while IFS= read -r line; do
+        [ -n "$line" ] && printf "          %s\n" "$line"
+      done <<< "$disc_tests_output"
+    fi
+  else
+    warn "test_lint_discoveries.sh not found — regression harness skipped"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"
