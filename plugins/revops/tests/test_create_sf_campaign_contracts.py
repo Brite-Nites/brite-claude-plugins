@@ -18,6 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMAND_PATH = ROOT / "commands" / "create-sf-campaign.md"
+SIBLING_COMMAND_PATH = ROOT / "commands" / "update-sf-campaign-status.md"
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 
@@ -81,13 +82,17 @@ def test_all_required_input_flags_documented() -> None:
 
 def test_all_soft_fail_error_keys_present() -> None:
     """Soft-fail contract per BC-8724 design — orchestrators detect failure by
-    parsing the `error` key, not by exit code. All 5 documented error paths
+    parsing the `error` key, not by exit code. All 6 documented error paths
     must appear verbatim in the command body so the contract is auditable.
+
+    BC-10511 added `invalid_target_org` as the 6th key (sibling parity with
+    `/revops:update-sf-campaign-status` per ADR-015 amendment).
     """
     body = read_command()
     error_keys = [
         "missing_required_flag",
         "invalid_slug_format",
+        "invalid_target_org",
         "duplicate_slug",
         "missing_owner",
         "sf_cli_error",
