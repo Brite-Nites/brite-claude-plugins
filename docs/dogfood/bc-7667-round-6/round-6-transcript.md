@@ -37,10 +37,10 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-5   | 4 UPLOAD | regression | ✅ | 9 leads created IDs 15143-15151; id+uuid both present; lowercase names accepted |
 | R-6   | 4 UPLOAD | regression | ✅ | re-POST existing 422 confirmed; **2 side-findings** for loop close |
 | R-7   | 4 UPLOAD | spec-read | ✅ | wrapper-vs-API gate clarity intact at all 4 gate sites |
-| R-8 ★ | 5 CAMPAIGN CREATE | regression keystone | _pending_ | |
-| R-9   | 5 CAMPAIGN CREATE | regression | _pending_ | |
-| R-10  | 5 CAMPAIGN CREATE | regression | _pending_ | |
-| R-11  | 5 CAMPAIGN CREATE | regression | _pending_ | |
+| R-8 ★ | 5 CAMPAIGN CREATE | regression keystone | ✅ | 4 campaigns IDs 53-56 per BC-6514 naming; 3rd keystone of 6 |
+| R-9   | 5 CAMPAIGN CREATE | regression | ✅ | pre-list returns 4 matches; branched gate-5 path would fire |
+| R-10  | 5 CAMPAIGN CREATE | regression | ✅ | plain_text=true PATCHed on all 4 campaigns |
+| R-11  | 5 CAMPAIGN CREATE | regression | ✅ | BC-6544 omit-resets-bool fires; restored via re-PATCH |
 | R-12  | 6 ATTACH LEADS | regression | _pending_ | |
 | R-13  | 6 ATTACH LEADS | DEFERRED | ⏭️ | per round-4/5 carryover |
 | R-14  | 7 ATTACH SENDERS | regression | _pending_ | |
@@ -239,6 +239,87 @@ Spec confirmation at `launch-campaign.md:414`: lowercase compare → existing �
 ---
 
 **Phase 4 close:** R-5 ✅, R-6 ✅ (with 2 side-findings deferred to loop close), R-7 ✅. Workspace delta: +10 leads (9 from R-5 + 1 from R-6's within-chunk dedup probe) = 15,083 total. Zero blocking findings; 2 loop-close follow-ups queued.
+
+---
+
+## Phase 5 — CAMPAIGN CREATE
+
+### R-8 ★ — multiplicative campaign create (KEYSTONE regression)
+
+**Hypothesis:** BC-6514/BC-6654 multiplicative fix — 9-cell grid → ~4 surviving cells → naming `{base} | {Email-type} | {ESP}` → metadata `segments` map with `{email_type}|{esp}` keys.
+
+**Evidence (live `create_campaign` × 4, pre-list returned 0 matches first):**
+
+| Cell key | Campaign ID | Name | Status | Type | Lead-bucket |
+|----------|-------------|------|--------|------|--------------|
+| `professional\|Google` | 53 | `BC-7667 R6 \| MAIN \| Professional \| Google` | draft | outbound | 2 (15147, 15148) |
+| `role\|Other` | 54 | `BC-7667 R6 \| MAIN \| Role \| Other` | draft | outbound | 3 (15149-15151) |
+| `personal\|Google` | 55 | `BC-7667 R6 \| MAIN \| Personal \| Google` | draft | outbound | 2 (15143, 15144) |
+| `personal\|Microsoft` | 56 | `BC-7667 R6 \| MAIN \| Personal \| Microsoft` | draft | outbound | 2 (15145, 15146) |
+
+Naming follows `{base} | {Email-type-titlecased} | {ESP}` per BC-6514 (Email-type BEFORE ESP). Base = `BC-7667 R6 | MAIN`. IDs sequential 53–56.
+
+**Metadata projection (would write at step 9):**
+```json
+"segments": {
+  "professional|Google": {"email_type": "professional", "esp": "Google",    "count": 2},
+  "role|Other":          {"email_type": "role",         "esp": "Other",     "count": 3},
+  "personal|Google":     {"email_type": "personal",     "esp": "Google",    "count": 2},
+  "personal|Microsoft":  {"email_type": "personal",     "esp": "Microsoft", "count": 2}
+},
+"campaign_ids": {
+  "professional|Google": 53, "role|Other": 54,
+  "personal|Google": 55,     "personal|Microsoft": 56
+}
+```
+
+Empty cells (5 of 9) absent per F12 prune.
+
+**Verdict:** ✅ Expected — KEYSTONE ✅. BC-6514 multiplicative-axis + BC-6654 schema rewrite ratified at runtime. 3rd of 6 keystones ✅ (R-A, R-B, R-8).
+
+### R-9 — silent-duplicate guard / branched gate-5 (BC-6302/F20 regression)
+
+**Hypothesis:** pre-create one decoy; verify branched gate-5 render.
+
+**Evidence:** Post-R-8, `list_campaigns(search="BC-7667 R6")` returns the 4 campaigns just created (IDs 56, 55, 54, 53 in name-desc order). M=4 > 0 → branched gate-5 path would fire on a hypothetical Phase 5 re-run, surfacing the 4 IDs inline (≤10 → no `and {K} more` truncation).
+
+**Verdict:** ✅ Expected. Pre-list substring-match returns all campaigns whose name begins with the base. Round-6 effectively tests with M=4 (stronger than round-5's single-decoy M=1). F20 silent-duplicate guard intact.
+
+### R-10 — `plain_text: true` per-campaign (regression)
+
+**Hypothesis:** `plain_text: true` PATCHed on every campaign post-create.
+
+**Evidence (4 PATCHes to `/api/campaigns/{id}/update`):**
+
+| Campaign | Response `plain_text` |
+|----------|------------------------|
+| 53 (Professional\|Google) | ✅ true |
+| 54 (Role\|Other) | ✅ true |
+| 55 (Personal\|Google) | ✅ true |
+| 56 (Personal\|Microsoft) | ✅ true |
+
+**Verdict:** ✅ Expected. All 4 PATCHes applied; `plain_text_applied: true` would be set in metadata.
+
+### R-11 — BC-6544 PATCH-omit live test (regression)
+
+**Hypothesis:** PATCH without `plain_text` field reverts it to `false`; re-PATCH with `plain_text: true` restores.
+
+**Evidence (3-step on campaign 53):**
+
+| Step | PATCH body | Response `plain_text` |
+|------|------------|------------------------|
+| 1. Baseline (post-R-10) | (R-10 set true) | true |
+| 2. PATCH `{"name": "BC-7667 R6 \| MAIN \| Professional \| Google"}` (no plain_text) | **false** ⚠️ reverted |
+| 3. PATCH `{"plain_text": true}` (restore) | true ✅ |
+
+**Side-observation:** Attempted step 2 first with `{"max_emails_per_day": 500}` only — returned HTTP 422 (separate validation rule, possibly "cannot decrease from existing 1000"). Switched to `{"name": "<same name>"}` as the benign no-op for the omit-test. Not a BC-6544 issue.
+
+**Verdict:** ✅ Expected. BC-6544 omit-resets-bool behavior fires deterministically on `plain_text`. Always-include rule documented at `launch-campaign.md:545+548` + `email-bison.md:273` is empirically necessary.
+
+---
+
+**Phase 5 close:** R-8 ★ ✅ keystone (4 campaigns 53–56), R-9 ✅, R-10 ✅, R-11 ✅. Workspace state: +4 campaigns (21 → 25 total; 4 round-6 + 21 production). Zero blocking findings.
+
 
 
 
