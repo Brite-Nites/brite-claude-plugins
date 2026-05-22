@@ -184,6 +184,30 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b'' — flow-architecture verify-docs ecosystem vslice (BC-11029, Q58)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-verify-docs-ecosystem-vslice.sh —
+# asserts the 10 template files under plugins/flow-architecture/templates/
+# exist with required preamble, no brite-roster/brite-nites string leaks
+# into templates, and no <PLACEHOLDER> strings appear outside templates/.
+# See Q58 § Sub-decision 1 for the schema-discipline contract.
+section "2b''. flow-architecture verify-docs ecosystem vslice (BC-11029, Q58)"
+
+fda_ecosystem_test="$REPO_ROOT/plugins/flow-architecture/tests/run-verify-docs-ecosystem-vslice.sh"
+
+if [ ! -f "$fda_ecosystem_test" ]; then
+  warn "plugins/flow-architecture/tests/run-verify-docs-ecosystem-vslice.sh not found — skipped"
+else
+  if fda_ecosystem_out=$(bash "$fda_ecosystem_test" 2>&1); then
+    fda_ecosystem_pass_count=$(printf '%s\n' "$fda_ecosystem_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture verify-docs ecosystem vslice (${fda_ecosystem_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture verify-docs ecosystem vslice failed — run plugins/flow-architecture/tests/run-verify-docs-ecosystem-vslice.sh for details"
+    printf '%s\n' "$fda_ecosystem_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a

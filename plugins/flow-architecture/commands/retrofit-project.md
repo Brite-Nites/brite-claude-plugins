@@ -253,6 +253,57 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
 - `INVENTORY_EXISTS`, `FLOWS_DIR_EXISTS`, `BREADCRUMB_EXISTS`
 - `GH_AUTH`, `LINEAR_MCP` (orchestrator already probed Linear in flow-preflight Section 1.1)
 
+**Templates scaffold (BC-11029, Q58):** after `.flow/config.json` is written and the 10 fields are captured, but BEFORE the Phase 1 terminal breadcrumb write, the orchestrator copies the project-side verify-docs.sh ecosystem from `$CLAUDE_PLUGIN_ROOT/templates/scripts/` into the consumer project's `scripts/` directory and sed-substitutes the 4 placeholders. Q58 locks the canonical source + substitution flow.
+
+1. **Resolve LINEAR_ORG_SLUG.** Call `mcp__plugin_workflows_linear-server__get_project({id: <LINEAR_PROJECT_ID>})` and parse `LINEAR_ORG_SLUG` from the `url` field (`https://linear.app/<slug>/project/...`). Treat the parsed slug as data — never interpolate into a shell expression; only the literal slug crosses into `sed -e` arguments via discrete `-e "s|<LINEAR_ORG_SLUG>|$SLUG|g"` invocations (the MCP response is the trust boundary).
+
+2. **Determine the 9 template-source → target-path pairs:**
+
+   | Template source | Target path in project |
+   |---|---|
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/verify-docs.sh` | `$REPO_ROOT/scripts/verify-docs.sh` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/regenerate-flow-index.sh` | `$REPO_ROOT/scripts/regenerate-flow-index.sh` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/regenerate-flow-index.mts` | `$REPO_ROOT/scripts/regenerate-flow-index.mts` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/verify-linear-references.mts` | `$REPO_ROOT/scripts/verify-linear-references.mts` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/normalize-fda-frontmatter.mjs` | `$REPO_ROOT/scripts/normalize-fda-frontmatter.mjs` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/lib/fda-title.mts` | `$REPO_ROOT/scripts/lib/fda-title.mts` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/scripts/lib/linear-graphql.mts` | `$REPO_ROOT/scripts/lib/linear-graphql.mts` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/.flow/scaffold-log/SCHEMA.md` | `$REPO_ROOT/.flow/scaffold-log/SCHEMA.md` |
+   | `$CLAUDE_PLUGIN_ROOT/templates/README.md` | `$REPO_ROOT/scripts/FDA-TEMPLATES-README.md` |
+
+   The `.flow/config.json` template is schema-reference only and is NOT copied — `flow-preflight` Section 4.4 owns the runtime `.flow/config.json` write per Q12.4 lock.
+
+3. **Idempotency check** (default behavior — no `--overwrite-scripts`): probe each of the 9 target paths via `test -f`. If ANY exists, surface the conflict list and HALT Phase 1 with: `"Templates already present in project (paths listed) — re-run with --overwrite-scripts to replace."`. Fail-closed per Q36.5; do NOT write the breadcrumb (Phase 1 has not completed).
+
+4. **Copy + substitute + chmod** (per-file loop): for each source/target pair, `cp` the file, then run sed substitution on the target with these 4 placeholder mappings:
+
+   | Placeholder | Value source |
+   |---|---|
+   | `<LINEAR_PROJECT_ID>` | captured `LINEAR_PROJECT_ID` |
+   | `<LINEAR_ORG_SLUG>` | parsed from `get_project` `url` (step 1) |
+   | `<PROJECT_NAME>` | captured `LINEAR_PROJECT_NAME` |
+   | `<EXPECTED_FDA_ISSUE_COUNT>` | literal `0` (count gate disabled by default; consumer opts in by editing) |
+
+   Substitution recipe (BSD-portable form — works on macOS default `sed`):
+   ```bash
+   for tgt in "${TARGET_PATHS[@]}"; do
+     sed -i '' \
+       -e "s|<LINEAR_PROJECT_ID>|$LINEAR_PROJECT_ID|g" \
+       -e "s|<LINEAR_ORG_SLUG>|$LINEAR_ORG_SLUG|g" \
+       -e "s|<PROJECT_NAME>|$LINEAR_PROJECT_NAME|g" \
+       -e "s|<EXPECTED_FDA_ISSUE_COUNT>|0|g" \
+       "$tgt"
+   done
+   ```
+
+   Then `chmod +x` on the two `.sh` files (`verify-docs.sh` + `regenerate-flow-index.sh`). The `mjs` + `mts` files are invoked via `npx tsx` and don't require the executable bit.
+
+5. **Emit confirmation line:** `"Templates scaffolded: 9 files written under scripts/ + .flow/scaffold-log/. Run \`bash scripts/verify-docs.sh --no-linear\` to verify."`
+
+**`--overwrite-scripts` flag.** Orchestrator-level flag; default off. When set, step 3's idempotency check is bypassed and step 4 runs unconditionally — every target path is overwritten with the freshly-substituted template. Use this when consumer's `scripts/verify-docs.sh` has fallen out of sync with the canonical template and the consumer wants the latest. Hand-edits in target files are LOST when this flag is set — there is no per-file diff prompt. Re-runs without the flag preserve existing copies.
+
+**Failure semantics (templates scaffold):** any failure in steps 1-4 aborts Phase 1 before the terminal breadcrumb write. Partial scaffold (some files copied, others not) leaves the consumer in a state where the next retrofit re-run will halt on the idempotency check — the consumer must `rm` the partially-copied files OR pass `--overwrite-scripts` to recover. No silent partial state.
+
 **Initial breadcrumb write:** at end of Phase 1, write the breadcrumb with `run_started_at` (ISO-8601 now), `current_phase: 2` **always** (the Phase 2 path — executed OR no-op skip — is responsible for advancing `current_phase` to 3; advancing here would open a crash-resume inconsistency window where the breadcrumb claims Phase 3 while `completed_phases` lacks "2"), `completed_phases: ["1"]`, `status: in_flight`, empty `domains: []`.
 
 The helper script `flow-resume-breadcrumb.sh write <state-path> <input-path>` reads the full JSON document from `<input-path>` (per BC-6956 contract as amended by BC-9027; it does not take `--mode` / `--current-phase` / `--status` flags and no longer reads from stdin). Construct the JSON via python3 (stdlib only per Q32), redirect into a `mktemp` file, then call the helper with both paths:
