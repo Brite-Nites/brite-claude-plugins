@@ -15,7 +15,7 @@
         "mocked_marketing_context": "docs/marketing-context.md present with entity=brite-nites"
       },
       "assertions": [
-        "output artifact file written to path matching 'docs/campaigns/brite-(nites|labs)/copy-*.json'",
+        "output artifact file written to path matching 'docs/campaigns/(nites|labs)/copy-*.json' (short-form canonical per BC-8719)",
         "output.template_preset == 'list-building'",
         "output.vertical == 'municipalities'",
         "output.offer_posture == 'free-asset'",
