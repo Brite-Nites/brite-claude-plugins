@@ -39,6 +39,7 @@
 #   Y  valid baseline with date-only emitted_at (YYYY-MM-DD)        expect 0
 #   Z  empty signals array on valid file                            expect 0
 #   AA all 4 categories in one file (locked enum coverage)          expect 0
+#   AB schema-vs-lint-constants drift (6 invariants)                expect 0
 #
 # Usage:
 #   bash scripts/test_lint_discoveries.sh
@@ -573,6 +574,97 @@ run_aa() {
 }' >/dev/null
   invoke_lint_dir "$dir"
   assert_exit_and_substring "AA: all 4 categories" 0 "Discoveries lint OK — 1 discoveries.json"
+}
+
+# ── Scenario AB: schema-vs-lint-constants drift detection ───────────────
+# The lint mirrors the schema's additionalProperties:false allowlists +
+# required arrays + enums via module-level frozensets. This scenario asserts
+# they stay in sync — the single highest-value invariant for the lint's
+# correctness over time. Reviewer-flagged (PR #355 R1 P3).
+run_ab() {
+  local schema_path
+  schema_path="$script_dir/../plugins/marketing/data/discoveries-schema.json"
+  if [ ! -f "$schema_path" ]; then
+    echo "  FAIL  AB: schema-vs-lint-constants drift — schema not found at $schema_path"
+    fail=$((fail + 1))
+    return
+  fi
+  LAST_OUTPUT="$(SCHEMA_PATH="$schema_path" LINT_PATH="$LINT" python3 << 'PYEOF'
+import importlib.util
+import json
+import os
+import sys
+
+schema_path = os.environ["SCHEMA_PATH"]
+lint_path = os.environ["LINT_PATH"]
+
+with open(schema_path) as f:
+    schema = json.load(f)
+
+spec = importlib.util.spec_from_file_location("lint_discoveries", lint_path)
+lint = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(lint)
+
+errors = []
+
+# 1. SCHEMA_VERSION must match the schema const declaration.
+schema_version_const = schema["properties"]["schema_version"]["const"]
+if lint.SCHEMA_VERSION != schema_version_const:
+    errors.append(
+        f"SCHEMA_VERSION mismatch: lint={lint.SCHEMA_VERSION} schema={schema_version_const}"
+    )
+
+# 2. TOP_LEVEL_KEYS must match schema.properties (additionalProperties:false allowlist).
+schema_top = set(schema["properties"].keys())
+lint_top = set(lint.TOP_LEVEL_KEYS)
+if lint_top != schema_top:
+    errors.append(
+        f"TOP_LEVEL_KEYS mismatch: lint={sorted(lint_top)} schema={sorted(schema_top)}"
+    )
+
+# 3. SIGNAL_KEYS must match definitions.signal.properties (allowlist).
+signal_def = schema["definitions"]["signal"]
+schema_signal = set(signal_def["properties"].keys())
+lint_signal = set(lint.SIGNAL_KEYS)
+if lint_signal != schema_signal:
+    errors.append(
+        f"SIGNAL_KEYS mismatch: lint={sorted(lint_signal)} schema={sorted(schema_signal)}"
+    )
+
+# 4. SIGNAL_REQUIRED must match definitions.signal.required.
+schema_required = set(signal_def["required"])
+lint_required = set(lint.SIGNAL_REQUIRED)
+if lint_required != schema_required:
+    errors.append(
+        f"SIGNAL_REQUIRED mismatch: lint={sorted(lint_required)} schema={sorted(schema_required)}"
+    )
+
+# 5. ALLOWED_CATEGORIES must match definitions.signal.properties.category.enum.
+schema_categories = set(signal_def["properties"]["category"]["enum"])
+lint_categories = set(lint.ALLOWED_CATEGORIES)
+if lint_categories != schema_categories:
+    errors.append(
+        f"ALLOWED_CATEGORIES mismatch: lint={sorted(lint_categories)} schema={sorted(schema_categories)}"
+    )
+
+# 6. ALLOWED_PROMOTION_STATUS must match definitions.signal.properties.promotion_status.enum.
+schema_status = set(signal_def["properties"]["promotion_status"]["enum"])
+lint_status = set(lint.ALLOWED_PROMOTION_STATUS)
+if lint_status != schema_status:
+    errors.append(
+        f"ALLOWED_PROMOTION_STATUS mismatch: lint={sorted(lint_status)} schema={sorted(schema_status)}"
+    )
+
+if errors:
+    print("DRIFT detected:")
+    for e in errors:
+        print(f"  {e}")
+    sys.exit(1)
+print("CLEAN: lint constants match schema (6 invariants checked)")
+PYEOF
+)"
+  LAST_RC=$?
+  assert_exit_and_substring "AB: schema-vs-lint-constants drift" 0 "CLEAN: lint constants match schema"
 }
 
 # ── Run all scenarios ────────────────────────────────────────────────────

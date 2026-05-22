@@ -1238,7 +1238,7 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 15a' — GTM Discoveries Lint (BC-8722)
+# Section 15a-discoveries — GTM Discoveries Lint (BC-8722)
 # ──────────────────────────────────────────────────────────────────────
 # Runs plugins/marketing/scripts/lint_discoveries.py against the empty-OK
 # campaigns tree + the regression harness against an isolated tmpdir per

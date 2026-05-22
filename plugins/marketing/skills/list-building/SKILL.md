@@ -188,7 +188,7 @@ Emit a `title-discovery` signal when ALL three conditions hold for a contact-dis
 
 Do NOT emit a signal for: simple alias variations the title-normalization layer should catch (`VP of Marketing` ↔ `VP Marketing`); titles inside an already-active canonical alias chain; or single occurrences that read as one-off labelling quirks.
 
-### 2-call confirm gate
+### Confirm gate (one `AskUserQuestion` + one `Write`)
 
 The emit path is operator-confirmed, never automatic. Mirror the gate `campaign-debrief` uses for transferable-insight propagation (§3 Transferable-insight flagging there).
 
@@ -337,6 +337,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 2. Workflow 3 (enrichment, provider-routed, cost-gated).
 3. Workflow 4 (SMTP verify).
 4. Workflow 5 (free-email filter + `enriched_leads.csv` emission).
+5. Run § Discoveries title-discovery gate against the emitted `enriched_leads.csv` per § When to emit conditions (≥2 distinct-company occurrences of a non-canonical title). Each operator-confirmed emit appends one signal to `docs/campaigns/{entity}/{slug}/discoveries.json`; on operator decline, no write.
 
 **Expected output dir contents:**
 
@@ -349,6 +350,8 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 ├── enriched_leads.csv
 └── list_stats.json
 ```
+
+(Zero or more `title-discovery` signals may also be appended to `docs/campaigns/{entity}/{slug}/discoveries.json` per § Discoveries; the file lives outside this output-dir tree per the discoveries-promotion contract.)
 
 **Error handling:**
 
@@ -372,6 +375,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 3. Workflow 3 (enrichment).
 4. Workflow 4 (SMTP verify).
 5. Workflow 5 (free-email filter + emission).
+6. Run § Discoveries title-discovery gate (same as Task A step 5).
 
 **Expected output dir contents:**
 
@@ -385,6 +389,8 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 ├── enriched_leads.csv
 └── list_stats.json
 ```
+
+(Zero or more `title-discovery` signals to `docs/campaigns/{entity}/{slug}/discoveries.json` per § Discoveries — same as Task A.)
 
 **Error handling:** same as Task A + Workflow 2 HARD-FAIL on any unreachable EB workspace or SF.
 
@@ -405,6 +411,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 3. Workflow 3 (enrichment).
 4. Workflow 4 (SMTP verify).
 5. Workflow 5 (free-email filter + emission).
+6. Run § Discoveries title-discovery gate (same as Task A step 5).
 
 **Expected output dir contents:** same as Task B.
 

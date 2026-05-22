@@ -290,9 +290,9 @@ The post-campaign retro is the single richest moment for surfacing handbook-cano
 
 The list-building skill emits the fourth category (`title-discovery`) at contact-discovery time; the campaign-debrief skill owns the post-campaign three.
 
-**Common 2-call confirm gate.** All three categories use the same pattern: the skill surfaces the candidate via `AskUserQuestion` (1st call), and on `Yes` it `Read`s `docs/campaigns/{entity}/{slug}/discoveries.json` (file-not-found branches to a fresh `{schema_version: 1, signals: []}` shape), appends a single signal to `signals[]`, and `Write`s the file back (2nd call). Per-category payload shapes are spelled out below; `payload` is held open at the schema layer (`type: object`) so downstream consumers can evolve per category. `promotion_status` defaults to `"pending"` at emit time.
+**Common confirm gate** (one `AskUserQuestion` + one `Write` per category). All three categories use the same pattern: the skill surfaces the candidate via `AskUserQuestion`; on `Yes` it `Read`s `docs/campaigns/{entity}/{slug}/discoveries.json` (file-not-found branches to a fresh `{schema_version: 1, signals: []}` shape — mirrors the §5 Workflow 4 Step 1 file-not-found pattern; do NOT use `Glob` first), appends a single signal to `signals[]`, and `Write`s the file back. Per-category payload shapes are spelled out below; `payload` is held open at the schema layer (`type: object`) so downstream consumers can evolve per category. `promotion_status` defaults to `"pending"` at emit time.
 
-The discovery-emission gates run **after** the learnings.md append (Workflow 4 Step 4) and **before** Procedure 3 (Transferable-insight cross-entity propagation) — discoveries are operationally distinct from the cross-entity propagation flow: discoveries route to handbook-canonicals refinement; Procedure 3 routes to `docs/marketing-context.md`. The two flows can both fire on the same debrief.
+The discovery-emission gates fire from **Procedure 1 step 10 / Procedure 2 step 8** — after Workflow 4 completes (learnings.md written) and independent of Procedure 3's transferable-insight dispatch. Discoveries route to handbook-canonicals refinement; Procedure 3 routes to `docs/marketing-context.md`. The two flows can both fire on the same debrief.
 
 ### Category 1 — icp-refinement
 
@@ -458,9 +458,10 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 7. Assemble tags: `#entity/{entity}` from Gate 3; `#vertical/` proposed from the focal campaign's segment dimension (operator confirms); `#persona/` proposed from the gtm-strategy persona rollup (operator confirms); `#angle/` proposed from the creative-angles slug if seeded, else operator slugs.
 8. Compute campaign verdict from §3 Campaign verdict rubric using the Workflow 1 metrics. Echo the computed campaign verdict to the operator for sanity-check (optional `AskUserQuestion` override only if the computed campaign verdict contradicts operator's gut-read).
 9. Run §5 Workflow 4 to append the entry.
-10. On `transferable: true`, dispatch §6 Procedure 3.
+10. Run § Discoveries gates for each of the three categories (`icp-refinement` / `offer-retirement` / `persona-discovery`) — fire each gate only when its per-category When-to-emit conditions hold. Each emit appends one signal to `docs/campaigns/{entity}/{slug}/discoveries.json`; on operator decline, no write. Independent of step 11 below.
+11. On `transferable: true`, dispatch §6 Procedure 3.
 
-**Expected output:** One new entry appended to `docs/campaigns/{entity}/learnings.md` with the `## Campaign log` section starting with this entry and the prior entries below. Summary stats / What works / What doesn't sections regenerated. Debrief completed in under 5 minutes of operator time.
+**Expected output:** One new entry appended to `docs/campaigns/{entity}/learnings.md` with the `## Campaign log` section starting with this entry and the prior entries below. Summary stats / What works / What doesn't sections regenerated. Debrief completed in under 5 minutes of operator time. Zero or more signals appended to `docs/campaigns/{entity}/{slug}/discoveries.json` per § Discoveries gates (only categories whose When-to-emit conditions hold and that the operator confirmed).
 
 **Error handling:**
 - `analysis-*.md` parse failure (unexpected section headers or missing §2/§5/§6) → fall through to Procedure 2 (retroactive path) and note the artifact-corruption in the entry Q4 bullets.
@@ -483,9 +484,10 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 5. Present Q3 / Q4 / Q5 via `AskUserQuestion` — all operator-authored (retroactive path has no §5 Attribution rows to seed).
 6. Assemble tags as in Procedure 1 step 7. Operator confirms all four families.
 7. Run §5 Workflow 4 to append the entry.
-8. On `transferable: true`, dispatch §6 Procedure 3.
+8. Run § Discoveries gates for each of the three categories (`icp-refinement` / `offer-retirement` / `persona-discovery`) — fire each gate only when its per-category When-to-emit conditions hold. Same emit-path as Procedure 1 step 10. Independent of step 9 below.
+9. On `transferable: true`, dispatch §6 Procedure 3.
 
-**Expected output:** Same as Procedure 1 — one appended entry. Retroactive paths typically take longer (5–8 minutes) because Q3–Q5 lack auto-suggest; operator-authored in full.
+**Expected output:** Same as Procedure 1 — one appended entry plus zero or more discoveries.json signals per § Discoveries gates. Retroactive paths typically take longer (5–8 minutes) because Q3–Q5 lack auto-suggest; operator-authored in full.
 
 **Error handling:**
 - EB availability probe failure → halt with setup pointer, do not fall through to a fabricated-metrics path.
