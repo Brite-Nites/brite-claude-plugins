@@ -12,8 +12,9 @@
 # BC-10352 regression lock (Section 4): the classifier MUST accept Brand Hub
 # iter-2's shipped inventory shape — lowercase kebab-case domain slugs,
 # backtick-wrapped H3 headers, em-dash separator. Before BC-10352's Path A
-# fix lands, the lowercase + backtick assertions HARD-FAIL on the regex (line
-# 46) + H3 grep (line 64). That failure is the regression-catch evidence.
+# fix lands, the lowercase + backtick assertions HARD-FAIL on the
+# validate-DOMAIN regex + H3 grep blocks of flow-classify-domain-state.sh.
+# That failure is the regression-catch evidence.
 
 set -euo pipefail
 
@@ -54,6 +55,12 @@ new_scratch() {
   d="$(mktemp -d "$SCRATCH_ROOT/case.XXXXXX")"
   mkdir -p "$d/docs/product/flows" "$d/docs/product/journeys" "$d/docs/plans"
   echo "$d"
+}
+
+# UTC ISO-8601 timestamp factory — single source for breadcrumb test fixtures
+# so non-adjacent tests don't share an implicit-state variable.
+now_iso() {
+  python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z"))'
 }
 
 # Run a command, capture stdout + stderr + exit-code, expose as $STDOUT,
@@ -146,8 +153,7 @@ fi
 
 # 2.2 — read in_flight breadcrumb with fresh timestamp → STALE=no.
 SC_BC2="$(new_scratch)"
-NOW_ISO="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z"))')"
-printf '{"status":"in_flight","last_updated":"%s"}\n' "$NOW_ISO" \
+printf '{"status":"in_flight","last_updated":"%s"}\n' "$(now_iso)" \
   > "$SC_BC2/docs/plans/.flow-phase-state.json"
 run_capture "$BREADCRUMB" read "$SC_BC2/docs/plans/.flow-phase-state.json"
 if [ "$EXIT" -eq 0 ] \
@@ -231,7 +237,7 @@ fi
 
 # 2.9 — read breadcrumb with status=completed → STALE=yes, STALE_REASON=status-completed.
 SC_BC9="$(new_scratch)"
-printf '{"status":"completed","last_updated":"%s"}\n' "$NOW_ISO" \
+printf '{"status":"completed","last_updated":"%s"}\n' "$(now_iso)" \
   > "$SC_BC9/docs/plans/.flow-phase-state.json"
 run_capture "$BREADCRUMB" read "$SC_BC9/docs/plans/.flow-phase-state.json"
 if printf '%s\n' "$STDOUT" | grep -q '^STALE=yes$' \
@@ -243,7 +249,7 @@ fi
 
 # 2.10 — read breadcrumb with status=abandoned → STALE=yes, STALE_REASON=status-abandoned.
 SC_BC10="$(new_scratch)"
-printf '{"status":"abandoned","last_updated":"%s"}\n' "$NOW_ISO" \
+printf '{"status":"abandoned","last_updated":"%s"}\n' "$(now_iso)" \
   > "$SC_BC10/docs/plans/.flow-phase-state.json"
 run_capture "$BREADCRUMB" read "$SC_BC10/docs/plans/.flow-phase-state.json"
 if printf '%s\n' "$STDOUT" | grep -q '^STALE=yes$' \
@@ -331,8 +337,7 @@ SC_M7="$(new_scratch)"
 printf '# intent\n' > "$SC_M7/docs/product/intent.md"
 printf '# inventory\n' > "$SC_M7/docs/product/master-flow-inventory.md"
 printf '# story\n' > "$SC_M7/docs/product/flows/example.md"
-NOW_ISO_M7="$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z"))')"
-printf '{"status":"in_flight","last_updated":"%s"}\n' "$NOW_ISO_M7" \
+printf '{"status":"in_flight","last_updated":"%s"}\n' "$(now_iso)" \
   > "$SC_M7/docs/plans/.flow-phase-state.json"
 run_capture "$DETECT_MODE" "$SC_M7"
 if [ "$EXIT" -eq 0 ] && [ "$STDOUT" = "resume" ]; then

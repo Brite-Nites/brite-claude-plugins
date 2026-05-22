@@ -58,7 +58,7 @@ Parse the target domain section rows. Find the highest existing `<DOMAIN>-NN`. P
 
 ### Sub-flow-add
 
-1. Regex-locate the target domain section by H3 header: `^### \`?<DOMAIN>\`? — .* \(\d+ flows\)$`. Per Q20 amendment 2 (BC-10352, 2026-05-22): em-dash `—` is the canonical separator (matches Q20.3 memory + Brand Hub iter-2 reality); backtick-wrap around `<DOMAIN>` is optional; `<DOMAIN>` is lowercase kebab-case (`^[a-z][a-z0-9-]*$`).
+1. Regex-locate the target domain section by H3 header: `` `^### \`?<DOMAIN>\`? — .* \(\d+ flows\)$` ``. Per Q20 amendment 2 (BC-10352, 2026-05-22): em-dash `—` is the canonical separator (matches Q20.3 memory + Brand Hub iter-2 reality); backtick-wrap around `<DOMAIN>` is optional; `<DOMAIN>` is lowercase kebab-case (`^[a-z][a-z0-9-]*$`).
 2. Locate the table by column-header signature.
 3. Find the table terminator: next `### ` heading OR `---` boundary OR EOF.
 4. Insert the new row immediately before the terminator.
@@ -75,7 +75,7 @@ All unrelated content is preserved verbatim.
 
 ### Inventory-read (Q20 amendment 1, BC-9971)
 
-1. Regex-locate the target domain section by H3 header: `^### \`?<DOMAIN>\`?[[:space:]]` (whitespace boundary, backtick-wrap optional; matches the canonical `### \`<DOMAIN>\` — <display> (N flows)` form per Q20 amendment 2 (BC-10352, 2026-05-22) AND tolerates the bare-no-backtick variant Brand Hub iter-2 occasionally used).
+1. Regex-locate the target domain section by H3 header: `` `^### \`?<DOMAIN>\`?[[:space:]]` `` (whitespace boundary, backtick-wrap optional; matches the canonical `` `### \`<DOMAIN>\` — <display> (N flows)` `` form per Q20 amendment 2 (BC-10352, 2026-05-22) AND tolerates the bare-no-backtick variant Brand Hub iter-2 occasionally used).
 2. Parse the H3 line to extract `display` (the ` — <display>` portion, em-dash canonical) and the flow count (`(N flows)`).
 3. Parse the table immediately following the H3 row-by-row: each row yields `{id, title, primary_persona, notes_or_status_tag}`. Determine the top-level grouping by walking BACKWARD from the H3 line to the nearest `^## ` heading.
 4. Return the structured metadata to the caller — do NOT write. The Q20.4 hard-reject does NOT fire in this mode (the H3 IS expected to exist).

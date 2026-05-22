@@ -78,9 +78,11 @@ else
 fi
 
 # Journey doc path — `docs/product/journeys/<domain-lowercase>.md` per the
-# Q16 schema. Lowercase translation matches `commands/add-domain.md` Phase 5
-# terminator artifact (`docs/product/journeys/<target_domain>.md`). Manual
-# tr to avoid bash-4-only `${var,,}`.
+# Q16 schema. Q20 amendment 2 (BC-10352) makes DOMAIN lowercase-by-regex, so
+# the `tr` is a no-op for any value that passes the line-51 validation. It
+# stays as defense-in-depth: if a future maintainer loosens the regex (e.g.,
+# a hypothetical Path C hybrid-case schema), this preserves the
+# lowercase-canonical journey-doc path without an additional code change.
 DOMAIN_LC="$(printf '%s' "$DOMAIN" | tr '[:upper:]' '[:lower:]')"
 JOURNEY_DOC="$JOURNEYS_DIR/${DOMAIN_LC}.md"
 if [ -f "$JOURNEY_DOC" ]; then
