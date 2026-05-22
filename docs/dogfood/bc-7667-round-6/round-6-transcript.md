@@ -49,9 +49,9 @@ Per-R-row protocol: surface output + expected + 3-way verdict (✅ / ⚠️ / �
 | R-17  | 8 SCHEDULE | regression | ✅ | template id 3 → clones 28-31, BC-6303 field naming intact |
 | R-18  | 9 SEQUENCE | regression | ✅ | bare step_2.subject → "Re: " auto-prepended; variant=false ok |
 | R-19  | 9 SEQUENCE | regression | ✅ | wait clamped 0→1; thread_reply bool; UPPERCASE tokens accepted |
-| R-20  | 10 PREVIEW | regression | _pending_ | |
-| R-21 ★ | 10 PREVIEW | regression + BC-7599 live-fire | _pending_ | keystone |
-| R-21b | 10 PREVIEW | BC-7598 doc-claim live-val | _pending_ | NEW |
+| R-20  | 10 PREVIEW | regression | ✅ | Mode 1 local render, 5 sanity checks pass |
+| R-21 ★ | 10 PREVIEW | regression + BC-7599 live-fire | ✅ | 4th keystone — test-send fired w/o marketing-context.md |
+| R-21b | 10 PREVIEW | BC-7598 doc-claim live-val | ✅ | spec doc-claim intact; 1 side-finding (test-copy-liquid.json stale) |
 | R-22  | 11 ACTIVATE | regression | _pending_ | |
 | R-23 ★ | 11 ACTIVATE | regression keystone | _pending_ | round-6 closes here |
 | R-24  | side-flow | BC-6556 sad-path | _pending_ | |
@@ -486,6 +486,71 @@ All 4 sequences: `variant: false` accepted on both steps; step_2 submitted bare;
 ---
 
 **Phase 9 close:** R-18 ✅, R-19 ✅. Workspace state: 4 round-6 campaigns now FULLY provisioned (leads + senders + schedule + sequence) — all `status: draft`. Ready for Phase 10 PREVIEW + R-21 keystone live-fire.
+
+---
+
+## Phase 10 — PREVIEW
+
+### R-20 — Mode 1 local render (regression)
+
+**Representative lead pick:** largest cell = `role|Other` (3 leads); first lead = id 15149 `info@dogfoodtest.com` (Info Account, Operations Manager, Test Dogfood Aquarium).
+
+**step_1.subject rendered:** `"Quick question"` (spintax first-option pick).
+
+**step_1.body rendered (first spintax + UPPERCASE token substitution):**
+
+> Saw the downtown master-plan announcement at Test Dogfood Aquarium Info, and it lined up with a pattern we've been watching across municipalities.\<br>\<br>Most municipalities teams we work with run into downtown lighting specs getting stuck at design review, and one that solved it was Boulder Pearl Street, who ran 38% higher evening foot traffic in 2024.\<br>\<br>Happy to pull a short architectural lighting preview for Test Dogfood Aquarium if useful, no commitment.\<br>\<br>Best,\<br>Amanuel
+
+**5 sanity checks (regex applied to rendered output):**
+
+| Check | Regex | Result |
+|-------|-------|--------|
+| No unresolved `{VARIABLE}` | `\{[A-Z_]+\}` | ✅ no matches |
+| No unresolved spintax | `\{[^{}]*\|[^{}]*\}` | ✅ no matches |
+| No em-dash (—) | `—` | ✅ absent |
+| No `<p>` tag | `<p>` | ✅ absent (only `<br>`) |
+| No `{{` double-brace | `\{\{` | ✅ absent (artifact is bare-token, not Liquid) |
+
+**Verdict:** ✅ Expected. Mode 1 local render passes all 5 sanity checks.
+
+### R-21 ★ — Phase 10 Mode 2 test-send (KEYSTONE + BC-7599 live-fire)
+
+**Hypothesis:** real `--test-send corinne@britenites.com` delivers 1 email; NO `docs/marketing-context.md` required to pass IV-5.
+
+**Evidence (`POST /api/campaigns/sequence-steps/50/test-email` body `{"sender_email_id": 981, "to_email": "corinne@britenites.com"}`):**
+
+```json
+{"success": true, "data": {"success": true, "message": "Successfuly sent sequence test email"}}
+```
+
+**Sub-claim verification:**
+
+| Sub-claim | Evidence | Verdict |
+|-----------|----------|---------|
+| BC-7599 live-fire | `docs/marketing-context.md` absent in worktree; Mode 2 fired anyway | ✅ pre-fix halt path gone |
+| IV-5 email regex | `corinne@britenites.com` accepted; structured-JSON body | ✅ |
+| EB render pipeline triggered | `success: true` | ✅ |
+| Inbox delivery + `[test] ` prefix (BC-7598) + sender resolution (BC-6784) | observable in operator inbox post-walk | ⏳ async |
+
+**Verdict:** ✅ Expected (API layer). 4th keystone of 6 ✅ (R-A, R-B, R-8, R-21). **BC-7599 fix-validation complete at API layer.** Inbox-side observations are post-walk async.
+
+### R-21b — BC-7598 V4 Liquid whitespace doc-claim validation
+
+**Hypothesis:** F-Liquid-Space V4 pattern (no strip-hyphens for inline mid-sentence `{% if %}`) is documented and verified.
+
+**Evidence:** `email-copywriting/SKILL.md:293–317` contains the BC-7598 V4 doc claim:
+- Section header: "Inline Liquid: do NOT use strip-hyphens (BC-7598)"
+- "Broken" vs "Correct" worked examples included
+- Attribution: "Verified live, 2026-05-11, via UI Preview Body (canonical Liquid-render verification surface per BC-6785 round-5). Four variants tested; only the no-strip-hyphens form rendered correctly."
+
+**Side-finding C (loop-close):** `docs/dogfood/bc-6554/test-copy-liquid.json:17` still uses the **broken** `{%- if -%}` strip-hyphens form. File created pre-BC-7598; not updated to V4. Either update OR add an inline comment marking it as a deliberate "broken sample." Loop-close follow-up.
+
+**Verdict:** ✅ Expected (spec layer). BC-7598 V4 doc claim intact with live-verification attribution. Round-5 finding + 2026-05-11 PR-time live verification already covers the inline-Liquid behavior; re-firing round-6 UI verification would be redundant.
+
+---
+
+**Phase 10 close:** R-20 ✅, R-21 ★ ✅ (4th keystone), R-21b ✅. Workspace state: 4 fully-provisioned draft campaigns + 1 test email en route. Round-6 progress: 22/27 R-rows done (R-13 deferred). 5 R-rows remain: R-22 + R-23 ★ (Phase 11) + R-24, R-25 ★, R-26, R-27 (side-flows).
+
 
 
 
