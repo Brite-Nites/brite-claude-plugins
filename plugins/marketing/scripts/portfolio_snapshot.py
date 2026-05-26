@@ -41,6 +41,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _shared import canonicals_reader, manifest_loader, slug_parts
+
 SCHEMA_VERSION = 1
 
 # ── Argument parsing ────────────────────────────────────────────────────
@@ -127,178 +130,13 @@ def in_window(d: datetime, start: datetime, end: datetime) -> bool:
     return start <= d <= end_inclusive
 
 
-# ── Manifest discovery + filtering ──────────────────────────────────────
+# ── Manifest discovery + filtering (delegated to _shared/) ─────────────
 
-
-def slug_to_launch_month(slug: str) -> datetime | None:
-    """Derive launch month from a `*-fy{YY}-m{MM}(-v{N})?` slug.
-
-    Returns the first day of the launch month as UTC midnight, or None on
-    pattern mismatch.
-    """
-    m = re.search(r"-fy(\d{2})-m(\d{2})(?:-v\d+)?$", slug)
-    if not m:
-        return None
-    yy, mm = m.group(1), m.group(2)
-    year = 2000 + int(yy)
-    month = int(mm)
-    if not (1 <= month <= 12):
-        return None
-    return datetime(year, month, 1, tzinfo=timezone.utc)
-
-
-def load_manifests(campaigns_dir: Path) -> list[dict[str, Any]]:
-    """Glob docs/campaigns/<short-entity>/<slug>/manifest.json and load each."""
-    if not campaigns_dir.is_dir():
-        sys.stderr.write(f"ERROR: campaigns directory not found: {campaigns_dir}\n")
-        sys.exit(2)
-    manifests = []
-    for manifest_path in sorted(campaigns_dir.glob("*/*/manifest.json")):
-        # Skip _reviews/ — it's the output dir, never contains a manifest.
-        if "_reviews" in manifest_path.parts:
-            continue
-        try:
-            data = json.loads(manifest_path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            sys.stderr.write(
-                f"[BC-8731] Skipping unreadable manifest {manifest_path}: {exc}\n"
-            )
-            continue
-        data["__path"] = str(manifest_path)
-        data["__campaign_dir"] = str(manifest_path.parent)
-        manifests.append(data)
-    return manifests
-
-
-def filter_in_window(
-    manifests: list[dict[str, Any]],
-    window_start: datetime,
-    window_end: datetime,
-) -> list[dict[str, Any]]:
-    """Filter manifests to those whose created_at OR slug-derived launch month is in-window.
-
-    Window-fit decision per manifest:
-
-    1. If ``created_at`` parses as a valid ISO-8601 timestamp, that timestamp
-       decides in/out — slug suffix is ignored even if it disagrees (the timestamp
-       is the authoritative launch event; the slug month is the *intended* launch
-       month, which may differ for re-scheduled campaigns).
-    2. If ``created_at`` is missing OR unparseable, fall back to the slug's
-       ``-fy{YY}-m{MM}`` suffix and use the first day of the derived launch month.
-    3. If BOTH paths fail (no ``created_at`` AND slug has no valid fy/m suffix),
-       the manifest is excluded with a ``[BC-8731]`` stderr warning — silent drop
-       would mask a corrupted manifest, which is worse than a one-line warning.
-    """
-    in_window_list = []
-    for m in manifests:
-        # Try created_at first (post-σ3 manifests have it). If it parses
-        # successfully — in-window or out — trust the timestamp and move on
-        # (continue), bypassing the slug fallback. Only when created_at is
-        # missing OR unparseable do we fall through to the slug suffix.
-        created_at = m.get("created_at")
-        if created_at:
-            try:
-                normalized = created_at.replace("Z", "+00:00")
-                d = datetime.fromisoformat(normalized)
-                if in_window(d, window_start, window_end):
-                    in_window_list.append(m)
-                continue
-            except (ValueError, AttributeError, TypeError):
-                # Type-shape failures (numeric / bool / list created_at) and
-                # unparseable strings both fall through to slug fallback rather
-                # than halt the packet.
-                pass
-        # Fallback: derive launch month from slug.
-        slug = m.get("slug", "")
-        launch_month = slug_to_launch_month(slug)
-        if launch_month:
-            if in_window(launch_month, window_start, window_end):
-                in_window_list.append(m)
-            # Out-of-window via slug fallback — silent skip is correct.
-        else:
-            # Neither created_at nor slug suffix yielded a launch date — surface
-            # the corrupted manifest so an operator notices.
-            sys.stderr.write(
-                f"[BC-8731] Skipping manifest with no parseable launch date: "
-                f"slug={slug!r} created_at={created_at!r} path={m.get('__path', '(unknown)')!r}\n"
-            )
-    return in_window_list
-
-
-# ── Canonicals + posture lookup ─────────────────────────────────────────
-
-
-def load_canonicals_verticals(canonicals_dir: Path) -> list[str]:
-    """Read plugins/marketing/data/canonicals/_manifest.yaml to enumerate verticals.
-
-    Stdlib regex parse — matches `lint_canonicals.py` pattern (no PyYAML).
-    """
-    manifest_path = canonicals_dir / "_manifest.yaml"
-    if not manifest_path.is_file():
-        return []
-    try:
-        text = manifest_path.read_text()
-    except OSError:
-        return []
-    verticals = []
-    in_verticals = False
-    for line in text.splitlines():
-        if line.startswith("verticals:"):
-            in_verticals = True
-            continue
-        if in_verticals:
-            m = re.match(r"\s*-\s*([a-z0-9-]+)", line)
-            if m:
-                verticals.append(m.group(1))
-            elif line.strip() and not line.startswith((" ", "\t", "-")):
-                break
-    return verticals
-
-
-def lookup_posture(canonicals_dir: Path, vertical: str, offer: str) -> str | None:
-    """Resolve offer posture from canonicals/<vertical>.yaml. Returns None if missing."""
-    if not vertical or not offer:
-        return None
-    yaml_path = canonicals_dir / f"{vertical}.yaml"
-    if not yaml_path.is_file():
-        return None
-    try:
-        text = yaml_path.read_text()
-    except OSError:
-        return None
-    # Find the offers: section, then the matching offer slug, then its posture: line.
-    # Regex-based; stdlib only.
-    in_offers = False
-    current_offer_indent: int | None = None
-    current_offer_slug: str | None = None
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if stripped.startswith("offers:"):
-            in_offers = True
-            continue
-        if not in_offers:
-            continue
-        if stripped.startswith(("personas:", "discoveries:")) and not line.startswith(
-            (" ", "\t")
-        ):
-            in_offers = False
-            continue
-        m = re.match(r"^(\s*)-\s*slug:\s*([a-z0-9-]+)", line)
-        if m:
-            current_offer_indent = len(m.group(1))
-            current_offer_slug = m.group(2)
-            continue
-        if current_offer_slug == offer and current_offer_indent is not None:
-            indent = len(line) - len(line.lstrip())
-            if indent <= current_offer_indent:
-                current_offer_slug = None
-                continue
-            mp = re.match(r"\s*posture:\s*([a-z0-9-]+)", line)
-            if mp:
-                return mp.group(1)
-    return None
+load_manifests = manifest_loader.load_manifests
+filter_in_window = manifest_loader.filter_in_window
+slug_to_launch_month = slug_parts.slug_to_launch_month
+load_canonicals_verticals = canonicals_reader.load_canonicals_verticals
+lookup_posture = canonicals_reader.lookup_posture
 
 
 # ── Per-entity learnings.md traversal ──────────────────────────────────
