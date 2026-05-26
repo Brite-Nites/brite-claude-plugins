@@ -258,6 +258,36 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b''''' — flow-architecture orchestrator-recipe integration test (BC-11091)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-verify-docs-ecosystem-integration-vslice.sh —
+# asserts the /flow:retrofit-project Phase 1 templates-scaffold recipe end-to-end
+# against a fixture project: 9 files land + placeholders substituted + chmod +x
+# on .sh files + idempotency-with-flag re-writes + idempotency-without-flag
+# halts + verify-docs.sh --no-linear exits 0 on the substituted fixture.
+# Sits ON TOP of Section 2b'' (template fidelity) — exercises the recipe-
+# execution path which template-fidelity alone cannot catch. Pass count is
+# auto-derived from the harness's RESULT contract line. The §7 verify-docs
+# pipeline is gated on npm install of fixture devDependencies (tsx + gray-
+# matter); a missing npm install path SKIPs rather than FAILs since §1-6
+# already cover the recipe-regression surface.
+section "2b'''''. flow-architecture orchestrator-recipe integration test (BC-11091)"
+
+fda_recipe_test="$REPO_ROOT/plugins/flow-architecture/tests/run-verify-docs-ecosystem-integration-vslice.sh"
+
+if [ ! -f "$fda_recipe_test" ]; then
+  warn "plugins/flow-architecture/tests/run-verify-docs-ecosystem-integration-vslice.sh not found — skipped"
+else
+  if fda_recipe_out=$(bash "$fda_recipe_test" 2>&1); then
+    fda_recipe_pass_count=$(printf '%s\n' "$fda_recipe_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture orchestrator-recipe integration test (${fda_recipe_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture orchestrator-recipe integration test failed — run plugins/flow-architecture/tests/run-verify-docs-ecosystem-integration-vslice.sh for details"
+    printf '%s\n' "$fda_recipe_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
