@@ -451,7 +451,7 @@ Inline terminator phase. No sub-skill dispatch — orchestrator owns the final s
 2. **Final breadcrumb write:** `status: completed`, `current_phase: 8`, `completed_phases: ["1"..."8"]`. The Q31.5 atomic-rename write through `flow-resume-breadcrumb.sh write` is the **last operation** of the orchestrator — never write the `completed` marker before all artifacts land on disk (BC-5761 precedent applied here).
 
 3. Recommend next steps:
-   - Run `/flow:audit` (Q38; pending) for project-health snapshot covering the 35-gate stack.
+   - Run `/flow:audit` (Q38; pending) for project-health snapshot covering the 36-gate stack (post-Q29 amendment 2).
    - Run `/flow:plan-<discipline>` per discipline child for AC + Tasks population.
    - Hand-edit `docs/product/journeys/<domain>.md` to refine narrative voice if needed (atomic rename ensures journey doc fully written; `--force` regen will clobber hand-edits per Q16.3).
 

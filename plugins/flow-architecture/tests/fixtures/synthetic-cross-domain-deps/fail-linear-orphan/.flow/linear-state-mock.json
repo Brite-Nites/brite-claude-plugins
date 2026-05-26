@@ -1,0 +1,15 @@
+{
+  "_comment": "FAIL fixture — Linear has blockedBy BC-10360 → BC-10371 between FDA sub-flow parents, but the doc carries no `## Cross-domain dependencies` section to mirror it. The Linear → doc half of cross-domain-deps-bidirectional fails.",
+  "parents": {
+    "BC-10360": {
+      "flow_id": "asset-unification-02",
+      "domain": "asset-unification",
+      "blockedBy": ["BC-10371"]
+    },
+    "BC-10371": {
+      "flow_id": "creative-operations-01",
+      "domain": "creative-operations",
+      "blockedBy": []
+    }
+  }
+}

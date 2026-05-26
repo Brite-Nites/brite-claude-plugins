@@ -4,11 +4,11 @@ Quality gates in FDA are **filesystem-artifact-existence checks**, NOT LLM self-
 
 ## Why
 
-LLM self-report drifts. An agent can say "phase 2 complete" while the artifact it was supposed to produce is missing, malformed, or partial. Filesystem checks do not drift — either the file exists with the required content shape or it does not. Q7 locks this philosophy; Q29 enumerates the 35 gate types that follow from it; `/flow:audit` (Q38, pending) is the runner.
+LLM self-report drifts. An agent can say "phase 2 complete" while the artifact it was supposed to produce is missing, malformed, or partial. Filesystem checks do not drift — either the file exists with the required content shape or it does not. Q7 locks this philosophy; Q29 enumerates the 36 gate types that follow from it; `/flow:audit` (Q38, pending) is the runner.
 
 ## Gate categories
 
-Q29 manifests **35 distinct gate types** across three categories. Full per-gate definitions are locked at `docs/design-rationale/fda-plugin-interview.md` lines 240-273; this file names the categories and counts and points at the canonical source.
+Q29 manifests **36 distinct gate types** across three categories (post-Q29 amendment 2 adding the 6th cross-cutting gate). Full per-gate definitions are locked at `docs/design-rationale/fda-plugin-interview.md` lines 240-273; this file names the categories and counts and points at the canonical source.
 
 ### Phase-transition gates (8)
 
@@ -35,17 +35,18 @@ Aggregated from Q24 templates' Done-means / Verify sections per Q29 sub-decision
 
 Per-flow total: 5 + 4 + 3 + 5 + 5 = 22.
 
-### Cross-cutting consistency gates (5)
+### Cross-cutting consistency gates (6)
 
-Cross-file integrity per Q29 sub-decision 3 (`:261`):
+Cross-file integrity per Q29 sub-decision 3 (`:261`) plus Q29 amendment 2 (`cross-domain-deps-bidirectional`, LOCKED 2026-05-26 per BC-10729):
 
 - `inventory-story-doc-id-match` — every story doc's `flow_id` exists as a row in `master-flow-inventory.md`.
 - `index-story-doc-status-match` — `INDEX.md` Status column matches story-doc front-matter `status`.
 - `linear-children-match` — story-doc `children.*` BC numbers match the actual Linear `parentId` chain.
 - `parent-l3-summary-populated` — Linear parent issue body contains `## L3 review summary` with 5 discipline headlines (Q23 mod 2).
 - `milestone-subflows-table-match` — Linear domain milestone description's Sub-flows table matches actual children of that milestone (Q22).
+- `cross-domain-deps-bidirectional` — every story-doc `## Cross-domain dependencies` bullet (Q27 amendment 1 mod 4) has a matching Linear `blockedBy` relation on the sub-flow parent issue, and every Linear `blockedBy` between FDA sub-flow parents has a matching doc-side bullet. Bidirectional set-comparison via the same batched `list_issues({label: "domain:<slug>"})` call backing `linear-children-match`. Same-domain sibling blockedBy (tracked via `related_flows` front-matter) and discipline-child relations excluded. **Added per Q29 amendment 2.**
 
-Arithmetic: 8 + 22 + 5 = 35 distinct gate types (multiplied by N flows for per-flow gates).
+Arithmetic: 8 + 22 + 6 = 36 distinct gate types (multiplied by N flows for per-flow gates).
 
 ## Hard vs soft classification
 
@@ -73,6 +74,7 @@ Overrides persist for the phase invocation; they are NOT re-prompted within the 
 - `docs/design-rationale/fda-plugin-interview.md:60` — Q7 gate philosophy (filesystem-artifact-existence, not LLM self-report).
 - `docs/design-rationale/fda-plugin-interview.md:240-273` — Q29 full gate manifest (sub-decisions 1-7).
 - `docs/design-rationale/fda-plugin-interview.md:275-283` — Q29 amendment 1 (names the 8th phase-transition gate `preflight-complete`, LOCKED 2026-05-11 per BC-7066).
+- Q29 amendment 2 — adds the 6th cross-cutting gate `cross-domain-deps-bidirectional` (LOCKED 2026-05-26 per BC-10729); sibling to Q27 amendment 1 (story-doc `## Cross-domain dependencies` section).
 - Q38 (pending) — `/flow:audit` runner lock; see Q38 sub-decision 4 (`:1057`) for the `--linear-surface` parking-lot resolution.
 - `checkpoint-pattern.md` — `overrides[]` breadcrumb slot.
 - `linear-writeback-pattern.md` — `audit-concerns` v1.1 promotion path.

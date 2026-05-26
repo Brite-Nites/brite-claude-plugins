@@ -1,16 +1,16 @@
 ---
-description: Flow-Driven Architecture quality-gate runner — three-phase pipeline (verify-docs → filesystem gates → Linear MCP gates) emitting markdown or --json over Q29's 35-gate stack
+description: Flow-Driven Architecture quality-gate runner — three-phase pipeline (verify-docs → filesystem gates → Linear MCP gates) emitting markdown or --json over Q29's 36-gate stack
 ---
 
 # /flow:audit
 
-Utility command. Single-purpose runner for the Q29 35-gate quality-gate stack (`plugins/flow-architecture/skills/_shared/artifact-gate-pattern.md`). Three phases / **zero user-confirmation gates between internal steps** (utility, not orchestrator) / **READ-MOSTLY** — read-only against the filesystem and Linear MCP except for the single breadcrumb `overrides[]` append on user-selected Override per Q29 sub-decision 5 (see § Override mechanism for the write contract). Default wall ≈ 14s on a 28-domain Brand-Hub-shape project (Q38 sub-decision 3 batched-list-issues optimization); ~125s without batching.
+Utility command. Single-purpose runner for the Q29 36-gate quality-gate stack (`plugins/flow-architecture/skills/_shared/artifact-gate-pattern.md`; post-Q29 amendment 2 adding the 6th cross-cutting gate `cross-domain-deps-bidirectional`). Three phases / **zero user-confirmation gates between internal steps** (utility, not orchestrator) / **READ-MOSTLY** — read-only against the filesystem and Linear MCP except for the single breadcrumb `overrides[]` append on user-selected Override per Q29 sub-decision 5 (see § Override mechanism for the write contract). Default wall ≈ 14s on a 28-domain Brand-Hub-shape project (Q38 sub-decision 3 batched-list-issues optimization); ~125s without batching.
 
 > **Scope:** UI-bearing FDA projects (CDR-023). Non-UI-bearing work uses CDR-014's Phase Pattern + `/workflows:fix-milestone --migrate ...`, not this audit. The audit assumes the consuming project has been bootstrapped through `flow-preflight` (Q12 + Q36 embedded 7-step bootstrap) and has FDA artifacts on disk; absent artifacts surface as Q29.1 phase-transition gate failures, not infrastructure errors.
 
-> **DO NOT re-derive** the gate manifest, hard/soft classification, override mechanism, or three-section reporting format. All seven sub-decisions of Q38 are locked at `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:713` with a refinement audit trail at `:729`. Q38 sub-decision 4's deferred-decision resolution is at `:743`. Q29's full 35-gate manifest is locked at `:240` (sub-decisions 1-7 — including Q29.6 three-section reporting format at `:271` and Q29.7 verify-docs.sh integration at `:273`) and Q29 amendment 1 (`preflight-complete` gate, locked 2026-05-11 per BC-7066) at `:275`. Surfaced via `_shared/artifact-gate-pattern.md`; this command is the runner for that manifest, not a re-statement of it.
+> **DO NOT re-derive** the gate manifest, hard/soft classification, override mechanism, or three-section reporting format. All seven sub-decisions of Q38 are locked at `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:713` with a refinement audit trail at `:729`. Q38 sub-decision 4's deferred-decision resolution is at `:743`. Q29's full 35-gate manifest is locked at `:240` (sub-decisions 1-7 — including Q29.6 three-section reporting format at `:271` and Q29.7 verify-docs.sh integration at `:273`), Q29 amendment 1 (`preflight-complete` gate, locked 2026-05-11 per BC-7066) at `:275`, and Q29 amendment 2 (`cross-domain-deps-bidirectional` gate, locked 2026-05-26 per BC-10729) immediately above amendment 1. Post-Q29 amendment 2 the canonical total is 36 distinct gate types (8 + 22 + 6). Surfaced via `_shared/artifact-gate-pattern.md`; this command is the runner for that manifest, not a re-statement of it.
 
-> **Boundary contract with `/flow:review`** lives at `plugins/flow-architecture/CLAUDE.md` § Boundaries (Q52 sub-decision 4) — `/flow:audit` is process-compliance (35-gate stack); `/flow:review` is diff-level code review. v1.1 `--audit-preflight` flag for `/flow:review` is parking lot #48.
+> **Boundary contract with `/flow:review`** lives at `plugins/flow-architecture/CLAUDE.md` § Boundaries (Q52 sub-decision 4) — `/flow:audit` is process-compliance (36-gate stack); `/flow:review` is diff-level code review. v1.1 `--audit-preflight` flag for `/flow:review` is parking lot #48.
 
 ## Architecture overview
 
@@ -156,7 +156,7 @@ Phase B emits one `gate.status` entry per evaluated check into the report. Filte
 | Per-flow [Design] | `design-linear-completed`, `design-figma-node-id`, `design-children-design-populated` |
 | Per-flow [QA] | `qa-status-signed-off`, `qa-last-signed-off-iso8601`, `qa-history-row-signed-off`, `qa-comment-signature-match`, `qa-children-qa-populated` |
 | Per-flow [Docs] | `docs-customer-doc-exists`, `docs-customer-frontmatter-q28`, `docs-user-docs-url-non-tbd`, `docs-customer-verify-docs-pass`, `docs-children-docs-populated` |
-| Cross-cutting (Q29.3) | `inventory-story-doc-id-match`, `index-story-doc-status-match`, `linear-children-match`, `parent-l3-summary-populated`, `milestone-subflows-table-match` |
+| Cross-cutting (Q29.3 + amendment 2) | `inventory-story-doc-id-match`, `index-story-doc-status-match`, `linear-children-match`, `parent-l3-summary-populated`, `milestone-subflows-table-match`, `cross-domain-deps-bidirectional` |
 
 ## Phase C — Linear MCP gates
 
@@ -184,13 +184,14 @@ Then evaluate per-child gates against the batched response in memory — never p
 
 **Sandbox URL HTTP smoke-tests** (the `[Eng]` 3rd check) similarly fire per-flow. Parallelize with a 3s per-URL HTTP-HEAD timeout; cache by URL within the audit run (different flows can share a sandbox URL); cap in-flight requests at **8 per unique hostname AND 32 globally** (per-host cap protects a single sandbox from rate-limit cascades; global cap protects local socket / fd exhaustion when a project uses many distinct preview hostnames — e.g., per-flow Vercel preview URLs). Transient 5xx (and 429) counts as `gate: unknown` per § Failure semantics, not as hard-fail.
 
-**Q29.3 cross-cutting consistency gates (5):**
+**Q29.3 cross-cutting consistency gates (6 post-Q29 amendment 2):**
 
 - `inventory-story-doc-id-match` — every story doc's `flow_id` front-matter exists as a row in `master-flow-inventory.md`. **Filesystem-only — evaluated in Phase B** (no Linear MCP requirement); rendered in this section for cross-cutting report grouping. Continues to render even when Phase C is skipped due to Linear MCP auth failure.
 - `index-story-doc-status-match` — `INDEX.md` Status column matches story-doc front-matter `status` field. Filesystem-only — evaluated in Phase B; rendered here for grouping.
 - `linear-children-match` — story-doc `children.*` BC numbers match the actual Linear `parentId` chain. Uses the batched response per domain.
 - `parent-l3-summary-populated` — Linear parent issue body contains `## L3 review summary` section with 5 discipline headlines (Q23 mod 2). This is the **L3 review coverage gate** — see § L-review coverage clarification below for the L1/L2/L3/L4 routing.
 - `milestone-subflows-table-match` — Linear domain milestone description's Sub-flows table matches actual children of that milestone (Q22 schema).
+- `cross-domain-deps-bidirectional` — every story-doc `## Cross-domain dependencies` bullet (Q27 amendment 1 mod 4) of shape `<this-flow-id> blockedBy <other-flow-id>` has a matching Linear `blockedBy` relation on this flow's parent issue, and every Linear `blockedBy` relation between two FDA sub-flow parents (both endpoints carry `domain:*` label) has a matching doc-side bullet in the blocked flow's story doc. `gates` bullets are validated as the symmetric inverse (the OTHER flow's story doc should carry the matching `blockedBy` bullet). Same-domain sibling blockedBy (tracked via `related_flows` front-matter) and discipline-child relations are excluded. Reuses the per-domain `list_issues({label: "domain:<slug>"})` batched response that backs `linear-children-match` + `parent-l3-summary-populated` — no additional Linear round-trips. **Added per Q29 amendment 2 (LOCKED 2026-05-26 per BC-10729).**
 
 **Q29.2 [Eng]/[Design]/[QA]/[Docs] Linear-state checks** — the `list_issues` (and `list_comments` for [QA]) calls live here in Phase C; the per-flow row aggregation owned by Phase B (per the "Per-flow row aggregation" note in the Phase B section) consumes the cached Phase C response. A single per-flow discipline grade aggregates filesystem + Linear-state checks for that discipline.
 
@@ -358,7 +359,8 @@ The `audit-concerns marker reserved` in `_shared/linear-writeback-pattern.md`'s 
 
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:713` — Q38 lock (canonical source; seven sub-decisions + refinement audit trail at `:729`).
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:743` — Q38 sub-decision 4 deferred-decision resolution (stays strictly local in v1; `audit-concerns marker reserved` for v1.1 promotion).
-- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:240` — Q29 35-gate manifest lock.
+- `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:240` — Q29 35-gate manifest lock (pre-amendment-2; canonical post-amendment total is 36).
+- Q29 amendment 2 (LOCKED 2026-05-26 per BC-10729) — adds the 6th cross-cutting gate `cross-domain-deps-bidirectional` (cross-ref consistency between story-doc `## Cross-domain dependencies` section and Linear `blockedBy` relations on sub-flow parent issues); sibling to Q27 amendment 1 (story-doc template adding mod 4 `## Cross-domain dependencies` section).
 - `plugins/flow-architecture/skills/_shared/artifact-gate-pattern.md` — gate manifest reference (categories + counts; canonical source for re-derivation prevention).
 - `plugins/flow-architecture/skills/_shared/linear-writeback-pattern.md` — Q46 layer; `audit-concerns` marker enum entry.
 - `plugins/flow-architecture/skills/_shared/checkpoint-pattern.md` — `overrides[]` breadcrumb slot + `flow-resume-breadcrumb.sh` helper contract.
