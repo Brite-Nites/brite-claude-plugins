@@ -102,43 +102,15 @@ Requires a situation-mining artifact at `docs/research/situations/{domain}-{YYYY
 
 ### Asymmetry Score
 
-Every angle gets a reproducible number. The score weights Novelty and Evidence Density highest because they are the two dimensions that most often separate alpha from noise; Timing matters less only because the other five already constrain it; Downside carries the lowest weight because the worst case for a well-framed creative angle is usually "they ignore the email." Formula:
-
-```
-Score = (Novelty*2 + Evidence*2 + Timing*1.5 + Simplicity*1 + ShelfLife*1 + Downside*0.5) / 8
-```
-
-Each dimension scores on a 1–10 band using the per-dimension rubric below.
-
-- **Novelty (2x weight).** Low (1–3) = angle appears in Clay templates or common playbooks. Medium (4–6) = uncommon but discoverable. High (7–10) = no one is using this angle.
-- **Evidence Density (2x weight).** Low (1–3) = single data point, high speculation. Medium (4–6) = 2–3 data points, moderate inference. High (7–10) = 4+ data points, strong inference chain.
-- **Timing Urgency (1.5x weight).** Low (1–3) = evergreen, no time pressure. Medium (4–6) = seasonal or cyclical. High (7–10) = deadline-driven, narrow window.
-- **Execution Simplicity (1x weight).** Low (1–3) = custom tooling needed. Medium (4–6) = manual research. High (7–10) = build list in under 1 hour.
-- **Shelf Life (1x weight).** Low (1–3) = under 1 month. Medium (4–6) = 3–6 months. High (7–10) = 6+ months.
-- **Downside Cap (0.5x weight).** Low (1–3) = risk of negative brand perception. Medium (4–6) = neutral worst case. High (7–10) = worst case = they ignore the email.
-
-A reviewer reading a finished artifact can apply this rubric and arrive at the same score the skill assigned — that is the decidability guarantee. If two reviewers disagree by more than 1.0 on a total score, the angle's evidence chain is underspecified and §7 Rubric drops the run a band.
+See [handbook/marketing/frameworks/asymmetry-rubric.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/asymmetry-rubric.md) for the canonical rubric definition. Formula: `Score = (Novelty*2 + Evidence*2 + Timing*1.5 + Simplicity*1 + ShelfLife*1 + Downside*0.5) / 8`. Each dimension scores 1–10. A reviewer reading a finished artifact can apply the rubric and arrive at the same score — that is the decidability guarantee.
 
 ### Angle verdict mapping
 
-Every scored angle maps to exactly one angle verdict tier. The bounds are fixed — do not round, do not split a band.
-
-- **Score 8.0+ → ALPHA.** Test immediately. Small batch (50–100 prospects). Measure response rate before scaling.
-- **Score 6.0–7.9 → PROMISING.** Refine evidence density or timing, then test.
-- **Score 4.0–5.9 → INTERESTING.** Too creative for cold outbound. Redirect to content as a thought-leadership piece.
-- **Score below 4.0 → COMMODITY.** Discard entirely. Use standard campaign ideation via `outbound-playbook` instead.
-
-The angle verdict labels (`ALPHA`, `PROMISING`, `INTERESTING`, `COMMODITY`) are the only permitted tokens in the output artifact's Angle Verdict column — no "pretty strong," no "maybe worth a shot," no hedged prose substitutes. §8 Anti-Slop will refuse subjective angle verdicts.
+See [handbook/marketing/frameworks/asymmetry-rubric.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/asymmetry-rubric.md) for the canonical verdict mapping. Score 8.0+ → `ALPHA`; 6.0–7.9 → `PROMISING`; 4.0–5.9 → `INTERESTING`; below 4.0 → `COMMODITY`. These four labels are the only permitted tokens.
 
 ### Shelf-life requirements
 
-Every **ALPHA** and **PROMISING** angle MUST include three sub-fields. Missing any of the three drops the run to §7 Rubric 1–3 band; a scored ALPHA or PROMISING row without shelf-life metadata is a hard failure.
-
-1. **Shelf life estimate** — cite a decay category from `plugins/marketing/references/shelf-life-patterns.md`. The five categories are **Regulatory / Deadline**, **Competitive Move**, **Data Insight**, **Industry Pattern**, and **Structural**. Use the category's typical shelf-life band as the starting estimate, then adjust based on the cross-check section of that reference (Clay templates, LinkedIn thought-leaders, conference talks, blog posts, competitor outreach).
-2. **Decay trigger** — one sentence naming the specific event that would kill this angle. Examples: "when the first competitor blog post on SimilarWeb+tariff correlations publishes" or "when CMS finalizes the Q3 2026 rate update" or "when a Clay template for food-service permit monitoring ships." A generic trigger ("when it becomes common knowledge") is insufficient — name the event.
-3. **Refresh date** — a specific ISO date to re-evaluate the angle. Default: generation date + 90 days, or shelf-life expiry, whichever is sooner. Example: `2026-07-01`. Round to the nearest quarter-end only when the decay category is Structural (12+ months).
-
-INTERESTING and COMMODITY angle verdicts do NOT require shelf-life metadata — they are either redirected to content workflows (INTERESTING) or discarded (COMMODITY), so shelf-life is irrelevant to the decision. Only the alpha-bearing tiers carry the metadata burden, because only the alpha-bearing tiers produce angles the operator will ship.
+See [handbook/marketing/frameworks/asymmetry-rubric.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/asymmetry-rubric.md) for the canonical shelf-life requirements. Every ALPHA and PROMISING angle must include: (1) shelf life estimate citing a decay category, (2) decay trigger naming the specific event that would kill the angle, (3) refresh date (ISO date). INTERESTING and COMMODITY angles do not require shelf-life metadata.
 
 ---
 
@@ -199,7 +171,7 @@ Per [`plugins/marketing/references/hidden-signals-library.md`](../../../referenc
 | Experiment Verdict | message-market-fit | post-batch | during campaign |
 | Campaign Verdict | campaign-debrief | post-campaign | after campaign closes |
 
-This skill owns the **Angle Verdict** (Gate 1, pre-experiment). The handbook framework doc `marketing/frameworks/verdicts-cross-reference.md` (BC-8733) carries the canonical cross-vocabulary token-by-token translation.
+This skill owns the **Angle Verdict** (Gate 1, pre-experiment). See [handbook/marketing/frameworks/verdicts-cross-reference.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/verdicts-cross-reference.md) for the canonical cross-vocabulary token-by-token translation.
 
 ### Output artifact
 

@@ -59,60 +59,15 @@ Every artifact the skill emits MUST satisfy all of these rules before Write. Ada
 
 ### Hormozi value equation
 
-Every body paragraph in tier 2 + tier 3 + tier 4 emails applies the Hormozi value equation. Formula:
-
-```
-Value = (Dream Outcome × Perceived Likelihood of Achievement) / (Time Delay × Effort + Sacrifice)
-```
-
-Operator-facing: to make the email feel valuable, maximize the numerator (dream outcome + proof) and minimize the denominator (time-to-value + effort). The four inputs confirmed in §2 correspond one-to-one:
-
-| Input (from §2 gate) | Where it appears in the body | Brite example (Nites free-asset posture, free design preview) |
-|---|---|---|
-| Dream Outcome | Paragraph 1 / hook — names the outcome by the prospect's own language | "holiday install complete by Black Friday with zero coordination overhead" |
-| Perceived Likelihood of Achievement | Paragraph 2 — proof point with real case-study numbers | "Sugarloaf HOA ran 27 units in 2024 with the same architect-approved spec" |
-| Time Delay | Paragraph 2 or 3 — compresses the time-to-value | "design preview in 48 hours, install before Thanksgiving" |
-| Effort + Sacrifice | Paragraph 3 / CTA — the guarantee or free asset that shrinks perceived effort | "free architectural preview for {COMMUNITY_NAME} — review before any commitment" |
-
-Knowledge posture (helpful resource) skips the proof-point paragraph since the offer IS the proof. Risk-reversal posture makes the Effort + Sacrifice input the headline rather than the CTA.
-
-Full framework reference: `plugins/marketing/references/offer-design-frameworks.md` — Hormozi value equation origin + Brunson Value Ladder + Abraham strategic layer (Brite-originated synthesis).
+See [handbook/marketing/frameworks/value-equation.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/value-equation.md) for the canonical definition. Formula: `Value = (Dream Outcome × Perceived Likelihood of Achievement) / (Time Delay × Effort + Sacrifice)`. The 4 inputs confirmed in §2 map one-to-one: Dream Outcome → paragraph 1 hook, Perceived Likelihood → paragraph 2 proof, Time Delay → paragraph 2-3 compression, Effort+Sacrifice → paragraph 3 CTA. Full framework reference: `plugins/marketing/references/offer-design-frameworks.md`.
 
 ### Offer postures + entity-aware selection matrix
 
-Four postures, adapted from Revgrowth 10 and renamed per ADR-017 (legacy label: "offer tier" with T1/T2/T3/T4 letter codes — see §JSON artifact schema for the backward-compat alias mapping). Each posture maps to a different CTA architecture, proof-point posture, and value-equation emphasis.
-
-**Posture definitions:**
-
-- **`knowledge` — Knowledge / Helpful Resource.** CTA = "here's a resource, no reply needed." Lowest friction. Use when signal density is LOW and the operator wants a warming touch before a harder ask. (Legacy: T1.)
-- **`free-asset` — Free Asset.** CTA = "we'll prepare a specific asset for your context, no commitment." Example: free downtown lighting audit, free design preview, free deliverability audit. Most common outbound default for Nites. (Legacy: T2.)
-- **`pilot` — DFY Trial / Pilot.** CTA = "we'll run a small paid pilot; success pays for itself." Example: 3-home pilot install, single-night event lighting pilot. Use when prospect signal is HIGH and procurement signal is strong. (Legacy: T3.)
-- **`risk-reversal` — Risk Reversal / Guarantee.** CTA = "first phase on us if it doesn't hit {measurable outcome} by {date}." Example: performance guarantee on festival install. Use for large-spend / committee-heavy procurement where the denominator (Effort + Sacrifice) is the prospect's biggest blocker. (Legacy: T4.)
-
-**Entity-aware selection matrix (3 rows, one per Brite entity):**
-
-| Entity | Typical signal density | Recommended posture | Tone marker | Example vertical anchor |
-|---|---|---|---|---|
-| Nites | MEDIUM-HIGH for seasonal signals (new board, new management, calendar RFP) | `free-asset` default; `pilot` when HIGH signal density | Seasonal, residential, warm-neighborhood | HOAs, Landscape Architects, Builders, Universities (Nites-side seasonal overlays) |
-| Supply | HIGH signal density required (commercial procurement cycle is long) | `pilot` default; `risk-reversal` when enterprise committee visible | Commercial, spec-driven, procurement-aware | *(Supply verticals are out of scope per handbook — see §4 architectural rules)* |
-| Labs | MEDIUM for capital-project signals (bond, master plan, capital campaign) | `pilot` default; `risk-reversal` when multi-year spend / committee-heavy | Experiential, capital, design-production | Municipalities, Universities (capital), Theme Parks, Botanical Gardens |
-
-The skill RECOMMENDS the posture from this matrix then confirms with the operator per D2.
-
-Per-vertical offer guidance: `plugins/marketing/references/vertical-playbooks/{vertical}.md` (produced by Phase 2 roadmap issues R-4 through R-9 — e.g. `zoos.md`, `hotels-resorts.md`, `ski-resorts.md`, `sports-stadiums.md`, `aquariums.md`, `casinos.md`).
+See [handbook/marketing/frameworks/offer-postures.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/offer-postures.md) for the canonical posture definitions and entity-aware selection matrix. Four postures: `knowledge` (lowest friction, legacy T1), `free-asset` (most common Nites default, legacy T2), `pilot` (high signal + procurement, legacy T3), `risk-reversal` (large-spend / committee, legacy T4). Renamed from "Offer Tier" per ADR-017. Per-vertical offer guidance: `plugins/marketing/references/vertical-playbooks/{vertical}.md`.
 
 ### Recency waterfall (6-level hierarchy)
 
-The hook in paragraph 1 anchors to the most recent credible signal. Walk the waterfall top-to-bottom and use the highest-level signal available:
-
-1. **New job / role change** — "saw you just stepped into the Director of Campus Experience role at {COMPANY}."
-2. **LinkedIn post (prospect's own, within 90 days)** — "your post last week on {TOPIC} stuck with me."
-3. **Company news / press release (within 90 days)** — "with the {INITIATIVE} announcement last month."
-4. **CEO / leader podcast or interview (within 180 days)** — "heard {CEO_NAME} on {PODCAST} talking about {THEME}."
-5. **Company blog post (any time)** — "the {BLOG_TITLE} post on your site made me think about {ANGLE}."
-6. **Fallback (no recency signal)** — vertical-anchored trigger. "most {VERTICAL} teams we work with are scoping {SEASONAL_INITIATIVE} right now — thought {COMPANY} might be too."
-
-Only level 6 fires when the situation artifact's §Raw Data section yielded <2 recency-grade public signals. In that case, flag the email as LOW-confidence in the artifact, inherit situation-mining's thin-data framing, and recommend operator review before send.
+See [handbook/marketing/frameworks/recency-waterfall.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/recency-waterfall.md) for the canonical 6-level hierarchy. Walk the waterfall top-to-bottom and use the highest-level signal available: (1) new job / role change, (2) LinkedIn post within 90 days, (3) company news within 90 days, (4) CEO podcast within 180 days, (5) company blog post, (6) fallback vertical-anchored trigger. Level 6 fires when the situation artifact yielded <2 recency-grade signals — flag the email as LOW-confidence.
 
 ### Base template skeletons (2, entity-agnostic, inline)
 
