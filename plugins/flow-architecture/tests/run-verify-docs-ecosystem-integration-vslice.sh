@@ -178,18 +178,21 @@ run_templates_scaffold() {
     "$REPO_ROOT/scripts/FDA-TEMPLATES-README.md"
   )
 
-  # Step 3: idempotency check — unless --overwrite-scripts.
+  # Step 3: idempotency check — unless --overwrite-scripts. Use a bash array
+  # instead of a space-joined string so target paths containing spaces (e.g.,
+  # an exotic TMPDIR) survive unmangled — guard the empty-array expansion
+  # per the BC-6905 set -u gotcha.
   if [ "${FLOW_OVERWRITE_SCRIPTS:-false}" != "true" ]; then
-    local conflicts=""
+    local -a conflicts=()
     local i
-    for i in 0 1 2 3 4 5 6 7 8; do
+    for i in "${!TGT_PATHS[@]}"; do
       if [ -f "${TGT_PATHS[$i]}" ]; then
-        conflicts="$conflicts ${TGT_PATHS[$i]}"
+        conflicts+=("${TGT_PATHS[$i]}")
       fi
     done
-    if [ -n "$conflicts" ]; then
+    if [ "${#conflicts[@]}" -gt 0 ]; then
       printf 'Templates already present in project (paths listed) — re-run with --overwrite-scripts to replace.\n' >&2
-      printf '%s\n' $conflicts >&2
+      printf '%s\n' "${conflicts[@]}" >&2
       return 3
     fi
   fi
@@ -220,7 +223,7 @@ PY
 
   # Ensure target directories exist + copy template files into target paths.
   local idx
-  for idx in 0 1 2 3 4 5 6 7 8; do
+  for idx in "${!SRC_PATHS[@]}"; do
     local src="${SRC_PATHS[$idx]}"
     local tgt="${TGT_PATHS[$idx]}"
     mkdir -p "$(dirname "$tgt")"
@@ -229,7 +232,7 @@ PY
 
   # Cross-platform sed -i: -i.bak works on both BSD (macOS default) and GNU
   # sed; remove the .bak file after substitution.
-  for idx in 0 1 2 3 4 5 6 7 8; do
+  for idx in "${!TGT_PATHS[@]}"; do
     local tgt="${TGT_PATHS[$idx]}"
     sed -i.bak -f "$SED_SCRIPT" "$tgt"
     rm -f "$tgt.bak"
@@ -249,9 +252,20 @@ section "1" "first recipe run — placeholder substitution + 9 files land"
 # Fixture-specific placeholder values. These mirror the shape of real
 # Linear-derived inputs but are clearly test-only — any of these strings
 # showing up in production is a sign of test-fixture contamination.
+#
+# LINEAR_PROJECT_NAME intentionally contains `&`, `\\`, and `|` — these are
+# the three sed-replacement metacharacters the recipe's python3 esc() handles.
+#
+# Scope of what these metachars catch: §1 (recipe rc=0) + §2 (placeholder
+# substitution) exercise the TEST DRIVER's copy of esc() at runtime. This is
+# defense-in-depth against test-driver bit-rot (a future maintainer dropping
+# a handler in `run_templates_scaffold` above), NOT against drift in
+# `commands/retrofit-project.md` — approach (a)'s recipe-mirror is static, so
+# orchestrator drift in esc() is caught by §8's grep-based sync check, not by
+# fixture-input behavior. Both layers stay in place; this is the runtime one.
 LINEAR_PROJECT_ID="00000000-0000-0000-0000-000000000bc11091"
 LINEAR_ORG_SLUG="bc-11091-fixture"
-LINEAR_PROJECT_NAME="BC-11091 Fixture Project"
+LINEAR_PROJECT_NAME='BC-11091 Fixture & Co \\ Test | Project'
 REPO_ROOT="$TMP_FIXTURE"
 CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
 FLOW_OVERWRITE_SCRIPTS="false"
@@ -348,9 +362,12 @@ done
 section "4" "syntactic validity (post-substitution)"
 
 # The recipe substitutes inside .sh + .mts + .mjs files. If a Linear-derived
-# value contained a backtick or `$(...)`, the python esc() function would
-# protect against sed-replacement metachars, but the substituted value
-# could still break bash / JS syntax. bash -n catches the .sh case directly.
+# value contained a metachar that the esc() function failed to escape, the
+# substituted value could break bash / JS syntax. bash -n covers the .sh
+# files; `node --check` covers the .mjs file (free, no dep cost); .mts files
+# require tsx --check which has a tsx install cost, so we defer the .mts
+# syntactic check to §7 (where tsx is installed anyway as part of the full-
+# pipeline assertion).
 for sh in scripts/verify-docs.sh scripts/regenerate-flow-index.sh; do
   if bash -n "$TMP_FIXTURE/$sh" 2>/dev/null; then
     pass "bash -n passes: $sh"
@@ -359,6 +376,20 @@ for sh in scripts/verify-docs.sh scripts/regenerate-flow-index.sh; do
     bash -n "$TMP_FIXTURE/$sh" 2>&1 | head -3 | sed 's/^/    /'
   fi
 done
+
+# node --check on .mjs (built-in, no devDep needed).
+if command -v node >/dev/null 2>&1; then
+  for mjs in scripts/normalize-fda-frontmatter.mjs; do
+    if node --check "$TMP_FIXTURE/$mjs" 2>/dev/null; then
+      pass "node --check passes: $mjs"
+    else
+      fail "node --check syntax error: $mjs"
+      node --check "$TMP_FIXTURE/$mjs" 2>&1 | head -3 | sed 's/^/    /'
+    fi
+  done
+else
+  skip "node not installed — .mjs syntax check skipped"
+fi
 
 # ── §5: Idempotency without --overwrite-scripts ─────────────────────
 section "5" "idempotency — re-run without flag halts cleanly"
@@ -414,14 +445,18 @@ else
   pass "test marker gone — file re-written by --overwrite-scripts"
 fi
 
-# Re-confirm placeholder substitution after overwrite (catches an
-# overwrite-path that copies but skips substitution).
-if grep -qF "$LINEAR_PROJECT_ID" "$TMP_FIXTURE/scripts/verify-docs.sh" \
-  || grep -qF "$LINEAR_ORG_SLUG" "$TMP_FIXTURE/scripts/regenerate-flow-index.mts"; then
-  pass "overwrite path re-substituted placeholders"
-else
-  fail "overwrite path skipped substitution"
-fi
+# Re-confirm placeholder substitution across the full substitution scope
+# (catches an overwrite-path that copies but skips substitution on any one
+# file — a stricter assertion than the previous OR-of-two-files check, which
+# could silently pass when one file was substituted and another wasn't).
+for val in "$LINEAR_PROJECT_ID" "$LINEAR_ORG_SLUG" "$LINEAR_PROJECT_NAME"; do
+  if grep -rqF --include='*.sh' --include='*.mts' --include='*.mjs' --include='*.md' --include='*.json' \
+       "$val" "$TMP_FIXTURE/scripts" "$TMP_FIXTURE/.flow" 2>/dev/null; then
+    pass "overwrite re-substituted value: '$val'"
+  else
+    fail "overwrite path missing substituted value: '$val'"
+  fi
+done
 
 # ── §7: verify-docs.sh --no-linear exits 0 (full pipeline) ──────────
 section "7" "verify-docs.sh --no-linear exits 0"
@@ -435,15 +470,30 @@ section "7" "verify-docs.sh --no-linear exits 0"
 # Trip-wire per BC-11091 brief: "If the fixture project needs unusual setup
 # (e.g., needs `npm install` for tsx to run .mts files): note in the test
 # driver + PR description." This block is that note.
+#
+# CI cost knob: set BC_11091_SKIP_NPM_INSTALL=true to skip the npm install +
+# verify-docs.sh full-pipeline check entirely. Default (unset) runs the full
+# pipeline, satisfying AC #5 ("verify-docs.sh exits 0"). The env-var exists
+# so a future CI workflow can shed the ~25s cold-cache install cost on PRs
+# that don't touch the FDA plugin, while keeping the assertion on a nightly
+# / changed-files-gated job. Recipe-regression coverage is preserved by
+# §1-6 + §8 regardless of whether §7 runs.
+# Log paths under $TMP_FIXTURE/ (cleaned by the EXIT trap) — avoid /tmp/*.log
+# hardcoded paths which are vulnerable to symlink-TOCTOU races on shared hosts.
+NPM_LOG="$TMP_FIXTURE/.bc-11091-npm-install.log"
+REGEN_LOG="$TMP_FIXTURE/.bc-11091-regen.log"
+VERIFY_LOG="$TMP_FIXTURE/.bc-11091-verify.log"
 
 NPM_INSTALL_OK="false"
-if command -v npm >/dev/null 2>&1; then
-  if ( cd "$TMP_FIXTURE" && npm install --no-audit --no-fund --silent --prefer-offline ) >/tmp/bc-11091-npm-install.log 2>&1; then
+if [ "${BC_11091_SKIP_NPM_INSTALL:-false}" = "true" ]; then
+  skip "BC_11091_SKIP_NPM_INSTALL=true — verify-docs.sh full pipeline check skipped"
+elif command -v npm >/dev/null 2>&1; then
+  if ( cd "$TMP_FIXTURE" && npm install --no-audit --no-fund --silent --prefer-offline ) >"$NPM_LOG" 2>&1; then
     NPM_INSTALL_OK="true"
     pass "npm install succeeded in fixture tmpdir"
   else
-    skip "npm install failed — see /tmp/bc-11091-npm-install.log; cannot run verify-docs.sh full pipeline"
-    tail -5 /tmp/bc-11091-npm-install.log 2>/dev/null | sed 's/^/    /' || true
+    skip "npm install failed — see $NPM_LOG; cannot run verify-docs.sh full pipeline"
+    tail -5 "$NPM_LOG" 2>/dev/null | sed 's/^/    /' || true
   fi
 else
   skip "npm not installed — cannot run verify-docs.sh full pipeline"
@@ -453,18 +503,18 @@ if [ "$NPM_INSTALL_OK" = "true" ]; then
   # Seed INDEX.md by running regen in write mode. Without this, verify-docs.sh
   # would see "INDEX.md does not exist" and fail. The seeded INDEX is what
   # the --check assertion compares against on the next pass.
-  if ( cd "$TMP_FIXTURE" && bash scripts/regenerate-flow-index.sh ) >/tmp/bc-11091-regen.log 2>&1; then
+  if ( cd "$TMP_FIXTURE" && bash scripts/regenerate-flow-index.sh ) >"$REGEN_LOG" 2>&1; then
     pass "regenerate-flow-index.sh write-mode succeeded"
   else
     fail "regenerate-flow-index.sh write-mode failed"
-    tail -10 /tmp/bc-11091-regen.log 2>/dev/null | sed 's/^/    /' || true
+    tail -10 "$REGEN_LOG" 2>/dev/null | sed 's/^/    /' || true
   fi
 
-  if ( cd "$TMP_FIXTURE" && bash scripts/verify-docs.sh --no-linear ) >/tmp/bc-11091-verify.log 2>&1; then
+  if ( cd "$TMP_FIXTURE" && bash scripts/verify-docs.sh --no-linear ) >"$VERIFY_LOG" 2>&1; then
     pass "verify-docs.sh --no-linear exits 0"
   else
     fail "verify-docs.sh --no-linear exited non-zero"
-    tail -20 /tmp/bc-11091-verify.log 2>/dev/null | sed 's/^/    /' || true
+    tail -20 "$VERIFY_LOG" 2>/dev/null | sed 's/^/    /' || true
   fi
 fi
 
@@ -490,9 +540,31 @@ RETROFIT_MD="$PLUGIN_ROOT/commands/retrofit-project.md"
 if [ ! -f "$RETROFIT_MD" ]; then
   fail "retrofit-project.md not found at $RETROFIT_MD"
 else
-  # The 9 template source paths the recipe must reference (relative tails
-  # only — full path strings vary in the table). Each must appear in the
-  # orchestrator's prose; dropping one is a recipe regression.
+  # Extract the active templates-scaffold recipe block ONCE — collapses 22
+  # grep file-reads to one awk pass + 22 case-glob matches against the cached
+  # block content. Anchoring to the block (rather than full-file grep) removes
+  # false-positives where a primitive token survives in a deprecated section
+  # or "do not do this" anti-example elsewhere in retrofit-project.md.
+  RECIPE_BLOCK_CONTENT="$(awk '
+    /\*\*Templates scaffold \(BC-11029, Q58\):\*\*/ { flag=1 }
+    /\*\*Failure semantics \(templates scaffold\):\*\*/ { flag=0 }
+    flag
+  ' "$RETROFIT_MD")"
+
+  if [ -z "$RECIPE_BLOCK_CONTENT" ]; then
+    fail "could not extract active recipe block from retrofit-project.md — anchor headers drifted"
+  else
+    pass "active recipe block extracted from retrofit-project.md"
+  fi
+
+  # bash 3.2 case-glob with quoted "$needle" treats the variable as a literal
+  # pattern; only the outer `*`s are globs. One process fork per assertion
+  # turns into zero process forks (bash builtin).
+  block_contains() { case "$RECIPE_BLOCK_CONTENT" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
+
+  # The 9 template source paths the recipe must reference inside the active
+  # recipe block. Anchored to the block to reject benign references elsewhere
+  # in the file (e.g., a changelog entry mentioning the path).
   RECIPE_TEMPLATE_REFS=(
     "templates/scripts/verify-docs.sh"
     "templates/scripts/regenerate-flow-index.sh"
@@ -505,14 +577,17 @@ else
     "templates/README.md"
   )
   for ref in "${RECIPE_TEMPLATE_REFS[@]}"; do
-    if grep -qF "$ref" "$RETROFIT_MD"; then
-      pass "recipe references: $ref"
+    if block_contains "$ref"; then
+      pass "recipe block references: $ref"
     else
-      fail "recipe MISSING template ref: $ref (orchestrator drift)"
+      fail "recipe block MISSING template ref: $ref (orchestrator drift)"
     fi
   done
 
-  # The 4 placeholders the recipe substitutes — closed enum per Q58.
+  # The 4 placeholders the recipe substitutes — closed enum per Q58. Anchored
+  # to the active recipe block so an anti-example like "DO NOT substitute
+  # `<DEPRECATED_PLACEHOLDER>` anymore" in a separate section cannot mask a
+  # real removal of a current placeholder.
   RECIPE_PLACEHOLDERS=(
     "<LINEAR_PROJECT_ID>"
     "<LINEAR_ORG_SLUG>"
@@ -520,18 +595,17 @@ else
     "<EXPECTED_FDA_ISSUE_COUNT>"
   )
   for ph in "${RECIPE_PLACEHOLDERS[@]}"; do
-    if grep -qF "$ph" "$RETROFIT_MD"; then
-      pass "recipe substitutes placeholder: $ph"
+    if block_contains "$ph"; then
+      pass "recipe block substitutes placeholder: $ph"
     else
-      fail "recipe MISSING placeholder substitution: $ph (orchestrator drift)"
+      fail "recipe block MISSING placeholder substitution: $ph (orchestrator drift)"
     fi
   done
 
   # Load-bearing recipe primitives — the security-sensitive pattern parts
-  # that BC-9027 + Q58 lock in place. Mutating any breaks the trust-boundary
-  # discipline the recipe is designed to enforce. The `-- "$prim"` form is
-  # critical for tokens like `--overwrite-scripts` so grep doesn't mistake
-  # them for its own flags.
+  # that BC-9027 + Q58 lock in place. Anchored to the active recipe block
+  # so a string like "chmod +x" appearing in a benign comment elsewhere
+  # (e.g., a changelog entry) cannot satisfy the security invariant.
   RECIPE_PRIMITIVES=(
     "python3 > \"\$SED_SCRIPT\""
     "sed -i.bak -f"
@@ -540,10 +614,10 @@ else
     "--overwrite-scripts"
   )
   for prim in "${RECIPE_PRIMITIVES[@]}"; do
-    if grep -qF -- "$prim" "$RETROFIT_MD"; then
-      pass "recipe primitive present: $prim"
+    if block_contains "$prim"; then
+      pass "recipe block primitive present: $prim"
     else
-      fail "recipe MISSING primitive: $prim (orchestrator drift)"
+      fail "recipe block MISSING primitive: $prim (orchestrator drift)"
     fi
   done
 
@@ -559,10 +633,10 @@ else
     'replace("\n", "\\n")'
   )
   for ec in "${ESC_CHARS[@]}"; do
-    if grep -qF -- "$ec" "$RETROFIT_MD"; then
-      pass "recipe esc() handles: $ec"
+    if block_contains "$ec"; then
+      pass "recipe block esc() handles: $ec"
     else
-      fail "recipe esc() MISSING handler: $ec (security regression)"
+      fail "recipe block esc() MISSING handler: $ec (security regression)"
     fi
   done
 fi
