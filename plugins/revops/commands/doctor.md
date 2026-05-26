@@ -1,5 +1,5 @@
 ---
-description: Re-runnable, zero-mutation Salesforce environment health check for the revops plugin — the SF-specific analogue of /workflows:smoke-test. Verifies the sf CLI, node, gh auth, revops plugin install, revops MCP connectivity, brite-sandbox authentication, default target-org, a trivial SOQL probe, and dev-grade permission-set membership, then prints a PASS/FAIL/WARN/SKIP table with targeted remediation. Run it when /revops:deploy-sandbox mysteriously fails, after a laptop change, or to confirm a teammate is ready before pairing. Triggers on "revops doctor", "salesforce health check", "is my sf environment ok", "diagnose sf".
+description: Re-runnable, zero-mutation Salesforce environment health check for the revops plugin — the SF-specific analogue of /workflows:smoke-test. Verifies the sf CLI, node, gh auth, revops plugin install, revops MCP connectivity, brite-sandbox authentication, default target-org, a trivial SOQL probe, dev-grade permission-set membership, and brite-prod auth validity, then prints a PASS/FAIL/WARN/SKIP table with targeted remediation. Run it when /revops:deploy-sandbox mysteriously fails, after a laptop change, or to confirm a teammate is ready before pairing. Triggers on "revops doctor", "salesforce health check", "is my sf environment ok", "diagnose sf".
 allowed-tools: Bash
 ---
 
@@ -152,6 +152,24 @@ print(f'{int(mad)}|{int(mmd)}|{dev_grp}')
 else
   emit SKIP "permset self-probe" "trivial SOQL did not return a row"
 fi
+
+# 10. brite-prod auth validity (weekly JWT probe surface — BC-11098)
+if [ "${SF_OK:-0}" = "1" ] && [ "$PY_OK" = "1" ]; then
+  prod_cs="$(sf org display --target-org brite-prod --json 2>/dev/null | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    if d.get('status',1)!=0: print('NOT_AUTHED'); sys.exit(0)
+    print(d.get('result',{}).get('connectedStatus','UNKNOWN'))
+except Exception: print('PARSE_FAILED')
+" 2>/dev/null || echo PY_FAIL)"
+  case "$prod_cs" in
+    Connected) emit PASS "brite-prod auth" "Connected";;
+    NOT_AUTHED) emit WARN "brite-prod auth" "brite-prod alias not authenticated — run: sf org login web --alias brite-prod --instance-url https://login.salesforce.com";;
+    *) emit WARN "brite-prod auth" "not Connected ($prod_cs) — see brite-salesforce/docs/runbooks/sf-prod-auth-rotation.md";;
+  esac
+elif [ "${SF_OK:-0}" != "1" ]; then emit SKIP "brite-prod auth" "sf CLI unavailable"
+else emit SKIP "brite-prod auth" "python3 unavailable — cannot parse sf --json"; fi
 ```
 
 ---
@@ -174,6 +192,7 @@ From the emitted `STATUS<TAB>CHECK<TAB>NOTE` lines, render a results table (mirr
 | default target-org  | PASS   | brite-sandbox                                    |
 | trivial SOQL        | PASS   | SELECT Id FROM Organization returned a row       |
 | permset self-probe  | PASS   | dev-grade group present (Admin_Group)            |
+| brite-prod auth     | PASS   | Connected                                        |
 
 **Overall**: N PASS, N FAIL, N WARN, N SKIP — <verdict>
 ```
@@ -199,4 +218,5 @@ If there is any `FAIL` or `WARN`, add a **Remediation** section below the table 
 - **Probe with the `sf` CLI, not the MCP `run_soql_query`.** The MCP rejects an alias and needs a literal username per call; the CLI accepts `--target-org brite-sandbox`.
 - **Always pass `--target-org brite-sandbox`** for org-scoped probes — never rely on an ambient default.
 - **Plugin install is distinct from registration.** The plugin check reads `claude plugin list`, not marketplace.json.
-- **WARN never blocks.** A wrong/unset default target-org and a missing permset group are advisory (WARN), not FAIL — the environment may still be usable with explicit `--target-org`.
+- **WARN never blocks.** A wrong/unset default target-org, a missing permset group, and a non-Connected brite-prod alias are advisory (WARN), not FAIL — the environment may still be usable with explicit `--target-org`.
+- **brite-prod is advisory, not blocking.** The brite-prod auth check (check 10) emits WARN/SKIP, never FAIL — expired prod auth does not block sandbox development. The weekly CI probe (`.github/workflows/jwt-validity-probe.yml`) is the authoritative enforcement mechanism; it auto-files a Linear issue on failure.

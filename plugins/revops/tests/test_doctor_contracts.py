@@ -1,7 +1,7 @@
 """Contract tests for the /revops:doctor slash command.
 
 Slash commands are Claude-orchestrated markdown, not executable code, so these
-tests verify the markdown's contract (frontmatter, declared tools, the nine
+tests verify the markdown's contract (frontmatter, declared tools, the ten
 required checks, the table+Overall+remediation reporting shape, zero-gate /
 zero-mutation / no-retry rules, version bump) rather than runtime execution.
 The live walk (zero-mutation diff + idempotent re-run against brite-sandbox) is
@@ -98,7 +98,7 @@ def test_no_gate_prompts() -> None:
 
 
 def test_all_check_topics_present() -> None:
-    """Every AC-required check (nine) must be greppable so the contract is auditable."""
+    """Every AC-required check (ten) must be greppable so the contract is auditable."""
     body = read_command().lower()
     topics = {
         "sf CLI version": ["sf --version"],
@@ -110,6 +110,7 @@ def test_all_check_topics_present() -> None:
         "default target-org": ["sf config get target-org"],
         "trivial SOQL": ["select id from organization limit 1"],
         "permset self-probe": ["permissionsetassignment"],
+        "brite-prod auth": ["sf org display --target-org brite-prod"],
     }
     missing = {
         topic: absent
@@ -119,8 +120,8 @@ def test_all_check_topics_present() -> None:
     assert not missing, f"Check topics missing from command body: {missing}"
 
 
-def test_nine_emit_labels_present() -> None:
-    """The AC names exactly nine checks. test_all_check_topics_present greps a
+def test_ten_emit_labels_present() -> None:
+    """The AC names exactly ten checks. test_all_check_topics_present greps a
     representative command per topic, but that passes even if a check's `emit`
     row were deleted while its prose needle survived. Lock the actual emit labels
     (the second arg of each `emit STATUS "<label>"`) by set-equality so dropping,
@@ -133,10 +134,10 @@ def test_nine_emit_labels_present() -> None:
     expected = {
         "sf CLI", "node", "gh auth", "revops plugin", "revops MCP",
         "brite-sandbox auth", "default target-org", "trivial SOQL",
-        "permset self-probe",
+        "permset self-probe", "brite-prod auth",
     }
     assert labels == expected, (
-        "doctor must emit exactly the nine AC check labels; "
+        "doctor must emit exactly the ten AC check labels; "
         f"missing={expected - labels}, unexpected={labels - expected}"
     )
 
@@ -152,6 +153,7 @@ def test_key_commands_present_verbatim() -> None:
         "sf data query --target-org brite-sandbox",
         "SELECT Id FROM Organization LIMIT 1",
         "PermissionSetAssignment",
+        "sf org display --target-org brite-prod",
     ]
     missing = [cmd for cmd in expected if cmd not in body]
     assert not missing, f"Key commands missing verbatim from command body: {missing}"
@@ -181,6 +183,8 @@ def test_warn_and_skip_severity_routing() -> None:
         r'emit WARN "permset self-probe"',
         r'emit SKIP "brite-sandbox auth"',
         r'emit SKIP "trivial SOQL"',
+        r'emit WARN "brite-prod auth"',
+        r'emit SKIP "brite-prod auth"',
     ]
     missing = [pat for pat in required if not re.search(pat, body)]
     assert not missing, f"Required WARN/SKIP severity routing missing: {missing}"
@@ -188,19 +192,21 @@ def test_warn_and_skip_severity_routing() -> None:
     # Bidirectional lock: the advisory checks must NEVER emit FAIL. Asserting the
     # WARN line *exists* would not catch an additive regression that keeps the
     # WARN branch but also adds an `emit FAIL` branch for the same check. doctor
-    # has exactly four advisory (PASS/WARN/SKIP-only) checks: default-target-org
-    # and permset (AC-named), plus gh auth and revops MCP (not hard SF-auth
-    # prerequisites). The other five checks legitimately FAIL on a hard problem.
+    # has exactly five advisory (PASS/WARN/SKIP-only) checks: default-target-org,
+    # permset, and brite-prod auth (AC-named), plus gh auth and revops MCP (not
+    # hard SF-auth prerequisites). The other five checks legitimately FAIL on a
+    # hard problem.
     forbidden = [
         r'emit FAIL "default target-org"',
         r'emit FAIL "permset self-probe"',
         r'emit FAIL "gh auth"',
         r'emit FAIL "revops MCP"',
+        r'emit FAIL "brite-prod auth"',
     ]
     present = [pat for pat in forbidden if re.search(pat, body)]
     assert not present, (
-        "the four advisory checks (default-target-org, permset, gh auth, revops "
-        f"MCP) emit only PASS/WARN/SKIP — they must never emit FAIL: {present}"
+        "the five advisory checks (default-target-org, permset, brite-prod auth, "
+        f"gh auth, revops MCP) emit only PASS/WARN/SKIP — they must never emit FAIL: {present}"
     )
 
 
@@ -359,4 +365,53 @@ def test_permset_warn_mentions_dev_sandbox_access() -> None:
     assert "Dev_Sandbox_Access" in note, (
         "WARN copy must mention Dev_Sandbox_Access (BC-10727's sanctioned path), "
         f"got: {note!r}"
+    )
+
+
+def test_jwt_probe_targets_brite_prod() -> None:
+    """BC-11098: the JWT validity check must probe brite-prod (not brite-sandbox),
+    using sf org display (not sf org list which probes all orgs).
+    """
+    _, body = split_frontmatter(read_command())
+    assert "sf org display --target-org brite-prod" in body, (
+        "JWT check must use 'sf org display --target-org brite-prod' (BC-11098)"
+    )
+
+
+def test_jwt_probe_is_advisory_not_blocking() -> None:
+    """BC-11098: brite-prod auth is WARN/SKIP, never FAIL — expired prod auth
+    does not block sandbox development. The weekly CI probe is the authoritative
+    enforcement mechanism.
+    """
+    _, body = split_frontmatter(read_command())
+    assert re.search(r'emit PASS "brite-prod auth"', body), \
+        "JWT check must have a PASS branch for Connected"
+    assert re.search(r'emit WARN "brite-prod auth"', body), \
+        "JWT check must have a WARN branch for non-Connected"
+    assert re.search(r'emit SKIP "brite-prod auth"', body), \
+        "JWT check must have a SKIP branch when sf CLI unavailable"
+    assert not re.search(r'emit FAIL "brite-prod auth"', body), \
+        "JWT check must never emit FAIL (advisory only — BC-11098)"
+
+
+def test_jwt_probe_cites_runbook() -> None:
+    """BC-11098: the WARN remediation for brite-prod auth must cite the canonical
+    rotation runbook so operators know where to go.
+    """
+    _, body = split_frontmatter(read_command())
+    assert "sf-prod-auth-rotation.md" in body, (
+        "JWT WARN note must cite the rotation runbook "
+        "(brite-salesforce/docs/runbooks/sf-prod-auth-rotation.md)"
+    )
+
+
+def test_jwt_probe_skip_cascade_independent_of_sandbox() -> None:
+    """BC-11098: the brite-prod check's SKIP-cascade depends on SF_OK (sf CLI),
+    NOT on SB_OK (brite-sandbox auth) — prod auth is independently checkable.
+    """
+    _, body = split_frontmatter(read_command())
+    check_10_block = body[body.index("# 10."):]
+    assert "SB_OK" not in check_10_block, (
+        "JWT check must not depend on SB_OK — brite-prod auth is "
+        "independent of brite-sandbox"
     )
