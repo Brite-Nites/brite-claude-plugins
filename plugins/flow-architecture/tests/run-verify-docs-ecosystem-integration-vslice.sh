@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# BC-11091 integration test for /flow:retrofit-project Phase 1 templates-scaffold recipe.
+# BC-11091 + BC-11089 integration test for templates-scaffold recipe parity
+# across /flow:retrofit-project AND /flow:start-project Phase 1.
 #
 # Scope:
 #   1. Copy fixture project to a tmpdir + git init.
@@ -539,14 +540,47 @@ section "8" "retrofit-project.md recipe contract check"
 
 RETROFIT_MD="$PLUGIN_ROOT/commands/retrofit-project.md"
 
+# Shared assertion arrays — hoisted above §8/§9 conditionals so both
+# sections can iterate them regardless of whether the other section's
+# awk extraction succeeded. Under set -u, referencing an undefined
+# array crashes the script; hoisting prevents §9 from crashing when
+# §8's extraction fails (and vice versa).
+RECIPE_TEMPLATE_REFS=(
+  "templates/scripts/verify-docs.sh"
+  "templates/scripts/regenerate-flow-index.sh"
+  "templates/scripts/regenerate-flow-index.mts"
+  "templates/scripts/verify-linear-references.mts"
+  "templates/scripts/normalize-fda-frontmatter.mjs"
+  "templates/scripts/lib/fda-title.mts"
+  "templates/scripts/lib/linear-graphql.mts"
+  "templates/.flow/scaffold-log/SCHEMA.md"
+  "templates/README.md"
+)
+RECIPE_PLACEHOLDERS=(
+  "<LINEAR_PROJECT_ID>"
+  "<LINEAR_ORG_SLUG>"
+  "<PROJECT_NAME>"
+  "<EXPECTED_FDA_ISSUE_COUNT>"
+)
+RECIPE_PRIMITIVES=(
+  "python3 > \"\$SED_SCRIPT\""
+  "sed -i.bak -f"
+  "chmod +x"
+  "rm -f \"\$SED_SCRIPT\""
+  "--overwrite-scripts"
+  "mkdir -p"
+  "SRC_PATHS=("
+)
+ESC_CHARS=(
+  'replace("\\", "\\\\")'
+  'replace("|", "\\|")'
+  'replace("&", "\\&")'
+  'replace("\n", "\\n")'
+)
+
 if [ ! -f "$RETROFIT_MD" ]; then
   fail "retrofit-project.md not found at $RETROFIT_MD"
 else
-  # Extract the active templates-scaffold recipe block ONCE — collapses 22
-  # grep file-reads to one awk pass + 22 case-glob matches against the cached
-  # block content. Anchoring to the block (rather than full-file grep) removes
-  # false-positives where a primitive token survives in a deprecated section
-  # or "do not do this" anti-example elsewhere in retrofit-project.md.
   RECIPE_BLOCK_CONTENT="$(awk '
     /\*\*Templates scaffold \(BC-11029, Q58\):\*\*/ { flag=1 }
     /\*\*Failure semantics \(templates scaffold\):\*\*/ { flag=0 }
@@ -557,90 +591,96 @@ else
     fail "could not extract active recipe block from retrofit-project.md — anchor headers drifted"
   else
     pass "active recipe block extracted from retrofit-project.md"
+
+    block_contains() { case "$RECIPE_BLOCK_CONTENT" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
+
+    for ref in "${RECIPE_TEMPLATE_REFS[@]}"; do
+      if block_contains "$ref"; then
+        pass "recipe block references: $ref"
+      else
+        fail "recipe block MISSING template ref: $ref (orchestrator drift)"
+      fi
+    done
+
+    for ph in "${RECIPE_PLACEHOLDERS[@]}"; do
+      if block_contains "$ph"; then
+        pass "recipe block substitutes placeholder: $ph"
+      else
+        fail "recipe block MISSING placeholder substitution: $ph (orchestrator drift)"
+      fi
+    done
+
+    for prim in "${RECIPE_PRIMITIVES[@]}"; do
+      if block_contains "$prim"; then
+        pass "recipe block primitive present: $prim"
+      else
+        fail "recipe block MISSING primitive: $prim (orchestrator drift)"
+      fi
+    done
+
+    for ec in "${ESC_CHARS[@]}"; do
+      if block_contains "$ec"; then
+        pass "recipe block esc() handles: $ec"
+      else
+        fail "recipe block esc() MISSING handler: $ec (security regression)"
+      fi
+    done
   fi
+fi
 
-  # bash 3.2 case-glob with quoted "$needle" treats the variable as a literal
-  # pattern; only the outer `*`s are globs. One process fork per assertion
-  # turns into zero process forks (bash builtin).
-  block_contains() { case "$RECIPE_BLOCK_CONTENT" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
+# ── §9: start-project.md recipe contract check (BC-11089 parity) ────
+section "9" "start-project.md recipe contract check (BC-11089 parity)"
 
-  # The 9 template source paths the recipe must reference inside the active
-  # recipe block. Anchored to the block to reject benign references elsewhere
-  # in the file (e.g., a changelog entry mentioning the path).
-  RECIPE_TEMPLATE_REFS=(
-    "templates/scripts/verify-docs.sh"
-    "templates/scripts/regenerate-flow-index.sh"
-    "templates/scripts/regenerate-flow-index.mts"
-    "templates/scripts/verify-linear-references.mts"
-    "templates/scripts/normalize-fda-frontmatter.mjs"
-    "templates/scripts/lib/fda-title.mts"
-    "templates/scripts/lib/linear-graphql.mts"
-    "templates/.flow/scaffold-log/SCHEMA.md"
-    "templates/README.md"
-  )
-  for ref in "${RECIPE_TEMPLATE_REFS[@]}"; do
-    if block_contains "$ref"; then
-      pass "recipe block references: $ref"
-    else
-      fail "recipe block MISSING template ref: $ref (orchestrator drift)"
-    fi
-  done
+START_MD="$PLUGIN_ROOT/commands/start-project.md"
 
-  # The 4 placeholders the recipe substitutes — closed enum per Q58. Anchored
-  # to the active recipe block so an anti-example like "DO NOT substitute
-  # `<DEPRECATED_PLACEHOLDER>` anymore" in a separate section cannot mask a
-  # real removal of a current placeholder.
-  RECIPE_PLACEHOLDERS=(
-    "<LINEAR_PROJECT_ID>"
-    "<LINEAR_ORG_SLUG>"
-    "<PROJECT_NAME>"
-    "<EXPECTED_FDA_ISSUE_COUNT>"
-  )
-  for ph in "${RECIPE_PLACEHOLDERS[@]}"; do
-    if block_contains "$ph"; then
-      pass "recipe block substitutes placeholder: $ph"
-    else
-      fail "recipe block MISSING placeholder substitution: $ph (orchestrator drift)"
-    fi
-  done
+if [ ! -f "$START_MD" ]; then
+  fail "start-project.md not found at $START_MD"
+else
+  START_RECIPE_BLOCK="$(awk '
+    /\*\*Templates scaffold \(BC-11029, Q58\):\*\*/ { flag=1 }
+    /\*\*Failure semantics \(templates scaffold\):\*\*/ { flag=0 }
+    flag
+  ' "$START_MD")"
 
-  # Load-bearing recipe primitives — the security-sensitive pattern parts
-  # that BC-9027 + Q58 lock in place. Anchored to the active recipe block
-  # so a string like "chmod +x" appearing in a benign comment elsewhere
-  # (e.g., a changelog entry) cannot satisfy the security invariant.
-  RECIPE_PRIMITIVES=(
-    "python3 > \"\$SED_SCRIPT\""
-    "sed -i.bak -f"
-    "chmod +x"
-    "rm -f \"\$SED_SCRIPT\""
-    "--overwrite-scripts"
-  )
-  for prim in "${RECIPE_PRIMITIVES[@]}"; do
-    if block_contains "$prim"; then
-      pass "recipe block primitive present: $prim"
-    else
-      fail "recipe block MISSING primitive: $prim (orchestrator drift)"
-    fi
-  done
+  if [ -z "$START_RECIPE_BLOCK" ]; then
+    fail "could not extract recipe block from start-project.md — anchor headers missing (BC-11089 parity gap)"
+  else
+    pass "recipe block extracted from start-project.md"
 
-  # esc() metachar list — Q58 + BC-9027 lock the sed-replacement escape set
-  # at {\\, |, &, \n}. Dropping any one is a silent security regression
-  # because the recipe's sed substitution becomes vulnerable to that char
-  # in Linear-derived input. Patterns are the exact substring shape the
-  # python source emits — bash single-quote preserves backslashes literally.
-  ESC_CHARS=(
-    'replace("\\", "\\\\")'
-    'replace("|", "\\|")'
-    'replace("&", "\\&")'
-    'replace("\n", "\\n")'
-  )
-  for ec in "${ESC_CHARS[@]}"; do
-    if block_contains "$ec"; then
-      pass "recipe block esc() handles: $ec"
-    else
-      fail "recipe block esc() MISSING handler: $ec (security regression)"
-    fi
-  done
+    start_block_contains() { case "$START_RECIPE_BLOCK" in *"$1"*) return 0 ;; *) return 1 ;; esac; }
+
+    for ref in "${RECIPE_TEMPLATE_REFS[@]}"; do
+      if start_block_contains "$ref"; then
+        pass "start-project recipe references: $ref"
+      else
+        fail "start-project recipe MISSING template ref: $ref (parity drift)"
+      fi
+    done
+
+    for ph in "${RECIPE_PLACEHOLDERS[@]}"; do
+      if start_block_contains "$ph"; then
+        pass "start-project recipe substitutes placeholder: $ph"
+      else
+        fail "start-project recipe MISSING placeholder: $ph (parity drift)"
+      fi
+    done
+
+    for prim in "${RECIPE_PRIMITIVES[@]}"; do
+      if start_block_contains "$prim"; then
+        pass "start-project recipe primitive present: $prim"
+      else
+        fail "start-project recipe MISSING primitive: $prim (parity drift)"
+      fi
+    done
+
+    for ec in "${ESC_CHARS[@]}"; do
+      if start_block_contains "$ec"; then
+        pass "start-project esc() handles: $ec"
+      else
+        fail "start-project esc() MISSING handler: $ec (security parity drift)"
+      fi
+    done
+  fi
 fi
 
 # ── Summary ─────────────────────────────────────────────────────────
