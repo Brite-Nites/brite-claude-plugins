@@ -1,5 +1,6 @@
 """Contract tests for the /revops:deploy-prod + /revops:deploy-sandbox
-slash commands, locking the BC-11030 PR-diff-scoped default.
+slash commands, locking the BC-11030 PR-diff-scoped default and the
+BC-11037 Phase 0.5 recent-deploy detector.
 
 Slash commands are Claude-orchestrated markdown, not executable code, so these
 tests verify the markdown's contract (frontmatter, declared `--reconcile`
@@ -371,16 +372,15 @@ def test_deploy_sandbox_re_resolves_at_phase_3() -> None:
 
 # ── Version bump (plugin-cache propagation) ──────────────────────────────
 
-def test_revops_version_at_or_above_0_5_0() -> None:
-    """BC-11030 changes the default deploy behavior — a minor bump. The
-    plugin cache is keyed by version, so both plugin.json AND the
-    marketplace.json entry must be at >= 0.5.0 for clients to pick up
-    the new commands.
+def test_revops_version_at_or_above_0_5_2() -> None:
+    """BC-11037 adds Phase 0.5 — patch bump. The plugin cache is keyed by
+    version, so both plugin.json AND the marketplace.json entry must be at
+    >= 0.5.2 for clients to pick up the new commands.
     """
     plugin_data = json.loads(PLUGIN_JSON.read_text())
     parts = tuple(int(p) for p in plugin_data["version"].split("."))
-    assert parts >= (0, 5, 0), (
-        f"revops version {plugin_data['version']} must be >= 0.5.0 for BC-11030"
+    assert parts >= (0, 5, 2), (
+        f"revops version {plugin_data['version']} must be >= 0.5.2 for BC-11037"
     )
 
 
@@ -421,3 +421,229 @@ def test_sandbox_inline_re_deploy_hint_is_scoped() -> None:
     assert "force-app/main/default/layouts/" in body, (
         "Sandbox Phase 5 must show a scoped layout re-deploy invocation"
     )
+
+
+# ── Phase 0.5 recent-deploy detector (BC-11037) ────────────────────────
+
+def test_deploy_prod_has_phase_0_5_recent_deploy_detector() -> None:
+    body = read(PROD_PATH)
+    assert "## Phase 0.5 — Recent-deploy detector" in body, (
+        "deploy-prod must have a Phase 0.5 recent-deploy detector"
+    )
+
+
+def test_deploy_sandbox_has_phase_0_5_recent_deploy_detector() -> None:
+    body = read(SANDBOX_PATH)
+    assert "## Phase 0.5 — Recent-deploy detector" in body, (
+        "deploy-sandbox must have a Phase 0.5 recent-deploy detector"
+    )
+
+
+def test_deploy_prod_phase_0_5_ordering() -> None:
+    """Phase 0.5 must appear AFTER Phase 0 and BEFORE Phase 1."""
+    body = read(PROD_PATH)
+    idx_phase_0 = body.index("## Phase 0 — Deploy-mode resolution")
+    idx_phase_05 = body.index("## Phase 0.5 — Recent-deploy detector")
+    idx_phase_1 = body.index("## Phase 1 — Pre-flight")
+    assert idx_phase_0 < idx_phase_05 < idx_phase_1, (
+        "Phase 0.5 must appear between Phase 0 and Phase 1 in deploy-prod"
+    )
+
+
+def test_deploy_sandbox_phase_0_5_ordering() -> None:
+    body = read(SANDBOX_PATH)
+    idx_phase_0 = body.index("## Phase 0 — Deploy-mode resolution")
+    idx_phase_05 = body.index("## Phase 0.5 — Recent-deploy detector")
+    idx_phase_1 = body.index("## Phase 1 — Pre-flight")
+    assert idx_phase_0 < idx_phase_05 < idx_phase_1, (
+        "Phase 0.5 must appear between Phase 0 and Phase 1 in deploy-sandbox"
+    )
+
+
+def test_deploy_prod_phase_0_5_soql_shape() -> None:
+    """The DeployRequest SOQL must include the documented columns, filter,
+    ordering, and limit so the operator sees a useful table. Scoped to
+    Phase 0.5 section to avoid false-pass from future SOQL in other phases."""
+    body = read(PROD_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert "FROM DeployRequest" in phase_05_body, (
+        "deploy-prod Phase 0.5 must query the DeployRequest Tooling API object"
+    )
+    assert "LAST_N_HOURS:24" in phase_05_body, (
+        "deploy-prod Phase 0.5 must filter to last 24 hours"
+    )
+    assert "ORDER BY CreatedDate DESC" in phase_05_body, (
+        "deploy-prod Phase 0.5 must order by CreatedDate descending"
+    )
+    assert "LIMIT 5" in phase_05_body, (
+        "deploy-prod Phase 0.5 must limit to 5 results"
+    )
+    for col in ("CreatedBy.Name", "CreatedDate", "Status", "NumberComponentsTotal"):
+        assert col in phase_05_body, (
+            f"deploy-prod Phase 0.5 SOQL must SELECT {col}"
+        )
+    assert "--use-tooling-api" in phase_05_body, (
+        "deploy-prod Phase 0.5 must use --use-tooling-api (DeployRequest is a Tooling API object)"
+    )
+
+
+def test_deploy_sandbox_phase_0_5_soql_shape() -> None:
+    body = read(SANDBOX_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert "FROM DeployRequest" in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must query the DeployRequest Tooling API object"
+    )
+    assert "LAST_N_HOURS:24" in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must filter to last 24 hours"
+    )
+    assert "ORDER BY CreatedDate DESC" in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must order by CreatedDate descending"
+    )
+    assert "LIMIT 5" in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must limit to 5 results"
+    )
+    for col in ("CreatedBy.Name", "CreatedDate", "Status", "NumberComponentsTotal"):
+        assert col in phase_05_body, (
+            f"deploy-sandbox Phase 0.5 SOQL must SELECT {col}"
+        )
+    assert "--use-tooling-api" in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must use --use-tooling-api (DeployRequest is a Tooling API object)"
+    )
+
+
+def test_deploy_prod_phase_0_5_gate_on_results() -> None:
+    """Non-empty results must trigger an AskUserQuestion gate asking the
+    operator to confirm coordination with the prior deployer."""
+    body = read(PROD_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert "AskUserQuestion" in phase_05_body, (
+        "deploy-prod Phase 0.5 must use AskUserQuestion when results are non-empty"
+    )
+    assert re.search(r"coordinated", phase_05_body, re.IGNORECASE), (
+        "deploy-prod Phase 0.5 gate must ask about coordination with prior deployer"
+    )
+
+
+def test_deploy_sandbox_phase_0_5_gate_on_results() -> None:
+    body = read(SANDBOX_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert "AskUserQuestion" in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must use AskUserQuestion when results are non-empty"
+    )
+    assert re.search(r"coordinated", phase_05_body, re.IGNORECASE), (
+        "deploy-sandbox Phase 0.5 gate must ask about coordination with prior deployer"
+    )
+
+
+def test_deploy_prod_phase_0_5_empty_result_skips_gate() -> None:
+    """Empty result set must narrate 'No prod deploys' and proceed without gate."""
+    body = read(PROD_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert "No prod deploys in last 24h" in phase_05_body, (
+        "deploy-prod Phase 0.5 must narrate skip when no recent deploys found"
+    )
+
+
+def test_deploy_sandbox_phase_0_5_empty_result_skips_gate() -> None:
+    body = read(SANDBOX_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert "No sandbox deploys in last 24h" in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must narrate skip when no recent deploys found"
+    )
+
+
+def test_deploy_prod_phase_0_5_targets_brite_prod() -> None:
+    """Phase 0.5 SOQL must target brite-prod, not brite-sandbox."""
+    body = read(PROD_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert "--target-org brite-prod" in phase_05_body, (
+        "deploy-prod Phase 0.5 must target brite-prod"
+    )
+    assert "--target-org brite-sandbox" not in phase_05_body, (
+        "deploy-prod Phase 0.5 must NOT target brite-sandbox"
+    )
+
+
+def test_deploy_sandbox_phase_0_5_targets_brite_sandbox() -> None:
+    body = read(SANDBOX_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert "--target-org brite-sandbox" in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must target brite-sandbox"
+    )
+    assert "--target-org brite-prod" not in phase_05_body, (
+        "deploy-sandbox Phase 0.5 must NOT target brite-prod"
+    )
+
+
+def test_deploy_prod_phase_0_5_query_failure_does_not_halt() -> None:
+    """Query failure must not halt the deploy — Phase 0.5 is advisory only."""
+    body = read(PROD_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert re.search(r"[Qq]uery failure", phase_05_body), (
+        "deploy-prod Phase 0.5 must document the query-failure path"
+    )
+    assert re.search(r"do\s+\*\*not\*\*\s+halt", phase_05_body), (
+        "deploy-prod Phase 0.5 must explicitly state not to halt on query failure"
+    )
+
+
+def test_deploy_sandbox_phase_0_5_query_failure_does_not_halt() -> None:
+    body = read(SANDBOX_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert re.search(r"[Qq]uery failure", phase_05_body), (
+        "deploy-sandbox Phase 0.5 must document the query-failure path"
+    )
+    assert re.search(r"do\s+\*\*not\*\*\s+halt", phase_05_body), (
+        "deploy-sandbox Phase 0.5 must explicitly state not to halt on query failure"
+    )
+
+
+def test_phase_0_5_parity_both_files_have_it() -> None:
+    """Sandbox parity AC: both commands must have Phase 0.5."""
+    prod_body = read(PROD_PATH)
+    sandbox_body = read(SANDBOX_PATH)
+    assert "## Phase 0.5 — Recent-deploy detector" in prod_body
+    assert "## Phase 0.5 — Recent-deploy detector" in sandbox_body
+
+
+def test_deploy_prod_phase_0_5_cites_bc_11037() -> None:
+    """Phase 0.5 must cite BC-11037 via a markdown link (Magic-ID-safe form)."""
+    body = read(PROD_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert re.search(
+        r"\[BC-11037\]\(https://linear\.app/brite-nites/issue/BC-11037\)",
+        phase_05_body,
+    ), "deploy-prod Phase 0.5 must cite BC-11037 via markdown link"
+
+
+def test_deploy_sandbox_phase_0_5_cites_bc_11037() -> None:
+    body = read(SANDBOX_PATH)
+    phase_05_start = body.index("## Phase 0.5 — Recent-deploy detector")
+    phase_1_start = body.index("## Phase 1 — Pre-flight")
+    phase_05_body = body[phase_05_start:phase_1_start]
+    assert re.search(
+        r"\[BC-11037\]\(https://linear\.app/brite-nites/issue/BC-11037\)",
+        phase_05_body,
+    ), "deploy-sandbox Phase 0.5 must cite BC-11037 via markdown link"
