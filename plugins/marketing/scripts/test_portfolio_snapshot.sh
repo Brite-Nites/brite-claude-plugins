@@ -16,15 +16,24 @@
 #   B  empty campaigns dir (no manifests in window)                   expect 0
 #   C  multi-campaign — 3 campaigns same vertical roll up correctly   expect 0
 #   D  cross-vertical — 3 campaigns 3 verticals (breakdown distinct)  expect 0
-#   E  invalid flag rejection — markdown command static grep          expect 0
+#   E  invalid flag rejection — rubric-triad lock (anchor + table)    expect 0
 #   F  quarterly mode — 6 campaigns across 3 months in Q1             expect 0
 #   G  anti-creep guard — out path outside _reviews/ rejected         expect 2
 #   H  out-of-window manifest excluded                                expect 0
 #   I  learnings.md verdict tally — Summary stats aggregated          expect 0
 #   J  SF degraded_auth — Section 2 ⚠ banner emitted                  expect 0
-#   K  posture lookup from canonicals.yaml                            expect 0
+#   K  posture lookup from canonicals.yaml (cell-position locked)     expect 0
 #   L  command markdown has all 4 reject-flag clauses + V3 cite       expect 0
 #   M  helper refuses unknown --span value                            expect 2
+#   N  slug-fallback path — no created_at, valid fy/m slug            expect 0
+#   O  junk created_at + no fy/m slug → excluded with stderr warning  expect 0
+#   P  window boundary — 23:59:58Z IN / 00:00:00Z next-day OUT        expect 0
+#   Q  malformed learnings.md Summary stats — graceful fallback       expect 0
+#   R  quarterly Q1/Q2 boundary label (April-start → 2026-Q2)         expect 0
+#   S  SF degraded_query banner (SOQL-fail branch sibling of J)       expect 0
+#   T  unparseable created_at + valid slug → slug-fallback salvages    expect 0
+#   U  non-string created_at (JSON number) → except clause catches    expect 0
+#   V  manifest.angles[] populated → Section 3a distribution line     expect 0
 #
 # Usage:
 #   bash plugins/marketing/scripts/test_portfolio_snapshot.sh
@@ -55,7 +64,6 @@ tmproot="$(mktemp -d -t portfolio-snapshot-test.XXXXXX)" || {
   echo "FATAL: mktemp -d failed" >&2
   exit 2
 }
-trap 'cleanup' EXIT
 cleanup() {
   # Use find+rmdir to delete (avoids rm -r which the security hook blocks).
   if [ -d "$tmproot" ]; then
@@ -63,12 +71,12 @@ cleanup() {
     find "$tmproot" -depth -type d -exec rmdir {} + 2>/dev/null || true
   fi
 }
+trap 'cleanup' EXIT
 
 pass=0
 fail=0
 LAST_OUTPUT=""
 LAST_RC=0
-LAST_OUT_FILE=""
 
 assert_exit_and_substring() {
   local label="$1"
@@ -169,9 +177,15 @@ EOF
 }
 
 write_manifest() {
+  # created_at may be the literal string "OMIT" to write a manifest with NO
+  # created_at field at all — exercises the slug-fallback path in scenarios N/O.
   local dir="$1" entity="$2" slug="$3" vertical="$4" persona="$5" offer="$6" created_at="$7"
   local m_dir="$dir/docs/campaigns/$entity/$slug"
   mkdir -p "$m_dir"
+  local created_at_field=""
+  if [ "$created_at" != "OMIT" ]; then
+    created_at_field="  \"created_at\": \"$created_at\","
+  fi
   cat > "$m_dir/manifest.json" <<EOF
 {
   "schema_version": 1,
@@ -182,7 +196,7 @@ write_manifest() {
   "offer": "$offer",
   "year": 2026,
   "month": 4,
-  "created_at": "$created_at",
+${created_at_field}
   "salesforce": {"campaign_id": null},
   "email_bison": {"workspace": "emailbison-b2b", "campaign_id": null, "launched_at": null}
 }
@@ -302,16 +316,49 @@ run_d() {
 }
 
 # ── Scenario E: command markdown has all 4 rejection clauses ────────
-# Static grep against the command markdown (not the helper).
+# Static grep against the command markdown (not the helper). Applies the
+# [[pattern-rubric-lock-grep-triad]] from BC-10730 — single-pattern locks
+# (the previous `${flag}.*rejected` regex) are gameable by deprecation
+# rewordings like "`--weekly` was once rejected, now it's `--month`". This
+# scenario locks BOTH an HTML-comment anchor (structural clause) AND an
+# exact table-row shape per flag (catchphrase) — together impossible to
+# satisfy by accident or by a single-line reword.
 run_e() {
   local label_base="E: command markdown rejects"
   local rejected_flags=("--weekly" "--custom-window" "--forecast" "--charts")
+
+  # Structural-clause anchor: the HTML comment co-located with the table is a
+  # stable lock. Removing the table without removing the anchor leaves a dangling
+  # claim that fails this assertion; removing both makes the diff obvious.
+  if grep -q 'BC-8731-rejected-flags-anchor' "$COMMAND_MD"; then
+    echo "  PASS  ${label_base} (anchor present)"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  ${label_base} (anchor 'BC-8731-rejected-flags-anchor' missing)"
+    fail=$((fail + 1))
+  fi
+
   for flag in "${rejected_flags[@]}"; do
-    if grep -qE -- "${flag}.*rejected" "$COMMAND_MD"; then
-      echo "  PASS  ${label_base} ${flag} flag"
+    # Decoupled two-part assertion (per iter-2 test-quality review):
+    # (a) the flag appears in a backtick-fenced table cell somewhere in the file
+    # (b) an ERROR message for the flag, "rejected.", appears somewhere in the file
+    # Decoupling lets the table grow new columns (e.g., "Reason", "Since version")
+    # without breaking the assertion; what's locked is the shape of each PART
+    # independently, not their adjacency.
+    local flag_cell_pattern="\\| \`${flag}\` \\|"
+    local error_message_pattern="\`ERROR: ${flag} rejected\\."
+    if grep -qE -- "$flag_cell_pattern" "$COMMAND_MD"; then
+      echo "  PASS  ${label_base} ${flag} (flag-cell shape present)"
       pass=$((pass + 1))
     else
-      echo "  FAIL  ${label_base} ${flag} flag — no rejection clause found"
+      echo "  FAIL  ${label_base} ${flag} — flag-cell shape '| \`${flag}\` |' not found"
+      fail=$((fail + 1))
+    fi
+    if grep -qE -- "$error_message_pattern" "$COMMAND_MD"; then
+      echo "  PASS  ${label_base} ${flag} (ERROR message shape present)"
+      pass=$((pass + 1))
+    else
+      echo "  FAIL  ${label_base} ${flag} — ERROR message shape '\`ERROR: ${flag} rejected.' not found"
       fail=$((fail + 1))
     fi
   done
@@ -443,7 +490,11 @@ run_k() {
     --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
     --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
   assert_exit_and_substring "K: posture resolution exit OK" 0 "campaigns_in_window: 1"
-  assert_file_contains "K: pilot posture resolved" "$out" '\| pilot \|'
+  # Cell-position lock — assert the full Posture column position via the
+  # entity→...→Posture column sequence (defense against future column rearrangements
+  # or matching a stray "pilot" in another column).
+  assert_file_contains "K: pilot posture resolved in correct column" "$out" \
+    '\| labs \| ski-resorts \| pers \| season-pass-anchor \| pilot \|'
   assert_file_contains "K: pilot in posture-rollup" "$out" 'pilot = 1'
 }
 
@@ -488,6 +539,265 @@ run_m() {
     "invalid choice"
 }
 
+# ── Scenario N: slug-fallback path — no created_at, valid fy/m slug ──
+# Exercises filter_in_window's slug-derived launch-month fallback (the BC-8727
+# dogfood relies on this path in production). Without this scenario, the
+# fallback code path is silently untested.
+run_n() {
+  local dir; dir="$(mkdir_scenario N)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  # OMIT created_at — slug suffix must drive the window decision.
+  write_manifest "$dir" "labs" "hotels-resorts-pers-test-offer-fy26-m04" \
+    "hotels-resorts" "pers" "test-offer" "OMIT"
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "N: slug-fallback path includes manifest" 0 \
+    "campaigns_in_window: 1"
+  assert_file_contains "N: slug-fallback manifest in portfolio table" "$out" \
+    'hotels-resorts-pers-test-offer-fy26-m04'
+}
+
+# ── Scenario O: junk created_at + no fy-suffix slug → excluded with warning ──
+# Defensive — a corrupted manifest must not be silently dropped. Helper emits
+# `[BC-8731] Skipping manifest …` to stderr when neither created_at nor slug
+# yields a launch month.
+run_o() {
+  local dir; dir="$(mkdir_scenario O)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  # Junk created_at AND slug with no fy/m suffix — both paths fail.
+  write_manifest "$dir" "labs" "no-fy-suffix-here" \
+    "hotels-resorts" "pers" "test-offer" "garbage-not-a-date"
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "O: corrupted manifest excluded" 0 "campaigns_in_window: 0"
+  assert_exit_and_substring "O: corrupted manifest emits BC-8731 stderr warning" 0 \
+    "\\[BC-8731\\] Skipping manifest with no parseable launch date"
+}
+
+# ── Scenario P: window boundary inclusivity ─────────────────────────
+# Three timestamps test the precise inclusion semantic:
+#   * 23:59:58Z — IN (one second below boundary)
+#   * 23:59:59Z — IN (the EXACT inclusion boundary per in_window()'s
+#                  end.replace(second=59); a refactor to `<` exclusive would
+#                  silently drop this — the off-by-one detector)
+#   * 00:00:00Z next day — OUT (one second past boundary)
+run_p() {
+  local dir; dir="$(mkdir_scenario P)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  write_manifest "$dir" "labs" "hotels-resorts-in-edge-test-offer-fy26-m04" \
+    "hotels-resorts" "pers" "test-offer" "2026-04-30T23:59:58Z"
+  write_manifest "$dir" "labs" "hotels-resorts-exact-edge-test-offer-fy26-m04" \
+    "hotels-resorts" "pers2" "test-offer" "2026-04-30T23:59:59Z"
+  write_manifest "$dir" "labs" "hotels-resorts-out-edge-test-offer-fy26-m05" \
+    "hotels-resorts" "pers3" "test-offer" "2026-05-01T00:00:00Z"
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "P: boundary inclusivity (2 IN at 23:59:58Z + 23:59:59Z, 1 OUT)" 0 \
+    "campaigns_in_window: 2"
+  assert_file_contains "P: 23:59:58Z manifest IN window" "$out" 'in-edge'
+  assert_file_contains "P: 23:59:59Z EXACT boundary IN window" "$out" 'exact-edge'
+  assert_file_NOT_contains "P: 00:00:00Z next-day manifest OUT of window" "$out" \
+    'out-edge'
+}
+
+# ── Scenario Q: malformed Summary stats — graceful default ──────────
+# learnings.md with malformed verdict lines must not crash; the helper falls
+# back to 0/0/0/0 silently. Helper sub-scenarios cover three regex-fail modes
+# so a future regex-loosening regression catches at least one.
+run_q() {
+  # Q-helper that runs one fixture variant against the helper and asserts the
+  # 0/0/0/0 fallback.
+  run_q_variant() {
+    local label="$1" verdict_line="$2"
+    local dir; dir="$(mkdir_scenario Q-${label})"
+    write_canonicals_manifest "$dir" "hotels-resorts"
+    write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+    write_manifest "$dir" "labs" "hotels-resorts-pers-test-offer-fy26-m04" \
+      "hotels-resorts" "pers" "test-offer" "2026-04-15T10:00:00Z"
+    local e_dir="$dir/docs/campaigns/labs"
+    mkdir -p "$e_dir"
+    {
+      printf '# Campaign Learnings — labs\n\n'
+      printf '## Summary stats\n\n'
+      printf -- '- Total debriefs: 3\n'
+      printf -- '- %s\n' "$verdict_line"
+      printf -- '- Last debrief: 2026-04-30\n\n'
+      printf '## What works\n## What doesn'\''t\n## Campaign log\n'
+    } > "$e_dir/learnings.md"
+    local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+    invoke_helper \
+      --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+      --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+      --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+    assert_exit_and_substring "Q-${label}: exit OK" 0 "campaigns_in_window: 1"
+    assert_file_contains "Q-${label}: fallback to SCALE = 0" "$out" \
+      'SCALE = 0 / ITERATE = 0 / PAUSE = 0 / KILL = 0'
+  }
+  # Variant 1: reshuffled key order (the original Q fixture)
+  run_q_variant "reshuffled" "Campaign verdicts: KILL=1, SCALE=2, ITERATE=0, PAUSE=0"
+  # Variant 2: partial — only two keys present
+  run_q_variant "partial" "Campaign verdicts: SCALE=1, KILL=0"
+  # Variant 3: missing prefix — no "Campaign verdicts:" sentinel
+  run_q_variant "no-prefix" "SCALE=1, ITERATE=2, PAUSE=0, KILL=1"
+}
+
+# ── Scenario R: quarterly Q1/Q2 boundary — April-start window emits Q2 label ──
+run_r() {
+  local dir; dir="$(mkdir_scenario R)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  local out="$dir/docs/campaigns/_reviews/quarterly-2026-Q2.md"
+  invoke_helper \
+    --span quarterly --window-start 2026-04-01 --window-end 2026-06-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "R: Q2 boundary exit OK" 0 "campaigns_in_window: 0"
+  assert_file_contains "R: Q2 label correctly emitted (not Q1)" "$out" \
+    '# Portfolio Snapshot — 2026-04-01 → 2026-06-30 \(2026-Q2\)'
+}
+
+# ── Scenario T: unparseable created_at + valid slug → slug salvages window-fit ──
+# Branch coverage: scenarios N + O cover the missing-created_at and
+# both-paths-fail paths; T covers the unparseable-created_at-but-slug-saves
+# path. Without T, a regression flipping `except ValueError: pass` to
+# `except ValueError: continue` would silently exclude these manifests.
+run_t() {
+  local dir; dir="$(mkdir_scenario T)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  # Junk created_at (won't parse) AND valid fy26-m04 slug (in-window April).
+  write_manifest "$dir" "labs" "hotels-resorts-salvaged-test-offer-fy26-m04" \
+    "hotels-resorts" "pers" "test-offer" "not-an-iso-timestamp"
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "T: unparseable created_at — slug salvages window-fit" 0 \
+    "campaigns_in_window: 1"
+  assert_file_contains "T: salvaged manifest appears in portfolio table" "$out" \
+    'salvaged'
+}
+
+# ── Scenario U: non-string created_at → AttributeError NOT raised ──
+# Defensive against the manifest type-shape regression (a JSON-numeric or
+# JSON-list created_at would have raised uncaught AttributeError in iter-1's
+# filter_in_window; iter-2 broadened the except clause to catch
+# AttributeError/TypeError). Asserts the helper survives a non-string field
+# and falls through to slug fallback rather than halting.
+run_u() {
+  local dir; dir="$(mkdir_scenario U)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  # Hand-written JSON heredoc (not write_manifest) because the helper always
+  # wraps created_at in quotes; this scenario needs a non-string value to
+  # exercise the AttributeError branch in filter_in_window's except clause.
+  local m_dir="$dir/docs/campaigns/labs/hotels-resorts-numeric-test-offer-fy26-m04"
+  mkdir -p "$m_dir"
+  cat > "$m_dir/manifest.json" <<'EOF'
+{
+  "schema_version": 1,
+  "slug": "hotels-resorts-numeric-test-offer-fy26-m04",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "pers",
+  "offer": "test-offer",
+  "year": 2026,
+  "month": 4,
+  "created_at": 12345,
+  "salesforce": {"campaign_id": null},
+  "email_bison": {"workspace": "emailbison-b2b", "campaign_id": null, "launched_at": null}
+}
+EOF
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  # Non-string created_at → except clause catches AttributeError → slug fallback
+  # → fy26-m04 in April window → manifest IS in-window. The slug also includes
+  # 'numeric' to make presence-asserting unambiguous.
+  assert_exit_and_substring "U: non-string created_at falls back to slug" 0 \
+    "campaigns_in_window: 1"
+  assert_file_contains "U: numeric-created_at manifest survives + lands in-window" "$out" \
+    'hotels-resorts-numeric-test-offer-fy26-m04'
+}
+
+# ── Scenario V: Section 3a angles distribution (any_angles=True branch) ──
+# Coverage gap caught by iter-3 review — no prior scenario seeds
+# `manifest.angles[]` with scored entries, so the `any_angles=True` branch
+# in render_section_3 is untested. Seeds a manifest with 3 angles tokens
+# (ALPHA, PROMISING, INTERESTING) and asserts the distribution line emits.
+run_v() {
+  local dir; dir="$(mkdir_scenario V)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  # Hand-write manifest with angles[] populated (write_manifest doesn't take angles).
+  local m_dir="$dir/docs/campaigns/labs/hotels-resorts-pers-test-offer-fy26-m04"
+  mkdir -p "$m_dir"
+  cat > "$m_dir/manifest.json" <<'EOF'
+{
+  "schema_version": 1,
+  "slug": "hotels-resorts-pers-test-offer-fy26-m04",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "pers",
+  "offer": "test-offer",
+  "year": 2026,
+  "month": 4,
+  "created_at": "2026-04-15T10:00:00Z",
+  "angles": [
+    {"slug": "angle-a", "verdict": "ALPHA"},
+    {"slug": "angle-b", "verdict": "PROMISING"},
+    {"slug": "angle-c", "verdict": "INTERESTING"}
+  ],
+  "salesforce": {"campaign_id": null},
+  "email_bison": {"workspace": "emailbison-b2b", "campaign_id": null, "launched_at": null}
+}
+EOF
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "V: angles[] populated — exit OK" 0 "campaigns_in_window: 1"
+  assert_file_contains "V: Section 3a distribution line emits with non-zero ALPHA" "$out" \
+    'ALPHA = 1 / PROMISING = 1 / INTERESTING = 1 / COMMODITY = 0 / unscored = 0'
+}
+
+# ── Scenario S: SF degraded_query banner ─────────────────────────────
+# Sibling of Scenario J — covers the second SF failure mode (SOQL call fails)
+# beyond the auth-probe failure J already covers.
+run_s() {
+  local dir; dir="$(mkdir_scenario S)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  write_manifest "$dir" "labs" "hotels-resorts-pers-test-offer-fy26-m04" \
+    "hotels-resorts" "pers" "test-offer" "2026-04-15T10:00:00Z"
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --sf-status "degraded_query" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "S: SF degraded_query exit OK" 0 "sf=degraded_query"
+  assert_file_contains "S: SF degraded_query banner in Section 2" "$out" \
+    'SF rollup section degraded — SOQL call failed'
+  assert_file_contains "S: filesystem sections still emit" "$out" \
+    '## 1. Portfolio shape'
+}
+
 # ── Run scenarios ───────────────────────────────────────────────────
 echo "Running portfolio_snapshot.py regression harness against $HELPER"
 echo ""
@@ -505,6 +815,15 @@ run_j
 run_k
 run_l
 run_m
+run_n
+run_o
+run_p
+run_q
+run_r
+run_s
+run_t
+run_u
+run_v
 
 echo ""
 echo "RESULT pass=$pass fail=$fail"

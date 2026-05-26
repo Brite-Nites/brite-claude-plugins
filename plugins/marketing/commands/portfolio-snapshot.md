@@ -28,6 +28,8 @@ Exactly one of `--monthly` / `--quarterly` MUST be provided. If both are present
 
 Each of the four flags below is rejected at parse time with a non-zero exit and an explicit citation of the V3 outcome doc. These rejections are LOAD-BEARING per V3 item 6 ratification.
 
+<!-- BC-8731-rejected-flags-anchor: Do not edit this comment or the table below without updating `plugins/marketing/scripts/test_portfolio_snapshot.sh` Scenario E. The harness locks both the anchor and the per-row table shape per [[pattern-rubric-lock-grep-triad]]. -->
+
 | Flag | Reject message |
 |---|---|
 | `--weekly` | `ERROR: --weekly rejected. Monthly + quarterly are the only windows per V3 outcome (docs/v3-ratification-outcome-2026-05-22.md item 6). Weekly cadence is served by the SF list view (item 7), not by a review packet.` |
@@ -114,10 +116,13 @@ Filesystem reads are the load-bearing data source. SF + Linear are best-effort e
 
 1. **Glob `docs/campaigns/*/*/manifest.json`** — picks up every campaign scaffold under `docs/campaigns/<short-entity>/<slug>/` per BC-8719 (entity-slug short-form migration). Per `gotcha_lint_marker_token_collides_with_worktree_dirname.md`, anchor paths from `REPO_ROOT` (typically the CWD when the command runs) rather than from absolute paths to keep downstream filters robust.
 
-2. **Filter manifests to in-window** — for each manifest, check `created_at` (ISO timestamp). A manifest is in-window if `window_start <= created_at <= window_end T23:59:59Z`. If `created_at` is absent (older manifests pre-σ3), fall back to deriving from the slug's `fy{YY}-m{MM}` suffix:
-   - `fy{YY}` = fiscal year suffix → `2000 + YY` (Brite GTM uses calendar-aligned fiscal years per ADR-012).
-   - `m{MM}` = month number (01-12).
-   - Derived launch month start = `{2000+YY}-{MM}-01`. A manifest with a slug-derived launch month INSIDE the window counts.
+2. **Filter manifests to in-window** — three-clause priority per the helper's `filter_in_window` contract:
+   - **(1)** If `created_at` parses successfully as ISO-8601, the timestamp DECIDES (in-window or out-of-window). Slug suffix is ignored even if it disagrees — a campaign re-scheduled away from its slug-encoded launch month is fit by the actual launch event, not the intended one. A manifest is in-window if `window_start <= created_at <= window_end T23:59:59Z`.
+   - **(2)** If `created_at` is missing OR unparseable (malformed string / non-string type), fall back to deriving the launch month from the slug's `fy{YY}-m{MM}` suffix:
+     - `fy{YY}` = fiscal year suffix → `2000 + YY` (Brite GTM uses calendar-aligned fiscal years per ADR-012).
+     - `m{MM}` = month number (01-12).
+     - Derived launch month start = `{2000+YY}-{MM}-01`. A manifest with a slug-derived launch month INSIDE the window counts.
+   - **(3)** If BOTH paths fail (no `created_at` AND slug has no valid `fy/m` suffix), the manifest is EXCLUDED and the helper emits a `[BC-8731]` stderr warning so an operator notices the corrupted manifest. Silent drop would mask data loss; an explicit warning lets the operator triage.
 
 3. **For each in-window manifest**, read:
    - The manifest itself (slug + entity + vertical + persona + offer + year + month + salesforce.campaign_id + email_bison.workspace + email_bison.campaign_id + email_bison.launched_at).
@@ -219,7 +224,7 @@ A single table listing every in-window manifest, one row per campaign:
 | <entity> | <vertical> | <persona> | <offer> | <posture-from-manifest-or-canonicals> | <linear-status-from-Phase4-or-"unknown"> | <slug> |
 | ... | ... | ... | ... | ... | ... | ... |
 
-**Totals:** {N} campaigns in window · {entity-set-size} entities · {vertical-set-size} verticals · {persona-set-size} personas · {offer-set-size} offers · {posture-set-size} postures · {status-set-size} status blocks
+**Totals:** {N} campaigns in window · {entity-set-size} entities · {vertical-set-size} verticals · {persona-set-size} personas · {offer-set-size} offers · {posture-set-size} postures
 
 **By entity:** labs = {n} / supply = {n} / nites = {n} / cross-entity = {n}
 **By vertical:** {top-N vertical breakdown, others summarized}
@@ -363,10 +368,10 @@ If no MSPA matrices exist or no transitions are detected, render: "No cross-quar
 ```markdown
 ## 7. Cumulative transferables
 
-Quarterly-only: aggregate the Section 4 transferables across all entities + all in-quarter campaigns, then deduplicate identical bullets that appeared in multiple campaigns' learnings.md (a duplicate is signal — surface as "appeared in N campaigns" rather than collapsing).
+Quarterly-only: aggregate the Section 4 transferables across all entities + all in-quarter campaigns, then deduplicate identical bullets that appeared in multiple entities' learnings.md (a duplicate is signal — surface as "appeared in N entities" rather than collapsing). Note: `learnings.md` is one file per entity per [`campaign-debrief` §4](../skills/campaign-debrief/SKILL.md), so the de-dup unit is the entity, not the campaign.
 
-- {bullet} (appeared in N campaigns)
-- {bullet} (appeared in 1 campaign)
+- {bullet} (appeared in N entities)
+- {bullet} (appeared in 1 entity)
 - ...
 ```
 

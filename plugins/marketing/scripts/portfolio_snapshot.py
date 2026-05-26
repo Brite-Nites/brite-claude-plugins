@@ -175,29 +175,53 @@ def filter_in_window(
     window_start: datetime,
     window_end: datetime,
 ) -> list[dict[str, Any]]:
-    """Filter manifests to those whose created_at OR slug-derived launch month is in-window."""
+    """Filter manifests to those whose created_at OR slug-derived launch month is in-window.
+
+    Window-fit decision per manifest:
+
+    1. If ``created_at`` parses as a valid ISO-8601 timestamp, that timestamp
+       decides in/out — slug suffix is ignored even if it disagrees (the timestamp
+       is the authoritative launch event; the slug month is the *intended* launch
+       month, which may differ for re-scheduled campaigns).
+    2. If ``created_at`` is missing OR unparseable, fall back to the slug's
+       ``-fy{YY}-m{MM}`` suffix and use the first day of the derived launch month.
+    3. If BOTH paths fail (no ``created_at`` AND slug has no valid fy/m suffix),
+       the manifest is excluded with a ``[BC-8731]`` stderr warning — silent drop
+       would mask a corrupted manifest, which is worse than a one-line warning.
+    """
     in_window_list = []
     for m in manifests:
-        # Try created_at first (post-σ3 manifests have it).
+        # Try created_at first (post-σ3 manifests have it). If it parses
+        # successfully — in-window or out — trust the timestamp and move on
+        # (continue), bypassing the slug fallback. Only when created_at is
+        # missing OR unparseable do we fall through to the slug suffix.
         created_at = m.get("created_at")
-        landed = False
         if created_at:
             try:
-                # Parse ISO-8601 — strip 'Z' for fromisoformat compatibility.
                 normalized = created_at.replace("Z", "+00:00")
                 d = datetime.fromisoformat(normalized)
                 if in_window(d, window_start, window_end):
                     in_window_list.append(m)
-                    landed = True
-            except ValueError:
+                continue
+            except (ValueError, AttributeError, TypeError):
+                # Type-shape failures (numeric / bool / list created_at) and
+                # unparseable strings both fall through to slug fallback rather
+                # than halt the packet.
                 pass
-        if landed:
-            continue
         # Fallback: derive launch month from slug.
         slug = m.get("slug", "")
         launch_month = slug_to_launch_month(slug)
-        if launch_month and in_window(launch_month, window_start, window_end):
-            in_window_list.append(m)
+        if launch_month:
+            if in_window(launch_month, window_start, window_end):
+                in_window_list.append(m)
+            # Out-of-window via slug fallback — silent skip is correct.
+        else:
+            # Neither created_at nor slug suffix yielded a launch date — surface
+            # the corrupted manifest so an operator notices.
+            sys.stderr.write(
+                f"[BC-8731] Skipping manifest with no parseable launch date: "
+                f"slug={slug!r} created_at={created_at!r} path={m.get('__path', '(unknown)')!r}\n"
+            )
     return in_window_list
 
 
@@ -275,6 +299,35 @@ def lookup_posture(canonicals_dir: Path, vertical: str, offer: str) -> str | Non
             if mp:
                 return mp.group(1)
     return None
+
+
+# ── Per-entity learnings.md traversal ──────────────────────────────────
+
+
+def iter_entity_learnings(
+    manifests: list[dict[str, Any]], campaigns_dir: Path
+):
+    """Yield (entity, parsed_summary) once per unique in-window entity with a readable learnings.md.
+
+    Sections 3c, 4, and 7 each need the same per-entity dedup + read + parse;
+    this generator collapses three identical preambles into one. OSError on
+    read is swallowed silently (matches prior render-function behavior — a
+    transient FS error on one entity's learnings.md must not halt the packet).
+    """
+    entities_seen: set[str] = set()
+    for m in manifests:
+        entity = m.get("entity", "")
+        if not entity or entity in entities_seen:
+            continue
+        entities_seen.add(entity)
+        learnings_path = campaigns_dir / entity / "learnings.md"
+        if not learnings_path.is_file():
+            continue
+        try:
+            text = learnings_path.read_text()
+        except OSError:
+            continue
+        yield entity, parse_learnings_summary(text)
 
 
 # ── learnings.md parsing ────────────────────────────────────────────────
@@ -382,30 +435,6 @@ def parse_mmf_verdicts(text: str) -> list[str]:
 # ── analysis-*.md parsing ───────────────────────────────────────────────
 
 
-def parse_analysis_verdicts(text: str) -> list[str]:
-    """Extract verdict tokens (TOP PERFORMER / SCALE / TEST MORE / MONITOR / UNDERPERFORM)
-    from an analysis-*.md §2 Segment Performance Ranking table."""
-    verdicts = []
-    in_section = False
-    valid = {"TOP PERFORMER", "SCALE", "TEST MORE", "MONITOR", "UNDERPERFORM"}
-    for line in text.splitlines():
-        if re.match(r"^##\s+2\.\s+Segment Performance Ranking\b", line):
-            in_section = True
-            continue
-        if in_section and line.startswith("## "):
-            break
-        if not in_section:
-            continue
-        if line.startswith("|") and not re.match(r"^\|[-: |]+$", line):
-            cells = [c.strip() for c in line.strip("|").split("|")]
-            for cell in cells:
-                token = cell.upper()
-                if token in valid:
-                    verdicts.append(token)
-                    break
-    return verdicts
-
-
 def parse_analysis_actions(text: str) -> list[str]:
     """Extract action-tagged bullets from an analysis-*.md §6 Next Iteration block."""
     actions = []
@@ -470,6 +499,23 @@ def load_linear_json(path: str | None) -> dict[str, Any]:
     return {m.get("slug", m.get("name", "")): m for m in milestones if isinstance(m, dict)}
 
 
+# ── Cell formatters ────────────────────────────────────────────────────
+
+
+def fmt_money(value: float | int | None) -> str:
+    """Format a SF currency field as `$X,XXX` or `n/a` for null."""
+    if value is None:
+        return "n/a"
+    return f"${value:,.0f}"
+
+
+def fmt_int(value: int | None) -> str:
+    """Format a SF count field (NumberOfLeads etc.) as integer or `n/a` for null."""
+    if value is None:
+        return "n/a"
+    return str(value)
+
+
 # ── Section renderers ──────────────────────────────────────────────────
 
 
@@ -489,6 +535,17 @@ def render_section_1(
         lines.append("")
         return "\n".join(lines)
 
+    # Resolve posture once per manifest — eliminates 3× redundant canonicals reads
+    # (row render + postures set + per-posture rollup all consume the same value).
+    postures_by_slug: dict[str, str] = {}
+    for m in manifests:
+        slug = m.get("slug", "")
+        postures_by_slug[slug] = (
+            m.get("offer_posture")
+            or lookup_posture(canonicals_dir, m.get("vertical", ""), m.get("offer", ""))
+            or "(unknown)"
+        )
+
     lines.append("| Entity | Vertical | Persona | Offer | Posture | Status | Slug |")
     lines.append("|---|---|---|---|---|---|---|")
     for m in manifests:
@@ -497,11 +554,7 @@ def render_section_1(
         vertical = m.get("vertical", "(unknown)")
         persona = m.get("persona", "(unknown)")
         offer = m.get("offer", "(unknown)")
-        posture = (
-            m.get("offer_posture")
-            or lookup_posture(canonicals_dir, vertical, offer)
-            or "(unknown)"
-        )
+        posture = postures_by_slug.get(m.get("slug", ""), "(unknown)")
         # Linear status — look up by slug
         milestone = linear_by_slug.get(slug, {})
         status = milestone.get("status", "unknown") if linear_status == "ok" else "unknown"
@@ -514,16 +567,7 @@ def render_section_1(
     verticals = sorted({m.get("vertical", "") for m in manifests if m.get("vertical")})
     personas = sorted({m.get("persona", "") for m in manifests if m.get("persona")})
     offers = sorted({m.get("offer", "") for m in manifests if m.get("offer")})
-    postures = sorted(
-        {
-            (
-                m.get("offer_posture")
-                or lookup_posture(canonicals_dir, m.get("vertical", ""), m.get("offer", ""))
-                or "(unknown)"
-            )
-            for m in manifests
-        }
-    )
+    postures = sorted(set(postures_by_slug.values()))
     lines.append("")
     lines.append(
         f"**Totals:** {len(manifests)} campaigns in window · {len(entities)} entities · "
@@ -554,17 +598,14 @@ def render_section_1(
     )
     lines.append(f"**By vertical:** {vertical_rollup}")
 
-    # Per-posture rollup
+    # Per-posture rollup (reuses postures_by_slug from above — no re-resolution)
     posture_counts: dict[str, int] = {
         "free-asset": 0,
         "knowledge": 0,
         "pilot": 0,
         "risk-reversal": 0,
     }
-    for m in manifests:
-        p = m.get("offer_posture") or lookup_posture(
-            canonicals_dir, m.get("vertical", ""), m.get("offer", "")
-        )
+    for p in postures_by_slug.values():
         if p in posture_counts:
             posture_counts[p] += 1
     lines.append(
@@ -658,11 +699,8 @@ def render_section_2(
         if leads is not None:
             leads_total += int(leads)
         lines.append(
-            f"| {slug} | {sf_id} | "
-            f"{('$' + format(amt_all, ',.0f')) if amt_all is not None else 'n/a'} | "
-            f"{('$' + format(amt_won, ',.0f')) if amt_won is not None else 'n/a'} | "
-            f"{leads if leads is not None else 'n/a'} | "
-            f"{eb_id} | {launched} |"
+            f"| {slug} | {sf_id} | {fmt_money(amt_all)} | {fmt_money(amt_won)} | "
+            f"{fmt_int(leads)} | {eb_id} | {launched} |"
         )
 
     if not manifests:
@@ -757,26 +795,17 @@ def render_section_3(
     lines.append("")
 
     # 3c — Campaign Verdict (learnings.md Summary stats)
-    lines.append("### 3c. Campaign Verdict (from learnings.md Summary stats)")
+    lines.append("### 3c. Campaign Verdict (entity-cumulative — from learnings.md Summary stats)")
     lines.append("")
     aggregate = {"SCALE": 0, "ITERATE": 0, "PAUSE": 0, "KILL": 0}
     debrief_total = 0
-    entities_seen = set()
-    for m in manifests:
-        entity = m.get("entity", "")
-        if not entity or entity in entities_seen:
-            continue
-        entities_seen.add(entity)
-        learnings_path = campaigns_dir / entity / "learnings.md"
-        if not learnings_path.is_file():
-            continue
-        try:
-            summary = parse_learnings_summary(learnings_path.read_text())
-        except OSError:
-            continue
+    entities_with_debriefs: list[str] = []
+    for entity, summary in iter_entity_learnings(manifests, campaigns_dir):
         for k in aggregate:
             aggregate[k] += summary["verdicts"].get(k, 0)
         debrief_total += summary["total_debriefs"]
+        if summary["total_debriefs"] > 0:
+            entities_with_debriefs.append(entity)
     not_yet = max(0, len(manifests) - debrief_total)
     lines.append(
         "Distribution: "
@@ -784,6 +813,20 @@ def render_section_3(
         + f" / not-yet-debriefed = {not_yet}"
     )
     lines.append("")
+    # Lifetime-vs-window semantic note — the Summary stats block in each
+    # learnings.md is regenerated by `campaign-debrief` from the ENTIRE
+    # append-only Campaign log (per its §3 Append-only invariant carve-out),
+    # NOT filtered to the in-window debriefs. Surfacing this inline prevents
+    # a reader from interpreting these counts as window-scoped. The internal
+    # anti-creep rationale stays in this code comment — operator-facing prose
+    # gets only the load-bearing semantic.
+    if debrief_total > 0:
+        lines.append(
+            f"> **Note**: Counts above are *entity-cumulative* across each "
+            f"entity's entire `learnings.md` Campaign log "
+            f"({', '.join(entities_with_debriefs)}), not window-scoped."
+        )
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -801,19 +844,7 @@ def render_section_4(
     ]
     works: list[str] = []
     doesnt: list[str] = []
-    entities_seen = set()
-    for m in manifests:
-        entity = m.get("entity", "")
-        if not entity or entity in entities_seen:
-            continue
-        entities_seen.add(entity)
-        learnings_path = campaigns_dir / entity / "learnings.md"
-        if not learnings_path.is_file():
-            continue
-        try:
-            summary = parse_learnings_summary(learnings_path.read_text())
-        except OSError:
-            continue
+    for _entity, summary in iter_entity_learnings(manifests, campaigns_dir):
         works.extend(summary["what_works"])
         doesnt.extend(summary["what_doesnt"])
 
@@ -924,7 +955,7 @@ def render_section_6(
         "section reports presence/absence of mmf-matrix.md artifacts only."
     )
     lines.append("")
-    lines.append(f"In-window campaigns with `mmf-matrix.md`: {any_mmf and 'at least one' or 'none'}")
+    lines.append("In-window campaigns with `mmf-matrix.md`: at least one")
     lines.append("")
     return "\n".join(lines)
 
@@ -936,19 +967,7 @@ def render_section_7(
     lines = ["## 7. Cumulative transferables", ""]
     works_counter: dict[str, int] = {}
     doesnt_counter: dict[str, int] = {}
-    entities_seen = set()
-    for m in manifests:
-        entity = m.get("entity", "")
-        if not entity or entity in entities_seen:
-            continue
-        entities_seen.add(entity)
-        learnings_path = campaigns_dir / entity / "learnings.md"
-        if not learnings_path.is_file():
-            continue
-        try:
-            summary = parse_learnings_summary(learnings_path.read_text())
-        except OSError:
-            continue
+    for _entity, summary in iter_entity_learnings(manifests, campaigns_dir):
         for bullet in summary["what_works"]:
             works_counter[bullet] = works_counter.get(bullet, 0) + 1
         for bullet in summary["what_doesnt"]:
@@ -1011,9 +1030,7 @@ def render_section_8(
             leads = sf.get("NumberOfLeads")
             lines.append(
                 f"| {v} | {p} | {o} | v{version} | "
-                f"{('$' + format(amt_all, ',.0f')) if amt_all is not None else 'n/a'} | "
-                f"{('$' + format(amt_won, ',.0f')) if amt_won is not None else 'n/a'} | "
-                f"{leads if leads is not None else 'n/a'} |"
+                f"{fmt_money(amt_all)} | {fmt_money(amt_won)} | {fmt_int(leads)} |"
             )
     lines.append("")
     return "\n".join(lines)
@@ -1074,7 +1091,6 @@ def render_packet(
         if args.span == "monthly"
         else f"{args.window_start[:4]}-Q{((int(args.window_start[5:7]) - 1) // 3) + 1}"
     )
-    sources_filesystem = "ok"
 
     frontmatter = [
         "---",
@@ -1088,7 +1104,7 @@ def render_packet(
         "sources:",
         f"  sf: {args.sf_status}",
         f"  linear: {args.linear_status}",
-        f"  filesystem: {sources_filesystem}",
+        "  filesystem: ok",
         "---",
         "",
         f"# Portfolio Snapshot — {args.window_start} → {args.window_end} ({window_label})",
