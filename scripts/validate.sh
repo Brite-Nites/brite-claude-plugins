@@ -1387,6 +1387,40 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-8731 — Portfolio snapshot helper regression harness (BC-8731)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_portfolio_snapshot.sh — bash unit
+# tests for the portfolio_snapshot.py section composer + static-grep checks
+# on plugins/marketing/commands/portfolio-snapshot.md for the V3 outcome
+# anti-creep guard clauses (--weekly / --custom-window / --forecast /
+# --charts rejection, V3 cite, campaign-analysis §3.3 cite). The harness's
+# RESULT contract line drives the pass count (matches Sections 2b' / 2b'' /
+# 2b''' / 2c / 15a-discoveries).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-8731. Portfolio snapshot regression harness (BC-8731)"
+
+ps_harness="$REPO_ROOT/plugins/marketing/scripts/test_portfolio_snapshot.sh"
+ps_helper="$REPO_ROOT/plugins/marketing/scripts/portfolio_snapshot.py"
+
+if [ ! -f "$ps_helper" ]; then
+  warn "plugins/marketing/scripts/portfolio_snapshot.py not found — portfolio snapshot harness skipped"
+elif [ ! -f "$ps_harness" ]; then
+  warn "plugins/marketing/scripts/test_portfolio_snapshot.sh not found — portfolio snapshot harness skipped"
+else
+  if ps_harness_out=$(bash "$ps_harness" "$ps_helper" 2>&1); then
+    ps_pass_count=$(printf '%s\n' "$ps_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$ps_pass_count" ]; then
+      pass "portfolio-snapshot regression harness (${ps_pass_count} assertions)"
+    else
+      pass "portfolio-snapshot regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "portfolio-snapshot regression harness failed:"
+    printf '%s\n' "$ps_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"
