@@ -1,0 +1,15 @@
+{
+  "_comment": "FAIL_BOTH fixture — doc references blockedBy ops-hardening-99 (no Linear match → doc orphan) AND Linear has blockedBy BC-10360 → BC-10371 (creative-operations-01) with no matching doc bullet (Linear orphan). Both halves of cross-domain-deps-bidirectional fail.",
+  "parents": {
+    "BC-10360": {
+      "flow_id": "asset-unification-02",
+      "domain": "asset-unification",
+      "blockedBy": ["BC-10371"]
+    },
+    "BC-10371": {
+      "flow_id": "creative-operations-01",
+      "domain": "creative-operations",
+      "blockedBy": []
+    }
+  }
+}

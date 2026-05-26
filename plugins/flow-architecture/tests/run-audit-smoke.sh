@@ -61,7 +61,7 @@ story-docs-complete journey-complete index-complete \
 story-doc-exists story-front-matter-populated story-job-story-regex story-ac-gherkin-count \
 eng-children-engineering-populated design-children-design-populated docs-children-docs-populated \
 qa-children-qa-populated qa-status-signed-off qa-last-signed-off-iso8601 qa-history-row-signed-off \
-inventory-story-doc-id-match index-story-doc-status-match"
+inventory-story-doc-id-match index-story-doc-status-match cross-domain-deps-bidirectional"
 
 is_recognized_gate() {
   case " $RECOGNIZED_GATES " in
@@ -381,6 +381,8 @@ skip "Phase C linear-children-match cross-cutting gate" \
      "Linear-side; the story-doc children.* checks above are the filesystem half"
 skip "Phase C milestone-subflows-table-match cross-cutting gate" \
      "Linear-side; no filesystem proxy"
+skip "Phase C cross-domain-deps-bidirectional cross-cutting gate" \
+     "Linear-side; doc-side parse + set-comparison exercised by run-cross-domain-deps-vslice.sh per Q29 amendment 2 / BC-10729"
 skip "Phase C [Eng] sandbox HTTP smoke-test gate" \
      "network-bound; no live sandbox URL in fixture"
 skip "Phase C [QA] list_comments structured-signature match" \

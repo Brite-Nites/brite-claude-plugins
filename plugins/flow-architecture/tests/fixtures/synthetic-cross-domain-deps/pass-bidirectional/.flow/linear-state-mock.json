@@ -1,0 +1,20 @@
+{
+  "_comment": "Static mock of the per-domain list_issues batched response shape. Live /flow:audit Phase C reads this via Linear MCP, not from this file. Each parent issue carries extracted blockedBy[] of other FDA sub-flow parent IDs (same-domain siblings + discipline children pre-filtered out).",
+  "parents": {
+    "BC-10360": {
+      "flow_id": "asset-unification-02",
+      "domain": "asset-unification",
+      "blockedBy": ["BC-10371", "BC-10372"]
+    },
+    "BC-10371": {
+      "flow_id": "creative-operations-01",
+      "domain": "creative-operations",
+      "blockedBy": ["BC-10372"]
+    },
+    "BC-10372": {
+      "flow_id": "creative-operations-02",
+      "domain": "creative-operations",
+      "blockedBy": []
+    }
+  }
+}

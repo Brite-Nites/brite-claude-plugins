@@ -21,7 +21,7 @@ This document is a **synthesized architecture overview** of the multi-session de
    - 3e. [Greenfield Orchestrator Phase Flow](#3e-greenfield-orchestrator-phase-flow)
    - 3f. [Retrofit Orchestrator Phase Flow](#3f-retrofit-orchestrator-phase-flow)
    - 3g. [Multi-Perspective L-Review Pattern](#3g-multi-perspective-l-review-pattern)
-   - 3h. [Quality Gate Stack (35 gates)](#3h-quality-gate-stack)
+   - 3h. [Quality Gate Stack (36 gates post-Q29 amendment 2)](#3h-quality-gate-stack)
    - 3i. [State Substrates — Where Things Live](#3i-state-substrates)
 4. [Locked Decisions Summary](#4-locked-decisions-summary)
 5. [Pending Decisions](#5-pending-decisions)
@@ -515,10 +515,10 @@ Per Q54 (meta-Q): every artifact gets multi-perspective AI review at appropriate
 
 ### 3h. Quality Gate Stack
 
-Per Q29 lock — **35 gates** across 3 categories:
+Per Q29 lock + Q29 amendment 2 (LOCKED 2026-05-26 per BC-10729) — **36 gates** across 3 categories:
 
 ```
-   QUALITY GATE STACK (Q29) — 35 gates total
+   QUALITY GATE STACK (Q29 + amendment 2) — 36 gates total
    ═══════════════════════════════════════════════════════════
 
    ┌────────────────────────────────────────────────────────────┐
@@ -552,14 +552,22 @@ Per Q29 lock — **35 gates** across 3 categories:
    └────────────────────────────────────────────────────────────┘
 
    ┌────────────────────────────────────────────────────────────┐
-   │  CROSS-CUTTING CONSISTENCY GATES (5)                       │
+   │  CROSS-CUTTING CONSISTENCY GATES (6 post-Q29 amendment 2)  │
    │  Detect inter-substrate drift                              │
+   │  (Canonical names per Q29.3 + artifact-gate-pattern.md)    │
    │                                                            │
-   │  flow-id-stable (no renames post-publish)                  │
-   │  linear-children-match (5 disciplines per parent)          │
-   │  story-doc-frontmatter-binds-linear (parent_issue field)   │
-   │  parent-l3-summary-populated (after L3 review fires)       │
-   │  domain-milestone-eyebrow-link-block (Q22 anchor block)    │
+   │  inventory-story-doc-id-match (every story_doc flow_id     │
+   │    appears as row in master-flow-inventory.md)             │
+   │  index-story-doc-status-match (INDEX.md Status col matches │
+   │    story-doc front-matter status)                          │
+   │  linear-children-match (story-doc children.* BCs match     │
+   │    actual Linear parentId chain)                           │
+   │  parent-l3-summary-populated (Linear parent body carries   │
+   │    `## L3 review summary` with 5 discipline headlines)     │
+   │  milestone-subflows-table-match (Q22 milestone Sub-flows   │
+   │    table matches actual children of that milestone)        │
+   │  cross-domain-deps-bidirectional (Q27 amendment 1 mod 4    │
+   │    ↔ Linear blockedBy 1:1 mirror; BC-10729)                │
    └────────────────────────────────────────────────────────────┘
 
    RUNNER: /flow:audit (Q38)
@@ -715,7 +723,7 @@ By topic cluster (not strict phase ordering — phases are organizational gloss)
 
 | Q   | Topic                            | Lock summary                                                             |
 |-----|----------------------------------|--------------------------------------------------------------------------|
-| Q29 | Quality-gate stack enumeration   | 35 gates (8 phase-transition + 22 per-flow + 5 cross-cutting); 3-section report; Override flow per Q29.5 |
+| Q29 | Quality-gate stack enumeration   | 36 gates post-Q29 amendment 2 (8 phase-transition + 22 per-flow + 6 cross-cutting incl. `cross-domain-deps-bidirectional`); 3-section report; Override flow per Q29.5 |
 | Q38 | /flow:audit shape                | 7 sub-decisions; --gate filter; inline batched list_issues; auto-invoked from /flow:ship + /flow:plan-X; stdout-only by default |
 
 ### Content Drafts (Q33-Q35)
@@ -1094,7 +1102,7 @@ Diagrams in this document, in order of appearance:
 7. **Greenfield orchestrator phase flow** (§3e) — 8 phases / 4 gates with hybrid control flow
 8. **Retrofit orchestrator phase flow** (§3f) — 9 phases / 5 gates with Q14 cross-reference
 9. **L-review scoping** (§3g) — L1/L2/L3/L4 scopes + fire-and-write flow
-10. **Quality gate stack** (§3h) — 8 + 22 + 5 = 35 gates + audit runner
+10. **Quality gate stack** (§3h) — 8 + 22 + 6 = 36 gates post-Q29 amendment 2 + audit runner
 11. **State substrates** (§3i) — per-project + repo + Linear + cross-org
 12. **Plan forward — 6 phases** (§7) — design → org migration → scoping → implementation → dogfood → release
 13. **Migration map** (§8) — memory file → canonical homes
@@ -1130,7 +1138,7 @@ Q25  Flow INDEX.md schema                        — 11 columns
 Q26  Per-domain user journey doc template        — Q26 mod 2: L2 review summary
 Q27  Job story doc template                      — 17 front-matter fields
 Q28  Customer-facing how-to template             — voice-bound
-Q29  Quality-gate stack enumeration              — 35 gates (8+22+5)
+Q29  Quality-gate stack enumeration              — 36 gates post-amendment 2 (8+22+6)
 Q30  Plugin manifest + directory structure       — Q30.2 17 commands enum
 Q31  Resume breadcrumb schema                    — Q31.1 schema; 2 amendments
 Q32  MCP and dependency requirements             — Linear MCP; jq + python3
@@ -1139,7 +1147,7 @@ Q34  Operating-standards page content draft      — Q34 sister to milestones.md
 Q35  CDR-014 amendment content                   — in-place edits + milestones.md
 Q36  Plugin bootstrap shape                      — per-project; per-org parked
 Q37  Greenfield orchestrator phase sequence      — 8 phases / 4 gates / hybrid
-Q38  /flow:audit shape                           — 7 sub-decisions; 35-gate runner
+Q38  /flow:audit shape                           — 7 sub-decisions; 36-gate runner (post-Q29 amendment 2)
 Q40  Production readiness checklist              — LOCKED 2026-05-08; static doc; v1.0 release gate; 12 criteria
 Q41  PROJECT-INTENT.md template                  — LOCKED; 6 FM fields + 7 sections + L1
 Q42  /flow:office-hours skill design             — LOCKED; 7 sub-decisions; Q31 amendment 1

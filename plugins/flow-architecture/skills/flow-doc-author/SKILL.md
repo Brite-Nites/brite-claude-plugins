@@ -1,6 +1,6 @@
 ---
 name: flow-doc-author
-description: Per-domain story doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes N markdown files at `docs/product/flows/<domain>/<flow-id>.md`, one per sub-flow under a domain, conforming to the Q27 locked template. Hybrid authoring — programmatic substitution for 17 deterministic top-level YAML keys + 2 deterministic body items (`children` is one top-level key with 5 nested fields); parallel background `Agent(general-purpose)` dispatch for 8 narrative sections. Runs AFTER `flow-linear-scaffold` so parent + children BC numbers are available. 2-layer fidelity-review (mechanical `verify-docs.sh` + per-doc narrative drift check). 0 synchronous gates in default mode (filesystem writes; git review is the implicit gate). Per-domain authoring wall ~60s greenfield, ~90s retrofit; the second-wave fidelity-review fan-out adds ~30-60s, which can be overlapped with downstream `flow-journey-author`.
+description: Per-domain story doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes N markdown files at `docs/product/flows/<domain>/<flow-id>.md`, one per sub-flow under a domain, conforming to the Q27 locked template + Q27 amendment 1 (mod 4: optional `## Cross-domain dependencies` section). Hybrid authoring — programmatic substitution for 17 deterministic top-level YAML keys + 2 deterministic body items (`children` is one top-level key with 5 nested fields); parallel background `Agent(general-purpose)` dispatch for up to 9 narrative sections (the 9th — `## Cross-domain dependencies` — is OPTIONAL per Q27 amendment 1 and authored only when the sub-flow has cross-domain build-order or gating relations). Runs AFTER `flow-linear-scaffold` so parent + children BC numbers + sibling `blockedBy` relations are available for 1:1 mirror. 2-layer fidelity-review (mechanical `verify-docs.sh` + per-doc narrative drift check). 0 synchronous gates in default mode (filesystem writes; git review is the implicit gate). Per-domain authoring wall ~60s greenfield, ~90s retrofit; the second-wave fidelity-review fan-out adds ~30-60s, which can be overlapped with downstream `flow-journey-author`.
 user-invocable: false
 disable-model-invocation: true
 allowed-tools: Agent, Bash, Read, Write, Edit, Glob, Grep
@@ -57,18 +57,19 @@ The skill substitutes the following without LLM dispatch:
 
 Body deterministic items: H1 title `<DOMAIN-NN>: <Inventory title>`; doc-type-warning blockquote from template boilerplate.
 
-### Agent-authored (8 narrative sections)
+### Agent-authored (up to 9 narrative sections; the 9th is optional per Q27 amendment 1)
 
 One `Agent(general-purpose, run_in_background: true)` per sub-flow. Each agent fills:
 
 1. one-line summary blockquote
 2. optional `## Status notes` (Q27 mod 2 --- include only when status drift OR retrofit code-evidence flag)
-3. `## Job story` --- When/I want/So I can JTBD format
-4. `## Actor` --- RBAC + persona doc cross-link
-5. `## Preconditions` --- max 3 bullets
-6. `## Acceptance criteria` --- 3-5 Gherkin `Scenario:` blocks
-7. `## Out of scope`
-8. `## QA history` --- initial empty row
+3. optional `## Cross-domain dependencies` (**Q27 amendment 1 mod 4** --- include only when the sub-flow has cross-domain build-order or gating relations. Bullet list of `<this-flow-id> blockedBy <other-flow-id>` and/or `<this-flow-id> gates <other-flow-id>` lines, each with a one-line reason. 1:1 mirror of Linear `blockedBy` relations on the sub-flow parent issue --- enforced by Q29 amendment 2 `cross-domain-deps-bidirectional` gate. Same-domain sibling deps go in `related_flows` front-matter, NOT here.)
+4. `## Job story` --- When/I want/So I can JTBD format
+5. `## Actor` --- RBAC + persona doc cross-link
+6. `## Preconditions` --- max 3 bullets
+7. `## Acceptance criteria` --- 3-5 Gherkin `Scenario:` blocks
+8. `## Out of scope`
+9. `## QA history` --- initial empty row
 
 ---
 
@@ -79,11 +80,12 @@ One `Agent(general-purpose, run_in_background: true)` per sub-flow. Skill collec
 **Wall time:** ~30-60s for any N (vs ~4-8 min serial for N=8). Each agent receives:
 
 - Skeleton with `TBD` markers for narrative fields.
-- Q27 template path.
+- Q27 template path (incl. Q27 amendment 1 mod 4 `## Cross-domain dependencies` section).
 - Persona doc(s) for the assigned personas.
 - Journey doc (if already authored --- in greenfield this skill runs before journey-author, so usually unavailable).
 - Inventory row.
 - Code-evidence summary (if status > NOT_STARTED --- Section 7).
+- Cross-domain blockedBy snapshot for this sub-flow parent issue (from `flow-linear-scaffold` scaffold-log output --- list of `<other-flow-id, blocker-bc>` pairs; empty list = no cross-domain deps; agent omits the `## Cross-domain dependencies` section in that case).
 
 ---
 
