@@ -31,7 +31,9 @@ jobs:
 
       - name: Authenticate to brite-prod
         run: |
-          echo "${{ secrets.SFDX_AUTH_URL_PROD }}" | sf org login sfdx-url --sfdx-url-stdin --alias brite-prod
+          printf '%s' "${{ secrets.SFDX_AUTH_URL_PROD }}" > "$RUNNER_TEMP/sfdx-auth.txt"
+          sf org login sfdx-url --sfdx-url-file "$RUNNER_TEMP/sfdx-auth.txt" --alias brite-prod
+          rm -f "$RUNNER_TEMP/sfdx-auth.txt"
 
       - name: Probe auth validity
         id: probe
