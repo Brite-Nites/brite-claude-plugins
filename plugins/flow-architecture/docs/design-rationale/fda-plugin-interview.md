@@ -2621,3 +2621,17 @@ Q58 follows the Q56 / Q57 new-Q-lock precedent (a fresh Q-number for a scope dec
 ### Audit trail
 
 Q58 authored 2026-05-22 by orchestrator session-start synthesizing the BC-11029 handoff prompt + brite-roster PR #8 reference impl read + `commands/retrofit-project.md` Phase 1 structural analysis. Triggered by BC-11029 scoping (filed 2026-05-21). Sibling BCs to file post-ship: (a) `/flow:start-project` templates-scaffold parity; (b) brite-roster swap to plugin-provided scripts (low priority — current code works); (c) brite-base swap to plugin-provided scripts (defer until ≥2 more dogfood iterations). Companion artifacts: `plugins/flow-architecture/templates/README.md` (consumer-facing install + Option C migration plan) + `tests/run-verify-docs-ecosystem-vslice.sh` (harness asserting template fidelity) + BC-6956 description amendment (layer-boundary note: BC-6956 = plugin-internal helpers under `plugins/flow-architecture/scripts/`; BC-11029 = project-side toolchain templates under `plugins/flow-architecture/templates/`).
+
+### Q58 amendment 1 — `/flow:start-project` parity + recipe-block expansion (2026-05-26, [BC-11089](https://linear.app/brite-nites/issue/BC-11089))
+
+**What changed.** Two orchestrator-level changes close the Q58 § Out-of-scope gap (a) and fold in the BC-11029 final-review P3 #3:
+
+1. **`/flow:start-project` gains the templates-scaffold step.** The same 5-step recipe (resolve org slug → build arrays → idempotency check → copy+substitute+chmod → emit confirmation) now appears in `commands/start-project.md` Phase 1, byte-identical to `commands/retrofit-project.md` Phase 1. Greenfield projects bootstrapping via `/flow:start-project` no longer skip the verify-docs ecosystem. The `--overwrite-scripts` flag, failure semantics, and trust-boundary discipline are identical across both orchestrators.
+
+2. **Recipe-block expansion in both orchestrators.** The `cp` + `mkdir -p` + `chmod +x` loops and the `SRC_PATHS` / `TARGET_PATHS` array construction are now explicit inline bash in both `start-project.md` and `retrofit-project.md` (previously elided as prose in retrofit-project.md). This keeps the orchestrator-LLM from needing to synthesize the mechanical recipe from narrative paragraphs at runtime.
+
+**What did NOT change.** Q58's core decisions (Option A for v1.2, Option C as planned end-state, Q29.7 consumer-ownership semantics, idempotency design, placeholder substitution set, sub-decision 1 schema discipline, sub-decision 2 reversibility, sub-decision 3 migration trigger) are all unchanged. The amendment extends coverage to a second orchestrator surface; it does not alter the recipe itself.
+
+**Regression prevention.** [BC-11091](https://linear.app/brite-nites/issue/BC-11091)'s `tests/run-verify-docs-ecosystem-integration-vslice.sh` gains §9 — a contract-sync check against `start-project.md` mirroring §8's check against `retrofit-project.md`. The same 24 assertions (9 template refs + 4 placeholders + 7 primitives + 4 esc() metachar handlers) are verified in both files. Regression-validated: mutate start-project recipe → test FAILS; revert → test PASSES.
+
+**Audit trail.** Q58 amendment 1 authored 2026-05-26 by executor session implementing [BC-11089](https://linear.app/brite-nites/issue/BC-11089). Closes the gap called out in Q58 § Out-of-scope item (a). Plugin version 1.2.3 → 1.2.4 (patch — additive parity, no breaking change).
