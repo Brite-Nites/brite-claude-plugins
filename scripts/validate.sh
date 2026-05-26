@@ -1535,6 +1535,34 @@ else
   fi
 fi
 
+# Section 15a-bc-8725 — Canonicals bootstrap harness (BC-8725)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_canonicals_bootstrap.sh (vertical,
+# offer, persona subcommands against tempdir fixtures).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-8725. Canonicals bootstrap regression harness (BC-8725)"
+
+cb_harness="$REPO_ROOT/plugins/marketing/scripts/test_canonicals_bootstrap.sh"
+cb_helper="$REPO_ROOT/plugins/marketing/scripts/canonicals_bootstrap.py"
+
+if [ ! -f "$cb_helper" ]; then
+  warn "plugins/marketing/scripts/canonicals_bootstrap.py not found — bootstrap harness skipped"
+elif [ ! -f "$cb_harness" ]; then
+  warn "plugins/marketing/scripts/test_canonicals_bootstrap.sh not found — bootstrap harness skipped"
+else
+  if cb_harness_out=$(bash "$cb_harness" "$cb_helper" 2>&1); then
+    cb_pass_count=$(printf '%s\n' "$cb_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$cb_pass_count" ]; then
+      pass "canonicals bootstrap regression harness (${cb_pass_count} assertions)"
+    else
+      pass "canonicals bootstrap regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "canonicals bootstrap regression harness failed:"
+    printf '%s\n' "$cb_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
 # ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
