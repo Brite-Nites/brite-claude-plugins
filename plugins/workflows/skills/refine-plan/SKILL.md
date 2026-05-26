@@ -2,10 +2,12 @@
 name: refine-plan
 description: Refines a v1 project plan into agent-ready tasks with clear context, implementation steps, and validation criteria. Use after /plan-project has produced a v1 plan.
 user-invocable: false
-allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, Read, Write, Glob, Grep
+allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, Read, Write, Glob, Grep, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__get_page, mcp__plugin_workflows_gbrain-team__list_pages
 agent: plan-refiner
 context: fork
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
 
 ## Instructions
 

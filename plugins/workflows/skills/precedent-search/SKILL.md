@@ -3,6 +3,9 @@ name: precedent-search
 description: Searches project and org-level precedent INDEX files for relevant past decisions. Activates during brainstorming or planning when historical decisions may inform the current approach — searches by keyword against Decision and Tags columns, filters by category, lazy-loads full trace files on match.
 user-invocable: false
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 # Precedent Search

@@ -2,8 +2,10 @@
 name: story-doc-author
 description: Draft a per-sub-flow story doc (Q27 job-story template) — JTBD When/I want/So I can, 3-5 Gherkin AC, persona, status notes. Filesystem-only. Returns filled markdown.
 model: sonnet
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, mcp__plugin_flow-architecture_gbrain-team__query, mcp__plugin_flow-architecture_gbrain-team__get_page, mcp__plugin_flow-architecture_gbrain-team__list_pages
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
 
 _Spec: Q21 (memory:463) bullet 3 (memory:471) + Q27 template (memory:525) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 

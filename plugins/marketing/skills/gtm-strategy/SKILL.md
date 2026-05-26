@@ -2,12 +2,14 @@
 name: gtm-strategy
 description: 5-phase net-new GTM motion scoping — research → segments (weighted scoring) → personas → messaging pillars → offer recommendations. Triggers "gtm strategy", "go-to-market plan", "new motion scoping", "segments and personas", "messaging pillars", "new market entry strategy". Distinct from launch-strategy (product launches) and content-strategy (content marketing).
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob
+allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob, mcp__plugin_marketing_gbrain-team__query, mcp__plugin_marketing_gbrain-team__get_page, mcp__plugin_marketing_gbrain-team__list_pages
 metadata:
   version: 0.1.0
   upstream: Revgrowth1/ai-gtm-workflows
   category: Outbound Lead Gen
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
 
 # GTM Strategy
 

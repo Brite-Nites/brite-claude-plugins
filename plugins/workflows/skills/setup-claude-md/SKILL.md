@@ -2,10 +2,12 @@
 name: setup-claude-md
 description: Generates a best-practices CLAUDE.md file for the project. Analyzes the codebase and applies Claude Code best practices for optimal agent performance. Use at project setup or after /create-issues.
 user-invocable: false
-allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, Read, Write, Bash(find:*), Bash(cat:*), Bash(ls:*), Glob, Grep
+allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, Read, Write, Bash(find:*), Bash(cat:*), Bash(ls:*), Glob, Grep, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__get_page, mcp__plugin_workflows_gbrain-team__list_pages
 agent: claude-md-generator
 context: fork
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
 
 ## Instructions
 

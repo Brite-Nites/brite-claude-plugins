@@ -3,6 +3,9 @@ name: handbook-drift-check
 description: Detects handbook content that has drifted from project reality after shipping. Activates during the ship phase — compares the shipped diff against handbook files via GitHub API, identifies stale or missing handbook content, and optionally opens a PR to the handbook repo with proposed updates.
 user-invocable: false
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 # Handbook Drift Check

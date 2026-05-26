@@ -10,6 +10,8 @@ metadata:
   scoring: "130 points across 7 categories"
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 <!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Metadata Authoring (lines 130, 143-144) + §Permissions & Security (lines 175-176) + §Apex & Automation (lines 182, 191-193) + §Migration Reference + scripts/migration/. -->
 
 # Salesforce Data Operations Expert (sf-data) (Brite edition)
