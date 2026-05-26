@@ -84,15 +84,17 @@ if [ -z "$TMP_FIXTURE" ] || [ ! -d "$TMP_FIXTURE" ]; then
   printf '─────────────────────────────────────────────\n'
   exit 1
 fi
-case "$TMP_FIXTURE" in
-  "$REPO_TOPLEVEL_FROM_TEST"|"$REPO_TOPLEVEL_FROM_TEST"/*)
-    fail "TMP_FIXTURE ('$TMP_FIXTURE') resolved INSIDE the repo ('$REPO_TOPLEVEL_FROM_TEST') — refusing to mutate"
-    printf '\n─────────────────────────────────────────────\n'
-    printf 'RESULT pass=%d fail=%d skip=%d total=%d\n' "$PASS" "$FAIL" "$SKIP" $((PASS + FAIL + SKIP))
-    printf '─────────────────────────────────────────────\n'
-    exit 1
-    ;;
-esac
+if [ -n "$REPO_TOPLEVEL_FROM_TEST" ]; then
+  case "$TMP_FIXTURE" in
+    "$REPO_TOPLEVEL_FROM_TEST"|"$REPO_TOPLEVEL_FROM_TEST"/*)
+      fail "TMP_FIXTURE ('$TMP_FIXTURE') resolved INSIDE the repo ('$REPO_TOPLEVEL_FROM_TEST') — refusing to mutate"
+      printf '\n─────────────────────────────────────────────\n'
+      printf 'RESULT pass=%d fail=%d skip=%d total=%d\n' "$PASS" "$FAIL" "$SKIP" $((PASS + FAIL + SKIP))
+      printf '─────────────────────────────────────────────\n'
+      exit 1
+      ;;
+  esac
+fi
 # Cleanup tmpdir on exit (success OR fail) so re-runs start clean. Guard
 # inside the trap too — if TMP_FIXTURE got unset somehow between here and
 # exit, the empty-string-rm would either no-op or (in pathological cases)
@@ -222,10 +224,10 @@ for ph, env in [
 PY
 
   # Ensure target directories exist + copy template files into target paths.
-  local idx
+  local idx src tgt
   for idx in "${!SRC_PATHS[@]}"; do
-    local src="${SRC_PATHS[$idx]}"
-    local tgt="${TGT_PATHS[$idx]}"
+    src="${SRC_PATHS[$idx]}"
+    tgt="${TGT_PATHS[$idx]}"
     mkdir -p "$(dirname "$tgt")"
     cp "$src" "$tgt"
   done
@@ -233,7 +235,7 @@ PY
   # Cross-platform sed -i: -i.bak works on both BSD (macOS default) and GNU
   # sed; remove the .bak file after substitution.
   for idx in "${!TGT_PATHS[@]}"; do
-    local tgt="${TGT_PATHS[$idx]}"
+    tgt="${TGT_PATHS[$idx]}"
     sed -i.bak -f "$SED_SCRIPT" "$tgt"
     rm -f "$tgt.bak"
   done
