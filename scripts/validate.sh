@@ -1341,6 +1341,41 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-8726 — icp-refinement-review helper harness (BC-8726)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_icp_refinement_review.sh against an
+# isolated tmpdir per scenario. Covers scan / apply / emit-handbook against
+# the discoveries.json schema BC-8722 ships. No live-lint step here — the
+# slash command's runtime contract is end-to-end driven through the test
+# harness, and the mutated files would re-pass Section 15a-discoveries on
+# the next validate.sh anyway.
+# ══════════════════════════════════════════════════════════════════════
+section "ICP Refinement Review Helper"
+
+icp_helper="$REPO_ROOT/plugins/marketing/scripts/icp_refinement_review.py"
+icp_tests="$REPO_ROOT/plugins/marketing/scripts/test_icp_refinement_review.sh"
+
+if [ ! -f "$icp_helper" ]; then
+  warn "icp_refinement_review.py not found — harness skipped"
+elif [ ! -f "$icp_tests" ]; then
+  warn "test_icp_refinement_review.sh not found — harness skipped"
+else
+  if icp_tests_output=$(bash "$icp_tests" "$icp_helper" 2>&1); then
+    icp_tests_pass=$(printf '%s\n' "$icp_tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$icp_tests_pass" ]; then
+      pass "icp_refinement_review regression harness — $icp_tests_pass scenarios"
+    else
+      pass "icp_refinement_review regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "icp_refinement_review regression harness failed:"
+    while IFS= read -r line; do
+      [ -n "$line" ] && printf "          %s\n" "$line"
+    done <<< "$icp_tests_output"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-8719 — Entity-slug short-form lint (BC-8719 / O15)
 # ──────────────────────────────────────────────────────────────────────
 # Per BC-8719, the canonical campaign filesystem layout is short-form
