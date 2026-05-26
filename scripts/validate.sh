@@ -1456,6 +1456,56 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-8728 — Shared utilities + offer-performance harnesses (BC-8728)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_shared_utilities.sh (canonicals_reader,
+# slug_parts, manifest_loader) AND test_offer_performance.sh (8-scenario
+# regression harness). Rule-of-Three extraction + new command surface.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-8728. Shared utilities regression harness (BC-8728)"
+
+su_harness="$REPO_ROOT/plugins/marketing/scripts/test_shared_utilities.sh"
+
+if [ ! -f "$su_harness" ]; then
+  warn "plugins/marketing/scripts/test_shared_utilities.sh not found — shared utilities harness skipped"
+else
+  if su_harness_out=$(bash "$su_harness" 2>&1); then
+    su_pass_count=$(printf '%s\n' "$su_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$su_pass_count" ]; then
+      pass "shared utilities regression harness (${su_pass_count} assertions)"
+    else
+      pass "shared utilities regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "shared utilities regression harness failed:"
+    printf '%s\n' "$su_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+section "15a-bc-8728b. Offer-performance regression harness (BC-8728)"
+
+op_harness="$REPO_ROOT/plugins/marketing/scripts/test_offer_performance.sh"
+op_helper="$REPO_ROOT/plugins/marketing/scripts/offer_performance.py"
+
+if [ ! -f "$op_helper" ]; then
+  warn "plugins/marketing/scripts/offer_performance.py not found — offer-performance harness skipped"
+elif [ ! -f "$op_harness" ]; then
+  warn "plugins/marketing/scripts/test_offer_performance.sh not found — offer-performance harness skipped"
+else
+  if op_harness_out=$(bash "$op_harness" "$op_helper" 2>&1); then
+    op_pass_count=$(printf '%s\n' "$op_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$op_pass_count" ]; then
+      pass "offer-performance regression harness (${op_pass_count} assertions)"
+    else
+      pass "offer-performance regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "offer-performance regression harness failed:"
+    printf '%s\n' "$op_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"

@@ -48,6 +48,9 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _shared import manifest_loader
+
 SCHEMA_VERSION = 1
 TARGET_CATEGORY = "icp-refinement"
 PENDING_STATES = frozenset({"pending"})  # absent == pending per schema default
@@ -61,9 +64,7 @@ def _err(msg: str) -> None:
 
 def _glob_discoveries(campaigns_dir: Path) -> list[Path]:
     """Mirrors lint_discoveries.py's `discover_files` (sorted, two-deep glob)."""
-    if not campaigns_dir.is_dir():
-        return []
-    return sorted(campaigns_dir.glob("*/*/discoveries.json"))
+    return manifest_loader.glob_campaign_files(campaigns_dir, "discoveries.json")
 
 
 def _load_json(path: Path) -> dict:
@@ -82,12 +83,11 @@ def _is_pending(signal: dict) -> bool:
 
 def _read_manifest_vertical(discoveries_path: Path) -> str | None:
     """Sibling manifest.json vertical field, when present."""
-    manifest = discoveries_path.parent / "manifest.json"
-    if not manifest.is_file():
+    manifest_path = discoveries_path.parent / "manifest.json"
+    if not manifest_path.is_file():
         return None
-    try:
-        data = json.loads(manifest.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    data = manifest_loader.load_manifest(manifest_path)
+    if data is None:
         return None
     v = data.get("vertical")
     return v if isinstance(v, str) and v else None
