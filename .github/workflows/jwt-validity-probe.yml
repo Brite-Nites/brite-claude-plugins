@@ -79,7 +79,7 @@ jobs:
                       'description': (
                           'Automated weekly JWT probe detected brite-prod auth is no longer Connected'
                           f' (status: {os.environ[\"PROBE_STATUS\"]}).\n\n'
-                          'Runbook: brite-salesforce/docs/runbooks/sf-prod-jwt-auth-rotation.md\n'
+                          'Runbook: brite-salesforce/docs/runbooks/sf-prod-auth-rotation.md\n'
                           'Probe workflow: .github/workflows/jwt-validity-probe.yml\n\n'
                           'This issue was auto-filed by the scheduled probe. Re-authenticate and close when resolved.'
                       ),

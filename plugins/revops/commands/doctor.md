@@ -166,7 +166,7 @@ except Exception: print('PARSE_FAILED')
   case "$prod_cs" in
     Connected) emit PASS "brite-prod auth" "Connected";;
     NOT_AUTHED) emit WARN "brite-prod auth" "brite-prod alias not authenticated — run: sf org login web --alias brite-prod --instance-url https://login.salesforce.com";;
-    *) emit WARN "brite-prod auth" "not Connected ($prod_cs) — see brite-salesforce/docs/runbooks/sf-prod-jwt-auth-rotation.md";;
+    *) emit WARN "brite-prod auth" "not Connected ($prod_cs) — see brite-salesforce/docs/runbooks/sf-prod-auth-rotation.md";;
   esac
 elif [ "${SF_OK:-0}" != "1" ]; then emit SKIP "brite-prod auth" "sf CLI unavailable"
 else emit SKIP "brite-prod auth" "python3 unavailable — cannot parse sf --json"; fi

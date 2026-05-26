@@ -399,9 +399,9 @@ def test_jwt_probe_cites_runbook() -> None:
     rotation runbook so operators know where to go.
     """
     _, body = split_frontmatter(read_command())
-    assert "sf-prod-jwt-auth-rotation.md" in body, (
+    assert "sf-prod-auth-rotation.md" in body, (
         "JWT WARN note must cite the rotation runbook "
-        "(brite-salesforce/docs/runbooks/sf-prod-jwt-auth-rotation.md)"
+        "(brite-salesforce/docs/runbooks/sf-prod-auth-rotation.md)"
     )
 
 
