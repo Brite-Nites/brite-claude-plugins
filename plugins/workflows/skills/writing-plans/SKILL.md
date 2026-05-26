@@ -3,10 +3,9 @@ name: writing-plans
 description: Breaks work into bite-sized tasks before coding. Activates when a multi-step task needs planning — creates tasks small enough for a junior developer to follow (2-5 minutes each), with exact file paths, complete implementation details, and verification steps. References Linear issue context and project-specific test commands from CLAUDE.md.
 user-invocable: false
 ---
+<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 **Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
-<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 # Writing Plans
 

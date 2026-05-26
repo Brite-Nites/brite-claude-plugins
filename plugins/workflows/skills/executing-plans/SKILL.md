@@ -3,10 +3,9 @@ name: executing-plans
 description: Executes a structured plan using subagent-per-task with TDD enforcement. Activates when given an approved plan to implement — launches fresh subagents for each task, enforces red-green-refactor, runs two-stage review per task, and checkpoints between tasks. Parallelizes independent tasks.
 user-invocable: false
 ---
+<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 **Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
-<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 # Executing Plans
 

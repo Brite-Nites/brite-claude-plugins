@@ -3,10 +3,9 @@ name: best-practices-audit
 description: Audits and auto-fixes a project's CLAUDE.md against Anthropic best practices. Activates during ship phase — checks conciseness, enforces @import structure for detailed docs, auto-excludes bloat, identifies hook candidates, and auto-fixes structural issues. Flags content questions for developer review.
 user-invocable: false
 ---
+<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 **Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
-<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 # Best Practices Audit
 

@@ -3,10 +3,9 @@ name: brainstorming
 description: Socratic discovery and design exploration before planning. Activates when objective complexity criteria are met (2+ modules, 4+ tasks, 2+ approaches, or new patterns/integrations) — asks clarifying questions, explores alternatives and tradeoffs, produces a design document for approval. Pulls context from Linear issue description, linked docs, and existing CLAUDE.md learnings.
 user-invocable: false
 ---
+<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 **Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
-<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 # Brainstorming
 

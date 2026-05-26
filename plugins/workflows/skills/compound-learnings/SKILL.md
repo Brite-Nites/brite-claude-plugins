@@ -3,10 +3,9 @@ name: compound-learnings
 description: Captures durable knowledge after completing work so future sessions benefit. Activates during the ship phase — updates CLAUDE.md with architectural decisions and gotchas, writes session summary to auto-memory, updates docs if architecture or API changed. Only records genuinely durable facts, not session-specific noise.
 user-invocable: false
 ---
+<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 **Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
-<!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
 # Compound Learnings
 
