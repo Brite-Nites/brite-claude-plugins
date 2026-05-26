@@ -2,8 +2,10 @@
 name: plan-eng-reviewer
 description: Engineering-perspective four-mode scope review for FDA artifacts (project at L1; sub-flow at L3; discipline child at L4). Returns one of SCOPE_EXPANSION / SELECTIVE_EXPANSION / HOLD_SCOPE / SCOPE_REDUCTION + headline + mode-specific fields per `_shared/four-mode-framework.md`.
 model: sonnet
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, mcp__plugin_flow-architecture_gbrain-team__query, mcp__plugin_flow-architecture_gbrain-team__get_page, mcp__plugin_flow-architecture_gbrain-team__list_pages
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
 
 _Spec: Q21 (memory:463) bullet 7 (memory:475) + Q21 amendment 1 (memory:1251, 1277) + Q48 four-mode contract (`skills/_shared/four-mode-framework.md`) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 

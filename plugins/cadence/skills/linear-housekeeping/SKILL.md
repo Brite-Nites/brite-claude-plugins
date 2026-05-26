@@ -2,8 +2,10 @@
 name: linear-housekeeping
 description: Phase 3 of /cadence:weekly. Derives Linear mutations from Phase 2 scope decisions, re-runs the issue-quality-gate on every cycle-path mutation, previews the batch grouped by decision path + mutation type, and executes atomically with per-group user approval, idempotent pre-flight checks, and an ISO-8601 timestamped audit log. Triggers on "sprint cleanup", "linear housekeeping", "move to cycle", "back to backlog", "batch mutations", "apply scope decisions", or "/cadence:weekly phase 3".
 user-invocable: false
-allowed-tools: mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_comment, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__get_milestone, mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__list_comments, mcp__plugin_workflows_linear-server__list_milestones, AskUserQuestion, Read, Write, Edit, Bash, Skill, Agent
+allowed-tools: mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_comment, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__get_milestone, mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__list_comments, mcp__plugin_workflows_linear-server__list_milestones, AskUserQuestion, Read, Write, Edit, Bash, Skill, Agent, mcp__plugin_cadence_gbrain-team__query, mcp__plugin_cadence_gbrain-team__get_page, mcp__plugin_cadence_gbrain-team__list_pages
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
 
 # Phase 3 — Linear Housekeeping
 

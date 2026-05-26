@@ -5,6 +5,8 @@ user-invocable: false
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 # Precedent Search
 
 You are searching for relevant past decisions that may inform the current design or planning task. Your goal is to surface prior art from the project's decision trace history and the org-level precedent database so agents don't reinvent wheels or contradict established patterns.

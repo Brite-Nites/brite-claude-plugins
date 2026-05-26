@@ -2,12 +2,14 @@
 name: icp-scoring
 description: Pre-outreach prospect prioritization — score raw lists 0-100 (with reasoning) or A/B/C tier (Haiku letter-only) against entity-specific ICP criteria. Triggers "icp score", "icp verify", "qualify prospects", "score this list", "rank companies", "tier by icp". Distinct from `lead-routing` (post-reply SF assignment).
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob, Bash
+allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob, Bash, mcp__plugin_marketing_gbrain-team__query, mcp__plugin_marketing_gbrain-team__get_page, mcp__plugin_marketing_gbrain-team__list_pages
 metadata:
   version: 0.1.0
   upstream: Revgrowth1/ai-gtm-workflows + Revgrowth1/tam-map
   category: Outbound Lead Gen
 ---
+
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
 
 # ICP Scoring
 
