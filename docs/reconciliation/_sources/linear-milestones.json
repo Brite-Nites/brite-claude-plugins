@@ -1,0 +1,401 @@
+{
+  "milestones": [
+    {
+      "id": "01b1ee94-fd59-43c2-aafd-fa968af72807",
+      "name": "FY26, M06 | Municipalities | 250th Anniversary Final Call",
+      "description": "## Summary\n\nLast-call urgency send for the 250th Anniversary offer to US municipalities. Targets M3 non-engagers + net-new municipalities never on the M3 list, reframed around the calendar-forced \"build window closes end of June\" urgency angle.\n\n**Lead angle:** Last realistic build window for July 4 250th custom illuminated installations — anything scoped in July ships too late.\n\n**Brand:** Brite Labs\n\n---\n\n## ICP & targeting\n\n* **Tier:** Enterprise — cities >25k pop with active July 4 / civic programming budgets, dedicated parks-and-rec or special-events staff\n* **DM titles:** Director of Parks and Recreation, Director of Cultural Affairs, Special Events Coordinator, Director of Tourism, Downtown Development Director, City Manager, Public Art Coordinator, DDA Executive Director\n* **Target volume per ESP:** Google 800 / Microsoft 1,200 / SMTP 800 (\\~2,800 prospects)\n\n## Exclusion logic\n\n* Suppress ALL M3 Municipalities 250th recipients who opened/clicked/replied\n* Target only (a) M3 non-engagers where 90+ days have passed, AND (b) net-new municipalities sourced via [SAM.gov](<http://SAM.gov>) + state municipal league directories not in original M3 list\n* Cross-workspace EB suppression mandatory (workspace 55 + workspace 13)\n\n## 2-cycle rule justification\n\n90 days from M3 < 180-day floor. Calendar forces it — 250th cannot ship after July 4. M3 non-engagers didn't consume the offer; net-new munis weren't on M3 list.\n\n---\n\n## History\n\n* M3 Municipalities America 250 — 706 leads, 51 replies, 16 bounced, 100% complete. M6 final-call targets non-engagers + net-new only.\n\n---\n\n*Draft milestone proposed via planning session 2026-05-15. Review before activating.*",
+      "progress": 0,
+      "sortOrder": 61370,
+      "targetDate": "2026-06-30"
+    },
+    {
+      "id": "b051d339-4b66-4c1c-b1a9-b1c1127c247d",
+      "name": "FY26, M06 | Wineries & Breweries | Summer Programming",
+      "description": "## Summary\n\nNet-new vertical for FY26. Targets the planning window for Aug-Oct harvest events, weddings, and outdoor programming. Diagnostic angle: evening experiential differentiation tied to wine-club / tasting-room conversion.\n\n**Lead angle:** Custom illuminated installations sized for vineyard rows + biergartens that extend evening events and drive Instagram-shareable moments → wine-club sign-ups.\n\n**Brand:** Brite Labs\n\n---\n\n## ICP & targeting\n\n* **Tier:** Affluent/luxury — estate wineries >$10M revenue with on-premise wedding/event venues, craft breweries with taprooms + outdoor programming + active event calendars\n* **DM titles:** Director of Hospitality, Events Manager, Director of Marketing, Tasting Room Manager, Director of Wine Club, GM, Director of Experiences\n* **Target volume per ESP:** Google 1,100 / Microsoft 1,700 / SMTP 1,100 (\\~3,900 prospects)\n\n## Exclusion logic\n\n* Net-new vertical for FY26 — no prior sends to suppress\n* Standard cross-workspace EB suppression + SF Lead suppression\n* Build via Spider.cloud crawl of state wine/brewery association directories (Napa Valley Vintners, CA Brewers Guild, Oregon Wine Board, NY Wine, WA Wine)\n\n---\n\n## TAM signal\n\n* True US TAM: \\~20,500 venues (11k wineries with tasting rooms + 9.5k craft breweries with taprooms)\n* After ICP tier filter: \\~6,000-8,000 venues\n* Realistic clean addressable: 3,000-4,000 contacts\n\n---\n\n*Draft milestone proposed via planning session 2026-05-15. Review before activating.*",
+      "progress": 0,
+      "sortOrder": 62278,
+      "targetDate": "2026-06-30"
+    },
+    {
+      "id": "06fd698a-89d5-4d7e-83e5-5413fc6759d7",
+      "name": "FY26, M06 | Theaters | Year-Round",
+      "description": "## Summary\n\nNet-new vertical for FY26 — LORT-tier regional theaters, opera houses, major symphony halls. Targets the 2026-27 season-opener planning window. Angle: architectural lighting + lobby/facade installations amortized across 4 tentpole events per year.\n\n**Lead angle:** \"Donor-arrival\" experience economics — sculptural installations tied to season programming that perform across opener / gala / holiday show / spring fundraiser.\n\n**Brand:** Brite Labs\n\n---\n\n## ICP & targeting\n\n* **Tier:** Enterprise — regional performing arts centers, LORT-member theaters, opera houses, symphony halls with >$5M annual budget, dedicated donor/development programming\n* **DM titles:** Director of Development, Director of Marketing, Executive Director, Director of Donor Experience, Director of Operations, Director of Patron Services, Gala Chair / Special Events Director\n* **Target volume per ESP:** Google 700 / Microsoft 1,100 / SMTP 700 (\\~2,500 prospects)\n\n## Exclusion logic\n\n* Net-new vertical for FY26 — no prior sends to suppress\n* Cross-workspace EB + SF suppression standard\n* Build from TCG (Theatre Communications Group) member list + LORT roster + League of American Orchestras + Opera America membership crawls\n\n---\n\n## TAM signal\n\n* True US TAM: \\~1,000-1,100 venues\n* Realistic clean addressable: \\~3,800-5,000 contacts\n\n---\n\n*Draft milestone proposed via planning session 2026-05-15. Review before activating.*",
+      "progress": 0,
+      "sortOrder": 63190,
+      "targetDate": "2026-06-30"
+    },
+    {
+      "id": "0608871d-0a1c-447f-9a11-528f6b0aea5c",
+      "name": "FY26, M07 | Universities | Holiday Lighting",
+      "description": "## Summary\n\nHoliday Lighting kickoff for premium university facilities/advancement buyers. July is the planning window — procurement cycles run 4-6 months for fall/winter activations. Reframed angle vs M2 (generic Professional Emails): this is the facilities/advancement buyer (operations side), not academic affairs.\n\n**Lead angle:** \"Most facilities directors at peer institutions start holiday lighting vendor selection in July — permitting + electrical surveys eat 60 days before a single bulb goes up.\"\n\n**Brand:** Brite Labs\n\n---\n\n## ICP & targeting\n\n* **Tier:** Enterprise — R1/R2 + top-100 endowment privates + flagship state universities with >$500M endowments\n* **DM titles:** VP/AVP Facilities, Director of Grounds, Director of Auxiliary Services, Senior Director of Campus Operations, VP Alumni Relations, Director of Advancement Events, Campus Architect\n* **Target volume per ESP:** Google 400 / Microsoft 200 / SMTP 200 (\\~800 prospects M7)\n\n## Exclusion logic\n\n* M2 Colleges & Universities was generic — NOT Holiday Lighting offer\n* Cross-workspace EB suppression for any contact that received M2\n* 2-cycle rule satisfied: M7 = cycle 2 with materially different offer + different buyer persona (facilities vs academic)\n\n---\n\n## TAM signal\n\n* True US TAM: \\~480 institutions matching luxury tier\n* Realistic clean addressable: \\~1,150-1,200 verified facilities/advancement contacts\n\n---\n\n## History\n\n* M2 Colleges & Universities was generic 'capability' email. M7 reframes around facilities-team procurement timing + Holiday Lighting tier. No buyer-persona overlap.\n\n---\n\n*Draft milestone proposed via planning session 2026-05-15. Review before activating.*",
+      "progress": 0,
+      "sortOrder": 64176,
+      "targetDate": "2026-07-31"
+    },
+    {
+      "id": "dfd2f55f-04d6-4b63-9809-4e98cdd21281",
+      "name": "FY26, M07 | Brite Supply S4 | Year-Round Installer Partnership",
+      "description": "## Summary\n\nYear-Round installer partnership outreach to established decorative lighting installer businesses. July is the demand-planning month for installers preparing Q4 holiday peak — they source supply partners NOW to lock pricing/inventory for Nov-Dec install.\n\n**Lead angle:** \"Most premium installers lock supply partners in August for Q4 peak — pricing, lead times, and inventory commitments tighten after Labor Day.\"\n\n**Brand:** Brite Supply (S4 program)\n\n---\n\n## ICP & targeting\n\n* **Tier:** Enterprise — multi-crew installers (>5 trucks, >$2M annual revenue) servicing luxury residential + commercial\n* **DM titles:** Owner/Founder, GM, Director of Operations, VP of Purchasing, Procurement Manager, Operations Manager\n* **Target volume per ESP:** Google 1,500 / Microsoft 750 / SMTP 750 (\\~3,000 prospects)\n\n## Exclusion logic\n\n* Cross-reference EB workspace 55 for any prior Brite Supply S4 sends in FY26\n* Cross-workspace EB exclusion mandatory\n\n---\n\n## TAM signal\n\n* True US TAM: \\~8,500 qualifying installers\n* Realistic clean addressable: \\~3,000 contacts post-dedup\n\n---\n\n*Draft milestone proposed via planning session 2026-05-15. Review before activating.*",
+      "progress": 0,
+      "sortOrder": 65146,
+      "targetDate": "2026-07-31"
+    },
+    {
+      "id": "615e6393-4be0-44d9-8fa9-ec9d44ac8f4f",
+      "name": "FY26, M08 | Botanical Gardens | Holiday Lighting",
+      "description": "## Summary\n\nHoliday Lighting outreach to AAM-accredited botanical gardens running signature ticketed winter light events (Longwood Christmas, NYBG GLOW, Atlanta Garden Lights). Planning cycle locks August for November opens.\n\nReframes vs M4 Botanical Gardens (generic Professional Emails to horticulture/program directors): M8 targets the revenue/events buying committee with the gate-revenue worldview.\n\n**Lead angle:** \"Gardens running ticketed winter light events typically lock production partner by August 1 — November opens require 90 days install + 30 days programming.\"\n\n**Brand:** Brite Labs\n\n---\n\n## ICP & targeting\n\n* **Tier:** Enterprise + affluent — AAM-accredited gardens, >100K annual visitors\n* **DM titles:** Executive Director, VP of Visitor Experience, Director of Events, Director of Marketing, CFO, Director of Earned Revenue\n* **Target volume per ESP:** Google 120 / Microsoft 60 / SMTP 60 (\\~240 prospects)\n\n## Exclusion logic\n\n* Suppress any M4 contact directly — target only NEW personas at same orgs (events/marketing/revenue vs M4 horticulture/program)\n* 2-cycle rule satisfied because M4 was horticulture-buyer angle, M8 is revenue-event-buyer angle (different committee, different P&L driver)\n\n---\n\n## TAM signal\n\n* True US TAM: \\~600 gardens (APGA + AAM accredited)\n* Realistic clean addressable: \\~180 after enterprise/affluent filter\n\n---\n\n## History\n\n* M4 Botanical Gardens — 271 leads, 504 sends, 17 replies, 94.92% complete. Reframe to events/revenue buyer to avoid persona overlap.\n\n---\n\n*Draft milestone proposed via planning session 2026-05-15. Review before activating.*",
+      "progress": 0,
+      "sortOrder": 66120,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "7ef43d09-2041-4fd0-b0f2-c185591bb2a7",
+      "name": "FY26, M08 | Zoos | Holiday Lighting",
+      "description": "## Summary\n\nHoliday Lighting outreach to AZA-accredited zoos running ticketed winter light events (Wild Lights, Zoolights, Wildlights). Winter events = 25-40% of annual gate revenue in 6 weeks. AZA zoos lock production partner by August for November opens.\n\nReframes vs M4 Zoos (generic Professional Emails to conservation/education leadership): M8 targets revenue/marketing/events buying committee at the SAME zoos.\n\n**Lead angle:** \"AZA zoos running ticketed winter events lock production partner by mid-August — 90 days install + 30 days marketing means November opens are decided in July-August.\"\n\n**Brand:** Brite Labs\n\n---\n\n## ICP & targeting\n\n* **Tier:** Enterprise — AZA-accredited, >500K annual attendance, existing ticketed evening event capacity\n* **DM titles:** President/CEO, COO, VP Guest Experience, Director of Events, CMO/VP Marketing, Director of Earned Revenue\n* **Target volume per ESP:** Google 100 / Microsoft 50 / SMTP 50 (\\~200 prospects)\n\n## Exclusion logic\n\n* Suppress all M4 touched contacts entirely\n* Target NEW personas (events/marketing/revenue) at SAME zoos where M4 hit conservation/education\n\n---\n\n## TAM signal\n\n* True US TAM: \\~240 AZA + \\~50 ZAA tier-2 zoos in NA\n* Realistic clean addressable: \\~140 after enterprise filter\n\n---\n\n## History\n\n* M4 Zoos — 441 leads, 412 sends, 15 replies, 47.3% complete (paused). Reframe to revenue/events buyer.\n\n---\n\n*Draft milestone proposed via planning session 2026-05-15. Review before activating.*",
+      "progress": 0,
+      "sortOrder": 67213,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "41c8e21f-fb75-4577-abe5-7e8322cde916",
+      "name": "FY26, M09 | HOAs Self-Managed | Holiday Lighting",
+      "description": "## Summary\n\nNet-new vertical for FY26 — first Brite Labs outbound to self-managed luxury HOAs. Boards finalize holiday vendor selections in Sept-Oct for Nov-Dec install. Angle: volunteer burnout + board liability, NOT aesthetics.\n\n**Lead angle:** \"Year 3 of the volunteer ladder day or the same handyman who flaked last year — both lose to board liability + member complaints.\"\n\n**Brand:** Brite Labs\n\n---\n\n## ICP & targeting\n\n* **Tier:** Luxury/affluent — gated/master-planned communities, >$5M annual operating budgets, dues >$8K/year, $750K+ median home value, 200+ doors\n* **DM titles:** HOA Board President, Board Treasurer, Board Secretary, Architectural Review Committee Chair, Holiday/Social Committee Chair, Community Volunteer Coordinator\n* **Target volume per ESP:** Google 600 / Microsoft 300 / SMTP 300 (\\~1,200 prospects)\n\n## Exclusion logic\n\n* Net-new vertical — no FY26 history conflict\n* Cross-workspace EB exclusion (Personal + B2B) + SF Lead suppression\n* Self-managed only — exclude any HOA tagged \"professionally managed\"\n\n---\n\n## TAM signal\n\n* True US TAM: \\~18,000 self-managed HOAs in target affluence band\n* Realistic clean addressable: \\~3,500-4,500 board contacts\n* One of the largest enrichment-gap verticals; broker stack must include Spider.cloud + HOA-USA directory scraping + Prospeo/BlitzAPI for board emails\n\n---\n\n*Draft milestone proposed via planning session 2026-05-15. Review before activating.*",
+      "progress": 0,
+      "sortOrder": 68269,
+      "targetDate": "2026-09-30"
+    },
+    {
+      "id": "982cf8fe-6212-4f37-bd4e-bf1df8a7ff3a",
+      "name": "FY26, M07 | Aquariums | Holiday Underwater Festival",
+      "description": "## Offer\n\nNew net-new vertical from handbook PR #532 (aquariums offers folder created). Lead with Holiday Underwater Festival and Coral Reef After-Dark Event.\n\n## PR #532 offer pages (handbook)\n\n* marketing/go-to-market/verticals/aquariums/offers/holiday-underwater-festival.md\n* marketing/go-to-market/verticals/aquariums/offers/coral-reef-after-dark-event.md\n* marketing/go-to-market/verticals/aquariums/offers/corporate-sponsor-tank-naming.md\n* marketing/go-to-market/verticals/aquariums/offers/educational-school-group-experience.md\n* marketing/go-to-market/verticals/aquariums/offers/member-night-and-donor-event.md\n* marketing/go-to-market/verticals/aquariums/offers/permanent-exhibit-feature-lighting.md\n\n## Segment / Tier\n\nCommercial-to-Enterprise (varies by aquarium scale). Enterprise tier for system aquariums (Monterey Bay, Georgia, Shedd).\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18) — segment-first vertical taxonomy + 134 new offer pages.",
+      "progress": 0,
+      "sortOrder": 69191,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "e99e9f06-cf50-463b-988c-1dc54e02c09c",
+      "name": "FY26, M07 | Casinos | Casino Floor Holiday Takeover",
+      "description": "## Offer\n\nM05 Casinos Summer Programming already running. M07 Holiday gap-fill from PR #532 — Casino Floor Holiday Takeover as lead offer, Porte-Cochère Arrival and Resort Pool Deck Permanent as secondary.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/casinos/offers/casino-floor-holiday-takeover.md\n* marketing/go-to-market/verticals/casinos/offers/porte-cochere-arrival-experience.md\n* marketing/go-to-market/verticals/casinos/offers/resort-pool-deck-permanent.md\n* marketing/go-to-market/verticals/casinos/offers/tribal-gala-cultural-event-production.md\n* marketing/go-to-market/verticals/casinos/offers/vip-host-event-customization.md\n\n## Segment / Tier\n\nEnterprise. Coordinates with Tribes & Reservations milestone for tribal-owned properties.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).",
+      "progress": 0,
+      "sortOrder": 70114,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "d76e1ae1-734a-494d-9237-048f14648c09",
+      "name": "FY26, M07 | Country Clubs | Members' Christmas Gala Production",
+      "description": "## Offer\n\nM05 Country Clubs Summer Programming already running. M07 Holiday gap-fill from PR #532 — Members' Christmas Gala Production as lead, Clubhouse Entrance Signature and Holiday Events Calendar Package as secondary. Ultra-private tier (Members-Only Bespoke Creative Direction) for top 10% prospects.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/country-clubs/offers/members-christmas-gala-production.md\n* marketing/go-to-market/verticals/country-clubs/offers/clubhouse-entrance-signature.md\n* marketing/go-to-market/verticals/country-clubs/offers/holiday-events-calendar-package.md\n* marketing/go-to-market/verticals/country-clubs/offers/members-only-bespoke-creative-direction.md\n* marketing/go-to-market/verticals/country-clubs/offers/members-only-private-experience.md\n\n## Segment / Tier\n\nCommercial mid-tier + Enterprise ultra-private. Per Brite Labs ICP tier policy: luxury/affluent/enterprise only.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).",
+      "progress": 0,
+      "sortOrder": 71084,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "cf1a7a5c-bfae-48c1-aad1-51852af56785",
+      "name": "FY26, M07 | Hotels & Resorts | Aman-Tier Bespoke Creative Direction",
+      "description": "## Offer\n\nNet-new luxury tier introduced in PR #532 — Aman-tier bespoke creative direction for top-tier hospitality (Aman, Four Seasons, Belmond, Rosewood, Ritz-Carlton Reserve). Marquee offer of the new luxury hotels-resorts batch.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/hotels-resorts/offers/aman-tier-bespoke-creative-direction.md\n* marketing/go-to-market/verticals/hotels-resorts/offers/arrival-porte-cochere-signature.md\n\n(Hotels & Resorts has 12 added offers total — luxury and mid-tier. Mid-tier hotels handled separately under FY25 M10 / FY26 M03 history.)\n\n## Segment / Tier\n\nEnterprise / Luxury. Brite Labs lead, Brite Nites field execution. Aligns with ICP tier policy (luxury/affluent/enterprise only).\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18) — \"aman\" tier added per Drake's note.",
+      "progress": 0,
+      "sortOrder": 72017,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "f542bb56-8c8c-4bb0-9e58-480ee05c2b31",
+      "name": "FY26, M07 | Hospitals | Donor-Recognition & Foundation Season",
+      "description": "## Offer\n\nM04 Hospitals Holiday Lighting already exists (generic). M07 gap-fill from PR #532 leads with Donor-Recognition Courtyard and Foundation/Donor Season offers — buyer-intent window aligns to Q4 calendar-year giving + foundation board meetings.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/hospitals/offers/donor-recognition-courtyard.md\n* marketing/go-to-market/verticals/hospitals/offers/oncology-cancer-center-feature.md\n* marketing/go-to-market/verticals/hospitals/offers/chapel-meditation-garden-lighting.md\n* marketing/go-to-market/verticals/hospitals/offers/entrance-arrival-experience.md\n* marketing/go-to-market/verticals/hospitals/offers/cafeteria-staff-area-morale.md\n\n## Segment / Tier\n\nEnterprise / system hospitals + academic medical centers. Foundation-led buying motion (donor-funded named installations).\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).",
+      "progress": 0,
+      "sortOrder": 73029,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "c9f0af23-f2a5-4ff4-b749-15ead34c0424",
+      "name": "FY26, M07 | Ski Resorts | Village Base-Area Holiday Takeover",
+      "description": "## Offer\n\nM04 After-Dark Gondola Walkthrough + Terrain Park Projection and M05 Night-Time Wedding Venue already running. M07 Holiday gap-fill from PR #532 — Village Base-Area Holiday Takeover as lead (opening-day prep), Gondola/Lift Architectural and Holiday Festival Flagship as secondary. Targets ski season opening (Thanksgiving-Christmas).\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/ski-resorts/offers/village-base-area-takeover.md\n* marketing/go-to-market/verticals/ski-resorts/offers/gondola-lift-architectural.md\n* marketing/go-to-market/verticals/ski-resorts/offers/winter-festival-flagship.md\n* marketing/go-to-market/verticals/ski-resorts/offers/apres-ski-experiential.md\n* marketing/go-to-market/verticals/ski-resorts/offers/multi-resort-portfolio.md\n\n## Segment / Tier\n\nEnterprise / Vail Resorts, Alterra, Boyne, POWDR ski conglomerates.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).",
+      "progress": 0,
+      "sortOrder": 74061,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "9518a3c6-b67a-4f76-904a-186a83c98d62",
+      "name": "FY26, M07 | Amusement Parks | Winter Holiday Takeover",
+      "description": "## Offer\n\nM05 Amusement Parks Summer Experiential already running. M07 Holiday gap-fill from PR #532 — Winter Holiday Takeover as lead, Night Show Spectacle and Holiday Overlay Program as secondary.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/amusement-parks/offers/winter-holiday-takeover-event.md\n* marketing/go-to-market/verticals/amusement-parks/offers/night-show-spectacle-production.md\n* marketing/go-to-market/verticals/amusement-parks/offers/seasonal-ride-overlay.md\n* marketing/go-to-market/verticals/amusement-parks/offers/season-pass-holder-exclusive-event.md\n* marketing/go-to-market/verticals/amusement-parks/offers/event-day-private-buyout-decor.md\n\n## Segment / Tier\n\nEnterprise / Six Flags, Cedar Fair, Herschend, Palace Entertainment, regional parks.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 0 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 0 |\n| Active EB campaigns | 0 |\n| Draft EB campaigns | 1 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 75134,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "b41149c4-6617-41ae-9559-bd515b7d2633",
+      "name": "FY26, M07 | Sports Stadiums | Gameday Holiday Fan-Zone Activation",
+      "description": "## Offer\n\nM05 Sports Stadiums Holiday & Off-Season Activation drafts exist (90/86/84 in EB). PR #532 added Championship Celebration, Permanent Stadium-Facade Architectural, Non-Gameday Concert/Event Rental, Multi-Venue Portfolio. M07 holiday push leads with Gameday Holiday Fan-Zone.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/sports-stadiums/offers/gameday-fan-zone-holiday.md\n* marketing/go-to-market/verticals/sports-stadiums/offers/concourse-club-level-holiday.md\n* marketing/go-to-market/verticals/sports-stadiums/offers/permanent-stadium-facade-architectural.md\n* marketing/go-to-market/verticals/sports-stadiums/offers/championship-celebration.md\n* marketing/go-to-market/verticals/sports-stadiums/offers/non-gameday-concert-event-rental.md\n\n## Segment / Tier\n\nEnterprise / pro-team venues + university stadiums.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).",
+      "progress": 0,
+      "sortOrder": 76044,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "ffc93c9e-1074-404a-b6ea-b20e0a811878",
+      "name": "FY26, M07 | Shopping Centers | Anchor Tenant Holiday Center-Court",
+      "description": "## Offer\n\nM05 Shopping Centers Holiday Foot Traffic & Tenant Retention already running (campaigns 101/99/97). M07 follow-on push targets escalation/year-over-year accounts with Anchor Tenant Holiday Center-Court as anchor (pun intended) and Outdoor Walkway Permanent as architectural upsell.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/shopping-centers/offers/anchor-tenant-center-court.md\n* marketing/go-to-market/verticals/shopping-centers/offers/outdoor-walkway-permanent.md\n* marketing/go-to-market/verticals/shopping-centers/offers/parking-structure-illumination.md\n* marketing/go-to-market/verticals/shopping-centers/offers/tenant-rent-incentive.md\n* marketing/go-to-market/verticals/shopping-centers/offers/seasonal-photo-op.md\n\n## Segment / Tier\n\nCommercial enterprise — Simon, Brookfield, Macerich, Tanger, Unibail-Rodamco-Westfield.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).",
+      "progress": 0,
+      "sortOrder": 76984,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "23d8b1a8-7a97-477f-ae87-4ca6a3fe7128",
+      "name": "FY26, M07 | Historic Sites | Heritage Week & Holiday Tourism Driver",
+      "description": "## Offer\n\nNet-new vertical activation from PR #532. No prior milestone. Heritage Week Illumination leads, Seasonal Tourism Driver and Preservation-Safe Permanent Architectural fill secondary. After-Dark Heritage Activation referenced in PR summary.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/historic-sites/offers/heritage-week-illumination.md\n* marketing/go-to-market/verticals/historic-sites/offers/seasonal-tourism-driver.md\n* marketing/go-to-market/verticals/historic-sites/offers/preservation-safe-permanent-architectural.md\n\n## Segment / Tier\n\nEnterprise / National Trust for Historic Preservation properties, state historic sites, presidential libraries, heritage tourism boards.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).\n\n## Active waves\n\nLead offer: Heritage Week Illumination. ESP-partitioned 2-step Professional Emails sequence drafted 2026-05-18 (spintax-driven, 7-day E1→E2 gap, thread-reply E2 per 2-send max rule).\n\n* `SMTP | FY26, M07 | Historic Sites | Heritage Week & Holiday Tourism Driver | Professional Emails` — EB campaign #111 — Draft\n* `Google | FY26, M07 | Historic Sites | Heritage Week & Holiday Tourism Driver | Professional Emails` — EB campaign #116 — Draft\n* `Microsoft | FY26, M07 | Historic Sites | Heritage Week & Holiday Tourism Driver | Professional Emails` — EB campaign #117 — Draft\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 0 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 0 |\n| Active EB campaigns | 0 |\n| Draft EB campaigns | 3 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 78082,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "b9c6deb5-be75-4efb-82d0-dee57bbc9744",
+      "name": "FY26, M07 | Tribes & Reservations | Cultural Festival & Holiday Activation",
+      "description": "## Offer\n\nNet-new vertical from PR #532 (tribes-reservations offers folder created). Cultural Festival as lead, Community-Center Holiday and Tribal Government Building Architectural as secondary. Coordinates with Casinos milestone for tribal-owned gaming properties.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/tribes-reservations/offers/cultural-festival.md\n* marketing/go-to-market/verticals/tribes-reservations/offers/community-center-holiday.md\n* marketing/go-to-market/verticals/tribes-reservations/offers/tribal-government-building-architectural.md\n* marketing/go-to-market/verticals/tribes-reservations/offers/cultural-tourism-destination-walk.md\n* marketing/go-to-market/verticals/tribes-reservations/offers/multi-year-tribal-services-msa.md\n\n## Segment / Tier\n\nEnterprise / tribal nations with cultural-tourism programs.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).\n\n## Active waves\n\nLead offer: Cultural Festival Light Installation (production under tribal cultural direction). ESP-partitioned 2-step Professional Emails sequence drafted 2026-05-18. Copy explicitly references warm-introduction path per vertical playbook constraint (cold-only outreach is rarely effective in this vertical).\n\n* `SMTP | FY26, M07 | Tribes & Reservations | Cultural Festival & Holiday Activation | Professional Emails` — EB campaign #112 — Draft\n* `Google | FY26, M07 | Tribes & Reservations | Cultural Festival & Holiday Activation | Professional Emails` — EB campaign #118 — Draft\n* `Microsoft | FY26, M07 | Tribes & Reservations | Cultural Festival & Holiday Activation | Professional Emails` — EB campaign #119 — Draft\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 0 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 0 |\n| Active EB campaigns | 0 |\n| Draft EB campaigns | 3 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 79054,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "262fa9be-6f9e-4d33-a08a-c59b25f12a59",
+      "name": "FY26, M07 | Theaters | Producer's Night Gala & Donor Holiday",
+      "description": "## Offer\n\nM06 Theaters Year-Round milestone already exists. M07 Holiday gap-fill from PR #532 — Producer's Night Gala and Donor Event Fundraiser as lead offers, layered with Lobby Marquee and Permanent Exterior Architectural.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/theaters/offers/producers-night-gala.md\n* marketing/go-to-market/verticals/theaters/offers/donor-event-fundraiser.md\n* marketing/go-to-market/verticals/theaters/offers/lobby-marquee.md\n* marketing/go-to-market/verticals/theaters/offers/permanent-exterior-architectural.md\n\n## Segment / Tier\n\nCommercial / Enterprise / Broadway league, regional repertory theaters, performing arts centers.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).\n\n## Active waves\n\nLead offer: Producer's Night / Gala Activation (Brite Labs experiential, four-moment evening — reception → arrival → intermission → after-party). ESP-partitioned 2-step Professional Emails sequence drafted 2026-05-18.\n\n* `SMTP | FY26, M07 | Theaters | Producer's Night Gala & Donor Holiday | Professional Emails` — EB campaign #113 — Draft\n* `Google | FY26, M07 | Theaters | Producer's Night Gala & Donor Holiday | Professional Emails` — EB campaign #120 — Draft\n* `Microsoft | FY26, M07 | Theaters | Producer's Night Gala & Donor Holiday | Professional Emails` — EB campaign #121 — Draft\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 0 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 0 |\n| Active EB campaigns | 0 |\n| Draft EB campaigns | 3 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 80006,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "27427fcf-172a-40f5-b430-04afe365deb3",
+      "name": "FY26, M07 | Apartments | Multi-Property Holiday Portfolio Program",
+      "description": "## Offer\n\nM04 Apartments Holiday Lighting already running. M07 follow-on from PR #532 — Multi-Property Portfolio Program for property mgmt cos with 5+ communities; Leasing Office Curb Appeal and Amenity Pool & Courtyard Permanent as cross-sell.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/apartments/offers/multi-property-portfolio-program.md\n* marketing/go-to-market/verticals/apartments/offers/leasing-office-curb-appeal.md\n* marketing/go-to-market/verticals/apartments/offers/amenity-pool-and-courtyard-permanent.md\n* marketing/go-to-market/verticals/apartments/offers/holiday-resident-event-installation.md\n\n## Segment / Tier\n\nCommercial / Greystar, Mid-America, Camden, Equity Residential, Cortland — top-50 multifamily operators.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18).\n\n## Active waves\n\nLead offer: Multi-Property Portfolio Program (Regional Director ABM angle, pilot-first, portfolio-pricing, dedicated AE). Copy intentionally non-overlapping with the M04 Apartments Holiday Lighting tactical wave (which used a property-level / resident-experience angle). ESP-partitioned 2-step Professional Emails sequence drafted 2026-05-18.\n\n* `SMTP | FY26, M07 | Apartments | Multi-Property Holiday Portfolio Program | Professional Emails` — EB campaign #114 — Draft\n* `Google | FY26, M07 | Apartments | Multi-Property Holiday Portfolio Program | Professional Emails` — EB campaign #122 — Draft\n* `Microsoft | FY26, M07 | Apartments | Multi-Property Holiday Portfolio Program | Professional Emails` — EB campaign #123 — Draft\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 289 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 2 |\n| Active EB campaigns | 1 (incl. 1 AI-suggested) |\n| Draft EB campaigns | 3 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 81085,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "c5b162d0-9a80-4ab0-9618-910fb32c3c0e",
+      "name": "FY26, M05 | Botanical Gardens | 250th Anniversary Activation",
+      "description": "## Offer\n\n250th anniversary overlay (per 2-cycle/year rule: FY26 250th adds 1 one-time touchpoint to touched verticals). Send now (M05) for July 4 peak. PR #532 added 250th Anniversary offer for Botanical Gardens — pairs with corporate sponsor gateway for foundation funding angle.\n\n## PR #532 offer pages\n\n* marketing/go-to-market/verticals/botanical-gardens/offers/250th-anniversary.md\n* marketing/go-to-market/verticals/botanical-gardens/offers/corporate-sponsor-gateway.md\n\n(M08 Botanical Gardens Holiday Lighting milestone covers the holiday push separately.)\n\n## Segment / Tier\n\nEnterprise / American Public Gardens Association membership — Longwood, Missouri, Brooklyn, NY, Chicago, Atlanta.\n\n## Source\n\nHandbook PR #532 (merged 2026-05-18) + 250th overlay rule.",
+      "progress": 0,
+      "sortOrder": 81989,
+      "targetDate": "2026-06-30"
+    },
+    {
+      "id": "dddaf314-e91b-457a-a85b-60c667e564cc",
+      "name": "FY26, M07 | Local Retail (Utah) | Storefront Seasonal & Permanent Illumination",
+      "description": "## Offer\n\nBrite Nites bread-and-butter offer adapted for local Utah retail — seasonal storefront illumination (holiday) plus permanent perimeter architectural lighting. Targets independent main-street retailers and small Utah-based chains within the warehouse-served radius (Salt Lake metro + Park City + Provo + Ogden + St. George).\n\n**Lead angle:** Storefronts go dark by 7 PM, missing the dinner-and-shop / date-night / holiday window-shopping foot traffic. Local crews, local warehouse stock, install + maintenance + removal handled.\n\n**Brand:** Brite Nites\n\n## Segment / Tier\n\nCommercial — local Utah retail SMB. ICP: single-storefront and small-chain (≤5 locations) main-street retailers in the residential commercial tier; excludes national chain stores (different motion).\n\n## Source\n\nCreated 2026-05-18 alongside the M07 ESP-partitioned campaign drop. Net-new geo-targeted vertical for the Brite Nites retail SMB motion.\n\n## Active waves\n\nLead offer: Storefront Seasonal & Permanent Illumination. ESP-partitioned 2-step Professional Emails sequence drafted 2026-05-18.\n\n* `SMTP | FY26, M07 | Local Retail (Utah) | Storefront Seasonal & Permanent Illumination | Professional Emails` — EB campaign #124 — Draft\n* `Google | FY26, M07 | Local Retail (Utah) | Storefront Seasonal & Permanent Illumination | Professional Emails` — EB campaign #126 — Draft\n* `Microsoft | FY26, M07 | Local Retail (Utah) | Storefront Seasonal & Permanent Illumination | Professional Emails` — EB campaign #127 — Draft\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 0 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 0 |\n| Active EB campaigns | 0 |\n| Draft EB campaigns | 3 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 83058,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "ce6a3c30-2f78-4bf3-80ea-db8766b59ae1",
+      "name": "FY26, M07 | Lighting Installers | Training Library & Brite Platform Access",
+      "description": "## Offer\n\nSubcontractor-installer partner activation. Bundles Brite's installer training library (training assets and install playbooks, no cost to partner crews) with platform access to the Brite operational stack — inventory management, scheduling, field service management, and quoting — all in one place.\n\n**Lead angle:** Most installer subs run their back-office on spreadsheets. Brite offers a turnkey operational stack plus a training library, on the house for partner installers. One-stop shop replaces the patchwork.\n\n**Brand:** Brite Supply (platform + training) + Brite Nites (partner-installer relationship)\n\n## Segment / Tier\n\nCommercial — independent lighting installer subcontractors and small install shops doing architectural + seasonal install work in markets adjacent to Brite Nites / Brite Supply distribution. Pairs with the M07 Brite Supply S4 Year-Round Installer Partnership milestone but targets a wider installer ICP (not S4-pixel specific).\n\n## Source\n\nCreated 2026-05-18 alongside the M07 ESP-partitioned campaign drop. Net-new partner-program activation milestone.\n\n## Active waves\n\nLead offer: Training Library + Brite Platform Access. ESP-partitioned 2-step Professional Emails sequence drafted 2026-05-18.\n\n* `SMTP | FY26, M07 | Lighting Installers | Training Library & Brite Platform Access | Professional Emails` — EB campaign #125 — Draft\n* `Google | FY26, M07 | Lighting Installers | Training Library & Brite Platform Access | Professional Emails` — EB campaign #128 — Draft\n* `Microsoft | FY26, M07 | Lighting Installers | Training Library & Brite Platform Access | Professional Emails` — EB campaign #129 — Draft\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 0 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 0 |\n| Active EB campaigns | 0 |\n| Draft EB campaigns | 3 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 84149,
+      "targetDate": "2026-08-31"
+    },
+    {
+      "id": "17450de2-f8f2-4107-8625-c07594e06066",
+      "name": "[ARCHIVED] Hotels Resort Holiday Anchor Audit M02",
+      "description": "# Campaign brief — hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02\n\n> Scaffolded by `/marketing:plan-campaign` ([BC-8727](https://linear.app/brite-nites/issue/BC-8727/gtm-t6-o-run-first-dogfood-campaign-through-plan-campaign-capture) first dogfood, T6-O).\n> Brief template uses the inline fallback (Step 8a.4) — handbook template at `marketing/go-to-market/templates/campaign-brief-template.md` is gitbook-prose, doesn't carry the `{{slot}}` placeholders the spec substitutes. See friction-log F7.\n\n## 1\\. Overview\n\n* **Entity**: labs\n* **Vertical**: Hotels & Resorts (hotels-resorts)\n* **Persona**: Director of Resort Experience — title cascade: Director of Resort Experience, Director of Guest Experience, Director of Resort Activations, Director of Recreation & Resort Activations, Director of Guest Experiences, VP Resort Experience, VP Guest Experience\n* **Offer**: Resort Holiday Anchor Audit (holiday-anchor-audit) — posture: free-asset\n* **Launch date**: 2026-02-03\n* **Owner**: [marketingadmin@britenites.com](<mailto:marketingadmin@britenites.com>)\n* **Month**: February 2026\n\n## 2\\. Goals\n\n<!-- OPERATOR-FILL: what does this campaign aim to achieve? Reference offer page goals + handbook ICP success metrics. -->\n\nFor the cohort-1 dogfood ([BC-8727](https://linear.app/brite-nites/issue/BC-8727/gtm-t6-o-run-first-dogfood-campaign-through-plan-campaign-capture)), the campaign-level goal is to validate the GTM Campaign Orchestration v1.0 system end-to-end: a single `/marketing:plan-campaign` invocation produces working Linear milestone + sub-issues + plugin manifest + (soft-fail) SF Campaign, with friction captured for V3 ratification ([BC-8729](https://linear.app/brite-nites/issue/BC-8729/gtm-t6-p-v3-marketing-ratification-meeting)). Marketing-outcome goals (replies, accepted Audits, pipeline) are stub — V3 retro decides if cohort-1 is the right shape.\n\n## 3\\. Audience\n\n* **Canonical persona**: director-of-resort-experience (display: Director of Resort Experience)\n* **Title cascade**: Director of Resort Experience, Director of Guest Experience, Director of Resort Activations, Director of Recreation & Resort Activations, Director of Guest Experiences, VP Resort Experience, VP Guest Experience\n* **Vertical ICP**: <!-- OPERATOR-FILL: paste/summarize from handbook/hotels-resorts/README.md ICP section. Cohort-1 MSPA: AAA 4/5-Diamond OR Marriott/Hilton \"Luxury Collection\" OR boutique luxury (Auberge / Pendry / Rosewood tier) within BN service territory; EXCLUDES Gaylord (proprietary ICE! IP), Princess (incumbent vendors), Mission Inn (Roberts-family owner-led since 1993). -->\n\n## 4\\. Messaging\n\n<!-- OPERATOR-FILL: 1-2 angle hypotheses from /marketing:creative-angles (sub-issue #10) + offer page value props. Cohort-1 lock: Angle A FY27-Ammunition (Asymmetry 7.2/10). Alternatives B-E identified during design session: B FOMO 6.7, C Post-Mortem-Rebound 6.5, D Vendor-Tier-Gap 5.8, E Sponsor-Stack-Headstart. -->\n\n## 5\\. Channels\n\n* **Primary**: cold email (Email Bison workspace `emailbison-b2b`)\n* **Secondary**: <!-- OPERATOR-FILL: e.g. LinkedIn, paid retargeting -->\n\n## 6\\. Assets\n\n<!-- OPERATOR-FILL: deliverable spec, sample brief PDF, landing-page link. Offer shape: senior creative lead + outdoor production strategist 1-2 days on-site auditing a single resort. Deliverable = 25-30 page strategic brief with 3-year program roadmap + phased budget + sponsor-stack hypothesis + projected attendance/revenue benchmarked against Princess (16M lights / 300K attendees) / Mission Inn / Callaway / Gaylord. Free. Brite cost \\~$8-12K per Audit (FTE-time). -->\n\n## 7\\. Budget\n\n<!-- OPERATOR-FILL: $-spend + FTE-time estimates. Cohort-1 baseline: \\~$8-12K per accepted Audit (FTE-time only); $0 outbound spend (cold-email via EB). -->\n\n## 8\\. Success metrics\n\n<!-- OPERATOR-FILL: open rate / reply rate / acceptance rate / conversion-to-next-stage targets. Cohort-1 verdict gate: ≥1 accepted Audit booked from this campaign = SCALE; 0 accepted but qualified replies = ITERATE (angle / list / month); 0 replies = KILL. Conversion path: Audit → paid Master Light Plan ($25-50K) → multi-year build ($300K-$3M+) → ongoing MSA. -->\n\n---\n\n**Sub-issue chain** (created at scaffold; tracked in Linear):\n\n 1. Brief approved (this doc; gate)\n 2. Target list built\n 3. Copy written + approved\n 4. Salesforce setup\n 5. Pre-launch QA\n 6. Launch executed\n 7. Active management — weekly reviews\n 8. Campaign closed + debrief\n 9. Situation Mining (Labs-gated; enabled via --situation-mining)\n10. Creative Angles (enabled via --creative-angles)\n\n---\n\n## References\n\n* **Cohort-1 spec source**: `docs/gtm-campaign-orchestration-README.md` § 3.6 (Path A worked example, commit `c6535a5`).\n* **Linear**: [BC-8727](https://linear.app/brite-nites/issue/BC-8727/gtm-t6-o-run-first-dogfood-campaign-through-plan-campaign-capture) (T6-O first dogfood) — `https://linear.app/brite-nites/issue/BC-8727`.\n* **Friction log**: `docs/plans/gtm-campaign-orchestration-friction-log.md` ([BC-8727](https://linear.app/brite-nites/issue/BC-8727/gtm-t6-o-run-first-dogfood-campaign-through-plan-campaign-capture) PR).\n* **V3 ratification**: [BC-8729](https://linear.app/brite-nites/issue/BC-8729/gtm-t6-p-v3-marketing-ratification-meeting) will use this campaign's data as the populated dogfood snapshot.\n\n> **Note on launch date**: 2026-02-03 is past (today is 2026-05-19). This is intentional — [BC-8727](https://linear.app/brite-nites/issue/BC-8727/gtm-t6-o-run-first-dogfood-campaign-through-plan-campaign-capture) retroactively scaffolds the cohort-1 walk per the lock. Live operator runs should use forward-looking dates.",
+      "progress": 0,
+      "sortOrder": 85236
+    },
+    {
+      "id": "3710c0b4-796a-4781-97ef-ba6eeace0186",
+      "name": "[ARCHIVED] FY25, M09 | Community Management | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\nThis milestone exists to retain a Linear record of an outbound campaign that ran in EB before the per-milestone GTM tracking model was adopted.\n\n* **EB **[**7**](<https://send.outbase.so/campaign/7>) — `FY25, M09 | Community Management | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: **PAUSED at 100% completion** (sending finished; campaign object stopped before archival)\n  * Leads: 9,240 · Sent: 17,717 · Replies: 586 · Bounced: 365 · Reply rate: 6.34%\n\nNo sub-issues will be created retroactively. This milestone is a historical record only.",
+      "progress": 0,
+      "sortOrder": 86261,
+      "targetDate": "2025-09-30"
+    },
+    {
+      "id": "c9f5e24a-0b4a-4206-9275-191a82620d8d",
+      "name": "[ARCHIVED] FY25, M09 | Bars | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**11**](<https://send.outbase.so/campaign/11>) — `FY25, M09 | Bars | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 11,890 · Sent: 23,160 · Replies: 556 · Bounced: 270 · Reply rate: 4.68%\n\nHistorical record only — no sub-issues.",
+      "progress": 0,
+      "sortOrder": 87289,
+      "targetDate": "2025-09-30"
+    },
+    {
+      "id": "a9b99032-e40e-46b8-bd31-ff4e2814dfb1",
+      "name": "[ARCHIVED] FY25, M10 | Drive-Thru | Employees Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**12**](<https://send.outbase.so/campaign/12>) — `FY25, M10 | Drive-Thru | Employees | Professional Emails`\n  * Status in EB: COMPLETED 100%\n  * Leads: 2,295 · Sent: 4,581 · Replies: 17 · Bounced: 4 · Reply rate: 0.74%\n\nHistorical record only — no sub-issues. Note: very low reply rate on this Employees-targeted send.",
+      "progress": 0,
+      "sortOrder": 88201,
+      "targetDate": "2025-10-31"
+    },
+    {
+      "id": "cf52da59-411a-44a9-925f-032d6542c5cf",
+      "name": "[ARCHIVED] FY25, M10 | Hotels | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**14**](<https://send.outbase.so/campaign/14>) — `FY25, M10 | Hotels | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 67,512 · Sent: 130,036 · Replies: 3,144 · Bounced: 3,179 · Reply rate: 4.66%\n\nHistorical record only — no sub-issues. Largest single wave by volume across this retro set.",
+      "progress": 0,
+      "sortOrder": 89263,
+      "targetDate": "2025-10-31"
+    },
+    {
+      "id": "8719f727-25ea-465a-bacc-a126968cdaf9",
+      "name": "[ARCHIVED] FY25, M11 | Car Dealerships | Role",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**16**](<https://send.outbase.so/campaign/16>) — `FY25, M11 | Car Dealerships | Role Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 3,463 · Sent: 6,809 · Replies: 79 · Bounced: 65 · Reply rate: 2.28%\n\nHistorical record. Note: companion EB 15 (Mgr+ Pro variant) is currently PAUSED at 27% — see separate retro for that wave.",
+      "progress": 0,
+      "sortOrder": 90252,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "78e64de2-5af6-4453-ac41-d34ce08b5151",
+      "name": "[ARCHIVED] FY25, M11 | Shopping Centers, Malls, Outlets | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**21**](<https://send.outbase.so/campaign/21>) — `FY25, M11 | Shopping Centers, Malls, Outlets | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 3,281 · Sent: 6,380 · Replies: 163 · Bounced: 78 · Reply rate: 4.97%\n\nHistorical record only.",
+      "progress": 0,
+      "sortOrder": 91224,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "7978d80f-b480-4655-9cfa-89d0c3fa9301",
+      "name": "[ARCHIVED] FY25, M11 | Healthcare Facilities | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**29**](<https://send.outbase.so/campaign/29>) — `FY25, M11 | Healthcare Facilities | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 998 · Sent: 1,960 · Replies: 36 · Bounced: 22 · Reply rate: 3.61%\n\nHistorical record. Note: see also live M04 `Hospitals & Healthcare | Holiday Lighting` (EB 67 active 49.8%) and forthcoming M07 `Hospitals | Donor-Recognition`.",
+      "progress": 0,
+      "sortOrder": 92241,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "5651e96e-eec5-4a4c-b21e-ca37f64e2848",
+      "name": "[ARCHIVED] FY25, M11 | Churches | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**33**](<https://send.outbase.so/campaign/33>) — `FY25, M11 | Churches | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: **PAUSED at 73.05% completion** (not fully shipped)\n  * Leads: 18,976 · Sent: 26,617 · Replies: 827 · Bounced: 104 · Reply rate: 4.36%\n\nHistorical record. Reason for pause unknown — operator can resume EB 33 if Churches list is still relevant.",
+      "progress": 0,
+      "sortOrder": 93177,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "ea9079f3-452e-47c9-8d9f-71cf45028d92",
+      "name": "[ARCHIVED] FY25, M11 | Churches | Role",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**34**](<https://send.outbase.so/campaign/34>) — `FY25, M11 | Churches | Role Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 10,414 · Sent: 20,330 · Replies: 627 · Bounced: 125 · Reply rate: 6.02%\n\nHistorical record. Top-3 reply rate across the entire retro set.",
+      "progress": 0,
+      "sortOrder": 94173,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "1c840d25-002e-467d-96a3-0f243a0658f9",
+      "name": "[ARCHIVED] FY25, M11 | Banks | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**35**](<https://send.outbase.so/campaign/35>) — `FY25, M11 | Banks | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 2,014 · Sent: 3,912 · Replies: 139 · Bounced: 35 · Reply rate: 6.9%\n\nHistorical record only.",
+      "progress": 0,
+      "sortOrder": 95152,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "1e7c8c1b-0114-49d8-aa2f-6933c04cb36b",
+      "name": "[ARCHIVED] FY25, M11 | Apartments | Role",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**38**](<https://send.outbase.so/campaign/38>) — `FY25, M11 | Apartments | Role Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 3,269 · Sent: 6,357 · Replies: 159 · Bounced: 68 · Reply rate: 4.86%\n\nHistorical record only.",
+      "progress": 0,
+      "sortOrder": 96075,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "3d513031-12f1-4de5-9d40-9bb42c5f47f2",
+      "name": "[ARCHIVED] FY25, M11 | Restaurants & Bars | Pro (Direct Q Offer)",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**39**](<https://send.outbase.so/campaign/39>) — `FY25, M11 | Restaurants & Bars | Professional Emails | All ESPs | Direct Question Offer`\n  * Status in EB: COMPLETED 100%\n  * Leads: 6,373 · Sent: 12,363 · Replies: 290 · Bounced: 201 · Reply rate: 4.55%\n\nHistorical record. The \"Direct Question Offer\" copy variant is the distinguishing pattern from the Role-emails wave (EB 40).",
+      "progress": 0,
+      "sortOrder": 97090,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "2bfbcb2c-5cd3-4d1c-a04a-72b0206fb7f6",
+      "name": "[ARCHIVED] FY25, M11 | Restaurants & Bars | Role",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**40**](<https://send.outbase.so/campaign/40>) — `FY25, M11 | Restaurants & Bars | Role Emails | All ESPs`\n  * Status in EB: **PAUSED at 68.15% completion**\n  * Leads: 13,055 · Sent: 16,725 · Replies: 730 · Bounced: 114 · Reply rate: 5.59%\n\nHistorical record. Largest reply count across the FY25 retro set.",
+      "progress": 0,
+      "sortOrder": 98044,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "41b03af5-f64f-4cbc-bccd-670f9b1b9b28",
+      "name": "[ARCHIVED] FY25, M11 | Car Washes | Role",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**45**](<https://send.outbase.so/campaign/45>) — `FY25, M11 | Car Washes | Role Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 496 · Sent: 944 · Replies: 41 · Bounced: 13 · Reply rate: 8.27%\n\nHistorical record. Highest reply rate in the retro set despite the smallest list — operator may want to dig into why this vertical/role mix performed so strongly.",
+      "progress": 0,
+      "sortOrder": 99123,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "5521ef12-9811-4a56-ae99-247d0246a46d",
+      "name": "[ARCHIVED] FY25, M11 | Casinos | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**47**](<https://send.outbase.so/campaign/47>) — `FY25, M11 | Casinos | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 787 · Sent: 1,537 · Replies: 25 · Bounced: 23 · Reply rate: 3.18%\n\nHistorical record. M05 Summer Programming (`a1f11743`) and M07 Casino Floor Holiday Takeover (`e99e9f06`) milestones are the current Casinos work.",
+      "progress": 0,
+      "sortOrder": 100117,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "a7c43508-f1dc-4cbf-866b-05be2daff829",
+      "name": "[ARCHIVED] FY25, M11 | Casinos | Role",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20\n\n* **EB **[**48**](<https://send.outbase.so/campaign/48>) — `FY25, M11 | Casinos | Role Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 34 · Sent: 66 · Replies: 2 · Bounced: 0 · Reply rate: 5.88%\n\nHistorical record. Very small Casinos role-email list.",
+      "progress": 0,
+      "sortOrder": 101192,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "db598bb0-e4c9-49d9-8742-7b89f854f619",
+      "name": "[ARCHIVED] FY25, M09 | Bars | Owners & GMs General",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20 (retry after classifier transient denial)\n\n* **EB **[**10**](<https://send.outbase.so/campaign/10>) — `FY25, M09 | Bars | Bar Owners, GMs | General Emails`\n  * Status in EB: COMPLETED 100%\n  * Leads: 13,678 · Sent: 26,670 · Replies: 650 · Bounced: 275 · Reply rate: 4.75%\n\nHistorical record only — no sub-issues. Explicitly authorized by user via /workflows:session-start AskUserQuestion answer 2026-05-20.",
+      "progress": 0,
+      "sortOrder": 104136,
+      "targetDate": "2025-09-30"
+    },
+    {
+      "id": "1d9fcdff-2040-4879-94d3-f1d910842641",
+      "name": "[ARCHIVED] FY25, M11 | Banks | Role",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20 (retry after classifier transient denial)\n\n* **EB **[**36**](<https://send.outbase.so/campaign/36>) — `FY25, M11 | Banks | Role Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 727 · Sent: 1,424 · Replies: 25 · Bounced: 12 · Reply rate: 3.44%\n\nHistorical record only. Explicitly authorized by user via /workflows:session-start AskUserQuestion answer 2026-05-20.",
+      "progress": 0,
+      "sortOrder": 105067,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "239e978e-42a5-42ad-a406-488716e6c16d",
+      "name": "[ARCHIVED] FY25, M11 | Apartments | Mgr+ Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20 (retry after classifier transient denial)\n\n* **EB **[**37**](<https://send.outbase.so/campaign/37>) — `FY25, M11 | Apartments | Managers+ | Professional Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 3,678 · Sent: 7,179 · Replies: 248 · Bounced: 20 · Reply rate: 6.74%\n\nHistorical record only. Explicitly authorized by user via /workflows:session-start AskUserQuestion answer 2026-05-20.",
+      "progress": 0,
+      "sortOrder": 106144,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "a346f77b-ec82-47ea-8659-5cadb1f896bb",
+      "name": "[ARCHIVED] FY25, M11 | Community Management | Pro",
+      "description": "## 📦 Retroactive milestone — captured 2026-05-20 (retry after classifier transient denial)\n\n* **EB **[**42**](<https://send.outbase.so/campaign/42>) — `FY25, M11 | Community Management | Professional Emails | All ESPs`\n  * Status in EB: COMPLETED 100%\n  * Leads: 7,744 · Sent: 15,061 · Replies: 506 · Bounced: 135 · Reply rate: 6.53%\n\nHistorical record only. Explicitly authorized by user via /workflows:session-start AskUserQuestion answer 2026-05-20.",
+      "progress": 0,
+      "sortOrder": 107146,
+      "targetDate": "2025-11-30"
+    },
+    {
+      "id": "c679a128-f98a-465c-819b-6d693fe2c9b0",
+      "name": "FY26, M04 | Zoos | Holiday Lighting",
+      "description": "In-market Holiday Lighting outbound wave for Zoos. Matches EB campaign #62 (`FY26, M4 | Zoos | Professional Emails | All ESPs`). Created to fill the missing M04 milestone — sibling to the other in-market M04 Holiday Lighting verticals (Amusement Parks, Hospitals, Museums, Shopping Centers, Sports Stadiums). Distinct from the `FY26, M08 | Zoos | Holiday Lighting` planning milestone.\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 264 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 0 |\n| Active EB campaigns | 1 (incl. 1 AI-suggested) |\n| Draft EB campaigns | 0 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 108093,
+      "targetDate": "2026-04-30"
+    },
+    {
+      "id": "eb93cd10-c0ad-4f45-bb12-c9dab515092d",
+      "name": "FY26, M04 | Aquariums | Holiday Lighting",
+      "description": "In-market Holiday Lighting outbound wave for Aquariums. Matches EB campaign #73 (`FY26, M4 | Aquariums | Professional Emails | All ESPs`). Created to fill the missing M04 milestone — sibling to the other in-market M04 Holiday Lighting verticals. Distinct from the `FY26, M07 | Aquariums | Holiday Underwater Festival` (Brite Labs experiential) campaign.\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 138 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 1 |\n| Active EB campaigns | 1 (incl. 1 AI-suggested) |\n| Draft EB campaigns | 0 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 109059,
+      "targetDate": "2026-04-30"
+    },
+    {
+      "id": "860089ba-cc75-4408-abf7-be3f6374bd8d",
+      "name": "FY26, M05 | Auto Dealerships | Year-End Sales Visibility",
+      "description": "In-market Year-End Sales Visibility outbound wave for Auto Dealerships. Matches EB campaigns #92 (SMTP) and #88 (Microsoft) — `FY26, M05 | Auto Dealerships | Year-End Sales Visibility | Professional Emails`. New offer for this vertical; distinct from the archived `[ARCHIVED-PRE-M5-INACTIVE] FY26, M04 | Auto Dealerships | Holiday Lighting` milestone.\n\n<!-- perf-start -->\n\n## Current week performance (Week of May 19)\n\n| Metric | Value |\n| -- | -- |\n| Sends | 2,900 |\n| Replies | 0 (0.0%) |\n| Interested | 0 (0.0%) |\n| Bounces | 12 |\n| Active EB campaigns | 1 |\n| Draft EB campaigns | 0 |\n\n*Last updated by n8n weekly digest.*\n<!-- perf-end -->",
+      "progress": 0,
+      "sortOrder": 110113,
+      "targetDate": "2026-05-31"
+    },
+    {
+      "id": "9a82a5b0-f6a7-4d14-94c0-58a4e3be01ef",
+      "name": "hotels-resorts-director-of-resort-experience-custom-illuminated-artwork-fy26-m07",
+      "description": "# Campaign brief — hotels-resorts-director-of-resort-experience-custom-illuminated-artwork-fy26-m07\n\n> Scaffolded by `/marketing:plan-campaign` (2026-05-27). Graduated from CONCEPT LIBRARY concept [BC-11163](https://linear.app/brite-nites/issue/BC-11163/custom-permanent-artwork-campaign-outline) \"Custom Permanent Artwork\". Offer `custom-illuminated-artwork` was hand-promoted to canonical (status: draft) the same day; a proper handbook PR + `/marketing:new-offer` should follow.\n\n## 1\\. Overview\n\n* **Entity**: labs (Brite Labs)\n* **Vertical**: Hotels & Resorts (hotels-resorts)\n* **Persona**: Director of Resort Experience — title cascade: Director of Resort Experience, Director of Guest Experience, Director of Resort Activations, Director of Recreation & Resort Activations, Director of Guest Experiences, VP Resort Experience, VP Guest Experience\n* **Offer**: Custom Illuminated Artwork (custom-illuminated-artwork) — posture: free-asset, status: draft\n* **Launch date**: 2026-07-01\n* **Owner**: [marketingadmin@britenites.com](<mailto:marketingadmin@britenites.com>)\n* **Month**: July 2026\n\n## 2\\. Goals\n\n<!-- OPERATOR-FILL: what does this campaign aim to achieve? -->\nSell custom-fabricated, site-specific PERMANENT illuminated artwork (not seasonal holiday lighting, not catalog fixtures) into resort properties as an after-dark dwell / on-property-spend lever.\n\n## 3\\. Audience\n\n* **Canonical persona**: director-of-resort-experience (Director of Resort Experience)\n* **Vertical ICP**: <!-- OPERATOR-FILL: from handbook/hotels-resorts/README.md ICP section -->\n\n## 4\\. Messaging\n\nPositioning artifact (creative-angles, 2026-05-26): `docs/research/angles/custom-illuminated-artwork-2026-05-26.md`. Lead angles for resorts: Angle 1 (port the casino/integrated-resort \"anchor feature → non-gaming revenue & dwell\" playbook) + Angle 3 (2026 capex reallocation to memorable first-impression / outdoor experience). Knowledge/diagnostic posture, soft free-asset CTA (a tailored concept for the property).\n\n## 5\\. Channels\n\n* **Primary**: cold email (Email Bison workspace `emailbison-b2b`, Brite Nites company workspace)\n* 3 ESP-split draft campaigns already built (draft, no leads): **135** (Microsoft), **136** (Google), **137** (SMTP) — wave names `{ESP} | FY26, M07 | Hotels & Resorts | Custom Illuminated Artwork | Professional Emails`\n* Copy artifact: `docs/campaigns/labs/copy-hotels-resorts-custom-illuminated-artwork-2026-05-26.json`\n\n## 6\\. Assets\n\n<!-- OPERATOR-FILL: concept renders / portfolio photos (Sarah). -->\n\n## 7\\. Budget\n\n<!-- OPERATOR-FILL -->\n\n## 8\\. Success metrics\n\n<!-- OPERATOR-FILL: reply rate / concept-request rate / meetings booked. -->\n\n---\n\n**Sub-issue chain** (created at scaffold): #1 Brief approved → #2 Target list built → #3 Copy written + approved → #4 Salesforce setup → #5 Pre-launch QA → #6 Launch executed → #7 Active management → #8 Campaign closed + debrief.",
+      "progress": 0,
+      "sortOrder": 111082
+    },
+    {
+      "id": "9ea32701-376c-4b46-955a-07cc37bfdb36",
+      "name": "flagship-retail-vp-marketing-custom-illuminated-artwork-fy26-m07",
+      "description": "# Campaign brief — flagship-retail-vp-marketing-custom-illuminated-artwork-fy26-m07\n\n> Scaffolded by `/marketing:plan-campaign` (2026-05-27). Retail half of CONCEPT LIBRARY concept [BC-11163](https://linear.app/brite-nites/issue/BC-11163/custom-permanent-artwork-campaign-outline) \"Custom Permanent Artwork\" (companion to the resort milestone). Offer `custom-illuminated-artwork` (canonical, status: draft). **Vertical** `flagship-retail` **was hand-added to canonicals 2026-05-27 — it is NOT in the handbook 27-vertical taxonomy (overlaps** `shopping-centers`**); a handbook decision should bless/merge it.**\n\n## 1\\. Overview\n\n* **Entity**: labs (Brite Labs)\n* **Vertical**: Flagship Retail (flagship-retail)\n* **Persona**: VP of Marketing (vp-marketing) — campaign copy ALSO speaks to Center Owner / Asset Manager\n* **Offer**: Custom Illuminated Artwork (custom-illuminated-artwork) — posture: free-asset, status: draft\n* **Launch date**: 2026-07-01\n* **Owner**: [marketingadmin@britenites.com](<mailto:marketingadmin@britenites.com>)\n* **Month**: July 2026\n\n## 2\\. Goals\n\nSell custom-fabricated, site-specific PERMANENT illuminated artwork into premium/destination retail — landing for both a destination-center owner/asset-manager AND a big-ticket brand's VP of Marketing (\"rich brands that buy identity\") — as a foot-traffic / dwell / brand-identity anchor.\n\n## 3\\. Audience\n\n* **Canonical persona (primary)**: vp-marketing (VP of Marketing); secondary: center-owner-asset-manager.\n* **Vertical ICP**: <!-- OPERATOR-FILL: premium flagship brands + destination retail centers/districts. -->\n\n## 4\\. Messaging\n\nPositioning artifact: `docs/research/angles/custom-illuminated-artwork-2026-05-26.md`. Lead angles for retail: Angle 5 (vacancy-to-anchor / artwork as leasing + NOI instrument) + Angle 2 (permanent owned photo-landmark). Free-asset / proof-led posture, soft concept CTA. NOTE: the named-account (\"Gateway\") proof was genericized to \"a signature piece a property gets known for\" on 2026-05-26.\n\n## 5\\. Channels\n\n* **Primary**: cold email (Email Bison workspace `emailbison-b2b`)\n* 3 ESP-split draft campaigns already built (draft, no leads): **138** (Microsoft), **139** (Google), **140** (SMTP) — wave names `{ESP} | FY26, M07 | Flagship Retail | Custom Illuminated Artwork | Professional Emails`\n* Copy artifact: `docs/campaigns/labs/copy-flagship-retail-custom-illuminated-artwork-2026-05-26.json`\n\n## 6\\. Assets\n\n<!-- OPERATOR-FILL: concept renders / portfolio photos (Sarah). -->\n\n## 7\\. Budget\n\n<!-- OPERATOR-FILL -->\n\n## 8\\. Success metrics\n\n<!-- OPERATOR-FILL: reply rate / concept-request rate / meetings booked. -->\n\n---\n\n**Sub-issue chain** (created at scaffold): #1 Brief approved → #2 Target list built → #3 Copy written + approved → #4 Salesforce setup → #5 Pre-launch QA → #6 Launch executed → #7 Active management → #8 Campaign closed + debrief.",
+      "progress": 0,
+      "sortOrder": 111989
+    }
+  ]
+}
