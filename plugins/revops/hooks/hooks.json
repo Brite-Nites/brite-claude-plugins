@@ -1,5 +1,5 @@
 {
-  "description": "RevOps plugin hooks \u2014 cwd-aware SessionStart banner when an SFDX project is reachable from the user's pwd",
+  "description": "RevOps plugin hooks — cwd-aware SessionStart banner when an SFDX project is reachable from the user's pwd",
   "hooks": {
     "SessionStart": [
       {

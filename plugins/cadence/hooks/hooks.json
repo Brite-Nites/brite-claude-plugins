@@ -1,4 +1,5 @@
 {
+  "description": "Cadence plugin hooks — SubagentStart brain-first preamble injection",
   "hooks": {
     "SubagentStart": [
       {
