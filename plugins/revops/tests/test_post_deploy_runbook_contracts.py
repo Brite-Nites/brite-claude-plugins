@@ -136,6 +136,24 @@ def test_soql_selects_required_fields() -> None:
         )
 
 
+def test_soql_queries_from_flow() -> None:
+    """The SOQL must query FROM Flow (Tooling API)."""
+    body = read_command()
+    soql_section = body[body.find("## Phase 3"):body.find("## Phase 4")]
+    assert re.search(r"FROM\s+Flow\b", soql_section), (
+        "Phase 3 SOQL must query FROM Flow (Tooling API)"
+    )
+
+
+def test_query_uses_json_flag() -> None:
+    """The sf data query command must use --json for parseable output."""
+    body = read_command()
+    phase3_section = body[body.find("## Phase 3"):body.find("## Phase 4")]
+    assert "sf data query --use-tooling-api --json" in phase3_section, (
+        "Phase 3 query must use --json for parseable output"
+    )
+
+
 def test_fallback_to_last_n_hours() -> None:
     """The spec mandates LAST_N_HOURS:2 as fallback when git date extraction fails."""
     body = read_command()
@@ -177,6 +195,9 @@ def test_bulk_delete_path_exists() -> None:
     assert "--use-tooling-api" in phase3_section, (
         "Phase 3 delete must use --use-tooling-api flag"
     )
+    assert "--sobject Flow" in phase3_section, (
+        "Phase 3 delete must target --sobject Flow (Tooling API Flow object)"
+    )
 
 
 def test_individual_delete_path_exists() -> None:
@@ -213,6 +234,31 @@ def test_summary_includes_flow_draft_cleanup() -> None:
     )
 
 
+# ── Phase 3 structural contracts ─────────────────────────────────────────
+
+def test_phase3_is_unconditional() -> None:
+    """Phase 3 must NOT be conditional on a diff flag — it self-determines."""
+    body = read_command()
+    phase3_heading = re.search(r"^## Phase 3 — (.*)$", body, re.MULTILINE)
+    assert phase3_heading, "Phase 3 heading not found"
+    assert "conditional" not in phase3_heading.group(1).lower(), (
+        "Phase 3 must not be conditional on a diff flag — it self-determines "
+        "via the Tooling API query result"
+    )
+
+
+def test_summary_includes_phase3_unique_statuses() -> None:
+    """Phase 7 must surface Phase 3's unique N/A statuses."""
+    body = read_command()
+    phase7_section = body[body.find("## Phase 7"):]
+    assert "N/A — no Drafts detected" in phase7_section, (
+        "Phase 7 must surface Phase 3's 'N/A — no Drafts detected' status"
+    )
+    assert "N/A — query failed" in phase7_section, (
+        "Phase 7 must surface Phase 3's 'N/A — query failed' status"
+    )
+
+
 # ── BC-11038 rationale callout ──────────────────────────────────────────
 
 def test_cites_bc_11038() -> None:
@@ -227,11 +273,13 @@ def test_cites_bc_11038() -> None:
 # ── Rules section updates ──────────────────────────────────────────────
 
 def test_rules_acknowledge_phase3_mutations() -> None:
-    """The zero-mutation rule must carve out Phase 3."""
+    """The zero-mutation rule must carve out Phase 3 in the same sentence."""
     body = read_command()
     rules_section = body[body.find("## Rules"):]
-    assert "except" in rules_section.split("\n")[2].lower() or "Phase 3" in rules_section, (
-        "Rules section must acknowledge Phase 3 as an exception to zero-mutation"
+    first_rule = rules_section.split("\n")[2]
+    assert "except" in first_rule.lower() and "Phase 3" in first_rule, (
+        "The first rule must carve out Phase 3 from the zero-mutation contract "
+        "in the same sentence"
     )
 
 

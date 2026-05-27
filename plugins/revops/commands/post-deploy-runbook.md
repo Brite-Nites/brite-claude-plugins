@@ -79,7 +79,7 @@ The `-l` flag emits filenames-only (one path per line for each file containing a
 
 If all four flags are false, narrate:
 
-> No manual post-deploy steps detected for this diff — the deploy landed no Flows, Scheduled Apex, Named Credentials, or standard-object picklists. Nothing to walk.
+> No manual post-deploy steps detected for this diff — the deploy landed no Flows, Scheduled Apex, Named Credentials, or standard-object picklists. No Flow Draft cleanup needed. Nothing to walk.
 
 Then **skip directly to Phase 7** and surface all five steps as `N/A — not detected`. Do not walk Phases 2-6. Do not prompt further.
 
@@ -192,9 +192,9 @@ Parse the JSON response. Read `result.records` (an array of Flow rows).
 
   Then proceed to Phase 3.3 (gate).
 
-- **Empty result set** (`result.records` is empty or `result.totalSize === 0`) — narrate: *"No Flow Drafts found in deploy window — skipping."* Mark phase status `N/A — no Drafts detected`. Skip the gate and proceed to Phase 4.
+- **Empty result set** (`result.records` is empty or `result.totalSize === 0`) — narrate: *"No Flow Drafts found in deploy window — skipping."* Mark phase status `N/A — no Drafts detected`. Narrate: `Phase 3/7: Flow Draft cleanup... done`. Proceed to Phase 4.
 
-- **Query failure** (`status !== 0` or unexpected shape) — do **not** halt the runbook over an advisory check. Print the raw JSON and narrate: *"Flow Draft query failed (Tooling API error). Proceeding — check manually in Setup → Process Automation → Flows if needed."* Mark phase status `N/A — query failed`. Proceed to Phase 4.
+- **Query failure** (`status !== 0` or unexpected shape) — do **not** halt the runbook over an advisory check. Print the raw JSON and narrate: *"Flow Draft query failed (Tooling API error). Proceeding — check manually in Setup → Process Automation → Flows if needed."* Mark phase status `N/A — query failed`. Narrate: `Phase 3/7: Flow Draft cleanup... done`. Proceed to Phase 4.
 
 ### 3.3 Gate
 
@@ -203,7 +203,7 @@ Ask via `AskUserQuestion`:
 - Question: `{N} stale Flow Drafts detected from this deploy window. Delete them?` (substitute `{N}` with the record count)
 - Options:
   - `Delete all` — proceed to Phase 3.4 (bulk delete).
-  - `Skip — keep Drafts` — mark phase status `skipped`. Proceed to Phase 4.
+  - `Skip — keep Drafts` — mark phase status `skipped`. Narrate: `Phase 3/7: Flow Draft cleanup... done`. Proceed to Phase 4.
   - `Pick individually` — proceed to Phase 3.5 (per-Draft gate).
 
 ### 3.4 Bulk delete
