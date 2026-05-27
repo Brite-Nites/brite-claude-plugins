@@ -319,6 +319,31 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2d — Security Hook Classifier Regression (BC-11117)
+# ══════════════════════════════════════════════════════════════════════
+# Spec-tests the PreToolUse > Bash prompt-hook and regex-hook to ensure
+# the --force-with-lease carve-out is present with correct branch-aware
+# constraints. Pass count auto-derived from the harness's RESULT line.
+section "2d. Security Hook Classifier Regression"
+
+classifier_test="$REPO_ROOT/scripts/test_security_hook_classifier.sh"
+hooks_json="$REPO_ROOT/plugins/workflows/hooks/hooks.json"
+
+if [ ! -f "$classifier_test" ]; then
+  warn "scripts/test_security_hook_classifier.sh not found — classifier regression check skipped"
+elif [ ! -f "$hooks_json" ]; then
+  warn "plugins/workflows/hooks/hooks.json not found — classifier regression check skipped"
+else
+  if classifier_out=$(bash "$classifier_test" "$hooks_json" 2>&1); then
+    pass_count=$(printf '%s\n' "$classifier_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "security hook classifier regression (${pass_count:-?} scenarios)"
+  else
+    fail "security hook classifier regression failed — run scripts/test_security_hook_classifier.sh for details"
+    printf '%s\n' "$classifier_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
 # ══════════════════════════════════════════════════════════════════════
 
