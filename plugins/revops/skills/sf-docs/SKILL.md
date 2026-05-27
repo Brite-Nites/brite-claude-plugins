@@ -8,8 +8,6 @@ metadata:
   author: "Jag Valaiyapathy"
 ---
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 <!-- Adopted verbatim from Jaganpro/sf-skills@ff1ab74 (MIT). Web-retrieval concern only (developer.salesforce.com, help.salesforce.com, etc.). Brite-internal SF documentation (artifacts inventory, ADR convention, cross-repo pointers) lives in the sibling sf-internal-docs skill — see BC-6081. -->
 
 # sf-docs

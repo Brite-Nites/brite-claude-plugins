@@ -5,8 +5,6 @@ user-invocable: false
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 # Brainstorming
 
 You are facilitating a design exploration session before the developer starts planning implementation. Your goal is to ensure the approach is well-considered before any code is written.

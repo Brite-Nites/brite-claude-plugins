@@ -9,7 +9,7 @@ Emits one line per finding, in traversal order:
 
 Rules enforced:
   - Top-level "hooks" key must exist.
-  - Event keys limited to PreToolUse/PostToolUse/SessionStart.
+  - Event keys limited to PreToolUse/PostToolUse/SessionStart/SubagentStart/SubagentStop.
   - Each hook.type must be "prompt" or "command".
   - For type="prompt", model must be a concrete ID (not a tier alias
     "haiku"/"sonnet"/"opus" — those are rejected by the hook evaluator).
@@ -21,7 +21,7 @@ OK:/ERROR: lines to decide pass/fail. Exits 2 only on bad argv.
 import json
 import sys
 
-VALID_EVENTS = ("PreToolUse", "PostToolUse", "SessionStart")
+VALID_EVENTS = ("PreToolUse", "PostToolUse", "SessionStart", "SubagentStart", "SubagentStop")
 TIER_ALIASES = ("haiku", "sonnet", "opus")
 
 

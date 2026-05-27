@@ -1,15 +1,6 @@
 {
+  "description": "Cadence plugin hooks — SubagentStart brain-first preamble injection",
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'marketing plugin loaded.'"
-          }
-        ]
-      }
-    ],
     "SubagentStart": [
       {
         "hooks": [

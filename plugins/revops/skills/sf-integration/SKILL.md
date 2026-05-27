@@ -10,8 +10,6 @@ metadata:
   scoring: "120 points across 6 categories"
 ---
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 <!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md §Engineering Standards (line 45) + §Apex & Automation (lines 182-184) + §External Client Apps (lines 148-152) + namedCredentials/Slack_Webform_Alerts. -->
 
 # sf-integration: Salesforce Integration Patterns Expert (Brite edition)

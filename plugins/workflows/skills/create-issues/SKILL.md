@@ -7,8 +7,6 @@ agent: issue-creator
 context: fork
 ---
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 ## Instructions
 
 You are creating Linear issues from a refined project plan.

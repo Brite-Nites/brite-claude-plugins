@@ -82,6 +82,18 @@
           }
         ]
       }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/../_shared/team-gbrain-usage.md\" 2>/dev/null || true",
+            "timeout": 3,
+            "statusMessage": "Loading brain-first guidance..."
+          }
+        ]
+      }
     ]
   }
 }

@@ -9,8 +9,6 @@ metadata:
   upstream: "Jaganpro/sf-skills@ff1ab74"
 ---
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 <!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). This file layers Brite conventions from brite-salesforce/CLAUDE.md. -->
 
 # sf-deploy: Salesforce Deploy Orchestration (Brite edition)
