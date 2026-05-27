@@ -97,10 +97,10 @@ assert_grep "disposition completeness gate blocks scoping-needed" \
 section "4/7" "Per-milestone sub-step ordering"
 
 # Extract line numbers for the 4 sub-steps to verify ordering.
-LINE_REHOME=$(grep -n "Sub-step a: Re-home" "$CMD" | head -1 | cut -d: -f1)
-LINE_CLOSE=$(grep -n "Sub-step b: Close-as-obsolete" "$CMD" | head -1 | cut -d: -f1)
-LINE_ANNOTATE=$(grep -n "Sub-step c: Annotate" "$CMD" | head -1 | cut -d: -f1)
-LINE_ARCHIVE=$(grep -n "Sub-step d: Archive" "$CMD" | head -1 | cut -d: -f1)
+LINE_REHOME=$(grep -n "Sub-step a: Re-home" "$CMD" | head -1 | cut -d: -f1 || true)
+LINE_CLOSE=$(grep -n "Sub-step b: Close-as-obsolete" "$CMD" | head -1 | cut -d: -f1 || true)
+LINE_ANNOTATE=$(grep -n "Sub-step c: Annotate" "$CMD" | head -1 | cut -d: -f1 || true)
+LINE_ARCHIVE=$(grep -n "Sub-step d: Archive" "$CMD" | head -1 | cut -d: -f1 || true)
 
 if [ -n "$LINE_REHOME" ] && [ -n "$LINE_CLOSE" ] && [ -n "$LINE_ANNOTATE" ] && [ -n "$LINE_ARCHIVE" ]; then
   pass "all 4 sub-steps present"
