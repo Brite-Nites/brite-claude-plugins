@@ -5,7 +5,7 @@
 **Status**: Filed — design phase closed 2026-05-12; refined and filed as Linear BC-8712 through BC-8735 + BC-8752 (audit-fix). See `docs/project-plan-refined.md` for refined tasks and `docs/linear-issues-created.md` for the BC table.
 **Source design doc**: `docs/designs/gtm-campaign-orchestration-design.md`
 **Companion memories**: `memory/project_gtm_campaign_architecture.md`, `memory/project_marketing_vocabulary.md`, `memory/session_2026_05_11_gtm_campaign_design.md`
-**Linear project (this plan's BCs)**: Brite Plugin Marketplace (plugin engineering work)
+**Linear project (this plan's BCs)**: Brite Skill Packs (plugin engineering work)
 **Linear project (campaigns themselves, downstream)**: Brite GTM (per D2 + O7)
 **Cross-repo**: brite-salesforce (SF metadata), brite-nites/handbook (PRs for O14)
 
@@ -573,7 +573,7 @@ These intersect with implementation but don't require new BCs from this plan. Se
 ## 9. Next steps
 
 1. **Refine this plan** via `/workflows:refine-plan` — expand each BC sketch into agent-ready issue spec with full ACs + research notes + validation criteria
-2. **Create issues** via `/workflows:create-issues` — file the 21 BCs in Linear "Brite Plugin Marketplace" project with cross-linked dependencies
+2. **Create issues** via `/workflows:create-issues` — file the 21 BCs in Linear "Brite Skill Packs" project with cross-linked dependencies
 3. **Execute Tier 1 first** — parallelize T1-A through T1-D once T1-A lands
 4. **Status check at end of Tier 4** — confirm plan-campaign is operator-usable before committing to Tier 5+
 5. **V3 ratification at Tier 6** — load-bearing M2/M3 decision

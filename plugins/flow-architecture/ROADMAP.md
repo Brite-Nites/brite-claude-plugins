@@ -24,7 +24,7 @@ The FDA plugin ships in **6 phases** spanning design, org-prerequisites, scoping
 
 ## Phase 3 — Linear scoping (done 2026-05-10)
 
-Milestone **Flow-Driven Architecture Plugin v1.0** in the Brite Skill Packs project (Layer C; renamed from "Brite Plugin Marketplace" 2026-05-27), 21 issues (3 parents + 18 standalones) under label `flow-architecture`. Per Q1 amendment 1, plugin infrastructure is non-UI-bearing per the Q1 scope test, so it tracks under the CDR-014 Phase Pattern (not the FDA 5-discipline pattern that this plugin is for OTHER products to use).
+Milestone **Flow-Driven Architecture Plugin v1.0** in the Brite Skill Packs project (Layer C; renamed from "Brite Skill Packs" 2026-05-27), 21 issues (3 parents + 18 standalones) under label `flow-architecture`. Per Q1 amendment 1, plugin infrastructure is non-UI-bearing per the Q1 scope test, so it tracks under the CDR-014 Phase Pattern (not the FDA 5-discipline pattern that this plugin is for OTHER products to use).
 
 ## Phase 4 — Plugin implementation (in progress)
 

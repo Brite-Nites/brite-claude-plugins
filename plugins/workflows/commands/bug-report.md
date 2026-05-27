@@ -113,7 +113,7 @@ If the search returns no results, skip the duplicate prompt and proceed directly
 Determine where to file the issue:
 
 1. **Team** — If the project's CLAUDE.md or context makes the team obvious, suggest it. Otherwise, list available teams using `list_teams` and ask.
-2. **Project** — Optional. If the developer is working within a known project context (e.g., "Brite Plugin Marketplace"), suggest it. Otherwise, ask if they want to assign it to a project or leave it unassigned.
+2. **Project** — Optional. If the developer is working within a known project context (e.g., "Brite Skill Packs"), suggest it. Otherwise, ask if they want to assign it to a project or leave it unassigned.
 
 ## Step 5: Review Draft
 

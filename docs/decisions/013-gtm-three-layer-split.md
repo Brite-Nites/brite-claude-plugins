@@ -44,7 +44,7 @@ Salesforce sits beside this trio as the **reporting + attribution surface** (see
 - Handbook `active-campaigns.md` becomes a navigation doc pointing at SF list view URL + Linear project URL (per D6 / BC-8734).
 - All canonical taxonomies (vocabulary canon, framework docs, vertical playbooks) live in handbook (per O14 / BC-8732/BC-8733).
 - All operational state (canonicals.yaml, MSPA matrix, learnings, manifest, discoveries) lives in plugin (per Phase 2 7.2 + ADR-016).
-- Linear is the orchestration layer; the "Brite GTM" project holds milestones + sub-issues; the "Brite Plugin Marketplace" project holds plugin engineering work.
+- Linear is the orchestration layer; the "Brite GTM" project holds milestones + sub-issues; the "Brite Skill Packs" project holds plugin engineering work.
 - Cross-skill handoffs flow through plugin filesystem (e.g., `campaign-debrief` → `product-marketing-context` proposal via `discoveries.json` signals); skills never directly mutate handbook.
 
 ## Alternatives Considered
