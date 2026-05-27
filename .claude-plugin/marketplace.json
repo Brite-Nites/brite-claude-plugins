@@ -29,7 +29,7 @@
       "name": "revops",
       "source": "./plugins/revops",
       "description": "Revenue operations plugin \u2014 Salesforce dev + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
-      "version": "0.5.2"
+      "version": "0.5.3"
     },
     {
       "name": "flow-architecture",
