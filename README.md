@@ -560,4 +560,4 @@ MIT
 
 ## Issue Tracking
 
-Issues for this project are tracked in [Brite Plugin Marketplace](https://linear.app/brite-nites/project/brite-plugin-marketplace-402b57908532).
+Issues for this project are tracked in [Brite Skill Packs](https://linear.app/brite-nites/project/brite-skill-packs-402b57908532) (Layer C). Sibling Linear projects under the same initiative: [Brite Orchestration Layer](https://linear.app/brite-nites/project/brite-orchestration-layer-d46d5338fa95), [Brite Knowledge Layer](https://linear.app/brite-nites/project/brite-knowledge-layer-b47f7155b42e), [Brite Runtime & Harness](https://linear.app/brite-nites/project/brite-runtime-andamp-harness-0cd1bad14ad1).

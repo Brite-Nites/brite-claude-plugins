@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Linear Project
 
-Project: **Brite Plugin Marketplace** (team: Brite Company, prefix: `BC-`, not `BRI-`).
+Project: **Brite Skill Packs** (team: Brite Company, prefix: `BC-`, not `BRI-`).
+Sibling projects (same team, same prefix, same initiative — created 2026-05-27 4-layer re-org): **Brite Orchestration Layer** (Layer A), **Brite Knowledge Layer** (Layer D), **Brite Runtime & Harness** (Layer B). See `docs/history/prd-m5-m8-archive.md`.
 
 ## Quick Start
 
