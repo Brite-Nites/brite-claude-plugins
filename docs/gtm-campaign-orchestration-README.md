@@ -1,9 +1,9 @@
 # GTM Campaign Orchestration — Effort README
 
-**Status**: Design phase CLOSED 2026-05-12; pre-implementation audit complete; **25 Linear issues filed; Task 0 (BC-8712) complete 2026-05-15; 24 BCs ready for execution** (BC-8713 through BC-8735 + BC-8752; BC-8736 cancelled as duplicate of BC-8752).
-**Doc lifecycle**: LIVING — this README is updated as BCs ship + V3 ratifies + Tiers complete. See [§12 Maintenance protocol](#12-next-steps--open-items) for what to update when.
-**Last updated**: 2026-05-15 (session-4 — BC-8712 closed; plugin-bump guardrail in pre-commit.sh + Repo-line backfill across 11 affected BC bodies + count-drift fixes 22→25 / 23→25)
-**README version**: v1.1 (status-column added; first BC closure)
+**Status**: ✅ **MILESTONE CLOSED 2026-05-27.** V3 M2 ratified 2026-05-22 (see `docs/v3-ratification-outcome-2026-05-22.md`); **all 25 build BCs shipped** (BC-8713 through BC-8735 + BC-8752); plus 6 post-V3/dogfood additions (BC-10510, BC-10511, BC-10653, BC-10654, BC-11098 all Done + deferred BC-10512); milestone progress @ 94.35% — the single open item is BC-10512, deferred-by-design per Rule of Two (extract σ3 username-resolution to shared ref; waits for 3rd σ3 SF-write surface).
+**Doc lifecycle**: CLOSED — this README is now a historical record. BC-10512 will be picked up when its trigger condition is met (3rd σ3 SF-write surface).
+**Last updated**: 2026-05-27 (milestone closed; all build BCs Done; BC-11098 Done; PR #334 merged)
+**README version**: v1.3 (milestone close-out)
 **Audience**: anyone trying to understand "what is this work, what was decided, and how do I act on it."
 **TL;DR**: Brite had three parallel "campaign" systems with three different definitions. This design unifies them into a 3-layer architecture (Handbook = HOW / Linear = orchestration / Plugin = WHAT, with Salesforce as portfolio reporting surface), locks ~30 architectural decisions, and breaks implementation into 25 atomic Linear issues across 9 tiers. Critical path: ~5-6 weeks at single-developer pace.
 
@@ -1241,41 +1241,52 @@ Audience: external partners / new hires / anyone outside the Brite engineering o
 
 ---
 
-## 7. The 23 Linear issues
+## 7. The 25 Linear issues
 
 All issues in the **Brite Plugin Marketplace** project (team Brite Company).
 
 ### By tier
 
-Status legend: `[done]` = shipped + Linear Done; `[wip]` = in flight; `[blocked]` = blocked by upstream; blank = backlog. Per §12 maintenance protocol, update this column when a BC closes.
+Status legend: `[done]` = shipped + Linear Done; `[deferred]` = intentionally held; `[wip]` = in flight; `[blocked]` = blocked by upstream; blank = backlog.
 
 | Status | BC | Task | Title (abbreviated) | Tier | Complexity |
 |---|---|---|---|---|---|
 | [done] | [BC-8712](https://linear.app/brite-nites/issue/BC-8712) | Task 0 | Bootstrap — create-issues + setup-claude-md + provision Brite GTM project | — | S |
-|  | [BC-8713](https://linear.app/brite-nites/issue/BC-8713) | T1-A | 4 SF custom fields | 1 | S |
-|  | [BC-8714](https://linear.app/brite-nites/issue/BC-8714) | T1-B | 4 SF saved list views | 1 | S |
-|  | [BC-8715](https://linear.app/brite-nites/issue/BC-8715) | T1-C | Performance Dashboard | 1 | M |
-|  | [BC-8716](https://linear.app/brite-nites/issue/BC-8716) | T1-D | Pipeline by Offer Family Dashboard | 1 | M |
-|  | [BC-8717](https://linear.app/brite-nites/issue/BC-8717) | T2-E | `/revops:create-sf-campaign` slash command (respec'd from MCP tool 2026-05-19) | 2 | M |
-|  | [BC-8723](https://linear.app/brite-nites/issue/BC-8723) | T2-F | `/revops:update-sf-campaign-status` slash command (respec'd from MCP tool 2026-05-19) | 2 | S |
-|  | [BC-8752](https://linear.app/brite-nites/issue/BC-8752) | T2-FA | σ3 trigger automation (audit-fix) | 2 | M |
-|  | [BC-8718](https://linear.app/brite-nites/issue/BC-8718) | T3-G | canonicals.yaml backfill (27 verticals) | 3 | M |
-|  | [BC-8730](https://linear.app/brite-nites/issue/BC-8730) | T3-H | D8 persona authorship process doc | 3 | S |
-|  | [BC-8724](https://linear.app/brite-nites/issue/BC-8724) | T4-I | `/marketing:plan-campaign` command | 4 | L |
-|  | [BC-8719](https://linear.app/brite-nites/issue/BC-8719) | T5-K | Entity slug short-form migration | 5 | S |
-|  | [BC-8720](https://linear.app/brite-nites/issue/BC-8720) | T5-L | offer-tier → offer-posture rename | 5 | M |
-|  | [BC-8721](https://linear.app/brite-nites/issue/BC-8721) | T5-M | 3-verdict parent labels rename | 5 | S |
-|  | [BC-8722](https://linear.app/brite-nites/issue/BC-8722) | T5-N | discoveries.json category schema | 5 | M |
-|  | [BC-8727](https://linear.app/brite-nites/issue/BC-8727) | T6-O | First dogfood campaign | 6 | M |
-|  | [BC-8729](https://linear.app/brite-nites/issue/BC-8729) | T6-P | V3 Marketing ratification | 6 | S |
-|  | [BC-8731](https://linear.app/brite-nites/issue/BC-8731) | T7-Q | `/marketing:portfolio-snapshot` command | 7 | L |
-|  | [BC-8732](https://linear.app/brite-nites/issue/BC-8732) | T8-R | Handbook PR — vocabulary.md | 8 | M |
-|  | [BC-8733](https://linear.app/brite-nites/issue/BC-8733) | T8-S | Handbook PR — 7 framework docs | 8 | L |
-|  | [BC-8734](https://linear.app/brite-nites/issue/BC-8734) | T8-T | Handbook PR — active-campaigns nav refactor | 8 | S |
-|  | [BC-8735](https://linear.app/brite-nites/issue/BC-8735) | T8-U | Handbook PR — how-we-operate cadence rows | 8 | S |
-|  | [BC-8728](https://linear.app/brite-nites/issue/BC-8728) | T9-V | `/marketing:offer-performance` (deferrable) | 9 | M |
-|  | [BC-8725](https://linear.app/brite-nites/issue/BC-8725) | T9-W | new-vertical/offer/persona commands (deferrable) | 9 | M |
-|  | [BC-8726](https://linear.app/brite-nites/issue/BC-8726) | T9-X | icp-refinement-review command (deferrable) | 9 | M |
+| [done] | [BC-8713](https://linear.app/brite-nites/issue/BC-8713) | T1-A | 4 SF custom fields | 1 | S |
+| [done] | [BC-8714](https://linear.app/brite-nites/issue/BC-8714) | T1-B | 4 SF saved list views | 1 | S |
+| [done] | [BC-8715](https://linear.app/brite-nites/issue/BC-8715) | T1-C | Performance Dashboard | 1 | M |
+| [done] | [BC-8716](https://linear.app/brite-nites/issue/BC-8716) | T1-D | Pipeline by Offer Family Dashboard | 1 | M |
+| [done] | [BC-8717](https://linear.app/brite-nites/issue/BC-8717) | T2-E | `/revops:create-sf-campaign` slash command (respec'd from MCP tool 2026-05-19) | 2 | M |
+| [done] | [BC-8723](https://linear.app/brite-nites/issue/BC-8723) | T2-F | `/revops:update-sf-campaign-status` slash command (respec'd from MCP tool 2026-05-19) | 2 | S |
+| [done] | [BC-8752](https://linear.app/brite-nites/issue/BC-8752) | T2-FA | σ3 trigger automation (audit-fix) | 2 | M |
+| [done] | [BC-8718](https://linear.app/brite-nites/issue/BC-8718) | T3-G | canonicals.yaml backfill (27 verticals) | 3 | M |
+| [done] | [BC-8730](https://linear.app/brite-nites/issue/BC-8730) | T3-H | D8 persona authorship process doc | 3 | S |
+| [done] | [BC-8724](https://linear.app/brite-nites/issue/BC-8724) | T4-I | `/marketing:plan-campaign` command | 4 | L |
+| [done] | [BC-8719](https://linear.app/brite-nites/issue/BC-8719) | T5-K | Entity slug short-form migration | 5 | S |
+| [done] | [BC-8720](https://linear.app/brite-nites/issue/BC-8720) | T5-L | offer-tier → offer-posture rename | 5 | M |
+| [done] | [BC-8721](https://linear.app/brite-nites/issue/BC-8721) | T5-M | 3-verdict parent labels rename | 5 | S |
+| [done] | [BC-8722](https://linear.app/brite-nites/issue/BC-8722) | T5-N | discoveries.json category schema | 5 | M |
+| [done] | [BC-8727](https://linear.app/brite-nites/issue/BC-8727) | T6-O | First dogfood campaign | 6 | M |
+| [done] | [BC-8729](https://linear.app/brite-nites/issue/BC-8729) | T6-P | V3 Marketing ratification | 6 | S |
+| [done] | [BC-8731](https://linear.app/brite-nites/issue/BC-8731) | T7-Q | `/marketing:portfolio-snapshot` command | 7 | L |
+| [done] | [BC-8732](https://linear.app/brite-nites/issue/BC-8732) | T8-R | Handbook PR — vocabulary.md | 8 | M |
+| [done] | [BC-8733](https://linear.app/brite-nites/issue/BC-8733) | T8-S | Handbook PR — 7 framework docs | 8 | L |
+| [done] | [BC-8734](https://linear.app/brite-nites/issue/BC-8734) | T8-T | Handbook PR — active-campaigns nav refactor | 8 | S |
+| [done] | [BC-8735](https://linear.app/brite-nites/issue/BC-8735) | T8-U | Handbook PR — how-we-operate cadence rows | 8 | S |
+| [done] | [BC-8728](https://linear.app/brite-nites/issue/BC-8728) | T9-V | `/marketing:offer-performance` (deferrable — but shipped post-Rule-of-Three trigger 2026-05-26) | 9 | M |
+| [done] | [BC-8725](https://linear.app/brite-nites/issue/BC-8725) | T9-W | new-vertical/offer/persona commands (deferrable — but shipped 2026-05-26, dogfood-promoted) | 9 | M |
+| [done] | [BC-8726](https://linear.app/brite-nites/issue/BC-8726) | T9-X | icp-refinement-review command (deferrable — but shipped 2026-05-26) | 9 | M |
+
+### Post-V3 / dogfood additions to milestone (not in original 25)
+
+| Status | BC | Source | Title | Notes |
+|---|---|---|---|---|
+| [done] | [BC-10510](https://linear.app/brite-nites/issue/BC-10510) | BC-8723 session learning | Backport Phase 0 metadata cache to `/revops:create-sf-campaign` | σ3 sibling parity (divergence #1) |
+| [done] | [BC-10511](https://linear.app/brite-nites/issue/BC-10511) | BC-8723 session learning | Backport `--target-org` regex to `/revops:create-sf-campaign` | σ3 sibling parity (divergence #2) |
+| [deferred] | [BC-10512](https://linear.app/brite-nites/issue/BC-10512) | BC-8723 session learning | Extract σ3 username-resolution to shared ref | Rule of Two — held until 3rd σ3 SF-write surface lands |
+| [done] | [BC-10653](https://linear.app/brite-nites/issue/BC-10653) | BC-8727 dogfood F12 | Fix SF JWT auth refresh blocking σ3 Campaign writes | Documented runbook in `brite-salesforce/docs/runbooks/sf-prod-jwt-auth-rotation.md` |
+| [done] | [BC-10654](https://linear.app/brite-nites/issue/BC-10654) | BC-8727 dogfood F7 | Handbook campaign-brief `{{slot}}` placeholders | 14 named slots; deterministic brief population |
+| [done] | [BC-11098](https://linear.app/brite-nites/issue/BC-11098) | V3 outcome item 8 Option B | Weekly `/revops:doctor` JWT-validity probe + alert routing | Shipped 2026-05-27 (PR #375 + fix-up #378; revops 0.5.2) |
 
 ### Critical path
 
