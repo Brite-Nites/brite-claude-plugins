@@ -10,7 +10,7 @@ For the new framing, see `docs/designs/brite-agent-platform.md` (header retrofit
 
 ## The original PRD framing (2026-02 through 2026-04)
 
-The Brite Plugin Marketplace project was originally scoped as a **4-layer agent platform** with an **8-milestone roadmap** (M1-M8), plus two lateral workstreams that lived in the same Linear project without M-numbers:
+The Brite Plugin Marketplace project was originally scoped as a **4-layer agent platform** with an **8-milestone roadmap** (M1-M8), plus one lateral workstream that lived in the same Linear project without an M-number:
 
 **8 PRD-numbered milestones** (canonical names from `docs/designs/brite-agent-platform.md`):
 
@@ -23,10 +23,9 @@ The Brite Plugin Marketplace project was originally scoped as a **4-layer agent 
 7. M7 — Symphony Autonomous Execution — **this archive**
 8. M8 — Context Governance & Observability — **this archive**
 
-**2 lateral workstreams** (no M-number, lived alongside the PRD milestones in the same Linear project):
+**1 lateral workstream** (no M-number, lived alongside the PRD milestones in the same Linear project):
 
 - Marketing Function — empty stub, never had child issues; `[ARCHIVED]` 2026-05-27
-- (Note: Domain Plugin Expansion is M5 above, not a lateral — included in the 4 archived below.)
 
 **Linear-vs-PRD milestone-name drift.** During execution, the Linear project's actual milestones diverged from the PRD's canonical M1-M8 names. Linear's shipped milestones used operational labels like "Foundation & Quick Wins" (Feb 2026), "The Inner Loop" (Mar), "The Outer Loop" (Apr), "Orchestration" (May), "Plugin Ecosystem" (Jun) — these aren't 1:1 maps of PRD M1-M4 names. Throughout this archive, the M-numbers reference the PRD-canonical names; references to Linear milestone state use the Linear names.
 
@@ -46,7 +45,7 @@ The empirical lesson: per-layer milestones decayed when the architecture itself 
 
 - **OpenAI Symphony** shipped publicly — `Linear board IS the orchestration substrate`. Tickets in, PRs out. Codex inside the workspace. Brite's actual stack aligns with this pattern: Linear-as-substrate + Claude Code inside the worktree. The daemon was the wrong shape.
 - **gbrain Minions** (Garry Tan, Q1 2026) bid to be its own orchestration plane — Postgres LISTEN/NOTIFY + Minion job dashboard. Different substrate, same orchestration question.
-- **Mission Control Plugin v0.1** codified a lighter-weight tracker+worker pattern (one mission-control session keeps state + dispatches worker briefs + integrates paste-backs; multiple worker sessions in worktrees execute single-scope work). Not Symphony-class, but proved value of the parallel-tracker pattern without needing a daemon.
+- **Mission Control Plugin v0.1** (planned, Layer C, 0% per the 2026-05-27 cleanup manifest) is scoped as a lighter-weight tracker+worker pattern (one mission-control session keeps state + dispatches worker briefs + integrates paste-backs; multiple worker sessions in worktrees execute single-scope work). Not Symphony-class, but the parallel-tracker pattern has been validated informally enough to scope as a plugin without needing a daemon.
 
 **Where the vision lives now:** **Brite Orchestration Layer** project (Layer A in the new 4-layer architecture). New milestones:
 
@@ -69,7 +68,7 @@ The Linear-as-substrate decision (vs gbrain-Minions or Hermes-runtime) remains a
 
 1. **BigQuery scope was wrong.** Brite uses Snowflake as the data warehouse, not BigQuery. The PRD's 90d trend computation, temporal diff library, and PII handling sections all cited BigQuery throughout. Wholesale rescoping would have been needed even to start. Captured in `memory/feedback_snowflake_not_bigquery.md`.
 
-2. **gbrain made the pattern obsolete.** The "refresh pipeline" was a workaround for not having a brain — a way to materialize SoR data into handbook markdown so agents could read it. gbrain (Garry Tan, MIT-licensed personal/team knowledge base — Q1 2026) ingests handbook directly via `gbrain sync --repo <handbook>` on push-to-main + weekly cron. The brain is the substrate now. BC-11006 registered the gbrain-team HTTP MCP in `plugins/workflows/.mcp.json`; BC-11153 shipped preamble injection via SubagentStart hooks. Already operational.
+2. **gbrain made the pattern obsolete.** The "refresh pipeline" was a workaround for not having a brain — a way to materialize SoR data into handbook markdown so agents could read it. gbrain (Garry Tan, MIT-licensed personal/team knowledge base — Q1 2026) ingests handbook directly via `gbrain sync --repo <handbook>` on push-to-main + weekly cron. The brain is the substrate now. BC-11006 registered the gbrain-team HTTP MCP in `plugins/workflows/.mcp.json`; BC-11153 shipped preamble injection via SubagentStart hooks. Already operational. (Snowflake-not-BigQuery note: captured in the user-side auto-memory at `~/.claude/projects/.../memory/feedback_snowflake_not_bigquery.md`.)
 
 **Where the vision lives now:** **Brite Knowledge Layer** project (Layer D in the new 4-layer architecture). New milestones:
 
@@ -81,11 +80,11 @@ Snowflake → handbook analytical-context piping (the survivable part of the ori
 
 ---
 
-## Domain Plugin Expansion (PRD lateral, between M4 and M5)
+## M5 — Domain Plugin Expansion
 
 **Original PRD vision:** Four new domain plugins — Engineering, Design, Sales, Product — each with an extracted skill set from the workflows plugin plus new domain-specific context-skills and tools.
 
-**7 child issues** (BC-1343, 1968, 1969, 1970, 1971, 2009 — all cancelled 2026-05-27).
+**6 child issues** (BC-1343, BC-1968, BC-1969, BC-1970, BC-1971, BC-2009 — all cancelled 2026-05-27). The original milestone description claimed "7 issues (5 new + 2 existing)" but only 6 issues survived to the 2026-05-27 cancellation point.
 
 **Why it didn't ship:** The 4 plugins never started. By the time the energy was available, the workflows plugin (Layer C — Skill Packs) had already ABSORBED most of what they would have provided:
 
@@ -144,7 +143,7 @@ The 4-plugin extraction would have created duplication overhead (4 plugins with 
 - 2026-05-27 cleanup manifest: `~/.claude/plans/2026-05-27-plugin-marketplace-cleanup.md`
 - New 4-layer architecture: `docs/designs/brite-agent-platform.md` (retrofitted with supersession header)
 - gbrain integration: `plugins/workflows/.mcp.json` (gbrain-team HTTP MCP), `plugins/workflows/scripts/gbrain-team-broker.sh`, commit `4dcc7625` (BC-11153, SubagentStart preamble injection)
-- Brite memory notes: `memory/feedback_snowflake_not_bigquery.md`, `memory/project_brite_agent_platform.md`
+- Brite memory notes (user-side, in `~/.claude/projects/-Users-holdenhalford-Projects-work-brite-nites-britenites-claude-plugins/memory/`): `feedback_snowflake_not_bigquery.md`, `project_brite_agent_platform.md`
 - Symphony reference: https://github.com/openai/symphony
 - gbrain reference: `~/code/gbrain` (Garry Tan, MIT)
 - gstack reference: `~/.gstack/` (Garry Tan, MIT)
