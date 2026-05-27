@@ -69,7 +69,7 @@ from pathlib import Path
 
 # ── Module-level constants ────────────────────────────────────────────────
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # Bumped 1 → 2 in BC-11852 (introduces audience_tiers block).
 
 # Strict kebab: starts with a letter, no doubled or trailing hyphens.
 SLUG_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
@@ -95,8 +95,10 @@ OFFER_KEYS = frozenset(
         "prose_path",
     }
 )
-# Mirrors schema.json#/definitions/manifest.
-MANIFEST_KEYS = frozenset({"schema_version", "verticals"})
+# Mirrors schema.json#/definitions/manifest. BC-11852 added audience_tiers[].
+MANIFEST_KEYS = frozenset({"schema_version", "verticals", "audience_tiers"})
+AUDIENCE_TIER_ENTRY_KEYS = frozenset({"slug", "axis", "display", "description", "matches"})
+AUDIENCE_TIER_AXES = frozenset({"tier", "seniority", "modifier"})
 
 # Pre-compiled parse_yaml regexes (hot loop).
 RE_TOP_KV = re.compile(r"^([a-zA-Z_][\w-]*)\s*:\s*(.*)$")
@@ -782,7 +784,81 @@ def _validate_manifest(manifest: dict[str, object], where: str) -> tuple[list[st
         if v in seen:
             errs.append(f"{where}: duplicate vertical slug '{v}'")
         seen.add(v)
+    # BC-11852 — validate audience_tiers[] block if present.
+    audience_tiers = manifest.get("audience_tiers")
+    if audience_tiers is not None:
+        errs.extend(_validate_audience_tiers(audience_tiers, where))
     return (errs, string_items)
+
+
+def _validate_audience_tiers(
+    audience_tiers: object, where: str
+) -> list[str]:
+    """Validate the BC-11852 audience_tiers[] block in _manifest.yaml.
+
+    Each entry must:
+      - be a mapping
+      - have required keys slug + axis + display
+      - axis ∈ {tier, seniority, modifier}
+      - slug be kebab-case
+      - matches[] (if present) be a list of non-empty strings
+
+    Cross-entry rule: slug values must be unique within an axis. A 'reverified'
+    modifier and a 'reverified' tier would collide (the auto-classifier picks
+    by axis-keyed lookup, but reusing the slug across axes makes audits
+    confusing — keep slugs globally unique per ADR-020).
+    """
+    errs: list[str] = []
+    label = f"{where} audience_tiers"
+    if not isinstance(audience_tiers, list):
+        return [f"{label}: must be a list (got {type(audience_tiers).__name__})"]
+    if len(audience_tiers) == 0:
+        return [f"{label}: list is empty — schema requires >=1 entry"]
+    seen_slugs: set[str] = set()
+    for i, entry in enumerate(audience_tiers):
+        elabel = f"{label}[{i}]"
+        if not isinstance(entry, dict):
+            errs.append(f"{elabel}: must be a mapping (got {type(entry).__name__})")
+            continue
+        errs.extend(_check_unknown_keys(entry, AUDIENCE_TIER_ENTRY_KEYS, elabel))
+        for required in ("slug", "axis", "display"):
+            if required not in entry:
+                errs.append(f"{elabel}: missing required key '{required}'")
+        if any("missing required" in e for e in errs[-3:]):
+            continue
+        slug = entry["slug"]
+        if not isinstance(slug, str) or not SLUG_RE.match(slug):
+            errs.append(f"{elabel}: slug {slug!r} is not kebab-case")
+        elif slug in seen_slugs:
+            errs.append(f"{elabel}: duplicate slug '{slug}' in audience_tiers[]")
+        else:
+            seen_slugs.add(slug)
+        axis = entry["axis"]
+        if not isinstance(axis, str) or axis not in AUDIENCE_TIER_AXES:
+            errs.append(
+                f"{elabel}: axis {axis!r} not in {sorted(AUDIENCE_TIER_AXES)}"
+            )
+        errs.extend(_check_non_empty_string(entry["display"], elabel, "display"))
+        desc = entry.get("description")
+        if desc is not None and not isinstance(desc, str):
+            errs.append(
+                f"{elabel}: description must be a string "
+                f"(got {type(desc).__name__})"
+            )
+        matches = entry.get("matches")
+        if matches is not None:
+            if not isinstance(matches, list):
+                errs.append(
+                    f"{elabel}: matches must be a list "
+                    f"(got {type(matches).__name__})"
+                )
+            else:
+                for j, mtoken in enumerate(matches):
+                    if not isinstance(mtoken, str) or not mtoken.strip():
+                        errs.append(
+                            f"{elabel}: matches[{j}] must be a non-empty string"
+                        )
+    return errs
 
 
 def main(argv: list[str] | None = None) -> int:

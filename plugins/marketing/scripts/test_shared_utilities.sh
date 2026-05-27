@@ -78,7 +78,7 @@ echo "── canonicals_reader ──"
 # CR1: load_canonicals_verticals — valid manifest
 cdir=$(mk_canonicals_dir "CR1")
 cat > "$cdir/_manifest.yaml" <<'YAML'
-schema_version: 1
+schema_version: 2
 verticals:
   - hotels-resorts
   - wineries-breweries
@@ -107,7 +107,7 @@ assert_exit_and_substring "CR2: missing manifest returns empty" 0 "\\[\\]"
 # CR3: lookup_posture — valid offer
 cdir3=$(mk_canonicals_dir "CR3")
 cat > "$cdir3/_manifest.yaml" <<'YAML'
-schema_version: 1
+schema_version: 2
 verticals:
   - hotels-resorts
 YAML
