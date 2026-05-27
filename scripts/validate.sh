@@ -290,7 +290,7 @@ fi
 # Section 2b'''''' — flow-architecture deprecate-legacy contract tests (BC-10219)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh —
-# 55 assertions locking two-pass detection, pre-comms gate, sub-step ordering,
+# 57 assertions locking two-pass detection, pre-comms gate, sub-step ordering,
 # AskUserQuestion gates, review doc schema, and Q59 cross-reference integration.
 section "2b''''''. flow-architecture deprecate-legacy contract tests (BC-10219)"
 

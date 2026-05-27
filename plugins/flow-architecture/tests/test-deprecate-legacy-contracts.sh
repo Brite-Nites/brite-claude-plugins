@@ -90,6 +90,8 @@ assert_grep "Pre-comms gate halt on <24h" \
   "24h cooling period" "$CMD"
 assert_grep "ISO-8601 timestamp delta check" \
   "≥24" "$CMD"
+assert_grep "disposition completeness gate blocks scoping-needed" \
+  "scoping-needed' disposition" "$CMD"
 
 # ══════════════════════════════════════════════════════════════════════
 section "4/7" "Per-milestone sub-step ordering"

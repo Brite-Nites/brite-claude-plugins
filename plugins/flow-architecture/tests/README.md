@@ -14,7 +14,7 @@ their fixtures.
 | `run-built-criterion-fixture-vslice.sh` (BC-10730) | bash v-slice | Operator-consumable BUILT criterion against `fixtures/synthetic-built-criterion-drift/`. Locks the rubric tightening in `flow-inventory-codebase-scan/SKILL.md` § 6.1 + `flow-inventory-add/SKILL.md` § 7. Section 4 uses a triad of catchphrase + structural-clause + negative-case greps against both SKILL.md files to defend against rubric-gutting edits. Wired into `scripts/validate.sh` Section 2b'''. |
 | `run-mode-classifier-eval.sh` (BC-7059) | bash eval | Mode-classifier evaluation against `fixtures/mode-classifier-eval.json`. |
 | `test-clone-drift.sh` (BC-7060) | bash regression | `scripts/check-clone-drift.sh` three-path classifier (match / trivial / substantive). |
-| `test-deprecate-legacy-contracts.sh` (BC-10219) | bash contract tests | `/flow:deprecate-legacy` command markdown, `flow-legacy-cross-reference` SKILL.md flag changes, Q59 design-rationale lock. 56 assertions across 7 sections: file presence, two-pass detection logic, pre-comms gate enforcement, sub-step ordering, AskUserQuestion gates, review doc schema, cross-reference skill + Q59 integration. Wired into `scripts/validate.sh` Section 2b''''''. |
+| `test-deprecate-legacy-contracts.sh` (BC-10219) | bash contract tests | `/flow:deprecate-legacy` command markdown, `flow-legacy-cross-reference` SKILL.md flag changes, Q59 design-rationale lock. 57 assertions across 7 sections: file presence, two-pass detection logic, pre-comms gate enforcement, sub-step ordering, AskUserQuestion gates, review doc schema, cross-reference skill + Q59 integration. Wired into `scripts/validate.sh` Section 2b''''''. |
 | `fixtures/` | dir | Synthetic project shapes + JSON eval datasets. |
 
 ## Constraints

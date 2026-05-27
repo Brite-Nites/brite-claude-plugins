@@ -174,3 +174,5 @@ Brand Hub retrofit, M=27 legacy milestones:
 - `memory/gotcha_linear_markdown_mangling.md` --- Prosemirror mangling patterns this skill spot-checks against.
 - `skills/flow-linear-scaffold/SKILL.md` --- sibling sub-skill that creates net-new FDA milestones; runs after this skill in retrofit mode.
 - `skills/flow-preflight/SKILL.md` --- preceding sub-skill; preamble's `MODE=retrofit` gates this skill's invocation.
+- `docs/design-rationale/fda-plugin-interview.md` Q59 --- deprecate-legacy scope widening + user-invocable lift.
+- `commands/deprecate-legacy.md` --- Phase 5 orchestrator; second consumer of this skill's mapping cascade.

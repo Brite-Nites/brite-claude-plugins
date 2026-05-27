@@ -182,7 +182,7 @@ For each open issue under the milestone with disposition `re-home`:
 
    > "Moved from legacy milestone `<legacy-milestone-name>` to FDA domain milestone `<target-milestone-name>` as part of Phase 5 legacy deprecation. Original milestone carried `## FDA migration` mapping to domain `<DOMAIN>`. See `docs/plans/<project-slug>-deprecate-legacy.md` for the full disposition review."
 
-3. Log the re-home in `state.execution_log[]`.
+3. Record the operation for the Completion Summary step.
 
 For `close-as-obsolete` disposition milestones, skip this sub-step (no issues to re-home — they go to step b).
 
@@ -195,7 +195,7 @@ For each issue under the milestone with disposition `close-as-obsolete` (or rema
 
    > "Closed as obsolete during Phase 5 legacy deprecation. Legacy milestone `<legacy-milestone-name>` is being archived. If this issue is still relevant, re-open and move to the appropriate FDA domain milestone. See `docs/plans/<project-slug>-deprecate-legacy.md`."
 
-3. Log the closure in `state.execution_log[]`.
+3. Record the operation for the Completion Summary step.
 
 #### Sub-step c: Annotate milestone description
 
