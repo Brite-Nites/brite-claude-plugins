@@ -5,6 +5,8 @@ user-invocable: false
 allowed-tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__list_comments, AskUserQuestion, Read, Write, Edit, Bash, Skill, Agent, mcp__plugin_cadence_gbrain-team__query, mcp__plugin_cadence_gbrain-team__get_page, mcp__plugin_cadence_gbrain-team__list_pages
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 # Phase 2 — Sprint Scoping
 
 Sequential per-project loop. For each active project, surface alternatives via brainstorming, run the adaptive interview from BC-5810 § 2 (5 carry-over Qs + 5 scope Qs), enforce the issue-quality-gate from § 3 with block-with-override, and append a project block to the weekly-planning checkpoint as decisions accumulate. No Linear mutations — those are deferred to Phase 3 (BC-5761).

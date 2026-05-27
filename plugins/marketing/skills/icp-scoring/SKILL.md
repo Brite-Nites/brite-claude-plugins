@@ -9,6 +9,8 @@ metadata:
   category: Outbound Lead Gen
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 # ICP Scoring
 
 A BDR, RevOps operator, or marketing lead with a raw prospect list today has two options: run them all (waste sender reputation + enrichment credits on poor-fit prospects) or hand-filter (slow, inconsistent across operators). This skill produces a third option — a parallel, criteria-grounded score per record with reasoning, split into qualified vs disqualified outputs the downstream campaign skill can consume directly. The skill is **dual-mode**: standalone invocation defaults to `score_0_100` (Sonnet, 4-bucket reasoning); when delegated from `tam-mapping` Phase 7 it switches to `abc` (Haiku, letter-only tier-A/B/C) for cost-efficient TAM-scale runs. **Distinct from `lead-routing` (BC-2725):** this skill is pre-outreach prioritization of raw prospects, not post-reply SF MQL assignment.
