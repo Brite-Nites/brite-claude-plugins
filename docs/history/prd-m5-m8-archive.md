@@ -10,20 +10,27 @@ For the new framing, see `docs/designs/brite-agent-platform.md` (header retrofit
 
 ## The original PRD framing (2026-02 through 2026-04)
 
-The Brite Plugin Marketplace project was originally scoped as a **4-layer agent platform** with an **8-milestone roadmap**:
+The Brite Plugin Marketplace project was originally scoped as a **4-layer agent platform** with an **8-milestone roadmap** (M1-M8), plus two lateral workstreams that lived in the same Linear project without M-numbers:
 
-1. Foundation & Quick Wins (M1 substrate)
-2. The Inner Loop (M2)
-3. The Outer Loop (M3)
-4. Orchestration (M4)
-5. Plugin Ecosystem (M5)
-6. Marketing Function (archived — empty stub)
-7. Context Refresh Pipeline (M6) — *this archive*
-8. Symphony Autonomous Execution (M7) — *this archive*
-9. Context Governance & Observability (M8) — *this archive*
-10. Domain Plugin Expansion — *this archive*
+**8 PRD-numbered milestones** (canonical names from `docs/designs/brite-agent-platform.md`):
 
-M1-M4 delivered (100% across dated milestones from Feb-Jun 2026). M5-M8 did not. Energy moved into per-plugin milestones (Cadence, FDA, RevOps, Marketing GTM, Revenue Rhythm, Mission Control, Runtime Context Loading) that emerged organically.
+1. M1 — Company Knowledge Layer
+2. M2 — Project-Start Redesign
+3. M3 — Decision Trace Architecture
+4. M4 — Plugin Ecosystem Foundation
+5. M5 — Domain Plugin Expansion — **this archive**
+6. M6 — Context Refresh Pipeline — **this archive**
+7. M7 — Symphony Autonomous Execution — **this archive**
+8. M8 — Context Governance & Observability — **this archive**
+
+**2 lateral workstreams** (no M-number, lived alongside the PRD milestones in the same Linear project):
+
+- Marketing Function — empty stub, never had child issues; `[ARCHIVED]` 2026-05-27
+- (Note: Domain Plugin Expansion is M5 above, not a lateral — included in the 4 archived below.)
+
+**Linear-vs-PRD milestone-name drift.** During execution, the Linear project's actual milestones diverged from the PRD's canonical M1-M8 names. Linear's shipped milestones used operational labels like "Foundation & Quick Wins" (Feb 2026), "The Inner Loop" (Mar), "The Outer Loop" (Apr), "Orchestration" (May), "Plugin Ecosystem" (Jun) — these aren't 1:1 maps of PRD M1-M4 names. Throughout this archive, the M-numbers reference the PRD-canonical names; references to Linear milestone state use the Linear names.
+
+The PRD's M1-M4 outcomes shipped (Linear milestones 100% across Feb-Jun 2026). M5-M8 did not. Energy moved into per-plugin milestones (Cadence, FDA, RevOps, Marketing GTM, Revenue Rhythm, Mission Control, Runtime Context Loading) that emerged organically.
 
 The empirical lesson: per-layer milestones decayed when the architecture itself was still in flight. Per-plugin milestones survived because the plugin was the actual shipping unit. The 2026-05-27 cleanup formalizes this — see `~/.claude/plans/2026-05-27-plugin-marketplace-cleanup.md`.
 
@@ -33,7 +40,7 @@ The empirical lesson: per-layer milestones decayed when the architecture itself 
 
 **Original PRD vision:** Poll-Dispatch-Resolve-Land daemon. Elixir/BEAM concurrency. Custom Linear states. Workpad pattern. Brite review agents as quality gates. Compound-learnings persistence across autonomous runs. Cost management.
 
-**14 child issues** (BC-1352, 1979-1990, 2007 — all cancelled 2026-05-27).
+**14 child issues** (BC-1352, BC-1979 through BC-1990 inclusive, BC-2007 — all cancelled 2026-05-27).
 
 **Why it didn't ship:** The daemon-shape framing assumed a heavy custom runtime (Elixir fork, BEAM supervision trees, polled state machine) before Brite had clarity on which orchestration substrate to build on. In the intervening months:
 
@@ -116,7 +123,7 @@ The 4-plugin extraction would have created duplication overhead (4 plugins with 
 | Linear-board-as-substrate orchestration | **Survives** as a Layer A research milestone |
 | Polled daemon, Elixir/BEAM, custom Linear states | **Cancelled** — wrong shape |
 | Codex-style workpad pattern | **Folded** into Mission Control v0.1 (lighter-weight tracker+worker) |
-| Symphony review-agents-as-quality-gates | **Already shipped** in workflows plugin (9-agent tiered review) |
+| Symphony review-agents-as-quality-gates | **Already shipped** in workflows plugin (10-agent tiered review per `plugins/workflows/agents/*reviewer.md`) |
 | Compound-learnings autonomous integration | **Already operational** in workflows:ship pipeline |
 | BigQuery → handbook pipeline | **Cancelled** — wrong data warehouse + gbrain superseded |
 | Salesforce → handbook pipeline | **Held open** — could re-emerge as gbrain-side ingestion if needed |
@@ -138,7 +145,7 @@ The 4-plugin extraction would have created duplication overhead (4 plugins with 
 - New 4-layer architecture: `docs/designs/brite-agent-platform.md` (retrofitted with supersession header)
 - gbrain integration: `plugins/workflows/.mcp.json` (gbrain-team HTTP MCP), `plugins/workflows/scripts/gbrain-team-broker.sh`, commit `4dcc7625` (BC-11153, SubagentStart preamble injection)
 - Brite memory notes: `memory/feedback_snowflake_not_bigquery.md`, `memory/project_brite_agent_platform.md`
-- Symphony reference: github.com/openai/symphony
-- gbrain reference: `/Users/holdenhalford/code/gbrain` (Garry Tan, MIT)
+- Symphony reference: https://github.com/openai/symphony
+- gbrain reference: `~/code/gbrain` (Garry Tan, MIT)
 - gstack reference: `~/.gstack/` (Garry Tan, MIT)
 - Brite's competitive bet (from user notes 2026-05-27): owns Layer C (5 plugins, floor met); delegates Layer B to Claude Code; uses Linear+terminal as channel surface; provisioning Layer D via gbrain on Supabase; distinctive Layer A bet = **schedule-driven (cadence:weekly) + phase-driven (workflows pipeline) hybrid orchestration via Linear-board-as-substrate**.
