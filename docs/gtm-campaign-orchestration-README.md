@@ -1232,7 +1232,7 @@ Audience: external partners / new hires / anyone outside the Brite engineering o
 | **σ3** | Token label for the Salesforce-orchestration sub-decision from the design session's O11 question. See [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md). |
 | **M2 / M3** | Outcomes of V3 Marketing ratification. M2 ships portfolio-snapshot + Pipeline-by-Offer-Family Dashboard + 4 handbook PRs. M3 drops those 5 BCs; SF Performance Dashboard + Coverage view still ship. See [§5 M2/M3 callout](#5-what-was-decided). |
 | **V3** | Validation gate from the design session — Marketing buy-in (Sarah Cullen + Kells) on the canonicals + vocab + framework docs + portfolio-snapshot packet, against a populated dogfood (BC-8729). |
-| **Brite GTM project** | The Linear project that holds campaign milestones (separate from "Brite Skill Packs" — Layer C — which holds plugin engineering work; renamed from "Brite Skill Packs" 2026-05-27). Per D2 / ADR-013 + O7. Provisioned by BC-8712 Task 0. |
+| **Brite GTM project** | The Linear project that holds campaign milestones (separate from "Brite Skill Packs" — Layer C — which holds plugin engineering work; renamed from "Brite Plugin Marketplace" 2026-05-27). Per D2 / ADR-013 + O7. Provisioned by BC-8712 Task 0. |
 | **brite-gtm repo** | Sibling git repo at `/Users/holdenhalford/projects/work/brite-nites/brite-gtm/`. Holds the pre-Linear ideation queue (`docs/campaign-portfolio.md` with 🟢🟡⚪ candidates) per O7. NOT the same as the Linear "Brite GTM" project. |
 | **Tier** | Grouping concept from the implementation plan — 9 tiers across the 23 BCs (Tier 1 = SF metadata foundation; Tier 9 = optional sibling commands). See [§7](#7-the-23-linear-issues). |
 | **plugin version bump** | CLAUDE.md gotcha: when any plugin file under `plugins/{name}/{commands,skills,hooks,agents}/**` changes, the matching `plugin.json` + `marketplace.json` entry MUST be version-bumped in the same commit. BC-6000 precedent — 4 stale-cache sessions lost. |
@@ -1243,7 +1243,7 @@ Audience: external partners / new hires / anyone outside the Brite engineering o
 
 ## 7. The 25 Linear issues
 
-All issues in the **Brite Skill Packs** project (team Brite Company; renamed from "Brite Skill Packs" 2026-05-27).
+All issues in the **Brite Skill Packs** project (team Brite Company; renamed from "Brite Plugin Marketplace" 2026-05-27).
 
 ### By tier
 
@@ -1466,7 +1466,7 @@ Every doc + memory + Linear artifact, with one-line description.
 
 ### Linear
 
-- **Project**: Brite Skill Packs (team Brite Company; renamed from "Brite Skill Packs" 2026-05-27)
+- **Project**: Brite Skill Packs (team Brite Company; renamed from "Brite Plugin Marketplace" 2026-05-27)
 - **Issues**: BC-8712 through BC-8735 + BC-8752 (23 total)
 - **URL**: https://linear.app/brite-nites/project/brite-skill-packs-402b57908532
 
