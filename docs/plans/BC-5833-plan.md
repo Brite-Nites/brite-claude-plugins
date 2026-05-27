@@ -2,7 +2,7 @@
 
 **Issue**: BC-5833 — Create marketing skill: gtm-strategy (5-phase net-new motion: research → segments → personas → pillars)
 **Branch**: `corinne/bc-5833-create-marketing-skill-gtm-strategy-5-phase-net-new-motion`
-**Milestone**: Marketing Plugin: GTM Workflows
+**Milestone**: Marketing Plugin v0.1 — GTM Workflows (Revgrowth)
 **Scoping doc**: `docs/plans/marketing-gtm-expansion.md` §3.3
 **Upstream**: [Revgrowth1/ai-gtm-workflows workflow 04](https://github.com/Revgrowth1/ai-gtm-workflows/tree/main/workflows/04-gtm-strategy) (MIT)
 **Tasks**: 9 (estimated 1–1.5 focused days)

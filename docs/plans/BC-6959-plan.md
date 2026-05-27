@@ -86,7 +86,7 @@ Per-skill scope:
 After all 9 SKILL.md files land + validation passes, create 9 child issues under BC-6959 via `save_issue` (one per sub-skill) with:
 - Title: `flow-architecture — <skill-name> SKILL.md (sub-skill)`
 - parentId: BC-6959 UUID (`c5dfd1a6-2efe-4dad-8ef9-fad28de14ed5`)
-- projectId: Brite Plugin Marketplace (`941dbf85-b812-428a-a54e-1c688bdfb3ed`)
+- projectId: Brite Skill Packs (`941dbf85-b812-428a-a54e-1c688bdfb3ed`)
 - state: Done (since work just landed; or In Progress if PR still open at creation time)
 - Body: pointer to SKILL.md + Q-lock memory ref
 - Label: `flow-architecture`, `skill`
