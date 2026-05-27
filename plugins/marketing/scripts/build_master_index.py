@@ -43,20 +43,26 @@ ESP_TOKENS = {"microsoft", "google", "smtp"}
 SUFFIX_ALL_ESPS = "all esps"
 
 
+_AUDIENCE_EMAIL_SUFFIX_RE = re.compile(r"\b(professional|role|personal|general)\s+emails\b")
+
+
 def is_audience_tier_token(token: str) -> bool:
     """A token belongs to the trailing audience-tier suffix run.
 
-    Matches: any *-emails (professional/role/personal/general), managers+ and
-    variants (with parentheticals), employees, owners/gms variants, and the
-    historic `direct question offer` copy-modifier that always trailed an
-    audience-tier suffix.
+    Matches: explicit `*-emails` audience labels (professional/role/personal/
+    general), managers+ and variants (with parentheticals), employees,
+    owners/gms variants, and the historic `direct question offer`
+    copy-modifier that always trailed an audience-tier suffix. Anchored
+    against the known token vocabulary rather than a substring match on
+    "emails" so future offer/vertical names containing the word "emails"
+    aren't silently folded into the audience-tier suffix.
     """
     t = token.strip().lower()
     if not t:
         return False
     if t == SUFFIX_ALL_ESPS:
         return True
-    if "emails" in t:
+    if _AUDIENCE_EMAIL_SUFFIX_RE.search(t):
         return True
     if t == "employees":
         return True
@@ -636,13 +642,31 @@ def md_truncate(s: str | None, n: int) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+def md_cell(s: str | None, n: int | None = None) -> str:
+    """Truncate + escape `|` so table cells survive Markdown rendering.
+
+    EB and Linear names use `|` as their own internal separator (e.g.
+    `FY26, M05 | Casinos | ...`), and dropping those literals straight into
+    a Markdown pipe-table fragments the row across columns. Use this for
+    every dynamic cell.
+    """
+    out = md_truncate(s, n) if n is not None else (s or "")
+    return out.replace("|", "\\|")
+
+
 def render_markdown(rows: list[dict[str, Any]]) -> str:
     total = len(rows)
     matched = sum(1 for r in rows if r["cross_reference"] == "match")
     orphan_eb = sum(1 for r in rows if r["cross_reference"] == "orphan-eb")
     orphan_linear = sum(1 for r in rows if r["cross_reference"] == "orphan-linear")
     eb_record_count = sum(len(r["eb_campaigns"]) for r in rows)
-    linear_record_count = sum(len(r["linear_milestones"]) for r in rows)
+    # Count UNIQUE milestone IDs — the EB-group join key drops `offer` so a
+    # single milestone can match several offer-keyed EB groups (e.g.
+    # FY26/M07 hotels-resorts has 2 offer-groups + 1 milestone). Summing
+    # row-embeddings would over-count those cases.
+    linear_record_count = len(
+        {ms["id"] for r in rows for ms in r["linear_milestones"]}
+    )
 
     rec_counts = defaultdict(int)
     for r in rows:
@@ -722,13 +746,13 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
             else "??"
         )
         v_disp = (
-            f"{md_truncate(r['vertical_raw'], 28)} → "
+            f"{md_cell(r['vertical_raw'], 28)} → "
             f"`{r['vertical_slug'] or 'MISS'}`"
             f"{'' if r['vertical_inference'] == 'canonical' else ' *(' + r['vertical_inference'] + ')*'}"
         )
-        offer_disp = md_truncate(r["offer_raw"], 40)
+        offer_disp = md_cell(r["offer_raw"], 40)
         ms_disp = "; ".join(
-            f"`{ms['id'][:8]}` {md_truncate(ms['name'], 40)}"
+            f"`{ms['id'][:8]}` {md_cell(ms['name'], 40)}"
             for ms in r["linear_milestones"]
         ) or "—"
         eb_disp = (
@@ -737,8 +761,8 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
             )
             or "—"
         )
-        tiers_disp = ", ".join(r["audience_tiers"]) or "—"
-        status_disp = ", ".join(r["eb_status_set"]) or "—"
+        tiers_disp = md_cell(", ".join(r["audience_tiers"])) or "—"
+        status_disp = md_cell(", ".join(r["eb_status_set"])) or "—"
         stats_disp = (
             f"{r['eb_stats']['leads']} / {r['eb_stats']['sent']} / "
             f"{r['eb_stats']['replies']} / {r['eb_stats']['bounced']}"
