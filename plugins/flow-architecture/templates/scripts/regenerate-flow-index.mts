@@ -170,7 +170,7 @@ export function parseDomainOrder(inventoryText: string): DomainEntry[] {
     // Match: "### <DOMAIN> — <Display> (N flows)" (em-dash, U+2014) and en-dash
     // (U+2013) and ASCII hyphen defensively. Display name may contain its own
     // parentheticals — only the trailing "(N flows)" suffix is stripped.
-    const m = line.match(/^###\s+([A-Z]+)\s+[—–-]\s+(.+?)(?:\s*\(\d+\s+flows?\))?\s*$/);
+    const m = line.match(/^###\s+`?([A-Za-z][A-Za-z0-9-]*)`?\s+[—–-]\s+(.+?)(?:\s*\(\d+\s+flows?\))?\s*$/);
     if (!m) continue;
     const code = m[1]!;
     const display = m[2]!.trim();

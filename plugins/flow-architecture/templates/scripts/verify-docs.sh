@@ -83,7 +83,7 @@ if [ "$stale_only" = false ]; then
     # codes for this project). Strictly limit orphan-check matches to that set
     # so non-flow IDs (JTBD-N, NFR-N, FR-N, OQ-N, ADR-NNNN, CDR-NNN, RFC-NNN,
     # GH-NNN, Pillar-N, etc.) don't false-positive as orphans.
-    prefixes=$(echo "$defined" | sed -E 's/-.*//' | sort -u | grep -v '^$' | tr '\n' '|' | sed 's/|$//')
+    prefixes=$(echo "$defined" | sed -E 's/-.*//' | sort -u | grep -v '^$' | tr '\n' '|' | sed 's/|$//' || true)
     if [ -n "$prefixes" ]; then
       refd=$(grep -rohE "($prefixes)-[0-9]+[a-z]?" docs/product/flows/ docs/product/journeys/ docs/designs/ 2>/dev/null | sort -u || true)
     else
