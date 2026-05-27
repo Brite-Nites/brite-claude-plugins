@@ -1,15 +1,5 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'marketing plugin loaded.'"
-          }
-        ]
-      }
-    ],
     "SubagentStart": [
       {
         "hooks": [

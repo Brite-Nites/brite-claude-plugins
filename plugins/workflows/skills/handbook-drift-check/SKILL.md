@@ -5,8 +5,6 @@ user-invocable: false
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 # Handbook Drift Check
 
 You are checking whether the company handbook needs updating after this PR ships. Handbook drift happens silently — the handbook says X but the codebase now does Y. Your job is to detect this drift, surface it clearly, and optionally open a PR against the handbook repo with proposed fixes.

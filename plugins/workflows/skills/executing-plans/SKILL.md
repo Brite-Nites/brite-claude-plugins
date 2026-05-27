@@ -5,8 +5,6 @@ user-invocable: false
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 # Executing Plans
 
 You are executing an approved plan by delegating each task to a fresh subagent. The key insight: **context is your fundamental constraint** — each task gets a clean context with only what it needs, preventing accumulated noise from degrading quality.
