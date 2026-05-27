@@ -78,12 +78,12 @@ if [ "$stale_only" = false ]; then
   echo "→ Orphan flow ID check"
   inv="docs/product/master-flow-inventory.md"
   if [ -f "$inv" ]; then
-    defined=$(grep -ohE "^\| [A-Z]+-[0-9]+[a-z]?" "$inv" | tr -d '| ' | sort -u || true)
+    defined=$(grep -ohE "^\| [A-Za-z][A-Za-z0-9]*(-[A-Za-z][A-Za-z0-9]*)*-[0-9]+[a-z]?" "$inv" | tr -d '| ' | sort -u || true)
     # Derive flow-ID prefix allowlist from inventory rows (the actual FDA domain
     # codes for this project). Strictly limit orphan-check matches to that set
     # so non-flow IDs (JTBD-N, NFR-N, FR-N, OQ-N, ADR-NNNN, CDR-NNN, RFC-NNN,
     # GH-NNN, Pillar-N, etc.) don't false-positive as orphans.
-    prefixes=$(echo "$defined" | sed -E 's/-.*//' | sort -u | grep -v '^$' | tr '\n' '|' | sed 's/|$//' || true)
+    prefixes=$(echo "$defined" | sed -E 's/-[0-9]+[a-z]?$//' | sort -u | grep -v '^$' | tr '\n' '|' | sed 's/|$//' || true)
     if [ -n "$prefixes" ]; then
       refd=$(grep -rohE "($prefixes)-[0-9]+[a-z]?" docs/product/flows/ docs/product/journeys/ docs/designs/ 2>/dev/null | sort -u || true)
     else
