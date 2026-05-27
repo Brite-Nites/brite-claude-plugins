@@ -1241,13 +1241,13 @@ Audience: external partners / new hires / anyone outside the Brite engineering o
 
 ---
 
-## 7. The 23 Linear issues
+## 7. The 25 Linear issues
 
 All issues in the **Brite Plugin Marketplace** project (team Brite Company).
 
 ### By tier
 
-Status legend: `[done]` = shipped + Linear Done; `[wip]` = in flight; `[blocked]` = blocked by upstream; blank = backlog. Per §12 maintenance protocol, update this column when a BC closes.
+Status legend: `[done]` = shipped + Linear Done; `[deferred]` = intentionally held; `[wip]` = in flight; `[blocked]` = blocked by upstream; blank = backlog.
 
 | Status | BC | Task | Title (abbreviated) | Tier | Complexity |
 |---|---|---|---|---|---|
@@ -1275,7 +1275,7 @@ Status legend: `[done]` = shipped + Linear Done; `[wip]` = in flight; `[blocked]
 | [done] | [BC-8735](https://linear.app/brite-nites/issue/BC-8735) | T8-U | Handbook PR — how-we-operate cadence rows | 8 | S |
 | [done] | [BC-8728](https://linear.app/brite-nites/issue/BC-8728) | T9-V | `/marketing:offer-performance` (deferrable — but shipped post-Rule-of-Three trigger 2026-05-26) | 9 | M |
 | [done] | [BC-8725](https://linear.app/brite-nites/issue/BC-8725) | T9-W | new-vertical/offer/persona commands (deferrable — but shipped 2026-05-26, dogfood-promoted) | 9 | M |
-| [done] | [BC-8726](https://linear.app/brite-nites/issue/BC-8726) | T9-X | icp-refinement-review command (deferrable) | 9 | M |
+| [done] | [BC-8726](https://linear.app/brite-nites/issue/BC-8726) | T9-X | icp-refinement-review command (deferrable — but shipped 2026-05-26) | 9 | M |
 
 ### Post-V3 / dogfood additions to milestone (not in original 25)
 
