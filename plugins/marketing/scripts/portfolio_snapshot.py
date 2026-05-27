@@ -44,7 +44,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _shared import canonicals_reader, manifest_loader, slug_parts
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 1  # Output packet frontmatter schema_version (unrelated to
+# the input manifest.json schema_version, which can be 1 or 2 — BC-11852).
 
 # ── Argument parsing ────────────────────────────────────────────────────
 
@@ -354,6 +355,63 @@ def fmt_int(value: int | None) -> str:
     return str(value)
 
 
+def eb_render_fields(manifest: dict[str, Any]) -> tuple[str, str]:
+    """Return (eb_campaign_id_display, launched_yes_no) for a manifest.
+
+    BC-11852: handles both v1 (`email_bison.campaign_id` + `launched_at`
+    singular fields) AND v2 (`email_bison.campaigns[]` array). The v2 path
+    aggregates across all campaign records — when ≥1 record has a
+    `launched_at`, the campaign is considered launched, and the display
+    string shows the first record's campaign_id followed by `(+N more)`
+    when multiple records exist.
+
+    When v1 fields are absent AND campaigns[] is empty/missing → "(not
+    launched)" + "no". This matches the v1 behavior so the regression
+    harness's existing v1 fixtures stay green without per-scenario branching.
+    """
+    eb = manifest.get("email_bison") or {}
+    campaigns = eb.get("campaigns")
+    if isinstance(campaigns, list) and campaigns:
+        # v2 — aggregate across EB records.
+        first = campaigns[0]
+        first_id = first.get("campaign_id") if isinstance(first, dict) else None
+        more = len(campaigns) - 1
+        if first_id is None:
+            id_display = "(not launched)"
+        elif more > 0:
+            id_display = f"{first_id} (+{more} more)"
+        else:
+            id_display = str(first_id)
+        any_launched = any(
+            isinstance(c, dict) and c.get("launched_at")
+            for c in campaigns
+        )
+        return (id_display, "yes" if any_launched else "no")
+    # v1 fallback — singular fields.
+    legacy_id = eb.get("campaign_id")
+    id_display = str(legacy_id) if legacy_id is not None else "(not launched)"
+    launched = "yes" if eb.get("launched_at") else "no"
+    return (id_display, launched)
+
+
+def eb_any_launched(manifests: list[dict[str, Any]]) -> int:
+    """Count manifests with at least one launched EB campaign — v1+v2 aware."""
+    n = 0
+    for m in manifests:
+        eb = m.get("email_bison") or {}
+        campaigns = eb.get("campaigns")
+        if isinstance(campaigns, list) and campaigns:
+            if any(
+                isinstance(c, dict) and c.get("launched_at")
+                for c in campaigns
+            ):
+                n += 1
+            continue
+        if eb.get("launched_at"):
+            n += 1
+    return n
+
+
 # ── Section renderers ──────────────────────────────────────────────────
 
 
@@ -513,7 +571,6 @@ def render_section_2(
     pipeline_total = 0.0
     won_total = 0.0
     leads_total = 0
-    launched_count = 0
     any_sf = False
     for m in manifests:
         slug = m.get("slug", "(unknown)")
@@ -524,12 +581,8 @@ def render_section_2(
         leads = sf.get("NumberOfLeads")
         if sf:
             any_sf = True
-        eb = m.get("email_bison") or {}
-        eb_id = eb.get("campaign_id") or "(not launched)"
-        launched_at = eb.get("launched_at")
-        launched = "yes" if launched_at else "no"
-        if launched_at:
-            launched_count += 1
+        # BC-11852: shape-aware EB display — v1 singular fields OR v2 campaigns[].
+        eb_id, launched = eb_render_fields(m)
         if amt_all is not None:
             pipeline_total += float(amt_all)
         if amt_won is not None:
@@ -540,6 +593,7 @@ def render_section_2(
             f"| {slug} | {sf_id} | {fmt_money(amt_all)} | {fmt_money(amt_won)} | "
             f"{fmt_int(leads)} | {eb_id} | {launched} |"
         )
+    launched_count = eb_any_launched(manifests)
 
     if not manifests:
         lines.append("| (no in-window campaigns) | | | | | | |")
