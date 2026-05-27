@@ -287,6 +287,27 @@ else
   fi
 fi
 
+# Section 2b'''''' — flow-architecture deprecate-legacy contract tests (BC-10219)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh —
+# 55 assertions locking two-pass detection, pre-comms gate, sub-step ordering,
+# AskUserQuestion gates, review doc schema, and Q59 cross-reference integration.
+section "2b''''''. flow-architecture deprecate-legacy contract tests (BC-10219)"
+
+fda_deprecate_test="$REPO_ROOT/plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh"
+
+if [ ! -f "$fda_deprecate_test" ]; then
+  warn "plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh not found — skipped"
+else
+  if fda_deprecate_out=$(bash "$fda_deprecate_test" 2>&1); then
+    fda_deprecate_pass_count=$(printf '%s\n' "$fda_deprecate_out" | sed -n 's/^Results: \([0-9]*\) PASS.*/\1/p')
+    pass "flow-architecture deprecate-legacy contract tests (${fda_deprecate_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture deprecate-legacy contract tests failed — run plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh for details"
+    printf '%s\n' "$fda_deprecate_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
 # ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════

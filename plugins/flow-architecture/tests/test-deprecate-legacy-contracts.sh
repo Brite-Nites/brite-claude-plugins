@@ -46,15 +46,6 @@ assert_no_grep() {
   fi
 }
 
-assert_grep_regex() {
-  local label="$1" pattern="$2" path="$3"
-  if grep -qE "$pattern" "$path" 2>/dev/null; then
-    pass "$label"
-  else
-    fail "$label (pattern '$pattern' not matched in $path)"
-  fi
-}
-
 assert_file() {
   local label="$1" path="$2"
   if [ -f "$path" ]; then pass "$label"; else fail "$label (missing: $path)"; fi
@@ -91,8 +82,8 @@ section "3/7" "Pre-comms gate enforcement"
 
 assert_grep "Pre-comms 24h gate documented" \
   "Pre-comms posted at" "$CMD"
-assert_grep "24h enforcement" \
-  "24h" "$CMD"
+assert_grep "24h cooling period enforcement" \
+  "24h cooling period" "$CMD"
 assert_grep "Pre-comms gate halt on absent marker" \
   "Pre-comms marker not found" "$CMD"
 assert_grep "Pre-comms gate halt on <24h" \
@@ -148,6 +139,8 @@ assert_grep "execute this milestone option" \
   "Execute this milestone" "$CMD"
 assert_grep "skip this milestone option" \
   "Skip this milestone" "$CMD"
+assert_grep "pause + resume later option" \
+  "Pause + resume later" "$CMD"
 assert_grep "cancel remaining option" \
   "Cancel remaining" "$CMD"
 assert_grep "archive hand-off AskUserQuestion" \

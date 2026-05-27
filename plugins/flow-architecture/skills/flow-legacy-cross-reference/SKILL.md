@@ -6,7 +6,7 @@ allowed-tools: mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin
 license: MIT
 metadata:
   version: "0.1.0"
-  q-locks: "Q9, Q14"
+  q-locks: "Q9, Q14, Q59"
   related-locks: "memory:94-106 (Q14 6 sub-decisions); Q13.5 retry pattern (memory:90); Q22 milestone schema"
 ---
 

@@ -47,7 +47,7 @@ This command uses a **two-pass execution model** mirroring the Q14.6 pattern fro
 | Review doc PRESENT with `last_reviewed: <ISO-8601>` AND `## Pre-comms posted at <ISO>` marker absent or < 24h old | Pass 2 — blocked | Pre-comms gate not satisfied. Surface instructions. Exit. |
 | Review doc PRESENT with `last_reviewed: <ISO-8601>` AND `## Pre-comms posted at <ISO>` marker ≥ 24h old | Pass 2 — execute | Execute per-milestone disposition. |
 
-`<project-slug>` is derived deterministically from the Linear project name using the same slugification contract as `flow-legacy-cross-reference` § 3.1 (lowercase ASCII, collapse non-alnum to `-`, strip leading/trailing `-`, validate `^[a-z0-9]+(-[a-z0-9]+)*$`).
+`<project-slug>` is derived deterministically from the Linear project name: lowercase ASCII only, collapse any run of non-`[a-z0-9]` to a single `-`, strip leading/trailing `-`, validate against `^[a-z0-9]+(-[a-z0-9]+)*$`. If the result fails this regex (empty string, etc.), HALT with a diagnostic. This is the same slugification contract used by `flow-legacy-cross-reference` for the cross-reference review doc path.
 
 ---
 
@@ -149,7 +149,7 @@ Surface:
 
 2. **Pre-comms gate.** Parse `## Pre-comms posted at <ISO-8601>` from the review doc body. The header text after `## Pre-comms posted at ` must parse as a valid ISO-8601 timestamp. Calculate the delta from now. If the marker is absent, halt with: `"Pre-comms marker not found. Post the pre-comms message and update the marker before executing."` If < 24 hours old, halt with: `"Pre-comms posted <X hours> ago. The 24h cooling period ensures teammates can raise concerns. Re-run after <timestamp>."`
 
-3. **Disposition completeness.** Scan the disposition table for any `scoping-needed` rows that still lack a manually-assigned target domain. Halt with: `"<N> milestones still have 'scoping-needed' disposition without a target domain. Edit the review doc to assign targets before executing."`
+3. **Disposition completeness.** Scan the disposition table for any `scoping-needed` rows. All `scoping-needed` rows MUST be resolved before Pass 2 — the operator must change the disposition to either `re-home` (with a target domain assigned) or `close-as-obsolete`. Halt with: `"<N> milestones still have 'scoping-needed' disposition. Edit the review doc to change each to 're-home' or 'close-as-obsolete' before executing."` The `scoping-needed` value is a Pass 1 placeholder only — it has no execution path in Pass 2.
 
 ### Per-milestone execution (serial)
 
