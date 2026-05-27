@@ -4,6 +4,8 @@ description: Creates docs/marketing-context.md with foundational marketing conte
 user-invocable: true
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 # Marketing Context Skill
 
 This is the foundational context-skill for the marketing domain plugin. It creates and maintains the project-specific context document that all other skills in this plugin read before acting.

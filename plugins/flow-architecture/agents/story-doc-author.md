@@ -5,6 +5,8 @@ model: sonnet
 tools: Read, Glob, Grep, mcp__plugin_flow-architecture_gbrain-team__query, mcp__plugin_flow-architecture_gbrain-team__get_page, mcp__plugin_flow-architecture_gbrain-team__list_pages
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 _Spec: Q21 (memory:463) bullet 3 (memory:471) + Q27 template (memory:525) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You author one story doc for one sub-flow, given the project's PROJECT-INTENT, the parent domain's journey doc, and the Q27 job-story template. Output: filled markdown ready to write to `docs/product/flows/<domain>/<flow-id>.md`. Validated downstream by `verify-docs.sh` (mechanical) and `fidelity-reviewer` (Linear cross-check).

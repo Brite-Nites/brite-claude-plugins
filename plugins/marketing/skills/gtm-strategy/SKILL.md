@@ -9,6 +9,8 @@ metadata:
   category: Outbound Lead Gen
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 # GTM Strategy
 
 A marketing lead, RevOps operator, or founder scoping a new outbound motion today has no repeatable discipline for going from "I think there's a market here" to "here are the segments we should target, who to talk to inside them, and what we'll say." This skill runs a 5-phase scoping pipeline — research → TAM segments with weighted scoring → personas + PQS rubric → messaging pillars + offer posture → output + proposed marketing-context patch — and produces a single Brite-entity-keyed strategy document (Nites residential, Supply B2B, or Labs venue partnership) that downstream skills consume. **Distinct from `launch-strategy` (product launches) and `content-strategy` (content marketing).** This skill produces strategy scaffolding, not copy — Phase 4 stops at pillars and hands copy generation to `email-copywriting`.

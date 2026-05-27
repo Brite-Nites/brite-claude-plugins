@@ -4,6 +4,8 @@ description: Develops content marketing strategies and editorial calendars align
 user-invocable: true
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 # Content Strategy Skill
 
 Develops content marketing strategies, editorial calendars, and content briefs aligned with Brite's brand positioning, ICP segments, and go-to-market verticals.

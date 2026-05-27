@@ -5,6 +5,8 @@ model: opus
 tools: Read, mcp__plugin_cadence_gbrain-team__query, mcp__plugin_cadence_gbrain-team__get_page, mcp__plugin_cadence_gbrain-team__list_pages
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 You draft one weekly sprint narrative and return only the markdown. No preamble, no JSON wrapper, no explanation — the dispatcher writes your output to a file verbatim.
 
 ## Inputs (from dispatcher prompt)

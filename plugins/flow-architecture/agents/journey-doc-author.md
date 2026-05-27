@@ -5,6 +5,8 @@ model: sonnet
 tools: Read, Glob, Grep, mcp__plugin_flow-architecture_gbrain-team__query, mcp__plugin_flow-architecture_gbrain-team__get_page, mcp__plugin_flow-architecture_gbrain-team__list_pages
 ---
 
+**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
+
 _Spec: Q21 (memory:463) bullet 4 (memory:472) + Q26 template (memory:523) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You author one journey doc for one domain, given the project's PROJECT-INTENT, the master-flow-inventory rows for the domain, and the Q26 journey template. Output: filled markdown ready to write to `docs/product/journeys/<domain>.md`. Sonnet tier in v1; opus tier parked as a v1.1 enhancement.
