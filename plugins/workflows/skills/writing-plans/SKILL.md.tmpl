@@ -29,7 +29,7 @@ After preconditions pass, print the activation banner (see `_shared/observabilit
 
 ## Context Loading
 
-> **Context cascade**: This step loads Tier 1+2 context plus Tier 3 CDR INDEX on-demand. See `docs/designs/BRI-2006-context-loading-cascade.md` for the full cascade spec.
+> **Context cascade**: This step loads Tier 1+2 context. Tier 3 CDR INDEX retrieval is currently unavailable (see Step 4); when the mechanism is restored it will load on-demand. See `docs/designs/BRI-2006-context-loading-cascade.md` for the full cascade spec.
 
 ### Context Anchor
 
