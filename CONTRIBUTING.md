@@ -113,9 +113,9 @@ metadata:                      # Optional. Only for skills from external sources
 
 The plugin includes hooks in `plugins/workflows/hooks/hooks.json` (auto-loaded by Claude Code — do NOT add a `hooks` field to `plugin.json`):
 
-- **PreToolUse (Bash)**: Two-layer security — regex command hook (deterministic, blocks `rm -rf`, `--force`, `DROP`, `chmod 777`, piped downloads) runs first, then Haiku prompt hook as fallback
-- **PreToolUse (Bash)**: Pre-commit quality — intercepts `git commit` commands, detects project type (`package.json` → JS/TS, `pyproject.toml`/`setup.py` → Python), runs linters on staged files only (ESLint, `tsc --noEmit`, Ruff). Degrades gracefully if no linters installed. Note: inactive from plugins until upstream [#6305](https://github.com/anthropics/claude-code/issues/6305) is fixed.
-- **PreToolUse (Write/Edit)**: Two-layer security — regex command hook (deterministic, blocks `sk-proj-`, `AKIA`, `ghp_`, `sk_live/test` patterns) runs first, then Haiku prompt hook as fallback
+- **PreToolUse (Bash)**: Regex command hook (deterministic, blocks `rm -rf`, `git push --force`/`-f`, `DROP TABLE/DATABASE`, `chmod 777`, piped downloads). Haiku-prompt fallback was retired in BC-11889 (workflows v3.31.0).
+- **PreToolUse (Bash)**: Pre-commit quality — intercepts `git commit` commands, detects project type (`package.json` → JS/TS, `pyproject.toml`/`setup.py` → Python), runs linters on staged files only (ESLint, `tsc --noEmit`, Ruff). Degrades gracefully if no linters installed.
+- **PreToolUse (Write/Edit)**: Regex command hook (deterministic, blocks `sk-`, `sk-proj-`, `AKIA`, `gh[ps]_`, `sk_live/test_`, PEM private keys, Slack `xox[abprs]-`, Google `AIza`).
 - **PostToolUse (Write/Edit)**: Auto-linter — runs ESLint (JS/TS) or Ruff (Python) if available
 - **SessionStart**: Team context — runs environment health checks (git, node, gh, npx) and shows key commands
 

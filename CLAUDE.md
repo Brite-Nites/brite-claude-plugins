@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Linear Project
 
-Project: **Brite Plugin Marketplace** (team: Brite Company, prefix: `BC-`, not `BRI-`).
+Project: **Brite Skill Packs** (team: Brite Company, prefix: `BC-`, not `BRI-`).
+Sibling projects (same team, same prefix, same initiative — created 2026-05-27 4-layer re-org): **Brite Orchestration Layer** (Layer A), **Brite Knowledge Layer** (Layer D), **Brite Runtime & Harness** (Layer B). See `docs/history/prd-m5-m8-archive.md`.
 
 ## Quick Start
 
@@ -32,7 +33,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full script reference, `plugin.js
 
 On-demand references — read when working on these subsystems, not auto-loaded every session:
 
-- [ADR-001: Cross-repo import solution](docs/decisions/001-cross-repo-import-solution.md) — Context7 for cross-repo handbook access
+- [ADR-001: Cross-repo import solution](docs/decisions/001-cross-repo-import-solution.md) — **Withdrawn** — see file for current status
 - [ADR-002: Trait evolution mechanism](docs/decisions/002-trait-evolution-mechanism.md) — Trait add/remove commands + auto-detect
 - [ADR-003: Plugin distribution architecture](docs/decisions/003-plugin-distribution-architecture.md)
 - [ADR-007: RevOps plugin design decisions](docs/decisions/007-revops-plugin-design.md) — naming, subtree, augment-not-replace, skill filter, MCP scope
@@ -53,7 +54,7 @@ handbook-topics: architecture, coding-standards, tools, team-structure, onboardi
 
 - **Process**: Superpowers' full workflow with TDD, subagent-per-task execution, and compound knowledge accumulation
 - **Org**: Linear integration at every step, security hooks, team conventions
-- **Not domain**: Skills that teach framework-specific patterns (React, Python, CI/CD) belong in domain plugins. Process skills (brainstorming, planning, execution) stay here. Use context7 MCP for framework docs.
+- **Not domain**: Skills that teach framework-specific patterns (React, Python, CI/CD) belong in domain plugins. Process skills (brainstorming, planning, execution) stay here.
 
 ## Repository Structure
 
@@ -91,6 +92,20 @@ Skills activate via their `description` field — Claude matches user intent aga
 
 Override the default review agent selection by adding a `## Review Agents` section to your project CLAUDE.md with `include:` / `exclude:` lists (Tier 1 agents — code, security, performance — cannot be excluded). Full spec, depth modes, confidence scoring, and model tiering in `docs/workflow-guide.md`.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in **Linear** (Brite Company team, `BC-` prefix, *Brite Skill Packs* project) via the workflows-plugin Linear MCP — not GitHub Issues, despite the GitHub remote. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical triage roles with default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context; ADRs live in `docs/decisions/` (not `docs/adr/`). See `docs/agents/domain.md`.
+
 ## Gotchas
 
 - **`plugin.json` strict schema.** Any unrecognized field causes silent hard failure with no error. Allowlist: `name`, `description`, `author`, `version`, `homepage`, `repository`, `license`, `keywords`, `commands`, `skills`, `mcpServers` (inline object only), `userConfig` (inline object declaring user-prompted settings; use with `sensitive: true` for secrets stored in OS keychain — but note that `${user_config.*}` substitution into HTTP MCP headers is currently broken in Claude Code (BC-5551), see `email-bison.md` § Known Claude Code limitation; for stdio MCPs the recommended pattern is OS env-vars populated by `bw-run.sh` rather than `userConfig` substitution, see [CONTRIBUTING.md § Plugin secret-config canon](CONTRIBUTING.md#plugin-secret-config-canon) — full Rejected Alternatives and rotation semantics in [ADR-010](docs/decisions/010-plugin-secret-config-canon.md)). **Never** add `agents`, `hooks`, or `mcpServers` as string path — they're auto-discovered by convention.
@@ -107,4 +122,4 @@ Override the default review agent selection by adding a `## Review Agents` secti
 - **Bash scripts using `set -u` MUST guard `"${arr[@]}"` of arrays that may be empty.** macOS ships bash 3.2 by default; bash 3.2 + `set -u` errors with `arr[@]: unbound variable` for empty-array expansion. Wrap with `if [ "${#arr[@]}" -gt 0 ]; then for x in "${arr[@]}"; do ...; done; fi`. Surfaced in BC-6905 — the spike's verbatim wrapper code wouldn't have run on macOS without this guard.
 - **`validate.sh` Step-sequence lint treats `## Step N.M` as duplicate Step N.** The regex `^#{2,4} Step [0-9]+([^0-9a-zA-Z]|$)` extracts the leading integer; `.` matches `[^0-9a-zA-Z]`, so `## Step 1.5 — ...` registers as Step 1 + creates `gap Step 1 to Step 2` AND `duplicate Step 1` errors. Use the sub-step letter-suffix form `## Step 1b — ...` instead — `1b` fails the regex (next char after `1` is alphanumeric), excluded from sequence counting, no false-positive. Per the validator's own comment: "Sub-steps like 'Step 2b' are excluded." Surfaced in BC-8724 iter-1 fixes 2026-05-19 when a new parse-time-validation sub-step landed as `## Step 1.5` and blocked validate.sh.
 - **APFS case-insensitive `.gitignore` matches silently swallow new files.** macOS APFS is case-insensitive by default; git's gitignore matching follows the filesystem's case-sensitivity. A top-level `AUDIT.md` rule (or any case-overlapping pattern) silently matches `audit.md`, `Audit.md`, etc. — symptom: file written + visible via `ls`, but absent from `git status` and `git ls-files` (not even `??`). Always run `git check-ignore -v <path>` after writing a new file whose name case-insensitively overlaps an existing gitignore pattern; add an explicit `!path/to/file.md` negation when needed. Surfaced in BC-6969 ([precedent task-4](docs/precedents/BC-6969.md#BC-6969-task-4)) — `audit.md` was silently swallowed by `.gitignore`'s `AUDIT.md` rule.
-- **`git push --force-with-lease` is carved out for user-owned branches only.** The Haiku prompt-hook classifier (BC-11117, workflows v3.30.1) treats `--force-with-lease` as safe on feature branches matching `holden/*`, `feat/*`, `fix/*`, `bug/*`, `refactor/*`, `docs/*`, `chore/*`, or any `<username>/*` pattern. It still blocks `--force-with-lease` on protected refs (`main`, `master`, `release/*`, `prod/*`, `production/*`) — use the `!`-prefix escape hatch for those. Plain `--force` / `-f` is always blocked regardless of target branch. Regression-locked by `scripts/test_security_hook_classifier.sh` (10 scenarios, wired into validate.sh §2d).
+- **`git push --force` / `-f` is regex-blocked; `--force-with-lease` and `--force-if-includes` are allowed on all branches.** workflows v3.31.0+ (BC-11889) replaced the Haiku LLM classifier with regex-only gating — the regex matches `--force`/`-f` but not the safer check-then-push variants, so they pass everywhere (including `main`). The BC-11117 branch-aware carve-out was retired with its classifier. Defense-in-depth for the regex is in `scripts/test-hooks.sh` (wired into `validate.sh` §2d).

@@ -104,14 +104,7 @@ claude plugins add https://github.com/Brite-Nites/brite-claude-plugins
 
 Verify the plugin is loaded by checking that `/workflows:tech-stack` is available.
 
-## Step 8: Context7 Setup
-
-1. Confirm Context7 account (org admin at context7.com can add seats)
-2. Context7 is bundled with the plugin — you'll be prompted to authorize on first use
-3. Verify: `resolve-library-id` returns results for "react" and "brite-nites handbook"
-4. Note: Context7 is strongly recommended but sessions degrade gracefully without it
-
-## Step 9: Verification
+## Step 8: Verification
 
 Run a final check to confirm everything works:
 
@@ -130,7 +123,6 @@ Report results as a checklist:
 [x] Database running
 [x] IDE configured
 [x] Claude Code plugins loaded
-[x] Context7 configured (or noted as follow-up)
 [x] Build passes
 [x] Tests pass
 [x] Dev server starts
@@ -138,7 +130,7 @@ Report results as a checklist:
 
 If any step failed, summarize what still needs attention.
 
-## Step 10: Next Steps
+## Step 9: Next Steps
 
 Once everything passes, suggest:
 

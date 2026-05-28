@@ -4,7 +4,7 @@ Compose 4 preset files for the ski resorts vertical per the R-8 playbook V1 offe
 
 ## Issue
 
-[BC-5936](https://linear.app/brite-nites/issue/BC-5936) · High · Marketing Plugin: GTM Workflows milestone · R-14 of email-copywriting preset roadmap · unblocks BC-5940+.
+[BC-5936](https://linear.app/brite-nites/issue/BC-5936) · High · Marketing Plugin v0.1 — GTM Workflows (Revgrowth) milestone · R-14 of email-copywriting preset roadmap · unblocks BC-5940+.
 
 ## Approach
 

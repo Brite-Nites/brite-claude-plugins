@@ -7,6 +7,8 @@
 **Completes:** BC-2714 (research findings doc)
 **Blocks:** BC-2717–2722 (6 outbound marketing skills: 5 Outbound Lead Gen + 1 Demand Gen)
 
+> **Status update (2026-05-27, BC-11891):** Context7 was removed from this repo and ADR-001 marked Withdrawn. Any "Context7 for semantic search" tier described below is currently unavailable; the GitHub MCP + domain MCP tiers remain unchanged. A future ADR will document the gbrain-based replacement.
+
 ---
 
 ## Context

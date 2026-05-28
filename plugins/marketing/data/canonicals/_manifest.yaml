@@ -1,8 +1,12 @@
-# GTM canonicals manifest — index of valid vertical slugs.
+# GTM canonicals manifest — index of valid vertical slugs + audience-tier enum.
 # Source-of-truth: brite-nites/handbook@main:marketing/go-to-market/verticals/README.md
 # Per ADR-016 (plugin-side canonicals) + D7 (thin schema) + D11 (all 27 day-1).
 # Skills read this manifest before plan-campaign Step 2 hard-fail validation.
-schema_version: 1
+#
+# schema_version: 2 (BC-11852 / ADR-020). Added audience_tiers[] block —
+# canonical 3-axis taxonomy (tier / seniority / modifier) derived from EB
+# strings observed in docs/reconciliation/master-index.json (PR #391).
+schema_version: 2
 verticals:
   - amusement-parks
   - apartments
@@ -31,3 +35,73 @@ verticals:
   - universities
   - wineries-breweries
   - zoos
+# audience_tiers — BC-11852 / ADR-020. Three orthogonal axes:
+#   - tier (ESP/email-type, REQUIRED on every audience_tier_object): primary
+#     classification of the email list (professional/role/personal/general).
+#   - seniority (job-level filter, OPTIONAL): managers-plus / employees /
+#     bar-owners-gms. Null when not used.
+#   - modifier (orthogonal flag, OPTIONAL list): reverified / direct-question-offer.
+#     Empty array when none apply.
+#
+# matches[] are case-insensitive substring tokens that the BC-11849
+# import-campaign auto-classifier scans for in EB campaign names. A single EB
+# name maps to exactly one tier slug + at most one seniority slug + zero or
+# more modifier slugs. See ADR-020 for the decision rationale (structured over
+# flat) and the worked examples covering all 11 distinct observed EB strings.
+audience_tiers:
+  - slug: professional
+    axis: tier
+    display: Professional Emails
+    description: Verified work emails — the canonical b2b lead-list shape.
+    matches:
+      - Professional Emails
+  - slug: role
+    axis: tier
+    display: Role Emails
+    description: Role-based shared inboxes (e.g., sales@, info@). Lower trust than professional.
+    matches:
+      - Role Emails
+  - slug: personal
+    axis: tier
+    display: Personal Emails
+    description: Personal email addresses — typically routed to emailbison-personal workspace.
+    matches:
+      - Personal Emails
+  - slug: general
+    axis: tier
+    display: General Emails
+    description: Mixed personal + role tier; lower confidence in deliverability targeting.
+    matches:
+      - General Emails
+  - slug: managers-plus
+    axis: seniority
+    display: Managers+
+    description: Job-level filter — managers and above (director, VP, C-level).
+    matches:
+      - Managers+
+  - slug: employees
+    axis: seniority
+    display: Employees
+    description: Job-level filter — rank-and-file (non-manager) staff.
+    matches:
+      - Employees
+  - slug: bar-owners-gms
+    axis: seniority
+    display: Bar Owners, GMs
+    description: Vertical-specific (bars-restaurants) seniority — bar owners and general managers.
+    matches:
+      - Bar Owners, GMs
+      - Bars Owners, GMs
+  - slug: reverified
+    axis: modifier
+    display: Reverified
+    description: Modifier — leads were re-verified for deliverability since the last campaign.
+    matches:
+      - (Reverified)
+      - Reverified
+  - slug: direct-question-offer
+    axis: modifier
+    display: Direct Question Offer
+    description: Modifier — copy variant using a direct-question opener instead of a statement.
+    matches:
+      - Direct Question Offer

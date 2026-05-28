@@ -2,7 +2,7 @@
 description: Start a work session — pull latest, pick an FDA discipline-child issue, brainstorm, plan with discipline dispatch, set up worktree, execute
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/session-start.md) on 2026-05-07. Upstream-SHA: 607c18cd3e126b588aacf7ec0ade5e2927481259. Drift-detection per parking lot #45. -->
+<!-- Cloned from workflows v3.32.0 (commands/session-start.md) on 2026-05-28. Upstream-SHA: 39282fa82e6563ce0b385cf54fcc47be37801a4a. Drift-detection per parking lot #45. Re-synced for BC-11891 (context7 removal — both files dropped their Context7 prereq probes in tandem). -->
 
 # Session Start
 
@@ -20,15 +20,11 @@ BRITE_ROOT="$(cat ~/.brite-plugins/.repo-root 2>/dev/null)" && bash "$BRITE_ROOT
 
 ## Step 0: Verify Prerequisites
 
-Before starting, confirm critical dependencies. **Issue all four probes as a single parallel batch** — they are independent availability checks with no inter-probe data dependency. Wait for all to complete before classifying failures.
+Before starting, confirm critical dependencies. **Issue all three probes as a single parallel batch** — they are independent availability checks with no inter-probe data dependency. Wait for all to complete before classifying failures.
 
 1. **Linear MCP** — Call the Linear MCP to list projects (just 1 result). Confirms auth and connectivity.
 2. **Sequential-thinking MCP** — Send a trivial thought (e.g., "Planning session start"). Confirms the MCP server is running.
-3. **Context7 MCP** — Two parallel sub-probes within this batch: (a) `resolve-library-id` with query "react"; (b) `resolve-library-id` with query "brite-nites handbook". Both fire in parallel with the other three top-level probes (no gating). After all results return:
-   - If (a) succeeded → "Context7: OK". If (b) also succeeded → "Handbook: OK"; else "Handbook: not found".
-   - If (a) failed → "Context7: unavailable. Handbook: N/A" and ignore (b)'s result. WARN: "Context7 is not available. Library docs and handbook context will be missing this session. Re-authorize Context7 via `/workflows:smoke-test` or restart Claude Code to retry on the next session start."
-   - Do NOT stop — continue with degraded experience.
-4. **FDA preflight** — Run `flow-preflight` (Q12) to load `.flow/config.json` (Q12 schema — see plugin CLAUDE.md § Bootstrap + first-run for the canonical field list), classify mode (`greenfield | retrofit | incremental-add | resume`), and discover FDA artifacts (`docs/product/intent.md`, `docs/product/master-flow-inventory.md`, `docs/product/flows/`, `docs/plans/.flow-phase-state.json`). If preflight fails (e.g., missing `.flow/config.json` because the project hasn't been bootstrapped, or the `linear_project_id` no longer resolves), stop with: "FDA preflight failed. Run `/flow:retrofit-project` (for an existing project) or `/flow:start-project` (greenfield) to bootstrap."
+3. **FDA preflight** — Run `flow-preflight` (Q12) to load `.flow/config.json` (Q12 schema — see plugin CLAUDE.md § Bootstrap + first-run for the canonical field list), classify mode (`greenfield | retrofit | incremental-add | resume`), and discover FDA artifacts (`docs/product/intent.md`, `docs/product/master-flow-inventory.md`, `docs/product/flows/`, `docs/plans/.flow-phase-state.json`). If preflight fails (e.g., missing `.flow/config.json` because the project hasn't been bootstrapped, or the `linear_project_id` no longer resolves), stop with: "FDA preflight failed. Run `/flow:retrofit-project` (for an existing project) or `/flow:start-project` (greenfield) to bootstrap."
 
 If Linear or sequential-thinking fails:
 - Stop with: "Cannot reach [Linear/sequential-thinking]. Run `/workflows:smoke-test` to diagnose."

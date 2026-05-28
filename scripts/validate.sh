@@ -287,6 +287,27 @@ else
   fi
 fi
 
+# Section 2b'''''' — flow-architecture deprecate-legacy contract tests (BC-10219)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh —
+# 57 assertions locking two-pass detection, pre-comms gate, sub-step ordering,
+# AskUserQuestion gates, review doc schema, and Q59 cross-reference integration.
+section "2b''''''. flow-architecture deprecate-legacy contract tests (BC-10219)"
+
+fda_deprecate_test="$REPO_ROOT/plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh"
+
+if [ ! -f "$fda_deprecate_test" ]; then
+  warn "plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh not found — skipped"
+else
+  if fda_deprecate_out=$(bash "$fda_deprecate_test" 2>&1); then
+    fda_deprecate_pass_count=$(printf '%s\n' "$fda_deprecate_out" | sed -n 's/^Results: \([0-9]*\) PASS.*/\1/p')
+    pass "flow-architecture deprecate-legacy contract tests (${fda_deprecate_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture deprecate-legacy contract tests failed — run plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh for details"
+    printf '%s\n' "$fda_deprecate_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
 # ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
@@ -343,27 +364,45 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 2d — Security Hook Classifier Regression (BC-11117)
+# Section 2d — Security Hook Regex Regression (BC-11889)
 # ══════════════════════════════════════════════════════════════════════
-# Spec-tests the PreToolUse > Bash prompt-hook and regex-hook to ensure
-# the --force-with-lease carve-out is present with correct branch-aware
-# constraints. Pass count auto-derived from the harness's RESULT line.
-section "2d. Security Hook Classifier Regression"
+# Thin regex-only smoke test for the surviving PreToolUse regex hooks.
+# Replaces the BC-11117 classifier harness retired with its Haiku layer.
+section "2d. Security Hook Regex Regression"
 
-classifier_test="$REPO_ROOT/scripts/test_security_hook_classifier.sh"
-hooks_json="$REPO_ROOT/plugins/workflows/hooks/hooks.json"
+hooks_test="$REPO_ROOT/scripts/test-hooks.sh"
 
-if [ ! -f "$classifier_test" ]; then
-  warn "scripts/test_security_hook_classifier.sh not found — classifier regression check skipped"
-elif [ ! -f "$hooks_json" ]; then
-  warn "plugins/workflows/hooks/hooks.json not found — classifier regression check skipped"
+if [ ! -f "$hooks_test" ]; then
+  warn "scripts/test-hooks.sh not found — hook regex regression check skipped"
 else
-  if classifier_out=$(bash "$classifier_test" "$hooks_json" 2>&1); then
-    pass_count=$(printf '%s\n' "$classifier_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
-    pass "security hook classifier regression (${pass_count:-?} scenarios)"
+  if hooks_out=$(bash "$hooks_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$hooks_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "security hook regex regression (${pass_count:-?} scenarios)"
   else
-    fail "security hook classifier regression failed — run scripts/test_security_hook_classifier.sh for details"
-    printf '%s\n' "$classifier_out" | tail -25 | sed 's/^/    /' >&2
+    fail "security hook regex regression failed — run scripts/test-hooks.sh for details"
+    printf '%s\n' "$hooks_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2d' — Pre-commit Advisory Hook (BC-11890)
+# ══════════════════════════════════════════════════════════════════════
+# Hermetic execution test for the PreToolUse Bash quality hook after its
+# block → warn demotion: must always emit {"ok":true} (never block) and
+# surface failing-linter output on stderr behind an advisory banner.
+section "2d'. Pre-commit Advisory Hook"
+
+advisory_test="$REPO_ROOT/scripts/test_precommit_advisory.sh"
+
+if [ ! -f "$advisory_test" ]; then
+  warn "scripts/test_precommit_advisory.sh not found — advisory hook check skipped"
+else
+  if advisory_out=$(bash "$advisory_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$advisory_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "pre-commit advisory hook (${pass_count:-?} scenarios)"
+  else
+    fail "pre-commit advisory hook failed — run scripts/test_precommit_advisory.sh for details"
+    printf '%s\n' "$advisory_out" | tail -25 | sed 's/^/    /' >&2
   fi
 fi
 
@@ -1663,6 +1702,39 @@ PY
         fi
       done <<< "$plugins_tsv"
     fi
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 15z — Agent-skills config drift (BC-11934)
+# ══════════════════════════════════════════════════════════════════════
+# WARN when docs/agents/ config and the CLAUDE.md '## Agent skills' block
+# drift out of sync. Advisory only (never errors) — mirrors check-guardrails.sh
+# C2. Logic + unit tests live in scripts/_lib/agent_skills_drift.sh and
+# scripts/test_agent_skills_drift.sh (run via test_* harness convention).
+section "Agent-skills config drift"
+# shellcheck source=/dev/null
+. "$REPO_ROOT/scripts/_lib/agent_skills_drift.sh"
+_drift_found=0
+while IFS= read -r _msg; do
+  warn "$_msg"
+  _drift_found=1
+done < <(detect_agent_skills_drift "$REPO_ROOT/CLAUDE.md" "$REPO_ROOT/docs/agents")
+[ "$_drift_found" -eq 0 ] && pass "agent-skills config and CLAUDE.md block are in sync"
+
+# Run the drift-detector's fixture unit tests (mirrors Section 2b' pattern).
+# Pass count auto-derived from the harness's RESULT contract line.
+section "Agent-skills drift unit tests"
+drift_test="$REPO_ROOT/scripts/test_agent_skills_drift.sh"
+if [ ! -f "$drift_test" ]; then
+  warn "scripts/test_agent_skills_drift.sh not found — skipped"
+else
+  if drift_test_out=$(bash "$drift_test" 2>&1); then
+    drift_pass_count=$(printf '%s\n' "$drift_test_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "agent-skills drift unit tests (${drift_pass_count:-?} assertions)"
+  else
+    fail "agent-skills drift unit tests failed — run scripts/test_agent_skills_drift.sh for details"
+    printf '%s\n' "$drift_test_out" | tail -25 | sed 's/^/    /' >&2
   fi
 fi
 

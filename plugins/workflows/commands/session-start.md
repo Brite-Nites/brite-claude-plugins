@@ -22,11 +22,6 @@ Before starting, confirm critical dependencies:
 
 1. **Linear MCP** — Call the Linear MCP to list projects (just 1 result). Confirms auth and connectivity.
 2. **Sequential-thinking MCP** — Send a trivial thought (e.g., "Planning session start"). Confirms the MCP server is running.
-3. **Context7 MCP** — Call `resolve-library-id` with query "react" (lightweight check). Confirms MCP server is running and authenticated.
-   - If it succeeds, also check for handbook: `resolve-library-id` with "brite-nites handbook".
-   - Report: "Context7: [OK/unavailable]. Handbook: [OK/not found/N/A]."
-   - If Context7 fails: WARN "Context7 is not available. Library docs and handbook context will be missing this session. Authorize Context7 when prompted on next session start."
-   - Do NOT stop — continue with degraded experience.
 
 If Linear or sequential-thinking fails:
 - Stop with: "Cannot reach [Linear/sequential-thinking]. Run `/workflows:smoke-test` to diagnose."

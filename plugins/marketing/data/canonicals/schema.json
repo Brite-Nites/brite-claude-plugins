@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://brite.nites/schemas/canonicals/vertical.json",
   "title": "GTM Canonicals — Vertical Entry",
-  "$comment": "Schema scope — the top-level shape describes a VERTICAL entry; #/definitions/manifest describes _manifest.yaml. Editor tooling (e.g., yaml-language-server) MUST NOT validate _manifest.yaml against the top-level vertical shape; reference #/definitions/manifest explicitly via a yaml-language-server directive at the top of _manifest.yaml when IDE support is added.",
-  "description": "Thin schema per ADR-016 (D7). One file per vertical under plugins/marketing/data/canonicals/{slug}.yaml. _manifest.yaml shape is documented in #/definitions/manifest. Brite repo is stdlib-only — this schema is the declarative contract; plugins/marketing/scripts/lint_canonicals.py is the runtime enforcement (it mirrors the constraints below).",
+  "$comment": "Schema scope — the top-level shape describes a VERTICAL entry; #/definitions/manifest describes _manifest.yaml; #/definitions/campaign_manifest (BC-11852, schema v2) describes docs/campaigns/<entity>/<slug>/manifest.json. Editor tooling (e.g., yaml-language-server) MUST NOT validate _manifest.yaml against the top-level vertical shape; reference #/definitions/manifest explicitly via a yaml-language-server directive at the top of _manifest.yaml when IDE support is added.",
+  "description": "Thin schema per ADR-016 (D7). One file per vertical under plugins/marketing/data/canonicals/{slug}.yaml. _manifest.yaml shape is documented in #/definitions/manifest (schema_version: 2 since BC-11852 to admit the audience_tiers block). Campaign manifests (docs/campaigns/<entity>/<slug>/manifest.json) are described in #/definitions/campaign_manifest (schema_version: 2 since BC-11852). Brite repo is stdlib-only — this schema is the declarative contract; plugins/marketing/scripts/lint_canonicals.py is the runtime enforcement (it mirrors the constraints below).",
   "type": "object",
   "required": ["slug", "display", "personas", "offers"],
   "additionalProperties": false,
@@ -121,15 +121,15 @@
       }
     },
     "manifest": {
-      "$comment": "Shape of _manifest.yaml. Enforced by plugins/marketing/scripts/lint_canonicals.py (Brite repo has no jsonschema runtime dependency).",
+      "$comment": "Shape of _manifest.yaml. Enforced by plugins/marketing/scripts/lint_canonicals.py (Brite repo has no jsonschema runtime dependency). schema_version bumped 1 → 2 in BC-11852 to admit the audience_tiers block.",
       "type": "object",
       "required": ["schema_version", "verticals"],
       "additionalProperties": false,
       "properties": {
         "schema_version": {
           "type": "integer",
-          "const": 1,
-          "description": "Pinned to the linter's SCHEMA_VERSION constant. Bump in lockstep with the linter + data shape."
+          "const": 2,
+          "description": "Pinned to the linter's SCHEMA_VERSION constant. Bumped 1 → 2 in BC-11852 (introduces the audience_tiers block)."
         },
         "verticals": {
           "type": "array",
@@ -140,6 +140,219 @@
             "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
           },
           "description": "Alphabetized + duplicate-free list of canonical vertical slugs (>=1 required)."
+        },
+        "audience_tiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/audience_tier_entry" },
+          "description": "BC-11852: canonical audience-tier slugs + display + observed EB-name matches. Empirically derived from docs/reconciliation/master-index.json (PR #391). The auto-classifier (BC-11849 import-campaign) maps EB campaign-name strings to a structured audience_tier object via the 'matches' substrings here. See ADR-020."
+        }
+      }
+    },
+    "audience_tier_entry": {
+      "$comment": "Per-axis entry inside audience_tiers[] in _manifest.yaml. The audience-tier taxonomy decomposes into THREE orthogonal axes (per ADR-020): 'tier' (ESP/email-type), 'seniority' (job-level filter), and 'modifiers' (orthogonal copy/data flags). Each entry below names one slug on one axis. The 'matches' field is a list of substring tokens that, when found in an EB campaign name, indicate this slug applies — a single EB name maps to ONE tier slug + AT MOST ONE seniority slug + ZERO OR MORE modifier slugs.",
+      "type": "object",
+      "required": ["slug", "axis", "display"],
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Strict kebab-case canonical slug for this axis-value."
+        },
+        "axis": {
+          "type": "string",
+          "enum": ["tier", "seniority", "modifier"],
+          "description": "Which axis this slug belongs to. 'tier' = ESP/email-type (e.g., professional, role); 'seniority' = job-level filter (e.g., managers-plus, employees); 'modifier' = orthogonal flag (e.g., reverified, direct-question-offer)."
+        },
+        "display": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable display name (e.g., 'Professional Emails')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. One-line explanation of what this slug means semantically."
+        },
+        "matches": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Optional. Substring tokens that, when present in an EB campaign name, indicate this slug applies. Used by the BC-11849 import-campaign auto-classifier. Case-insensitive match — the classifier lowercases both sides. Empty/omitted means manual classification only."
+        }
+      }
+    },
+    "campaign_manifest": {
+      "$comment": "Shape of docs/campaigns/<entity>/<slug>/manifest.json. Schema v2 introduced in BC-11852 — email_bison.campaign_id (singular) replaced by email_bison.campaigns[] (one entry per EB campaign record across ESPs + audience_tiers, since a single logical Brite campaign may produce multiple EB records — empirically up to 6 per docs/reconciliation/master-index.md). email_bison.workspace is retained as the primary-workspace pointer (where the canonical lead list lives), distinct from campaigns[].workspace which records the workspace each EB record was created in.",
+      "type": "object",
+      "required": [
+        "schema_version",
+        "slug",
+        "entity",
+        "vertical",
+        "persona",
+        "offer",
+        "year",
+        "month",
+        "linear",
+        "salesforce",
+        "email_bison",
+        "created_at",
+        "scaffolded_by"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "const": 2,
+          "description": "v2 per BC-11852. v1 manifests must be migrated via plugins/marketing/scripts/migrate_manifest_v1_to_v2.py before they will validate."
+        },
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Canonical campaign slug — {vertical}-{persona}-{offer}-fy{YY}-m{MM} per ADR-012."
+        },
+        "entity": {
+          "type": "string",
+          "enum": ["nites", "supply", "labs"],
+          "description": "Short-form entity per BC-8719 (long-form 'brite-{entity}' retired)."
+        },
+        "vertical": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Vertical slug — must resolve to a canonical vertical in plugins/marketing/data/canonicals/_manifest.yaml verticals[]."
+        },
+        "persona": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "offer": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "year": { "type": "integer", "minimum": 2025, "maximum": 2099 },
+        "month": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "offer_posture": {
+          "type": "string",
+          "enum": ["knowledge", "free-asset", "pilot", "risk-reversal"],
+          "description": "Optional override of the offer-canonical posture for this campaign instance per ADR-017."
+        },
+        "linear": {
+          "type": "object",
+          "required": ["milestone_id", "milestone_url", "project"],
+          "additionalProperties": false,
+          "properties": {
+            "milestone_id": { "type": ["string", "null"] },
+            "milestone_url": { "type": ["string", "null"] },
+            "project": { "type": "string" }
+          }
+        },
+        "salesforce": {
+          "type": "object",
+          "required": ["campaign_id", "campaign_name"],
+          "additionalProperties": false,
+          "properties": {
+            "campaign_id": { "type": ["string", "null"] },
+            "campaign_name": { "type": "string" }
+          }
+        },
+        "email_bison": { "$ref": "#/definitions/email_bison_block_v2" },
+        "created_at": {
+          "type": "string",
+          "description": "ISO-8601 UTC timestamp at scaffold time."
+        },
+        "scaffolded_by": {
+          "type": "string",
+          "description": "Tool that scaffolded the manifest (e.g., /marketing:plan-campaign)."
+        }
+      }
+    },
+    "email_bison_block_v2": {
+      "$comment": "v2 email_bison block. workspace = PRIMARY-workspace pointer (where the canonical lead list lives — distinct from each EB record's workspace in campaigns[].workspace). campaign_id (singular) is INTENTIONALLY REMOVED — replaced by campaigns[] array. campaign_name retained for cross-walks against Salesforce.campaign_name and EB-name auto-classify.",
+      "type": "object",
+      "required": ["workspace", "campaign_name", "campaigns"],
+      "additionalProperties": false,
+      "properties": {
+        "workspace": {
+          "type": "string",
+          "enum": ["emailbison-b2b", "emailbison-personal"],
+          "description": "Primary workspace — where the canonical lead list is imported. The two Brite EB workspaces are b2b (professional/role audience) and personal (personal-email audience)."
+        },
+        "campaign_name": {
+          "type": "string",
+          "description": "Logical campaign name (typically matches slug). Used for cross-walks against Salesforce.campaign_name and as the auto-classifier seed for EB record naming."
+        },
+        "campaigns": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/eb_campaign_record" },
+          "description": "EB campaign records — one entry per (workspace × audience_tier × ESP) split. Empty array = not yet launched. A single logical Brite campaign may produce multiple EB records (empirically up to 6, e.g., Professional Emails + Personal Emails + Role Emails across both workspaces)."
+        }
+      }
+    },
+    "eb_campaign_record": {
+      "type": "object",
+      "required": ["workspace", "campaign_id", "audience_tier"],
+      "additionalProperties": false,
+      "properties": {
+        "workspace": {
+          "type": "string",
+          "enum": ["emailbison-b2b", "emailbison-personal"],
+          "description": "EB workspace this record was created in."
+        },
+        "campaign_id": {
+          "oneOf": [
+            { "type": "integer" },
+            { "type": "string", "pattern": "^[0-9]+$" }
+          ],
+          "description": "EB campaign ID (numeric). String form admitted because earlier EB MCP responses serialized as string; both shapes are accepted on read."
+        },
+        "esp": {
+          "type": "string",
+          "description": "Email Service Provider this record targets (e.g., 'gmail-workspace', 'office365', 'all'). Free-form — EB does not enforce an ESP enum."
+        },
+        "audience_tier": { "$ref": "#/definitions/audience_tier_object" },
+        "name": {
+          "type": "string",
+          "description": "EB-side campaign name (as it appears in EB UI). May include composite suffixes like '| Professional Emails | All ESPs'."
+        },
+        "launched_at": {
+          "type": ["string", "null"],
+          "description": "ISO-8601 UTC timestamp when this EB record was launched. Null until launched."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "launched", "paused", "completed", "archived"],
+          "description": "EB-side status. Defaults to 'draft' on creation; transitions through launched/paused/completed/archived."
+        },
+        "pending_classification": {
+          "type": "boolean",
+          "description": "Set true by migrate_manifest_v1_to_v2.py when a v1 launched-but-unclassified campaign is auto-migrated with a placeholder audience_tier. Operators clear this flag once they've classified the record via /marketing:import-campaign (BC-11849)."
+        }
+      }
+    },
+    "audience_tier_object": {
+      "$comment": "Structured audience-tier per ADR-020. Three orthogonal axes — tier (REQUIRED), seniority (optional), modifiers (optional list). Slug values are validated against the _manifest.yaml audience_tiers[] block at lint time.",
+      "type": "object",
+      "required": ["tier"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Primary ESP/email-type axis (e.g., professional, role, personal, general)."
+        },
+        "seniority": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Optional job-level filter (e.g., managers-plus, employees, bar-owners-gms). Null when not specified."
+        },
+        "modifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          },
+          "description": "Optional orthogonal flags (e.g., reverified, direct-question-offer). Empty array when none apply."
         }
       }
     }

@@ -4,7 +4,7 @@
 **Branch**: `holden/bc-5923-create-pluginsmarketingreferencesvertical-playbookssports`
 **Worktree**: `.claude/worktrees/bc-5923/`
 **Tasks**: 12 (grouped into 3 phases — research / pre-compose gate / compose-and-verify)
-**Milestone**: Marketing Plugin: GTM Workflows
+**Milestone**: Marketing Plugin v0.1 — GTM Workflows (Revgrowth)
 
 ## Prerequisites
 

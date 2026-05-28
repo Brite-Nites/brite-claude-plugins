@@ -26,13 +26,12 @@ After installing, the plugin provides:
 | Agents | 7 | `code-reviewer`, `security-reviewer`, `typescript-reviewer`, `claude-md-generator`, `issue-creator`, `plan-refiner`, `post-plan-orchestrator` |
 | Skills | 10 | Design, React/Next.js, browser automation, project planning, workflow |
 | Hooks | 4 | Bash security, write security, auto-lint, session context |
-| MCP Servers | 3 | Linear, Context7, sequential-thinking |
+| MCP Servers | 3 | Linear, sequential-thinking, gbrain-team |
 
 ## Avoiding Duplicates
 
-If a team member already has Linear, Context7, or sequential-thinking configured standalone, the plugin versions take precedence. To avoid duplicates:
+If a team member already has Linear or sequential-thinking configured standalone, the plugin versions take precedence. To avoid duplicates:
 
 - Remove `linear` from `~/.claude/mcp-settings.json` if present
-- Remove `context7` from `~/.claude/mcp-settings.json` if present (the plugin now bundles it)
 - Disable the standalone `sequential-thinking` plugin in `~/.claude/settings.json` if present
 - Keep `bigquery` standalone (the plugin doesn't bundle it)

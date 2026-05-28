@@ -97,7 +97,7 @@ mk_standard_fixture() {
   d=$(mk_canonicals_dir "$name")
 
   cat > "$d/_manifest.yaml" <<'YAML'
-schema_version: 1
+schema_version: 2
 verticals:
   - apartments
   - hotels-resorts

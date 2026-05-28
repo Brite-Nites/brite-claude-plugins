@@ -7,6 +7,8 @@
 **Blocks:** BC-5042 (Phase 3 — design doc, template, findings)
 **Pre-resolved:** ADR 2c ratifies PR #116's pattern and adds a degradation policy (no fallback to curl when MCP is unreachable)
 
+> **Status update (2026-05-27, BC-11891):** Context7 was removed from this repo and ADR-001 marked Withdrawn. The "Context7 for semantic search" tier described in Alternative 4 (and the recommendation to index sibling repos on Context7) is currently unavailable; the GitHub MCP + domain MCP tiers remain unchanged. A future ADR will document the gbrain-based replacement.
+
 ---
 
 ## ADR 2a. MCP Server Adoption Strategy

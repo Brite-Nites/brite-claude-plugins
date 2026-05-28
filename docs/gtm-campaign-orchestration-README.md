@@ -70,7 +70,7 @@ Before this design, three separate "campaign" systems ran in parallel with three
 
    ┌──────────────────────────────────────────────────────────────────────┐
    │  LINEAR = ORCHESTRATION / WORK / DRILL-DOWN                          │
-   │  "Brite GTM" project (separate from "Brite Plugin Marketplace")     │
+   │  "Brite GTM" project (separate from "Brite Skill Packs")            │
    │                                                                      │
    │  Milestones (one per campaign = Vertical × Persona × Offer × Month) │
    │  Sub-issues (8 standard + 2 optional per milestone — D4 template)   │
@@ -1232,7 +1232,7 @@ Audience: external partners / new hires / anyone outside the Brite engineering o
 | **σ3** | Token label for the Salesforce-orchestration sub-decision from the design session's O11 question. See [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md). |
 | **M2 / M3** | Outcomes of V3 Marketing ratification. M2 ships portfolio-snapshot + Pipeline-by-Offer-Family Dashboard + 4 handbook PRs. M3 drops those 5 BCs; SF Performance Dashboard + Coverage view still ship. See [§5 M2/M3 callout](#5-what-was-decided). |
 | **V3** | Validation gate from the design session — Marketing buy-in (Sarah Cullen + Kells) on the canonicals + vocab + framework docs + portfolio-snapshot packet, against a populated dogfood (BC-8729). |
-| **Brite GTM project** | The Linear project that holds campaign milestones (separate from "Brite Plugin Marketplace" which holds plugin engineering work). Per D2 / ADR-013 + O7. Provisioned by BC-8712 Task 0. |
+| **Brite GTM project** | The Linear project that holds campaign milestones (separate from "Brite Skill Packs" — Layer C — which holds plugin engineering work; renamed from "Brite Plugin Marketplace" 2026-05-27). Per D2 / ADR-013 + O7. Provisioned by BC-8712 Task 0. |
 | **brite-gtm repo** | Sibling git repo at `/Users/holdenhalford/projects/work/brite-nites/brite-gtm/`. Holds the pre-Linear ideation queue (`docs/campaign-portfolio.md` with 🟢🟡⚪ candidates) per O7. NOT the same as the Linear "Brite GTM" project. |
 | **Tier** | Grouping concept from the implementation plan — 9 tiers across the 23 BCs (Tier 1 = SF metadata foundation; Tier 9 = optional sibling commands). See [§7](#7-the-23-linear-issues). |
 | **plugin version bump** | CLAUDE.md gotcha: when any plugin file under `plugins/{name}/{commands,skills,hooks,agents}/**` changes, the matching `plugin.json` + `marketplace.json` entry MUST be version-bumped in the same commit. BC-6000 precedent — 4 stale-cache sessions lost. |
@@ -1243,7 +1243,7 @@ Audience: external partners / new hires / anyone outside the Brite engineering o
 
 ## 7. The 25 Linear issues
 
-All issues in the **Brite Plugin Marketplace** project (team Brite Company).
+All issues in the **Brite Skill Packs** project (team Brite Company; renamed from "Brite Plugin Marketplace" 2026-05-27).
 
 ### By tier
 
@@ -1434,7 +1434,7 @@ Read these sections if you are:
 1. **All decisions in §5 are LOCKED.** Do NOT re-litigate without explicit user direction.
 2. **Read `docs/designs/gtm-campaign-orchestration-design.md` Section 7.8** end-to-end for the full O6 chain.
 3. **Memory files**: `project_gtm_campaign_architecture.md` (architecture summary), `project_marketing_vocabulary.md` (vocab canon), `session_2026_05_11_gtm_campaign_design.md` (full trajectory).
-4. **Linear**: `mcp__plugin_workflows_linear-server__list_issues team:"Brite Company" project:"Brite Plugin Marketplace" query:"GTM"` returns all 23 BCs.
+4. **Linear**: `mcp__plugin_workflows_linear-server__list_issues team:"Brite Company" project:"Brite Skill Packs" query:"GTM"` returns all 23 BCs.
 5. **If a user push-back surfaces** that genuinely needs re-opening a locked decision, surface explicitly (per feedback memory) — never silently drift.
 
 ---
@@ -1466,9 +1466,9 @@ Every doc + memory + Linear artifact, with one-line description.
 
 ### Linear
 
-- **Project**: Brite Plugin Marketplace (team Brite Company)
+- **Project**: Brite Skill Packs (team Brite Company; renamed from "Brite Plugin Marketplace" 2026-05-27)
 - **Issues**: BC-8712 through BC-8735 + BC-8752 (23 total)
-- **URL**: https://linear.app/brite-nites/project/brite-plugin-marketplace
+- **URL**: https://linear.app/brite-nites/project/brite-skill-packs-402b57908532
 
 ### External
 

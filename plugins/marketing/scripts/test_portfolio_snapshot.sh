@@ -34,6 +34,9 @@
 #   T  unparseable created_at + valid slug → slug-fallback salvages    expect 0
 #   U  non-string created_at (JSON number) → except clause catches    expect 0
 #   V  manifest.angles[] populated → Section 3a distribution line     expect 0
+#   W  BC-11852 v2 manifest read — single-record campaigns[] launched   expect 0
+#   X  BC-11852 v2 manifest read — multi-record campaigns[] (+N more)   expect 0
+#   Y  BC-11852 v2 manifest read — empty campaigns[] = not launched     expect 0
 #
 # Usage:
 #   bash plugins/marketing/scripts/test_portfolio_snapshot.sh
@@ -153,8 +156,11 @@ mkdir_scenario() {
 write_canonicals_manifest() {
   local dir="$1"
   shift
+  # BC-11852: schema_version bumped 1 → 2; lint is strict but the
+  # canonicals_reader used by portfolio-snapshot is tolerant — both shapes
+  # round-trip cleanly. Fixtures use v2 to match production.
   {
-    printf 'schema_version: 1\n'
+    printf 'schema_version: 2\n'
     printf 'verticals:\n'
     for v in "$@"; do
       printf '  - %s\n' "$v"
@@ -798,6 +804,154 @@ run_s() {
     '## 1. Portfolio shape'
 }
 
+# ── Scenario W: BC-11852 v2 manifest — single-record campaigns[] launched ──
+# Exercises the v2 reader path with one EB record. The Section 2 row must
+# show the campaign_id (no "+N more" suffix) and "yes" in the Launched column.
+run_w() {
+  local dir; dir="$(mkdir_scenario W)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  local m_dir="$dir/docs/campaigns/labs/hotels-resorts-v2-single-test-offer-fy26-m04"
+  mkdir -p "$m_dir"
+  cat > "$m_dir/manifest.json" <<'EOF'
+{
+  "schema_version": 2,
+  "slug": "hotels-resorts-v2-single-test-offer-fy26-m04",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "pers",
+  "offer": "test-offer",
+  "year": 2026,
+  "month": 4,
+  "created_at": "2026-04-15T10:00:00Z",
+  "salesforce": {"campaign_id": null, "campaign_name": "x"},
+  "email_bison": {
+    "workspace": "emailbison-b2b",
+    "campaign_name": "x",
+    "campaigns": [
+      {
+        "workspace": "emailbison-b2b",
+        "campaign_id": 42,
+        "audience_tier": {"tier": "professional", "seniority": null, "modifiers": []},
+        "launched_at": "2026-04-20T12:00:00Z",
+        "status": "launched"
+      }
+    ]
+  }
+}
+EOF
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "W: v2 single-record manifest read OK" 0 "campaigns_in_window: 1"
+  assert_file_contains "W: v2 row shows EB campaign_id 42 in Section 2" "$out" \
+    '\| 42 \| yes \|'
+  assert_file_contains "W: v2 launched row counted in EB launched total" "$out" \
+    'EB campaigns launched in window = 1'
+  assert_file_NOT_contains "W: no '+N more' suffix on single-record row" "$out" \
+    'more)'
+}
+
+# ── Scenario X: BC-11852 v2 manifest — multi-record campaigns[] (+N more) ──
+run_x() {
+  local dir; dir="$(mkdir_scenario X)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  local m_dir="$dir/docs/campaigns/labs/hotels-resorts-v2-multi-test-offer-fy26-m04"
+  mkdir -p "$m_dir"
+  cat > "$m_dir/manifest.json" <<'EOF'
+{
+  "schema_version": 2,
+  "slug": "hotels-resorts-v2-multi-test-offer-fy26-m04",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "pers",
+  "offer": "test-offer",
+  "year": 2026,
+  "month": 4,
+  "created_at": "2026-04-15T10:00:00Z",
+  "salesforce": {"campaign_id": null, "campaign_name": "x"},
+  "email_bison": {
+    "workspace": "emailbison-b2b",
+    "campaign_name": "x",
+    "campaigns": [
+      {
+        "workspace": "emailbison-b2b",
+        "campaign_id": 100,
+        "audience_tier": {"tier": "professional", "seniority": null, "modifiers": []},
+        "launched_at": "2026-04-20T12:00:00Z",
+        "status": "launched"
+      },
+      {
+        "workspace": "emailbison-b2b",
+        "campaign_id": 101,
+        "audience_tier": {"tier": "role", "seniority": null, "modifiers": []},
+        "launched_at": "2026-04-21T12:00:00Z",
+        "status": "launched"
+      },
+      {
+        "workspace": "emailbison-personal",
+        "campaign_id": 200,
+        "audience_tier": {"tier": "personal", "seniority": null, "modifiers": []},
+        "launched_at": null,
+        "status": "draft"
+      }
+    ]
+  }
+}
+EOF
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "X: v2 multi-record manifest read OK" 0 "campaigns_in_window: 1"
+  assert_file_contains "X: first campaign_id + (+2 more) suffix" "$out" \
+    '\| 100 \(\+2 more\) \| yes \|'
+  assert_file_contains "X: any-launched aggregation counts the campaign" "$out" \
+    'EB campaigns launched in window = 1'
+}
+
+# ── Scenario Y: BC-11852 v2 manifest — empty campaigns[] (not launched) ──
+run_y() {
+  local dir; dir="$(mkdir_scenario Y)"
+  write_canonicals_manifest "$dir" "hotels-resorts"
+  write_canonical_vertical "$dir" "hotels-resorts" "test-offer" "free-asset"
+  local m_dir="$dir/docs/campaigns/labs/hotels-resorts-v2-empty-test-offer-fy26-m04"
+  mkdir -p "$m_dir"
+  cat > "$m_dir/manifest.json" <<'EOF'
+{
+  "schema_version": 2,
+  "slug": "hotels-resorts-v2-empty-test-offer-fy26-m04",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "pers",
+  "offer": "test-offer",
+  "year": 2026,
+  "month": 4,
+  "created_at": "2026-04-15T10:00:00Z",
+  "salesforce": {"campaign_id": null, "campaign_name": "x"},
+  "email_bison": {
+    "workspace": "emailbison-b2b",
+    "campaign_name": "x",
+    "campaigns": []
+  }
+}
+EOF
+  local out="$dir/docs/campaigns/_reviews/monthly-2026-04.md"
+  invoke_helper \
+    --span monthly --window-start 2026-04-01 --window-end 2026-04-30 \
+    --campaigns-dir "$dir/docs/campaigns" --canonicals-dir "$dir/canonicals" \
+    --command-version "marketing@test" --generated-at "2026-05-26T15:00:00Z" --out "$out"
+  assert_exit_and_substring "Y: v2 empty-campaigns manifest read OK" 0 "campaigns_in_window: 1"
+  assert_file_contains "Y: row reads as not launched" "$out" \
+    '\| \(not launched\) \| no \|'
+  assert_file_contains "Y: empty campaigns[] = zero launched total" "$out" \
+    'EB campaigns launched in window = 0'
+}
+
 # ── Run scenarios ───────────────────────────────────────────────────
 echo "Running portfolio_snapshot.py regression harness against $HELPER"
 echo ""
@@ -824,6 +978,9 @@ run_s
 run_t
 run_u
 run_v
+run_w
+run_x
+run_y
 
 echo ""
 echo "RESULT pass=$pass fail=$fail"

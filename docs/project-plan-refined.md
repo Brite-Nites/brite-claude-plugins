@@ -2,7 +2,7 @@
 
 > **Start here for orientation**: `docs/gtm-campaign-orchestration-README.md` — master entry point with TL;DR, decision log, glossary, audit narrative, and per-audience onboarding paths. This refined plan is the per-task execution surface; the README is the navigation surface.
 
-**Linear Project**: [Brite Plugin Marketplace](https://linear.app/brite-nites/project/brite-plugin-marketplace-402b57908532) (team Brite Company, prefix `BC-`)
+**Linear Project**: [Brite Skill Packs](https://linear.app/brite-nites/project/brite-skill-packs-402b57908532) (team Brite Company, prefix `BC-`)
 
 ## BC-ID ↔ Task-ID Mapping
 
@@ -23,7 +23,7 @@
 |        |        | T8-T | [BC-8734](https://linear.app/brite-nites/issue/BC-8734) |
 |        |        | T8-U | [BC-8735](https://linear.app/brite-nites/issue/BC-8735) |
 
-All 25 issues filed in `Brite Plugin Marketplace` project (initial 22 on 2026-05-12; T2-FA audit-fix BC-8752 added 2026-05-13; milestone-assignment pass on 2026-05-14 normalized to 25). Dependencies wired via `blockedBy` per the Mermaid graph below.
+All 25 issues filed in `Brite Skill Packs` project (initial 22 on 2026-05-12; T2-FA audit-fix BC-8752 added 2026-05-13; milestone-assignment pass on 2026-05-14 normalized to 25). Dependencies wired via `blockedBy` per the Mermaid graph below.
 
 ## Summary
 
@@ -32,7 +32,7 @@ Build the plugin-side execution layer for Brite's GTM campaign system: 4 SF Camp
 **Source design doc**: `docs/designs/gtm-campaign-orchestration-design.md` (897 lines, all locks narrated)
 **Source v1 plan**: `docs/plans/gtm-campaign-orchestration-plan.md`
 **Companion memories**: `memory/project_gtm_campaign_architecture.md`, `memory/project_marketing_vocabulary.md`
-**Linear project for these BCs**: Brite Plugin Marketplace (team Brite Company, prefix `BC-`)
+**Linear project for these BCs**: Brite Skill Packs (team Brite Company, prefix `BC-`)
 **Linear project for downstream campaigns**: Brite GTM
 **Cross-repo touch**: `brite-salesforce` (SF metadata deploys), `brite-nites/handbook` (4 PRs for O14/O8)
 
@@ -155,14 +155,14 @@ Critical path: **T0 → T1-A → T2-E → T4-I → T6-O → T6-P → T7-Q** (7 n
 
 ### Task 0: Generate Linear Issues and Update CLAUDE.md — [BC-8712](https://linear.app/brite-nites/issue/BC-8712)
 
-- **Context**: This plan files 21 new BCs into Linear "Brite Plugin Marketplace" project (team Brite Company, prefix `BC-`). After issues are filed, CLAUDE.md needs review so future agents have current project context. This task runs before any code task.
+- **Context**: This plan files 21 new BCs into Linear "Brite Skill Packs" project (team Brite Company, prefix `BC-`). After issues are filed, CLAUDE.md needs review so future agents have current project context. This task runs before any code task.
 - **Steps**:
   1. Run `/workflows:create-issues docs/project-plan-refined.md` — files all 21 BCs with cross-linked dependencies. Each BC inherits its task's title, context, ACs, and dependency list.
   2. Capture the BC numbers in a comment at the top of this plan (BC-ID ↔ task-ID mapping) so subsequent ship cycles can reference issue IDs.
   3. Run `/workflows:setup-claude-md` — audits and refactors CLAUDE.md against best practices (size guardrail, anti-slop, @import structure, hook-candidate identification).
   4. Manually update `memory/MEMORY.md` index to add a one-line entry pointing at `memory/project_gtm_campaign_architecture.md` if not already present (it is — verify).
 - **Validation**:
-  - `mcp__plugin_workflows_linear-server__list_issues team:"Brite Company" project:"Brite Plugin Marketplace" query:"<unique-token-from-each-spec>"` returns 21 issues.
+  - `mcp__plugin_workflows_linear-server__list_issues team:"Brite Company" project:"Brite Skill Packs" query:"<unique-token-from-each-spec>"` returns 21 issues.
   - Each issue has parentId set per its dependency chain (or `blockedBy` relations) and labels matching its tier (`tier-1` / `tier-2` / etc.).
   - `./scripts/check-guardrails.sh --claude-md CLAUDE.md` exits 0.
   - The BC-ID ↔ task-ID mapping is committed at the top of this file.
@@ -358,7 +358,7 @@ Critical path: **T0 → T1-A → T2-E → T4-I → T6-O → T6-P → T7-Q** (7 n
 - **Context**: Plugin-side canonicals data layer (per Phase 2 reframe: plugin = WHAT). Source-of-truth for what counts as a valid (vertical, persona, offer) tuple before plan-campaign Step 2 hard-fail check. Per D7 (thin schema) + D11 (all 27 day-1) + Phase 2 reframe (plugin not handbook). **Source of vertical list**: `brite-nites/handbook@main:marketing/go-to-market/verticals/README.md`. **Per-entry depth varies**: 7 Active verticals get full ≥1-persona + ≥1-offer populated; Exploring + Future verticals can be skeleton (slug + display only). Personas graduate via D8 + handbook review (T3-H).
 - **Steps**:
   1. Create directory `plugins/marketing/data/canonicals/`.
-  2. Fetch the 27-vertical list from handbook (use `mcp__plugin_workflows_context7__query-docs` with `/brite-nites/handbook` if available; fallback: `gh api repos/brite-nites/handbook/contents/marketing/go-to-market/verticals/README.md`).
+  2. Fetch the 27-vertical list from handbook via `gh api repos/brite-nites/handbook/contents/marketing/go-to-market/verticals/README.md`.
   3. Author `_manifest.yaml`:
      ```yaml
      schema_version: 1

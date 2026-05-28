@@ -135,7 +135,7 @@ For each of the 3 sibling findings (documented in `brand-hub-dogfood-findings.md
 Create one Linear issue per finding via `mcp__plugin_workflows_linear-server__save_issue`. Each gets:
 
 - Title prefixed with "flow-architecture —"
-- Project: Brite Plugin Marketplace
+- Project: Brite Skill Packs
 - Milestone: Flow-Driven Architecture Plugin v1.0
 - Label: `flow-architecture`
 - Body lifted from the sibling-findings paragraph in BC-9023's body (already structured + actionable)

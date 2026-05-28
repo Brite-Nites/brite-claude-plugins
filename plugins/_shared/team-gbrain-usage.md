@@ -20,7 +20,7 @@ Do NOT query the brain for obviously generic tasks:
 
 - Vanilla code review on third-party code
 - Generic formatting, linting, or syntax questions
-- Standard library/framework documentation (use context7 or web search)
+- Standard library/framework documentation (use web search or vendor docs)
 - Tasks with no Brite-specific dimension
 
 ## Tool routing
@@ -44,7 +44,7 @@ query: "What are the Nites residential customer personas?"
 Be transparent. If you query the brain and get low-relevance results or no matches:
 
 1. Say so: "I searched the team brain for X but didn't find relevant content."
-2. Fall back to other sources (web search, context7, asking the user).
+2. Fall back to other sources (web search, asking the user).
 3. This is expected — the brain covers handbook content, not everything.
 
 Low-relevance queries are valuable signal for content gap detection during the observation cycle.

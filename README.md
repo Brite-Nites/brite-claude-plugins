@@ -16,7 +16,7 @@ session-start → brainstorm → plan → [worktree] → execute (subagent + TDD
 
 - **Process**: Superpowers' full workflow with TDD, subagent-per-task execution, and compound knowledge
 - **Org**: Linear integration at every step, security hooks, team conventions
-- **Domain skills are separate plugins** — tech-stack knowledge comes from context7 MCP or dedicated domain plugins
+- **Domain skills are separate plugins** — tech-stack knowledge lives in dedicated domain plugins
 
 Influenced by [superpowers](https://github.com/obra/superpowers) and [compound-engineering](https://github.com/EveryInc/compound-engineering-plugin). See the [Roadmap](ROADMAP.md) for what's coming next.
 
@@ -560,4 +560,4 @@ MIT
 
 ## Issue Tracking
 
-Issues for this project are tracked in [Brite Plugin Marketplace](https://linear.app/brite-nites/project/brite-plugin-marketplace-402b57908532).
+Issues for this project are tracked in [Brite Skill Packs](https://linear.app/brite-nites/project/brite-skill-packs-402b57908532) (Layer C). Sibling Linear projects under the same initiative: [Brite Orchestration Layer](https://linear.app/brite-nites/project/brite-orchestration-layer-d46d5338fa95), [Brite Knowledge Layer](https://linear.app/brite-nites/project/brite-knowledge-layer-b47f7155b42e), [Brite Runtime & Harness](https://linear.app/brite-nites/project/brite-runtime-andamp-harness-0cd1bad14ad1).

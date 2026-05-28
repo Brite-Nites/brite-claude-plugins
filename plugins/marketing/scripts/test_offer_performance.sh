@@ -113,7 +113,7 @@ mk_fixture_dirs() {
   mkdir -p "$camp" "$canon"
   # Minimal canonicals
   cat > "$canon/_manifest.yaml" <<'YAML'
-schema_version: 1
+schema_version: 2
 verticals:
   - hotels-resorts
 YAML

@@ -3,7 +3,7 @@
 **Created:** 2026-04-19
 **Author:** Holden Halford (session-driven)
 **Status:** Decisions locked; issues being filed
-**Linear project:** Brite Plugin Marketplace
+**Linear project:** Brite Skill Packs
 **Linear milestone:** RevOps Plugin
 **Related (already filed):** BC-5780 (marketing setup-email-bison fix), BC-5781 (proactive marketing onboarding)
 
