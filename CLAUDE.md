@@ -96,7 +96,7 @@ Override the default review agent selection by adding a `## Review Agents` secti
 
 ### Issue tracker
 
-Issues live in **Linear** (Brite Company team, `BC-` prefix, *Brite Plugin Marketplace* project) via the workflows-plugin Linear MCP — not GitHub Issues, despite the GitHub remote. See `docs/agents/issue-tracker.md`.
+Issues live in **Linear** (Brite Company team, `BC-` prefix, *Brite Skill Packs* project) via the workflows-plugin Linear MCP — not GitHub Issues, despite the GitHub remote. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
