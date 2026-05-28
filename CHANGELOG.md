@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Removed
+- Haiku LLM PreToolUse hooks from `workflows` plugin (BC-11889 — workflows 3.30.2 → 3.31.0)
+  - Dropped `type: "prompt"` security review on every Bash call (10s timeout, false-positive prone)
+  - Dropped `type: "prompt"` security review on every Write/Edit content scan
+  - Deleted `scripts/test_security_hook_classifier.sh` (dead-code test for removed classifier)
+  - Removed `validate.sh` Section 2d (invoked the deleted test)
+  - **Behavior change**: regex-only gating retained (`rm -rf`, `git push --force`/`-f`, `DROP TABLE`, `chmod 777`, piped downloads, common secret patterns). `git push --force-with-lease` now passes on all branches including `main` (was branch-aware via BC-11117 LLM carve-out).
+
 ### Added
 - Health scoring rubrics for 10 inner-loop skills (BC-2468)
   - LLM-as-judge rubric YAML format with weighted dimensions and pass thresholds

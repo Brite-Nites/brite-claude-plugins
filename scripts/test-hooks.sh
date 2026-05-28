@@ -23,7 +23,7 @@ section() { printf "\n\033[1m=== %s ===\033[0m\n" "$1"; }
 BASH_REGEX='rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*f|rm[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*r|git[[:space:]]+push.*[[:space:]]-f|git[[:space:]]+push.*--force([[:space:]]|"|$)|drop[[:space:]]+(table|database)|chmod[[:space:]]+777|(curl|wget)[^"]*[|][[:space:]]*(bash|sh|zsh)'
 
 # Write/Edit PreToolUse regex (the grep -Eq pattern)
-WRITE_REGEX='sk-[a-zA-Z0-9]{20,}|sk-proj-[a-zA-Z0-9]{10,}|AKIA[A-Z0-9]{12,}|gh[ps]_[a-zA-Z0-9]{20,}|sk_(live|test)_[a-zA-Z0-9]{10,}'
+WRITE_REGEX='sk-[a-zA-Z0-9]{20,}|sk-proj-[a-zA-Z0-9]{10,}|AKIA[A-Z0-9]{12,}|gh[ps]_[a-zA-Z0-9]{20,}|sk_(live|test)_[a-zA-Z0-9]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[abprs]-[a-zA-Z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}'
 
 # Git commit detection regex (pre-commit quality hook)
 COMMIT_REGEX='(^|[;&|[:space:]])git[[:space:]]+commit([[:space:]]|$)'
@@ -99,6 +99,12 @@ test_match "$WRITE_REGEX" 'AKIAIOSFODNN7EXAMPLE'                         block "
 test_match "$WRITE_REGEX" 'ghp_ABCDEFghijklmnop12345678'                 block "GitHub personal token"
 test_match "$WRITE_REGEX" 'sk_live_abcdefghij123456'                     block "Stripe live key"
 test_match "$WRITE_REGEX" 'sk_test_abcdefghij123456'                     block "Stripe test key"
+test_match "$WRITE_REGEX" '-----BEGIN RSA PRIVATE KEY-----'              block "PEM RSA private key header (BC-11889)"
+test_match "$WRITE_REGEX" '-----BEGIN PRIVATE KEY-----'                  block "PEM generic private key header (BC-11889)"
+test_match "$WRITE_REGEX" '-----BEGIN EC PRIVATE KEY-----'               block "PEM EC private key header (BC-11889)"
+test_match "$WRITE_REGEX" 'xoxb-1234567890-abcdefghij'                   block "Slack bot token (BC-11889)"
+test_match "$WRITE_REGEX" 'xoxp-1234567890-abcdef-ghi'                   block "Slack user token (BC-11889)"
+test_match "$WRITE_REGEX" 'AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'      block "Google API key (BC-11889)"
 
 # ══════════════════════════════════════════════════════════════════════
 # Write/Edit PreToolUse — Should ALLOW (false positive check)
@@ -109,6 +115,10 @@ test_match "$WRITE_REGEX" 'sk-short'                                     allow "
 test_match "$WRITE_REGEX" 'AKIA'                                         allow "AKIA prefix only"
 test_match "$WRITE_REGEX" 'ghp_'                                         allow "ghp_ prefix only"
 test_match "$WRITE_REGEX" 'This is a description of sk-proj keys'        allow "mention, not a real key"
+test_match "$WRITE_REGEX" '-----BEGIN CERTIFICATE-----'                  allow "PEM certificate (not private key)"
+test_match "$WRITE_REGEX" 'xox'                                          allow "xox prefix only"
+test_match "$WRITE_REGEX" 'AIza'                                         allow "AIza prefix only"
+test_match "$WRITE_REGEX" 'AIzaTooShort'                                 allow "AIza but too short"
 
 # ══════════════════════════════════════════════════════════════════════
 # Git Commit Detection — Should MATCH (triggers quality checks)
