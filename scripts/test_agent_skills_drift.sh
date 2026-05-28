@@ -142,5 +142,14 @@ printf 'tracker\n' > "$d/docs/agents/issue-tracker.md"
 assert_contains "lowercase heading is not recognized as the block (orphaned warns)" \
   'no `## Agent skills` block' "$(run_detect "$d")"
 
+# ── Scenario 11: nested-path ref is validated by BASENAME only (documented limitation) ──
+# A ref to docs/agents/sub/foo.md is satisfied by a top-level docs/agents/foo.md, because
+# docs/agents/ is flat by convention. Locks this behavior so a future change to full-path
+# resolution trips the suite intentionally.
+d="$tmproot/nested"; mkdir -p "$d/docs/agents"
+printf '# CLAUDE.md\n\n## Agent skills\n\nSee docs/agents/sub/foo.md.\n' > "$d/CLAUDE.md"
+printf 'x\n' > "$d/docs/agents/foo.md"   # top-level basename match → treated as present
+assert_empty "nested ref satisfied by basename match stays silent (flat-dir convention)" "$(run_detect "$d")"
+
 echo "RESULT pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

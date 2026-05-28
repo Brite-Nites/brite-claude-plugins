@@ -36,6 +36,9 @@ detect_agent_skills_drift() {
     # Reference paths must match [A-Za-z0-9._/-] (no spaces/parens) — refs with spaces in the
     # filename are intentionally not extracted (and so won't be drift-checked). docs/agents/
     # filenames are kebab-case by convention, so this is a non-issue in practice.
+    # Existence is checked by BASENAME only (against agents_dir), not the full ref path:
+    # docs/agents/ is flat by convention, so a nested ref like docs/agents/sub/foo.md is
+    # validated against <agents_dir>/foo.md. Nested-path drift is out of scope by design.
     while IFS= read -r ref; do
       [ -n "$ref" ] || continue
       base="${ref##*/}"
