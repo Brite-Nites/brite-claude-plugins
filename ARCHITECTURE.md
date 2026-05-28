@@ -236,7 +236,7 @@ The `workflows` plugin uses **regex-only command hooks** for security gating —
 | `PreToolUse` | `Bash` | command | Pre-commit quality: intercepts `git commit`, runs ESLint/tsc/ruff on staged files |
 | `PreToolUse` | `Write\|Edit` | command | Blocks common secret patterns (`sk-`, `sk-proj-`, `AKIA`, `gh[ps]_`, `sk_live/test_`, PEM private keys, Slack `xox[abprs]-`, Google `AIza`) |
 | `PostToolUse` | `Write\|Edit` | command | Auto-lint: ESLint (JS/TS) or Ruff (Python) if installed |
-| `SessionStart` | `startup` | command | Loads Brite session context and Context7 instructions |
+| `SessionStart` | `startup` | command | Loads Brite session context (env + key commands) and initializes telemetry |
 
 **Why regex-only?** The Haiku prompt-hook layer ran on every Bash and every Write/Edit (~1–10s latency each), produced false positives, and the exception list had to be hand-maintained. The regex layer catches the load-bearing destructive/secret-leak patterns at zero latency. Defense-in-depth is preserved via the pre-commit quality hook, PostToolUse auto-linter, downstream CI, and the regression harness at `scripts/test-hooks.sh` (wired into `validate.sh` §2d).
 

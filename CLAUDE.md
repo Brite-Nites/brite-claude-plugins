@@ -33,7 +33,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full script reference, `plugin.js
 
 On-demand references — read when working on these subsystems, not auto-loaded every session:
 
-- [ADR-001: Cross-repo import solution](docs/decisions/001-cross-repo-import-solution.md) — Context7 for cross-repo handbook access
+- [ADR-001: Cross-repo import solution](docs/decisions/001-cross-repo-import-solution.md) — **Withdrawn** — see file for current status
 - [ADR-002: Trait evolution mechanism](docs/decisions/002-trait-evolution-mechanism.md) — Trait add/remove commands + auto-detect
 - [ADR-003: Plugin distribution architecture](docs/decisions/003-plugin-distribution-architecture.md)
 - [ADR-007: RevOps plugin design decisions](docs/decisions/007-revops-plugin-design.md) — naming, subtree, augment-not-replace, skill filter, MCP scope
@@ -54,7 +54,7 @@ handbook-topics: architecture, coding-standards, tools, team-structure, onboardi
 
 - **Process**: Superpowers' full workflow with TDD, subagent-per-task execution, and compound knowledge accumulation
 - **Org**: Linear integration at every step, security hooks, team conventions
-- **Not domain**: Skills that teach framework-specific patterns (React, Python, CI/CD) belong in domain plugins. Process skills (brainstorming, planning, execution) stay here. Use context7 MCP for framework docs.
+- **Not domain**: Skills that teach framework-specific patterns (React, Python, CI/CD) belong in domain plugins. Process skills (brainstorming, planning, execution) stay here.
 
 ## Repository Structure
 

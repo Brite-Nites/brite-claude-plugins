@@ -403,7 +403,7 @@ Organized by phase + reason:
 | Phase 5 — enrichment (future swap) | `mcp__plugin_marketing_enrichment__*` | brite-enrichment | ADR-008 + BC-5537/5538 (NOT in `allowed-tools` until GA) |
 | Phase 6 — SMTP verify (Labs) | `Bash` → `verify_smtp.py` | MillionVerifier | tam-map upstream |
 | Phase 7 — tier delegation (Labs) | invoke `icp-scoring` skill | n/a (in-plugin delegation) | BC-5831 + tam-map-port-policy.md §4 |
-| Cross-repo handbook reads | `Bash` → `gh api repos/Brite-Nites/handbook/contents/...` | Brite-Nites/handbook (private repo) | `reference_handbook_access.md` (Context7 doesn't resolve private repo) |
+| Cross-repo handbook reads | `Bash` → `gh api repos/Brite-Nites/handbook/contents/...` | Brite-Nites/handbook (private repo) | `reference_handbook_access.md` |
 
 ### Architectural rules that apply
 

@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Removed
+- **workflows 3.32.0:** context7 MCP server, SessionStart context7-instruction hook, and all skill/agent/command paths that depended on it (BC-11891)
+  - ADR-001 marked Withdrawn; future gbrain-based replacement to land in a separate ADR
+  - CDR compliance reviewer + handbook lookups + org-level precedent search degrade with skip-and-continue narration
+  - URL-resolution work in cdr-compliance-reviewer is unaffected
+  - `handbook-drift-check` skill is unaffected — it already used `gh api` directly
+  - precedent-search SKILL.md.tmpl renumbered Phase 5 → Phase 4 (org-level INDEX phase deleted)
+  - cdr-compliance-reviewer agent's CDR-comparison spec sections wrapped in a `## CDR-compliance spec (currently deferred)` callout with an inline re-activation guide
+  - Plugin MCP count: 4 → 3 (under the advisory ~5-6 soft cap; budget headroom preserved for the future gbrain replacement)
+  - **Semver convention note:** this is a MINOR bump for a capability removal. CONTRIBUTING.md's semver definition treats MCP-server removal ambiguously — convention amendment (MAJOR vs MINOR for graceful-degradation removals) tracked as a follow-up.
 - Haiku LLM PreToolUse hooks from `workflows` plugin (BC-11889 — workflows 3.30.2 → 3.31.0)
   - Dropped `type: "prompt"` security review on every Bash call (10s timeout, false-positive prone)
   - Dropped `type: "prompt"` security review on every Write/Edit content scan

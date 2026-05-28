@@ -18,8 +18,18 @@ cd "$REPO_ROOT"
 
 DRIFT="plugins/flow-architecture/scripts/check-clone-drift.sh"
 CLONE_FILE="plugins/flow-architecture/commands/session-start.md"
-TARGET_LINE='Upstream-SHA: 607c18cd3e126b588aacf7ec0ade5e2927481259'
+TARGET_LINE='Upstream-SHA: 39282fa82e6563ce0b385cf54fcc47be37801a4a'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
+
+# Drive the classifier from the branch's HEAD blob, not origin/main. The test
+# fixture exercises the classifier paths using the WORKING-TREE / HEAD state of
+# the upstream file as the baseline so this regression test passes even on PRs
+# that legitimately modify the cloned source (BC-11891 was the trigger — both
+# the workflows session-start.md AND its FDA clone changed in tandem; origin/
+# main was therefore stale during this PR's CI). The production drift check
+# (clone-drift-check CI job) still defaults to origin/main per check-clone-
+# drift.sh — only this regression test overrides.
+export UPSTREAM_REF="HEAD"
 
 errors=0
 pass_t() { printf "  \033[32mPASS\033[0m  %s\n" "$1"; }
@@ -59,7 +69,10 @@ else
 fi
 
 # ── Path 2: trivial whitespace drift ──────────────────────────────────
-cp plugins/workflows/commands/session-start.md /tmp/clone-drift-ws.md
+# Pull from HEAD (matches the classifier's UPSTREAM_REF=HEAD override above)
+# so the synthetic WS blob differs from the recorded baseline by ONLY the
+# whitespace tweak — independent of working-tree edits relative to origin/main.
+git show "HEAD:plugins/workflows/commands/session-start.md" > /tmp/clone-drift-ws.md
 printf ' \n' >> /tmp/clone-drift-ws.md
 WS_BLOB="$(git hash-object -w /tmp/clone-drift-ws.md)"
 sed -i.bak "s|$TARGET_LINE|Upstream-SHA: $WS_BLOB|" "$CLONE_FILE"

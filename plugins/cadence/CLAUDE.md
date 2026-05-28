@@ -33,7 +33,7 @@ Phases flow via a session-scoped state object; no re-fetching from Linear betwee
 
 ## MCP Servers
 
-None registered. Linear is consumed via `mcp__plugin_workflows_linear-server__*` from the workflows plugin — duplicate registration breaks tooling. Sequential-thinking + Context7 similarly inherited. `gh` CLI covers the only GitHub use (Phase 5 connectivity check); see BC-5811 § 4.2.
+None registered. Linear is consumed via `mcp__plugin_workflows_linear-server__*` from the workflows plugin — duplicate registration breaks tooling. Sequential-thinking similarly inherited. `gh` CLI covers the only GitHub use (Phase 5 connectivity check); see BC-5811 § 4.2.
 
 ## Gotchas
 

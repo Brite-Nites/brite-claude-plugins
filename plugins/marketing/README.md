@@ -51,7 +51,7 @@ The foundational skill `product-marketing-context` creates `docs/marketing-conte
 - Contains project-specific marketing knowledge (brand positioning, ICP, messaging pillars, voice/tone)
 - Is read by ALL other skills in this plugin before they act
 - Includes `last_refreshed` / `refresh_cadence` frontmatter for staleness tracking
-- Enriched from the Brite Handbook via Context7 MCP (`/brite-nites/handbook`)
+- Enriched from the Brite Handbook via `gh api` (the prior Context7 path was removed; see ADR-001 Withdrawal note)
 
 ### Adding new domain skills
 
