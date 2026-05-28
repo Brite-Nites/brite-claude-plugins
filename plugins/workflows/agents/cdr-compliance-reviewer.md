@@ -81,19 +81,38 @@ End the agent's output with:
 ```
 ---
 **Summary**: X P1, Y P2, Z P3
-**CDR Compliance**: N/A (CDR INDEX unavailable) | N/A (no handbook configured) | Compliant | Violation Found | Review Needed
+**CDR Compliance**: N/A (CDR INDEX unavailable) | N/A (no handbook configured) | N/A (invalid handbook-library) | Compliant | Violation Found | Review Needed
 **CDRs Checked**: 0 (lookup skipped) | [N] active CDRs ([list of IDs checked])
 ```
 
 - **N/A (CDR INDEX unavailable)** — current default while the CDR Loading Protocol stub at step 4 always skips.
-- **N/A (no handbook configured)** — emitted by Loading Protocol steps 2-3 when CLAUDE.md has no `## Company Context` or `handbook-library` is empty/malformed.
+- **N/A (no handbook configured)** — emitted by Loading Protocol step 2 when CLAUDE.md has no `## Company Context` section or `handbook-library` is empty.
+- **N/A (invalid handbook-library)** — emitted by Loading Protocol step 3 when `handbook-library` does not match the `/org/repo` pattern.
 - **Compliant** — no P1 or P2 CDR findings (reachable only when the CDR-loading mechanism returns).
 - **Violation Found** — at least one P1 CDR finding (reachable only when the CDR-loading mechanism returns).
 - **Review Needed** — no P1s, but P2s that need developer attention (reachable only when the CDR-loading mechanism returns).
 
+## Rules
+
+- Never block the review if the CDR INDEX cannot be loaded. Skip gracefully (the CDR-Loading-Protocol stub currently always skips — see step 4).
+- Focus on architectural and tooling decisions, not style-level compliance (formatting, naming conventions).
+- When ambiguous about whether a pattern violates a CDR, use P2 and score conservatively (5-6).
+- Defer security concerns to security-reviewer. Defer code quality concerns to code-reviewer. Only flag patterns that conflict with a specific CDR.
+- Do not flag CDR compliance for test case files (`*.test.*`, `*.spec.*`). Test configuration and infrastructure files (e.g., `jest.config.ts`, `vitest.config.ts`) should still be checked since they can introduce production dependencies.
+- If all loaded CDRs are compliant and no gaps are worth noting, output a clean summary with no findings.
+
 ## CDR-compliance spec (currently deferred)
 
-> **Deferred:** The sections below describe CDR-comparison behavior that does NOT currently fire — the CDR Loading Protocol stub at step 4 always skips. When the CDR-INDEX retrieval mechanism returns (future ADR), these sections become live. They are preserved so the contract is documented for the eventual restoration; until then, only the URL Resolution Check above produces findings.
+<!--
+BC-11891 deferral boundary — to restore CDR comparison when the CDR-INDEX retrieval mechanism returns (likely via gbrain), apply these edits as one atomic change:
+  1. Replace CDR Loading Protocol step 4 (above) with the new retrieval logic (steps 4-9 of the pre-BC-11891 protocol — see `git show <pre-BC-11891-sha>:plugins/workflows/agents/cdr-compliance-reviewer.md`).
+  2. Replace `## Review Protocol` stub (above) with the original 5-step review protocol.
+  3. Unwrap THIS H2 — promote `### What to Look For (deferred)` / `### Severity Classification (deferred)` / `### Per-finding format (deferred)` / `### Confidence Scoring (deferred)` back to H2 and remove the `(deferred)` suffix from each heading.
+  4. Reconcile the live `## Output Format` (URL-finding emit contract) with `### Per-finding format` (the CDR-specific per-finding template). On restore, the agent will emit BOTH URL findings AND CDR findings — both formats apply.
+  5. Update the Summary verdict union to drop the `N/A (CDR INDEX unavailable)` state (steps 2-3 N/A states stay).
+-->
+
+> **Deferred:** The sections below describe CDR-comparison behavior that does NOT currently fire — the CDR Loading Protocol stub at step 4 always skips. When the CDR-INDEX retrieval mechanism returns (future ADR), these sections become live. They are preserved so the contract is documented for the eventual restoration; until then, only the URL Resolution Check above produces findings. The live `## Output Format` section above documents URL-finding output; these deferred sections describe CDR-finding output that will be emitted in parallel when CDR loading is restored.
 
 ### What to Look For (deferred)
 
@@ -156,12 +175,3 @@ Confidence: N/10
 Calibration rules:
 - A CDR with an Exceptions section that might apply caps violation confidence at 6 until exceptions are verified.
 - Reading the full CDR (not just the INDEX) increases confidence. Skipping lazy-load caps confidence at 5.
-
-## Rules
-
-- Never block the review if the CDR INDEX cannot be loaded. Skip gracefully (the CDR-Loading-Protocol stub currently always skips — see step 4).
-- Focus on architectural and tooling decisions, not style-level compliance (formatting, naming conventions).
-- When ambiguous about whether a pattern violates a CDR, use P2 and score conservatively (5-6).
-- Defer security concerns to security-reviewer. Defer code quality concerns to code-reviewer. Only flag patterns that conflict with a specific CDR.
-- Do not flag CDR compliance for test case files (`*.test.*`, `*.spec.*`). Test configuration and infrastructure files (e.g., `jest.config.ts`, `vitest.config.ts`) should still be checked since they can introduce production dependencies.
-- If all loaded CDRs are compliant and no gaps are worth noting, output a clean summary with no findings.

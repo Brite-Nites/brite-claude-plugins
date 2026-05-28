@@ -75,7 +75,7 @@ Does the output follow the precedent-search skill's defined protocol?
 ### Skill-Specific Instruction Criteria
 
 - Prints activation banner with trigger reason
-- Follows 4-phase structure: Extract Search Terms, Search Project INDEX, Lazy-Load Traces, Format Results
+- Follows 4-phase structure: Extract Search Terms, Search Project-Level INDEX, Lazy-Load Traces, Format Results
 - Narrates phase progress (e.g., `Phase 2/4: Searching project precedents... done (N matches)`)
 - Caps results at max 5 (callers may further reduce to 3)
 - Handles graceful degradation: missing INDEX or missing trace files logged and skipped without blocking
