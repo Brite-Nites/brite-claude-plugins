@@ -151,5 +151,16 @@ printf '# CLAUDE.md\n\n## Agent skills\n\nSee docs/agents/sub/foo.md.\n' > "$d/C
 printf 'x\n' > "$d/docs/agents/foo.md"   # top-level basename match → treated as present
 assert_empty "nested ref satisfied by basename match stays silent (flat-dir convention)" "$(run_detect "$d")"
 
+# ── Scenario 12: duplicate '## Agent skills' blocks → every block is scanned ──
+# A malformed CLAUDE.md with two blocks: the awk flag re-arms on the second heading, so refs
+# in BOTH are checked. Locks current behavior (no "first block wins") against a future awk rewrite.
+d="$tmproot/dup_heading"; mkdir -p "$d/docs/agents"
+printf '# CLAUDE.md\n\n## Agent skills\n\nSee docs/agents/alpha.md.\n\n## Gotchas\n\nstuff\n\n## Agent skills\n\nSee docs/agents/beta.md.\n' > "$d/CLAUDE.md"
+out="$(run_detect "$d")"   # neither alpha.md nor beta.md exists → both flagged
+assert_contains "duplicate blocks: first block's missing ref flagged" \
+  'references missing file: docs/agents/alpha.md' "$out"
+assert_contains "duplicate blocks: second block's missing ref flagged" \
+  'references missing file: docs/agents/beta.md' "$out"
+
 echo "RESULT pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
