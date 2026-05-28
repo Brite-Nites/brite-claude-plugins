@@ -2,7 +2,7 @@
 description: Start a work session — pull latest, pick an FDA discipline-child issue, brainstorm, plan with discipline dispatch, set up worktree, execute
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/session-start.md) on 2026-05-07. Upstream-SHA: 607c18cd3e126b588aacf7ec0ade5e2927481259. Drift-detection per parking lot #45. -->
+<!-- Cloned from workflows v3.32.0 (commands/session-start.md) on 2026-05-28. Upstream-SHA: 39282fa82e6563ce0b385cf54fcc47be37801a4a. Drift-detection per parking lot #45. Re-synced for BC-11891 (context7 removal — both files dropped their Context7 prereq probes in tandem). -->
 
 # Session Start
 
