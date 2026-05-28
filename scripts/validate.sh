@@ -361,6 +361,28 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2d' — Pre-commit Advisory Hook (BC-11890)
+# ══════════════════════════════════════════════════════════════════════
+# Hermetic execution test for the PreToolUse Bash quality hook after its
+# block → warn demotion: must always emit {"ok":true} (never block) and
+# surface failing-linter output on stderr behind an advisory banner.
+section "2d'. Pre-commit Advisory Hook"
+
+advisory_test="$REPO_ROOT/scripts/test_precommit_advisory.sh"
+
+if [ ! -f "$advisory_test" ]; then
+  warn "scripts/test_precommit_advisory.sh not found — advisory hook check skipped"
+else
+  if advisory_out=$(bash "$advisory_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$advisory_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "pre-commit advisory hook (${pass_count:-?} scenarios)"
+  else
+    fail "pre-commit advisory hook failed — run scripts/test_precommit_advisory.sh for details"
+    printf '%s\n' "$advisory_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
 # ══════════════════════════════════════════════════════════════════════
 
