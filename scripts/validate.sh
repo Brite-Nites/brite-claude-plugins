@@ -340,27 +340,23 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 2d — Security Hook Classifier Regression (BC-11117)
+# Section 2d — Security Hook Regex Regression (BC-11889)
 # ══════════════════════════════════════════════════════════════════════
-# Spec-tests the PreToolUse > Bash prompt-hook and regex-hook to ensure
-# the --force-with-lease carve-out is present with correct branch-aware
-# constraints. Pass count auto-derived from the harness's RESULT line.
-section "2d. Security Hook Classifier Regression"
+# Thin regex-only smoke test for the surviving PreToolUse regex hooks.
+# Replaces the BC-11117 classifier harness retired with its Haiku layer.
+section "2d. Security Hook Regex Regression"
 
-classifier_test="$REPO_ROOT/scripts/test_security_hook_classifier.sh"
-hooks_json="$REPO_ROOT/plugins/workflows/hooks/hooks.json"
+hooks_test="$REPO_ROOT/scripts/test-hooks.sh"
 
-if [ ! -f "$classifier_test" ]; then
-  warn "scripts/test_security_hook_classifier.sh not found — classifier regression check skipped"
-elif [ ! -f "$hooks_json" ]; then
-  warn "plugins/workflows/hooks/hooks.json not found — classifier regression check skipped"
+if [ ! -f "$hooks_test" ]; then
+  warn "scripts/test-hooks.sh not found — hook regex regression check skipped"
 else
-  if classifier_out=$(bash "$classifier_test" "$hooks_json" 2>&1); then
-    pass_count=$(printf '%s\n' "$classifier_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
-    pass "security hook classifier regression (${pass_count:-?} scenarios)"
+  if hooks_out=$(bash "$hooks_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$hooks_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "security hook regex regression (${pass_count:-?} scenarios)"
   else
-    fail "security hook classifier regression failed — run scripts/test_security_hook_classifier.sh for details"
-    printf '%s\n' "$classifier_out" | tail -25 | sed 's/^/    /' >&2
+    fail "security hook regex regression failed — run scripts/test-hooks.sh for details"
+    printf '%s\n' "$hooks_out" | tail -25 | sed 's/^/    /' >&2
   fi
 fi
 
