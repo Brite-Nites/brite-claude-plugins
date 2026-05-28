@@ -92,6 +92,20 @@ Skills activate via their `description` field — Claude matches user intent aga
 
 Override the default review agent selection by adding a `## Review Agents` section to your project CLAUDE.md with `include:` / `exclude:` lists (Tier 1 agents — code, security, performance — cannot be excluded). Full spec, depth modes, confidence scoring, and model tiering in `docs/workflow-guide.md`.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in **Linear** (Brite Company team, `BC-` prefix, *Brite Plugin Marketplace* project) via the workflows-plugin Linear MCP — not GitHub Issues, despite the GitHub remote. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical triage roles with default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context; ADRs live in `docs/decisions/` (not `docs/adr/`). See `docs/agents/domain.md`.
+
 ## Gotchas
 
 - **`plugin.json` strict schema.** Any unrecognized field causes silent hard failure with no error. Allowlist: `name`, `description`, `author`, `version`, `homepage`, `repository`, `license`, `keywords`, `commands`, `skills`, `mcpServers` (inline object only), `userConfig` (inline object declaring user-prompted settings; use with `sensitive: true` for secrets stored in OS keychain — but note that `${user_config.*}` substitution into HTTP MCP headers is currently broken in Claude Code (BC-5551), see `email-bison.md` § Known Claude Code limitation; for stdio MCPs the recommended pattern is OS env-vars populated by `bw-run.sh` rather than `userConfig` substitution, see [CONTRIBUTING.md § Plugin secret-config canon](CONTRIBUTING.md#plugin-secret-config-canon) — full Rejected Alternatives and rotation semantics in [ADR-010](docs/decisions/010-plugin-secret-config-canon.md)). **Never** add `agents`, `hooks`, or `mcpServers` as string path — they're auto-discovered by convention.
