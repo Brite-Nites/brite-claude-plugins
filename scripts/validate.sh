@@ -1682,6 +1682,23 @@ PY
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15z — Agent-skills config drift (BC-11934)
+# ══════════════════════════════════════════════════════════════════════
+# WARN when docs/agents/ config and the CLAUDE.md '## Agent skills' block
+# drift out of sync. Advisory only (never errors) — mirrors check-guardrails.sh
+# C2. Logic + unit tests live in scripts/_lib/agent_skills_drift.sh and
+# scripts/test_agent_skills_drift.sh (run via test_* harness convention).
+section "Agent-skills config drift"
+# shellcheck source=/dev/null
+. "$REPO_ROOT/scripts/_lib/agent_skills_drift.sh"
+_drift_found=0
+while IFS= read -r _msg; do
+  warn "$_msg"
+  _drift_found=1
+done < <(detect_agent_skills_drift "$REPO_ROOT/CLAUDE.md" "$REPO_ROOT/docs/agents")
+[ "$_drift_found" -eq 0 ] && pass "agent-skills config and CLAUDE.md block are in sync"
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 16 — Summary
 # ══════════════════════════════════════════════════════════════════════
 section "Summary"
