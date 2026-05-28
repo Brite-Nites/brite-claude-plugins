@@ -22,9 +22,11 @@ Per [ADR-021](../../../docs/decisions/021-marketing-snowflake-access.md), the ma
 
 | Name | Tier | Status | Purpose | Owner | Refresh | Consumer skill |
 |---|---|---|---|---|---|---|
-| `dim_people` | Golden record | Live | Per-person canonical record with full enrichment | Corinne ([BC-1447](https://linear.app/brite-nites/issue/BC-1447)) | Daily (dbt) | `list-building` Source 2/4, `prospect-temporal-gate` (future) |
-| `dim_companies` | Golden record | Live | Per-company canonical record with firmographics + tech stack | Corinne ([BC-1446](https://linear.app/brite-nites/issue/BC-1446)) | Daily (dbt) | `list-building` Source 2/4 |
-| `audience_commercial_outreach` | Audience view | **Planned** ([BC-2314](https://linear.app/brite-nites/issue/BC-2314)) | Quality-gated, dedup'd commercial outreach list ready for EB | Corinne ([BC-2314](https://linear.app/brite-nites/issue/BC-2314)) | TBD when [BC-2314](https://linear.app/brite-nites/issue/BC-2314) lands | `list-building` Source 4 (after [BC-11929](https://linear.app/brite-nites/issue/BC-11929)) |
+| `dim_people` | Golden record | Live | Per-person canonical record with full enrichment | Corinne ([BC-1447](https://linear.app/brite-nites/issue/BC-1447)) | Daily (dbt) | `list-building` Source 2/4 (cost gate **requires explicit `--snowflake-limit`**), `prospect-temporal-gate` (future) |
+| `dim_companies` | Golden record | Live | Per-company canonical record with firmographics + tech stack | Corinne ([BC-1446](https://linear.app/brite-nites/issue/BC-1446)) | Daily (dbt) | `list-building` Source 2/4 (cost gate **requires explicit `--snowflake-limit`**) |
+| `audience_commercial_outreach` | Audience view | **Planned** ([BC-2314](https://linear.app/brite-nites/issue/BC-2314)) | Quality-gated, dedup'd commercial outreach list ready for EB | Corinne ([BC-2314](https://linear.app/brite-nites/issue/BC-2314)) | TBD when [BC-2314](https://linear.app/brite-nites/issue/BC-2314) lands | `list-building` Source 4 (after [BC-11929](https://linear.app/brite-nites/issue/BC-11929)); cost-gate default 5000 sufficient |
+
+**Cost-gate note for golden records.** `dim_people` and `dim_companies` are full tables (100k+ rows each), so the default 5000-row cost gate (per [Source 4 design § 5](../../../docs/designs/source-4-list-building-snowflake.md)) will always halt without an explicit `--snowflake-limit`. This is the intended discipline: operators consuming golden records MUST decide upfront how many rows they need. Audience views (`audience_*`) are pre-filtered to outbound-ready slices, so the default gate is appropriate.
 
 Future entries are appended as new views ship; the table is the allowlist.
 

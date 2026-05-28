@@ -76,9 +76,13 @@ The wrapper validates view names against a static allowlist generated from [BC-1
 
 **Future work.**
 
-- If the audience-view catalog grows beyond ~10 views OR if a Snowflake MCP server lands in the GA `@snowflake/mcp` package (currently community-only via `snowflake-labs/mcp-server-snowflake`), this ADR may be revisited under the [ADR-009](009-sf-capability-adoption.md) six-check framework.
+- If the audience-view catalog grows beyond ~10 views OR if a Snowflake MCP server lands in the GA `@snowflake/mcp` package (currently community-only via `snowflake-labs/mcp-server-snowflake`), this ADR may be revisited under the [ADR-009](009-sf-capability-adoption.md) six-check framework. A measured threshold: **once a session routinely makes >2 Snowflake calls** (e.g., when `prospect-temporal-gate` consumes the same query layer), the per-invocation cold-start cost of the CLI wrapper (`bw-run.sh` unlock + `snow` bootstrap, ~1.5–5s amortized over zero calls today) inverts the MCP-vs-CLI tradeoff and an MCP becomes the right answer.
 - A future `prospect-temporal-gate` enhancement could reuse the wrapper for direct golden-record state lookups (e.g., "does this domain appear in `dim_companies`?"), avoiding the EB-workspace round-trip.
 - If [BC-11929](https://linear.app/brite-nites/issue/BC-11929) eval tests surface cost-gate or pagination pain that the CLI shell-out makes hard to manage, the wrapper can be promoted to an MCP in a follow-up without breaking the skill's `--snowflake-audience` contract.
+- **Add CI lint** for `audience-views.md` ↔ `brite-data-platform/main` drift detection (planned `/marketing:audit-views` command, gated on [BC-11856](https://linear.app/brite-nites/issue/BC-11856) drift-detection patterns). Eliminates the manual coordination overhead between the marketing plugin and GTM Intelligence projects.
+- **Extract catalog to typed data file** (`audience-views.yaml`/`.json`) so the wrapper + skill don't parse markdown at runtime. Tracked in [BC-11929](https://linear.app/brite-nites/issue/BC-11929) follow-up.
+
+**Logging discipline.** The wrapper at `plugins/marketing/scripts/snowflake/query_audience.py` MUST NOT log `os.environ` or any subset of it on error paths. Stderr output is restricted to a structured JSON envelope containing only `view`, `where`, `limit`, `query_hash`, `error_code`, and `error_detail`. Snowflake credentials never appear in any log stream. (Defensive-logging idioms that dump environments on uncaught exceptions are explicitly prohibited.)
 
 ## Alternatives Considered
 

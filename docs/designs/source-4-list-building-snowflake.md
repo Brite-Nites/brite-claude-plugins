@@ -30,25 +30,55 @@ Mutual exclusion rules (Workflow 1 step 0 validation): at most one of `--input-d
 
 ### View-name validation
 
-The view name is validated against the catalog at [`plugins/marketing/references/audience-views.md`](../../plugins/marketing/references/audience-views.md):
+The view name is validated against the catalog at [`plugins/marketing/references/audience-views.md`](../../plugins/marketing/references/audience-views.md). Two layers, with the wrapper as the **authoritative** gate:
 
-1. Parse the catalog markdown's catalog table (the table under `## Catalog`).
-2. Extract view names from column 1.
-3. Reject any input not in the extracted set with `EX-VIEW-NOT-IN-CATALOG`, listing valid views.
+1. **Skill (advisory).** Before invoking the wrapper, the skill reads `audience-views.md`, parses the deterministic catalog block (first table immediately following the exact heading `## Catalog` — if no table or multiple matching tables, the parse FAILS and the skill HALTs), and rejects view names not in column 1. This is an early-fail UX check.
+2. **Wrapper (authoritative).** The wrapper at `plugins/marketing/scripts/snowflake/query_audience.py` re-derives the allowlist independently and rejects out-of-allowlist names with its own structured-stderr error. The skill's advisory check is an optimization; the wrapper is the security boundary.
 
-Per [ADR-021](../decisions/021-marketing-snowflake-access.md), this is the SQL-injection guardrail for an operator-supplied identifier flowing into a database call. Arbitrary view names cannot be passed.
+Both layers MUST reject view names that don't match `^[a-z][a-z0-9_]{0,62}$`. Per [ADR-021](../decisions/021-marketing-snowflake-access.md), this two-layer pattern is the SQL-injection guardrail for the operator-supplied identifier; arbitrary view names cannot reach Snowflake.
+
+**Future work.** Markdown-table parsing is fragile under doc-reformatting tools. [BC-11929](https://linear.app/brite-nites/issue/BC-11929) follow-up: extract the catalog table into a typed data file (`plugins/marketing/references/audience-views.yaml` or `.json`), have `audience-views.md` render from / link to that source, and have both skill + wrapper read the typed file. Adds CI lint to detect catalog ↔ `brite-data-platform/main` drift.
 
 ### Predicate validation
 
-`--snowflake-where` is allowlist-validated at the column-reference level — a deliberately narrow surface, since this string flows into SQL:
+`--snowflake-where` is allowlist-validated against a strict grammar — a deliberately narrow surface, since this string flows into SQL. The implementation MUST use `sqlglot` to parse the predicate to an AST and then walk the AST asserting the allowlist below; do NOT use `sqlparse` (which is a tokenizer, not a validator, and has known misparse issues on adversarial input).
 
-- Allowed: `<column> <op> <literal>` joined by `AND` / `OR`, where:
-  - `<column>` is one of the columns documented for the target view in audience-views.md
-  - `<op>` ∈ `{=, !=, >, >=, <, <=, IN, NOT IN, IS NULL, IS NOT NULL, LIKE}`
-  - `<literal>` is a quoted string, integer, float, NULL, or a parenthesized list for `IN` / `NOT IN`
-- Rejected: subqueries, function calls, `--` / `/*` / `;`, multi-statement chains, any token not in the grammar above
+**Grammar (AST-level allowlist).**
 
-If the predicate fails validation, HALT with `EX-PREDICATE-VALIDATION` quoting the rejected token. The implementation may use a simple `sqlparse`-based check or hand-rolled tokenizer; correctness over completeness — operators with complex needs export to CSV (Source 2) and skip Source 4.
+- The predicate parses as a single `WHERE` clause expression.
+- Top-level structure: one or more `<comparison>` joined by `AND` or `OR`. When the predicate mixes `AND` and `OR`, every sub-expression MUST be parenthesized — `a = 1 AND b = 2 OR c = 3` is REJECTED; `(a = 1 AND b = 2) OR c = 3` is accepted. Forces explicit precedence; eliminates the boolean-precedence ambiguity class.
+- A `<comparison>` is exactly one of:
+  - `<column> <op> <literal>`
+  - `<column> IS NULL`
+  - `<column> IS NOT NULL`
+  - `<column> IN ( <literal> [, <literal>]{0,99} )` — IN list MUST contain 1–100 literals (cap protects against COUNT-probe DoS); NOT IN follows the same shape
+  - `<column> LIKE <quoted-string> ESCAPE '\'` — the `ESCAPE '\'` clause is REQUIRED (no implicit escape semantics); the literal value MUST NOT contain unescaped `_` or `%` — operators who want bare wildcards explicitly use `LIKE '...\_...' ESCAPE '\'` etc.
+- `<column>` is a bare unquoted identifier matching `^[a-z][a-z0-9_]{0,62}$` (ASCII-only, no dotted refs, no quoted identifiers, no schema qualifications). After parsing, the identifier MUST match (case-sensitive) one of the columns documented for the target view in `audience-views.md`. Unicode confusables, smart quotes, and bidi marks all FAIL the regex.
+- `<op>` ∈ `{=, !=, >, >=, <, <=}`. `=` and `!=` with a `NULL` literal are REJECTED (use `IS [NOT] NULL` — `col = NULL` always evaluates UNKNOWN in SQL and silently filters everything).
+- `<literal>` is exactly one of:
+  - **Quoted string** — single-quoted; embedded single quotes MUST be escaped as `''` (no backslash escapes); contents MUST match `^[\x20-\x7e\t]*$` (printable ASCII + tab — no newlines, no NUL, no high-bit, no control characters)
+  - **Integer** — matches `^-?[0-9]{1,18}$`
+  - **Float** — matches `^-?[0-9]{1,18}\.[0-9]{1,9}$`
+  - **NULL** (only allowed in `IS [NOT] NULL`, see above)
+
+**Rejected.** Any AST node not in the grammar above — subqueries, function calls (including `LOWER`, `UPPER`, `CAST`, `::`), arithmetic operators, CASE expressions, BETWEEN, EXISTS, multi-statement chains, comments (`--`, `/*`), semicolons (anywhere), backslash escapes in string literals.
+
+**Implementation contract.** The wrapper at `plugins/marketing/scripts/snowflake/query_audience.py` exposes a `validate_predicate(view, predicate) -> Predicate | raises ExPredicateValidation` function. The validator MUST be the single chokepoint — the skill never passes a predicate string to the wrapper without it going through this function. If validation fails, HALT with `EX-PREDICATE-VALIDATION` and the rejected AST node (with its sqlglot type) quoted in the error.
+
+**Eval coverage required for [BC-11929](https://linear.app/brite-nites/issue/BC-11929).** At minimum:
+
+1. `1=1 OR business_category='commercial'` → REJECT (LHS-integer rule)
+2. `business_category = NULL` → REJECT (`= NULL` rule)
+3. `email LIKE '%admin%'` → REJECT (missing ESCAPE; bare `%`)
+4. `email LIKE '\_admin' ESCAPE '\'` → ACCEPT
+5. `id IN (1,2,...,150)` (151 elements) → REJECT (cap rule)
+6. `a = 1 AND b = 2 OR c = 3` → REJECT (mixed AND/OR without parens)
+7. `"work_email" = 'x'` → REJECT (quoted identifier rule)
+8. `email = 'O''Brien'` → ACCEPT (escaped single quote)
+9. `email = 'newline\ninjection'` → REJECT (literal content rule)
+10. `LOWER(email) = 'x'` → REJECT (function call rule)
+11. `email::text = 'x'` → REJECT (cast operator rule)
+12. `EXISTS (SELECT 1)` → REJECT (subquery rule)
 
 ## 2. Per-source EB-exclusion routing
 
@@ -84,7 +114,7 @@ Source 4 extends `source.json` with a `source` field value of `snowflake-audienc
 }
 ```
 
-`query_hash` is `sha256(view + "::" + (where || "") + "::" + (limit || ""))`. Resume logic for Source 4:
+`query_hash` is `sha256(json.dumps({"view": view, "where": where, "limit": limit}, sort_keys=True, separators=(",", ":")).encode("utf-8"))`. Use JSON serialization (not a delimiter-joined string) so a WHERE containing literal colons or other delimiter-like characters cannot collide hashes across different (view, where, limit) tuples. Resume logic for Source 4:
 
 1. Read `source.json`. If `source != "snowflake-audience"`, skip Source 4 resume entirely.
 2. Compute the current invocation's `query_hash`.
@@ -130,13 +160,15 @@ The COUNT probe + query are not transactional — between probe and main query, 
 
 ## 6. Audit trail
 
-`source.json` carries the full query-intent record (§ 3) plus execution metadata. Additionally, the skill writes a compact audit log line for every Source 4 invocation to `<output-dir>/audit.log`:
+`source.json` carries the full query-intent record (§ 3) plus execution metadata. Additionally, the skill writes a compact audit log entry for every Source 4 invocation to `<output-dir>/audit.log` as **JSON-lines** (one JSON object per line):
 
-```
-2026-05-28T14:23:00Z source=snowflake-audience view=audience_commercial_outreach where="business_category='commercial' AND data_quality_score>=80" limit=5000 probe_count=4327 actual_count=4327 exec_ms=1840 wrapper_exit=0
+```jsonl
+{"ts":"2026-05-28T14:23:00Z","source":"snowflake-audience","view":"audience_commercial_outreach","where":"business_category='commercial' AND data_quality_score>=80","limit":5000,"probe_count":4327,"actual_count":4327,"exec_ms":1840,"wrapper_exit":0}
 ```
 
-One line per attempt (including resume-skip cases — which log `wrapper_exit=resume-skip`). Append-only; never overwritten. Used by `prospect-temporal-gate` debugging + by future drift-detection commands (e.g., [BC-11856](https://linear.app/brite-nites/issue/BC-11856) `/marketing:audit-campaigns`).
+JSON-lines is required (not space-delimited key=value) because the predicate may contain quoted strings whose contents are operator-supplied. JSON encoding eliminates the audit-log-injection class where a maliciously-crafted literal value (e.g., one containing embedded newlines) could spoof a second audit line. The predicate-validation grammar in § 1 already rejects newlines in literals as a defense-in-depth measure, but the JSONL format is the authoritative protection.
+
+One line per attempt (including resume-skip cases — which log `"wrapper_exit":"resume-skip"`). Append-only; never overwritten. Used by `prospect-temporal-gate` debugging + by future drift-detection commands (e.g., [BC-11856](https://linear.app/brite-nites/issue/BC-11856) `/marketing:audit-campaigns`).
 
 ## 7. Cross-skill boundaries
 
@@ -147,14 +179,16 @@ What this design **owns**:
 - Cost-gate behavior + audit trail
 - Resume detection extensions
 - Error-code → HALT message mapping
+- **The predicate-validation grammar** (§ 1) — both the skill's advisory check and the wrapper's authoritative gate consume the same grammar definition from this doc
 
 What this design **does not own**:
 
 - Audience-view definitions (TAM source contract) → owned by `brite-data-platform` (Corinne / GTM Intelligence)
-- Audience-view catalog content → owned by [`plugins/marketing/references/audience-views.md`](../../plugins/marketing/references/audience-views.md), maintained by marketing plugin owners
-- Snowflake credential rotation → owned by [ADR-010](../decisions/010-plugin-secret-config-canon.md) + Bitwarden
+- Audience-view catalog content → owned by [`plugins/marketing/references/audience-views.md`](../../plugins/marketing/references/audience-views.md), maintained by marketing plugin owners. The **catalog → Snowflake → skill consistency** is a three-way burden: the catalog can drift ahead of (or behind) `brite-data-platform/main`. Reconciliation is org coordination (with Corinne) until the future-work CI lint lands.
+- Snowflake credential rotation → owned by [ADR-010](../decisions/010-plugin-secret-config-canon.md) + Bitwarden. The wrapper MUST NOT log `os.environ` on error paths; structured stderr is restricted to `view`, `where`, `limit`, `query_hash`, `error_code`, `error_detail` — credentials never appear in any output stream.
 - Wrapper script implementation → BC-11929 ships `plugins/marketing/scripts/snowflake/query_audience.py`
 - Enrichment / SMTP verify / free-email filter → existing list-building Workflows 3-5 (unchanged)
+- Allowlist authoritative enforcement → the wrapper (the skill's check is advisory; see § 1 "View-name validation")
 
 ## Acceptance gates for [BC-11929](https://linear.app/brite-nites/issue/BC-11929)
 
