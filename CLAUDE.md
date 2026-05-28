@@ -40,6 +40,7 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-008: tam-mapping enrichment pluggability](docs/decisions/008-tam-mapping-enrichment-pluggability.md) — provider selection via userConfig, shared input/output schema, swap path
 - [ADR-009: SF capability adoption framework](docs/decisions/009-sf-capability-adoption.md) — 6-check framework (runtime model, license, plugin slot, toolset breadth, GA gate, domain fit) with worked examples
 - [ADR-010: Plugin secret-config canon](docs/decisions/010-plugin-secret-config-canon.md) — Bitwarden + `bw-run.sh` broker for stdio MCPs and CLI scripts; HTTP MCPs covered by BC-5551 exception
+- [ADR-020: Anti-spam guardrails consolidation](docs/decisions/020-anti-spam-guardrails.md) — five TAM-protection rules (180-day non-repeat, 2-cycle/year, enterprise-commercial-post-Q2, Tier-1 Q1-Q2 window, calendar-year offer rotation) owned by `prospect-temporal-gate`
 
 ## Company Context
 
