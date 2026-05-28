@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Removed
+- **workflows 3.32.0:** context7 MCP server, SessionStart context7-instruction hook, and all skill/agent/command paths that depended on it (BC-11891). ADR-001 marked Withdrawn. CDR compliance reviewer + handbook lookups + org-level precedent search degrade with skip-and-continue narration (URL-resolution work in cdr-compliance-reviewer is unaffected). The `handbook-drift-check` skill is unaffected — it already used `gh api` directly. A future gbrain-based replacement will be documented in a separate ADR. Notes: precedent-search SKILL.md.tmpl renumbered Phase 5 → Phase 4; cdr-compliance-reviewer agent's spec sections wrapped in a "deferred pending CDR INDEX wire-up" callout.
 - Haiku LLM PreToolUse hooks from `workflows` plugin (BC-11889 — workflows 3.30.2 → 3.31.0)
   - Dropped `type: "prompt"` security review on every Bash call (10s timeout, false-positive prone)
   - Dropped `type: "prompt"` security review on every Write/Edit content scan

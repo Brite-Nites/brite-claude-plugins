@@ -7,6 +7,8 @@ originSessionId: 3178b23f-ec01-4bdf-ae82-811c5e31fca0
 
 After Phase 3 sign-off (BC-6578, 2026-05-06, decision: scale), the user opened a multi-session design interview to turn Brite's Flow-Driven Architecture (FDA) into a Claude Code plugin called `flow-architecture`. Style is one-question-per-turn with recommended answer + reasoning + honest pushback per question. Locks through Q12 + Q22-Q28 + meta-Q autoplan-recurrence captured below.
 
+> **Status update (2026-05-27, BC-11891):** Context7 was removed from the workflows plugin and ADR-001 marked Withdrawn. Q-lock entries below (notably Q32 and Q50) reference Context7 as an inherited/available MCP — those references describe the prior plugin state and are preserved as historical audit trail. Workflows now registers 3 MCPs (sequential-thinking, linear-server, gbrain-team); FDA's `.mcp.json` is still empty `{}` per the cadence precedent — that part of the lock is unchanged.
+
 ## Critical clarifications (foundational — read first)
 
 **The "5" only applies to discipline children.** Three quantities in FDA are commonly conflated; only one is fixed:

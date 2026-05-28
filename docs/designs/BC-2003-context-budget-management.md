@@ -3,6 +3,8 @@
 **Issue**: BC-2003 — Context budget management strategy
 **Date**: 2026-03-16
 
+> **Status update (2026-05-27, BC-11891):** Context7 was removed and ADR-001 marked Withdrawn. References to "CDR INDEX via Context7" in this doc describe the prior implementation; the CDR INDEX is currently unavailable pending a future gbrain-based replacement.
+
 ### Problem
 
 A fully-loaded project could consume ~690 lines (10-15% of context window) before any code loads — and it grows as CDRs and precedents accumulate.

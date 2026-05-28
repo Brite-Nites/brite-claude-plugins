@@ -63,7 +63,7 @@ Reviewer agents share the `_shared/four-mode-framework.md` contract; the L4 plan
 The flow-architecture plugin **requires** the `workflows` plugin to be installed alongside it. The dependency is structural and load-bearing — not advisory.
 
 - **MCP reuse (Q30.4 + Q32):** all Linear access goes through `mcp__plugin_workflows_linear-server__*`. FDA's own `.mcp.json` is empty `{}` per the cadence precedent. Registering a duplicate Linear server breaks tool routing (per [BC-5810](https://linear.app/brite-nites/issue/BC-5810) § 4 and [BC-5811](https://linear.app/brite-nites/issue/BC-5811) § 4.2).
-- **Three-channel reuse mechanism (Q50 sub-decisions 4-6):** (1) **REUSE** — workflows tools called transparently from FDA sub-skills (Linear MCP, sequential-thinking, Context7); (2) **CLONE** — three workflows command bodies copied into `commands/{session-start,review,ship}.md` with locked FDA-swap axes per Q51 / Q52 / Q53; (3) **TRANSITIVE REUSE** (per Q50 amendment 2) — cloned commands invoke workflows skills and agents the cloned body already references (`/workflows:diff-triage`, the workflows review agents, etc.); those callees are not re-implemented in FDA.
+- **Three-channel reuse mechanism (Q50 sub-decisions 4-6):** (1) **REUSE** — workflows tools called transparently from FDA sub-skills (Linear MCP, sequential-thinking); (2) **CLONE** — three workflows command bodies copied into `commands/{session-start,review,ship}.md` with locked FDA-swap axes per Q51 / Q52 / Q53; (3) **TRANSITIVE REUSE** (per Q50 amendment 2) — cloned commands invoke workflows skills and agents the cloned body already references (`/workflows:diff-triage`, the workflows review agents, etc.); those callees are not re-implemented in FDA.
 - **No modifications to workflows from this plugin.** If a workflows-side change is needed, edit the workflows plugin directly and bump its version. FDA never mutates `../workflows/`.
 
 Relative path note: this file lives at `plugins/flow-architecture/CLAUDE.md`; `../workflows/` resolves to the sibling plugin per Q30.2 directory placement.
@@ -73,7 +73,7 @@ Relative path note: this file lives at `plugins/flow-architecture/CLAUDE.md`; `.
 **MCPs (Q32):**
 
 - **Required** — `mcp__plugin_workflows_linear-server__*` (provided transitively by the workflows plugin).
-- **Available but not depended on** — `mcp__plugin_workflows_sequential-thinking__*`, `mcp__plugin_workflows_context7__*`. FDA does not register either; both remain usable through the workflows registration.
+- **Available but not depended on** — `mcp__plugin_workflows_sequential-thinking__*`. FDA does not register it; it remains usable through the workflows registration.
 
 **External CLIs (Q32):**
 

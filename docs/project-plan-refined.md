@@ -358,7 +358,7 @@ Critical path: **T0 → T1-A → T2-E → T4-I → T6-O → T6-P → T7-Q** (7 n
 - **Context**: Plugin-side canonicals data layer (per Phase 2 reframe: plugin = WHAT). Source-of-truth for what counts as a valid (vertical, persona, offer) tuple before plan-campaign Step 2 hard-fail check. Per D7 (thin schema) + D11 (all 27 day-1) + Phase 2 reframe (plugin not handbook). **Source of vertical list**: `brite-nites/handbook@main:marketing/go-to-market/verticals/README.md`. **Per-entry depth varies**: 7 Active verticals get full ≥1-persona + ≥1-offer populated; Exploring + Future verticals can be skeleton (slug + display only). Personas graduate via D8 + handbook review (T3-H).
 - **Steps**:
   1. Create directory `plugins/marketing/data/canonicals/`.
-  2. Fetch the 27-vertical list from handbook (use `mcp__plugin_workflows_context7__query-docs` with `/brite-nites/handbook` if available; fallback: `gh api repos/brite-nites/handbook/contents/marketing/go-to-market/verticals/README.md`).
+  2. Fetch the 27-vertical list from handbook via `gh api repos/brite-nites/handbook/contents/marketing/go-to-market/verticals/README.md`.
   3. Author `_manifest.yaml`:
      ```yaml
      schema_version: 1

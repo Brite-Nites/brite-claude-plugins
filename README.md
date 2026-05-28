@@ -16,7 +16,7 @@ session-start → brainstorm → plan → [worktree] → execute (subagent + TDD
 
 - **Process**: Superpowers' full workflow with TDD, subagent-per-task execution, and compound knowledge
 - **Org**: Linear integration at every step, security hooks, team conventions
-- **Domain skills are separate plugins** — tech-stack knowledge comes from context7 MCP or dedicated domain plugins
+- **Domain skills are separate plugins** — tech-stack knowledge lives in dedicated domain plugins
 
 Influenced by [superpowers](https://github.com/obra/superpowers) and [compound-engineering](https://github.com/EveryInc/compound-engineering-plugin). See the [Roadmap](ROADMAP.md) for what's coming next.
 
