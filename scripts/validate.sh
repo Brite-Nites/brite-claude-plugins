@@ -1700,6 +1700,7 @@ done < <(detect_agent_skills_drift "$REPO_ROOT/CLAUDE.md" "$REPO_ROOT/docs/agent
 
 # Run the drift-detector's fixture unit tests (mirrors Section 2b' pattern).
 # Pass count auto-derived from the harness's RESULT contract line.
+section "Agent-skills drift unit tests"
 drift_test="$REPO_ROOT/scripts/test_agent_skills_drift.sh"
 if [ ! -f "$drift_test" ]; then
   warn "scripts/test_agent_skills_drift.sh not found — skipped"

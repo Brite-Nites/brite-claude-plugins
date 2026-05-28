@@ -33,6 +33,9 @@ detect_agent_skills_drift() {
     local block ref base
     # The block runs from the '## Agent skills' heading to the next H2 (### sub-headings don't close it).
     block="$(awk '/^## Agent skills[[:space:]]*$/{f=1;next} /^## /{f=0} f' "$claude_md")"
+    # Reference paths must match [A-Za-z0-9._/-] (no spaces/parens) — refs with spaces in the
+    # filename are intentionally not extracted (and so won't be drift-checked). docs/agents/
+    # filenames are kebab-case by convention, so this is a non-issue in practice.
     while IFS= read -r ref; do
       [ -n "$ref" ] || continue
       base="${ref##*/}"
