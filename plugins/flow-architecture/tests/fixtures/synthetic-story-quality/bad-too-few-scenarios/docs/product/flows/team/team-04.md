@@ -6,7 +6,6 @@ status: built
 parent_issue: BC-9004
 personas: Workspace owner chasing an unaccepted invite
 intent: ../../intent.md
-parent_journey: ../journeys/team.md
 ---
 
 # team-04 — Resend pending invite

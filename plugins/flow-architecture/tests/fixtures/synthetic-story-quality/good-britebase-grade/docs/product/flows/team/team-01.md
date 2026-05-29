@@ -6,7 +6,6 @@ status: built
 parent_issue: BC-9001
 personas: Workspace owner onboarding a new hire
 intent: ../../intent.md
-parent_journey: ../journeys/team.md
 ---
 
 # team-01 — Invite teammate

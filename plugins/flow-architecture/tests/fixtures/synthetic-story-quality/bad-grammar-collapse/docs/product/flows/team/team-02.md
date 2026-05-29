@@ -6,7 +6,6 @@ status: built
 parent_issue: BC-9002
 personas: Workspace owner offboarding a departing teammate
 intent: ../../intent.md
-parent_journey: ../journeys/team.md
 ---
 
 # team-02 — Remove teammate

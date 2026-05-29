@@ -9,7 +9,7 @@
 
 ## Problem
 
-FDA's *mechanical* floor is mature (36-gate `/flow:audit`, 4 dedicated `validate.sh` CI sections, `fidelity-reviewer`, `verify-docs.sh`, `verify-linear-references.mts`). But the artifacts FDA *generates* have regressed below the hand-written BriteBase bar: stories are weaker and sub-flows coarser. The existing `fidelity-reviewer` only checks **template structure** (has 3–5 Gherkin, the `When/I want/so I can` regex), so it green-lights structurally-valid-but-substantively-weak output. Nothing enforces **quality**, **granularity**, or **grounding in real-world flows**.
+FDA's *mechanical* floor is mature (36-gate `/flow:audit`, 4 dedicated `validate.sh` CI sections, `fidelity-reviewer`, `verify-docs.sh`, `verify-linear-references.mts`). But the artifacts FDA *generates* have regressed below the hand-written BriteBase bar: stories are weaker and sub-flows coarser. The existing `fidelity-reviewer` only checks **template structure** (front-matter completeness, section order, cross-reference accuracy) and the deterministic gates only check **shape** (the `story-job-story-regex` gate + the WS-A grammar/AC lints confirm a `When/I want/so I can` frame and ≥3 Gherkin blocks exist) — so structurally-valid-but-substantively-weak output green-lights. Nothing enforces **quality**, **granularity**, or **grounding in real-world flows**.
 
 ### Evidence (6-repo teardown, 2026-05-28)
 

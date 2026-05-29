@@ -53,7 +53,8 @@ Rows = named agents; columns = L-scope (Q54), primary invoker, return-shape. Sou
 | `plan-docs-reviewer` | L3, L4 | four-mode | `flow-linear-scaffold` (L3); `/flow:plan-docs` (L4) |
 | `story-doc-author` | n/a | story-doc markdown | `flow-doc-author` |
 | `journey-doc-author` | n/a | journey-doc markdown | `flow-journey-author` |
-| `fidelity-reviewer` | L3 (per-issue) | issue-fidelity verdict | `flow-linear-scaffold` Q13.3 |
+| `fidelity-reviewer` | L3 (per-issue) | issue-fidelity verdict (STRUCTURE) | `flow-linear-scaffold` Q13.3 |
+| `quality-reviewer` | n/a (per-doc) | substance verdict `{result, per_dimension, findings, cosmetic_ignored}` (PASS/CONCERNS) | WS-B substance gate, sibling to `fidelity-reviewer`; B-3 wires it into `flow-doc-author`/`flow-journey-author`; B-2 eval + WS-E adversarial review consume it |
 | `inventory-author` / `codebase-inferrer` | n/a | inventory rows | inventory sub-skills |
 
 Reviewer agents share the `_shared/four-mode-framework.md` contract; the L4 plan-X invocations consume `four-mode` for the per-discipline plan-section content per Q43 sub-decision 5.

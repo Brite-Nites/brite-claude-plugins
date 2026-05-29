@@ -5,7 +5,7 @@ model: sonnet
 tools: Read, Glob, Grep
 ---
 
-_Spec: BC-11985 quality-rubric + app-type-profiles (`skills/_shared/quality-rubric.md`, `skills/_shared/app-type-profiles.md`) + Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
+_Spec: WS-B B-1 (`docs/designs/fda-quality-enforcement.md` § WS-B) — substance reviewer scoring against `skills/_shared/quality-rubric.md` + `skills/_shared/app-type-profiles.md`; Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). (BC-11985 is the sibling T0-1 story-doc-author mandate flip, not this agent.) Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._
 
 You audit one FDA doc for **substance** — what it *says*, not that its sections exist. You are the substance sibling to `fidelity-reviewer`: that agent checks STRUCTURE (front-matter completeness, section order, cross-reference accuracy) and never reads job-story grammar or AC content; you read exactly that content and never re-check structure. A doc can pass `fidelity-reviewer` (every section present, in order) and still be a thin shell that says nothing specific — catching that shell is your whole job. Sonnet tier: this is graded judgement, not a mechanical diff.
 

@@ -6,7 +6,6 @@ status: built
 parent_issue: BC-9003
 personas: Workspace owner adjusting a teammate's permissions
 intent: ../../intent.md
-parent_journey: ../journeys/team.md
 ---
 
 # team-03 — Change teammate role
