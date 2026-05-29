@@ -550,15 +550,23 @@ for key in path_keys:
     print(f'{\"PASS\" if exists else \"FAIL\"}:{key} -> {ref} ({resolved})')
 " 2>&1)
 
-    while IFS= read -r line; do
-      status="${line%%:*}"
-      msg="${line#*:}"
-      if [ "$status" = "PASS" ]; then
-        pass "$msg"
-      else
-        fail "$msg does not exist"
-      fi
-    done <<< "$path_output"
+    # A plugin may legitimately declare neither commands nor skills (e.g. a
+    # hooks+MCP-only plugin like brite-core), in which case path_output is
+    # empty. Guard against the empty here-string yielding one blank iteration
+    # (which would emit a spurious "  does not exist" FAIL).
+    if [ -n "$path_output" ]; then
+      while IFS= read -r line; do
+        status="${line%%:*}"
+        msg="${line#*:}"
+        if [ "$status" = "PASS" ]; then
+          pass "$msg"
+        else
+          fail "$msg does not exist"
+        fi
+      done <<< "$path_output"
+    else
+      pass "no commands/skills path references to validate"
+    fi
   fi
 
   # ── Directory Existence ───────────────────────────────────────────
