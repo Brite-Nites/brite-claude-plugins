@@ -38,6 +38,7 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-007: RevOps plugin design decisions](docs/decisions/007-revops-plugin-design.md) — naming, subtree, augment-not-replace, skill filter, MCP scope
 - [ADR-008: tam-mapping enrichment pluggability](docs/decisions/008-tam-mapping-enrichment-pluggability.md) — provider selection via userConfig, shared input/output schema, swap path
 - [ADR-009: SF capability adoption framework](docs/decisions/009-sf-capability-adoption.md) — 6-check framework (runtime model, license, plugin slot, toolset breadth, GA gate, domain fit) with worked examples
+- [ADR-021: Per-account reply-triggered creative assets](docs/decisions/021-per-account-reply-triggered-creative-assets.md) — reply-triggered per-account asset routing + ADR-013 layer split
 
 ## Company Context
 
