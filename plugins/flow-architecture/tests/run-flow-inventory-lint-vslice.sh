@@ -84,6 +84,25 @@ assert_has "mixed-scheme: UPPERCASE + kebab in one inventory flagged" \
   "$(detect_inventory_consistency "$TMP/ms/docs/product/master-flow-inventory.md" "$TMP/ms/docs/product/flows")" \
   "mixes flow-ID schemes"
 
+# body-flow_id-ignored: a flow_id: line in the BODY (e.g. a fenced yaml example)
+# must NOT count as a declared flow-ID — only the leading front-matter block does.
+# Without the front-matter scoping, demo/ghost below would be a phantom orphan-doc.
+mk_inventory "$TMP/bf/docs/product/master-flow-inventory.md" '| `demo/flow-one` | One | ✓ |'
+mkdir -p "$TMP/bf/docs/product/flows/demo"
+cat > "$TMP/bf/docs/product/flows/demo/flow-one.md" <<'BFDOC'
+---
+flow_id: demo/flow-one
+title: t
+---
+# t
+
+```yaml
+flow_id: demo/ghost
+```
+BFDOC
+assert_clean "body flow_id in a fenced block is ignored (front-matter scoped)" \
+  "$(detect_inventory_consistency "$TMP/bf/docs/product/master-flow-inventory.md" "$TMP/bf/docs/product/flows")"
+
 section "2/2" "A-9 flow-ID immutability (diff-aware)"
 
 mk_inventory "$TMP/old.md" '| FOO-01 | a | |' '| FOO-02 | b | |' '| BAR-01 | c | |'

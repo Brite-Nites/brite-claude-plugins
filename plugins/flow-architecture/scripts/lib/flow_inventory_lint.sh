@@ -33,10 +33,19 @@ _fil_inventory_ids() {
 }
 
 # Echo the flow-IDs declared by the story docs under a flows dir (front-matter
-# `fda_sub_flow_id:` or `flow_id:`), sorted-unique.
+# `fda_sub_flow_id:` or `flow_id:`), sorted-unique. Scoped per-file to the leading
+# YAML front-matter block (between the first two `---` fences): a `flow_id:` line
+# in the BODY (e.g. inside a fenced ```yaml example) is NOT a declared flow-ID and
+# must not be counted (it would otherwise produce a spurious A-8 orphan-doc).
 _fil_doc_ids() {
-  find "$1" -type f -name '*.md' ! -name 'INDEX.md' 2>/dev/null -exec \
-    grep -hE '^(fda_sub_flow_id|flow_id):' {} + 2>/dev/null \
+  find "$1" -type f -name '*.md' ! -name 'INDEX.md' 2>/dev/null \
+    | while IFS= read -r f; do
+        awk '
+          NR==1 && $0=="---" { infm=1; next }
+          infm && $0=="---"  { exit }
+          infm && /^(fda_sub_flow_id|flow_id):/ { print }
+        ' "$f" 2>/dev/null
+      done \
     | sed -E 's/^(fda_sub_flow_id|flow_id):[[:space:]]*//; s/[`"]//g; s/[[:space:]]+$//' \
     | grep -vE '^$' | sort -u
 }

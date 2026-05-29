@@ -23,8 +23,15 @@
 #                  lead) is a known generic project-wide default.
 #   FRAME_MISMATCH (D11) a non-human / infra actor (crawler/bot/spider/googlebot)
 #                  forced into the first-person job-story frame instead of the
-#                  constraint-spec frame. ACTOR-scoped: a human flow that merely
-#                  names a crawler as an OBJECT does not trip.
+#                  constraint-spec frame. Subject-scoped HEURISTIC: it keys on the
+#                  non-human term appearing in subject position (just after `When`,
+#                  or as the `I'm a <actor>` roleplay) — so a human flow that names
+#                  a crawler as the OBJECT of the `I want to …` clause does not
+#                  trip. The guard is proximity-based, not a parser: an infra term
+#                  named early in the `When` clause (within ~3 words of `When`) can
+#                  still trip. Treat FRAME_MISMATCH as an advisory flag for human
+#                  review, not a precise actor classifier — the LLM quality-reviewer
+#                  is the authoritative judge of actor/frame fit.
 #
 # Bash 3.2 compatible (macOS default). Stdlib only. No literal backtick inside
 # any grep regex (apostrophes use the ['’] bracket class).
@@ -102,8 +109,11 @@ lint_story_doc() {
   fi
 
   # ── FEW_SCENARIOS: fewer than 3 Scenario blocks ────────────────────
+  # Count both `Scenario:` and Gherkin `Scenario Outline:` (a parametrized
+  # scenario is still a scenario — omitting Outline would false-flag a doc that
+  # uses 3 outlines).
   local scen
-  scen="$(grep -cE '^[[:space:]]*Scenario:' "$doc" 2>/dev/null || true)"
+  scen="$(grep -cE '^[[:space:]]*Scenario( Outline)?:' "$doc" 2>/dev/null || true)"
   [ -n "$scen" ] || scen=0
   if [ "$scen" -lt 3 ]; then
     defects="$defects FEW_SCENARIOS"
