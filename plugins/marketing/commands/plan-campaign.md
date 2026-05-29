@@ -1,5 +1,5 @@
 ---
-description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 8 standard sub-issues (with up to 2 optional) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
+description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 8 standard sub-issues (with up to 3 optional, incl. a creative-asset-template issue assigned to the Brite Labs creative team) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
 argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--situation-mining] [--creative-angles] [--dry-run]
 allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_workflows_linear-server__create_issue_label, mcp__plugin_revops_salesforce__get_username
 ---
@@ -13,7 +13,7 @@ The campaign-scaffolding orchestrator. One invocation creates one campaign acros
 | Layer | What lands | Source-of-truth |
 |---|---|---|
 | Plugin filesystem | `docs/campaigns/{entity}/{slug}/manifest.json` | Cross-layer index — the breadcrumb that ties Linear ↔ SF ↔ EB together |
-| Linear | 1 project-milestone in "Brite GTM" + 8 standard sub-issues + up to 2 optional sub-issues (blocked-by chained) | Orchestration + work-tracking surface |
+| Linear | 1 project-milestone in "Brite GTM" + 8 standard sub-issues + up to 3 optional sub-issues (blocked-by chained) | Orchestration + work-tracking surface |
 | Salesforce | 1 Campaign record (Status=Planned, custom fields populated) | Portfolio reporting surface (rollups, pipeline attribution) |
 | Email Bison | Workspace assignment recorded in manifest (NO EB campaign created here) | Sending-execution surface — actual EB campaign is created later by `/marketing:launch-campaign` at sub-issue #6 |
 
@@ -24,7 +24,7 @@ The campaign-scaffolding orchestrator. One invocation creates one campaign acros
 **Outputs**:
 - `docs/campaigns/{entity}/{slug}/manifest.json` — fully populated per the schema in Step 7.
 - 1 Linear milestone (with labels applied to the 8-10 child issues, not the milestone itself — see § Step 8a).
-- 8 standard sub-issues (+ optional #9 Situation Mining for Labs, + optional #10 Creative Angles).
+- 8 standard sub-issues (+ optional #9 Situation Mining for Labs, + optional #10 Creative Angles, + optional #11 Creative Asset Template — assigned to the Brite Labs creative team).
 - 1 Salesforce Campaign record (if `/revops:create-sf-campaign` succeeded; null `campaign_id` in manifest if it soft-failed).
 - Operator-readable summary printed at Step 11.
 
@@ -74,6 +74,7 @@ Parse the invocation arguments. Required flags: `--vertical`, `--persona`, `--of
 | `--theme` | conditional | Required if `--entity=cross-entity`. Otherwise ignored. |
 | `--situation-mining` | no | Enable optional sub-issue #9 (Labs-only — Step 10 enforces). |
 | `--creative-angles` | no | Enable optional sub-issue #10. |
+| `--creative-asset-template` | no | Enable optional sub-issue #11 (Creative Asset Template — assigned to the Brite Labs creative team at scaffold time; Step 10.3 details the assignee exception). |
 | `--dry-run` | no | Print the full preview at Step 5 and exit without writing anything. |
 
 ### Interactive prompt example
@@ -348,6 +349,7 @@ Print the operator-readable plan. Use this format (or a close variant — readab
     #8  Campaign closed + debrief                   [terminal; expects /marketing:campaign-debrief]
     #9  Situation Mining            <-- ONLY IF --situation-mining flag set AND entity=labs
     #10 Creative Angles             <-- ONLY IF --creative-angles flag set
+    #11 Creative Asset Template     <-- ONLY IF --creative-asset-template flag set (assignee: Sarah Cullen)
 
 =================================================================
 ```
@@ -851,6 +853,27 @@ If `--creative-angles` was passed, create sub-issue #10:
 - **blocks**: none directly (informs #3 informationally)
 - **Labels**: same 8-label set as the standard sub-issues.
 
+### 10.3 — Creative Asset Template (no entity restriction)
+
+If `--creative-asset-template` was passed, create sub-issue #11. This sub-issue scaffolds the **per-campaign/offer branded template** that the per-account reply-triggered asset flow personalizes into — the "design once per campaign, personalize per reply" bandwidth model from ADR-021 § 3.5 (per-account reply-triggered creative assets; authored under BC-11972). It is the upstream prerequisite that lets the reply-processing layer (n8n) auto-draft commercial PDFs and enterprise landing pages with **no per-reply designer touch**.
+
+This is **distinct from** the per-vertical Phase 5 "GTM Asset Development" / Phase 6 "Landing Page(s)" collateral (the campaign-level decks, one-pagers, and per-vertical LPs owned by the Brite Labs creative team — e.g. BC-7482, BC-11106). Those are not scaffolded by this orchestrator and must not be duplicated here. Sub-issue #11 is specifically the **template artifact** that the *per-account* motion consumes.
+
+- **Title**: `Creative asset template`
+- **Description**:
+  > Brite Labs creative team designs the branded, reusable template for this campaign/offer that the per-account reply-triggered asset flow personalizes into (commercial → 3–5 page PDF template with a brand-kit-constrained eye-catcher slot; enterprise → a per-company parameterization of `IndustryPageTemplate` at `/industry/[vertical]/[company]/[offer]`, reusing the per-vertical pattern proven by BC-11106). Layout is owned by the designer and fixed once; per positive reply, only *content* is merged in. The brief's segment context (sub-issue #1) determines which template type(s) this campaign needs.
+  >
+  > **Policy source**: ADR-021 § 3.5 (Generation approach) + § 3.1 (routing rule) — per-account reply-triggered creative assets (BC-11972). Layer split per [ADR-013](../../../docs/decisions/013-gtm-three-layer-split.md): this template is the designer-owned input; the per-reply brief contract is the `creative-asset-brief` skill (BC-11973); generation is the n8n reply-processing layer (out of repo).
+  > **Sub-issue role**: pre-launch creative deliverable; parallel with #2–#5. The template must exist by launch so the first positive replies can be served. Does NOT gate the send (#6) — it gates the post-launch per-account reply motion.
+  > **Expected plugin command**: none directly; this is designer work tracked in Linear. The downstream consumers are the `creative-asset-brief` skill (BC-11973) and the n8n reply layer (deferred).
+- **Assignee (EXCEPTION to Step 9's omit-assignee convention)**: set `assignee: "sarahc@britenites.com"` (Sarah Cullen, Brite Labs creative-team lead per ADR-021). Step 9 omits `assignee` on the 8 standard sub-issues because they are claimed at start time by whoever picks them up; #11 is the one sub-issue with a single, known, bandwidth-constrained owner from scaffold time, so naming her up front makes her queue visible immediately. If Sarah is unavailable, the documented alternate is Max Brengle — change the email here rather than leaving it unassigned. This is the **only** scaffold-time assignee in this orchestrator.
+- **dueDate**: `<launch-date> - 7 days` (template ready a week before sending begins, so it is in place when the first replies arrive).
+- **blockedBy**: [#1] (needs the approved brief's vertical / persona / offer / segment context to know which template type to build).
+- **blocks**: none (the send path does not depend on it; it feeds the post-launch reply motion).
+- **Labels**: same 8-label set as the standard sub-issues.
+
+**Promotion path (why optional, not standard).** #11 is flag-gated rather than a 9th standard sub-issue because its sole consumer — the n8n reply-processing layer that personalizes templates per positive reply — is deferred and not yet built. Making it mandatory on every campaign now would file designer work with nothing to consume the output, which fails ADR-021's "saves more designer time than it costs" bar. **When the reply-processing layer ships**, promote #11 to a standard sub-issue (move this spec into § 9.1, give it a `#9` ordinal, drop the flag gate, and renumber the current optional #9/#10) so every campaign produces its template by default.
+
 ---
 
 ## Step 11 — Summary output
@@ -877,6 +900,7 @@ Campaign scaffolded — /marketing:plan-campaign
                     #8  Campaign closed + debrief       <id>
                     #9  Situation Mining (Labs)         <id>   <-- if --situation-mining
                     #10 Creative Angles                 <id>   <-- if --creative-angles
+                    #11 Creative Asset Template         <id>   <-- if --creative-asset-template (→ Sarah Cullen)
   EB workspace:   <eb-workspace>  (campaign will be created at sub-issue #6
                                    via /marketing:launch-campaign — NOT now)
 
