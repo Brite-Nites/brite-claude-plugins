@@ -30,6 +30,13 @@ if [ -z "$state" ] || [ ! -f "$state" ]; then
   echo "usage: flow-linear-lint.sh <linear-state.json> [flows-dir]" >&2
   exit 2
 fi
+# A given-but-nonexistent flows-dir must be a hard invocation error, NOT a silent
+# "zero doc bullets" — the latter makes A-5 report every real Linear blockedBy edge
+# as a false "never wired" orphan. (Omitting the arg entirely cleanly SKIPs A-5.)
+if [ -n "$flows" ] && [ ! -d "$flows" ]; then
+  echo "FATAL: flows-dir not found: $flows" >&2
+  exit 2
+fi
 [ -f "$LIB" ] || { echo "FATAL: lib not found at $LIB" >&2; exit 2; }
 command -v python3 >/dev/null 2>&1 || { echo "FATAL: python3 required" >&2; exit 2; }
 

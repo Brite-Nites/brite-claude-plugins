@@ -190,7 +190,13 @@ def _doc_cross_domain_pairs(flows_dir):
     for doc_path in sorted(flows_root.rglob("*.md")):
         if doc_path.name == "INDEX.md":
             continue
-        match = _SECTION_RE.search(doc_path.read_text(encoding="utf-8"))
+        # A stray non-UTF-8 / unreadable .md in an arbitrary consumer repo must not
+        # abort the whole A-5 pass with a traceback — skip it.
+        try:
+            text = doc_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        match = _SECTION_RE.search(text)
         if not match:
             continue
         for line in match.group(1).splitlines():
@@ -349,8 +355,20 @@ def main(argv):
     flows_dir = argv[1] if len(argv) > 1 else None
     try:
         state = load_state(state_path)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
+        # ValueError covers JSON decode errors; RecursionError covers pathologically
+        # nested JSON. A type-confused-but-parseable snapshot is shape-checked below.
         sys.stderr.write("FATAL: could not load state '{}': {}\n".format(state_path, exc))
+        return 2
+    # Shape guard: detectors index parents/children as dicts. A malformed snapshot
+    # (e.g. "parents": [...]) would otherwise crash a detector with a TypeError
+    # mid-run; fail cleanly with the same exit-2 "unusable state" contract instead.
+    if not isinstance(state, dict) \
+       or not isinstance(state.get("parents", {}), dict) \
+       or not isinstance(state.get("children", {}), dict):
+        sys.stderr.write(
+            "FATAL: malformed state '{}': 'parents' and 'children' must be objects\n".format(state_path)
+        )
         return 2
 
     total = 0

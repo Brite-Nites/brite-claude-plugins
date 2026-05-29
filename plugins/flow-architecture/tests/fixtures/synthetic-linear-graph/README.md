@@ -23,6 +23,10 @@ JSON snapshot and the **live** evaluation reads the same shape from Linear MCP.
   "parents": {                       // FDA sub-flow PARENT issues
     "<issue-id>": {
       "flow_id":   "<domain>-NN" | "<domain>/<slug>",  // inventory flow-ID
+      // A-5 caveat: the `## Cross-domain dependencies` bullet parser (the BC-10729
+      // predicate this reuses) matches only the `<...>-NN` flow-id form (e.g.
+      // `seo-foundation-01`). A slash-form `<domain>/<slug>` flow_id is valid for
+      // A-8/A-9 but will not be matched by A-5's doc-bullet mirror.
       "domain":    "<domain-slug>",                     // for cross-domain A-5
       "title":     "<DOMAIN-NN: ...>",
       "milestone": "<milestone name>" | null,           // A-6 inheritance source

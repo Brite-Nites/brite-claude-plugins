@@ -119,6 +119,16 @@ assert_body_has "  …names the expected label type:design" "$a4_bad" "expected 
 # unanchored-search false-positive class.
 a4_noncanon="$(lint_call_inline '{"parents":{},"children":{"H1":{"parent":"BC-100","title":"[Backend Handoff] follow-up to [Design] mock","labels":["type:eng"]},"H2":{"parent":"BC-100","title":"Audit [Design] consistency across pages","labels":["type:eng"]}}}' detect_label_contamination)"
 assert_count "non-canonical/prose [Design] brackets (type:eng) → 0 A-4 (fda-title.mts boundary)" "$a4_noncanon" 0
+# DOMAIN-NN binding: a title that LEADS with a discipline bracket but has no
+# DOMAIN-NN code ("[Design] retro cleanup") is NOT a canonical child (prose-bracket
+# titles already fail the start-anchor, so this pins the DOMAIN-NN half of the
+# _LEADING_CHILD_RE boundary specifically).
+a4_nodomain="$(lint_call_inline '{"parents":{},"children":{"H3":{"parent":"BC-100","title":"[Design] retro cleanup","labels":["type:eng"]}}}' detect_label_contamination)"
+assert_count "leading [Design] but no DOMAIN-NN code → 0 A-4 (DOMAIN-NN binding)" "$a4_nodomain" 0
+# type:parent exclusion: a canonical discipline child carrying ONLY type:parent
+# (no type:<discipline>) must not be flagged — _type_labels excludes type:parent.
+a4_typeparent="$(lint_call_inline '{"parents":{},"children":{"H4":{"parent":"BC-100","title":"[Design] SEO-01 x","labels":["type:parent","domain:seo"]}}}' detect_label_contamination)"
+assert_count "[Design] child carrying only type:parent → 0 A-4 (type:parent excluded)" "$a4_typeparent" 0
 
 # ── 3: A-5 blockedBy-wiring (doc ↔ Linear) ────────────────────────────────────
 section "3/6" "A-5 detect_blockedby_wiring"
@@ -136,6 +146,11 @@ assert_count "no flows-dir → A-5 inert (cannot evaluate doc side)" "$a5_noflow
 # internal helper directly: it takes the parents map.)
 a5_nonefid="$(lint_call_inline '{"BC-1":{"domain":"a","flow_id":null,"blockedBy":["BC-2"]},"BC-2":{"domain":"b","flow_id":"content-model-01","blockedBy":[]}}' _linear_cross_domain_pairs)"
 assert_count "parent with unresolved flow_id → excluded from A-5 pairs (no 'None' pair)" "$a5_nonefid" 0
+# Same-domain exclusion: a parent→parent blockedBy edge WITHIN one domain is a
+# sibling-ordering concern (related_flows), NOT cross-domain wiring — it must be
+# dropped, else A-5 emits phantom linear-orphans for every intra-domain dependency.
+a5_samedomain="$(lint_call_inline '{"BC-1":{"domain":"seo","flow_id":"seo-01","blockedBy":["BC-2"]},"BC-2":{"domain":"seo","flow_id":"seo-02","blockedBy":[]}}' _linear_cross_domain_pairs)"
+assert_count "same-domain parent→parent blockedBy → excluded from A-5 pairs" "$a5_samedomain" 0
 
 # ── 4: A-6 child-milestone-inheritance ────────────────────────────────────────
 section "4/6" "A-6 detect_milestone_inheritance"
