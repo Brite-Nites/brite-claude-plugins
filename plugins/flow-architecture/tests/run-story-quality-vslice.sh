@@ -125,6 +125,14 @@ scan_doc() {
   # Pull the job-story sentence. Q27 canonical shape is a blockquote with
   # bold When / I want to / so I can markers. We accept either the
   # bold-marker form or a plain "When ..., I want to ..., so I can ..." line.
+  #
+  # SCOPE: this grep lock catches only the high-signal ARTICLE-led collapse
+  # ("I want to a/an/the …", "so I can a/an/the …"). The broader verb-less
+  # collapse classes the rubric D1 names — a feeling ("so I can feel
+  # confident"), a non-action ("so I can consistent navigation"), a bare noun
+  # phrase ("so I can 100-400+ pages") — need verb detection that bash grep
+  # can't do reliably; those are the LLM `quality-reviewer`'s job (rubric D1),
+  # not this deterministic lock.
   local jobstory
   jobstory="$(grep -iE 'I want to' "$doc" 2>/dev/null | grep -iE 'so I can' | head -1 || true)"
 
@@ -190,19 +198,31 @@ scan_doc() {
   fi
 
   # ── Check (d): generic project-wide default persona ────────────────
-  # Pull the personas: front-matter value, normalize surrounding whitespace,
-  # and compare verbatim against the known generic-default list.
-  local persona_val
+  # Pull the personas: front-matter value, normalize it (lowercase via tr —
+  # bash 3.2 has no ${,,}; strip surrounding [ ] brackets and quotes; collapse
+  # the spaces around commas), then flag if ANY token equals a known generic
+  # default. Handles bare scalar (`personas: the user`), YAML flow-list
+  # (`personas: [the user, admin]`), quoted (`personas: "The User"`), and case
+  # variants — an exact whole-value match missed all of those.
+  local persona_val persona_norm
   persona_val="$(grep -iE '^personas:[[:space:]]*' "$doc" 2>/dev/null \
     | head -1 \
     | sed -E 's/^[Pp]ersonas:[[:space:]]*//; s/[[:space:]]+$//' || true)"
   if [ -n "$persona_val" ]; then
+    persona_norm="$(printf '%s' "$persona_val" \
+      | tr '[:upper:]' '[:lower:]' \
+      | tr -d "[]\"'" \
+      | sed -E 's/[[:space:]]*,[[:space:]]*/,/g; s/^[[:space:]]+//; s/[[:space:]]+$//')"
+    # Comma-wrap so each token is delimited, then match a generic default as a
+    # whole token (',the user,' won't false-match ',the users,').
+    local persona_hay=",${persona_norm},"
     while IFS= read -r generic; do
       [ -n "$generic" ] || continue
-      if [ "$persona_val" = "$generic" ]; then
-        defects="$defects GENERIC_PERSONA"
-        break
-      fi
+      local gtok
+      gtok=",$(printf '%s' "$generic" | tr '[:upper:]' '[:lower:]'),"
+      case "$persona_hay" in
+        *"$gtok"*) defects="$defects GENERIC_PERSONA"; break ;;
+      esac
     done <<EOF
 $GENERIC_PERSONAS
 EOF
@@ -354,26 +374,26 @@ assert_defect "bad-frame-mismatch trips FRAME_MISMATCH (3rd-person subject — W
 assert_defect "bad-frame-mismatch-firstperson trips FRAME_MISMATCH (1st-person actor — FIRST_PERSON_RE)" \
   "$BAD_FRAME_FP_DOC" "FRAME_MISMATCH"
 
-# Negative-cross-checks: each bad fixture must NOT spuriously trip the
-# *other* defects (keeps each fixture a single-axis regression lock). The
-# good fixtures already proved all five checks can be clean simultaneously,
-# so here we only assert the bad fixtures are otherwise well-formed.
-gram_verdict="$(scan_doc "$BAD_GRAMMAR_DOC" || true)"
-case " $gram_verdict " in
-  *" BOILERPLATE "*|*" FEW_SCENARIOS "*|*" GENERIC_PERSONA "*|*" FRAME_MISMATCH "*)
-    fail "bad-grammar-collapse leaks an unintended defect: $gram_verdict" ;;
-  *) pass "bad-grammar-collapse trips ONLY the grammar defect" ;;
-esac
-
-# The frame-mismatch fixture is grammatically well-formed and fully-specified
-# — it must trip ONLY FRAME_MISMATCH, proving the new check is single-axis and
-# does not piggy-back on the grammar / boilerplate / scenario / persona checks.
-frame_verdict="$(scan_doc "$BAD_FRAME_DOC" || true)"
-case " $frame_verdict " in
-  *" GRAMMAR "*|*" BOILERPLATE "*|*" FEW_SCENARIOS "*|*" GENERIC_PERSONA "*)
-    fail "bad-frame-mismatch leaks an unintended defect: $frame_verdict" ;;
-  *) pass "bad-frame-mismatch trips ONLY the frame defect" ;;
-esac
+# Single-axis isolation: each bad fixture must trip EXACTLY its one named defect
+# and nothing else — keeps every fixture a clean single-axis regression lock.
+# Exact-equality on the trimmed verdict (a substring match would let a second,
+# leaked defect slip through). The good fixtures already proved all checks can be
+# clean simultaneously.
+assert_only() {
+  local label="$1" doc="$2" want="$3" verdict
+  verdict="$(scan_doc "$doc" || true)"
+  if [ "$verdict" = "$want" ]; then
+    pass "$label (verdict exactly: $verdict)"
+  else
+    fail "$label (expected EXACTLY '$want', got: $verdict)"
+  fi
+}
+assert_only "bad-grammar-collapse trips ONLY GRAMMAR"        "$BAD_GRAMMAR_DOC"     "GRAMMAR"
+assert_only "bad-boilerplate-ac trips ONLY BOILERPLATE"      "$BAD_BOILERPLATE_DOC" "BOILERPLATE"
+assert_only "bad-too-few-scenarios trips ONLY FEW_SCENARIOS" "$BAD_SCENARIOS_DOC"   "FEW_SCENARIOS"
+assert_only "bad-generic-persona trips ONLY GENERIC_PERSONA" "$BAD_PERSONA_DOC"     "GENERIC_PERSONA"
+assert_only "bad-frame-mismatch trips ONLY FRAME_MISMATCH"   "$BAD_FRAME_DOC"       "FRAME_MISMATCH"
+assert_only "bad-frame-mismatch-firstperson trips ONLY FRAME_MISMATCH" "$BAD_FRAME_FP_DOC" "FRAME_MISMATCH"
 
 # ──────────────────────────────────────────────────────────────────────
 # Summary — machine-readable RESULT line for validate.sh
