@@ -11,6 +11,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Social media strategy skill stub
 - Content strategy skill stub
 
+## [0.10.0] - 2026-05-29
+
+BC-5537 (plugins half) — register the Brite Enrichment MCP (3-tool scaffold) so marketing skills can reach the enrichment engine.
+
+### Added
+- `enrichment` server in `plugins/marketing/.mcp.json` — stdio + `bw-run.sh` broker (7 provider keys from the Engineering Bitwarden collection), running `tools/enrichment-mcp/brite-enrichment-mcp` from `brite-data-platform` pinned to SHA `6854446` (PR #181). Non-secret config (`USE_MOCK_PROVIDERS=False`, `MARTS_DATABASE=ANALYTICS`, `MARTS_SCHEMA=MARTS`) in the entry's `env` block; Snowflake creds sourced from the developer's shell profile.
+- `tools/integrations/brite-enrichment.md` — integration guide for the 3-tool MVP (`check_enrichment_health`, `enrich_contacts`, `query_entity`): auth, registration, tool inventory, common workflow, confirmation gates, costs, gotchas. Full 9-command surface deferred to BC-5538.
+
+### Changed
+- `email-bison.md` upstream-integration note now points at the Brite Enrichment MCP (was "No MCP server exists for the enrichment engine").
+- `_template/OUTBOUND-SKILL-TEMPLATE.md` §5 availability-check list adds the `enrichment` server (`check_enrichment_health`).
+
 ## [0.3.13] - 2026-04-29
 
 BC-6301 — 5th BC-5906 round-2 follow-up. Two distinct sequence-step spec drifts in `/marketing:launch-campaign` Phase 9.
