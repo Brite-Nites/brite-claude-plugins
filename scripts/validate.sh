@@ -340,6 +340,30 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2c' — Pre-push Hook Bare-Root Regression (BC-11951)
+# Runs scripts/test-pre-push-hook.sh against .githooks/pre-push in a hermetic
+# sandbox. Asserts the hook skips cleanly from a bare-repo root (no worktree)
+# instead of aborting the push, and still runs validate.sh from a worktree.
+# ══════════════════════════════════════════════════════════════════════
+section "2c'. Pre-push Hook Bare-Root Regression"
+
+prepush_test="$REPO_ROOT/scripts/test-pre-push-hook.sh"
+prepush_hook="$REPO_ROOT/.githooks/pre-push"
+
+if [ ! -f "$prepush_test" ]; then
+  warn "scripts/test-pre-push-hook.sh not found — pre-push regression check skipped"
+elif [ ! -f "$prepush_hook" ]; then
+  warn ".githooks/pre-push not found — pre-push regression check skipped"
+else
+  if prepush_out=$(bash "$prepush_test" "$prepush_hook" 2>&1); then
+    pass "pre-push hook bare-root regression (test-pre-push-hook.sh)"
+  else
+    printf '%s\n' "$prepush_out" | sed 's/^/      /'
+    fail "pre-push hook regression failed — run scripts/test-pre-push-hook.sh for details"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2d — Security Hook Regex Regression (BC-11889)
 # ══════════════════════════════════════════════════════════════════════
 # Thin regex-only smoke test for the surviving PreToolUse regex hooks.
