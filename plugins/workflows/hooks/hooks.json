@@ -1,5 +1,5 @@
 {
-  "description": "Brite plugin hooks — security guardrails, post-edit validation, and session context",
+  "description": "Brite plugin hooks — security guardrails, post-edit validation, session context, and a SessionStart core-enablement nudge",
   "hooks": {
     "PreToolUse": [
       {
@@ -59,6 +59,17 @@
             "command": "REPO_ROOT=\"$(cd \"${CLAUDE_PLUGIN_ROOT}/../..\" 2>/dev/null && pwd)\"; if [ ! -f \"$REPO_ROOT/plugins/workflows/.claude-plugin/plugin.json\" ]; then exit 0; fi; (umask 077; mkdir -p \"$HOME/.brite-plugins/telemetry\"); printf '%s\\n' \"$REPO_ROOT\" > \"$HOME/.brite-plugins/.repo-root\"; SCRIPT=\"$REPO_ROOT/scripts/telemetry-log.sh\"; if [ -x \"$SCRIPT\" ]; then bash \"$SCRIPT\" finalize-stale 2>/dev/null; bash \"$SCRIPT\" session-start 2>/dev/null; fi; exit 0",
             "timeout": 3,
             "statusMessage": "Initializing telemetry..."
+          }
+        ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/../_shared/core-enablement-warning.sh\" workflows",
+            "timeout": 3,
+            "statusMessage": "Checking brite-core enablement..."
           }
         ]
       }

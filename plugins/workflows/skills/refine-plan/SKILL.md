@@ -7,8 +7,6 @@ agent: plan-refiner
 context: fork
 ---
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 ## Instructions
 
 You are refining a v1 project plan into agent-ready tasks.
