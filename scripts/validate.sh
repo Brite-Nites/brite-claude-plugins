@@ -337,6 +337,59 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b'''''''' — flow-architecture WS-A reusable doc-lint vslice (BC-11983)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh — the
+# regression lock for the reusable, multi-line-aware story-doc lint lib
+# (scripts/lib/flow_doc_lint.sh) used by WS-E remediation to lint any consumer
+# repo's flows. Asserts lint_story_doc returns the right verdict on the shared
+# synthetic-story-quality fixtures: GOOD (human job-story + constraint-spec +
+# human-mentions-infra) → PASS; each BAD fixture → its named defect (A-1 GRAMMAR
+# / A-3 BOILERPLATE / FEW_SCENARIOS / A-2 GENERIC_PERSONA / D11 FRAME_MISMATCH).
+# Pass count auto-derived from the harness's RESULT line.
+section "2b''''''''. flow-architecture WS-A doc-lint vslice (BC-11983)"
+
+fda_doclint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh"
+
+if [ ! -f "$fda_doclint_test" ]; then
+  warn "plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh not found — skipped"
+else
+  if fda_doclint_out=$(bash "$fda_doclint_test" 2>&1); then
+    fda_doclint_pass_count=$(printf '%s\n' "$fda_doclint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture WS-A doc-lint vslice (${fda_doclint_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture WS-A doc-lint vslice failed — run plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh for details"
+    printf '%s\n' "$fda_doclint_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b''''''''' — flow-architecture WS-A inventory lints (BC-11983)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh — the
+# regression lock for the inventory lints (scripts/lib/flow_inventory_lint.sh):
+# A-8 inventory ↔ doc two-identifier consistency (orphan docs / orphan rows /
+# UPPERCASE-vs-kebab scheme mix, handling both Q20-amendment-2 schemes) and A-9
+# flow-ID immutability (a removed/renamed flow-ID is the FK-fragility breach;
+# `-a`/`-b` splits and [DEPRECATED]-but-present IDs are allowed). Fixtures built
+# in a temp dir. Pass count auto-derived from the harness's RESULT line.
+section "2b'''''''''. flow-architecture WS-A inventory lints (BC-11983)"
+
+fda_invlint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh"
+
+if [ ! -f "$fda_invlint_test" ]; then
+  warn "plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh not found — skipped"
+else
+  if fda_invlint_out=$(bash "$fda_invlint_test" 2>&1); then
+    fda_invlint_pass_count=$(printf '%s\n' "$fda_invlint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture WS-A inventory lints vslice (${fda_invlint_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture WS-A inventory lints vslice failed — run plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh for details"
+    printf '%s\n' "$fda_invlint_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
