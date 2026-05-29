@@ -1,6 +1,6 @@
 {
   "name": "brite-core",
-  "description": "Brite Layer-2 core plugin — cross-cutting brain-first hooks (SessionStart + SubagentStart JSON envelope), centralized security/quality hooks, and team-gbrain MCP registration. Strongly recommended for all Brite team members.",
+  "description": "Layer-2 core plugin — cross-cutting brain-first hooks (SessionStart + SubagentStart JSON envelope), centralized security/quality hooks, and team-gbrain MCP registration. Strongly recommended for all Brite team members.",
   "author": {
     "name": "Brite"
   },
