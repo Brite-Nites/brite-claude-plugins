@@ -5,8 +5,6 @@ model: sonnet
 tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_cadence_gbrain-team__query, mcp__plugin_cadence_gbrain-team__get_page, mcp__plugin_cadence_gbrain-team__list_pages
 ---
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 You enrich one Linear project for Phase 2 scope planning and emit a compact JSON card with backlog candidates, carry-over relations, and brainstorming-ranked SQ2 alternatives. Read-only — never call any mutation tool (no `save_*`, no `delete_*`, no `update_*`).
 
 ## Inputs (from dispatcher prompt)

@@ -1,5 +1,5 @@
 {
-  "description": "RevOps plugin hooks — cwd-aware SessionStart banner when an SFDX project is reachable from the user's pwd",
+  "description": "RevOps plugin hooks — cwd-aware SessionStart banner when an SFDX project is reachable from the user's pwd + SessionStart core-enablement nudge",
   "hooks": {
     "SessionStart": [
       {
@@ -10,6 +10,17 @@
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sfdx-banner.sh\"",
             "timeout": 3,
             "statusMessage": "Probing for SFDX project..."
+          }
+        ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/../_shared/core-enablement-warning.sh\" revops 2>/dev/null || true",
+            "timeout": 3,
+            "statusMessage": "Checking brite-core enablement..."
           }
         ]
       }

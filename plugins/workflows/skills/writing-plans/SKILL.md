@@ -5,8 +5,6 @@ user-invocable: false
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 # Writing Plans
 
 You are creating a detailed execution plan that breaks work into bite-sized tasks. Each task should be small enough that a fresh subagent with no prior context can execute it correctly.

@@ -7,8 +7,6 @@ agent: claude-md-generator
 context: fork
 ---
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 ## Instructions
 
 You are generating a comprehensive CLAUDE.md file that follows

@@ -5,8 +5,6 @@ user-invocable: false
 allowed-tools: mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_comment, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__get_milestone, mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__list_comments, mcp__plugin_workflows_linear-server__list_milestones, AskUserQuestion, Read, Write, Edit, Bash, Skill, Agent, mcp__plugin_cadence_gbrain-team__query, mcp__plugin_cadence_gbrain-team__get_page, mcp__plugin_cadence_gbrain-team__list_pages
 ---
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 # Phase 3 — Linear Housekeeping
 
 Batch mutation preview and atomic execute. Consumes the state object populated by Phase 2 (`sprint-scoping`), derives a `mutations[]` list, re-runs the `issue-quality-gate` on every cycle-path mutation with block-with-override, renders the full preview grouped by decision path, collects per-group approval, then executes sequentially while timestamping every write in a housekeeping log for audit trail. No Linear mutations fire until the user approves the full preview (BC-5810 § 1.1c). No Phase 4 narrative work.

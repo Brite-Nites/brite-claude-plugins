@@ -1,6 +1,19 @@
 {
-  "description": "Cadence plugin hooks — SubagentStart brain-first preamble injection",
+  "description": "Cadence plugin hooks — SessionStart core-enablement nudge + SubagentStart brain-first preamble injection",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/../_shared/core-enablement-warning.sh\" cadence 2>/dev/null || true",
+            "timeout": 3,
+            "statusMessage": "Checking brite-core enablement..."
+          }
+        ]
+      }
+    ],
     "SubagentStart": [
       {
         "hooks": [

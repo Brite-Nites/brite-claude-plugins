@@ -5,8 +5,6 @@ user-invocable: false
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 # Compound Learnings
 
 You are capturing knowledge from the work just completed so that future sessions in this project are smarter. This is the compound interest of engineering — each session makes the next one better.

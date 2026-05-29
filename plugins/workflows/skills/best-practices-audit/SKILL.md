@@ -5,8 +5,6 @@ user-invocable: false
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 
-**Brain-first**: Query team gbrain for Brite-specific context before external lookups. See `plugins/_shared/team-gbrain-usage.md`.
-
 # Best Practices Audit
 
 You are auditing a project's CLAUDE.md to ensure it follows Anthropic's official best practices and stays effective as the project evolves. This runs after compound learnings are captured, to catch any drift.
