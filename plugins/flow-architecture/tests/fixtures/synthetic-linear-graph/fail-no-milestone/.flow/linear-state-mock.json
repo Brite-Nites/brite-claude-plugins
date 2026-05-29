@@ -1,0 +1,47 @@
+{
+  "_comment": "A-6 fixture, three distinct milestone-inheritance defects: (1) parent BC-200 has no milestone (no inheritance source); (2) child BC-104 has no milestone (NO_MILESTONE — brite-supply's 141/208); (3) child BC-105 milestone differs from its parent BC-100. Labels + disciplines stay clean so only A-6 fires. BC-201's milestone-vs-(absent-parent-milestone) is intentionally NOT flagged — a child can't mismatch a milestone the parent doesn't have; that parent is flagged once at the source instead.",
+  "parents": {
+    "BC-100": {
+      "flow_id": "seo-foundation-01",
+      "domain": "seo-foundation",
+      "title": "SEO-01: Sitemap & robots",
+      "milestone": "SEO Foundation",
+      "blockedBy": [],
+      "labels": ["type:parent", "domain:seo-foundation"]
+    },
+    "BC-200": {
+      "flow_id": "content-model-01",
+      "domain": "content-model",
+      "title": "CON-01: Page model",
+      "milestone": null,
+      "blockedBy": [],
+      "labels": ["type:parent", "domain:content-model"]
+    }
+  },
+  "children": {
+    "BC-101": {
+      "parent": "BC-100",
+      "title": "[Story] SEO-01 Sitemap & robots",
+      "milestone": "SEO Foundation",
+      "labels": ["type:story", "domain:seo-foundation"]
+    },
+    "BC-104": {
+      "parent": "BC-100",
+      "title": "[QA] SEO-01 Sitemap & robots",
+      "milestone": null,
+      "labels": ["type:qa", "domain:seo-foundation"]
+    },
+    "BC-105": {
+      "parent": "BC-100",
+      "title": "[Docs] SEO-01 Sitemap & robots",
+      "milestone": "Some Other Milestone",
+      "labels": ["type:docs", "domain:seo-foundation"]
+    },
+    "BC-201": {
+      "parent": "BC-200",
+      "title": "[Story] CON-01 Page model",
+      "milestone": "Content Model",
+      "labels": ["type:story", "domain:content-model"]
+    }
+  }
+}
