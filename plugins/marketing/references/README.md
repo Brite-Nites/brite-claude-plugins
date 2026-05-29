@@ -11,7 +11,7 @@ Shared reference library consumed by the Brite marketing plugin's skills. These 
 - `offer-design-frameworks.md` — Hormozi value equation, Brunson value ladder, Abraham risk-reversal, and B2B-outbound frontend/backend characteristics. Brite-originated; read by vertical playbooks and preset-composition issues to evaluate and design offers.
 - `shelf-life-patterns.md` — Five decay categories (Regulatory/Deadline, Competitive Move, Data Insight, Industry Pattern, Structural) for reasoning about signal timing.
 - `vertical-playbooks/` — Per-vertical playbooks distilling the vendor landscape, buyer personas, recency signals, program economics, offer evaluations, voice rules, and anti-slop rules for each targeted vertical. Entries: `zoos.md` (BC-5920), `hotels-resorts.md` (BC-5921), `ski-resorts.md` (BC-5922). Read by email-copywriting preset composition, tam-mapping, and situation-mining.
-- `audience-views.md` — Catalog of Snowflake views (`dim_people`, `dim_companies`, planned `audience_*`) consumed by `list-building`. Allowlist + schema reference + naming convention. Read by `list-building` Source 2 (today, manual CSV) + Source 4 (planned via [ADR-021](../../../docs/decisions/021-marketing-snowflake-access.md) + [BC-11929](https://linear.app/brite-nites/issue/BC-11929)).
+- `audience-views.md` — Catalog of Snowflake views (`dim_people`, `dim_companies`, planned `audience_*`) consumed by `list-building`. Allowlist + schema reference + naming convention. Read by `list-building` Source 2 (today, manual CSV) + Source 4 (planned via [ADR-022](../../../docs/decisions/022-marketing-snowflake-access.md) + [BC-11929](https://linear.app/brite-nites/issue/BC-11929)).
 
 ## Expected consumers
 
