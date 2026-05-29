@@ -166,7 +166,8 @@ Discover decision-makers at a company and enrich each with a work email (+ best-
 phone). One company per call — a skill enriching N companies calls it N times. Returns
 one ADR-008 `EnrichmentOutput` (as a dict) per candidate that yielded an email; empty
 list when none found. Each item has at least `email` (str), `confidence_score` (float
-0.0–1.0), `source` (str); optional `mobile` / `phone` / `title` / `linkedin_url` /
+0.0–1.0), `source` (str); optional `first_name` / `last_name` (carried from discovery
+when the provider returns them) / `mobile` / `phone` / `title` / `linkedin_url` /
 `provider_raw`. **Spends provider credit** — see § Rate limits.
 
 `title_seed` filters discovery to the role you want (e.g. `"Director of Facilities"`).

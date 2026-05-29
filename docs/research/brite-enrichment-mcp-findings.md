@@ -124,7 +124,7 @@ The MVP picks one of each type, weighted by day-1 consumer satisfaction (from RQ
 
 1. **`check_enrichment_health` (Type C — novel).** Synthesizes a single read-only status object from three engine primitives: (a) `cost_ops.check_enrichment_budget()` for budget status / daily spend / block flag (`operations/cost_ops.py:64-102`), (b) `recipes/parser.py` for "N recipes loaded" + recipe-name list (subsumes `list-recipes`), (c) a Snowflake `SELECT 1` round-trip via `shared/snowflake_client.execute_query()`. Returns `{ok: bool, budget: {…}, recipes: [name…], snowflake_reachable: bool, providers_configured: [name…]}`. No provider call, $0 cost. **Satisfies the availability-check requirement of ADR 2c** (see RQ7).
 
-2. **`enrich_contacts` (Type B — composite).** ADR-008 contract: `EnrichmentInput → EnrichmentOutput[]`. Input: `domain` (required), `company_name` (required), optional `linkedin_url` / `title_seed` / `geo`. Output: list of `{email, mobile?, phone?, title?, linkedin_url?, confidence_score, source, provider_raw?}` per ADR-008 lines 92-112. Internal flow: if no `title_seed`, return early with a helpful error (Apollo People Search needs titles); otherwise (1) `discover-people` to find candidate decision makers at the company, (2) `run-recipe work_email_waterfall` per discovered person, (3) `run-recipe phone_discovery` per person with an email. **Confirmation-gate candidate** — see RQ8.
+2. **`enrich_contacts` (Type B — composite).** ADR-008 contract: `EnrichmentInput → EnrichmentOutput[]`. Input: `domain` (required), `company_name` (required), optional `linkedin_url` / `title_seed` / `geo`. Output: list of `{email, first_name?, last_name?, mobile?, phone?, title?, linkedin_url?, confidence_score, source, provider_raw?}` per ADR-008 lines 92-112. Internal flow: if no `title_seed`, return early with a helpful error (Apollo People Search needs titles); otherwise (1) `discover-people` to find candidate decision makers at the company, (2) `run-recipe work_email_waterfall` per discovered person, (3) `run-recipe phone_discovery` per person with an email. **Confirmation-gate candidate** — see RQ8.
 
 3. **`query_entity` (Type C — novel).** Read-only `dim_companies` / `ENRICHMENT_ENTITIES` lookup by domain or `entity_id`. Returns the canonical company + linked person rows from the golden record. $0 provider cost. **Satisfies** (a) list-building's "is this lead already in our DB?" pre-flight, (b) situation-mining's firmographic-fallback (when populated), (c) the icp-scoring activation-day need without forcing icp-scoring's `allowed-tools` registration today. Backed by RQ10 follow-up issue in M49 — `query_entity_by_domain` helper does not exist in `shared/snowflake_client.py` today (verified via grep).
 
@@ -788,6 +788,8 @@ Three rows, every column populated. This table is the deliverable BC-5537 uses v
 [
   {
     "email": str,            # lowercase, trimmed, required
+    "first_name": str | None,  # carried from discovery when returned (BC-12078)
+    "last_name": str | None,   # carried from discovery when returned (BC-12078)
     "mobile": str | None,    # E.164 preferred
     "phone": str | None,     # office/landline; E.164 preferred
     "title": str | None,     # actual title returned (may differ from title_seed)
