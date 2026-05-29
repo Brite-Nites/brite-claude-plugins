@@ -309,6 +309,34 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b''''''' — flow-architecture story-doc quality vslice (BC-11985)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-story-quality-vslice.sh — the
+# regression lock for the story-doc-author quality rewrite (BC-11985/BC-11986).
+# Greps fixture story docs and FAILS on any of four quality defects: (a) job-story
+# When/I want to/so I can grammar collapse (verb-less "so I can <noun>" or
+# "I want to a/the <noun>"), (b) circular boilerplate AC ("the outcome
+# described in" / "holds true"), (c) fewer than 3 Gherkin Scenario blocks,
+# (d) a generic project-wide default persona repeated verbatim (T0-2/A-2 seed).
+# A GOOD BriteBase-grade fixture passes all four; each BAD fixture trips exactly
+# its named defect. Pass count auto-derived from the harness's RESULT line.
+section "2b'''''''. flow-architecture story-doc quality vslice (BC-11985)"
+
+fda_story_quality_test="$REPO_ROOT/plugins/flow-architecture/tests/run-story-quality-vslice.sh"
+
+if [ ! -f "$fda_story_quality_test" ]; then
+  warn "plugins/flow-architecture/tests/run-story-quality-vslice.sh not found — skipped"
+else
+  if fda_story_quality_out=$(bash "$fda_story_quality_test" 2>&1); then
+    fda_story_quality_pass_count=$(printf '%s\n' "$fda_story_quality_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture story-doc quality vslice (${fda_story_quality_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture story-doc quality vslice failed — run plugins/flow-architecture/tests/run-story-quality-vslice.sh for details"
+    printf '%s\n' "$fda_story_quality_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
