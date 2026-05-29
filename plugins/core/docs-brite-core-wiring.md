@@ -7,7 +7,7 @@ serve/sync/Minions side; this one covers what lives **in this plugins repo**.
 
 | Concern | File | Replaces |
 |---|---|---|
-| Brain-first guidance (session) | `plugins/core/hooks/hooks.json` → SessionStart | the inline `**Brain-first**:` pointer lines (removal = BC-11750, later in v0.1) |
+| Brain-first guidance (session) | `plugins/core/hooks/hooks.json` → SessionStart | the inline `Brain-first` pointer lines (the bold-prefixed one-liners in agent/skill bodies; removal = BC-11750, later in v0.1) |
 | Brain-first guidance (subagent) | `plugins/core/hooks/hooks.json` → SubagentStart (JSON envelope) | the broken plain-stdout SubagentStart hooks (PR #385) |
 | Shared security/quality hooks | `plugins/core/hooks/hooks.json` → PreToolUse/PostToolUse | per-plugin duplicates (de-dup = BC-11753, later in v0.1) |
 | Team-gbrain MCP | `plugins/core/.mcp.json` + `scripts/gbrain-team-broker.sh` | the 5 domain-plugin registrations (de-dup = BC-11753, later in v0.1) |
@@ -25,9 +25,10 @@ the guidance is double-delivered (pointer lines + hooks), which is harmless. The
 steps land next, once the hooks are validated firing in real sessions:
 
 - **BC-11750** — remove the pointer lines (43 occurrences: 36 in `.md` bodies + 7 in `.tmpl`
-  sources; acceptance gate `grep -rE '\*\*Brain-first\*\*' plugins/ --include='*.md'` → 0
-  after also regenerating the 7 templated `SKILL.md`) + add core-enablement warnings to the
-  5 domain plugins.
+  sources; acceptance gate `grep -rE '\*\*Brain-first\*\*' plugins/ --include='*.md' | grep -v plugins/core/`
+  → 0 after also regenerating the 7 templated `SKILL.md`. The `plugins/core/` exclusion skips
+  this doc + the README, which reference the token descriptively) + add core-enablement
+  warnings to the 5 domain plugins.
 - **BC-11753** — remove the now-duplicate `gbrain-team` MCP from the 5 domain `.mcp.json` and
   the shared security/quality hooks from their `hooks/hooks.json`.
 

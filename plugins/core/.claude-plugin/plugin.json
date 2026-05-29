@@ -5,8 +5,8 @@
     "name": "Brite"
   },
   "version": "0.1.0",
-  "homepage": "https://github.com/Brite-Nites/britenites-claude-plugins",
-  "repository": "https://github.com/Brite-Nites/britenites-claude-plugins",
+  "homepage": "https://github.com/Brite-Nites/brite-claude-plugins",
+  "repository": "https://github.com/Brite-Nites/brite-claude-plugins",
   "license": "MIT",
   "keywords": [
     "claude-code",
