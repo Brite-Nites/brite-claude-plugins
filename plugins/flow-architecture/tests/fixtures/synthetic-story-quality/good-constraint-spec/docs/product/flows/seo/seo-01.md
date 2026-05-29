@@ -6,7 +6,6 @@ status: built
 parent_issue: BC-9101
 personas: SEO operator accountable for every published page being crawl-discoverable
 intent: ../../intent.md
-parent_journey: ../journeys/seo.md
 ---
 
 # seo-01 — Per-domain sitemap and robots

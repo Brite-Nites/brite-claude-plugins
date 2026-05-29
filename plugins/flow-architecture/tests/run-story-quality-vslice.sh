@@ -62,6 +62,7 @@ BAD_BOILERPLATE_DIR="$FIXTURES_DIR/bad-boilerplate-ac"
 BAD_SCENARIOS_DIR="$FIXTURES_DIR/bad-too-few-scenarios"
 BAD_PERSONA_DIR="$FIXTURES_DIR/bad-generic-persona"
 BAD_FRAME_DIR="$FIXTURES_DIR/bad-frame-mismatch"
+BAD_FRAME_FP_DIR="$FIXTURES_DIR/bad-frame-mismatch-firstperson"
 
 # ── Counters ─────────────────────────────────────────────────────────
 PASS=0
@@ -250,10 +251,11 @@ BAD_BOILERPLATE_DOC="$BAD_BOILERPLATE_DIR/docs/product/flows/team/team-03.md"
 BAD_SCENARIOS_DOC="$BAD_SCENARIOS_DIR/docs/product/flows/team/team-04.md"
 BAD_PERSONA_DOC="$BAD_PERSONA_DIR/docs/product/flows/team/team-05.md"
 BAD_FRAME_DOC="$BAD_FRAME_DIR/docs/product/flows/seo/seo-02.md"
+BAD_FRAME_FP_DOC="$BAD_FRAME_FP_DIR/docs/product/flows/seo/seo-09.md"
 
 for d in "$GOOD_DOC" "$GOOD_CONSTRAINT_DOC" "$GOOD_HUMAN_INFRA_DOC" \
          "$BAD_GRAMMAR_DOC" "$BAD_BOILERPLATE_DOC" "$BAD_SCENARIOS_DOC" \
-         "$BAD_PERSONA_DOC" "$BAD_FRAME_DOC"; do
+         "$BAD_PERSONA_DOC" "$BAD_FRAME_DOC" "$BAD_FRAME_FP_DOC"; do
   if [ -f "$d" ]; then
     pass "fixture present: ${d#$FIXTURES_DIR/}"
   else
@@ -344,8 +346,13 @@ assert_defect "bad-too-few-scenarios trips FEW_SCENARIOS" \
   "$BAD_SCENARIOS_DOC" "FEW_SCENARIOS"
 assert_defect "bad-generic-persona trips GENERIC_PERSONA" \
   "$BAD_PERSONA_DOC" "GENERIC_PERSONA"
-assert_defect "bad-frame-mismatch trips FRAME_MISMATCH" \
+assert_defect "bad-frame-mismatch trips FRAME_MISMATCH (3rd-person subject — WHEN_SUBJECT_RE)" \
   "$BAD_FRAME_DOC" "FRAME_MISMATCH"
+# Locks the FIRST_PERSON_RE branch — the canonical D11 shape ("When I'm a <crawler>…")
+# that the 3rd-person fixture above does NOT exercise. Without this, deleting the
+# FIRST_PERSON_RE OR-branch from scan_doc leaves the suite green (mutation-confirmed).
+assert_defect "bad-frame-mismatch-firstperson trips FRAME_MISMATCH (1st-person actor — FIRST_PERSON_RE)" \
+  "$BAD_FRAME_FP_DOC" "FRAME_MISMATCH"
 
 # Negative-cross-checks: each bad fixture must NOT spuriously trip the
 # *other* defects (keeps each fixture a single-axis regression lock). The

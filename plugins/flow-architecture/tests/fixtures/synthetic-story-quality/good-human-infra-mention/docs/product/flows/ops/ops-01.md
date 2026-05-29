@@ -6,7 +6,6 @@ status: built
 parent_issue: BC-9201
 personas: SEO operator triaging which pages search crawlers failed to fetch
 intent: ../../intent.md
-parent_journey: ../journeys/ops.md
 ---
 
 # ops-01 — Review crawl-coverage gaps
