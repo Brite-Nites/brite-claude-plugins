@@ -1,14 +1,12 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 **Superpowers methodology + compound engineering + Linear integration.** A Process + Org plugin bundle for the Brite organization — structured workflow (brainstorm → plan → worktree → execute → review → compound → audit) with Linear woven into every step. No build process; changes are pure markdown/JSON.
 
 ## Linear Project
 
-Project: **Brite Plugin Marketplace** (team: Brite Company, prefix: `BC-`, not `BRI-`).
+Project: **Brite Skill Packs** (team: Brite Company, prefix: `BC-`, not `BRI-`).
 
 ## Quick Start
 
@@ -28,9 +26,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full script reference, `plugin.js
 - **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) — plugin resolution, runtime flow, hook execution, full skill routing catalog.
 - **Marketing skill porting:** [`docs/guides/marketing-skill-porting.md`](docs/guides/marketing-skill-porting.md) — upstream `coreyhaines31/marketingskills` → `plugins/marketing/` conventions.
 
-## Architecture Decisions
-
-On-demand references — read when working on these subsystems, not auto-loaded every session:
+## Architecture Decisions (on-demand — read per-subsystem, not auto-loaded)
 
 - [ADR-001: Cross-repo import solution](docs/decisions/001-cross-repo-import-solution.md) — Context7 for cross-repo handbook access
 - [ADR-002: Trait evolution mechanism](docs/decisions/002-trait-evolution-mechanism.md) — Trait add/remove commands + auto-detect
