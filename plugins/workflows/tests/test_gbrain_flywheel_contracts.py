@@ -183,13 +183,20 @@ def assert_valid_context_queries(name: str, path: Path) -> None:
 
 def assert_context_load_prose(name: str, path: Path) -> None:
     cl = section(body_of(path), "Context-load")
-    # Require the full wiring, not just a name-drop — a gutted "TODO: wire later
-    # (mentions query and render_as)" stub must fail. Every context-load block
-    # maps BOTH kinds and anchors on the declared frontmatter.
-    assert f"{GBRAIN_TEAM_PREFIX}list_pages" in cl, \
-        f"{name}: Context-load must map kind:list -> gbrain-team list_pages"
-    assert f"{GBRAIN_TEAM_PREFIX}query" in cl, \
-        f"{name}: Context-load must map kind:vector -> gbrain-team query"
+    # Require the kind->tool mapping only for the kinds this artifact actually
+    # declares (e.g. plan-campaign is vector-only — demanding a list_pages bullet
+    # there is spurious). Still strong enough that a gutted "TODO" stub fails:
+    # it must wire the tool for every declared kind AND anchor on context_queries
+    # + render_as.
+    kinds = {q.get("kind") for q in gbrain_block(path).get("context_queries", []) if isinstance(q, dict)}
+    if "list" in kinds:
+        assert f"{GBRAIN_TEAM_PREFIX}list_pages" in cl, \
+            f"{name}: declares a kind:list query but Context-load doesn't map it to gbrain-team list_pages"
+    if "vector" in kinds:
+        assert f"{GBRAIN_TEAM_PREFIX}query" in cl, \
+            f"{name}: declares a kind:vector query but Context-load doesn't map it to gbrain-team query"
+    assert (f"{GBRAIN_TEAM_PREFIX}list_pages" in cl) or (f"{GBRAIN_TEAM_PREFIX}query" in cl), \
+        f"{name}: Context-load must invoke at least one gbrain-team tool (list_pages / query)"
     assert "context_queries" in cl, \
         f"{name}: Context-load must instruct fulfilling the declared gbrain.context_queries"
     assert "render_as" in cl, \

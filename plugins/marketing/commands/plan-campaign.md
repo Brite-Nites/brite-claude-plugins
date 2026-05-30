@@ -37,7 +37,7 @@ The campaign-scaffolding orchestrator. One invocation creates one campaign acros
 
 ## Context-load phase
 
-The read half of the brain-as-delivery flywheel. Before scaffolding, load relevant prior GTM context from the **team** gbrain — the OAuth-backed `mcp__plugin_workflows_gbrain-team__*` MCP, NOT the local/personal `gbrain` CLI (different brain). For each entry under this command's `gbrain.context_queries` frontmatter, run the matching team-brain tool and render results under that entry's `render_as` heading:
+The read half of the brain-as-delivery flywheel. **Run this phase only AFTER the vertical/persona/offer tuple is resolved** (from `--vertical/--persona/--offer` flags or interactive collection) — the queries substitute those values, so firing before the tuple is known would query the brain with unresolved `{vertical}`/`{persona}`/`{offer}` placeholders. Once resolved, load relevant prior GTM context from the **team** gbrain — the OAuth-backed `mcp__plugin_workflows_gbrain-team__*` MCP, NOT the local/personal `gbrain` CLI (different brain). For each entry under this command's `gbrain.context_queries` frontmatter, run the matching team-brain tool and render results under that entry's `render_as` heading:
 
 - `kind: list` → `mcp__plugin_workflows_gbrain-team__list_pages` with the entry's `filter` / `sort` / `limit`
 - `kind: vector` → `mcp__plugin_workflows_gbrain-team__query` with the entry's `query` text (and `limit`)
