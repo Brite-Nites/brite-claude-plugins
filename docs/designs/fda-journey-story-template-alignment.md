@@ -52,7 +52,6 @@ Frontmatter: `domain · milestone: BC-XXXX · personas[] · flow_ids_in_scope[] 
 ```
 # <DOMAIN>: <Display name>
 > Doc-type banner (1:1 with Linear milestone)
-## Title + domain code
 ## Actor / Persona
 ## Scenario + Expectations          (Profile-D two-arc framing nested here)
 ## Journey phases                   (4–8, verb-led)
@@ -100,7 +99,7 @@ Frontmatter (full canonical + FDA `intent`): `flow_id · domain · status · par
 4. **Cross-check the rubric** — confirm `quality-rubric.md` J6/J8/D-dims still describe sections that now exist in the template (they should — this *closes* the template↔rubric gap, not opens one).
 5. **Same-commit version bump** — `plugins/flow-architecture/.claude-plugin/plugin.json` + the `marketplace.json` entry (CLAUDE.md cache-staleness gotcha).
 
-**Q-record mapping (corrected during implementation):** this is **not** a Q26/Q27 amendment — Q16 sub-decision 1 + Q15 already lock the canonical section sets; the agents had *drifted from their own locks*. So it records as: (a) a **drift correction** restoring `journey-doc-author`/`story-doc-author` to the Q15/Q16 canonical-section order; (b) a **Q58 amendment 2** extending the templates-scaffold copy manifest 9 → 11 (seed the two doc templates into consumers — the missing-template-file root cause); (c) a small FDA-additive (the evidence-anchor `## Status` section, grill D4). Recorded in `docs/design-rationale/fda-plugin-interview.md` § Q58 amendment 2.
+**Q-record mapping (corrected during implementation + adversarial review):** Q16 sub-decision 1 + Q15 already lock the canonical section sets; the agents had *drifted from their own locks*. It records as: (a) a **drift correction** restoring `journey-doc-author`/`story-doc-author` to the Q15/Q16 canonical-section order — **including dropping `## Title + domain code`** (Q26 mod 3 / Q16 already removed it; the first cut wrongly re-added it from the stale handbook file); (b) a **Q58 amendment 2** extending the templates-scaffold copy manifest 9 → 11 (seed the two doc templates into consumers — the missing-template-file root cause); (c) a **Q27 amendment 2** for the genuinely-new evidence-anchor `## Status` body section (grill D4). Recorded in `docs/design-rationale/fda-plugin-interview.md` §§ Q58 amendment 2 + Q27 amendment 2.
 
 ## Blast radius / sequencing (D6)
 
@@ -116,4 +115,4 @@ Frontmatter (full canonical + FDA `intent`): `flow_id · domain · status · par
 
 - **`children:{}` backfill timing.** Story docs may be authored before `flow-linear-scaffold` creates the 5N children. Confirm the FDA phase order; if docs precede children, define the backfill step (or leave `children:` as `TBD` placeholders the scaffold fills).
 - **`plan-story` fold** (inherited open question #1 from the parent design doc). With the WHAT fully front-loaded into the story doc, is `plan-story` left thin? Adjacent to this work; decide separately before WS-B B-3.
-- **`Title + domain code` section** — canonical keeps it; it is near-redundant with the H1. Kept for fidelity-reviewer section-order fidelity; revisit if it adds noise.
+- **`Title + domain code` section — DROPPED** (resolved during adversarial review). Q26 mod 3 + Q16 sub-decision 1 already removed it (redundant with the H1); the stale handbook template file still carries it, and the first impl cut wrongly copied it in. The seeded journey template + `journey-doc-author` now omit it, matching the Q16 lock. Follow-up: drop it from the handbook `domain-journey.md` template too (separate handbook cleanup).

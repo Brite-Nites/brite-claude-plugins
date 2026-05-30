@@ -78,6 +78,19 @@ section "1/5" "Seeded canonical template files present"
 assert_file "journey template present in plugin templates/" "$JOURNEY_TMPL"
 assert_file "story template present in plugin templates/" "$STORY_TMPL"
 
+# Extra-file guard: the docs-template seed subtree must contain EXACTLY these two
+# files. run-verify-docs-ecosystem-vslice.sh §3b excludes templates/docs/ from ITS
+# count, so without this guard an undeclared third file dropped under templates/docs/
+# would be caught by neither harness.
+DOCS_TMPL_DIR="$PLUGIN_ROOT/templates/docs/templates"
+docs_tmpl_count=$(find "$DOCS_TMPL_DIR" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+if [ "$docs_tmpl_count" = "2" ]; then
+  pass "templates/docs/templates/ contains exactly 2 seeded templates (no undeclared extras)"
+else
+  fail "templates/docs/templates/ has $docs_tmpl_count files, expected 2 (domain-journey.md + job-story.md)"
+  find "$DOCS_TMPL_DIR" -type f -name '*.md' 2>/dev/null | sed "s|$PLUGIN_ROOT/||; s/^/    /"
+fi
+
 # ── Section 2: Journey template — canonical sections + no drift ──────
 section "2/5" "Journey template carries canonical sections (and not the drift)"
 
@@ -99,6 +112,7 @@ assert_no_grep_re "journey: NO standalone ## Narrative shape (drift)"        '^#
 assert_no_grep_re "journey: NO standalone ## Sub-flows in this domain (drift)" '^## Sub-flows'            "$JOURNEY_TMPL"
 assert_no_grep_re "journey: NO domain-level ## Pain points (per-phase only)" '^## Pain points'           "$JOURNEY_TMPL"
 assert_no_grep_re "journey: NO domain-level ## Opportunities (per-phase only)" '^## Opportunities'       "$JOURNEY_TMPL"
+assert_no_grep_re "journey: NO ## Title + domain code (Q26 mod 3 dropped it; H1 carries it)" '^## Title \+ domain code' "$JOURNEY_TMPL"
 
 # ── Section 3: Story template — canonical sections + frames + no boilerplate ──
 section "3/5" "Story template carries canonical sections + both frames (and no boilerplate)"
@@ -125,6 +139,8 @@ assert_grep "story: frontmatter children: map"               "children:"      "$
 # grep-triad warns about) — so scope the negative to the fenced gherkin block.
 assert_grep "story: AC guidance forbids the boilerplate clause" \
   "Never emit the placeholder clauses" "$STORY_TMPL"
+assert_grep_re "story: an example gherkin block is present (not just guidance)" \
+  '^```gherkin' "$STORY_TMPL"
 GHERKIN_BLOCK="$(awk '/^```gherkin/{f=1;next} /^```/{f=0} f' "$STORY_TMPL")"
 if printf '%s' "$GHERKIN_BLOCK" | grep -qF "Then the outcome described in 'So I can"; then
   fail "story: example gherkin block ships the boilerplate AC clause"
@@ -160,9 +176,14 @@ for cmd_label in "start-project:$START_CMD" "retrofit-project:$RETROFIT_CMD"; do
     "templates/docs/templates/domain-journey.md" "$cmd"
   assert_grep "$label SRC array includes job-story.md" \
     "templates/docs/templates/job-story.md" "$cmd"
-  assert_grep "$label TARGET array writes docs/templates/domain-journey.md" \
-    "/docs/templates/domain-journey.md" "$cmd"
-  assert_grep "$label array count bumped 9 -> 11" \
+  # Needle includes the $REPO_ROOT/ prefix so it matches ONLY the TARGET-array line,
+  # not the SRC line ($CLAUDE_PLUGIN_ROOT/templates/docs/templates/<f>), whose path
+  # contains "/docs/templates/<f>" as a substring.
+  assert_grep "$label TARGET array writes \$REPO_ROOT/docs/templates/domain-journey.md" \
+    "\$REPO_ROOT/docs/templates/domain-journey.md" "$cmd"
+  assert_grep "$label TARGET array writes \$REPO_ROOT/docs/templates/job-story.md" \
+    "\$REPO_ROOT/docs/templates/job-story.md" "$cmd"
+  assert_grep "$label orchestrator prose states the seeded-template count (currently 11)" \
     "Build the 11 template-source" "$cmd"
 done
 

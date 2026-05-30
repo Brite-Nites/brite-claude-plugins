@@ -13,11 +13,9 @@ last_reviewed: YYYY-MM-DD
 
 > **Doc type:** User journey (per-domain). Aligns 1:1 with the Linear milestone for this domain.
 > For cross-domain scenario narratives that span multiple domains (e.g. "Sales → Quote → Acceptance"
-> spanning APPT + SURV + QUO + QLIFE + CPUB), use [`docs/templates/journey.md`](./journey.md) instead.
-
-## Title + domain code
-
-`<DOMAIN> — <Display name>` (e.g. `QUO — Quote Building`).
+> spanning APPT + SURV + QUO + QLIFE + CPUB), author a separate cross-scenario journey doc under
+> `docs/product/journeys/<scenario-slug>.md` instead. The domain code + display name are carried by
+> the H1 above (no separate "Title + domain code" section).
 
 ## Actor / Persona
 
