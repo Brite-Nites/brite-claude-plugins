@@ -24,6 +24,7 @@ dev-runnable contract assertions. Run with:
 from __future__ import annotations
 
 import re
+import subprocess
 from functools import lru_cache
 from pathlib import Path
 
@@ -247,3 +248,61 @@ def test_flywheel_page_type_convention_is_consistent() -> None:
     review_save = section(body_of(REVIEW), "Save-results")
     assert re.search(r"\*\*type:\*\*\s*`?review-finding`?", review_save), \
         "review.md Save-results must set page type `review-finding` (matches the prior-review-learnings type filter)"
+
+
+# --- FDA clones (BC-11754/55 propagation) ----------------------------------
+# flow-architecture clones session-start/review/ship from workflows; the
+# flywheel propagates verbatim so the clone-drift guard stays minimal.
+FDA_SESSION_START = REPO_ROOT / "plugins" / "flow-architecture" / "commands" / "session-start.md"
+FDA_REVIEW = REPO_ROOT / "plugins" / "flow-architecture" / "commands" / "review.md"
+FDA_SHIP = REPO_ROOT / "plugins" / "flow-architecture" / "commands" / "ship.md"
+
+
+def test_fda_session_start_has_context_queries_and_context_load() -> None:
+    assert_valid_context_queries("flow:session-start", FDA_SESSION_START)
+    assert_context_load_prose("flow:session-start", FDA_SESSION_START)
+
+
+def test_fda_review_has_flywheel() -> None:
+    assert_valid_context_queries("flow:review", FDA_REVIEW)
+    assert_context_load_prose("flow:review", FDA_REVIEW)
+    save = section(body_of(FDA_REVIEW), "Save-results")
+    assert f"{GBRAIN_TEAM_PREFIX}put_page" in save and "reviews/" in save and "learnings/" in save, \
+        "flow:review Save-results must put_page to reviews/ or learnings/"
+
+
+def test_fda_ship_has_flywheel() -> None:
+    assert_valid_context_queries("flow:ship", FDA_SHIP)
+    assert_context_load_prose("flow:ship", FDA_SHIP)
+    save = section(body_of(FDA_SHIP), "Save-results")
+    assert f"{GBRAIN_TEAM_PREFIX}put_page" in save and "releases/" in save, \
+        "flow:ship Save-results must put_page to releases/"
+
+
+def _blob_sha(path: Path) -> str:
+    """git blob SHA of the working-tree file (== `git rev-parse HEAD:<path>` for
+    identical content; == origin/main's blob once merged). Same source of truth
+    as flow-architecture/scripts/check-clone-drift.sh."""
+    return subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "hash-object", str(path)],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+
+def test_fda_clone_upstream_sha_matches_current_workflows_blob() -> None:
+    """After re-syncing the flywheel into the FDA clones, each clone's recorded
+    Upstream-SHA must equal the current workflows source blob — or the
+    flow-architecture clone-drift guard (vslice-greenfield CI) fails."""
+    for name, fda_path in {
+        "session-start": FDA_SESSION_START,
+        "review": FDA_REVIEW,
+        "ship": FDA_SHIP,
+    }.items():
+        upstream = REPO_ROOT / "plugins" / "workflows" / "commands" / f"{name}.md"
+        expected = _blob_sha(upstream)
+        m = re.search(r"Upstream-SHA:\s*([0-9a-fA-F]{40})", fda_path.read_text(encoding="utf-8"))
+        assert m, f"{name} FDA clone: header missing Upstream-SHA"
+        assert m.group(1).lower() == expected, (
+            f"{name} FDA clone Upstream-SHA {m.group(1)[:7]} != current workflows blob "
+            f"{expected[:7]} — re-record the header after propagating the flywheel"
+        )

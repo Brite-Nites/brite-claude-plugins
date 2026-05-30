@@ -18,7 +18,7 @@ cd "$REPO_ROOT"
 
 DRIFT="plugins/flow-architecture/scripts/check-clone-drift.sh"
 CLONE_FILE="plugins/flow-architecture/commands/session-start.md"
-TARGET_LINE='Upstream-SHA: 39282fa82e6563ce0b385cf54fcc47be37801a4a'
+TARGET_LINE='Upstream-SHA: 076d60745aa75cb3e9ec6ba920a30749d4eb9893'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 
 # Drive the classifier from the branch's HEAD blob, not origin/main. The test

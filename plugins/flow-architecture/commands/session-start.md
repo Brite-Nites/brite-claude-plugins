@@ -1,8 +1,31 @@
 ---
 description: Start a work session — pull latest, pick an FDA discipline-child issue, brainstorm, plan with discipline dispatch, set up worktree, execute
+gbrain:
+  schema: 1
+  context_queries:
+    - id: recent-sessions
+      kind: list
+      filter:
+        type: session-summary
+        tags_contains: "repo:{repo_slug}"
+      sort: updated_at_desc
+      limit: 5
+      render_as: "## Recent sessions on this repo"
+    - id: wip-and-open-questions
+      kind: vector
+      query: "work in progress, checkpoints, and open questions for {repo_slug}"
+      limit: 5
+      render_as: "## Work-in-progress + open threads"
+    - id: recent-releases
+      kind: list
+      filter:
+        tags_contains: "release"
+      sort: updated_at_desc
+      limit: 3
+      render_as: "## Recent releases for this repo"
 ---
 
-<!-- Cloned from workflows v3.32.0 (commands/session-start.md) on 2026-05-28. Upstream-SHA: 39282fa82e6563ce0b385cf54fcc47be37801a4a. Drift-detection per parking lot #45. Re-synced for BC-11891 (context7 removal — both files dropped their Context7 prereq probes in tandem). -->
+<!-- Cloned from workflows v3.32.0 (commands/session-start.md) on 2026-05-28. Upstream-SHA: 076d60745aa75cb3e9ec6ba920a30749d4eb9893. Drift-detection per parking lot #45. Re-synced for BC-11891 (context7 removal — both files dropped their Context7 prereq probes in tandem). Re-synced for BC-11754 (team-gbrain context-load phase — propagated verbatim from upstream). -->
 
 # Session Start
 
@@ -17,6 +40,16 @@ Run silently before any other work (suppress all output, never fail):
 ```bash
 BRITE_ROOT="$(cat ~/.brite-plugins/.repo-root 2>/dev/null)" && bash "$BRITE_ROOT/scripts/telemetry-log.sh" start session-start 2>/dev/null || true
 ```
+
+## Context-load phase
+
+The read half of the brain-as-delivery flywheel. Before orienting, load relevant prior context from the **team** gbrain — the OAuth-backed `mcp__plugin_workflows_gbrain-team__*` MCP, NOT the local/personal `gbrain` CLI (different brain). For each entry under this command's `gbrain.context_queries` frontmatter, run the matching team-brain tool and render results under that entry's `render_as` heading:
+
+- `kind: list` → `mcp__plugin_workflows_gbrain-team__list_pages` with the entry's `filter` / `sort` / `limit`
+- `kind: vector` → `mcp__plugin_workflows_gbrain-team__query` with the entry's `query` text (and `limit`)
+- `kind: filesystem` → read local files matching `glob` (no brain call)
+
+Substitute `{repo_slug}` with the current repo slug. If a query returns nothing, note it briefly and proceed — empty results are a content-gap signal, not an error. Cite anything you apply (e.g., "Prior learning applied: <slug>").
 
 ## Step 0: Verify Prerequisites
 

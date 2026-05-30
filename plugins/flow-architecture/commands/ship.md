@@ -1,14 +1,45 @@
 ---
 description: FDA-shaped Ship & Compound — pre-ship audit + FDA-shaped PR + Q46 ship-summary writeback + retro soft-notification. Cloned from workflows ship.md with FDA-swap at Steps 1, 2, 3, 8 (Q53 lock).
+gbrain:
+  schema: 1
+  context_queries:
+    - id: recent-releases
+      kind: list
+      filter:
+        type: release
+        tags_contains: "repo:{repo_slug}"
+      sort: updated_at_desc
+      limit: 5
+      render_as: "## Recent releases for this repo"
+    - id: post-deploy-issues
+      kind: vector
+      query: "post-deploy issues, rollbacks, and incidents for {repo_slug}"
+      limit: 5
+      render_as: "## Prior post-deploy issues to watch"
+    - id: changelog-patterns
+      kind: vector
+      query: "changelog and release-note conventions for {repo_slug}"
+      limit: 3
+      render_as: "## Changelog patterns"
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: a22fd5dae19065c499a1202a03120324a68fe2ce. Drift-detection per parking lot #45. -->
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 6004a8f244d14c453fb3e8059bef5eba2f39a169. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). -->
 
 # Ship & Compound
 
 You are shipping completed work on a Flow-Driven Architecture discipline-child and capturing what was learned. Your job is to run the pre-ship audit, create a clean FDA-shaped PR, route the Linear write through the Q46 ship-summary marker, run the compound + audit cycle, clean up, and close the session with a retro soft-notification if this shipped the last sub-flow in the domain.
 
 > **DO NOT re-derive** the 9-step structure, the per-step FDA-swap classification (Steps 0/7 verbatim; Steps 4/5/6 transitive-reuse; Steps 1/2/3/8 with FDA augments), or the Q46 ship-summary call signature. All three are locked at Q53 (`docs/design-rationale/fda-plugin-interview.md:1621` with sub-decisions at `:1625-1654` and refinement audit trail at `:1664`). The HTML-comment header above pins the workflows source SHA for drift detection per parking lot #45. Re-read those before drafting any change to this file.
+
+## Context-load phase
+
+The read half of the brain-as-delivery flywheel (pairs with Step 4b's save-results). Before shipping, load relevant prior context from the **team** gbrain — the OAuth-backed `mcp__plugin_workflows_gbrain-team__*` MCP, NOT the local/personal `gbrain` CLI (different brain). For each entry under this command's `gbrain.context_queries` frontmatter, run the matching team-brain tool and render results under that entry's `render_as` heading:
+
+- `kind: list` → `mcp__plugin_workflows_gbrain-team__list_pages` with the entry's `filter` / `sort` / `limit`
+- `kind: vector` → `mcp__plugin_workflows_gbrain-team__query` with the entry's `query` text (and `limit`)
+- `kind: filesystem` → read local files matching `glob` (no brain call)
+
+Substitute `{repo_slug}` with the current repo slug. If a query returns nothing, note it briefly and proceed — empty results are a content-gap signal, not an error. Cite anything you apply (e.g., "Prior learning applied: <slug>").
 
 ## Step 0: Verify GitHub CLI
 
@@ -180,6 +211,21 @@ Only durable knowledge gets recorded. No session-specific noise.
 This step is preserved verbatim from workflows ship.md (TRANSITIVE REUSE per Q50 amendment 2). The `compound-learnings` skill lives in the workflows plugin and is invoked transparently — FDA does not re-implement it.
 
 Narrate: `Step 4/8: Compounding learnings... done`
+
+## Step 4b: Save-results — release page to the team brain
+
+Narrate: `Step 4b/8: Saving release to team brain...`
+
+The write half of the brain-as-delivery flywheel (pairs with this command's context-load phase): save the release as a team gbrain page so later `/workflows:ship` and `/workflows:review` runs surface it. Use `mcp__plugin_workflows_gbrain-team__put_page` — the OAuth-backed **team** brain MCP, NOT the local/personal `gbrain` CLI (different brain).
+
+- **slug:** `releases/<version>` (e.g., `releases/v0.5.4`). Derive `<version>` from the tag/VERSION bumped in this ship; if there is none, use `releases/<repo-slug>-pr-<pr-number>`.
+- **type:** `release` — set the page type so the context-load `type: release` filter matches this page.
+- **title:** `Release: <version> — <pr-title>`
+- **tags:** `[release, <version>, repo:<repo-slug>, ...affected-components]` — the `repo:<repo-slug>` tag is load-bearing: it's how the context-load `tags_contains: "repo:{repo_slug}"` filter finds this page later.
+- **content:** release notes / changelog summary, key changes, deploy details, and post-deploy considerations (migrations, feature flags, rollback notes).
+
+### Throttle handling
+If `put_page` returns a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`), do NOT fail the ship — log a `TODO: retry releases/<version> save` line and continue. The release already shipped; the brain page is best-effort.
 
 ## Step 5: Best Practices Audit
 
