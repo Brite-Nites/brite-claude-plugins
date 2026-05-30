@@ -58,7 +58,10 @@ _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
 
 @lru_cache(maxsize=None)
 def read(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    # Normalize CRLF so the frontmatter regex + section scoping are line-ending
+    # agnostic (a Windows checkout with core.autocrlf=true would otherwise make
+    # every split_frontmatter raise a misleading "no frontmatter" error).
+    return path.read_text(encoding="utf-8").replace("\r\n", "\n")
 
 
 def split_frontmatter(path: Path) -> tuple[str, str]:
@@ -72,11 +75,24 @@ def split_frontmatter(path: Path) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
-def gbrain_block(path: Path) -> dict:
-    """Parse the `gbrain:` frontmatter block as YAML and return it (or {})."""
+def _frontmatter_mapping(path: Path) -> dict[str, object]:
+    """YAML-parse the frontmatter, asserting it's a mapping (clear AssertionError
+    rather than an opaque AttributeError if it parses to a list/scalar)."""
     frontmatter, _ = split_frontmatter(path)
-    data = yaml.safe_load(frontmatter) or {}
-    return data.get("gbrain") or {}
+    data = yaml.safe_load(frontmatter)
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise AssertionError(f"{path.name}: frontmatter is not a YAML mapping")
+    return data
+
+
+def gbrain_block(path: Path) -> dict[str, object]:
+    """Parse the `gbrain:` frontmatter block as YAML and return it (or {})."""
+    gb = _frontmatter_mapping(path).get("gbrain") or {}
+    if not isinstance(gb, dict):
+        raise AssertionError(f"{path.name}: `gbrain:` frontmatter is not a mapping")
+    return gb
 
 
 def body_of(path: Path) -> str:
@@ -91,11 +107,14 @@ def section(body: str, heading_keyword: str) -> str:
     Scoping prevents a keyword (e.g. "content") elsewhere in the doc from
     false-passing an assertion meant for this section.
     """
-    m = re.search(rf"^(#+)\s+.*{re.escape(heading_keyword)}.*$", body, re.MULTILINE)
+    # Strip fenced code blocks first so a `#`-prefixed line inside a ``` fence
+    # can't be mistaken for the section heading (latent false-anchor trap).
+    scrubbed = re.sub(r"(?ms)^```.*?^```", "", body)
+    m = re.search(rf"^(#+)\s+.*{re.escape(heading_keyword)}.*$", scrubbed, re.MULTILINE)
     if not m:
         raise AssertionError(f"No heading containing {heading_keyword!r} found")
     level = len(m.group(1))
-    rest = body[m.end():]
+    rest = scrubbed[m.end():]
     # Next heading at the same or higher level (<= this heading's depth) ends the section.
     nxt = re.search(rf"^#{{1,{level}}}\s+\S", rest, re.MULTILINE)
     return rest[: nxt.start()] if nxt else rest
@@ -112,7 +131,8 @@ def test_ship_declares_save_results_to_releases_slug() -> None:
     assert "releases/" in save, \
         "ship.md Save-results must use the releases/<version> slug pattern"
     for field in ("title", "tags", "content"):
-        assert field in save, f"ship.md Save-results must document the `{field}` field"
+        assert re.search(rf"\*\*{field}:\*\*", save), \
+            f"ship.md Save-results must document the **{field}:** field as a bullet"
 
 
 def test_review_declares_save_results_to_reviews_or_learnings_slug() -> None:
@@ -125,7 +145,8 @@ def test_review_declares_save_results_to_reviews_or_learnings_slug() -> None:
     assert "learnings/" in save, \
         "review.md Save-results must offer the learnings/<topic-slug> slug for recurring patterns"
     for field in ("title", "tags", "content"):
-        assert field in save, f"review.md Save-results must document the `{field}` field"
+        assert re.search(rf"\*\*{field}:\*\*", save), \
+            f"review.md Save-results must document the **{field}:** field as a bullet"
 
 
 # --- READ side (BC-11754): gbrain.context_queries + context-load phase -----
@@ -161,19 +182,24 @@ def assert_valid_context_queries(name: str, path: Path) -> None:
 
 def assert_context_load_prose(name: str, path: Path) -> None:
     cl = section(body_of(path), "Context-load")
-    assert (f"{GBRAIN_TEAM_PREFIX}query" in cl) or (f"{GBRAIN_TEAM_PREFIX}list_pages" in cl), \
-        f"{name}: Context-load phase must invoke the gbrain-team MCP tools (query / list_pages)"
+    # Require the full wiring, not just a name-drop — a gutted "TODO: wire later
+    # (mentions query and render_as)" stub must fail. Every context-load block
+    # maps BOTH kinds and anchors on the declared frontmatter.
+    assert f"{GBRAIN_TEAM_PREFIX}list_pages" in cl, \
+        f"{name}: Context-load must map kind:list -> gbrain-team list_pages"
+    assert f"{GBRAIN_TEAM_PREFIX}query" in cl, \
+        f"{name}: Context-load must map kind:vector -> gbrain-team query"
+    assert "context_queries" in cl, \
+        f"{name}: Context-load must instruct fulfilling the declared gbrain.context_queries"
     assert "render_as" in cl, \
-        f"{name}: Context-load phase must tell the agent to render results under each query's render_as"
+        f"{name}: Context-load must render results under each query's render_as"
 
 
 def assert_tool_allowlist_includes_gbrain(name: str, path: Path, key: str) -> None:
     """For artifacts with a RESTRICTED tool list (commands' allowed-tools, agents'
     tools), the gbrain-team query/list_pages tool must be present — a restricted
     surface cannot call a tool it doesn't declare, so context-load would no-op."""
-    frontmatter, _ = split_frontmatter(path)
-    data = yaml.safe_load(frontmatter) or {}
-    raw = data.get(key)
+    raw = _frontmatter_mapping(path).get(key)
     if isinstance(raw, str):
         toolset = {t.strip() for t in raw.split(",") if t.strip()}
     elif isinstance(raw, list):
@@ -280,13 +306,26 @@ def test_fda_ship_has_flywheel() -> None:
 
 
 def _blob_sha(path: Path) -> str:
-    """git blob SHA of the working-tree file (== `git rev-parse HEAD:<path>` for
-    identical content; == origin/main's blob once merged). Same source of truth
-    as flow-architecture/scripts/check-clone-drift.sh."""
-    return subprocess.run(
+    """git blob SHA of the WORKING-TREE file content (`git hash-object`).
+
+    This validates that the FDA clone headers were re-recorded to match the
+    workflows source AS EDITED ON THIS BRANCH — the same content that becomes
+    origin/main's blob once the PR merges. NOTE this intentionally differs from
+    the production guard (check-clone-drift.sh defaults UPSTREAM_REF=origin/main):
+    mid-PR, origin/main still holds the pre-flywheel blob, so the production
+    `clone-drift-check` job is advisory (continue-on-error) and goes green on
+    merge. The BC-7060 regression test (test-clone-drift.sh) likewise overrides
+    to UPSTREAM_REF=HEAD. `git hash-object` needs no repo, but surface a clear
+    error if git is unavailable / the file is unreadable rather than an opaque
+    CalledProcessError that hides stderr.
+    """
+    r = subprocess.run(
         ["git", "-C", str(REPO_ROOT), "hash-object", str(path)],
-        capture_output=True, text=True, check=True,
-    ).stdout.strip()
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise AssertionError(f"git hash-object failed for {path}: {r.stderr.strip()}")
+    return r.stdout.strip()
 
 
 def test_fda_clone_upstream_sha_matches_current_workflows_blob() -> None:
