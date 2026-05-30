@@ -185,6 +185,10 @@ for cmd_label in "start-project:$START_CMD" "retrofit-project:$RETROFIT_CMD"; do
     "\$REPO_ROOT/docs/templates/job-story.md" "$cmd"
   assert_grep "$label orchestrator prose states the seeded-template count (currently 11)" \
     "Build the 11 template-source" "$cmd"
+  # Lock the confirmation-line count too — it must move in lockstep with the array
+  # count (the stale-"9" drift class already hit once, fixed in 63ae7a0e).
+  assert_grep "$label confirmation line states 11 files + docs/templates/" \
+    "11 files written under scripts/ + docs/templates/" "$cmd"
 done
 
 # ── Summary ──────────────────────────────────────────────────────────
