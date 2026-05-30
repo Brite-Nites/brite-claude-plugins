@@ -2638,6 +2638,22 @@ Q58 authored 2026-05-22 by orchestrator session-start synthesizing the BC-11029 
 
 **Audit trail.** Q58 amendment 1 authored 2026-05-26 by executor session implementing [BC-11089](https://linear.app/brite-nites/issue/BC-11089). Closes the gap called out in Q58 § Out-of-scope item (a). Plugin version 1.2.3 → 1.2.4 (patch — additive parity, no breaking change).
 
+### Q58 amendment 2 — seed the canonical doc templates into consumers (copy manifest 9 → 11) + journey/story-doc-author drift correction (2026-05-30, [BC-11983](https://linear.app/brite-nites/issue/BC-11983) WS-E precursor)
+
+**Trigger.** The brite-sites WS-E doc pass (PR #32) surfaced that the FDA-generated journey + story docs had **drifted structurally from the canonical handbook templates** (`about-handbook/style-guide/templates/{domain-journey,job-story}.md`) — losing `## Decision points` / `## Open questions` (journey) and `## Preconditions` / `## QA history` (story), and adding domain-level duplicate `Pain points`/`Opportunities`/`Sub-flows`/consolidated `Job stories` sections. Full decision record + grill (D1–D6) in [`docs/designs/fda-journey-story-template-alignment.md`](../../../../docs/designs/fda-journey-story-template-alignment.md).
+
+**Root cause (two layers).** (1) The author reads `template_path = docs/templates/<journey|job-story>.md` from the **consumer repo**, but the plugin shipped **only** the verify-docs.sh ecosystem (`templates/scripts/` + `.flow/`), never the doc templates — so a consumer without the hand-promoted handbook templates (brite-sites) had no file to read; (2) the author's fallback prose (`journey-doc-author` / `story-doc-author`) had itself drifted from its own **Q15 / Q16 canonical-section locks**.
+
+**What changed (plugin-side only — handbook templates were already canonical).**
+1. **Seed the doc templates (Q58 manifest 9 → 11).** The plugin now ships `templates/docs/templates/{domain-journey,job-story}.md` (canonical structure + the FDA-additive sections — `## L2 review summary` per Q26 mod 2, conditional `## Cross-domain dependencies` per Q27 amendment 1 mod 4, `## Status notes`, and an evidence-anchor `## Status` section [grill D4]). Both `/flow:start-project` + `/flow:retrofit-project` Phase 1 templates-scaffold copy them into the consumer's `docs/templates/`. Only the journey template's `linear_project_id: <LINEAR_PROJECT_ID>` is sed-substituted; all authoring placeholders (`<DOMAIN>`, `<DOMAIN-NN>`, `<role>`) pass through intact.
+2. **Drift correction (NOT a Q15/Q16/Q26/Q27 amendment).** `journey-doc-author` + `story-doc-author` prose re-aligned to the canonical section order their Q15/Q16 locks already specified; the per-phase-only rule (no domain-level duplicate sections) and the canonical-order enumeration are made explicit. Frame rules (D11 / EARS constraint-spec) unchanged.
+
+**Frontmatter (grill D3, amended).** Story frontmatter = full canonical incl. per-discipline `eng_status`/`design_status`/`docs_status`/`qa_status` — these are the **published delivery-state mirror** `regenerate-flow-index.mts` renders into the `INDEX.md` grid (Linear stays orchestration SoT). Omitting them silently blanks that dashboard, so the original "hybrid: omit volatile state" framing was reversed during implementation.
+
+**Regression prevention.** New `tests/run-template-alignment-vslice.sh` (50 assertions; validate.sh §2b''''''''''') — grep-triad (catchphrase + structural + negative) over both templates, both agents, and both orchestrators' copy arrays; mutation-verified. `tests/run-verify-docs-ecosystem-vslice.sh` §3b scoped to exclude `templates/docs/` (doc templates are a separate category from the verify-docs ecosystem).
+
+**Audit trail.** Q58 amendment 2 authored 2026-05-30 by grill-with-docs session (BC-11983 WS-E precursor). Plugin version 1.2.8 → 1.2.9 (patch — additive template seeding + agent drift correction, no breaking change). Sequencing: template-first → re-pass brite-sites → 6 remaining WS-E repos (grill D6).
+
 ## Q59 — `/flow:deprecate-legacy` orchestrator: Phase 5 legacy-milestone retirement codified as a two-pass command (LOCKED 2026-05-26, per [BC-10219](https://linear.app/brite-nites/issue/BC-10219))
 
 Phase 5 of the FDA lifecycle — retiring legacy milestones after a project's retrofit is complete — was previously a manual process (precedent: [BC-6580](https://linear.app/brite-nites/issue/BC-6580) BriteBase). Q59 codifies the 4 per-milestone sub-steps into a repeatable orchestrator command at `commands/deprecate-legacy.md`.

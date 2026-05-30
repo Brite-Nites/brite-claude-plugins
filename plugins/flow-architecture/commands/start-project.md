@@ -194,11 +194,11 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
 - `INTENT_EXISTS`, `INVENTORY_EXISTS`, `FLOWS_DIR_EXISTS`, `BREADCRUMB_EXISTS` (all `no` for fresh greenfield)
 - `GH_AUTH`, `LINEAR_MCP` (orchestrator already probed Linear in flow-preflight Section 1.1)
 
-**Templates scaffold (BC-11029, Q58):** after `.flow/config.json` is written and the 10 fields are captured, but BEFORE the Phase 1 terminal breadcrumb write, the orchestrator copies the project-side verify-docs.sh ecosystem from `$CLAUDE_PLUGIN_ROOT/templates/scripts/` into the consumer project's `scripts/` directory and substitutes the 4 placeholders via a python3-built sed script file. Q58 locks the canonical source + substitution flow.
+**Templates scaffold (BC-11029, Q58):** after `.flow/config.json` is written and the 10 fields are captured, but BEFORE the Phase 1 terminal breadcrumb write, the orchestrator copies the project-side verify-docs.sh ecosystem from `$CLAUDE_PLUGIN_ROOT/templates/scripts/` into the consumer project's `scripts/` directory **and the canonical doc templates** (`domain-journey.md`, `job-story.md`) from `$CLAUDE_PLUGIN_ROOT/templates/docs/templates/` into the consumer's `docs/templates/` directory, then substitutes the 4 placeholders via a python3-built sed script file. Q58 locks the canonical source + substitution flow; seeding the doc templates is what gives `story-doc-author` / `journey-doc-author` a real `template_path` to read (their fallback-to-drifted-prose failure mode otherwise).
 
 1. **Resolve LINEAR_ORG_SLUG.** Call `mcp__plugin_workflows_linear-server__get_project({id: <LINEAR_PROJECT_ID>})` and parse `LINEAR_ORG_SLUG` from the `url` field (`https://linear.app/<slug>/project/...`). The MCP response is the trust boundary — Linear-derived strings (`LINEAR_PROJECT_NAME`, `LINEAR_ORG_SLUG`) MUST NOT cross into shell as `$VAR` inside a double-quoted argument (a backtick or `$(...)` in a malicious project name would execute on the developer's machine at sed-time). Step 4 below builds the sed script via a single-quoted python heredoc, mirroring the protection pattern the breadcrumb write uses below.
 
-2. **Build the 9 template-source → target-path parallel arrays** (bash 3.2 compatible — no associative arrays):
+2. **Build the 11 template-source → target-path parallel arrays** (bash 3.2 compatible — no associative arrays):
 
    ```bash
    SRC_PATHS=(
@@ -211,6 +211,8 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
      "$CLAUDE_PLUGIN_ROOT/templates/scripts/lib/linear-graphql.mts"
      "$CLAUDE_PLUGIN_ROOT/templates/.flow/scaffold-log/SCHEMA.md"
      "$CLAUDE_PLUGIN_ROOT/templates/README.md"
+     "$CLAUDE_PLUGIN_ROOT/templates/docs/templates/domain-journey.md"
+     "$CLAUDE_PLUGIN_ROOT/templates/docs/templates/job-story.md"
    )
    TARGET_PATHS=(
      "$REPO_ROOT/scripts/verify-docs.sh"
@@ -222,12 +224,14 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
      "$REPO_ROOT/scripts/lib/linear-graphql.mts"
      "$REPO_ROOT/.flow/scaffold-log/SCHEMA.md"
      "$REPO_ROOT/scripts/FDA-TEMPLATES-README.md"
+     "$REPO_ROOT/docs/templates/domain-journey.md"
+     "$REPO_ROOT/docs/templates/job-story.md"
    )
    ```
 
-   The `.flow/config.json` template is schema-reference only and is NOT copied — `flow-preflight` Section 4.4 owns the runtime `.flow/config.json` write per Q12.4 lock. The 10th file in the plugin's `templates/` directory (`.flow/config.json`, the schema reference) stays plugin-side; only the 9 above land in the consumer project.
+   The `.flow/config.json` template is schema-reference only and is NOT copied — `flow-preflight` Section 4.4 owns the runtime `.flow/config.json` write per Q12.4 lock. That schema-reference file stays plugin-side; only the 11 above land in the consumer project. (The two `docs/templates/*.md` entries carry no `<LINEAR_*>`/`<PROJECT_NAME>`/`<EXPECTED_FDA_ISSUE_COUNT>` placeholders except the journey template's `linear_project_id: <LINEAR_PROJECT_ID>`, so the sed pass substitutes only that one token and leaves every authoring placeholder — `<DOMAIN>`, `<DOMAIN-NN>`, `<role>` — intact for the doc-author agents to fill.)
 
-3. **Idempotency check** (default behavior — no `--overwrite-scripts`): probe each of the 9 target paths via `test -f`. If ANY exists, surface the conflict list and HALT Phase 1. Recovery semantics differ from Q36.5's atomic-rename (which guarantees absent-or-complete): templates-scaffold's per-file loop CAN leave partial state on crash. That partial state is recoverable but NOT atomic — the next re-run halts on this idempotency check before any further mutation, surfacing the conflict to the operator. See § Failure semantics below.
+3. **Idempotency check** (default behavior — no `--overwrite-scripts`): probe each of the 11 target paths via `test -f`. If ANY exists, surface the conflict list and HALT Phase 1. Recovery semantics differ from Q36.5's atomic-rename (which guarantees absent-or-complete): templates-scaffold's per-file loop CAN leave partial state on crash. That partial state is recoverable but NOT atomic — the next re-run halts on this idempotency check before any further mutation, surfacing the conflict to the operator. See § Failure semantics below.
 
    ```bash
    if [ "${FLOW_OVERWRITE_SCRIPTS:-false}" != "true" ]; then

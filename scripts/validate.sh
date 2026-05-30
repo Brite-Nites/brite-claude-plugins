@@ -419,6 +419,35 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b''''''''''' — flow-architecture journey/story template alignment (BC-11983 WS-E precursor)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-template-alignment-vslice.sh — the
+# regression lock that keeps the journey-doc-author / story-doc-author agents
+# AND the canonical templates the plugin seeds into consumers
+# (templates/docs/templates/{domain-journey,job-story}.md) from drifting away
+# from the canonical handbook structure (the brite-sites teardown root cause:
+# missing consumer template file + drifted agent fallback prose). Grep-triad
+# per file (catchphrase + structural-clause + negative-case): restores Decision
+# points / Open questions / Preconditions / QA history, forbids the domain-level
+# duplicate sections, and asserts both orchestrators COPY the templates into the
+# consumer's docs/templates/. Pass count auto-derived from the harness RESULT line.
+section "2b'''''''''''. flow-architecture journey/story template alignment (BC-11983)"
+
+fda_tmpl_align_test="$REPO_ROOT/plugins/flow-architecture/tests/run-template-alignment-vslice.sh"
+
+if [ ! -f "$fda_tmpl_align_test" ]; then
+  warn "plugins/flow-architecture/tests/run-template-alignment-vslice.sh not found — skipped"
+else
+  if fda_tmpl_align_out=$(bash "$fda_tmpl_align_test" 2>&1); then
+    fda_tmpl_align_pass_count=$(printf '%s\n' "$fda_tmpl_align_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture journey/story template alignment vslice (${fda_tmpl_align_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture journey/story template alignment vslice failed — run plugins/flow-architecture/tests/run-template-alignment-vslice.sh for details"
+    printf '%s\n' "$fda_tmpl_align_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
