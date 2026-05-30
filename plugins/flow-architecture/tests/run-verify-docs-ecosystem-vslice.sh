@@ -112,17 +112,27 @@ done
 # ── §3b: Extra-file detection — actual count matches EXPECTED_FILES ─
 section "3b" "no extra files in templates/ beyond EXPECTED_FILES (drift detection)"
 
+# Scope §3b's file COUNT to the verify-docs.sh ECOSYSTEM subtree only — exclude
+# templates/docs/ (the canonical doc-templates domain-journey.md / job-story.md, a
+# separate category seeded by the same copy step but locked by
+# run-template-alignment-vslice.sh, not this ecosystem fidelity check). This -not -path
+# exclusion governs ONLY the §3b file count. (The doc-templates' authoring placeholders
+# (<DOMAIN> etc.) and the brite-nites Linear-org URL are independently out of scope for
+# §3's forbidden-string and §4/§5's placeholder scans — those use --include='*.sh'/
+# '*.mts'/'*.mjs'/'*.json' filters that never match the .md templates.)
 actual_count=$(find "$TEMPLATES_DIR" -type f \
                 \( -name '*.sh' -o -name '*.mts' -o -name '*.mjs' -o -name '*.json' -o -name '*.md' \) \
+                -not -path "$TEMPLATES_DIR/docs/*" \
                 2>/dev/null | wc -l | tr -d ' ')
 expected_count="${#EXPECTED_FILES[@]}"
 
 if [ "$actual_count" = "$expected_count" ]; then
-  pass "templates/ contains exactly $expected_count files (matches EXPECTED_FILES)"
+  pass "templates/ ecosystem subtree contains exactly $expected_count files (matches EXPECTED_FILES; templates/docs/ excluded)"
 else
-  fail "templates/ has $actual_count files but EXPECTED_FILES lists $expected_count — drift detected"
+  fail "templates/ ecosystem subtree has $actual_count files but EXPECTED_FILES lists $expected_count — drift detected"
   find "$TEMPLATES_DIR" -type f \
     \( -name '*.sh' -o -name '*.mts' -o -name '*.mjs' -o -name '*.json' -o -name '*.md' \) \
+    -not -path "$TEMPLATES_DIR/docs/*" \
     2>/dev/null | sed "s|$TEMPLATES_DIR/||" | sed 's/^/    /'
 fi
 

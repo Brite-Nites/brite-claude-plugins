@@ -18,13 +18,13 @@ You audit one FDA artifact for fidelity to its canonical template and cross-refe
 
 ## Steps
 
-1. **Read the template.** `Read template_path`. Capture required front-matter fields, required H2 sections in order, required body markers (e.g., Q46 idempotency comment pairs, Q23 review-summary marker, Q24 cross-discipline-context marker).
+1. **Read the template.** `Read template_path`. Capture required front-matter fields, required H2 sections in order, required body markers (e.g., Q46 idempotency comment pairs, Q23 review-summary marker, Q24 cross-discipline-context marker). **Conditional sections:** a template H2 whose heading text carries a literal `(sometimes)` suffix (e.g. `## Decision points (sometimes)`, `## Status notes (sometimes)`, `## Cross-domain dependencies (sometimes)`) is **optional** — record it as conditional, not required. Compare on the **bare** heading name (strip the `(sometimes)` annotation): the authored artifact emits the bare heading (`## Decision points`), never the annotated form.
 2. **Read the artifact.**
    - `linear_issue` → call `mcp__plugin_workflows_linear-server__get_issue` with `id: artifact_ref`. Inspect `description`, `labels`, `status`, `assignee`.
    - `story_doc` / `journey_doc` → `Read artifact_ref`.
 3. **Run the fidelity checks (in order).** A FAIL on any required-shape check halts the rest and goes straight to the FAIL output. Cosmetic checks (typos, whitespace, casing) never fail — they accumulate in `cosmetic_ignored[]`.
    - **Front-matter completeness.** All required template front-matter fields present? Missing field → FAIL.
-   - **Section order.** H2 sections in template order? Out-of-order or missing required H2 → FAIL.
+   - **Section order.** Required (non-conditional) H2 sections present and in template order? Out-of-order or missing **required** H2 → FAIL. A **conditional** `(sometimes)` section is exempt: its absence is never a FAIL, and when present it is checked for position-among-the-required-sections only (compare on the bare heading name). Never FAIL a doc for omitting a `(sometimes)` section.
    - **Cross-reference accuracy.** Does the artifact reference the parent / siblings / labels that match `cross_ref_state`? Wrong parent ID or wrong label set → FAIL.
    - **Status alignment.** For `linear_issue`: does `status` match `cross_ref_state.expected_status`? Drift → FAIL.
    - **Q46 marker presence.** For templates that require `<!-- FDA-WRITEBACK-<type>-START -->` / `END` marker pairs, both present and balanced? Missing or unbalanced → FAIL.
