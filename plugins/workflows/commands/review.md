@@ -373,7 +373,7 @@ The write half of the brain-as-delivery flywheel (pairs with this command's cont
 - **type:** `review-finding` (or `learning` for a `learnings/` page) — set the page type so the context-load `type: review-finding` filter matches this page.
 - **title:** `Review: <pr-title>` (or `Learning: <topic>` for a `learnings/` page).
 - **tags:** `[review, repo:<repo-slug>, <pr-number>, ...finding-topic-tags]` — the `repo:<repo-slug>` tag is load-bearing: it's how the context-load `tags_contains: "repo:{repo_slug}"` filter finds this page later.
-- **content:** the findings, severity-classified (P1/P2/P3 per `_shared/output-formats.md`), with code-line citations.
+- **content:** the findings, severity-classified (P1/P2/P3), with code-line citations.
 - **Redact before saving:** never persist secrets, credentials, connection strings, tokens, raw `.env` values, or customer PII into a brain page — cite the location (`config.ts:12 — hardcoded key, redacted`) instead of the value.
 
 ### Entity enrichment
