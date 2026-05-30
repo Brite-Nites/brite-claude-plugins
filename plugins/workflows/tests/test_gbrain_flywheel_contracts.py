@@ -177,7 +177,8 @@ def assert_valid_context_queries(name: str, path: Path) -> None:
         assert isinstance(q.get("render_as"), str) and q["render_as"], \
             f"{where} must have a string `render_as` heading"
         req = _KIND_REQUIRED_KEY[kind]
-        assert req in q, f"{where}: kind={kind} requires a `{req}` field (gstack schema)"
+        assert q.get(req), \
+            f"{where}: kind={kind} requires a non-empty `{req}` field (gstack schema)"
 
 
 def assert_context_load_prose(name: str, path: Path) -> None:
