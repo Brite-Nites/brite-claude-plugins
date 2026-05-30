@@ -24,7 +24,7 @@ gbrain:
       render_as: "## Recurring issue patterns"
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: d0421abf15e8e8d32369d9d01f94859cefd55678. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). -->
+<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: 60b8c67f400a2d059e358f01b721d4687897bd0f. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). -->
 
 # Review Loop (Phase 5)
 
@@ -408,8 +408,8 @@ The write half of the brain-as-delivery flywheel (pairs with this command's cont
 ### Entity enrichment
 Skip this on trivial/fast reviews. Otherwise take the **top 5–8 highest-signal** entities named in the findings (projects, technologies — NOT personal names / PII), dedup case-insensitively, then run **one** `mcp__plugin_workflows_gbrain-team__list_pages` to find which already exist. Create stubs at `entities/<entity-slug>` only for the missing ones, under the same throttle budget as the save above (defer on rate-limit). This bound keeps a large review from fanning out into dozens of brain round-trips.
 
-### Throttle handling
-If `put_page` returns a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`), do NOT fail the review — log a `TODO: retry reviews/<pr-number> save` line and continue. Findings are already reported; the brain page is best-effort.
+### Throttle / permission handling
+If `put_page` fails — a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`) OR a scope/permission error (`insufficient_scope`, `permission_denied`, `403`) — do NOT fail the review: log a `TODO: retry reviews/<pr-number> save` line and continue. Findings are already reported; the brain page is best-effort. **The team-brain client is read-scope only today, so `put_page` no-ops with `insufficient_scope` until write scope is granted (BC-12113) — this save then activates automatically.**
 
 ## Rules
 

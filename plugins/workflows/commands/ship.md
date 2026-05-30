@@ -157,8 +157,8 @@ The write half of the brain-as-delivery flywheel (pairs with this command's cont
 - **content:** release notes / changelog summary, key changes, deploy details, and post-deploy considerations (migrations, feature flags, rollback notes).
 - **Redact before saving:** never persist secrets, credentials, connection strings, tokens, raw `.env` values, or customer PII into a brain page — cite the location (`config.ts:12 — hardcoded key, redacted`) instead of the value.
 
-### Throttle handling
-If `put_page` returns a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`), do NOT fail the ship — log a `TODO: retry releases/<version> save` line and continue. The release already shipped; the brain page is best-effort.
+### Throttle / permission handling
+If `put_page` fails — a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`) OR a scope/permission error (`insufficient_scope`, `permission_denied`, `403`) — do NOT fail the ship: log a `TODO: retry releases/<version> save` line and continue. The release already shipped; the brain page is best-effort. **The team-brain client is read-scope only today, so `put_page` no-ops with `insufficient_scope` until write scope is granted (BC-12113) — this save then activates automatically.**
 
 ## Step 5: Best Practices Audit
 
