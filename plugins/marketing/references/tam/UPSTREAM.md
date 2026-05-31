@@ -33,7 +33,7 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 | `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `tier_and_segment.py` | `scripts/tier_and_segment.py` | **Removed** per BC-6907 — see § Local deviations |
-| `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header) + endpoint-drift fixes (BC-7011) — see § Local deviations |
+| `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header) + endpoint-drift fixes (BC-7011) + `aiark_search` account-filter sub-schema (BC-7157) — see § Local deviations |
 | `discolike-mcp.js` | `scripts/discolike-mcp.js` | Verbatim (+ 5-line `//` header + verification comment for BC-7011 — no functional drift) |
 | `package.json` | `scripts/package.json` | Verbatim (+ top-level `_source` + `_license` + `_ported` JSON fields — see § JSON attribution exception) |
 | `requirements.txt` | `scripts/requirements.txt` | Verbatim (+ 5-line `#` header) + local change (BC-6907) — see § Local deviations |
@@ -119,7 +119,29 @@ One tool removed: `aiark_enrich` — AI Ark has no domain-keyed enrich endpoint 
 
 **Validated:** live MCP smoke through `bw-run.sh` + the reloaded plugin (captured in the BC-7011 PR description).
 
-**Re-port action:** if a future upstream pull at a newer SHA includes the same path/auth fixes, drop this local diff. If upstream restores an `aiark_enrich` tool because a new endpoint shipped, restore that handler. The `account` sub-schema (firmographic filter field names) is the one remaining "unknown" — if AI Ark publishes the full shape, re-map this wrapper's pass-through fields to match.
+**Re-port action:** if a future upstream pull at a newer SHA includes the same path/auth fixes, drop this local diff. If upstream restores an `aiark_enrich` tool because a new endpoint shipped, restore that handler. The `account` sub-schema (firmographic filter field names) was the one remaining "unknown" — resolved in BC-7157 (see next section).
+
+### `aiark-mcp.js` — `aiark_search` account-filter sub-schema (BC-7157)
+
+BC-7011 corrected AI Ark's envelope (base URL, `POST /companies`, `X-TOKEN`, top-level `{account, lookalikeDomains, page, size}`) but left the `account` **interior** unmapped — the wrapper passed `account.industries`/`regions` as bare `string[]` and `employee_min/max` as scalars. Three of four smoke calls were green; `aiark_search` with any real filter returned `400 "request not readable"`. BC-7011 knowingly deferred this gap to BC-7157.
+
+**Root cause (verified live 2026-05-31):** the backend is Spring Boot and every `AccountFilter` field is an `all`/`any` → `include`/`exclude` **object** tree, not a list. A bare `string[]`/scalar (even an empty `[]`) can't bind to the target POJO, so Jackson raises `HttpMessageNotReadableException` → `400 "request not readable"`. Unknown field **names** are still silently ignored — which is why earlier guesses (`sectors`, `naics_codes`, …) returned the unfiltered default rather than 400ing, and why the diagnosis was non-obvious.
+
+**Schema source:** the public reference page renders `account` only as "object", but ReadMe's markdown export at `docs.ai-ark.com/reference/company-search-1.md` embeds the full OpenAPI spec (request example + `#/components/schemas/AccountFilter`). The springdoc/swagger endpoints under `…/developer-portal/v1/` return `401` to the `X-TOKEN` API key (they are web-session-gated), so the `.md` export — not a live spec endpoint — is the obtainable source.
+
+**Mapping applied to `aiark_search`** (the three surfaced filters):
+
+| wrapper input | AI Ark `account` field | shape sent |
+|---|---|---|
+| `industries: string[]` | `industries` | `{ any: { include: { mode: "WORD", content: [...] } } }` |
+| `regions: string[]` | `location` (note: **not** `regions`) | `{ any: { include: [...] } }` — plain string list of country/region names ("United States", "Texas") |
+| `employee_min` / `employee_max` | `employeeSize` | `{ type: "RANGE", range: [{ start, end }] }` — half-open ranges accepted |
+
+The wrapper builds `account` conditionally — only populating sub-fields the caller filtered on; an empty `account {}` remains a valid unfiltered search. `mode` is fixed to `WORD` (the docs' industries example default; `STRICT` returned identical results in verification). Input-schema param names (`industries`, `regions`, `employee_min`, `employee_max`, `limit`) are unchanged for consumer compatibility; `regions` maps onto the `location` field.
+
+**Validated (live, via `bw-run.sh`, captured in the BC-7157 PR):** driving the freshly-spawned wrapper over stdio — `industries:["software development"]` → 200, `totalElements` 2,236,141 (was 70,841,359 unfiltered), all results `software development` (Amazon, Google, Microsoft…); combined `software + United States + 50–500 employees` → 200, `totalElements` 9,925, all software; `aiark_similarity` regression (`stripe.com`) → 200 with records. Pre-fix the same calls returned `400 "request not readable"`.
+
+**Re-port action:** if a future upstream pull at a newer SHA maps the `account` interior the same way, drop this local diff. If AI Ark changes the `AccountFilter` shape, re-map against the then-current `…/reference/company-search-1.md` export.
 
 ## Relationship to the broader marketing plugin
 
