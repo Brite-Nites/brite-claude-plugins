@@ -30,7 +30,7 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 | `discolike_client.py` | `scripts/discolike_client.py` | Verbatim (+ 5-line `#` header after shebang) |
 | `icypeas_client.py` | `scripts/icypeas_client.py` | Verbatim (+ 5-line `#` header after shebang) |
 | `spider_crawl.py` | `scripts/spider_crawl.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7050) — see § Local deviations |
-| `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
+| `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fixes (BC-7051 async/sync split; BC-12128 BlitzAPI redesign re-application) — see § Local deviations |
 | `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `tier_and_segment.py` | `scripts/tier_and_segment.py` | **Removed** per BC-6907 — see § Local deviations |
 | `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header) + endpoint-drift fixes (BC-7011) + `aiark_search` account-filter sub-schema (BC-7157) — see § Local deviations |
@@ -142,6 +142,25 @@ The wrapper builds `account` conditionally — only populating sub-fields the ca
 **Validated (live, via `bw-run.sh`, captured in the BC-7157 PR):** driving the freshly-spawned wrapper over stdio — `industries:["software development"]` → 200, `totalElements` 2,236,141 (was 70,841,359 unfiltered), all results `software development` (Amazon, Google, Microsoft…); combined `software + United States + 50–500 employees` → 200, `totalElements` 9,925, all software; `aiark_similarity` regression (`stripe.com`) → 200 with records. Pre-fix the same calls returned `400 "request not readable"`.
 
 **Re-port action:** if a future upstream pull at a newer SHA maps the `account` interior the same way, drop this local diff. If AI Ark changes the `AccountFilter` shape, re-map against the then-current `…/reference/company-search-1.md` export.
+
+### `enrich_waterfall.py` — BlitzAPI redesign re-application (BC-12128)
+
+The wrapper used BlitzAPI as the primary owner-discovery provider via a single call `POST https://api.blitz-api.ai/v2/enrich {website}` → `{email}` with `Authorization: Bearer`. As of **2026-05-31** that endpoint returns an auth-independent `railway-edge 404`: BlitzAPI **redesigned its API** (now served by ElysiaJS) — a vendor redesign, not endpoint drift.
+
+**New contract (verified live 2026-05-31 against the OpenAPI spec at `api.blitz-api.ai/openapi`):**
+- **Auth:** `x-api-key: <key>` header (was `Authorization: Bearer`). The key is credit-metered (1000/period, 5 req/s observed) — the prior "unlimited credits" assumption no longer holds.
+- **The one-shot `/v2/enrich` is gone.** Enrichment is decomposed into granular `/v2/enrichment/*` endpoints plus people search under `/v2/search/*`.
+
+**Re-application (preserves the `blitz_enrich(company) → {email}|None` contract + the Blitz→Prospeo→(MillionVerifier) waterfall + JSONL I/O + the BC-7051 async/sync fix):** `blitz_enrich` is rewritten internally as a 3-call chain:
+1. `POST /v2/enrichment/domain-to-linkedin` `{domain}` → `company_linkedin_url`
+2. `POST /v2/search/employee-finder` `{company_linkedin_url, job_level:["C-Team","VP","Director"], max_results:5}` → decision-makers (owner/C-level first)
+3. `POST /v2/enrichment/email` `{person_linkedin_url}` → work email — iterated over candidates until one resolves.
+
+A new `_blitz_post` helper centralizes `x-api-key` auth + a 5 req/s throttle and **logs every non-200/error to stderr** (the pre-BC-12128 code swallowed non-200s silently with a bare `return None` — which is how this endpoint death went unnoticed). A `_clean_domain` helper normalizes full-URL domain fields to a bare host. Owner-email hit-rate is company-dependent (the first decision-maker often has no findable email); misses fall through to the unchanged Prospeo path.
+
+**Validated (live, via `bw-run.sh`, captured in the BC-12128 PR):** `enrich_waterfall.py` on one record `{"domain":"vercel.com"}` → `{"email":"behzod.sirjani@vercel.com","source":"blitzapi","person_name":"Behzod Sirjani"}`. Loud-logging confirmed (a non-resolving domain prints `[blitz] no company LinkedIn for …` to stderr instead of failing silently). The Prospeo fallback path and `verify_smtp.py` (MillionVerifier) are unchanged (0 diff); Prospeo confirmed live (HTTP 200).
+
+**Re-port action:** Brite-owned (upstream `Revgrowth1/tam-map` never advanced past its scaffold). **BC-6170** (brite-enrichment MCP, 14-provider) supersedes this interim shell-script waterfall — when it lands, this chain can be retired for `brite_mcp` enrichment. If BlitzAPI changes its surface again, re-map against the then-current `api.blitz-api.ai/openapi` spec.
 
 ## Relationship to the broader marketing plugin
 
