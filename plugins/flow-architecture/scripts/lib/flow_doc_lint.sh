@@ -39,13 +39,18 @@
 #                  of actor/frame fit.
 #                  SCOPE: this lint detects ONLY that first-person-non-human shape.
 #                  It deliberately does NOT flag a `Given … the system MUST … so
-#                  that` constraint-spec doc — under the lenient floor (BC-12134)
-#                  the mechanical gates (this lint + the audit story-frame gate)
-#                  tolerate that legacy frame so not-yet-reframed consumer repos
-#                  keep passing; the constraint-spec frame is caught only by the
-#                  LLM quality-reviewer via rubric D11. Mechanical detection of it
-#                  is intentionally DEFERRED to a future gate-narrowing, not an
-#                  oversight.
+#                  that` constraint-spec doc — that rejection lives in the audit
+#                  story-frame gate (`story-job-story-regex`), which since Q29
+#                  amendment 3 (BC-11983) rejects the constraint-spec frame in any
+#                  consumer repo whose `.flow/config.json` sets `story_frame:
+#                  strict`, and still tolerates it under the default `lenient`
+#                  floor (BC-12134) so not-yet-reframed repos keep passing. The
+#                  deterministic mirror is `tests/run-audit-smoke.sh`
+#                  `story_frame_present <doc> <mode>`. This lint is intentionally
+#                  NOT a second detection surface for the constraint-spec frame
+#                  (the floor gate is authoritative — the 2-surface scope locked
+#                  with Q29 amendment 3); under `lenient` such a doc is also caught
+#                  by the LLM quality-reviewer via rubric D11.
 #
 # Bash 3.2 compatible (macOS default). Stdlib only. No literal backtick inside
 # any grep regex (apostrophes use the ['’] bracket class).
