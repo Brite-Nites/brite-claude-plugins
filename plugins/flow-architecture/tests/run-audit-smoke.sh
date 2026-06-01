@@ -122,7 +122,14 @@ children_field_present() {
 # tolerated (grep -i); the gate enforces the semantic FRAME, not line breaks. Gate
 # ID unchanged across both modes (Q29 gate-stack stability).
 story_frame_present() {
-  local doc="$1" mode="${2:-lenient}" region
+  local doc="$1" mode region
+  # Normalize <mode> to lowercase (bash-3.2-safe via tr, NOT ${2,,}) so the function
+  # is self-consistent with the case-insensitive `story_frame` contract and safe to
+  # call independently: a caller passing `STRICT`/`Strict` narrows correctly instead
+  # of silently falling through to lenient (a fail-OPEN footgun on a frame-enforcement
+  # gate). Only the literal lowercase `strict` narrows; everything else → lenient,
+  # mirroring story_frame_mode's fail-safe. Default (no arg) = lenient.
+  mode="$(printf '%s' "${2:-lenient}" | tr '[:upper:]' '[:lower:]')"
   # The frame always sits between the title and `## Acceptance criteria` — under a
   # `## Job story` heading in brite-base / brite-sites docs, or directly beneath
   # the `# Title` blockquote in the leaner audit fixtures. Scope to that region
@@ -522,6 +529,19 @@ for variant in constraint-1line constraint-multi; do
     fail "lenient: gate rejected the constraint-spec frame ($variant) — lenient floor broken"
   fi
 done
+# <mode> arg is case-insensitive (locks the tr-normalization in story_frame_present
+# against a fail-OPEN regression): an uppercase `STRICT` must narrow (reject the
+# constraint-spec frame), and a mixed-case `Strict` must still accept the human frame.
+if story_frame_present "$FRAME_TMP/constraint-1line.md" STRICT; then
+  fail "strict (uppercase mode 'STRICT'): gate accepted the constraint-spec frame — case-sensitive fail-open"
+else
+  pass "strict (uppercase mode 'STRICT'): gate rejects the constraint-spec frame"
+fi
+if story_frame_present "$FRAME_TMP/jobstory-1line.md" Strict; then
+  pass "strict (mixed-case mode 'Strict'): gate accepts the human job-story frame"
+else
+  fail "strict (mixed-case mode 'Strict'): gate rejected a valid human frame"
+fi
 
 # ── Section 4c: story_frame:strict threads through run_phase_b_gates end-to-end ─
 # The unit assertions above pin the function; this pins the WIRING — that
@@ -545,11 +565,20 @@ new, _ = re.subn(
     s, count=1, flags=re.M)
 open(p, 'w').write(new)
 PY
-# Guard: confirm the swap took, else the e2e assertions below are vacuous.
-if grep -q 'the system \*\*MUST\*\*' "$STRICT_DOC" && ! grep -qE '\*\*When\*\*' "$STRICT_DOC"; then
-  pass "e2e setup: TEAM-01 frame swapped human → constraint-spec"
+# Guard: confirm the swap produced a PURE constraint-spec doc — the `**MUST**`
+# marker present AND zero residual human markers (`**When**` / `**I want to**` /
+# `**so I can**`). TEAM-01's frame is a single line, so the `^> **When**.*$` subn
+# replaces the whole line and leaves no orphans; this guard makes that explicit AND
+# fails LOUDLY if the fixture ever becomes multi-line (then the single-line subn
+# would strand the I-want-to / so-I-can lines → hybrid doc). Defeats both a vacuous
+# pass (swap no-op) and the mixed-marker fixture Greptile flagged. (Human markers
+# are bold-wrapped only in the frame; Gherkin `When` in scenarios is unbolded, so a
+# whole-doc scan is safe.)
+if grep -q 'the system \*\*MUST\*\*' "$STRICT_DOC" \
+   && ! grep -qiE '\*\*When\*\*|\*\*I want to\*\*|\*\*so I can\*\*' "$STRICT_DOC"; then
+  pass "e2e setup: TEAM-01 swapped to a pure constraint-spec doc (no residual human markers)"
 else
-  fail "e2e setup: frame swap did not take — e2e assertions are invalid"
+  fail "e2e setup: swap left residual human markers or didn't take — e2e assertions are invalid"
 fi
 
 # strict config → the constraint-spec doc FAILs story-job-story-regex end-to-end.
@@ -592,6 +621,9 @@ printf '%s' '{"version":"1"}' > "$MODE_TMP/.flow/config.json"
 printf '%s' '{"version":"1","story_frame":"strict"}' > "$MODE_TMP/.flow/config.json"
 [ "$(story_frame_mode "$MODE_TMP")" = "strict" ] \
   && pass "story_frame:strict → strict" || fail "story_frame:strict did not resolve strict"
+printf '%s' '{"version":"1","story_frame":"STRICT"}' > "$MODE_TMP/.flow/config.json"
+[ "$(story_frame_mode "$MODE_TMP")" = "strict" ] \
+  && pass "story_frame:STRICT (uppercase) → strict (case-insensitive contract)" || fail "uppercase STRICT did not resolve strict — case-insensitive contract broken"
 printf '%s' '{"version":"1","story_frame":"lenient"}' > "$MODE_TMP/.flow/config.json"
 [ "$(story_frame_mode "$MODE_TMP")" = "lenient" ] \
   && pass "story_frame:lenient → lenient" || fail "story_frame:lenient did not resolve lenient"
