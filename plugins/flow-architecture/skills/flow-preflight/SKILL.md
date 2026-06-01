@@ -174,6 +174,8 @@ Dispatch into Section 6 (Q36.3 7-step bootstrap). After the bootstrap completes 
 
 Parking-lot fields deferred to v1.1+ per Q12.4: `preferred_mode_override`, `app_classifier_cache`, `last_inventory_regen_at`, `linear_team_id` (UUID).
 
+**Optional field — `story_frame` (Q29 amendment 3 / BC-11983).** A consumer repo MAY carry `"story_frame": "strict"` to narrow the `/flow:audit` `story-job-story-regex` gate so the retired constraint-spec frame (`**Given**`+`**MUST**`+`**so that**`) no longer passes — only the human job-story frame does. **`flow-preflight` does NOT write this field** (the writer above stays at the 5 v1 fields): it is set **manually** when a repo's story docs have been reframed to the human-anchored JTBD frame. Absent / any value other than `"strict"` ⇒ the default **`lenient`** floor (both frames accepted, the BC-12134 backward-compat presence-floor). It is a TRANSIENT strangler-fig: once all WS-E consumer repos are `strict`, the flag is removed and `strict` becomes the hardcoded global end-state (tracked on a BC-11983 child). Extra keys are safe — the `preflight-complete` gate is a required-subset check, not a closed allowlist.
+
 ### 4.4 Atomic write (Q31.5 atomic-rename)
 
 Mirror `scripts/flow-resume-breadcrumb.sh`'s `cmd_write` contract exactly. Build the JSON with `python3 json.dump()` (never a shell heredoc — `PROJECT_NAME` etc. come from Linear and may contain `"`, `\`, newlines, or control bytes), parse-verify **before** `mv`, content-match **after** `mv`. Pass values via env, not argv, to keep them off the process listing:
