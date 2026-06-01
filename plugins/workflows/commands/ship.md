@@ -117,12 +117,13 @@ Narrate: `Step 2/8: Creating pull request... done`
 
 Narrate: `Step 2b: Greptile gate...`
 
-The `greptile-gate` skill activates to read Greptile's verdict on the PR just created in Step 2 and report its 0–5 confidence score.
+The `greptile-gate` skill activates to read Greptile's verdict on the PR just created in Step 2 and converge it toward a 5/5 confidence score.
 
 - If Greptile isn't installed on the repo (or hasn't reviewed yet), the gate reports that and **skips** — it never blocks the ship.
-- If Greptile has scored the PR, the gate surfaces the **N/5** score to the developer.
+- If Greptile scored below 5/5, the gate runs up to 3 human-in-the-loop rounds (grill-with-docs → `/workflows:review` fix loop → push → `@greptile-apps` re-review → bounded wait), then a final independent review on 5/5.
+- **The gate never merges** — it converges and hands back; you merge manually.
 
-In this release the gate reads and reports only. The full convergence loop — grill-with-docs, a `/workflows:review` fix loop, re-trigger via `@greptile-apps`, max-3 rounds, and a final independent PR review before merge — is tracked in BC-12249 / BC-12250 and will slot the terminal steps (compound-learnings, audit, handbook-drift) after convergence.
+Because the gate runs *before* the terminal steps below, Steps 4–6 (compound-learnings, audit, handbook-drift) operate on the converged code. If the gate can't reach 5/5 in 3 rounds (or Greptile times out), it stops and hands you the remaining findings — decide whether to continue before the terminal steps run.
 
 Narrate: `Step 2b: Greptile gate... done`
 
@@ -132,7 +133,7 @@ Narrate: `Step 3/8: Updating Linear...`
 
 Use the Linear MCP tools:
 
-1. **Move issue status** to "In Review" (or "Done" if team merges without separate review).
+1. **Move issue status** to "In Review". Leave it **In Review** — the greptile-gate (Step 2b) does not merge, so the developer merges manually; don't auto-advance to "Done".
 2. **Add a comment** on the issue with PR link and summary of what was implemented.
 3. **Link the PR** via attachment if possible.
 

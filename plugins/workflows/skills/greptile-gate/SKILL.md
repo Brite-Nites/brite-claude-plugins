@@ -1,14 +1,14 @@
 ---
 name: greptile-gate
-description: After a PR is opened (or on demand), read Greptile's 0–5 confidence score and converge the PR toward it — grill on intent, fix review findings, re-trigger Greptile — reporting each round. Use during /workflows:ship right after the PR is created, or when the user asks to check the Greptile score, run the Greptile gate, or read/address the Greptile review on a PR. Skips gracefully when Greptile isn't on the repo.
+description: After a PR is opened (or on demand), read Greptile's 0–5 confidence score and converge the PR toward 5/5 — grill on intent, fix review findings, re-trigger Greptile, loop up to 3 rounds, then run a final independent review. Use during /workflows:ship right after the PR is created, or when the user asks to check the Greptile score, run the Greptile gate, or read/address the Greptile review on a PR. Skips gracefully when Greptile isn't on the repo.
 user-invocable: true
 ---
 
 # Greptile Gate
 
-Read the Greptile AI reviewer's verdict on an open PR, report its 0–5 confidence score, and — when the score is below 5/5 — run one convergence round to close the gap. Invoked by `/workflows:ship` right after the PR is created, and re-runnable standalone against any open PR.
+Read the Greptile AI reviewer's verdict on an open PR, report its 0–5 confidence score, and converge the PR toward **5/5** — grilling on intent and fixing findings across up to **3 rounds**, then a final independent review. Invoked by `/workflows:ship` right after the PR is created, and re-runnable standalone against any open PR.
 
-> **Scope (through Slice 2 — BC-12248 / BC-12249): read, report, and one convergence round.** The full multi-round loop (max 3 rounds + escalation), the final independent PR review, and the stop-before-merge handoff land in BC-12250 — along with reordering ship's terminal steps to run after convergence.
+> **The gate never merges — the developer merges manually.** It converges and hands back.
 
 ## Quick start
 
@@ -27,12 +27,10 @@ The verdict helper emits one JSON line: `{"present":true,"score":3,…}`, `{"pre
    - `present:false` → "No Greptile verdict — Greptile isn't installed or hasn't reviewed yet. **Skipping the gate.**" Exit 0. *(Never block a ship.)*
    - `present:true` → report "Greptile scored this PR **N/5**" (or, `score:null`, "reviewed but posted no parseable score").
 
-3. **If score == 5** → done for now; report and stop. *(The final independent review + merge handoff is Slice 3.)*
-
-4. **If score < 5 → run ONE convergence round** (human-in-the-loop):
-   1. **Grill on intent.** Run the `grill-with-docs` skill to align on requirements and sharpen terminology; capture decisions in CONTEXT.md / ADRs. Where Greptile flagged a *deliberate* choice, reply to its comment explaining the intent so it learns.
+3. **Convergence loop — repeat up to a maximum of 3 rounds, until the score is 5/5.** If the current score is already 5/5, skip straight to the Final review. Otherwise run a round (human-in-the-loop):
+   1. **Grill on intent — every round.** Run the `grill-with-docs` skill to align on requirements and sharpen terminology; capture decisions in CONTEXT.md / ADRs. Where Greptile flagged a *deliberate* choice, reply to its comment explaining the intent so it learns.
    2. **Fix the code.** Run `/workflows:review`; fix each finding with sequential-thinking and ultrathink; re-run `/workflows:review` until it returns nothing.
-   3. **Confirm before pushing.** Show the developer the changes and get approval — this round is human-in-the-loop.
+   3. **Confirm before pushing.** Show the developer the changes and get approval — every round is human-in-the-loop.
    4. **Push** the fixes to the PR branch.
    5. **Re-trigger Greptile.** Record the trigger time, then post the re-review request:
       ```bash
@@ -43,13 +41,19 @@ The verdict helper emits one JSON line: `{"present":true,"score":3,…}`, `{"pre
       ```bash
       bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-await.sh" --pr "$PR" --trigger "$TRIGGER_ISO"
       ```
-      The final line is the terminal state: `FRESH_PASS`, `FRESH_FAIL`, or `TIMED_OUT` (Greptile didn't respond within the bound — report that and stop).
-   7. **Re-report** the new score from the returned verdict, then stop. *(Looping up to 3 rounds + escalation is Slice 3.)*
+      Final line is the terminal state:
+      - `FRESH_PASS` → now 5/5 → go to Final review.
+      - `FRESH_FAIL` → re-report the new N/5; if rounds remain, loop; else escalate (below).
+      - `TIMED_OUT` → Greptile didn't respond within the bound → stop and hand back with context.
+
+   **After 3 rounds without 5/5 → escalate:** stop and hand the developer the remaining Greptile findings plus the full context of what each round tried. Do not merge.
+
+4. **Final review (only on 5/5).** Dispatch **one independent review agent** to read the **open PR diff** (`gh pr diff "$PR"`) with fresh eyes and report its verdict. Then **stop — the gate never merges; the developer merges manually.** `/workflows:ship` then resumes its terminal steps (Linear stays **In Review**, compound-learnings, audit, handbook-drift) on the converged code.
 
 ## Notes
 
 - **Skip-gracefully is mandatory.** Greptile absent → report + exit 0; never hard-fail a ship.
-- **The @-handle is the #1 silent-stall risk.** `@greptile-apps` is the default; verify it against a live Greptile PR (BC-12249 AC) — a wrong handle posts the comment but triggers nothing, and the wait will (correctly) `TIMED_OUT` rather than hang.
+- **@-handle.** `@greptile-apps` is the confirmed trigger handle for this org. If it ever changes, the await fails *safe* (`TIMED_OUT` rather than hang) — but update it here, since a wrong handle posts the comment and triggers nothing.
 - The verdict reader keys off the Greptile author and the latest comment by timestamp; the freshness classifier treats a pre-trigger comment as stale, so an old summary never reads as a fresh re-review.
 - Requires authenticated `gh`, plus `jq` and `python3` (the helpers check and error clearly).
 - `grill-with-docs` is a user-global skill — invoke its behavior; don't vendor a copy.
