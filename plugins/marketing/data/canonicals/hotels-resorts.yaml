@@ -11,6 +11,10 @@
 #                the workaround for BC-8725 (sibling /marketing:new-persona +
 #                /marketing:new-offer commands not yet shipped). See
 #                docs/plans/gtm-campaign-orchestration-friction-log.md F1.
+#   2026-06-01 — added Brite Labs offer `custom-illuminated-artwork` (BC-11163),
+#                the resort twin of the flagship-retail campaign. Backs
+#                hotels-resorts-director-of-resort-experience-custom-illuminated-artwork
+#                (FY26 M07).
 slug: hotels-resorts
 display: "Hotels & Resorts"
 playbook_path: "marketing/go-to-market/verticals/hotels-resorts/README.md"
@@ -33,3 +37,9 @@ offers:
     target_personas:
       - director-of-resort-experience
     prose_path: "marketing/go-to-market/verticals/hotels-resorts/offers/holiday-anchor-audit.md"
+  - slug: custom-illuminated-artwork
+    display: "Custom Permanent Illuminated Artwork"
+    status: draft
+    posture: free-asset
+    target_personas:
+      - director-of-resort-experience
