@@ -196,8 +196,8 @@ Run in parallel; merge + dedup by domain at completion.
 | Provider | Tool | Script reference | Pagination |
 |---|---|---|---|
 | Spider.cloud | `mcp__plugin_marketing_spider__*` | `plugins/marketing/scripts/tam-map/spider_crawl.py` | crawls homepage + `/about` + `/contact` |
-| AI Ark | `mcp__plugin_marketing_aiark__*` | `plugins/marketing/scripts/tam-map/aiark_client.py` + `aiark-mcp.js` | paginated, no stated rate limit |
-| Discolike | `mcp__plugin_marketing_discolike__*` | `plugins/marketing/scripts/tam-map/discolike_client.py` + `discolike-mcp.js` | offset-based, X-Total-Count header |
+| AI Ark | `mcp__plugin_marketing_aiark__*` | `plugins/marketing/scripts/tam-map/aiark-mcp.js` | paginated, no stated rate limit |
+| Discolike | `mcp__plugin_marketing_discolike__*` | `plugins/marketing/scripts/tam-map/discolike-mcp.js` | offset-based, X-Total-Count header |
 | IcyPeas | `Bash` → `plugins/marketing/scripts/bw-run.sh ICYPEAS_API_KEY=tam-map-icypeas-api-key -- python plugins/marketing/scripts/tam-map/icypeas_client.py --icp ./output/{slug}/icp.json` | (no MCP — script-only per BC-5946) | max 100/page |
 
 Output:

@@ -33,6 +33,8 @@ Claude converts the prompt into `output/roofing-tx/icp.json`:
 
 ## 3. Discovery (parallel)
 
+> **Brite note (BC-12130):** this block shows the **upstream CLI** discovery flow. In Brite's pipeline, AI Ark and Discolike discovery run through their **MCP wrappers** (`mcp__plugin_marketing_aiark__*` / `mcp__plugin_marketing_discolike__*`) — the `aiark_client.py` / `discolike_client.py` CLI scripts shown below were **removed** (never wired; see [`UPSTREAM.md`](../UPSTREAM.md) § Local deviations). Only `icypeas_client.py` remains a live CLI script. A faithful Brite rewrite of this whole example (command name, MCP discovery, JSONL data-flow) is tracked in **BC-12278**.
+
 ```bash
 python scripts/aiark_client.py --icp output/roofing-tx/icp.json > output/roofing-tx/aiark.jsonl &
 python scripts/discolike_client.py --icp output/roofing-tx/icp.json > output/roofing-tx/discolike.jsonl &
