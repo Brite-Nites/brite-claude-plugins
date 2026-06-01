@@ -128,6 +128,10 @@ assert_no_grep_re "journey: NO ## Title + domain code (Q26 mod 3 dropped it; H1 
 # NEGATIVE — the retired T0-4 system-as-actor / constraint-lens framing must be GONE (BC-12134)
 assert_no_grep "journey: NO 'second actor' system framing (retired BC-12134)"  "second actor"   "$JOURNEY_TMPL"
 assert_no_grep "journey: NO 'constraint lens' framing (retired BC-12134)"      "constraint lens" "$JOURNEY_TMPL"
+# Symmetric with the story template + both agents: catch a paraphrased reintroduction,
+# not only the two literals that existed before (the journey template is a seeded generator).
+assert_no_grep    "journey: NO 'constraint-spec' terminology (retired BC-12134)"      "constraint-spec" "$JOURNEY_TMPL"
+assert_no_grep_re "journey: NO system-subject MUST/SHALL framing (retired BC-12134)"  "$SYS_SUBJECT_RE" "$JOURNEY_TMPL"
 
 # ── Section 3: Story template — canonical sections + frames + no boilerplate ──
 section "3/5" "Story template carries canonical sections + the human JTBD frame (no constraint-spec residue, no boilerplate)"

@@ -37,6 +37,15 @@
 #                  as an advisory flag for human review, not a precise actor
 #                  classifier — the LLM quality-reviewer is the authoritative judge
 #                  of actor/frame fit.
+#                  SCOPE: this lint detects ONLY that first-person-non-human shape.
+#                  It deliberately does NOT flag a `Given … the system MUST … so
+#                  that` constraint-spec doc — under the lenient floor (BC-12134)
+#                  the mechanical gates (this lint + the audit story-frame gate)
+#                  tolerate that legacy frame so not-yet-reframed consumer repos
+#                  keep passing; the constraint-spec frame is caught only by the
+#                  LLM quality-reviewer via rubric D11. Mechanical detection of it
+#                  is intentionally DEFERRED to a future gate-narrowing, not an
+#                  oversight.
 #
 # Bash 3.2 compatible (macOS default). Stdlib only. No literal backtick inside
 # any grep regex (apostrophes use the ['’] bracket class).
