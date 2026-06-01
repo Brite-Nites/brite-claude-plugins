@@ -4,14 +4,14 @@ description: Enforces the Brite Labs 2-cycle/year + 180-day non-repeat hard rule
 user-invocable: true
 allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Bash, Glob, Grep
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   category: Outbound Lead Gen
-  status: DRAFT — proposed by 2026-05-15 planning session, awaiting Holden review (BC-10190)
+  status: Active — wired into list-building Workflow 2.5 (BC-12266). Policy: ADR-023 anti-spam guardrails (BC-11924). Live-system validation gotchas tracked in BC-11930.
 ---
 
 # Prospect Temporal Gate
 
-> **DRAFT — pending Holden review.** This skill encodes the 2-cycle/year + 180-day non-repeat hard rule that's currently enforced only in operator memory. See [BC-10190](https://linear.app/brite-nites/issue/BC-10190) for the parent issue. Do not register in plugin marketplace until reviewed.
+> **Active — wired into `list-building` Workflow 2.5 ([BC-12266](https://linear.app/brite-nites/issue/BC-12266)).** This skill encodes the 2-cycle/year + 180-day non-repeat hard rule (ADR-023 anti-spam guardrails, [BC-11924](https://linear.app/brite-nites/issue/BC-11924); parent [BC-10190](https://linear.app/brite-nites/issue/BC-10190)). `list-building` runs it as a mandatory pre-enrichment gate on **every** source, including tam-output. Remaining live-system validation items (the § Known gotchas below — EB `last_contacted_at` semantics, personal-workspace schema) are tracked in [BC-11930](https://linear.app/brite-nites/issue/BC-11930).
 
 A list-builder running net-new outreach has FOUR failure modes around outreach recency, tiering, and seasonality:
 
@@ -168,11 +168,14 @@ The skill reads these per-vertical exception files and applies overrides only wh
 tam-mapping output  →  icp-scoring  →  PROSPECT-TEMPORAL-GATE  →  enrichment  →  SMTP verify  →  EB campaign launch
 ```
 
-It is the second-to-last gate before enrichment spend, which is the right place — credits aren't wasted on prospects we're not allowed to contact.
+It runs **before enrichment spend**, which is the right place — credits aren't wasted on prospects we're not allowed to contact.
+
+> **Canonical caller wiring ([BC-12266](https://linear.app/brite-nites/issue/BC-12266)).** Inside `list-building` the gate runs at **Workflow 2.5** — after EB-exclusion (Workflow 2) and before enrichment (Workflow 3). `icp-scoring` is **downstream** of `list-building` (it consumes the emitted `enriched_leads.csv`), so the diagram above shows the conceptual ordering, not the list-building call order: in practice the gate precedes enrichment, and icp-scoring runs after list-building emits its list.
 
 **Caller integration:**
 
-- `list-building` Workflow 2 must invoke this skill after the existing cross-workspace EB exclusion (which is a coarser lifetime-suppression check) and before enrichment provider dispatch.
+- `list-building` invokes this skill at **Workflow 2.5** — a mandatory pre-enrichment gate that runs on **every** source (including tam-output), after the source-routed EB existence-exclusion (Workflow 2, a coarser lifetime check) and before enrichment dispatch. See list-building SKILL.md § Workflow 2.5. Wired in [BC-12266](https://linear.app/brite-nites/issue/BC-12266).
+- **Pre-enrichment candidates may carry a blank `email`.** When list-building invokes the gate before contact-discovery (the common tam-output case), candidate rows have `domain` + `company_name` but no `email` yet. Treat a blank/empty `email` as "no email-level match possible" and enforce the rule at the **domain (org) level** for that row (Phase 5 steps 2–3) — never drop the row merely for lacking an email. Rows that do carry an email additionally get email-level matching (Phase 5 step 1).
 - `launch-campaign` Phase 1 (pre-flight) must verify `temporal-gate-confidence.json` exists for the prospect list and `halt_recommended: false`. Refuses activation otherwise.
 
 ---

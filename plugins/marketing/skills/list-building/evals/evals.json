@@ -1,10 +1,10 @@
 {
   "skill": "list-building",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "scenarios": [
     {
       "name": "happy-path-source-1-tam-output",
-      "description": "Source 1: tam-mapping Labs output dir; skill skips Workflow 2 (EB-exclusion already ran upstream).",
+      "description": "Source 1: tam-mapping Labs output dir; skill skips Workflow 2 EB-exclusion (ran upstream) but runs the mandatory Workflow 2.5 prospect temporal gate.",
       "input": {
         "flags": {
           "input-dir": "docs/campaigns/labs/tam/zoos/"
@@ -17,13 +17,16 @@
       },
       "assertions": [
         { "type": "prose", "value": "output mentions 'Source 1' or 'tam-mapping output' detection" },
-        { "type": "prose", "value": "output explicitly skips Workflow 2 with a 'tam-mapping Phase 4.5 already ran exclusion' note" },
+        { "type": "prose", "value": "output explicitly skips Workflow 2 EB-exclusion with a 'tam-mapping Phase 4.5 already ran exclusion' note" },
+        { "type": "prose", "value": "output STILL runs Workflow 2.5 (prospect temporal gate) — mandatory on every source including tam-output" },
+        { "type": "appears_before_phase", "phase": "Workflow 3", "string": "temporal gate" },
         { "type": "contains_verbatim", "value": "estimated enrichment cost:" },
         { "type": "appears_before_phase", "phase": "Workflow 3", "string": "estimated enrichment cost:" },
         { "type": "prose", "value": "output runs Workflow 4 (verify_smtp.py) and Workflow 5 (free-email filter + emission)" }
       ],
       "expected_output_files": [
         "<output-dir>/source.json",
+        "<output-dir>/temporal-gate/temporal-gate-confidence.json",
         "<output-dir>/enriched.jsonl",
         "<output-dir>/verified.jsonl",
         "<output-dir>/personal-contacts.csv",
@@ -152,7 +155,7 @@
     },
     {
       "name": "tam-mapping-upstream-skip-eb-exclusion",
-      "description": "Source 1 (tam-mapping output) — Workflow 2 explicitly skipped even when EB workspace would fail; skill proceeds to enrichment.",
+      "description": "Source 1 (tam-mapping output) — Workflow 2 EB-exclusion is skipped, but the mandatory Workflow 2.5 temporal gate needs EB; with EB mocked-failed the skill HARD-FAILS before enrichment (v0.2.0 behavior change — previously it proceeded).",
       "input": {
         "flags": {
           "input-dir": "docs/research/tam/austin-municipalities-2026-04-26/"
@@ -167,17 +170,18 @@
         }
       },
       "assertions": [
-        { "type": "prose", "value": "output skips Workflow 2 entirely (Source 1 routing)" },
-        { "type": "prose", "value": "output proceeds to Workflow 3 despite mocked EB workspace failure" },
-        { "type": "prose", "value": "output emits 'tam-mapping Phase 4.5 already ran exclusion' note" },
-        { "type": "contains_verbatim", "value": "estimated enrichment cost:" }
+        { "type": "prose", "value": "output skips Workflow 2 EB-exclusion (Source 1 routing)" },
+        { "type": "prose", "value": "output STILL attempts Workflow 2.5 temporal gate (mandatory on tam-output)" },
+        { "type": "prose", "value": "output HARD-FAILS at Workflow 2.5 because the temporal gate needs EB reachable to enforce the 180-day rule" },
+        { "type": "prose", "value": "output does NOT proceed to Workflow 3 (enrichment) — no cost estimate emitted" }
       ],
       "expected_output_files": [
-        "<output-dir>/source.json",
-        "<output-dir>/enriched.jsonl"
+        "<output-dir>/source.json"
       ],
       "expected_output_files_NOT": [
-        "<output-dir>/suppression_set.json"
+        "<output-dir>/suppression_set.json",
+        "<output-dir>/enriched.jsonl",
+        "<output-dir>/enriched_leads.csv"
       ]
     },
     {
@@ -257,7 +261,7 @@
     },
     {
       "name": "resume-source-1-tam-output-skips-suppression-slot",
-      "description": "Source 1 run died at Workflow 1. source.json exists with source=tam-output. Resume algorithm reads source.json first, skips suppression_set.json slot (Source 1 routing), checks enriched.jsonl (missing) → resumes at Workflow 3. Without source-aware branching, this would incorrectly resume at Workflow 2.",
+      "description": "Source 1 run died at Workflow 1. source.json exists with source=tam-output. Resume reads source.json first, skips suppression_set.json slot (Source 1 routing) but CHECKS the temporal-gate slot 2.5; confidence file missing → resumes at Workflow 2.5. Without source-aware branching, this would incorrectly resume at Workflow 2 EB-exclusion or skip the gate.",
       "input": {
         "flags": {
           "input-dir": "docs/campaigns/labs/tam/zoos/"
@@ -271,12 +275,43 @@
       },
       "assertions": [
         { "type": "prose", "value": "output reads source.json first, identifies source as tam-output" },
-        { "type": "prose", "value": "output SKIPS suppression_set.json slot in resume loop (Source 1 routing)" },
-        { "type": "prose", "value": "output detects enriched.jsonl missing → resumes at Workflow 3 (enrichment)" },
-        { "type": "prose", "value": "output does NOT incorrectly resume at Workflow 2" }
+        { "type": "prose", "value": "output SKIPS suppression_set.json slot (Source 1 routing) but CHECKS the temporal-gate slot 2.5" },
+        { "type": "prose", "value": "output detects temporal-gate-confidence.json missing → resumes at Workflow 2.5 (temporal gate)" },
+        { "type": "prose", "value": "output does NOT incorrectly resume at Workflow 2 EB-exclusion, and does NOT skip the temporal gate" }
       ],
       "expected_output_files_NOT": [
         "<output-dir>/suppression_set.json"
+      ]
+    },
+    {
+      "name": "temporal-gate-halt-blocks-enrichment",
+      "description": "Workflow 2.5 temporal gate returns halt_recommended:true (e.g. >80% of the list contacted within 180 days). Skill HALTS before enrichment; no credits spent. Backs Behavioral Test Tier 2 #10.",
+      "input": {
+        "flags": {
+          "input-csv": "lists/recently-contacted.csv"
+        },
+        "marketing_context_present": true,
+        "marketing_context_entity": "brite-labs",
+        "fixtures": {
+          "lists/recently-contacted.csv": "domain,company_name\nrecent-zoo.com,Recent Zoo\nrecent-aquarium.com,Recent Aquarium"
+        },
+        "mocked_temporal_gate": {
+          "halt_recommended": true,
+          "reason": "suppression_rate 0.92 > 0.80"
+        }
+      },
+      "assertions": [
+        { "type": "prose", "value": "output runs Workflow 2 then Workflow 2.5 (temporal gate)" },
+        { "type": "prose", "value": "output reads temporal-gate-confidence.json, sees halt_recommended:true, and HALTS" },
+        { "type": "prose", "value": "output surfaces the gate suppression-report reason" },
+        { "type": "prose", "value": "output does NOT proceed to Workflow 3 (no enrichment credits spent)" }
+      ],
+      "expected_output_files": [
+        "<output-dir>/temporal-gate/temporal-gate-confidence.json"
+      ],
+      "expected_output_files_NOT": [
+        "<output-dir>/enriched.jsonl",
+        "<output-dir>/enriched_leads.csv"
       ]
     }
   ]

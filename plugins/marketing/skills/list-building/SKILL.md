@@ -1,16 +1,16 @@
 ---
 name: list-building
-description: ICP-targeted outbound list assembly. Consumes a TAM source (tam-mapping output, dbt audience CSV, or manual CSV), runs cross-workspace EB exclusion + SF Lead suppression where needed, enriches via the resolved provider, SMTP-verifies, and emits enriched_leads.csv for launch-campaign or campaign-orchestration. Triggers "build list", "list building", "outbound list", "enrich list", "suppress dedup", "ICP list", "decision-maker list", "contact discovery".
+description: ICP-targeted outbound list assembly. Consumes a TAM source (tam-mapping output, dbt audience CSV, or manual CSV), runs cross-workspace EB exclusion + SF Lead suppression where needed, runs the mandatory prospect-temporal-gate (180-day non-repeat / 2-cycle-per-year — every source, including tam-output), enriches via the resolved provider, SMTP-verifies, and emits enriched_leads.csv for launch-campaign or campaign-orchestration. Triggers "build list", "list building", "outbound list", "enrich list", "suppress dedup", "ICP list", "decision-maker list", "contact discovery".
 user-invocable: true
 allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__plugin_marketing_spider__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, WebSearch, WebFetch, Read, Write, Bash, Glob, Grep
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   category: Outbound Lead Gen
 ---
 
 # List Building
 
-A BDR, RevOps operator, or marketing lead with a TAM in hand has two failure modes: hand-stitch the audience-to-campaign handoff (slow, error-prone, ICP drift) or skip suppression and burn EB workspace reputation on already-contacted leads. This skill is the third option — it consumes any of three TAM sources, runs cross-workspace EB exclusion + SF Lead suppression where the source needs it, enriches to verified contact-level via the resolved enrichment provider, SMTP-verifies, applies the free-email filter, and emits a single `enriched_leads.csv` ready for `launch-campaign` or `campaign-orchestration`.
+A BDR, RevOps operator, or marketing lead with a TAM in hand has two failure modes: hand-stitch the audience-to-campaign handoff (slow, error-prone, ICP drift) or skip suppression and burn EB workspace reputation on already-contacted leads. This skill is the third option — it consumes any of three TAM sources, runs cross-workspace EB exclusion + SF Lead suppression where the source needs it, runs the **mandatory prospect-temporal-gate** (the 180-day non-repeat + 2-cycle/year hard rule — on **every** source, including tam-output), enriches to verified contact-level via the resolved enrichment provider, SMTP-verifies, applies the free-email filter, and emits a single `enriched_leads.csv` ready for `launch-campaign` or `campaign-orchestration`.
 
 ---
 
@@ -64,12 +64,13 @@ Per Operational Runbook Task D, if `--output-dir` already exists with partial ou
 
 0. **First read `<output-dir>/source.json` to determine the active source.** If `source.json` is missing, treat as a fresh run (resume from Workflow 1). The `source` field drives the branching at slot 2 below.
 1. `source.json` (Workflow 1 — input source manifest)
-2. `suppression_set.json` (Workflow 2 — **only checked when `source.json.source` ∈ {`dbt-view`, `manual-csv`}**; SKIPPED entirely for `tam-output` source per the per-source EB-exclusion routing rule — checking it would force a Workflow 2 re-run that the routing table forbids)
+2. `suppression_set.json` (Workflow 2 — EB-exclusion; **only checked when `source.json.source` ∈ {`dbt-view`, `manual-csv`}**; SKIPPED entirely for `tam-output` source per the per-source EB-exclusion routing rule — checking it would force a Workflow 2 re-run that the routing table forbids)
+2.5. `temporal-gate/temporal-gate-confidence.json` (Workflow 2.5 — prospect-temporal-gate; **checked for ALL sources, including `tam-output`**. The temporal gate is mandatory on every source — unlike the source-routed EB-exclusion at slot 2, it never skips. A present-and-valid confidence file with `halt_recommended: false` means the gate passed and its survivor set is the input to Workflow 3.)
 3. `enriched.jsonl` (Workflow 3)
 4. `verified.jsonl` (Workflow 4)
 5. `enriched_leads.csv` (Workflow 5 — terminal)
 
-The skill NEVER restarts from Workflow 1 when resume state exists. Stop the file-existence loop at the first missing file; do not check subsequent entries. **For `tam-output` source, slot 2 is skipped entirely — the loop checks slots 1 → 3 → 4 → 5.**
+The skill NEVER restarts from Workflow 1 when resume state exists. Stop the file-existence loop at the first missing file; do not check subsequent entries. **For `tam-output` source, slot 2 (EB-exclusion `suppression_set.json`) is skipped, but slot 2.5 (temporal gate) is still checked — the loop checks slots 1 → 2.5 → 3 → 4 → 5.**
 
 ---
 
@@ -120,6 +121,21 @@ Whether Workflow 2 (EB-exclusion) runs depends on whether the upstream source al
 | dbt audience CSV (`--audience-csv`) | No | **Yes** |
 | Manual CSV (`--input-csv`) | No | **Yes** |
 
+> **The routing table above governs only the EB _existence_-exclusion (Workflow 2) — a coarse "have we ever loaded this lead into EB?" check. It does NOT govern the prospect temporal gate below, which runs on every source.**
+
+### Prospect temporal gate (mandatory — all sources)
+
+After EB-exclusion (when it runs) and **before** enrichment, the skill runs the **`prospect-temporal-gate`** skill on the surviving candidate set — **on every source, including tam-output** (Workflow 2.5). This is distinct from, and additional to, EB existence-exclusion:
+
+- **EB-exclusion** (Workflow 2, source-routed) answers _"is this lead already in an EB workspace?"_ — a lifetime presence check, skipped for tam-output because tam-mapping Phase 4.5 already ran it.
+- **The temporal gate** (Workflow 2.5, all sources) answers _"was this prospect — or this org — contacted within the 180-day non-repeat window, and would this be a 3rd cycle this year?"_ — a recency + frequency check sourced from EB workspaces 55+13 **and** SF Activity / `CampaignMember` history. tam-mapping Phase 4.5 does NOT do this, so tam-output still needs it. This is the rule that protects sender reputation against cross-campaign re-blast (ADR-023 anti-spam guardrails Rule 1, [BC-11924](https://linear.app/brite-nites/issue/BC-11924) / [BC-10190](https://linear.app/brite-nites/issue/BC-10190)).
+
+**Why before enrichment:** suppressed prospects must be dropped before the skill spends enrichment credits on them.
+
+**Identity grain.** The gate matches on `email` AND `domain`. Pre-enrichment candidates from tam-output carry `domain` + `company_name` but usually no `email` yet, so the gate enforces the rule at the **org (domain) level** for those rows — the whole org is in cooldown unless `--same-org-different-persona` is passed. Sources that already carry per-row emails (some dbt / manual CSVs) additionally get **email-level** recency matching. Either grain catches the re-blast risk this gate exists to prevent.
+
+**HARD-FAIL.** The gate is mandatory, not advisory. If its `temporal-gate-confidence.json` reports `halt_recommended: true` (zero survivors, >80% suppression, borderline-rate breach, enterprise-commercial-post-Q2, or a Tier-1 window violation), the skill HALTS and does NOT proceed to enrichment. If the gate cannot run because EB or SF is unreachable, the skill HARD-FAILS too — the same "don't spend enrichment credits on an unverified list" rule that governs EB-exclusion. **This applies to tam-output as well**: a tam-output run now requires EB + SF reachable for the gate, even though it skips EB existence-exclusion.
+
 ---
 
 ## Brite Implementation
@@ -137,6 +153,7 @@ Organized by phase + reason. Every row cites an ADR or a source file.
 | EB-exclusion availability check (Sources 2/3) | `mcp__emailbison-b2b__get_active_workspace_info` + `mcp__emailbison-personal__get_active_workspace_info` + `mcp__plugin_marketing_salesforce__run_soql_query` (`SELECT Id FROM User LIMIT 1`) | EB workspaces 55/13 + brite-salesforce prod | ADR 2a (Salesforce CRM SoR; EB sole sequencer); 3-probe parallel batch mirrors tam-mapping § 3 Phase 4.5 |
 | EB-exclusion bulk pagination (Sources 2/3) | `mcp__emailbison-b2b__list_leads` + `mcp__emailbison-personal__list_leads` | both EB workspaces | ADR 2a (two-workspace requirement) |
 | SF Lead suppression read (Sources 2/3) | `mcp__plugin_marketing_salesforce__run_soql_query` with `SELECT Id, Email, Status FROM Lead WHERE Email IN (:emails) LIMIT 2000` | brite-salesforce prod | `salesforce.md` § Common workflows → Lead suppression read |
+| Prospect temporal gate (ALL sources — Workflow 2.5, after EB-exclusion, before enrichment) | `prospect-temporal-gate` skill — its Phases 1–7 are the single source of truth; runs via the `mcp__emailbison-b2b__*` + `mcp__emailbison-personal__*` + `mcp__plugin_marketing_salesforce__run_soql_query` tools already in this skill's `allowed-tools` | EB workspaces 55/13 + brite-salesforce prod | [BC-10190](https://linear.app/brite-nites/issue/BC-10190); ADR-023 Rule 1 (180-day non-repeat); mandatory per the gate skill's § Integration |
 | Contact-discovery enrichment (provider-routed) | `Bash` → `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py` (default) OR `mcp__plugin_marketing_enrichment__*` (when GA via BC-5538 + BC-6170) | BlitzAPI + Prospeo (default) OR brite-enrichment (future) | [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pluggability.md) enrichment pluggability |
 | SMTP verify | `Bash` → `plugins/marketing/scripts/bw-run.sh MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key -- python plugins/marketing/scripts/tam-map/verify_smtp.py` | MillionVerifier | Same script as tam-mapping § 3 Phase 6 (single source of truth) |
 | Contact-context augmentation (Step 1 fallback when enrichment provider returns no LinkedIn URL) | `mcp__plugin_marketing_spider__*` | Spider.cloud | Crawl homepage + `/about` + `/contact` for an inline LinkedIn link; only invoked when enrichment provider misses Step 1 |
@@ -146,6 +163,7 @@ Organized by phase + reason. Every row cites an ADR or a source file.
 - **MCP-cap exception ratified.** Marketing plugin runs 4 plugin-level MCPs today (`salesforce`, `spider`, `aiark`, `discolike`) — within the ~5–6 advisory cap. No new MCPs added by this skill. (CLAUDE.md `MCP_cap_advisory.md` + [`docs/research/tam-map-port-policy.md`](../../../../docs/research/tam-map-port-policy.md) § 1.)
 - **EB-exclusion is HARD-FAIL when run** (Sources 2 + 3). If either EB workspace OR SF unreachable, skill HALTS — does NOT silent-skip and does NOT proceed to enrichment. Reason: enrichment costs real money. (Mirrors [tam-mapping § 3 Phase 4.5](../tam-mapping/SKILL.md) HARD-FAIL rule.)
 - **EB-exclusion is SKIPPED when source is tam-mapping output** (Source 1). tam-mapping Phase 4.5 already ran exclusion; running it again wastes EB API calls and may misclassify net-new leads as suppressed if EB state shifted between runs. (Per-source EB-exclusion routing table in § Methodology > Per-source EB-exclusion routing.)
+- **The prospect temporal gate is MANDATORY on every source — including tam-mapping output.** Unlike EB existence-exclusion, the 180-day non-repeat / 2-cycle gate (Workflow 2.5) is never skipped: tam-mapping Phase 4.5 runs EB+SF _existence_-exclusion but does NOT enforce recency or cycle count, so tam-output still passes through the gate. HARD-FAIL if the gate reports `halt_recommended: true` OR if EB / SF is unreachable (the gate needs send history to enforce recency). Gate skill: `prospect-temporal-gate`; ADR-023 Rule 1 / [BC-10190](https://linear.app/brite-nites/issue/BC-10190).
 - **SF MCP `directory` parameter trap.** Skill MUST pass `directory` pointing at a local `brite-salesforce/` checkout OR the skill MUST assert `pwd` contains an `sfdx-project.json` before calling. Calls from `britenites-claude-plugins/` cwd reject with path-not-found. (`salesforce.md` § Known gotchas → directory parameter trap.)
 - **`run_soql_query` `usernameOrAlias` must be the literal username**, not the alias or the `DEFAULT_TARGET_ORG` sentinel. Pass the service user's literal username (Bitwarden Notes field). (`salesforce.md` § Known gotchas; `gotcha_sf_mcp_username_not_alias.md`.)
 - **Contact-discovery Step 1 is conditional.** Skip when input row already has `linkedin_url`. Most input sources (tam-mapping output, many dbt audience CSVs) include it; unconditional Step-1 calls waste credits.
@@ -154,7 +172,7 @@ Organized by phase + reason. Every row cites an ADR or a source file.
 
 ### Cross-skill boundaries
 
-- **Owns:** Input-source detection (tam-output / dbt-CSV / manual-CSV). Path-flag validation for all 6 path inputs (Workflow 1 step 0). Per-source EB-exclusion routing. Source-aware resume detection (reads `source.json` first; skips slot 2 for tam-output). Source-1 staleness detection (gates re-run via explicit user override). SF Lead suppression. Contact-discovery enrichment orchestration (provider-routed). SMTP verify. Free-email filter. `enriched_leads.csv` emission.
+- **Owns:** Input-source detection (tam-output / dbt-CSV / manual-CSV). Path-flag validation for all 6 path inputs (Workflow 1 step 0). Per-source EB-exclusion routing. Source-aware resume detection (reads `source.json` first; skips slot 2 for tam-output, always checks slot 2.5). Source-1 staleness detection (gates re-run via explicit user override). SF Lead suppression. **Invoking the mandatory prospect-temporal-gate (Workflow 2.5 — all sources) and HARD-FAILing on its halt signal.** Contact-discovery enrichment orchestration (provider-routed). SMTP verify. Free-email filter. `enriched_leads.csv` emission.
 - **Receives from:**
   - `tam-mapping` (BC-5832) — Source 1 directly via `--input-dir <tam-output-dir>`. EB-exclusion ALREADY done; this skill skips it.
   - User invocation — Sources 2/3 with `--audience-csv` + `--audience-view-name` or `--input-csv`.
@@ -169,6 +187,7 @@ Organized by phase + reason. Every row cites an ADR or a source file.
   - Sequence design + EB campaign activation → `campaign-orchestration` (BC-2718) + `launch-campaign` (BC-5826).
   - dbt model design + Snowflake materialization → `brite-data-platform`.
   - Enrichment provider implementation → `services/enrichment/cli.py` in brite-data-platform (or BC-5538 future MCP).
+  - **Temporal-gate rule logic** (180-day non-repeat, 2-cycle/year, enterprise-commercial-post-Q2, Tier-1 window) → `prospect-temporal-gate` ([BC-10190](https://linear.app/brite-nites/issue/BC-10190)) + ADR-023 anti-spam guardrails ([BC-11924](https://linear.app/brite-nites/issue/BC-11924)). This skill **invokes** the gate as a mandatory inline step (Workflow 2.5) but does not define the rules or their day-counts.
 
 ---
 
@@ -233,7 +252,7 @@ Workflows grouped by phase, not by server. Bare semantic tool names; the `allowe
 0. **Validate ALL path-bearing flags before any Bash interpolation.** This step is the canonical enforcement point for the path-validation guarantees asserted in the flag table at § Before Starting → Invocation flags. Apply to every set flag in `{--output-dir, --input-dir, --input-csv, --audience-csv, --criteria-file, --sfdx-project-dir}`:
    - **Determine safe-root.** Try `git rev-parse --show-toplevel`. On non-zero exit (cwd is not a git checkout), fall back to `$PWD`. Treat the resolved value as the prefix that all path flags must stay under.
    - **Resolve to absolute + reject escapes.** Use Python (portable across BSD/GNU `realpath`) — `python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$FLAG_VALUE"` — passing the flag via `argv` (no shell interpolation). For `--output-dir`, use `os.path.realpath` with `strict=False` so the dir need not exist yet; for input flags, the file/dir MUST exist — refuse if missing. If the resolved path contains `..` literal-segments after resolution, OR does not start with the safe-root prefix, HALT with `<flag> validation failed: <resolved-path> escapes safe-root <safe-root>`.
-   - **Symlink defense.** When `<output-dir>` already exists (resume mode or repeat run), refuse to write into pre-existing symlink targets — re-resolve every `Write <output-dir>/<filename>` via Python `os.path.realpath` immediately before write and re-prefix-check. A pre-existing symlink under `<output-dir>` pointing outside safe-root is rejected at the per-write check, not just at step 0.
+   - **Symlink defense.** When `<output-dir>` already exists (resume mode or repeat run), refuse to write into pre-existing symlink targets — re-resolve every `Write <output-dir>/<filename>` via Python `os.path.realpath` immediately before write and re-prefix-check. A pre-existing symlink under `<output-dir>` pointing outside safe-root is rejected at the per-write check, not just at step 0. This re-resolution covers **nested** write targets too (e.g. `<output-dir>/temporal-gate/candidates.csv` and the gate's own writes under `--output-dir <output-dir>/temporal-gate/`): re-resolve the full target path including intermediate segments before each write, and the `--output-dir` handed to the prospect-temporal-gate inherits this same validated-prefix guarantee.
    - **`$BRITE_DATA_PLATFORM` validation** (only when `enrichment_provider` resolves to `brite_cli`, i.e., per § Before Starting → Enrichment-provider selection): require `$BRITE_DATA_PLATFORM` non-empty AND begins with `/` AND matches `^[A-Za-z0-9_/.-]+$`. On validation failure, fall through to `blitz_waterfall` AND log the validation reason (do NOT silently suppress — see Anti-Slop Bash-validation guardrail).
    - **`--criteria-file` content sanitize** (only when set): after path validation, parse the JSON; reject titles containing `$`, backticks, `;`, `|`, `&`, single quotes, double quotes, or newlines. This is the workflow-step binding for the Anti-Slop title-validation rule.
 
@@ -273,6 +292,24 @@ Workflows grouped by phase, not by server. Bare semantic tool names; the `allowe
 
 Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited average).
 
+### Workflow 2.5 — Prospect temporal gate (MANDATORY — ALL sources, including tam-output)
+
+> **Runs on every source.** Unlike Workflow 2 (EB existence-exclusion, source-routed), this gate is never skipped — it enforces the 180-day non-repeat / 2-cycle hard rule. The procedure + rule logic are owned by the `prospect-temporal-gate` skill (its Phases 1–7 are the single source of truth — keep in sync; when one changes, audit the other). [BC-10190](https://linear.app/brite-nites/issue/BC-10190) / ADR-023 anti-spam guardrails ([BC-11924](https://linear.app/brite-nites/issue/BC-11924)).
+
+1. **Build the candidate CSV.** Reshape the surviving rows (post-Workflow-2 for Sources 2/3; the raw input rows for Source 1, which skipped Workflow 2) to a temp CSV at `<output-dir>/temporal-gate/candidates.csv` with columns `email` (blank for net-new rows that have no email yet), `domain`, `company_name`. Resolve `vertical` + `entity` from `docs/marketing-context.md` / `--criteria-file` (same resolution as the ICP cascade). **Validate before passing them as flags** — `vertical` MUST match `^[a-z0-9-]+$` and `entity` MUST match `^[a-z-]+$`. These values flow into the gate as a filesystem path segment (`verticals/<vertical>/exceptions.md`), so an unvalidated slug is a path-traversal + anti-spam-policy-bypass vector (a traversed `exceptions.md` could set `lookback_override_days` below the 180 floor). HALT on mismatch — `--vertical`/`--entity` are NOT in the Workflow 1 step-0 path-validation set, so this is their validation point.
+2. **Invoke the gate.** Run the `prospect-temporal-gate` skill against the candidate CSV:
+   - `--input-csv <output-dir>/temporal-gate/candidates.csv`
+   - `--vertical <resolved-vertical>` · `--entity <resolved-entity>`
+   - `--lookback-days 180` (the ADR-023 Rule 1 floor — do NOT lower without a published per-vertical exception file)
+   - `--output-dir <output-dir>/temporal-gate/`
+   - pass `--same-org-different-persona` through ONLY when the operator set it on the list-building invocation (a deliberately different buying committee at already-touched orgs).
+
+   The gate runs via the EB (`mcp__emailbison-b2b__*` + `mcp__emailbison-personal__*`) + SF (`mcp__plugin_marketing_salesforce__run_soql_query`) tools already in this skill's `allowed-tools`. **Availability is HARD-FAIL**: if either EB workspace OR SF is unreachable, the gate cannot enforce recency — HALT (do not proceed to enrichment). This applies to tam-output too, even though Workflow 2 was skipped.
+3. **Consume the gate output.** Read `<output-dir>/temporal-gate/temporal-gate-confidence.json`.
+   - If `halt_recommended: true` → **HALT** the run. Surface the gate's `suppression-report.md` reason (zero survivors, >80% suppression, borderline-rate breach, enterprise-commercial-post-Q2, or Tier-1 window violation). Do NOT proceed to Workflow 3.
+   - Else → the gate's `filtered.csv` survivors (carrying `same_org_new_persona` + `borderline_2_cycle` flag columns) become the input to Workflow 3. Net-new rows whose only identity was `domain` survive when the org is outside the 180-day window; they re-acquire `email` in Workflow 3.
+4. **Record counts.** Carry the gate's per-source suppression counts (`eb_suppressed`, `sf_suppressed`, `bounce_suppressed`, `borderline_flagged`, `survivors`) into `list_stats.json` (Workflow 5 step 3).
+
 ### Workflow 3 — Contact-discovery enrichment (provider-routed via Bash)
 
 1. Resolve `enrichment_provider` per § Before Starting → Enrichment-provider selection (priority: `--enrichment-provider` flag → `${user_config.enrichment_provider}` → auto-detect cascade).
@@ -292,7 +329,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 ### Workflow 5 — Free-email filter + final emission
 
 1. **Filter free-email rows.** Rows whose email domain is `gmail.com` / `yahoo.com` / `hotmail.com` / `outlook.com` / `icloud.com` → write to `<output-dir>/personal-contacts.csv` for separate manual outreach. NEVER include in `enriched_leads.csv`. (Same rule as tam-mapping Operational rule 1.)
-2. **Emit `enriched_leads.csv`.** Reshape remaining `verified.jsonl` rows to `<output-dir>/enriched_leads.csv` with these 16 columns (final handoff schema). The `catch_all` column is **flattened from nested `record.smtp.catch_all`** in `verified.jsonl` (mirrors tam-mapping § 3 Phase 7's JSONL→flat-CSV reshape — the column MUST be top-level + literally named `catch_all` so callers can invoke `icp-scoring --rubric abc` on `enriched_leads.csv` without the contract-break that `missing required column 'catch_all' for --rubric abc` produces). The 3 firmographic columns (`industry`, `employees`, `geography`) are pass-through — list-building does NOT enrich firmographics on its own; they exist to feed icp-scoring's pre-filter optimization (per icp-scoring SKILL.md "expects `industry` + `employees` populated where possible"). **Note on the two icp-scoring upstream feeders.** `enriched_leads.csv` (16 cols, this file) and tam-mapping's `verified-flat.csv` (6 cols — `domain`, `company_name`, `industry`, `employees`, `geography`, `catch_all`) are deliberately different shapes. list-building emits the *fully-enriched* feeder (contact-level columns); tam-mapping emits the *tier-classification-only* feeder. Both satisfy icp-scoring's required column set; downstream consumers needing contact-level fields (e.g., `launch-campaign`'s post-icp-scoring step) MUST consume from `enriched_leads.csv`, not from `verified-flat.csv`. Cross-cite tam-mapping § 3 Phase 7 for the symmetric note on its side.
+2. **Emit `enriched_leads.csv`.** Reshape remaining `verified.jsonl` rows to `<output-dir>/enriched_leads.csv` with these 18 columns (final handoff schema). The `catch_all` column is **flattened from nested `record.smtp.catch_all`** in `verified.jsonl` (mirrors tam-mapping § 3 Phase 7's JSONL→flat-CSV reshape — the column MUST be top-level + literally named `catch_all` so callers can invoke `icp-scoring --rubric abc` on `enriched_leads.csv` without the contract-break that `missing required column 'catch_all' for --rubric abc` produces). The 3 firmographic columns (`industry`, `employees`, `geography`) are pass-through — list-building does NOT enrich firmographics on its own; they exist to feed icp-scoring's pre-filter optimization (per icp-scoring SKILL.md "expects `industry` + `employees` populated where possible"). **Note on the two icp-scoring upstream feeders.** `enriched_leads.csv` (18 cols, this file) and tam-mapping's `verified-flat.csv` (6 cols — `domain`, `company_name`, `industry`, `employees`, `geography`, `catch_all`) are deliberately different shapes. list-building emits the *fully-enriched* feeder (contact-level columns); tam-mapping emits the *tier-classification-only* feeder. Both satisfy icp-scoring's required column set; downstream consumers needing contact-level fields (e.g., `launch-campaign`'s post-icp-scoring step) MUST consume from `enriched_leads.csv`, not from `verified-flat.csv`. Cross-cite tam-mapping § 3 Phase 7 for the symmetric note on its side.
 
    | Column | Type | Notes |
    |---|---|---|
@@ -312,8 +349,10 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
    | `enrichment_provider` | string | resolved provider identifier |
    | `confidence_score` | float | 0.0–1.0 from enrichment provider (per ADR-008 output schema) |
    | `catch_all` | boolean | flattened from `record.smtp.catch_all` in `verified.jsonl` (top-level per icp-scoring `abc` contract) |
+   | `same_org_new_persona` | boolean | pass-through from the temporal gate (Workflow 2.5); `true` when the row survived a domain-level 180-day match under `--same-org-different-persona` (a deliberately different buying committee at an already-touched org). Blank/false otherwise. |
+   | `borderline_2_cycle` | boolean | pass-through from the temporal gate; `true` when the last touch falls in the early-warning window (90–180 days) — an operator-review flag, NOT a suppression. |
 
-3. **Write `<output-dir>/list_stats.json`** with input/output row counts + per-source suppression counts + enrichment-provider used + cost actually spent + any provider failures.
+3. **Write `<output-dir>/list_stats.json`** with input/output row counts + per-source suppression counts (EB-exclusion) + **temporal-gate counts** (`eb_suppressed` / `sf_suppressed` / `bounce_suppressed` / `borderline_flagged` / `survivors` + `halt_recommended`) + enrichment-provider used + cost actually spent + any provider failures.
 
 **MCP confirmation gates (out-of-scope reminders):**
 
@@ -333,17 +372,23 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 
 **Steps:**
 
-1. Workflow 1 (Source 1 detection + read; **skip Workflow 2**).
-2. Workflow 3 (enrichment, provider-routed, cost-gated).
-3. Workflow 4 (SMTP verify).
-4. Workflow 5 (free-email filter + `enriched_leads.csv` emission).
-5. Run § Discoveries title-discovery gate against the emitted `enriched_leads.csv` per § When to emit conditions (≥2 distinct-company occurrences of a non-canonical title). Each operator-confirmed emit appends one signal to `docs/campaigns/{entity}/{slug}/discoveries.json`; on operator decline, no write.
+1. Workflow 1 (Source 1 detection + read; **skip Workflow 2 EB-exclusion**).
+2. **Workflow 2.5 (prospect temporal gate — MANDATORY even for tam-output; HARD-FAIL if it reports `halt_recommended: true` or if EB/SF is unreachable).**
+3. Workflow 3 (enrichment, provider-routed, cost-gated).
+4. Workflow 4 (SMTP verify).
+5. Workflow 5 (free-email filter + `enriched_leads.csv` emission).
+6. Run § Discoveries title-discovery gate against the emitted `enriched_leads.csv` per § When to emit conditions (≥2 distinct-company occurrences of a non-canonical title). Each operator-confirmed emit appends one signal to `docs/campaigns/{entity}/{slug}/discoveries.json`; on operator decline, no write.
 
 **Expected output dir contents:**
 
 ```
 <output-dir>/
 ├── source.json
+├── temporal-gate/          # Workflow 2.5 — runs for tam-output too
+│   ├── candidates.csv
+│   ├── filtered.csv
+│   ├── suppression-report.md
+│   └── temporal-gate-confidence.json
 ├── enriched.jsonl
 ├── verified.jsonl
 ├── personal-contacts.csv
@@ -372,10 +417,11 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 
 1. Workflow 1 (Source 2 detection + read CSV + audit-log dbt model via `gh api`).
 2. Workflow 2 (EB-exclusion HARD-FAIL guard — both EB workspaces + SF).
-3. Workflow 3 (enrichment).
-4. Workflow 4 (SMTP verify).
-5. Workflow 5 (free-email filter + emission).
-6. Run § Discoveries title-discovery gate (same as Task A step 5).
+3. Workflow 2.5 (prospect temporal gate — MANDATORY; HARD-FAIL if it reports `halt_recommended: true` or if EB/SF is unreachable).
+4. Workflow 3 (enrichment).
+5. Workflow 4 (SMTP verify).
+6. Workflow 5 (free-email filter + emission).
+7. Run § Discoveries title-discovery gate (same as Task A step 6).
 
 **Expected output dir contents:**
 
@@ -383,6 +429,11 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 <output-dir>/
 ├── source.json
 ├── suppression_set.json
+├── temporal-gate/
+│   ├── candidates.csv
+│   ├── filtered.csv
+│   ├── suppression-report.md
+│   └── temporal-gate-confidence.json
 ├── enriched.jsonl
 ├── verified.jsonl
 ├── personal-contacts.csv
@@ -408,10 +459,11 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 
 1. Workflow 1 (Source 3 detection + column validation; halt with column-validation message if required columns missing).
 2. Workflow 2 (EB-exclusion).
-3. Workflow 3 (enrichment).
-4. Workflow 4 (SMTP verify).
-5. Workflow 5 (free-email filter + emission).
-6. Run § Discoveries title-discovery gate (same as Task A step 5).
+3. Workflow 2.5 (prospect temporal gate — MANDATORY; HARD-FAIL if it reports `halt_recommended: true` or if EB/SF is unreachable).
+4. Workflow 3 (enrichment).
+5. Workflow 4 (SMTP verify).
+6. Workflow 5 (free-email filter + emission).
+7. Run § Discoveries title-discovery gate (same as Task A step 6).
 
 **Expected output dir contents:** same as Task B.
 
@@ -427,7 +479,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 
 **Steps:**
 
-1. Skill reads `<output-dir>/source.json` first to determine the active source. Then runs the file-existence check in stable order (per § Before Starting → Resume detection), skipping slot 2 (`suppression_set.json`) when `source.source == "tam-output"`.
+1. Skill reads `<output-dir>/source.json` first to determine the active source. Then runs the file-existence check in stable order (per § Before Starting → Resume detection), skipping slot 2 (`suppression_set.json`) when `source.source == "tam-output"`. Slot 2.5 (`temporal-gate/temporal-gate-confidence.json`) is **always** checked — including for tam-output — since the temporal gate runs on every source.
 2. Resume from the first missing file's workflow.
 3. **NEVER restart from Workflow 1** when resume state exists.
 4. If `--resume` flag is passed, force resume even when state could be ambiguous (e.g., partial JSONL writes — the skill validates the last record line and resumes from the next).
@@ -440,9 +492,9 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 
 | Score | Criteria |
 |------:|----------|
-| 10 | Detects input source correctly (auto from flag or via `AskUserQuestion`). Runs/skips Workflow 2 per the source-routing table (skip Source 1, run Sources 2/3). Cost gate fires before Workflow 3 with the verbatim `estimated enrichment cost:` string. Workflow 4 uses the shared `verify_smtp.py` script. Free-email filter applied (rows routed to `personal-contacts.csv`, never in `enriched_leads.csv`). References ADR-008 for enrichment pluggability. Cross-links to BC-5832 / BC-5826 / BC-5831 / BC-2718 are present. SF MCP `directory` param handled (auto-detect or `--sfdx-project-dir`). Resume detection works without restarting from Workflow 1. |
+| 10 | Detects input source correctly (auto from flag or via `AskUserQuestion`). Runs/skips Workflow 2 per the source-routing table (skip Source 1, run Sources 2/3). **Runs the prospect temporal gate (Workflow 2.5) on every source — including tam-output — and HARD-FAILS on its `halt_recommended` signal or on EB/SF unreachability.** Cost gate fires before Workflow 3 with the verbatim `estimated enrichment cost:` string. Workflow 4 uses the shared `verify_smtp.py` script. Free-email filter applied (rows routed to `personal-contacts.csv`, never in `enriched_leads.csv`). References ADR-008 for enrichment pluggability. Cross-links to BC-5832 / BC-5826 / BC-5831 / BC-2718 are present. SF MCP `directory` param handled (auto-detect or `--sfdx-project-dir`). Resume detection works without restarting from Workflow 1. |
 | 7-9 | Functional but skips one verification — e.g. forgets the cost-gate verbatim string, OR skips the free-email filter, OR runs Workflow 2 against only one EB workspace. Output is functional but missing one architectural rule. |
-| 4-6 | Runs the workflows but mixes free-email rows into `enriched_leads.csv` OR skips Workflow 2 when source is dbt-CSV/manual-CSV OR uses pattern-based email recovery (`info@`, `contact@`, `hello@`) on single-location businesses OR restarts from Workflow 1 on resume. Functional but violates a core rule. |
+| 4-6 | Runs the workflows but mixes free-email rows into `enriched_leads.csv` OR skips Workflow 2 when source is dbt-CSV/manual-CSV OR **skips the prospect temporal gate (Workflow 2.5) on any source (including tam-output)** OR uses pattern-based email recovery (`info@`, `contact@`, `hello@`) on single-location businesses OR restarts from Workflow 1 on resume. Functional but violates a core rule. |
 | 1-3 | Hallucinates input-source detection. Calls unregistered MCP servers (e.g., `mcp__plugin_marketing_enrichment__*` before BC-5538 GA per BC-6170). Skips Workflow 2 cost protection — pulls enrichment credits blind. Outputs `gmail`/`yahoo` addresses in `enriched_leads.csv`. Hard-fails silently. |
 
 ---
@@ -455,6 +507,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 - Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
 - **Always run Workflow 2 EB-exclusion when source ∈ {dbt-CSV, manual-CSV}.** Never silent-skip. HARD-FAIL on any unreachable EB workspace or SF — costs real money to enrich already-contacted leads.
 - **Always SKIP Workflow 2 when source is tam-mapping output (default routing rule).** tam-mapping Phase 4.5 already ran exclusion; re-running wastes EB API calls and may misclassify net-new leads as suppressed if EB state shifted between runs. **Sole exception:** the Source-1 staleness gate (§ Before Starting → Input-source detection) detects an input-dir > 7 days old AND the user explicitly chooses the override option — only then may Workflow 2 run for a tam-output source. Default in that gate is also skip; the override path requires explicit user input via `AskUserQuestion`. Never auto-override.
+- **Always run the prospect temporal gate (Workflow 2.5) — on EVERY source, including tam-mapping output.** The 180-day non-repeat / 2-cycle rule is never skipped: tam-mapping Phase 4.5 does EB+SF _existence_-exclusion, not recency, so tam-output still needs the gate. HARD-FAIL if the gate reports `halt_recommended: true` or if EB/SF is unreachable. Never downgrade the gate to advisory; never lower `--lookback-days` below 180 without a published per-vertical exception file. (ADR-023 Rule 1 / [BC-10190](https://linear.app/brite-nites/issue/BC-10190).)
 - **Never use pattern-based email recovery (`info@`, `contact@`, `hello@`) on single-location businesses.** Upstream tested 10 patterns × 15,934 domains = 0 hits. (Same anti-rule as tam-mapping § 3 Phase 5.)
 - **Never include free-email-provider rows (`gmail.com`/`yahoo.com`/`hotmail.com`/`outlook.com`/`icloud.com`) in `enriched_leads.csv`.** Route to `personal-contacts.csv`. Sender-reputation rule.
 - **Never auto-confirm cost gates.** Per Workflow 3 step 2: when `--max-records` is unset and `estimated cost > $20`, `AskUserQuestion` MUST fire; when `--max-records` is set and `N < record_count`, HALT with overflow report (no silent truncation). Never auto-proceed past either case.
@@ -466,7 +519,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 
 ### Tier 1 — Free assertions
 
-1. Given user invokes "build a list from `docs/campaigns/labs/tam/zoos/` tam-output", output must walk Workflow 1 (Source 1) → Workflow 3 → 4 → 5 and **explicitly skip Workflow 2** with a "tam-mapping Phase 4.5 already ran exclusion" note.
+1. Given user invokes "build a list from `docs/campaigns/labs/tam/zoos/` tam-output", output must walk Workflow 1 (Source 1) → **Workflow 2.5 (prospect temporal gate)** → Workflow 3 → 4 → 5. It **explicitly skips Workflow 2 EB-exclusion** (with a "tam-mapping Phase 4.5 already ran exclusion" note) but **still runs the mandatory temporal gate** (Phase 4.5 does existence-exclusion, not recency).
 2. Given user invokes "build a list from `audiences/active-municipalities.csv`" without `--audience-view-name`, output must halt with a missing-required-flag message.
 3. Output sample `enriched_leads.csv` rows must NOT contain free-email domains.
 4. Given a manual CSV missing `domain` column, output must halt with a column-validation message.
@@ -476,5 +529,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 
 6. If `docs/marketing-context.md` exists, output must reference Brite entity from that file when applying the ICP title cascade.
 7. If `mcp__emailbison-b2b__get_active_workspace_info` returns auth failure with source ∈ {dbt-CSV, manual-CSV}, skill HARD-FAILS at Workflow 2 — does NOT proceed to Workflow 3.
-8. If source is tam-mapping output AND `mcp__emailbison-b2b__get_active_workspace_info` is auth-failed, skill PROCEEDS (Workflow 2 skipped per source routing — exclusion already ran upstream).
+8. If source is tam-mapping output AND `mcp__emailbison-b2b__get_active_workspace_info` is auth-failed, skill **HARD-FAILS** — Workflow 2 EB-exclusion is skipped per source routing, but the mandatory temporal gate (Workflow 2.5) needs EB reachable to enforce the 180-day rule, so the run halts before enrichment. (**Changed in v0.2.0** — previously tam-output proceeded; the mandatory temporal gate makes EB+SF reachability required on every source.)
 9. If `${user_config.enrichment_provider}` is `brite_mcp` and the MCP is unavailable, output emits "pending BC-5537/5538 GA" message and falls through to `blitz_waterfall` (will flip when BC-6170 ships).
+10. Given a list whose prospects were largely contacted within 180 days (temporal gate returns `halt_recommended: true` — e.g. `suppression_rate > 0.80`), the skill HALTS at Workflow 2.5, surfaces the gate's `suppression-report.md` reason, and does NOT proceed to Workflow 3 (no enrichment credits spent).
+11. Given a tam-output list whose orgs are all outside the 180-day window, the temporal gate passes (`halt_recommended: false`) and its `filtered.csv` survivors (domain-level, no email yet) flow into Workflow 3 where they acquire verified emails.
