@@ -546,6 +546,31 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2e — workflows helper-script unit tests (BC-12248)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/workflows/tests/test-*.sh — bash unit tests for workflows
+# helper scripts (currently greptile-verdict.sh, the greptile-gate score
+# reader). Pass count auto-derived from each harness's RESULT contract line.
+# Mirrors Section 2b' (the flow-architecture helper-test pattern); kept as a
+# localized glob so future workflows bash harnesses are picked up automatically.
+section "2e. workflows helper-script unit tests (BC-12248)"
+
+wf_ran=0
+for wf_test in "$REPO_ROOT"/plugins/workflows/tests/test-*.sh; do
+  [ -e "$wf_test" ] || continue   # bash 3.2: glob stays literal when no match
+  wf_ran=1
+  wf_name="$(basename "$wf_test")"
+  if wf_out=$(bash "$wf_test" 2>&1); then
+    wf_pass_count=$(printf '%s\n' "$wf_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "workflows: $wf_name (${wf_pass_count:-?} assertions)"
+  else
+    fail "workflows: $wf_name failed — run $wf_test for details"
+    printf '%s\n' "$wf_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+done
+[ "$wf_ran" -eq 1 ] || warn "no plugins/workflows/tests/test-*.sh found — skipped"
+
+# ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
 # ══════════════════════════════════════════════════════════════════════
 

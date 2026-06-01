@@ -113,6 +113,19 @@ If PR creation fails, use error recovery: AskUserQuestion with options: "Retry p
 
 Narrate: `Step 2/8: Creating pull request... done`
 
+## Step 2b: Greptile Gate
+
+Narrate: `Step 2b: Greptile gate...`
+
+The `greptile-gate` skill activates to read Greptile's verdict on the PR just created in Step 2 and report its 0–5 confidence score.
+
+- If Greptile isn't installed on the repo (or hasn't reviewed yet), the gate reports that and **skips** — it never blocks the ship.
+- If Greptile has scored the PR, the gate surfaces the **N/5** score to the developer.
+
+In this release the gate reads and reports only. The full convergence loop — grill-with-docs, a `/workflows:review` fix loop, re-trigger via `@greptile-apps`, max-3 rounds, and a final independent PR review before merge — is tracked in BC-12249 / BC-12250 and will slot the terminal steps (compound-learnings, audit, handbook-drift) after convergence.
+
+Narrate: `Step 2b: Greptile gate... done`
+
 ## Step 3: Update Linear
 
 Narrate: `Step 3/8: Updating Linear...`
