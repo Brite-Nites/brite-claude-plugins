@@ -22,21 +22,35 @@
 #   GENERIC_PERSONA(A-2) the persona (front-matter `personas:` or the `## Actor`
 #                  lead) is a known generic project-wide default.
 #   FRAME_MISMATCH (D11) a non-human / infra actor (crawler/bot/spider/googlebot)
-#                  forced into the first-person job-story frame instead of the
-#                  constraint-spec frame. Subject-scoped HEURISTIC: it keys on the
-#                  non-human term appearing in subject position (just after `When`,
-#                  or as the `I'm a <actor>` roleplay) — so a human flow that names
-#                  a crawler as the OBJECT of the `I want to …` clause does not
-#                  trip. The guard is proximity-based, not a parser: an infra term
-#                  named early in the `When` clause (within ~3 words of `When`) can
-#                  still trip. Treat FRAME_MISMATCH as an advisory flag for human
-#                  review, not a precise actor classifier — the LLM quality-reviewer
-#                  is the authoritative judge of actor/frame fit.
+#                  placed as the FIRST-PERSON SUBJECT of the job story ("When I'm
+#                  a crawler, I want …"). Under human-anchoring (BC-12134) the
+#                  remedy is to RE-ANCHOR on the human the mechanism serves (the
+#                  operator who trusts the run, or the customer who reads the
+#                  output) — NOT to switch to a system-subject "the system MUST"
+#                  constraint-spec frame, which is itself retired. Subject-scoped
+#                  HEURISTIC: it keys on the non-human term appearing in subject
+#                  position (just after `When`, or as the `I'm a <actor>` roleplay)
+#                  — so a human flow that names a crawler as the OBJECT of the
+#                  `I want to …` clause does not trip. The guard is proximity-based,
+#                  not a parser: an infra term named early in the `When` clause
+#                  (within ~3 words of `When`) can still trip. Treat FRAME_MISMATCH
+#                  as an advisory flag for human review, not a precise actor
+#                  classifier — the LLM quality-reviewer is the authoritative judge
+#                  of actor/frame fit.
+#                  SCOPE: this lint detects ONLY that first-person-non-human shape.
+#                  It deliberately does NOT flag a `Given … the system MUST … so
+#                  that` constraint-spec doc — under the lenient floor (BC-12134)
+#                  the mechanical gates (this lint + the audit story-frame gate)
+#                  tolerate that legacy frame so not-yet-reframed consumer repos
+#                  keep passing; the constraint-spec frame is caught only by the
+#                  LLM quality-reviewer via rubric D11. Mechanical detection of it
+#                  is intentionally DEFERRED to a future gate-narrowing, not an
+#                  oversight.
 #
 # Bash 3.2 compatible (macOS default). Stdlib only. No literal backtick inside
 # any grep regex (apostrophes use the ['’] bracket class).
 
-# ── Frame regexes (shared shape with the T0-4 audit gate + vslice) ───────────
+# ── Frame regexes (shared shape with the audit story-frame gate + vslice) ────
 FDL_NONHUMAN_ACTOR_RE='crawler|crawlers|googlebot|google bot|spider|\bbot\b'
 FDL_WHEN_SUBJECT_RE="[Ww]hen[*]*[[:space:]]+((a|an|the|web|search|engine|search-engine|[A-Za-z]+['’]s)[[:space:]]+){0,3}($FDL_NONHUMAN_ACTOR_RE)"
 FDL_FIRST_PERSON_RE="[Ii]([[:space:]]?['’]m|[[:space:]]am)[[:space:]]+(an?|the)[[:space:]]+([a-z-]+[[:space:]]+){0,3}($FDL_NONHUMAN_ACTOR_RE)"

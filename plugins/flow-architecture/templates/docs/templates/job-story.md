@@ -37,7 +37,7 @@ last_reviewed: YYYY-MM-DD
 
 ## Job story
 
-**Default — human actor (JTBD frame, Alan Klement):**
+**Job story (JTBD frame, Alan Klement) — anchored on the human the flow serves:**
 
 > **When** <situation — the user's context when this action becomes relevant>,
 > **I want to** <motivation — the capability the flow delivers>,
@@ -47,20 +47,23 @@ Don't use "As a [role]…" — the persona is the `## Actor` section. The `so I 
 move ("review and send the invoice in seconds instead of retyping line items"), not "stay organized"
 and not "100-400 pages are available" (the title jammed into the slot — the grammar-collapse fail).
 
-**Non-human / infrastructure actor (constraint-spec frame — the D11 / EARS rule):**
+**Infrastructure / non-human-mechanism flow — still a human job story, in this same `## Job story`
+section.** A crawler, CDN invalidation, cron, webhook receiver, sitemap/robots generation,
+canonical-URL resolution, redirect rule, CSP enforcement, ISR/revalidation, schema.org emission, or
+page-generation run has no first-person voice — but it always serves a human. Find that human and
+write *their* job story. **Anchor rule:** the **operator** who configures, runs, and trusts the
+mechanism — *unless* a customer directly reads or experiences the output (rendered page copy, a
+delivered confirmation), then the **customer**. The mechanism is the *means*: it lives in the
+concrete Gherkin ACs and `## Status`, never as the subject of the story.
 
-A crawler, CDN invalidation, cron, webhook receiver, sitemap/robots generation, canonical-URL
-resolution, redirect rule, CSP enforcement, ISR/revalidation, schema.org emission, or page-generation
-run gets a **constraint spec in this same `## Job story` section** — the heading stays:
+> **When** my domain's pages go live,
+> **I want to** have every published page enumerated in a `sitemap.xml`,
+> **so I can** trust search engines discover the full catalog per domain.
 
-> **Given** <context — the system event/state>,
-> the system **MUST** <behavior the system guarantees>,
-> **so that** <a human-serving outcome>.
-
-The subject is the system, never first-person "I". "When I'm a search-engine crawler, I want a
-sitemap…" is the canonical D11 failure. A flow that mixes a human trigger and a system guarantee
-(a form submit that fires a webhook) leads with the human job story and captures the system half as a
-clearly-labelled constraint-spec AC below.
+"When I'm a search-engine crawler, I want a sitemap…" is the canonical D11 failure — a crawler can't
+narrate in the first person. The safety guarantee the mechanism enforces (scope-by-tenant,
+draft-never-live, clean-404) rides forward as the human's trusted `so I can` outcome, so dropping the
+mechanism never drops the invariant.
 
 ## Status notes (sometimes)
 
@@ -73,9 +76,10 @@ attention. Omit entirely for a clean NOT_STARTED or a clean BUILT.
 Which RBAC role(s) take this action — name the role first and cross-link the canonical persona doc
 ([`docs/product/personas/<role>.md`](../../personas/<role>.md)) rather than restating it. Then add
 the role's **posture** (working context + the failure modes it won't tolerate) as a secondary clause
-— that posture drives which negative ACs matter (quality-rubric D7). For a **constraint-spec flow**,
-name the system process that acts (route handler, cron, crawler-facing surface) and the human it
-serves downstream, in place of an RBAC role.
+— that posture drives which negative ACs matter (quality-rubric D7). For an **infrastructure flow**,
+name the human the mechanism serves (the operator who trusts the run, or the customer who reads the
+output) and their posture; the system process that acts (route handler, cron, crawler-facing surface)
+is the means — name it in the one-line summary and `## Status`, not in place of the human.
 
 ## Preconditions
 
@@ -93,9 +97,10 @@ alone — name exact field names, enum values, function names, or verbatim error
 corroborates them; otherwise assert observable behavior in domain terms and `<!-- TODO: AC — <what> -->`
 any specific identifier engineering hasn't chosen. Never emit the placeholder clauses
 (`Then the outcome described in 'So I can …' holds true`); label an unbuilt scenario
-`(<STATUS> — gap to close)`. For a constraint-spec flow the `When` is a system event firing and the
-`Then` asserts an observable system guarantee (exact meta-tag values, canonical targets, sitemap
-include/exclude rules, HTTP status codes, redirect chains, revalidation windows, idempotency).
+`(<STATUS> — gap to close)`. For an infrastructure flow the `When` is often a system event firing and
+the `Then` asserts the observable guarantee the human trusts (exact meta-tag values, canonical
+targets, sitemap include/exclude rules, HTTP status codes, redirect chains, revalidation windows,
+idempotency) — machine-checkable ACs under a `## Job story` that stays the operator's or customer's.
 
 ```gherkin
 Scenario: <happy path scenario name>

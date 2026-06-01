@@ -10,6 +10,9 @@
 #     Open questions, Preconditions, QA history, …) and NOT the drifted ones;
 #   - the agent prose enumerates the canonical section order and forbids the
 #     domain-level duplicate sections;
+#   - the seeded templates + authoring agents carry the human-anchored JTBD
+#     frame ONLY — the retired T0-4 constraint-spec / system-as-actor frame
+#     must not reappear (BC-12134 human-anchoring durability lock);
 #   - both orchestrators COPY the two templates into the consumer's
 #     docs/templates/ (the missing-template-file root cause).
 #
@@ -27,6 +30,15 @@ JOURNEY_AGENT="$PLUGIN_ROOT/agents/journey-doc-author.md"
 STORY_AGENT="$PLUGIN_ROOT/agents/story-doc-author.md"
 START_CMD="$PLUGIN_ROOT/commands/start-project.md"
 RETROFIT_CMD="$PLUGIN_ROOT/commands/retrofit-project.md"
+
+# Retired-frame negative guard (BC-12134): the system-as-subject "the system MUST"
+# shape, GENERALIZED so a PARAPHRASED reintroduction (the platform / service / engine /
+# generator MUST|SHALL …) is caught — not only the exact string this change removed.
+# The generators (story/journey doc-authors + their seeded templates) are kept LITERALLY
+# clean of the retired frame: they teach the human frame positively, and any failure-mode
+# naming of the retired frame lives in the rubric / lint / audit, never in doc-author prose
+# — so the bare-token bans below are intentional, not over-strict.
+SYS_SUBJECT_RE='(the|a|an)[*[:space:]]+(system|platform|service|engine|generator)s?[*[:space:]]*(MUST|SHALL)'
 
 # ── Counters ─────────────────────────────────────────────────────────
 PASS=0
@@ -113,9 +125,16 @@ assert_no_grep_re "journey: NO standalone ## Sub-flows in this domain (drift)" '
 assert_no_grep_re "journey: NO domain-level ## Pain points (per-phase only)" '^## Pain points'           "$JOURNEY_TMPL"
 assert_no_grep_re "journey: NO domain-level ## Opportunities (per-phase only)" '^## Opportunities'       "$JOURNEY_TMPL"
 assert_no_grep_re "journey: NO ## Title + domain code (Q26 mod 3 dropped it; H1 carries it)" '^## Title \+ domain code' "$JOURNEY_TMPL"
+# NEGATIVE — the retired T0-4 system-as-actor / constraint-lens framing must be GONE (BC-12134)
+assert_no_grep "journey: NO 'second actor' system framing (retired BC-12134)"  "second actor"   "$JOURNEY_TMPL"
+assert_no_grep "journey: NO 'constraint lens' framing (retired BC-12134)"      "constraint lens" "$JOURNEY_TMPL"
+# Symmetric with the story template + both agents: catch a paraphrased reintroduction,
+# not only the two literals that existed before (the journey template is a seeded generator).
+assert_no_grep    "journey: NO 'constraint-spec' terminology (retired BC-12134)"      "constraint-spec" "$JOURNEY_TMPL"
+assert_no_grep_re "journey: NO system-subject MUST/SHALL framing (retired BC-12134)"  "$SYS_SUBJECT_RE" "$JOURNEY_TMPL"
 
 # ── Section 3: Story template — canonical sections + frames + no boilerplate ──
-section "3/5" "Story template carries canonical sections + both frames (and no boilerplate)"
+section "3/5" "Story template carries canonical sections + the human JTBD frame (no constraint-spec residue, no boilerplate)"
 
 assert_grep_re "story: ## Job story"            '^## Job story'              "$STORY_TMPL"
 assert_grep_re "story: ## Actor"                '^## Actor'                  "$STORY_TMPL"
@@ -125,9 +144,18 @@ assert_grep_re "story: ## Out of scope / no-gos" '^## Out of scope / no-gos' "$S
 assert_grep_re "story: ## Cross-domain dependencies (conditional gate)" '^## Cross-domain dependencies' "$STORY_TMPL"
 assert_grep_re "story: ## Cross-references"     '^## Cross-references'        "$STORY_TMPL"
 assert_grep_re "story: ## QA history (restored)" '^## QA history'            "$STORY_TMPL"
-# both job-story frames present (D11 / EARS)
-assert_grep "story: human JTBD frame"          "I want to"                  "$STORY_TMPL"
-assert_grep "story: constraint-spec frame (the system MUST)" "the system **MUST**" "$STORY_TMPL"
+# human JTBD frame present; the T0-4 constraint-spec frame is RETIRED (BC-12134 human-anchoring)
+assert_grep "story: human JTBD marker (**When**)"     "**When**"      "$STORY_TMPL"
+assert_grep "story: human JTBD marker (**I want to**)" "**I want to**" "$STORY_TMPL"
+assert_grep "story: human JTBD marker (**so I can**)"  "**so I can**"  "$STORY_TMPL"
+assert_no_grep "story: NO constraint-spec frame 'the system **MUST**' (retired BC-12134)" "the system **MUST**" "$STORY_TMPL"
+assert_no_grep_re "story: NO 'constraint-spec' / 'constraint spec' terminology (retired BC-12134)" 'constraint[ -]spec' "$STORY_TMPL"
+assert_no_grep_re "story: NO system-subject MUST/SHALL framing, any noun (retired BC-12134)" "$SYS_SUBJECT_RE" "$STORY_TMPL"
+assert_no_grep "story: GOLD gherkin — no 'Feature:' wrapper (retired BC-12134)" "Feature:" "$STORY_TMPL"
+# Positive asserts above confirm the human frame is TAUGHT; this confirms the worked GOLD
+# infra example (operator-anchored sitemap job story) isn't silently deleted — exclusivity
+# of the human frame rests on the negative guards, presence of the example on this one.
+assert_grep "story: GOLD infra example present (operator-anchored sitemap job story)" "my domain's pages go live" "$STORY_TMPL"
 # full canonical frontmatter — per-discipline delivery mirror feeding INDEX.md
 assert_grep "story: frontmatter eng_status (INDEX mirror)"    "eng_status:"    "$STORY_TMPL"
 assert_grep "story: frontmatter qa_status (INDEX mirror)"     "qa_status:"     "$STORY_TMPL"
@@ -159,11 +187,20 @@ assert_no_grep "journey-author: drifted '8 H2 sections after Q26 mod 3' GONE" \
   "8 H2 sections after Q26 mod 3" "$JOURNEY_AGENT"
 assert_no_grep "journey-author: drifted 'why-this-domain-exists' GONE" \
   "why-this-domain-exists" "$JOURNEY_AGENT"
+# NEGATIVE — the retired T0-4 system-as-actor / constraint-lens framing must be GONE (BC-12134)
+assert_no_grep "journey-author: NO 'second actor' system framing (retired BC-12134)"  "second actor"   "$JOURNEY_AGENT"
+assert_no_grep "journey-author: NO 'constraint lens' framing (retired BC-12134)"      "constraint lens" "$JOURNEY_AGENT"
+# Symmetric with the story-author guards: catch a paraphrased reintroduction, not just the
+# two strings that happened to exist before (the journey author is a generator too).
+assert_no_grep    "journey-author: NO 'constraint-spec' terminology (retired BC-12134)"      "constraint-spec" "$JOURNEY_AGENT"
+assert_no_grep_re "journey-author: NO system-subject MUST/SHALL framing (retired BC-12134)"  "$SYS_SUBJECT_RE" "$JOURNEY_AGENT"
 
-# story-doc-author: restored canonical sections named + constraint-spec retained
+# story-doc-author: canonical sections named + human-anchored frame ONLY (constraint-spec RETIRED BC-12134)
 assert_grep "story-author: names ## Preconditions"   "## Preconditions"   "$STORY_AGENT"
 assert_grep "story-author: names ## QA history"      "## QA history"      "$STORY_AGENT"
-assert_grep "story-author: retains constraint-spec frame rule" "constraint-spec frame" "$STORY_AGENT"
+assert_grep "story-author: teaches the human JTBD frame"           "I want to"     "$STORY_AGENT"
+assert_no_grep    "story-author: NO 'constraint-spec' frame rule (retired BC-12134)"      "constraint-spec" "$STORY_AGENT"
+assert_no_grep_re "story-author: NO system-subject MUST/SHALL framing (retired BC-12134)" "$SYS_SUBJECT_RE" "$STORY_AGENT"
 assert_grep "story-author: retains cross-domain-deps gate awareness" "cross-domain-deps-bidirectional" "$STORY_AGENT"
 
 # ── Section 5: Orchestrators copy the templates into consumers ──────
