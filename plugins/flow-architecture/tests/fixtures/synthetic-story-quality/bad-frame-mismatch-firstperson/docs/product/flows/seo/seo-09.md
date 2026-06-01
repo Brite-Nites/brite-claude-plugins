@@ -18,7 +18,7 @@ intent: ../../intent.md
 
 ## Actor
 
-Search-engine crawler. (First-person `When I'm a crawler …` framing — the D11 infra-misfit this fixture locks; the constraint-spec frame is the correct shape for a non-human actor.)
+Search-engine crawler. (First-person `When I'm a crawler …` framing — the D11 infra-misfit this fixture locks; the fix is to re-anchor on the human the mechanism serves — the operator who trusts the run, or the customer who reads the output.)
 
 ## Acceptance criteria
 

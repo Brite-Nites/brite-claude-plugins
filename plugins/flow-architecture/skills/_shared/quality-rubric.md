@@ -202,18 +202,18 @@ The single-doc-judgeable dimensions are the model: each names a signal observabl
 
 ---
 
-## D11 — Right story frame for the flow type
+## D11 — Story anchored on the human the flow serves
 
-**Definition.** Human-actor flows use the When / I want to / so I can JTBD frame. Infrastructure flows, automated processes, and non-human actors (crawlers, CDN invalidations, cron jobs, webhook receivers, CSP rules) use an engineering-constraint spec frame: "Given [context], the system MUST [behavior], so that [operator/user outcome]."
+**Definition.** Every flow uses the When / I want to / so I can JTBD frame, anchored on the human the flow serves — the system is the *means*, never the *subject*. For a flow a person triggers directly, that's the actor. For an infrastructure / non-human-mechanism flow (crawlers, CDN invalidations, cron jobs, webhook receivers, sitemap/robots, canonical resolution, CSP rules), there is still a human the mechanism serves; the **anchor rule** finds them — anchor on the **operator** who configures, runs, and trusts the mechanism, *unless* a customer directly reads or experiences the output, then the **customer**. The mechanism's guarantee lives in the concrete Gherkin ACs and `## Status`, not as the story's subject.
 
-**Good signal.** An email-confirmation send authored as "Given an appointment is created with status=scheduled AND the tenant has APPT-14 enabled, the system MUST dispatch a templated message within 30 seconds, so that the homeowner receives confirmation before the salesperson ends the call." The actor is the system; the outcome serves a human.
+**Good signal.** An appointment-confirmation flow authored through the homeowner who receives it — the customer who directly reads the output, so the anchor rule flips to them: "When I book an appointment with the contractor, I want to get a written confirmation right away, so I can check the date and time are right before the salesperson leaves." The Gherkin then asserts the machine-checkable guarantee — given the appointment is created with status=scheduled AND tenant APPT-14 enabled, a templated message is dispatched within 30 seconds — concrete and testable, under a job story anchored on the customer who reads the result. (Where the same mechanism serves an *unobserved* guarantee instead — a sitemap run nobody reads — the anchor is the operator who trusts it; see the story-doc D11 examples.)
 
-**Failure mode it catches.** Frame mismatch — a cron job or webhook authored as "When I'm a search engine crawler, I want to…" Putting a non-human actor in the first-person job-story frame produces untestable, incoherent ACs and signals the author did not distinguish user-facing from system-facing surfaces.
+**Failure mode it catches.** The system as subject — a cron job or crawler authored as "When I'm a search engine crawler, I want to…", or the retired "Given … the system MUST … so that" constraint-spec frame. A non-human mechanism cannot narrate in the first person; centering it produces untestable, incoherent ACs and signals the author never found the human the mechanism serves.
 
 **How to judge (pass / concern / fail).**
-- Pass — human-actor flows use the job-story frame; infra/automated flows use the constraint-spec frame.
-- Concern — an infra flow uses the job-story frame but its scenarios are otherwise concrete and testable.
-- Fail — an infra/automated flow is forced into a first-person job-story frame and produces circular or untestable scenarios.
+- Pass — every flow uses the job-story frame anchored on the right human (operator or customer per the anchor rule), with the mechanism's guarantee carried in concrete ACs.
+- Concern — the frame is human-anchored but on the wrong human (a generic end-user where the operator holds the guarantee), or the mechanism's guarantee is asserted only vaguely.
+- Fail — the system is the subject (a first-person non-human "When I'm a crawler…" or the constraint-spec "the system MUST…"), producing circular or untestable scenarios.
 
 ---
 

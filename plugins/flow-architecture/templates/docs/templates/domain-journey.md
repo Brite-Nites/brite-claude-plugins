@@ -26,10 +26,12 @@ have (what they see vs. don't), and the failure they cannot absorb. **Behavioral
 a fail. Link to the canonical persona doc: [`docs/product/personas/<role>.md`](../personas/<role>.md).
 
 For an **infrastructural / generation-plane domain** (its flows are predominantly non-human /
-automated actors — domain routing, sitemap/SEO infra, page generation, hosting), anchor the persona
-on the **operator** who configures, runs, and trusts the system, and name the **system itself** as a
-second actor narrated through a constraint lens (what it must guarantee) — never a forced human
-end-user. "When I'm the crawler…" is the journey-scale echo of the story-doc D11 failure.
+automated mechanisms — domain routing, sitemap/SEO infra, page generation, hosting), anchor the
+persona on the **operator** who configures, runs, and trusts the mechanism — *unless* the domain
+renders output a customer directly reads (rendered page copy, a delivered confirmation), in which
+case that customer is the anchor — not a forced generic end-user, and not the system itself (the
+system is the means, never the subject). "When I'm the crawler…" is the journey-scale echo of the
+story-doc D11 failure.
 
 ## Scenario + Expectations
 
@@ -40,9 +42,10 @@ what state is the user in when they arrive. The **expectations** set the success
 
 > **Profile D (programmatic-SEO / generation-plane) — narrate two arcs, kept separate, here:**
 > the **generation-lifecycle arc** (operator-facing: feed → template → run → quality gate → publish →
-> sitemap → verify) and the **searcher-discovery arc** (anonymous crawler/searcher consuming the
-> rendered output). The persona stays anchored on the operator; the system is the second actor,
-> always narrated as a constraint. The arcs intersect at the stable identifier contract — name it.
+> sitemap → verify) and the **searcher-discovery arc** (the anonymous searcher consuming the
+> rendered output). The generation arc is anchored on the operator, the discovery arc on the
+> searcher; the system is the means each relies on, not an actor narrated in its own voice. The arcs
+> intersect at the stable identifier contract — name it.
 
 ## Journey phases
 
