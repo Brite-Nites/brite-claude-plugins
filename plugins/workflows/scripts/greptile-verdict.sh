@@ -59,7 +59,7 @@ printf '%s' "$COMMENTS_JSON" | jq empty >/dev/null 2>&1 || { echo '{"present":fa
 # reviews carry .submittedAt — normalize both to a common shape, then pick the
 # latest Greptile-authored entry by timestamp.
 printf '%s' "$COMMENTS_JSON" | jq -c '
-  def score_of(b): ((b | capture("(?i)confidence[\\s\\S]*?(?<s>[0-5])\\s*/\\s*5") | .s) // null)
+  def score_of(b): ((b | capture("(?i)confidence\\s*(?:score)?[\\s:]*(?<s>[0-5])\\s*/\\s*5") | .s) // null)
                    | if . == null then null else tonumber end;
   ( [ ((.comments // [])[] | {login: (.author.login // ""), body: (.body // ""), ts: (.createdAt // ""),   id: .id}),
       ((.reviews  // [])[] | {login: (.author.login // ""), body: (.body // ""), ts: (.submittedAt // ""), id: .id}) ]

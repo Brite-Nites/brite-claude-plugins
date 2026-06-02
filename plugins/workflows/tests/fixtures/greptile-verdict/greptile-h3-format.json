@@ -1,0 +1,11 @@
+{
+  "comments": [
+    {
+      "id": "IC_h3_real",
+      "author": { "login": "greptile-apps" },
+      "body": "<h3>Greptile Summary</h3>\n\nThis reads Greptile's 0-5 confidence score and drives it toward 5/5 before handing back to the developer to merge.\n\n<h3>Confidence Score: 4/5</h3>\n\nSafe to merge.\n",
+      "createdAt": "2026-06-01T12:00:00Z",
+      "url": "https://github.com/brite/repo/pull/1#issuecomment-11"
+    }
+  ]
+}
