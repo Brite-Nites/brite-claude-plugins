@@ -1,0 +1,100 @@
+Subject: Catch-up notes — Holden's Claude Code command toolkit
+
+Hi [name],
+
+You missed Holden's "New Tricks" session on 6/1. Here's the toolkit he walked through —
+each command with what it does.
+
+Quick note on terms: a SKILL is one command that does one job (like /grill-me). A PLUGIN
+is a bundle of skills shipped together (like our marketing plugin). Most of these are
+skills from Holden's personal toolkit, installed for the whole team and available
+everywhere as slash-commands. The one exception is capture-idea, which lives in our
+marketing plugin.
+
+
+THINKING & SCOPING
+
+/grill-me — Interviews you with sharp questions until your thinking is clear. Works in any
+context, not just code. Use it when you have options and aren't sure which you want.
+
+/grill-with-docs — The same interview, but code-aware and it writes things down. Creates
+decision records (ADRs) in the repo as you agree on things, and exposes hidden requirements
+and edge cases before you build the wrong thing. Also doubles as a scoping tool. Run it
+inside the repo.
+
+/zoom-out — Draws a map of what's shipped, what's next, and where you are. Use it when you
+get lost in a session or are stepping away and want an easy re-entry point.
+
+/deep-research — Spins up a swarm of agents to research a hard technical question and return
+best practices. Heavy: expensive, slow, spawns many agents. Use it when a wrong answer has
+real consequences.
+
+/teach — Builds an interactive web page that explains a concept with a quiz, detects where
+you're confused, and re-explains. Files auto-delete after ~36 hours. Use it mid-scoping when
+you hit something you don't understand well enough.
+
+
+CRYSTALLIZING
+
+/to-prd — Turns the conversation you just had into a requirements document (PRD) in Linear.
+Doesn't re-interview you — it synthesizes what you already discussed. Asks which milestone to
+file under.
+
+/to-issues — Breaks a PRD into many small, well-scoped Linear issues that follow our
+conventions. Slices work into thin end-to-end "vertical slices" rather than horizontal layers.
+
+
+BUILDING
+
+/tdd — Test-driven build loop (write the test, make it pass, clean up). As a standalone it
+keeps your current conversation context instead of cold-loading an issue, and auto-creates an
+in-session checklist. Continues into your normal review and ship flow.
+
+/handoff — Compresses your entire session into a ~3,000-word handoff document plus a
+ready-to-paste prompt to launch the next session. This is what makes continuous, chained
+sessions possible.
+
+
+BUGS & TRIAGE
+
+/bug-report — File a bug from anywhere, even outside the codebase. Captures screenshots, repro
+steps, who's involved, and tradeoffs, then files a labeled Linear issue. Built so non-engineers
+can file clean bugs.
+
+/triage — Routes an incoming issue into one of: bug, enhancement, needs-info, ready-for-agent,
+ready-for-human, or won't-fix. Drafts follow-up questions to the reporter when info is missing.
+
+
+CLEANUP
+
+/improve-codebase-architecture — Scans the codebase and outputs a list of improvements to shape
+into issues. Meant to run on a regular cadence (good nightly cron job) rather than inline.
+
+
+IDEA CAPTURE
+
+capture-idea (marketing plugin) — Lightweight way to log a campaign idea from anywhere. Drops
+it into a Linear "ideas" milestone for the campaign-planning command to pick up later.
+Repo-independent.
+
+
+HOW IT FITS TOGETHER
+
+Two ways in:
+
+Push (you have an idea):
+   /grill-with-docs -> /to-prd -> /to-issues -> /tdd -> (review + ship) -> /handoff
+
+Pull (a bug finds you):
+   /bug-report -> /triage -> /tdd -> (review + ship)
+
+On a cadence:
+   /improve-codebase-architecture
+
+Underneath it all are two files in the repo that carry context between commands and sessions:
+CONTEXT.md (the project's Linear link, GitHub link, and domain notes) and docs/adrs/ (decision
+records written as you go).
+
+Happy to walk anyone through a live example.
+
+[your name]
