@@ -29,14 +29,20 @@ command -v python3 >/dev/null 2>&1 || { echo "fatal: python3 required" >&2; exit
 PR="" TRIGGER="" MAX_WAIT=600 INTERVAL=30
 while [ $# -gt 0 ]; do
   case "$1" in
-    --pr)       PR="${2:-}";       shift 2 ;;
-    --trigger)  TRIGGER="${2:-}";  shift 2 ;;
-    --max-wait) MAX_WAIT="${2:-}"; shift 2 ;;
-    --interval) INTERVAL="${2:-}"; shift 2 ;;
+    --pr)       PR="${2:-}";       shift "$(( $# >= 2 ? 2 : 1 ))" ;;
+    --trigger)  TRIGGER="${2:-}";  shift "$(( $# >= 2 ? 2 : 1 ))" ;;
+    --max-wait) MAX_WAIT="${2:-}"; shift "$(( $# >= 2 ? 2 : 1 ))" ;;
+    --interval) INTERVAL="${2:-}"; shift "$(( $# >= 2 ? 2 : 1 ))" ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 [ -n "$PR" ] && [ -n "$TRIGGER" ] || { echo "usage: greptile-await.sh --pr <ref> --trigger <iso8601> [--max-wait sec] [--interval sec]" >&2; exit 2; }
+
+# Reject non-numeric timing args (they'd otherwise crash the arithmetic / sleep
+# with an opaque error), and clamp interval to >=1 so --interval 0 can't hot-spin.
+case "$MAX_WAIT" in ''|*[!0-9]*) echo "--max-wait must be a non-negative integer" >&2; exit 2 ;; esac
+case "$INTERVAL" in ''|*[!0-9]*) echo "--interval must be a non-negative integer" >&2; exit 2 ;; esac
+[ "$INTERVAL" -ge 1 ] || INTERVAL=1
 
 now_iso() { python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z"))'; }
 
@@ -52,12 +58,15 @@ PY
 # Defensive backstop so a clock anomaly can't loop forever.
 max_iters=$(( MAX_WAIT / (INTERVAL > 0 ? INTERVAL : 1) + 2 ))
 
+verdict='{"present":false}'
 i=0
 while [ "$i" -lt "$max_iters" ]; do
   i=$((i + 1))
   verdict="$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')"
-  score="$(printf '%s' "$verdict" | jq -r '.score // "null"')"
-  vts="$(printf '%s' "$verdict" | jq -r '.commented_at // ""')"
+  # One jq pass extracts both fields (tab-separated) to save a fork per poll.
+  IFS="$(printf '\t')" read -r score vts <<EOF
+$(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // "")] | @tsv')
+EOF
   state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --score "$score")"
   case "$state" in
     FRESH_PASS|FRESH_FAIL|TIMED_OUT)
@@ -68,5 +77,5 @@ while [ "$i" -lt "$max_iters" ]; do
   esac
 done
 
-# Backstop tripped — report as a timeout so the caller never hangs.
-printf '%s\n%s\n' "$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')" "TIMED_OUT"
+# Backstop tripped — report the last verdict as a timeout so the caller never hangs.
+printf '%s\n%s\n' "$verdict" "TIMED_OUT"

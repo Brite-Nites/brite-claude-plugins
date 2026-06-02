@@ -1,0 +1,11 @@
+{
+  "comments": [
+    {
+      "id": "IC_intervening",
+      "author": { "login": "greptile-apps" },
+      "body": "## Greptile Summary\n\nReviewed 3 files, found 2 minor issues. Confidence score: 5/5\n",
+      "createdAt": "2026-06-01T12:00:00Z",
+      "url": "https://github.com/brite/repo/pull/1#issuecomment-10"
+    }
+  ]
+}

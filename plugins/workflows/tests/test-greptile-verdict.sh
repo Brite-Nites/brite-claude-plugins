@@ -124,6 +124,51 @@ else
   fail "expected score:null for 8/5 — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
 fi
 
+# ── 8. Intervening digits between "confidence" and the rating ────────
+# Locks the non-greedy regex: prose digits must not block a real N/5.
+section 8 "intervening digits — '…3 files, 2 issues. Confidence score: 5/5' → 5"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-intervening-digits.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "true" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "5" ]; then
+  pass "present:true, score:5 (digits in gap don't block)"
+else
+  fail "expected score:5 with intervening digits — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 9. Greptile summary posted as a REVIEW (not an issue comment) ────
+# Locks the comments+reviews union — score lives in a review body.
+section 9 "review-union — Greptile review body scored 4/5"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-review.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "4" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.comment_id')" = "PRR_greptile" ]; then
+  pass "score:4 from review body (PRR_greptile)"
+else
+  fail "expected score:4 from review — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 10. Equal timestamps → last comment in array order wins ──────────
+section 10 "tie-break — equal createdAt, last-in-array wins"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-tie-break.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "4" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.comment_id')" = "IC_tie_b" ]; then
+  pass "score:4 from IC_tie_b (stable sort, last wins)"
+else
+  fail "expected score:4 comment_id:IC_tie_b — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 11. Unparseable input → graceful present:false (no jq crash) ─────
+section 11 "malformed — non-JSON input → present:false, exit 0"
+run_capture "$VERDICT" --comments-file "$FIXTURES/malformed.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "false" ]; then
+  pass "present:false on unparseable input"
+else
+  fail "expected present:false exit 0 — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-12248 greptile-verdict unit tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"

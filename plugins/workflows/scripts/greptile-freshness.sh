@@ -23,11 +23,11 @@ command -v python3 >/dev/null 2>&1 || { echo "fatal: python3 required" >&2; exit
 TRIGGER="" NOW="" DEADLINE="" VERDICT_TS="" SCORE=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --trigger)    TRIGGER="${2:-}";    shift 2 ;;
-    --now)        NOW="${2:-}";        shift 2 ;;
-    --deadline)   DEADLINE="${2:-}";   shift 2 ;;
-    --verdict-ts) VERDICT_TS="${2:-}"; shift 2 ;;
-    --score)      SCORE="${2:-}";      shift 2 ;;
+    --trigger)    TRIGGER="${2:-}";    shift "$(( $# >= 2 ? 2 : 1 ))" ;;
+    --now)        NOW="${2:-}";        shift "$(( $# >= 2 ? 2 : 1 ))" ;;
+    --deadline)   DEADLINE="${2:-}";   shift "$(( $# >= 2 ? 2 : 1 ))" ;;
+    --verdict-ts) VERDICT_TS="${2:-}"; shift "$(( $# >= 2 ? 2 : 1 ))" ;;
+    --score)      SCORE="${2:-}";      shift "$(( $# >= 2 ? 2 : 1 ))" ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -38,7 +38,13 @@ import sys, datetime
 def parse(s):
     if not s or s == "null":
         return None
-    return datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+    try:
+        dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None  # unparseable → treat as absent (degrade to PENDING/TIMED_OUT)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)  # naive → UTC, never crash on compare
+    return dt
 
 trigger, now, deadline, vts, score = sys.argv[1:6]
 t, v, n, d = parse(trigger), parse(vts), parse(now), parse(deadline)

@@ -133,7 +133,7 @@ Narrate: `Step 3/8: Updating Linear...`
 
 Use the Linear MCP tools:
 
-1. **Move issue status** to "In Review". Leave it **In Review** — the greptile-gate (Step 2b) does not merge, so the developer merges manually; don't auto-advance to "Done".
+1. **Move issue status** to **In Review** and keep it there — the greptile-gate (Step 2b) does not merge, so the developer merges manually. Do not advance the status automatically after shipping.
 2. **Add a comment** on the issue with PR link and summary of what was implemented.
 3. **Link the PR** via attachment if possible.
 

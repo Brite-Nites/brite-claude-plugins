@@ -104,6 +104,20 @@ run_capture "$FRESH" --trigger "$TRIGGER" --now "$DEADLINE" --deadline "$DEADLIN
   --verdict-ts "$TS_STALE" --score 5
 assert_state "now==deadline" "TIMED_OUT"
 
+# ── 8. Precedence: a fresh 5/5 that lands PAST the deadline → FRESH_PASS
+# Locks branch order — fresh must win over timed-out (the await loop relies
+# on this: a late-but-fresh pass is still a pass, not a timeout).
+section 8 "precedence — fresh 5/5 arriving past deadline"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_PAST" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_FRESH" --score 5
+assert_state "fresh-past-deadline" "FRESH_PASS"
+
+# ── 9. Robustness: garbage verdict-ts → not fresh → PENDING (no crash) ─
+section 9 "robust parse — unparseable verdict-ts within window"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "not-a-timestamp" --score 5
+assert_state "garbage-verdict-ts" "PENDING"
+
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-12249 greptile-freshness unit tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"

@@ -72,10 +72,17 @@ else
 fi
 
 section 9 "ship.md: Linear stays In Review (no auto-Done)"
-if have "$SHIP" 'Leave it **In Review**' && ! grep -qF 'or "Done" if team merges' "$SHIP"; then
-  pass "Linear In Review lock (auto-Done phrasing removed)"
+# Scope to the Step 3 block, then lock: keeps In Review + the no-auto-advance
+# clause present, and the status name "Done" absent anywhere in Step 3 (concept
+# negative, not keyed to one removed phrase). Case-sensitive so the lowercase
+# "... done" narration doesn't trip it.
+step3_block="$(awk '/^## Step 3:/{f=1; print; next} f&&/^## Step [0-9]/{exit} f' "$SHIP")"
+if printf '%s\n' "$step3_block" | grep -qF '**In Review**' \
+   && printf '%s\n' "$step3_block" | grep -qF 'Do not advance the status automatically' \
+   && ! printf '%s\n' "$step3_block" | grep -qF 'Done'; then
+  pass "Linear In Review lock (Step 3 keeps In Review, status 'Done' absent)"
 else
-  fail "Linear should stay In Review and drop the auto-Done phrasing"
+  fail "Step 3 must keep Linear In Review and never advance the status to Done"
 fi
 
 # ──────────────────────────────────────────────────────────────────────
