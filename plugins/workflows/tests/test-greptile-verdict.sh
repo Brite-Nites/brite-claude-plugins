@@ -177,10 +177,26 @@ fi
 section 12 "real h3 format — preamble 'toward 5/5' + '<h3>Confidence Score: 4/5</h3>' → 4"
 run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-h3-format.json"
 if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "true" ] \
    && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "4" ]; then
-  pass "score:4 from the real Greptile h3 label"
+  pass "present:true, score:4 from the real Greptile h3 label"
 else
-  fail "expected score:4 from h3 format — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+  fail "expected present:true score:4 from h3 format — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 13. Scored comment + later EMPTY review → score from the comment ──
+# Greptile posts a scored comment, then a later empty COMMENTED review.
+# "Latest by timestamp" alone picks the empty review (score:null) — the bug
+# that made the real PR #421 read null. Must pick the scored comment.
+section 13 "comment+empty-review — scored comment beats later empty review → 4"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-comment-plus-empty-review.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "true" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "4" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.comment_id')" = "IC_scored" ]; then
+  pass "score:4 from IC_scored (empty review ignored)"
+else
+  fail "expected score:4 comment_id:IC_scored — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
 fi
 
 # ──────────────────────────────────────────────────────────────────────

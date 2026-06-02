@@ -63,10 +63,16 @@ printf '%s' "$COMMENTS_JSON" | jq -c '
                    | if . == null then null else tonumber end;
   ( [ ((.comments // [])[] | {login: (.author.login // ""), body: (.body // ""), ts: (.createdAt // ""),   id: .id}),
       ((.reviews  // [])[] | {login: (.author.login // ""), body: (.body // ""), ts: (.submittedAt // ""), id: .id}) ]
-    | map(select((.login | ascii_downcase) | test("greptile"))) ) as $g
+    | map(select((.login | ascii_downcase) | test("greptile")))
+    | map(. + {score: score_of(.body)}) ) as $g
   | if ($g | length) == 0
     then {present: false}
-    else ($g | sort_by(.ts) | last) as $c
-         | {present: true, score: score_of($c.body), comment_id: $c.id, commented_at: $c.ts}
+    # Greptile posts a SCORED comment and, seconds later, an EMPTY COMMENTED
+    # review — so "latest by timestamp" alone picks the empty review (score
+    # null). Prefer the latest entry that actually carries a score; only fall
+    # back to the latest overall when none has one.
+    else ( ($g | map(select(.score != null)) | sort_by(.ts) | last)
+           // ($g | sort_by(.ts) | last) ) as $c
+         | {present: true, score: $c.score, comment_id: $c.id, commented_at: $c.ts}
     end
 '
