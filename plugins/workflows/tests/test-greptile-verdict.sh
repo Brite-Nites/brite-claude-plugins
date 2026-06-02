@@ -199,6 +199,21 @@ else
   fail "expected score:4 comment_id:IC_scored — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
 fi
 
+# ── 14. Prose quotes vs the real <h3> verdict → the HEADING wins ─────
+# A meta-PR (about score parsing) has "Confidence Score: 3/5" / "4/5" in prose
+# quotes plus the real "<h3>Confidence Score: 5/5</h3>" verdict. The score must
+# come from the heading, not the first prose mention. This is the exact failure
+# that made the live PR #421 read 4 when Greptile's verdict was 5.
+section 14 "prose-vs-heading — quotes '…3/5 …4/5' but verdict '<h3>…5/5</h3>' → 5"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-prose-quote-plus-h3.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "true" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "5" ]; then
+  pass "score:5 from the <h3> verdict (prose quotes ignored)"
+else
+  fail "expected score:5 from heading — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-12248 greptile-verdict unit tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
