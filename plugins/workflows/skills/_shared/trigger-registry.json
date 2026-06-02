@@ -82,6 +82,14 @@
       "beats": []
     },
     {
+      "name": "greptile-gate",
+      "tier": "inner-loop",
+      "user_invocable": true,
+      "keywords": ["greptile score", "greptile gate", "greptile review", "check greptile", "greptile verdict", "read greptile"],
+      "negative_keywords": [],
+      "beats": []
+    },
+    {
       "name": "handbook-drift-check",
       "tier": "inner-loop",
       "user_invocable": false,
@@ -443,6 +451,12 @@
       "expected": ["handbook-drift-check"],
       "not_expected": [],
       "description": "Handbook update keyword triggers handbook-drift-check"
+    },
+    {
+      "phrase": "Check the greptile score on this PR and read the greptile review",
+      "expected": ["greptile-gate"],
+      "not_expected": [],
+      "description": "Greptile score/review keywords trigger greptile-gate"
     }
   ]
 }
