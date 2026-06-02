@@ -125,15 +125,17 @@ else
 fi
 
 # ── 8. Intervening digits between "confidence" and the rating ────────
-# Locks the non-greedy regex: prose digits must not block a real N/5.
-section 8 "intervening digits — '…3 files, 2 issues. Confidence score: 5/5' → 5"
+# Locks the label-anchored regex against the REAL Greptile shape: a stray N/5
+# in the preamble ("toward 5/5") must NOT win over the "Confidence Score:" line.
+# The old non-greedy regex returned 5 here — the bug Greptile flagged on PR #420.
+section 8 "preamble fraction — '…toward 5/5 … Confidence Score: 3/5' → 3 (not 5)"
 run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-intervening-digits.json"
 if [ "$EXIT" -eq 0 ] \
    && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "true" ] \
-   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "5" ]; then
-  pass "present:true, score:5 (digits in gap don't block)"
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "3" ]; then
+  pass "present:true, score:3 (preamble 5/5 doesn't win over the label)"
 else
-  fail "expected score:5 with intervening digits — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+  fail "expected score:3 (label-anchored) — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
 fi
 
 # ── 9. Greptile summary posted as a REVIEW (not an issue comment) ────
@@ -167,6 +169,49 @@ if [ "$EXIT" -eq 0 ] \
   pass "present:false on unparseable input"
 else
   fail "expected present:false exit 0 — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 12. Greptile's real HTML <h3> format with a preamble fraction → 4 ─
+# Reproduces PR #420's actual body: "<h3>Confidence Score: 4/5</h3>" with
+# "toward 5/5" in the prose above it. The shipped regex returned 5 here.
+section 12 "real h3 format — preamble 'toward 5/5' + '<h3>Confidence Score: 4/5</h3>' → 4"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-h3-format.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "true" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "4" ]; then
+  pass "present:true, score:4 from the real Greptile h3 label"
+else
+  fail "expected present:true score:4 from h3 format — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 13. Scored comment + later EMPTY review → score from the comment ──
+# Greptile posts a scored comment, then a later empty COMMENTED review.
+# "Latest by timestamp" alone picks the empty review (score:null) — the bug
+# that made the real PR #421 read null. Must pick the scored comment.
+section 13 "comment+empty-review — scored comment beats later empty review → 4"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-comment-plus-empty-review.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "true" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "4" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.comment_id')" = "IC_scored" ]; then
+  pass "score:4 from IC_scored (empty review ignored)"
+else
+  fail "expected score:4 comment_id:IC_scored — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 14. Prose quotes vs the real <h3> verdict → the HEADING wins ─────
+# A meta-PR (about score parsing) has "Confidence Score: 3/5" / "4/5" in prose
+# quotes plus the real "<h3>Confidence Score: 5/5</h3>" verdict. The score must
+# come from the heading, not the first prose mention. This is the exact failure
+# that made the live PR #421 read 4 when Greptile's verdict was 5.
+section 14 "prose-vs-heading — quotes '…3/5 …4/5' but verdict '<h3>…5/5</h3>' → 5"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-prose-quote-plus-h3.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.present')" = "true" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "5" ]; then
+  pass "score:5 from the <h3> verdict (prose quotes ignored)"
+else
+  fail "expected score:5 from heading — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
 fi
 
 # ──────────────────────────────────────────────────────────────────────

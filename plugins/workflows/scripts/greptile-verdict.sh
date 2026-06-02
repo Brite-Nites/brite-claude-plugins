@@ -59,14 +59,27 @@ printf '%s' "$COMMENTS_JSON" | jq empty >/dev/null 2>&1 || { echo '{"present":fa
 # reviews carry .submittedAt — normalize both to a common shape, then pick the
 # latest Greptile-authored entry by timestamp.
 printf '%s' "$COMMENTS_JSON" | jq -c '
-  def score_of(b): ((b | capture("(?i)confidence[\\s\\S]*?(?<s>[0-5])\\s*/\\s*5") | .s) // null)
-                   | if . == null then null else tonumber end;
+  # Greptile prints its verdict inside a heading: "<h3>Confidence Score: N/5</h3>"
+  # (or a markdown "### …"). A PR body — especially one ABOUT score parsing — also
+  # mentions "Confidence Score: N/5" in prose/quotes, so match the HEADING first
+  # and only fall back to a bare label when no heading verdict is present.
+  def score_of(b):
+    ( (b | capture("(?i)(?:<h[1-6][^>]*>|#{1,6}[ \\t]+)\\s*confidence\\s*score:?\\s*(?<s>[0-5])\\s*/\\s*5") | .s)
+      // (b | capture("(?i)confidence\\s*(?:score)?[\\s:]*(?<s>[0-5])\\s*/\\s*5") | .s)
+      // null )
+    | if . == null then null else tonumber end;
   ( [ ((.comments // [])[] | {login: (.author.login // ""), body: (.body // ""), ts: (.createdAt // ""),   id: .id}),
       ((.reviews  // [])[] | {login: (.author.login // ""), body: (.body // ""), ts: (.submittedAt // ""), id: .id}) ]
-    | map(select((.login | ascii_downcase) | test("greptile"))) ) as $g
+    | map(select((.login | ascii_downcase) | test("greptile")))
+    | map(. + {score: score_of(.body)}) ) as $g
   | if ($g | length) == 0
     then {present: false}
-    else ($g | sort_by(.ts) | last) as $c
-         | {present: true, score: score_of($c.body), comment_id: $c.id, commented_at: $c.ts}
+    # Greptile posts a SCORED comment and, seconds later, an EMPTY COMMENTED
+    # review — so "latest by timestamp" alone picks the empty review (score
+    # null). Prefer the latest entry that actually carries a score; only fall
+    # back to the latest overall when none has one.
+    else ( ($g | map(select(.score != null)) | sort_by(.ts) | last)
+           // ($g | sort_by(.ts) | last) ) as $c
+         | {present: true, score: $c.score, comment_id: $c.id, commented_at: $c.ts}
     end
 '
