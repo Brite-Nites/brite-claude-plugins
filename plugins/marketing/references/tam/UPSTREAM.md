@@ -20,14 +20,14 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 | `icp-definition.md` | `prompts/icp-definition.md` | Verbatim (+ frontmatter) |
 | `fit-scoring.md` | `prompts/fit-scoring.md` | Verbatim (+ frontmatter) |
 | `segment-routing.md` | `prompts/segment-routing.md` | Verbatim (+ frontmatter) |
-| `examples/roofing-contractors-tx.md` | `examples/roofing-contractors-tx.md` | Verbatim (+ frontmatter) |
+| `examples/roofing-contractors-tx.md` | `examples/roofing-contractors-tx.md` | Adapted (frontmatter + BC-6907 § 6 skill-delegation + BC-12130 § 3 note) — see § Local deviations |
 
 ## Per-file manifest — scripts
 
 | Target path (under `plugins/marketing/scripts/tam-map/`) | Upstream path | Verbatim vs adapted |
 |----------------------------------------------------------|---------------|---------------------|
-| `aiark_client.py` | `scripts/aiark_client.py` | Verbatim (+ 5-line `#` header after shebang) |
-| `discolike_client.py` | `scripts/discolike_client.py` | Verbatim (+ 5-line `#` header after shebang) |
+| `aiark_client.py` | `scripts/aiark_client.py` | **Removed** per BC-12130 — see § Local deviations |
+| `discolike_client.py` | `scripts/discolike_client.py` | **Removed** per BC-12130 — see § Local deviations |
 | `icypeas_client.py` | `scripts/icypeas_client.py` | Verbatim (+ 5-line `#` header after shebang) |
 | `spider_crawl.py` | `scripts/spider_crawl.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7050) — see § Local deviations |
 | `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fixes (BC-7051 async/sync split; BC-12128 BlitzAPI redesign re-application) — see § Local deviations |
@@ -48,7 +48,7 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 
 If upstream improvements are ever pulled, the operation is manual:
 
-1. Diff the target file against the pinned SHA (e.g., `git show 9f5c72e74b:scripts/aiark_client.py` against the local file, ignoring the Brite attribution header).
+1. Diff the target file against the pinned SHA (e.g., `git show 9f5c72e74b:scripts/spider_crawl.py` against the local file, ignoring the Brite attribution header).
 2. Re-apply Brite additions (`_source` JSON fields, adaptations from future R-4/R-5 issues) on top of the new upstream body.
 3. Bump the SHA references in this manifest + the per-file headers.
 4. Re-run `./scripts/validate.sh` + `./scripts/check-guardrails.sh --claude-md CLAUDE.md`.
@@ -103,6 +103,21 @@ Brite removes the script and folds its responsibility into the existing `icp-sco
 - The eighth Brite tam-map runtime credential is eliminated; only the seven vendor credentials remain. Vault cleanup is an admin step documented in the BC-6907 PR description.
 
 **Re-port action:** if a future upstream pull at a newer SHA still ships `scripts/tier_and_segment.py`, do not re-introduce the script — let it stay in upstream and continue absorbing its body into `icp-scoring` `abc` mode (prompt-only changes re-port to `fit-scoring.md`).
+
+### `aiark_client.py` + `discolike_client.py` — removed (dead ported clients, never wired) (BC-12130)
+
+Upstream ships `scripts/aiark_client.py` and `scripts/discolike_client.py` as standalone Python CLI discovery wrappers. Brite never wired either into its pipeline: the live AI Ark and Discolike integrations are the stdio MCP wrappers (`aiark-mcp.js`, `discolike-mcp.js`), which the `tam-mapping` skill and `/marketing:setup-tam-map` actually use. The two `*_client.py` files sat as verbatim ports carrying stale, pre-drift API shapes — e.g. `aiark_client.py` still POSTed `/v1/search` with `Authorization: Bearer` and a `filters{}` body, wrong on every axis vs the BC-7011 / BC-7157-verified contract (`POST /companies`, `X-TOKEN`, `account`/`page`/`size`). Beyond dead weight, the divergent `aiark_client.py` shape actively obscured the 2026-05-31 aiark diagnosis. Confirmed zero runtime callers (no Python `import`, no skill/command invocation) before removal.
+
+**Net effect:**
+
+- `plugins/marketing/scripts/tam-map/aiark_client.py` deleted.
+- `plugins/marketing/scripts/tam-map/discolike_client.py` deleted.
+- Per-file manifest rows above marked **Removed**.
+- Active references updated to the surviving MCP wrappers: `skills/tam-mapping/SKILL.md` provider table (drops the `*_client.py` halves, keeps `aiark-mcp.js` / `discolike-mcp.js`); `tools/integrations/ai-ark.md` + `discolike.md` "Consumed by" lists (drop the `*_client.py` bullets).
+- `icypeas_client.py` is **untouched** — it shares the `_client.py` suffix but is an **active** CLI script (SKILL.md provider table + the env-var table).
+- The example `references/tam/examples/roofing-contractors-tx.md` (§ "3. Discovery") still shows upstream's `python scripts/aiark_client.py` / `discolike_client.py` invocations. A **Brite note** was added inline at that block pointing to the MCP wrappers (Brite's actual aiark/discolike path) and to **BC-12278** (full example rewrite). That example was **already** Brite-adapted — BC-6907 reworked § 6 to the in-session `icp-scoring` skill delegation — so its manifest row above is corrected here from "Verbatim" to **Adapted** (the label had been stale since BC-6907). The `icypeas_client.py` invocation in the same block remains valid (icypeas is still a CLI script). A faithful end-to-end rewrite — command name (§ 1 `/marketing:tam-map`), MCP-driven discovery (§ 3), and the JSONL data-flow contract — is tracked in **BC-12278**.
+
+**Re-port action:** if a future upstream pull at a newer SHA still ships `scripts/aiark_client.py` / `scripts/discolike_client.py`, do **not** re-introduce them — the MCP wrappers (`aiark-mcp.js`, `discolike-mcp.js`) are the Brite integrations. Treat any aiark/discolike API-shape drift as a wrapper (`*-mcp.js`) fix, per BC-7011 / BC-7157.
 
 ### `aiark-mcp.js` — endpoint drift fixes (BC-7011)
 

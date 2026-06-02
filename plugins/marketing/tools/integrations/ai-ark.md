@@ -11,8 +11,7 @@ AI Ark is the **company-discovery layer** of the tam-map pipeline. Given a firmo
 ## Consumed by
 
 - `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 3c Labs collection (firmographic discovery)
-- `plugins/marketing/scripts/tam-map/aiark_client.py` — ported Python wrapper
-- `plugins/marketing/scripts/tam-map/aiark-mcp.js` — ported stdio MCP wrapper over the same API
+- `plugins/marketing/scripts/tam-map/aiark-mcp.js` — ported stdio MCP wrapper over the API
 
 ## Auth
 
