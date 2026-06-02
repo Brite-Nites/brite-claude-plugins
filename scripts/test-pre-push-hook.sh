@@ -97,6 +97,22 @@ exit 1
 SENTINEL
 chmod +x "$WORKFAIL/scripts/validate.sh"
 
+# Fixture 4 — worktree whose sentinel validate.sh reports whether the caller's
+# git env leaked through to it. Locks the hook's env-scrub-before-exec fix.
+WORKENV="$SANDBOX/workenv"
+mkdir -p "$WORKENV/scripts"
+git init -q "$WORKENV"
+cat > "$WORKENV/scripts/validate.sh" <<'SENTINEL'
+#!/usr/bin/env bash
+if [ -n "${GIT_DIR:-}" ] || [ -n "${GIT_INDEX_FILE:-}" ]; then
+  echo "GIT_ENV_LEAKED"
+else
+  echo "GIT_ENV_CLEAN"
+fi
+exit 0
+SENTINEL
+chmod +x "$WORKENV/scripts/validate.sh"
+
 # ═════════════════════════════════════════════════════════════════════
 section "Worktree context — validation still runs (AC2, regression lock)"
 # ═════════════════════════════════════════════════════════════════════
@@ -152,6 +168,26 @@ if printf '%s\n' "$HOOK_OUT" | grep -q "VALIDATE_FAILED"; then
   pass "failing gate: validate.sh actually ran before failing"
 else
   fail "failing gate: validate.sh did NOT run -- output: $HOOK_OUT"
+fi
+
+# ═════════════════════════════════════════════════════════════════════
+section "Worktree context, leaked git env — hook scrubs before exec (env-leak lock)"
+# ═════════════════════════════════════════════════════════════════════
+# `git push` presets GIT_DIR / GIT_INDEX_FILE in the hook env, pointing at the
+# caller's repo. Set them for THIS invocation (overriding the harness-top scrub),
+# pointing at the fixture's own .git so worktree resolution still succeeds, and
+# assert the hook unsets them before exec — so validate.sh and its hermetic
+# sub-tests run clean (the test_precommit_advisory.sh failure mode this fixes).
+set +e
+ENV_OUT="$(cd "$WORKENV" && GIT_DIR="$WORKENV/.git" GIT_INDEX_FILE="$WORKENV/.git/index" bash "$HOOK" origin "file://$WORKENV" </dev/null 2>&1)"
+ENV_RC=$?
+set -e
+if printf '%s\n' "$ENV_OUT" | grep -q "GIT_ENV_CLEAN"; then
+  pass "leaked git env: hook scrubbed it before exec (validate saw a clean env)"
+elif printf '%s\n' "$ENV_OUT" | grep -q "GIT_ENV_LEAKED"; then
+  fail "leaked git env: validate.sh saw leaked GIT_DIR/GIT_INDEX_FILE -- output: $ENV_OUT"
+else
+  fail "leaked git env: validate.sh did not run (worktree unresolved?) -- RC=$ENV_RC output: $ENV_OUT"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────
