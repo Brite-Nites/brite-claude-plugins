@@ -1,6 +1,6 @@
 ---
-description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 8 standard sub-issues (with up to 2 optional) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
-argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--situation-mining] [--creative-angles] [--dry-run]
+description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 2 substantive work issues (Deck Asset → Sarah, Data Sourcing & List Building → Corinne) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
+argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--deck-assignee <email>] [--list-assignee <email>] [--volume <small|medium|large>] [--dry-run]
 allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_workflows_linear-server__create_issue_label, mcp__plugin_revops_salesforce__get_username, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__list_pages
 gbrain:
   schema: 1
@@ -31,9 +31,11 @@ The campaign-scaffolding orchestrator. One invocation creates one campaign acros
 | Layer | What lands | Source-of-truth |
 |---|---|---|
 | Plugin filesystem | `docs/campaigns/{entity}/{slug}/manifest.json` | Cross-layer index — the breadcrumb that ties Linear ↔ SF ↔ EB together |
-| Linear | 1 project-milestone in "Brite GTM" + 8 standard sub-issues + up to 2 optional sub-issues (blocked-by chained) | Orchestration + work-tracking surface |
+| Linear | 1 project-milestone in "Brite GTM" + 2 substantive work issues (Deck Asset → Sarah Cullen, Data Sourcing & List Building → Corinne Brewer) | Orchestration + work-tracking surface |
 | Salesforce | 1 Campaign record (Status=Planned, custom fields populated) | Portfolio reporting surface (rollups, pipeline attribution) |
-| Email Bison | Workspace assignment recorded in manifest (NO EB campaign created here) | Sending-execution surface — actual EB campaign is created later by `/marketing:launch-campaign` at sub-issue #6 |
+| Email Bison | Workspace assignment recorded in manifest (NO EB campaign created here) | Sending-execution surface — actual EB campaign is created later by `/marketing:launch-campaign` once the deck + list are done |
+
+> **Why only 2 issues?** Earlier versions scaffolded an 8-issue process chain (brief gate, QA, weekly reviews, debrief, …). In practice those issues carried no content related to work anyone actually had to do, and they rotted in Backlog. Launching a campaign requires exactly two deliverables: the **deck asset** (creative) and the **enriched, verified prospect list** (data). Everything else is a command the operator runs (`/marketing:launch-campaign`, `/marketing:campaign-analysis`, `/marketing:campaign-debrief`), not an issue to track. The two issues this command creates are modeled on real, substantive issues the team has shipped from: BC-2816 (deck) and BC-10178 (list building).
 
 ## Context-load phase
 
@@ -50,10 +52,10 @@ Substitute `{vertical}` / `{persona}` / `{offer}` with this invocation's flags (
 
 **Outputs**:
 - `docs/campaigns/{entity}/{slug}/manifest.json` — fully populated per the schema in Step 7.
-- 1 Linear milestone (with labels applied to the 8-10 child issues, not the milestone itself — see § Step 8a).
-- 8 standard sub-issues (+ optional #9 Situation Mining for Labs, + optional #10 Creative Angles).
+- 1 Linear milestone (with labels applied to the 2 work issues, not the milestone itself — see § Step 8a).
+- 2 substantive work issues: **Deck Asset** (→ Sarah Cullen) + **Data Sourcing & List Building** (→ Corinne Brewer), each with campaign-specific content drafted at scaffold time per § Step 9.
 - 1 Salesforce Campaign record (if `/revops:create-sf-campaign` succeeded; null `campaign_id` in manifest if it soft-failed).
-- Operator-readable summary printed at Step 11.
+- Operator-readable summary printed at Step 10.
 
 **Precedent + sources**:
 - `plugins/revops/commands/create-sf-campaign.md` (BC-8717) — the slash command this orchestrator composes for σ3 SF auto-create.
@@ -65,7 +67,7 @@ Substitute `{vertical}` / `{persona}` / `{offer}` with this invocation's flags (
 
 ## Soft-fail philosophy
 
-The Salesforce auto-create step (Step 8b) is **soft-fail**: any error returned by `/revops:create-sf-campaign` (duplicate slug, missing owner, SF CLI error, invalid slug format) does NOT halt scaffolding. The manifest gets `salesforce.campaign_id: null`, a WARN line is logged, and the operator is told at Step 11 how to reconcile (manual re-run of `/revops:create-sf-campaign --slug=<slug> ...` once the underlying issue is resolved). Linear milestone + sub-issues + plugin manifest must always land — they are the gate that keeps the team able to plan against the campaign even if SF is temporarily unhealthy.
+The Salesforce auto-create step (Step 8b) is **soft-fail**: any error returned by `/revops:create-sf-campaign` (duplicate slug, missing owner, SF CLI error, invalid slug format) does NOT halt scaffolding. The manifest gets `salesforce.campaign_id: null`, a WARN line is logged, and the operator is told at Step 10 how to reconcile (manual re-run of `/revops:create-sf-campaign --slug=<slug> ...` once the underlying issue is resolved). Linear milestone + the 2 work issues + plugin manifest must always land — they are the gate that keeps the team able to plan against the campaign even if SF is temporarily unhealthy.
 
 Hard-fail paths (which DO halt scaffolding) are limited to:
 - Canonicality validation (Step 2) — invalid vertical/persona/offer tuple. Pointer to `/marketing:new-vertical|new-persona|new-offer` (BC-8725).
@@ -74,9 +76,9 @@ Hard-fail paths (which DO halt scaffolding) are limited to:
 
 ## Non-goals
 
-- Do NOT create the Email Bison campaign — that's `/marketing:launch-campaign` invoked at sub-issue #6.
-- Do NOT generate copy — that's `/marketing:email-copywriting` invoked at sub-issue #3.
-- Do NOT fill out the brief content (Audience / Messaging / etc.) at scaffold time — the brief is a sub-issue #1 deliverable. This command provides the template SKELETON populated with handbook citations + canonicals metadata; the marketing brief author fills the substantive content at sub-issue #1.
+- Do NOT create the Email Bison campaign — that's `/marketing:launch-campaign`, run by the operator once the deck + list issues are done.
+- Do NOT generate copy — that's `/marketing:email-copywriting`.
+- Do NOT scaffold process-tracking issues (brief gates, QA checklists, weekly-review reminders, debrief stubs, call scripts, strategy/positioning, channel selection, measurement & optimization). Those are operator commands or judgment calls, not Linear issues. The ONLY issues this command creates are the two real deliverables.
 - Do NOT support `--reference <campaign-id>` for cloning — that lives in `/marketing:launch-campaign`; not part of plan-campaign's surface.
 
 ---
@@ -99,8 +101,9 @@ Parse the invocation arguments. Required flags: `--vertical`, `--persona`, `--of
 | `--owner-email` | no | Resolve via the chain in Step 4. |
 | `--eb-workspace` | no | Resolve from entity per the map in Step 4. |
 | `--theme` | conditional | Required if `--entity=cross-entity`. Otherwise ignored. |
-| `--situation-mining` | no | Enable optional sub-issue #9 (Labs-only — Step 10 enforces). |
-| `--creative-angles` | no | Enable optional sub-issue #10. |
+| `--deck-assignee` | no | Default `sarahc@britenites.com` (Sarah Cullen — owns all GTM deck assets; see BC-2816 et al.). |
+| `--list-assignee` | no | Default `corinne@britenites.com` (Corinne Brewer — owns all list-building; see BC-10178 et al.). |
+| `--volume` | no | Target list volume tier: `small` (Google 400 / Microsoft 200 / SMTP 200 → ~800 verified), `medium` (~1,500), `large` (~3,000). Default `small` — per BC-10178: "small launch, expand based on results". If omitted in interactive mode, prompt with the 3 tiers. |
 | `--dry-run` | no | Print the full preview at Step 5 and exit without writing anything. |
 
 ### Interactive prompt example
@@ -130,6 +133,8 @@ Before any downstream step, validate every operator-controlled flag value. These
 | `--year` | 4-digit integer 2020-2099 (cap is arbitrary; widen via PR as needed) | `ERROR: --year must be 4-digit 2020-2099; got '<value>'` |
 | `--launch-date` | Matches `^\d{4}-\d{2}-\d{2}$` (ISO YYYY-MM-DD format) | `ERROR: --launch-date must be ISO YYYY-MM-DD; got '<value>'` |
 | `--owner-email` | If provided, matches `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` | `ERROR: --owner-email failed regex; got '<value>'` |
+| `--deck-assignee` / `--list-assignee` | If provided, same email regex as `--owner-email` | `ERROR: --<flag> failed email regex; got '<value>'` |
+| `--volume` | If provided, must be one of `small` / `medium` / `large` | `ERROR: --volume must be small, medium, or large; got '<value>'` |
 | `--vertical` / `--persona` / `--offer` | Strict kebab-case `^[a-z0-9]+(-[a-z0-9]+)*$` (canonicality membership checked in Step 2; this is the SHAPE check) | `ERROR: --<flag> must be strict kebab-case; got '<value>'` |
 | `--eb-workspace` | If provided, must be one of `emailbison-personal` / `emailbison-b2b` | `ERROR: --eb-workspace must be emailbison-personal or emailbison-b2b; got '<value>'` |
 
@@ -250,9 +255,9 @@ From the response, capture three values (the response shape includes `id`, `url`
 
 - `<gtm-project-id>` ← `projects[0].id`
 - `<project-url>` ← `projects[0].url` (used as the milestone-pointer URL — see Step 8a.5 F8 hot-patch)
-- `<brite-company-team-id>` ← `projects[0].teams[]` filtered to `name === "Brite Company"`, then `.id` (used in Step 8a.6 for the `teamId` arg on `create_issue_label`, which requires a UUID. § 9.0's container-issue + Step 9.1's sub-issue creates use `team: "Brite Company"` by-name on `save_issue` and do NOT need the captured UUID.)
+- `<brite-company-team-id>` ← `projects[0].teams[]` filtered to `name === "Brite Company"`, then `.id` (used in Step 8a.6 for the `teamId` arg on `create_issue_label`, which requires a UUID. Step 9's work-issue creates use `team: "Brite Company"` by-name on `save_issue` and do NOT need the captured UUID.)
 
-If `list_projects` returns 0 matches, HARD-FAIL — the "Brite GTM" project is a Phase 0 dependency (BC-8712 Task 0) and is meant to exist before plan-campaign ships. If `Brite Company` is absent from `teams[]`, HARD-FAIL — the project must be cross-team-shared with Brite Company (the team that owns all GTM sub-issues).
+If `list_projects` returns 0 matches, HARD-FAIL — the "Brite GTM" project is a Phase 0 dependency (BC-8712 Task 0) and is meant to exist before plan-campaign ships. If `Brite Company` is absent from `teams[]`, HARD-FAIL — the project must be cross-team-shared with Brite Company (the team that owns all GTM work issues).
 
 Then check for slug collision. Note the MCP-tool shape uses `project` (not `projectId`) and accepts NO `query` filter as of 2026-05-19 (BC-8727 friction-log F5/F6 — verified shape):
 
@@ -359,25 +364,20 @@ Print the operator-readable plan. Use this format (or a close variant — readab
     Description:  Filled brief template (8 sections per D5; see Step 8a)
     Labels:       slug:<slug>, entity:<entity>, vertical:<vertical>, persona:<persona>,
                   offer:<offer>, year:<year>, month:<month:02d>, status:planning
-                  (applied to each sub-issue, not the milestone — see Step 8a notes)
+                  (applied to the 2 work issues, not the milestone — see Step 8a notes)
 
   Salesforce auto-create (via /revops:create-sf-campaign --dry-run):
     <output of /revops:create-sf-campaign --dry-run with the same args>
 
-  Sub-issues to create (8 standard + N optional):
-    #1  Brief approved                              [gate, blocks #2-#8]
-    #2  Target list built                           [blocks #3; expects /marketing:list-building]
-    #3  Copy written + approved                     [blocks #4; expects /marketing:email-copywriting]
-    #4  Salesforce setup                            [blocks #5; post-σ3 reconciliation]
-    #5  Pre-launch QA                               [blocks #6]
-    #6  Launch executed                             [blocks #7; expects /marketing:launch-campaign]
-    #7  Active management — weekly reviews          [blocks #8]
-    #8  Campaign closed + debrief                   [terminal; expects /marketing:campaign-debrief]
-    #9  Situation Mining            <-- ONLY IF --situation-mining flag set AND entity=labs
-    #10 Creative Angles             <-- ONLY IF --creative-angles flag set
+  Work issues to create (2):
+    #1  Deck Asset — <offer_display> (<vertical_display>)             → <deck-assignee>, due <launch-date> - 14d
+    #2  Data Sourcing & List Building — <vertical_display> <offer_display> (M<month:02d>)
+                                                                       → <list-assignee>, due <launch-date> - 21d
 
 =================================================================
 ```
+
+**Then print both drafted issue bodies in full** (the Step 9 drafts — see § Step 9 for content rules), each under a `--- Issue draft: <title> ---` divider. The preview is where the operator catches a wrong positioning line, a missing suppression campaign, or a stale title cascade BEFORE anything is written — there is no post-hoc "brief approval" issue anymore, so this preview + the Step 6 confirm gate ARE the review.
 
 To produce the SF Campaign payload preview, invoke the sibling `/revops:create-sf-campaign --dry-run` via the `Skill` tool with the same flag values that the real Step 8b invocation will use; capture the single-line JSON it emits and pretty-print it under "Salesforce auto-create" above.
 
@@ -505,13 +505,13 @@ In `<brief-template>`, replace these slots (literal string-replace, in order):
 | `{{month_display}}` | `<month>` formatted as the full month name + year (e.g. "May 2026"). One-shot derivation via Python (portable across macOS/Linux; sidesteps BSD-vs-GNU `date` divergence + locale dependence): `python3 -c "import datetime; print(datetime.date(<year>, <month>, 1).strftime('%B %Y'))"`. `<year>` and `<month>` are pre-validated integers per Step 1b — safe to interpolate. |
 | `{{eb_workspace}}` | `<eb-workspace>` resolved at Step 4.1 (`emailbison-personal` for nites, `emailbison-b2b` for supply/labs, operator-picked for cross-entity) |
 
-Unsubstituted slots (slot present in template but no value in this table) remain literally `{{slot_name}}` for the brief author to fill at sub-issue #1.
+Unsubstituted slots (slot present in template but no value in this table) remain literally `{{slot_name}}` for the brief author to fill directly in the milestone description after scaffold.
 
 The handbook template at `marketing/go-to-market/templates/campaign-brief-template.md` references 14 of the 15 slots above (`{{year}}` is unused — redundant with `{{month_display}}`'s "Month Year" rendering). Slot names are load-bearing: the handbook side and this substitution map MUST stay in lockstep. Any addition or rename here requires a paired handbook PR landing first.
 
 #### 8a.4 — Inline fallback brief template
 
-When `gh api` fails, use this 8-section skeleton in place of the handbook template. Marker `<!-- OPERATOR-FILL -->` flags content the marketing brief author authors at sub-issue #1.
+When `gh api` fails, use this 8-section skeleton in place of the handbook template. Marker `<!-- OPERATOR-FILL -->` flags content the marketing brief author fills directly in the milestone description after scaffold.
 
 ```markdown
 # Campaign brief — {{slug}}
@@ -541,7 +541,7 @@ When `gh api` fails, use this 8-section skeleton in place of the handbook templa
 
 ## 4. Messaging
 
-<!-- OPERATOR-FILL: 1-2 angle hypotheses from /marketing:creative-angles (sub-issue #10 if --creative-angles enabled) + offer page value props -->
+<!-- OPERATOR-FILL: 1-2 angle hypotheses from /marketing:creative-angles (run manually if useful) + offer page value props -->
 
 ## 5. Channels
 
@@ -562,16 +562,10 @@ When `gh api` fails, use this 8-section skeleton in place of the handbook templa
 
 ---
 
-**Sub-issue chain** (created at scaffold; tracked in Linear):
+**Work issues** (created at scaffold; tracked against this milestone in Linear):
 
-1. Brief approved (this doc; gate)
-2. Target list built
-3. Copy written + approved
-4. Salesforce setup
-5. Pre-launch QA
-6. Launch executed
-7. Active management — weekly reviews
-8. Campaign closed + debrief
+1. Deck Asset — {{offer_display}} ({{vertical_display}})
+2. Data Sourcing & List Building — {{vertical_display}} {{offer_display}}
 ```
 
 The fallback is intentionally minimal — the goal is to ensure the milestone always has a usable description, not to replicate the full handbook template.
@@ -588,7 +582,7 @@ mcp__plugin_workflows_linear-server__save_milestone(
 )
 ```
 
-Capture the returned `id` into `<milestone-id>`. The MCP response shape does NOT include a `url` field (BC-8727 friction-log F8 — verified 2026-05-19). Use the `<project-url>` already captured at Step 3.3 as the milestone pointer (the operator clicks through to the milestone from the project view), and bind it as an alias so downstream sub-steps (§ 9.0 container description, § 9.0 rollback, Step 11 summary, Step 11.3 hand-off) read naturally:
+Capture the returned `id` into `<milestone-id>`. The MCP response shape does NOT include a `url` field (BC-8727 friction-log F8 — verified 2026-05-19). Use the `<project-url>` already captured at Step 3.3 as the milestone pointer (the operator clicks through to the milestone from the project view), and bind it as an alias so downstream sub-steps (Step 9d failure messaging, Step 10 summary, Step 10.3 hand-off) read naturally:
 
 ```
 <milestone-url> := <project-url>  # alias — same string; "milestone-url" framing kept for operator semantic clarity downstream
@@ -605,9 +599,9 @@ via `Read` → JSON-mutate → `Write` (atomic per-file rewrite — Edit's not a
 
 #### 8a.6 — Label-existence pre-check + create-on-miss
 
-Linear's project-milestone API does NOT accept labels (verified BC-8718 era + observed in `mcp__plugin_workflows_linear-server__save_milestone` shape). The 8-label set (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`) gets applied to each child sub-issue in Step 9 (sub-issues DO take labels via `save_issue`).
+Linear's project-milestone API does NOT accept labels (verified BC-8718 era + observed in `mcp__plugin_workflows_linear-server__save_milestone` shape). The 8-label set (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`) gets applied to each of the 2 work issues in Step 9 (issues DO take labels via `save_issue`).
 
-**The same 8-label set is the canonical CONSTANT for this orchestrator.** Whenever you see "the 8 labels", "the label set", or label-applying logic referenced from Step 9 / Step 10 / dry-run preview, the membership IS exactly these 8: `slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`. Drift between this enumeration and Step 9's `labels:` field is a defect — the contract test at `plugins/marketing/tests/test_plan_campaign_contracts.py` verifies the two stay in lockstep.
+**The same 8-label set is the canonical CONSTANT for this orchestrator.** Whenever you see "the 8 labels", "the label set", or label-applying logic referenced from Step 9 / dry-run preview, the membership IS exactly these 8: `slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`. Drift between this enumeration and Step 9's `labels:` field is a defect — the contract test at `plugins/marketing/tests/test_plan_campaign_contracts.py` verifies the two stay in lockstep.
 
 Before Step 9, ensure all 8 label values exist as `IssueLabel` records in the Brite Company team.
 
@@ -665,7 +659,7 @@ Continue to Step 9.
 
 **Soft-fail error shapes** (`{"error":"<kind>", ...}`):
 
-| Error kind | Manifest action | Step 11 reminder | Notes |
+| Error kind | Manifest action | Step 10 reminder | Notes |
 |---|---|---|---|
 | `duplicate_slug` | `salesforce.campaign_id` ← `existing_id` from error payload | INFO line: "SF Campaign for `<slug>` already exists (idempotent re-run); reusing existing_id." | Treat as success. The slug-collision check in Step 3 caught new ones; this is for the case where the SF record was created in a prior partial run that didn't update the manifest. |
 | `missing_owner` | `salesforce.campaign_id` ← `null` | WARN: "SF auto-create failed: `<owner-email>` is not an active SF user. Reconcile via `/revops:create-sf-campaign --slug=<slug> --owner-email=<corrected-email> ...` once owner is provisioned." | |
@@ -674,7 +668,7 @@ Continue to Step 9.
 | `missing_required_flag` | `salesforce.campaign_id` ← `null` | WARN: "SF auto-create missing required flag `<flag>`. This is an orchestrator bug — file an issue against plan-campaign." | Internal contract failure; should never fire if Step 4 resolved `<owner-email>` correctly. |
 | **`<any other error kind>`** (unknown future kind added by /revops:create-sf-campaign) | `salesforce.campaign_id` ← `null` | WARN: "SF auto-create returned unknown error kind `<error.error>`. Manifest gets null campaign_id; reconcile manually via `/revops:create-sf-campaign` after diagnosing. Update plan-campaign's error catalog to handle this kind explicitly in a follow-up PR." | Default branch — prevents silent no-op when sibling adds new error kinds. The canonical kind list lives at `plugins/revops/commands/create-sf-campaign.md` § "Error path catalog"; this orchestrator's table is downstream-consumer text that may drift. The default branch ensures behavior remains soft-fail even on drift. |
 
-Per the soft-fail philosophy: even on these errors, **continue to Step 9** (sub-issues still get created; the orchestrator's job is to scaffold the Linear surface even when SF is temporarily unhealthy).
+Per the soft-fail philosophy: even on these errors, **continue to Step 9** (the 2 work issues still get created; the orchestrator's job is to scaffold the Linear surface even when SF is temporarily unhealthy).
 
 #### 8b.2 — Persist the manifest update
 
@@ -682,205 +676,157 @@ Same `Read` → JSON-mutate → `Write` pattern as Step 8a.5.
 
 ---
 
-## Step 9 — Create 8 standard sub-issues with blockedBy chain
+## Step 9 — Create the 2 campaign work issues
 
-For each of the 8 sub-issues, call `save_issue` with:
+Launching a campaign requires exactly two deliverables someone has to produce: the **deck asset** (creative) and the **enriched, SMTP-verified prospect list** (data). Create exactly these two issues — no container parent, no `blockedBy` chain (they are independent and run in parallel), no process-tracking stubs. Issues attach to the milestone directly via `projectMilestoneId` — this matches how the real exemplar issues (BC-2816, BC-10178) are structured: top-level milestone issues, no parent.
+
+Both `save_issue` calls share:
 
 - `team`: "Brite Company"
-- `title`: as in the table below
-- `description`: per the per-issue spec below
-- `parentId`: see § 9.0 below (resolved at impl time)
 - `projectId`: `<gtm-project-id>`
 - `projectMilestoneId`: `<milestone-id>` from Step 8a
 - `labels`: the 8-label set from § Step 8a.6 (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`)
-- `assignee`: omit (sub-issues are assigned at sub-issue start time, not scaffold time)
-- `dueDate`: per the schedule (back-filled from `<launch-date>` — see per-issue spec)
+- `priority`: 2 (High)
+- NO `parentId` (top-level milestone issues, not sub-issues)
 
-After all 8 creates succeed, do a second pass to wire `blockedBy` relations. The Linear MCP `save_issue` shape for the second pass is **MINIMAL** — `save_issue(id=<sub-issue-id>, blockedBy=[<id>])` ONLY. The field is `blockedBy` (plural, array of issue IDs/identifiers; append-only per MCP schema), NOT `blockedById`.
+### 9a — Substance rules: draft the issue bodies at scaffold time
 
-**DOGFOOD-VERIFIED 2026-05-19 (BC-8727 friction-log F15)**: the minimal partial update is SAFE — labels, descriptions, parentId, projectMilestone all preserved on the second pass. Spec's earlier worry about merge-vs-replace blanking is unfounded at this MCP version. Keep the two-pass shape for robustness (single-pass would require `blockedBy` to accept forward-references to not-yet-created IDs in the same batch — untested and unlikely).
+The reason this command exists is to hand Sarah and Corinne issues they can ACT on — not skeletons. Draft both bodies BEFORE the Step 5 preview so the operator reviews real content at the confirm gate. Content sources, in priority order:
 
-### 9.0 — `parentId` resolution: container-issue pattern
+1. **Derived (mechanical — never skip).** From `<vertical-doc>` (cached at Step 2.2): persona `display` + `titles[]` (the YAML order IS the priority order), offer `display` + `posture`. From date math: due dates. From the prior-campaign mine (below): suppression list + persona-differentiation callout.
+2. **Drafted from brain context.** The Context-load phase already ran the `prior-campaigns` / `icp-research` / `message-market-fit` queries. Use that loaded content to draft the deck Positioning line, the source stack, the ICP line, and the case-study candidates. Cite which brain page informed each drafted line (e.g. `<!-- source: gbrain "M2 universities debrief" -->`). If brain context is empty, draft from the canonicals + handbook knowledge and mark the line `(draft — no prior-campaign data)`. NEVER leave a section as a bare TODO.
+3. **Operator-prompted (one question).** If `--volume` was not passed, ask ONE AskUserQuestion: "Target list volume for <slug>?" with options `small (~800 verified — default for new vertical/persona)` / `medium (~1,500)` / `large (~3,000)`. That is the only Step 9 prompt.
 
-Linear's project-milestones are project-scoped, NOT issue-scoped — they don't accept child issues directly. The 8 sub-issues need an issue parent. Use the **container-issue pattern** (this orchestrator-level design decision should be cross-referenced from `docs/decisions/013-gtm-three-layer-split.md` or promoted to a dedicated ADR when the second consumer adopts it):
+**Prior-campaign mine** (feeds the exclusion logic + persona-differentiation callout):
 
-1. Create a "Container" parent issue first via `save_issue`:
-   - `team`: "Brite Company"
-   - `title`: `<slug>` (matches milestone name)
-   - `description`: link to `<milestone-url>` + brief "campaign rollup — see milestone for brief content" pointer
-   - `projectId`: `<gtm-project-id>`
-   - `projectMilestoneId`: `<milestone-id>`
-   - `labels`: the 8-label set (Step 8a.6)
-2. Capture the returned issue ID as `<container-issue-id>`.
-3. Pass `parentId: <container-issue-id>` on every subsequent sub-issue `save_issue` call in § 9.1.
+```bash
+ls docs/campaigns/*/*/manifest.json 2>/dev/null
+```
 
-Rationale: gives the marketing operator a single "campaign" issue to track in their Linear inbox + a clean parent → 8-children tree that aligns with the worked example in README §3.6. If `save_issue` rejects the container-issue + `projectMilestoneId` combo at dogfood (BC-8727):
+`Read` each manifest; keep those where `.vertical == "<vertical>"` and `.slug != "<slug>"`. For each prior campaign found:
 
-1. HALT before creating the 8 sub-issues.
-2. Surface the partial state to the operator: "Container-issue create failed. Linear milestone `<milestone-url>` was created at Step 8a; manifest.json was written at Step 7. To clean up: delete the milestone via Linear UI, then delete `docs/campaigns/<entity>/<slug>/` and re-invoke plan-campaign once the underlying issue is resolved. Do NOT proceed manually with a flat structure."
-3. File a follow-up issue tracking the Linear MCP-shape gap.
+- If `email_bison.campaign_id` is non-null → emit a suppression line: "Pull `<prior-slug>` recipient list (EB campaign id `<id>`). Suppress ALL contacts."
+- If `email_bison.campaign_id` is null (scaffolded but never launched) → note it as "no recipients to suppress (never launched)".
+- If the prior campaign's `persona` ≠ this campaign's persona → add the persona-differentiation callout to the Goal section: "**Critical:** targets a DIFFERENT buyer persona than `<prior-slug>` (<this persona display>, not <prior persona display>). 'Different buyer persona at same account' is the 180-day-rule workaround — including <prior persona> contacts in this list breaks the rule."
+- If the prior campaign's `persona` == this campaign's persona → add a WARN to the Goal section: "Same persona as `<prior-slug>` — verify the 180-day rule window has elapsed before sending."
 
-Explicit rollback guidance prevents the orchestrator from leaving an orphan milestone + manifest hanging in inconsistent state.
+Volume tiers (`--volume`): `small` = Google 400 / Microsoft 200 / SMTP 200 → ~800 verified; `medium` = Google 750 / Microsoft 375 / SMTP 375 → ~1,500; `large` = Google 1,500 / Microsoft 750 / SMTP 750 → ~3,000.
 
-### 9.1 — Sub-issue specs
+### 9b — Issue #1: Deck Asset (→ Sarah)
 
-For each row below, the description ALWAYS includes: (a) the handbook citation, (b) the expected plugin command, (c) the sub-issue role (1-2 sentences).
-
-#### #1 — Brief approved (gate)
-
-- **Title**: `Brief approved`
-- **Description**:
-  > Marketing brief author finalizes the brief in this milestone's description. GTM lead reviewer approves. Closes when the brief is approved.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/templates/campaign-brief-template.md`
-  > **Sub-issue role**: gate — blocks all downstream work. Per [D5](../../docs/decisions/) the brief template is 8 sections; the marketing brief author owns sections 2-8 content.
-  > **Expected plugin command**: none directly; brief is edited in Linear milestone description.
-- **dueDate**: `<launch-date> - 21 days` (T-21d per README § 3.6.5).
-- **blocks**: #2, #3, #4, #5, #6, #7, #8 (and #9, #10 if created)
-
-#### #2 — Target list built
-
-- **Title**: `Target list built`
-- **Description**:
-  > Outbound operator builds the enriched lead CSV for this campaign — typically via `/marketing:list-building` (which assumes a dbt audience view exists for this canonical persona+offer combo) OR `/marketing:tam-mapping` (if the TAM doesn't exist yet — Phase 1 source discovery → Phase 7 enrichment hand-off).
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/list-building.md`
-  > **Sub-issue role**: produces the enriched lead CSV that feeds Phase 1 of `/marketing:launch-campaign` at sub-issue #6.
-  > **Expected plugin command**: `/marketing:list-building` or `/marketing:tam-mapping`.
+- **Title**: `Deck Asset — <offer_display> (<vertical_display>)`
+- **Assignee**: `<deck-assignee>` (default `sarahc@britenites.com` — Sarah Cullen)
 - **dueDate**: `<launch-date> - 14 days`
-- **blockedBy**: [#1]
-- **blocks**: [#3]
+- **Description** (modeled on BC-2816; every `<...>` is DRAFTED per § 9a, not left as a placeholder):
 
-#### #3 — Copy written + approved
+```markdown
+## Overview
 
-- **Title**: `Copy written + approved`
-- **Description**:
-  > Marketing brief author runs `/marketing:email-copywriting` to produce the BC-5825 JSON copy artifact (step_1 + step_2 + custom_variables). GTM lead reviewer approves the rendered copy before Phase 1 of launch-campaign.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/email-copywriting.md`
-  > **Sub-issue role**: produces the copy artifact that feeds Phase 1 of `/marketing:launch-campaign` at sub-issue #6.
-  > **Expected plugin command**: `/marketing:email-copywriting`.
-- **dueDate**: `<launch-date> - 10 days`
-- **blockedBy**: [#1] (NOT #2 — copy and target list can parallel)
-- **blocks**: [#4]
+Interactive HTML deck for <vertical_display> sales outreach — a publicly viewable GitHub Pages asset that sales can share directly with <persona_display> decision-makers.
 
-#### #4 — Salesforce setup
+**Positioning:** <1-2 sentences drafted from offer posture + message-market-fit brain context — the angle this deck leads with, e.g. BC-2816's "Holiday lighting as a student wellness benefit during finals week.">
 
-- **Title**: `Salesforce setup`
-- **Description**:
-  > Verify the SF Campaign record created at scaffold time (σ3 / `/revops:create-sf-campaign`). Populate audience members (CampaignMember records linked from EB lead suppress export). Wire Opportunity links if the offer is a pilot/risk-reversal posture.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/sf-campaign-setup.md`
-  > **Sub-issue role**: SF reconciliation post-σ3 auto-create. If auto-create soft-failed at scaffold, manual `/revops:create-sf-campaign` re-run lands here.
-  > **Expected plugin command**: `/revops:create-sf-campaign` (reconciliation) + manual SF UI work.
-- **dueDate**: `<launch-date> - 7 days`
-- **blockedBy**: [#3]
-- **blocks**: [#5]
+**Branding:** <entity-mapped: nites → "Brite Nites throughout, one Brite Labs capability page near the end"; labs → "Brite Labs throughout"; supply → "Brite Supply"; cross-entity → per --theme>
 
-#### #5 — Pre-launch QA
+## Design source
 
-- **Title**: `Pre-launch QA`
-- **Description**:
-  > Run the launch-campaign pre-flight checklist: copy renders correctly with sample leads, custom variables resolve, sender warm-up status, EB workspace health, SF Campaign linkage.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/pre-launch-qa.md`
-  > **Sub-issue role**: catches launch-blocking issues before sub-issue #6 fires sending.
-  > **Expected plugin command**: `/marketing:launch-campaign --preview` (dry-run mode) + manual review.
-- **dueDate**: `<launch-date> - 3 days`
-- **blockedBy**: [#4]
-- **blocks**: [#6]
+Figma: <link if a prior deck for this vertical exists in brain context / prior campaigns; else "GTM-Assets-2026-Templates (confirm node with Sarah)">
 
-#### #6 — Launch executed
+Suggested section outline (proven ~11-section pattern from prior decks):
 
-- **Title**: `Launch executed`
-- **Description**:
-  > Outbound operator runs `/marketing:launch-campaign` (Phase 11 ACTIVATE) to create + activate the EB campaign. Single EB campaign per [D1] (no sender splits).
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/launch.md`
-  > **Sub-issue role**: the moment the campaign goes live. EB campaign_id flows back into manifest.email_bison.campaign_id at this point.
-  > **Expected plugin command**: `/marketing:launch-campaign --activate` (consumes copy artifact from #3 + enriched CSV from #2).
-- **dueDate**: `<launch-date>`
-- **blockedBy**: [#5]
-- **blocks**: [#7]
+1. Hero — <drafted hook from positioning>
+2. The problem / stakes — <drafted from ICP research: the stat or pain that lands with this persona>
+3. "What if" positioning + hero imagery
+4. "What's possible" — installation gallery
+5. Proof — <case-study candidates: prior installs in this vertical from brain context; else nearest-vertical proof, named>
+6. Capabilities + stats
+7. Timeline / process
+8. "We handle everything" — full-service overview
+9. Calendar alignment — <vertical-specific scheduling angle>
+10. Credibility metrics (30 years, install counts)
+11. CTA — <offer-posture-matched: knowledge → "book a conversation"; free-asset → the asset; pilot → pilot scope call; risk-reversal → guarantee terms>
 
-#### #7 — Active management — weekly reviews
+## Technical approach
 
-- **Title**: `Active management — weekly reviews`
-- **Description**:
-  > Outbound operator runs `/marketing:campaign-analysis` weekly during the active sending window. GTM lead reviews. Adjustments (pause / unpause / sender swaps) per the analysis.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/active-management.md`
-  > **Sub-issue role**: weekly cadence during the ~4-week active window. Pause/kill decisions land here via `/marketing:sync-campaign-status` (T2-FA / BC-8752).
-  > **Expected plugin command**: `/marketing:campaign-analysis` weekly; `/marketing:sync-campaign-status` on status transitions.
-- **dueDate**: `<launch-date> + 28 days` (T+28d)
-- **blockedBy**: [#6]
-- **blocks**: [#8]
+* **Framework:** interactive scrolling HTML (same pattern as prior GTM decks — `Brite-Nites/gtm_assets`)
+* **Deployment:** GitHub Pages, publicly viewable link
+* **Workflow:** HTML-first development → push when ready
 
-#### #8 — Campaign closed + debrief
+## Decision makers addressed
 
-- **Title**: `Campaign closed + debrief`
-- **Description**:
-  > Run `/marketing:campaign-debrief` to produce the learnings.md artifact and update the MSPA results log. Linear status flips to `completed` (or `killed`) which triggers σ3 status-sync (BC-8752) to update SF Campaign.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/debrief.md`
-  > **Sub-issue role**: terminal step. Closes the campaign loop into the compounding MSPA flywheel.
-  > **Expected plugin command**: `/marketing:campaign-debrief`.
-- **dueDate**: `<launch-date> + 40 days` (T+40d)
-- **blockedBy**: [#7]
-- **blocks**: none (terminal)
+<persona titles[] from canonicals, priority order>
 
-### 9.2 — Capture sub-issue IDs
+## Dependencies
 
-For each `save_issue` response, capture the returned `id` + `identifier` (e.g., `BC-9001`). Pass to Step 11 for the summary output.
+* Photography: <prior installs in this vertical if known from brain context; else "flag — no vertical-specific install photos on record">
+* Metrics: finalize stats for the credibility section
+* Contact info: CTA destination URLs / scheduling links
 
----
+## Acceptance criteria
 
-## Step 10 — Optional sub-issues
-
-### 10.1 — Situation Mining (Labs-gated)
-
-If `--situation-mining` was passed, enforce Labs entity:
-
-If `<entity> != "labs"`, HARD-FAIL (the operator clearly meant something else):
-
-```
-ERROR: --situation-mining is a Brite Labs framework (per docs/gtm-campaign-orchestration-README.md § 3.5).
-You passed --situation-mining with --entity=<entity>. Either drop the flag, OR re-run with --entity=labs.
+- [ ] Deck live on GitHub Pages, link publicly viewable
+- [ ] Positioning + proof section reviewed by GTM lead
+- [ ] CTA links resolve
+- [ ] Link handed to `/marketing:email-copywriting` as the campaign asset for `<slug>`
 ```
 
-If `<entity> == "labs"`, create sub-issue #9:
+### 9c — Issue #2: Data Sourcing & List Building (→ Corinne)
 
-- **Title**: `Situation Mining`
-- **Description**:
-  > Run `/marketing:situation-mining` (Labs framework) to surface the latent situations that this campaign's persona is in BUT hasn't articulated yet. Output feeds the brief's Audience section (#1) and the copy artifact's angle hypotheses (#3).
-  >
-  > **Handbook citation**: `handbook@main:marketing/labs/situation-mining-framework.md`
-  > **Sub-issue role**: pre-launch discovery; parallel with #2 and #3.
-  > **Expected plugin command**: `/marketing:situation-mining`.
-- **dueDate**: `<launch-date> - 12 days`
-- **blockedBy**: [#1]
-- **blocks**: none directly (informs #2 and #3 informationally)
-- **Labels**: same 8-label set as the standard sub-issues.
+- **Title**: `Data Sourcing & List Building — <vertical_display> <offer_display> (M<month:02d>)`
+- **Assignee**: `<list-assignee>` (default `corinne@britenites.com` — Corinne Brewer)
+- **dueDate**: `<launch-date> - 21 days`
+- **Description** (modeled on BC-10178; every `<...>` is DRAFTED per § 9a):
 
-### 10.2 — Creative Angles (no entity restriction)
+```markdown
+## Goal
 
-If `--creative-angles` was passed, create sub-issue #10:
+Build enriched + SMTP-verified prospect list for `<milestone-name>` (`<slug>`). <persona-differentiation callout OR same-persona 180-day WARN from the § 9a prior-campaign mine; omit if no prior campaigns in this vertical> Deliver by **<launch-date minus 21 days, ISO date>**.
 
-- **Title**: `Creative Angles`
-- **Description**:
-  > Run `/marketing:creative-angles` to generate 3-5 angle hypotheses to test in copy. Output feeds the copy artifact at sub-issue #3.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/creative-angles.md`
-  > **Sub-issue role**: pre-copy discovery; parallel with #2. Especially important for NEW offers that haven't been tested yet.
-  > **Expected plugin command**: `/marketing:creative-angles`.
-- **dueDate**: `<launch-date> - 12 days`
-- **blockedBy**: [#1]
-- **blocks**: none directly (informs #3 informationally)
-- **Labels**: same 8-label set as the standard sub-issues.
+## Source stack
 
----
+<3-6 bullets drafted per vertical from ICP-research brain context + the tam-mapping source catalog — name SPECIFIC sources the way BC-10178 names NCES IPEDS / NACUBO / CASE for universities, with the signal each provides. Always end with:>
+* **ZoomInfo + LinkedIn Sales Nav** — title-based contact sourcing for the cascade below
+* **MillionVerifier** — SMTP verify
 
-## Step 11 — Summary output
+## Target volume
+
+* <tier breakdown per --volume, e.g. "Google: 400 / Microsoft: 200 / SMTP: 200 → ~800 verified (small launch, expand based on results)">
+* ICP: <drafted from icp-research brain context / canonicals — the account-level filter, e.g. BC-10178's "R1/R2 + top-100 endowment privates + flagship state with >$500M endowment">
+
+## Decision-maker titles (priority order)
+
+<numbered list = personas[<persona>].titles[] from {vertical}.yaml, verbatim, in YAML order>
+
+## Exclusion logic (CRITICAL)
+
+<numbered: one suppression line per prior same-vertical campaign from the § 9a mine (with EB campaign IDs), then always:>
+N. Cross-workspace EB exclusion (both workspaces)
+N+1. SF Lead suppression
+
+## Acceptance criteria
+
+- [ ] Enriched CSV: `email, first_name, last_name, title, company, <2-3 vertical-specific qualifier columns, drafted>, state`
+- [ ] SMTP-verified, bounce-risk <5%
+- [ ] Prior-campaign suppression dedup count logged
+- [ ] 80%+ rows match the title cascade above
+- [ ] Sample 50 rows QA'd
+
+## Tooling
+
+`/marketing:list-building` (dbt audience view exists) or `/marketing:tam-mapping` (TAM doesn't exist yet — full source-discovery → enrichment pipeline).
+
+## Notes
+
+<anything material from brain context: 180-day-rule mechanics, seasonal timing, prior-campaign learnings — drafted, with source cites; omit section if genuinely nothing>
+```
+
+### 9d — Create order, failure handling, ID capture
+
+Create #1 (deck) then #2 (list). If either `save_issue` fails, surface the partial state plainly: the milestone (Step 8a) + manifest (Step 7) + any already-created issue all exist and are correct — do NOT roll them back. Tell the operator which issue failed and re-issue ONLY the failed `save_issue` call (the bodies are already drafted; re-running the whole command would duplicate the milestone-collision path).
+
+For each successful `save_issue` response, capture the returned `id` + `identifier` (e.g. `BC-10178`). Pass both to Step 10 for the summary output.
+
+## Step 10 — Summary output
 
 Print the operator-readable summary:
 
@@ -893,43 +839,37 @@ Campaign scaffolded — /marketing:plan-campaign
   Linear:         <milestone-url>
   SF Campaign:    <campaign-url>  (OR null + reconciliation reminder if soft-failed)
   Manifest:       docs/campaigns/<entity>/<slug>/manifest.json
-  Sub-issues:     <count> created
-                    #1  Brief approved                  <id>
-                    #2  Target list built               <id>
-                    #3  Copy written + approved         <id>
-                    #4  Salesforce setup                <id>
-                    #5  Pre-launch QA                   <id>
-                    #6  Launch executed                 <id>
-                    #7  Active management — weekly      <id>
-                    #8  Campaign closed + debrief       <id>
-                    #9  Situation Mining (Labs)         <id>   <-- if --situation-mining
-                    #10 Creative Angles                 <id>   <-- if --creative-angles
-  EB workspace:   <eb-workspace>  (campaign will be created at sub-issue #6
-                                   via /marketing:launch-campaign — NOT now)
+  Work issues:    2 created
+                    #1  Deck Asset — <offer_display> (<vertical_display>)
+                        <identifier>  → <deck-assignee>, due <launch-date - 14d>
+                    #2  Data Sourcing & List Building — <vertical_display> <offer_display> (M<month:02d>)
+                        <identifier>  → <list-assignee>, due <launch-date - 21d>
+  EB workspace:   <eb-workspace>  (EB campaign is created later via
+                                   /marketing:launch-campaign once deck + list are done — NOT now)
 
 =================================================================
 ```
 
-### 11.1 — Soft-fail reminders (if applicable)
+### 10.1 — Soft-fail reminders (if applicable)
 
 If the σ3 SF auto-create soft-failed (`salesforce.campaign_id` is `null` in manifest), append the WARN line from § 8b.1's error catalog. Always end such reminders with the next-step pointer:
 
 > To reconcile manually:
 > `Skill(skill: "revops:create-sf-campaign", args: "--slug=<slug> --entity=<entity> --vertical=<vertical> --persona=<persona> --offer=<offer> --year=<year> --month=<month> --owner-email=<corrected-owner-email> --launch-date=<launch-date>")`
 
-### 11.2 — Status-transition guidance
+### 10.2 — Status-transition guidance
 
 Append:
 
 > For status transitions:
-> - When a sub-issue closes (#6 close → SF Status=`In Progress`; #8 close → SF Status=`Completed`), σ3 trigger automation (BC-8752) WILL fire `/revops:update-sf-campaign-status` automatically.
+> - σ3 status automation (BC-8752) fires `/revops:update-sf-campaign-status` automatically from `/marketing:launch-campaign` Phase 11 (→ SF Status=`In Progress`) and `/marketing:campaign-debrief` Workflow 4 (→ SF Status=`Completed`).
 > - When toggling `status:paused` or `status:killed` labels on the milestone, run `/marketing:sync-campaign-status` (T2-FA) manually — those are NOT auto-triggered.
 
-### 11.3 — Hand-off
+### 10.3 — Hand-off
 
 End with:
 
-> Next step: marketing brief author opens `<milestone-url>` and finalizes the brief (sub-issue #1).
+> Next steps: Sarah picks up the Deck Asset issue, Corinne picks up the Data Sourcing & List Building issue (both linked above). When both are done, run `/marketing:email-copywriting` then `/marketing:launch-campaign`.
 
 ---
 
@@ -939,11 +879,11 @@ This orchestrator is **partially** idempotent:
 
 - **Step 3.3 collision check** + **Step 8b duplicate_slug handling** ensure repeated invocations with the same slug don't create duplicates in Linear or SF.
 - **Step 7 manifest write** is destructive (overwrites any existing manifest.json). If re-running plan-campaign on an existing slug, the prior manifest is lost — copy it aside first if needed for diff comparison.
-- **Step 9 sub-issue create** is NOT idempotent — calling `save_issue` with the same title against the same parent creates a NEW sub-issue (Linear doesn't dedupe on title). Re-runs will produce duplicate sub-issue chains.
+- **Step 9 issue create** is NOT idempotent — calling `save_issue` with the same title creates a NEW issue (Linear doesn't dedupe on title). Re-runs will produce duplicate Deck Asset / Data Sourcing issues.
 
 If re-running plan-campaign is genuinely needed (rare — typically the operator should re-invoke specific sibling skills like `/revops:create-sf-campaign` directly):
 
-1. Delete the Linear milestone + sub-issues manually first.
+1. Delete the Linear milestone + the 2 work issues manually first.
 2. Delete the `docs/campaigns/<entity>/<slug>/` directory.
 3. Then re-run plan-campaign.
 
@@ -954,8 +894,8 @@ A future enhancement could add `--reset-slug` that does this cleanup automatical
 ## Gotchas
 
 - **`Skill` tool invocation of `/revops:create-sf-campaign`**: The skill returns its single-line JSON via stdout. Capture it as the skill-invocation result. If the skill emits multi-line output (e.g., diagnostic stderr leaking into stdout), parse the LAST line that starts with `{` as the JSON object — the skill's contract is one-line JSON, but defensive parsing keeps the orchestrator robust.
-- **Linear MCP `parentId` is `parentId`, NOT `parent`**: per [`memory/gotcha_linear_save_issue_parent_id.md`](../../../memory/gotcha_linear_save_issue_parent_id.md).
-- **Linear MCP `state` is `state`, NOT `status`**: per [`memory/gotcha_linear_save_issue_state_param.md`](../../../memory/gotcha_linear_save_issue_state_param.md). This orchestrator doesn't set state on sub-issues (they default to `Backlog`) — but if a future enhancement adds a default state, use `state:`.
+- **Linear MCP `parentId` is `parentId`, NOT `parent`**: per [`memory/gotcha_linear_save_issue_parent_id.md`](../../../memory/gotcha_linear_save_issue_parent_id.md). This orchestrator intentionally passes NO `parentId` (Step 9 creates top-level milestone issues) — the gotcha matters only if a future enhancement re-introduces issue nesting.
+- **Linear MCP `state` is `state`, NOT `status`**: per [`memory/gotcha_linear_save_issue_state_param.md`](../../../memory/gotcha_linear_save_issue_state_param.md). This orchestrator doesn't set state on the work issues (they default to `Backlog`) — but if a future enhancement adds a default state, use `state:`.
 - **Linear MCP `list_issues` `project:` param is unreliable**: per [`memory/gotcha_linear_list_issues_project_filter.md`](../../../memory/gotcha_linear_list_issues_project_filter.md). This orchestrator uses `list_milestones` (Step 3.3) which is RELIABLE for the slug-collision check; it does NOT use `list_issues` with project: filter.
 - **SF MCP `usernameOrAlias` must be literal username**: per [`memory/gotcha_sf_mcp_username_not_alias.md`](../../../memory/gotcha_sf_mcp_username_not_alias.md). This orchestrator only calls `get_username` (read-only metadata) at Step 4.2 — actual SF writes are delegated to `/revops:create-sf-campaign` which handles the literal-username resolution itself.
 - **Brite GTM project must exist before plan-campaign ships**: Step 3.3 HARD-FAILs if `list_projects(query="Brite GTM")` returns 0. The project is provisioned at BC-8712 Task 0 (Phase 0). If absent, file a follow-up to provision it before running plan-campaign on real campaigns.

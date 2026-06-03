@@ -3,8 +3,8 @@
 Slash commands are Claude-orchestrated markdown, not executable code, so these
 tests verify the markdown's contract (frontmatter, declared tools, documented
 flags, soft-fail composition pattern, soft-fail error key handling, schema
-fields, sub-issue chain, slug regex) rather than runtime execution. Runtime
-validation happens at BC-8727 (the first dogfood campaign).
+fields, the 2-work-issue contract, slug regex) rather than runtime execution.
+Runtime validation happens at BC-8727 (the first dogfood campaign).
 
 Pattern mirrors plugins/revops/tests/test_create_sf_campaign_contracts.py.
 Brite CI does not invoke pytest (per .github/dependabot.yml comment), so these
@@ -232,8 +232,9 @@ def test_all_documented_flags_present() -> None:
         "--owner-email",
         "--eb-workspace",
         "--theme",
-        "--situation-mining",
-        "--creative-angles",
+        "--deck-assignee",
+        "--list-assignee",
+        "--volume",
         "--dry-run",
     ]
     missing = [f for f in flags if f not in body]
@@ -400,43 +401,120 @@ def test_scaffolded_by_field_value() -> None:
         "scaffolded_by field must literally state the orchestrator name for trace"
 
 
-# --- Sub-issue chain contract ----------------------------------------------
+# --- 2-work-issue contract --------------------------------------------------
+
+# The BC-12xxx rework: the 8-sub-issue process chain is GONE. plan-campaign
+# creates exactly 2 substantive work issues modeled on real shipped exemplars:
+# Deck Asset (BC-2816 model, → Sarah Cullen) and Data Sourcing & List Building
+# (BC-10178 model, → Corinne Brewer).
 
 
-def test_eight_standard_sub_issues_present() -> None:
+def _step9_section() -> str:
+    _, body = split_frontmatter()
+    return extract_section(body, "## Step 9 — Create the 2 campaign work issues", "## Step 10")
+
+
+def test_two_work_issues_present() -> None:
+    section = _step9_section()
+    assert "Deck Asset" in section, "Issue #1 (Deck Asset) must be specced in Step 9"
+    assert "Data Sourcing & List Building" in section, \
+        "Issue #2 (Data Sourcing & List Building) must be specced in Step 9"
+    assert "projectMilestoneId" in section, \
+        "Both issues must attach to the milestone via projectMilestoneId (no container parent)"
+
+
+def test_default_assignees_documented() -> None:
+    """The whole point of the rework: issues land assigned to the people who do
+    the work. Defaults must be documented with override flags.
+    """
     body = read_command()
-    titles = [
+    assert "sarahc@britenites.com" in body, \
+        "Deck Asset default assignee (Sarah Cullen) must be documented"
+    assert "corinne@britenites.com" in body, \
+        "Data Sourcing default assignee (Corinne Brewer) must be documented"
+    assert "Sarah Cullen" in body and "Corinne Brewer" in body, \
+        "Default assignees must be named, not just email-addressed"
+
+
+def test_no_process_stub_issues() -> None:
+    """The retired 8-chain titles must NOT reappear as issue specs. They may be
+    mentioned in the 'why only 2 issues' rationale prose, but Step 9 must not
+    spec them as issues to create.
+    """
+    section = _step9_section()
+    retired = [
         "Brief approved",
         "Target list built",
         "Copy written + approved",
-        "Salesforce setup",
         "Pre-launch QA",
         "Launch executed",
         "Active management",
         "Campaign closed + debrief",
+        "Situation Mining",
+        "Creative Angles",
+        "Call Script",
+        "Strategy & Positioning",
+        "Channel Selection",
+        "Measurement & Optimization",
+        "Campaign Setup & Launch",
     ]
-    missing = [t for t in titles if t not in body]
-    assert not missing, f"Standard sub-issue titles missing: {missing}"
+    present = [t for t in retired if t in section]
+    assert not present, f"Retired process-stub issue titles found in Step 9: {present}"
 
 
-def test_two_optional_sub_issues_present() -> None:
-    body = read_command()
-    assert "Situation Mining" in body, "Optional sub-issue #9 (Situation Mining) must be documented"
-    assert "Creative Angles" in body, "Optional sub-issue #10 (Creative Angles) must be documented"
+def test_no_blocked_by_chain() -> None:
+    """The two work issues are independent and parallel — Step 9 must state
+    there is no blockedBy chain, and must not spec blocking relations.
+    """
+    section = _step9_section()
+    assert "no `blockedBy` chain" in section, \
+        "Step 9 must explicitly state the two issues have no blockedBy chain"
+    assert "blockedBy: [" not in section and "blocks: [" not in section, \
+        "Step 9 must not spec blockedBy/blocks relations between the work issues"
 
 
-def test_situation_mining_labs_gated() -> None:
-    body = read_command()
-    assert "Labs" in body and "--situation-mining" in body, \
-        "--situation-mining must be Labs-gated (HARD-FAIL on non-Labs entity)"
+def test_issue_bodies_have_substance_contract() -> None:
+    """Both issue-body templates must carry the substantive sections from the
+    real exemplars (BC-2816 deck / BC-10178 list building) — this is the
+    contract that prevents regression to empty-shell issues.
+    """
+    section = _step9_section()
+    # BC-10178 (list building) skeleton
+    for marker in [
+        "## Source stack",
+        "## Target volume",
+        "## Decision-maker titles (priority order)",
+        "## Exclusion logic (CRITICAL)",
+        "MillionVerifier",
+        "180-day",
+    ]:
+        assert marker in section, f"List-building issue body missing substance marker: {marker!r}"
+    # BC-2816 (deck) skeleton
+    for marker in [
+        "**Positioning:**",
+        "## Technical approach",
+        "## Decision makers addressed",
+        "## Dependencies",
+        "GitHub Pages",
+    ]:
+        assert marker in section, f"Deck issue body missing substance marker: {marker!r}"
+    # Both must close with acceptance criteria checkboxes
+    assert section.count("## Acceptance criteria") >= 2, \
+        "Both issue bodies must end with an Acceptance criteria checklist"
+    assert "- [ ]" in section, "Acceptance criteria must be markdown checkboxes"
 
 
-def test_blocked_by_chain_documented() -> None:
-    body = read_command()
-    assert "blockedBy" in body, \
-        "Sub-issue chain must reference blockedBy relations explicitly"
-    assert "blocks #2" in body or "blocks: #2" in body or "blocks all downstream" in body.lower(), \
-        "Step 9 must document that sub-issue #1 (Brief) gates the rest"
+def test_substance_rules_forbid_empty_skeletons() -> None:
+    """Step 9a must direct drafting from canonicals + brain context + the
+    prior-campaign manifest mine — and forbid bare-TODO sections.
+    """
+    section = _step9_section()
+    assert "NEVER leave a section as a bare TODO" in section, \
+        "Step 9a must forbid emitting placeholder-only issue bodies"
+    assert "manifest.json" in section, \
+        "Step 9a must spec the prior-campaign manifest mine (suppression list source)"
+    assert "titles[]" in section, \
+        "Step 9a must derive the title cascade from canonicals personas[].titles[]"
 
 
 # --- EB workspace map + entity coverage ------------------------------------
@@ -585,39 +663,32 @@ def test_gotcha_citation_link_shape_is_consistent() -> None:
     )
 
 
-# --- Container-issue pattern (Step 9.0) ------------------------------------
+# --- No container-issue pattern (retired with the 8-chain) ------------------
 
 
-def test_container_issue_pattern_documented() -> None:
-    """Step 9.0 introduced the container-issue parent pattern (Linear milestones
-    can't take child issues directly). This is a load-bearing design decision
-    that every downstream consumer (launch-campaign, campaign-debrief, σ3 status
-    sync) must agree on. The spec MUST document the pattern explicitly so
-    consumers can locate it (test-quality-reviewer P3 coverage gap).
+def test_no_container_issue_pattern() -> None:
+    """The container-issue parent pattern was retired with the 8-sub-issue
+    chain — with only 2 issues there is nothing to roll up, and the real
+    exemplars (BC-2816, BC-10178) attach directly to the milestone with no
+    parent. A reappearing container issue is scaffolding creep.
     """
-    body = read_command()
-    assert "container-issue pattern" in body.lower(), (
-        "Step 9.0 must document the container-issue pattern by name — load-bearing "
-        "for downstream consumers."
-    )
-    assert "projectMilestoneId" in body, (
-        "Spec must reference projectMilestoneId — the field that ties the container "
-        "issue to the milestone."
-    )
+    section = _step9_section()
+    assert "container-issue" not in section.lower(), \
+        "Step 9 must not re-introduce the container-issue parent pattern"
+    assert "NO `parentId`" in section, \
+        "Step 9 must explicitly state the work issues take no parentId"
 
 
-def test_container_issue_rollback_path_documented() -> None:
-    """If the container-issue create fails at runtime, the orchestrator MUST
-    document a rollback path so the operator isn't left with an orphan
-    milestone + manifest in inconsistent state (cdr-compliance P3 fix).
-    """
-    body = read_command()
-    assert "delete the milestone" in body.lower() or "manual-cleanup" in body.lower(), (
-        "Step 9.0 must document explicit rollback guidance for container-issue create failure."
-    )
+def test_issue_create_failure_handling_documented() -> None:
+    """If a work-issue create fails, the orchestrator must tell the operator to
+    re-issue ONLY the failed save_issue call — not roll back the milestone/
+    manifest, and not re-run the whole command (which would duplicate)."""
+    section = _step9_section()
+    assert "do NOT roll them back" in section, \
+        "Step 9d must document partial-failure handling (no rollback of milestone/manifest)"
 
 
-# --- Label set parity (Step 8a.6 ↔ Step 9 sub-issues) ----------------------
+# --- Label set parity (Step 8a.6 ↔ Step 9 work issues) ----------------------
 
 
 _EXPECTED_LABELS = [
@@ -650,13 +721,12 @@ def test_8label_set_referenced_in_step_9() -> None:
     by citing § Step 8a.6). Without this anchor, a future edit to Step 9's
     labels: field could drift from the canonical without test detection.
     """
-    body = read_command()
-    section = extract_section(body, "## Step 9 — Create 8 standard sub-issues", "## Step 10")
+    section = _step9_section()
     # Either explicit re-enumeration OR cross-reference to 8a.6 satisfies the contract
     has_reference = "8a.6" in section or all(label in section for label in _EXPECTED_LABELS)
     assert has_reference, (
         "Step 9 must either re-list the 8 canonical labels OR cite § Step 8a.6 — "
-        "otherwise sub-issue label-application can silently drift from canonical."
+        "otherwise work-issue label-application can silently drift from canonical."
     )
 
 
