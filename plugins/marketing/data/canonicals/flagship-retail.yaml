@@ -1,5 +1,6 @@
 slug: flagship-retail
 display: "Flagship Retail"
+playbook_path: "marketing/go-to-market/verticals/flagship-retail/README.md"
 aliases:
   - experiential-retail
   - flagship-brands
@@ -17,3 +18,6 @@ offers:
     display: "Custom Illuminated Artwork"
     status: draft
     posture: free-asset
+    target_personas:
+      - vp-marketing
+    prose_path: "marketing/go-to-market/verticals/flagship-retail/offers/custom-illuminated-artwork.md"
