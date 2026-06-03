@@ -19,8 +19,8 @@ Brite has a documented **Concept Library** — the `[CONCEPT LIBRARY] Half-Baked
 | 2 | Build form | Marketing plugin **command** `/marketing:capture-idea` (`plugins/marketing/commands/capture-idea.md`), team-facing, Brite conventions. |
 | 3 | Fields | Mirror the canonical **9-field template** (below). Status auto-derived `[Sketch]`/`[Maturing]`, never auto-`[Ready-to-promote]`. |
 | 4 | Canonical mapping | Free-text + **non-blocking** canonical hint (reads `data/canonicals/`). Never requires/creates canonicals. |
-| 5 | Interaction | **Brain-dump-first + optional flags + one confirm.** Dump as arg or prompted. Min to file: Concept name + one-sentence offer. |
-| 6 | Linear metadata | Project Brite GTM · milestone `[CONCEPT LIBRARY]` (verify, **hard-fail** if absent) · team Brite Company · state **Backlog** · priority **None** · **assignee empty** · Status in body **+ `status:sketch\|maturing\|ready-to-promote` label** (create-if-missing). |
+| 5 | Interaction | **Brain-dump-first + optional flags + one confirm.** Dump as arg or prompted. Min to file: Concept name + one-sentence offer — the offer is **enforced** (prompted if missing; never filed offerless). |
+| 6 | Linear metadata | Project Brite GTM · milestone `[CONCEPT LIBRARY]` (verify, **hard-fail** if absent) · team Brite Company · state **Backlog** · priority **None** · **assignee empty** · Status in body **+ `status:sketch\|maturing` label** (create-if-missing; never auto-create `status:ready-to-promote`). |
 | 7 | Handoff | Body adds promotion-criteria checklist + conditional `plan-campaign` suggestion + provenance footer. Terminal prints URL + missing-fields + promotion command. |
 | 8 | Dedup | **Soft-warn-then-confirm** — one `list_issues` similarity check, never blocks. |
 | 9 | v1 boundary | **Create-only.** `--update`/`--list` deferred; promotion permanently `plan-campaign`'s job. |
@@ -51,9 +51,9 @@ Never block; never write canonicals.
 
 ## Tool palette
 
-`Read, Glob, AskUserQuestion, mcp__plugin_workflows_linear-server__{list_projects, list_milestones, list_issues, list_issue_labels, create_issue_label, save_issue}`. (No gbrain context-load in v1 — kept lightweight; a "similar prior concepts" query is a future enhancement.)
+`Read, AskUserQuestion, mcp__plugin_workflows_linear-server__{list_projects, list_milestones, list_issues, list_issue_labels, create_issue_label, save_issue}`. (No `Glob` — canonicals are read by explicit path. No gbrain context-load in v1 — kept lightweight; a "similar prior concepts" query is a future enhancement.)
 
 ## Out of scope / follow-ups
 
 - `--update <BC-id>` (enrich a `[Sketch]` toward `[Maturing]`) and `--list` (maturity-filtered browse) — fast-follow.
-- Authoring the canonical Concept Library issue-template file + reconciling `brite-gtm/docs/milestone-template.md` vs handbook templates — see `memory/project_gtm_brief_template_followup.md`; file a Brite GTM issue at ship.
+- Authoring the canonical Concept Library issue-template file + reconciling `brite-gtm/docs/milestone-template.md` vs handbook templates — tracked in **BC-12392** (Brite GTM).
