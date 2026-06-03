@@ -40,6 +40,7 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-008: tam-mapping enrichment pluggability](docs/decisions/008-tam-mapping-enrichment-pluggability.md) — provider selection via userConfig, shared input/output schema, swap path
 - [ADR-009: SF capability adoption framework](docs/decisions/009-sf-capability-adoption.md) — 6-check framework (runtime model, license, plugin slot, toolset breadth, GA gate, domain fit) with worked examples
 - [ADR-010: Plugin secret-config canon](docs/decisions/010-plugin-secret-config-canon.md) — Bitwarden + `bw-run.sh` broker for stdio MCPs and CLI scripts; HTTP MCPs covered by BC-5551 exception
+- [ADR-021: `raise-a-ticket` intake](docs/decisions/021-raise-a-ticket-intake.md) — Linear-native, cross-product product-feedback intake (Bug/Idea → `type:bug`/`type:task` + `needs-triage`) that reuses `docs/agents/issue-tracker.md` for routing and hands off to `/triage`; deprecates `bug-report`
 
 ## Company Context
 
