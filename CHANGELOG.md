@@ -23,7 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - Removed `validate.sh` Section 2d (invoked the deleted test)
   - **Behavior change**: regex-only gating retained (`rm -rf`, `git push --force`/`-f`, `DROP TABLE`, `chmod 777`, piped downloads, common secret patterns). `git push --force-with-lease` now passes on all branches including `main` (was branch-aware via BC-11117 LLM carve-out).
 
+### Deprecated
+- **workflows 3.36.0:** `/workflows:bug-report` superseded by `/workflows:raise-a-ticket` (forwarding shim retained for one release; the successor adds cross-product routing, the Bug/Idea fork, canonical `type:bug`/`type:task` + `needs-triage` labels, and a `/triage` handoff).
+
 ### Added
+- **workflows 3.36.0:** `/workflows:raise-a-ticket` — Linear-native, cross-product product-feedback intake. Two reporter-facing kinds (Bug → `type:bug` / Idea-Feedback → `type:task`), `needs-triage` + `executor:hybrid`, existence-aware label reconciliation (falls back to Linear priority for severity and the built-in Triage state when `needs-triage` isn't provisioned). Routes via the per-repo `docs/agents/issue-tracker.md` (lazy-created on miss), is conversational-in / preview-out, and hands off to the triage stage. Adds the `bug`/`enhancement` → `type:bug`/`type:task` category mapping to `docs/agents/triage-labels.md`. See [ADR-021](docs/decisions/021-raise-a-ticket-intake.md).
 - Health scoring rubrics for 10 inner-loop skills (BC-2468)
   - LLM-as-judge rubric YAML format with weighted dimensions and pass thresholds
   - `scripts/score-skill-output.sh` and `scripts/score-behavioral.sh` scoring harnesses
