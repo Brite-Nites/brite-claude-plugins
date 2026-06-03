@@ -280,8 +280,8 @@ say "millionverifier (credits is a number)" "$(printf "%s" "$m" | jq -e "(.credi
 
 # IcyPeas — real find-companies search (catches request-shape drift)
 i=$(curl -s -m 30 -H "Authorization: $ICYPEAS_API_KEY" -H "Content-Type: application/json" \
-    -X POST https://app.icypeas.com/api/find-companies -d "{\"keywords\":\"software\",\"locations\":[],\"limit\":1}")
-say "icypeas   (find-companies success==true) [known: BC-12163]" "$(printf "%s" "$i" | jq -e ".success==true" >/dev/null 2>&1 && echo 1 || echo 0)"
+    -X POST https://app.icypeas.com/api/find-companies -d "{\"query\":{\"keyword\":{\"include\":[\"software\"]}},\"pagination\":{\"size\":1}}")
+say "icypeas   (find-companies success + total>0)" "$(printf "%s" "$i" | jq -e ".success==true and (.total>0)" >/dev/null 2>&1 && echo 1 || echo 0)"
 
 echo "  --- $pass pass, $fail surprise-fail, $known known-break ---"
 if [ "$fail" = 0 ] && [ "$known" = 0 ]; then
@@ -297,9 +297,7 @@ fi
 
 The script runs **all four** providers and reports a full board (no short-circuit). A `✗` (surprise) is a **correctness** failure, not a missing-key problem: the provider authenticated (no 401/403) but its endpoint or request shape drifted — the exact silent-failure class BC-7157 (aiark) and BC-12128 (BlitzAPI) fixed. A `⚠` is the **same kind of break but already tracked** under a `[known: BC-####]` tag (amber, not a surprise). Repair (or wait out) the wrapper and re-run; **do not proceed on a `✗`.** (A transient vendor outage or an `-m` timeout also surfaces as `✗` with an empty body on an untagged provider — re-run once before concluding a request-shape drift. Caveat: on a `[known:]`-tagged provider *any* failure, including an outage, shows as `⚠`, so re-run there too to tell a real outage from the tracked break.)
 
-(The four surfaces are deliberately cheap: MillionVerifier `/credits` and Prospeo `account-information` cost nothing; BlitzAPI `domain-to-linkedin` and IcyPeas `find-companies?limit=1` cost ~1 credit each. This keeps the smoke re-runnable without burning the per-key credit budget. Note: all four keys are expanded inside the inner `bash -c`, so the plaintext never enters your shell history — but the resolved value does sit in the `curl` process arguments (visible via `ps` / `/proc` / command-line audit logs) for the duration of each call, so treat the probe command as sensitive. MillionVerifier additionally rides its key in the URL query string (`?api=…`, vendor-mandated; the other three use a header), so it can also reach network/proxy access logs — the header-based three do not.)
-
-> **Known in-flight (2026-06-01):** the `icypeas` probe currently reports `⚠ [known: BC-12163]` — IcyPeas redesigned `find-companies` to require a `query` object, but the wrapper still sends the flat `{keywords, locations, limit}` shape and gets `200` + `success:false` / `EmptyQueryError`. With the other six providers green and this the only break, Phase 3d's OVERALL reads **⚠ DEGRADED (known)**, not RED — the smoke working as intended (surfacing a real "200-but-no-usable-data" drift the old `--help`-only check missed, and flagging it as *tracked* rather than a surprise), not a setup error. The fix is scoped in **BC-12163**; once it lands the icypeas line flips to `✓` and OVERALL to GREEN — drop the `[known: BC-12163]` annotation then.
+(The four surfaces are deliberately cheap: MillionVerifier `/credits` and Prospeo `account-information` cost nothing; BlitzAPI `domain-to-linkedin` and IcyPeas `find-companies` (`size:1`) cost ~1 credit each. This keeps the smoke re-runnable without burning the per-key credit budget. Note: all four keys are expanded inside the inner `bash -c`, so the plaintext never enters your shell history — but the resolved value does sit in the `curl` process arguments (visible via `ps` / `/proc` / command-line audit logs) for the duration of each call, so treat the probe command as sensitive. MillionVerifier additionally rides its key in the URL query string (`?api=…`, vendor-mandated; the other three use a header), so it can also reach network/proxy access logs — the header-based three do not.)
 
 ---
 

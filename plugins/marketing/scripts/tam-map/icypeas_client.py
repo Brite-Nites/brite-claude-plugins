@@ -3,7 +3,7 @@
 # Ported: 2026-04-24
 # License: MIT — see plugins/marketing/references/tam/UPSTREAM.md
 # Upstream path: scripts/icypeas_client.py
-# Changes: verbatim port, no functional edits
+# Changes: verbatim port + find-companies query-object remap (BC-12163)
 
 """
 IcyPeas client — keyword-based company search.
@@ -43,25 +43,41 @@ def search(icp: dict) -> list[dict]:
 
     companies = []
     for industry in industries:
-        payload = {
-            "keywords": industry,
-            "locations": regions,
-            "limit": 100,
-        }
-        pagination_token = None
+        # IcyPeas redesigned find-companies to require a structured `query` object
+        # (BC-12163). Map the consumer's free-text industry term -> query.keyword
+        # (free-text across the company profile — the old top-level `keywords`
+        # semantic); regions -> query.location. NB: query.industry is a controlled
+        # taxonomy, so free-text terms there return success:true + total 0 (silently
+        # unfiltered); query.keyword is the faithful mapping. Old `limit` -> pagination.size.
+        query = {"keyword": {"include": [industry]}}
+        if regions:
+            query["location"] = {"include": regions}
+        payload = {"query": query, "pagination": {"size": 100}}
         while True:
-            if pagination_token:
-                payload["pagination"] = {"token": pagination_token}
             r = requests.post(f"{BASE_URL}/find-companies", json=payload, headers=headers, timeout=30)
             r.raise_for_status()
             data = r.json()
+            if not data.get("success", False):
+                # 200 + success:false is a structured rejection (e.g. EmptyQueryError),
+                # NOT an empty result set — surface it loudly instead of silently
+                # returning zero companies (BC-12163; mirrors the BC-12128 loud-logging
+                # in enrich_waterfall.py). Non-fatal: IcyPeas is one of several discovery
+                # sources, so log this industry's failure and move on. Name the stage
+                # (initial request vs mid-pagination, e.g. token expiry) so a later-page
+                # failure isn't misread in the logs as a query-shape rejection.
+                detail = data.get("validationErrors") or data.get("error") or data
+                stage = "mid-pagination" if "token" in payload["pagination"] else "initial request"
+                print(f"  [icypeas] ⚠ find-companies returned success=false for "
+                      f"'{industry}' on the {stage}: {detail}", file=sys.stderr)
+                break
             leads = data.get("leads", [])
             if not leads:
                 break
             companies.extend(leads)
-            pagination_token = data.get("pagination", {}).get("token")
-            if not pagination_token:
+            token = data.get("pagination", {}).get("token")
+            if not token:
                 break
+            payload["pagination"]["token"] = token
 
     # Normalize + dedupe by website/domain
     seen = set()
