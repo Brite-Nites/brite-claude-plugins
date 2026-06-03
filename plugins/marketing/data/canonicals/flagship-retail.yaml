@@ -1,0 +1,19 @@
+slug: flagship-retail
+display: "Flagship Retail"
+aliases:
+  - experiential-retail
+  - flagship-brands
+personas:
+  - slug: vp-marketing
+    display: "VP of Marketing"
+    titles:
+      - "VP Marketing"
+      - "VP Brand & Experiential"
+      - "Head of Retail-Store Experience"
+      - "VP Real Estate & Store Development"
+      - "Director of Marketing"
+offers:
+  - slug: custom-illuminated-artwork
+    display: "Custom Illuminated Artwork"
+    status: draft
+    posture: free-asset
