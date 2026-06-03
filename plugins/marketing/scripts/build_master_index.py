@@ -294,8 +294,6 @@ VERTICAL_DISPLAY_OVERRIDES: dict[str, str] = {
     "car washes": None,
     "luxury retail stores": None,
     "museums & art galleries": None,
-    "flagship retail": "flagship-retail",
-    "flagship-retail": "flagship-retail",
     "local retail (utah)": "local-retail",
     "prior year interested": None,
     "brite recruiting": None,
