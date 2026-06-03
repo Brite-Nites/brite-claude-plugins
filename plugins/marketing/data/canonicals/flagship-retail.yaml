@@ -13,6 +13,8 @@ personas:
       - "Head of Retail-Store Experience"
       - "VP Real Estate & Store Development"
       - "Director of Marketing"
+      - "Brand Curator"
+      - "Retail Curator"
 offers:
   - slug: custom-illuminated-artwork
     display: "Custom Illuminated Artwork"
