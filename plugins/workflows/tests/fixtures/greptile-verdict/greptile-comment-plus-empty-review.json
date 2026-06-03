@@ -1,0 +1,19 @@
+{
+  "comments": [
+    {
+      "id": "IC_scored",
+      "author": { "login": "greptile-apps" },
+      "body": "<h3>Greptile Summary</h3>\n\nLooks good.\n\n<h3>Confidence Score: 4/5</h3>\n",
+      "createdAt": "2026-06-02T20:05:02Z"
+    }
+  ],
+  "reviews": [
+    {
+      "id": "PRR_empty",
+      "author": { "login": "greptile-apps" },
+      "body": "",
+      "state": "COMMENTED",
+      "submittedAt": "2026-06-02T20:05:08Z"
+    }
+  ]
+}
