@@ -28,7 +28,7 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 |----------------------------------------------------------|---------------|---------------------|
 | `aiark_client.py` | `scripts/aiark_client.py` | **Removed** per BC-12130 — see § Local deviations |
 | `discolike_client.py` | `scripts/discolike_client.py` | **Removed** per BC-12130 — see § Local deviations |
-| `icypeas_client.py` | `scripts/icypeas_client.py` | Verbatim (+ 5-line `#` header after shebang) |
+| `icypeas_client.py` | `scripts/icypeas_client.py` | Verbatim (+ 5-line `#` header) + find-companies query-object remap (BC-12163) — see § Local deviations |
 | `spider_crawl.py` | `scripts/spider_crawl.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7050) — see § Local deviations |
 | `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fixes (BC-7051 async/sync split; BC-12128 BlitzAPI redesign re-application) — see § Local deviations |
 | `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
@@ -114,7 +114,7 @@ Upstream ships `scripts/aiark_client.py` and `scripts/discolike_client.py` as st
 - `plugins/marketing/scripts/tam-map/discolike_client.py` deleted.
 - Per-file manifest rows above marked **Removed**.
 - Active references updated to the surviving MCP wrappers: `skills/tam-mapping/SKILL.md` provider table (drops the `*_client.py` halves, keeps `aiark-mcp.js` / `discolike-mcp.js`); `tools/integrations/ai-ark.md` + `discolike.md` "Consumed by" lists (drop the `*_client.py` bullets).
-- `icypeas_client.py` is **untouched** — it shares the `_client.py` suffix but is an **active** CLI script (SKILL.md provider table + the env-var table).
+- `icypeas_client.py` is **untouched by this removal** — it shares the `_client.py` suffix but is an **active** CLI script (SKILL.md provider table + the env-var table). _(Its `find-companies` request shape was later remapped by BC-12163 — see the § Local deviations subsection below; the manifest row reflects that as "Adapted".)_
 - The example `references/tam/examples/roofing-contractors-tx.md` (§ "3. Discovery") still shows upstream's `python scripts/aiark_client.py` / `discolike_client.py` invocations. A **Brite note** was added inline at that block pointing to the MCP wrappers (Brite's actual aiark/discolike path) and to **BC-12278** (full example rewrite). That example was **already** Brite-adapted — BC-6907 reworked § 6 to the in-session `icp-scoring` skill delegation — so its manifest row above is corrected here from "Verbatim" to **Adapted** (the label had been stale since BC-6907). The `icypeas_client.py` invocation in the same block remains valid (icypeas is still a CLI script). A faithful end-to-end rewrite — command name (§ 1 `/marketing:tam-map`), MCP-driven discovery (§ 3), and the JSONL data-flow contract — is tracked in **BC-12278**.
 
 **Re-port action:** if a future upstream pull at a newer SHA still ships `scripts/aiark_client.py` / `scripts/discolike_client.py`, do **not** re-introduce them — the MCP wrappers (`aiark-mcp.js`, `discolike-mcp.js`) are the Brite integrations. Treat any aiark/discolike API-shape drift as a wrapper (`*-mcp.js`) fix, per BC-7011 / BC-7157.
@@ -176,6 +176,30 @@ A new `_blitz_post` helper centralizes `x-api-key` auth + a 5 req/s throttle and
 **Validated (live, via `bw-run.sh`, captured in the BC-12128 PR):** `enrich_waterfall.py` on one record `{"domain":"vercel.com"}` → `{"email":"behzod.sirjani@vercel.com","source":"blitzapi","person_name":"Behzod Sirjani"}`. Loud-logging confirmed (a non-resolving domain prints `[blitz] no company LinkedIn for …` to stderr instead of failing silently). The Prospeo fallback path and `verify_smtp.py` (MillionVerifier) are unchanged (0 diff); Prospeo confirmed live (HTTP 200).
 
 **Re-port action:** Brite-owned (upstream `Revgrowth1/tam-map` never advanced past its scaffold). **BC-6170** (brite-enrichment MCP, 14-provider) supersedes this interim shell-script waterfall — when it lands, this chain can be retired for `brite_mcp` enrichment. If BlitzAPI changes its surface again, re-map against the then-current `api.blitz-api.ai/openapi` spec.
+
+### `icypeas_client.py` — find-companies query-object remap (BC-12163)
+
+`search()` POSTed `find-companies` with the flat body `{"keywords": <industry>, "locations": <regions>, "limit": 100}`. As of **2026-06-01** IcyPeas redesigned the endpoint to require a structured **`query` object**: the flat body returns `200` + `{"success": false, "validationErrors": [{"field": "query", "type": "EmptyQueryError"}]}`. Because the wrapper only called `r.raise_for_status()` (which passes on a 200) and read `data.get("leads", [])`, the rejection surfaced as a **silent zero-company result** — caught by the BC-12129 Phase-3d live round-trip smoke (the false-green it was built to kill).
+
+**Schema source (docs-first, per the BC-7157 win):** the current contract is documented at `api-doc.icypeas.com/leads-db/find-companies/` (+ `getting-started/`) — no login or vendor conversation required. Verified live 2026-06-02 against the **free** `find-companies/count` surface (0 credits) plus one real `find-companies` call.
+
+**New contract:** request body is `{"query": {…}, "pagination": {"size": 1–200 (default 100), "token": "…"}}`. Each string filter (`name`, `type`, `industry`, `location`, `keyword`, `domain`) takes an `{"include": [...], "exclude": [...]}` object (plain strings, ≤200/array); numeric filters (`headcount`, `headcountGrowth`) take range / min-max objects. Response shape is unchanged: `{"success": bool, "total": int, "leads": [...], "pagination": {…}}`.
+
+**Mapping applied to `search()`** (preserves the consumer ICP inputs — `icp["industries"]`, `icp["geo"]["regions"]` — translating internally, per the BC-7157 pattern):
+
+| wrapper input | IcyPeas `query` field | shape sent |
+|---|---|---|
+| `industries: string[]` (one request per industry) | `keyword` (**not** `industry`) | `{ "include": [<industry>] }` |
+| `geo.regions: string[]` | `location` | `{ "include": [<regions…>] }` — omitted entirely when `regions` is empty |
+| `limit: 100` | `pagination.size` | `100` (token chained across pages, `size` preserved) |
+
+`keyword` (free-text across the profile) is the faithful mapping of the old top-level `keywords` — and the correct one: `query.industry` is a **controlled taxonomy**, so a free-text term there returns `success:true` + `total 0` (verified live: `industry.include:["software"]` → 0 vs `keyword.include:["software"]` → 957,619) — the same silent-unfiltered trap as the BC-7157 aiark `account` case.
+
+**Loud-failure (mirrors BC-12128):** a `200 + success:false` is no longer treated as an empty result — `search()` logs `  [icypeas] ⚠ find-companies rejected the query for '<industry>' (success=false): <validationErrors>` to stderr and skips that industry (**non-fatal** — IcyPeas is one of several discovery sources; the missing-key `sys.exit(1)` is reserved for the genuinely-fatal case).
+
+**Validated (live, via `bw-run.sh`, 2026-06-02 — captured in the BC-12163 PR):** red→green on the free `find-companies/count` surface (old flat body → `success:false` / `EmptyQueryError`; `query.keyword` body → `success:true`, `total 957,619`); one real `find-companies size:1` → `success:true`, returned **Kobalt Associates** (industry "Technology, Information and Internet"; profile mentions "software support / web development") — a genuinely keyword-matched company, not the unfiltered default. One lead credit spent total. The BC-12129 Phase-3d `icypeas` probe flips `⚠ → ✓` (its inline curl remapped to the same `query` shape, assertion strengthened to `success==true and total>0`).
+
+**Re-port action:** Brite-owned (upstream `Revgrowth1/tam-map` never advanced past its 2026-04-20 scaffold — no upstream fix to pull). If IcyPeas changes the `find-companies` contract again, re-map against the then-current `api-doc.icypeas.com/leads-db/find-companies/` docs.
 
 ## Relationship to the broader marketing plugin
 
