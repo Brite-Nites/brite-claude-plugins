@@ -783,3 +783,84 @@ def test_idempotency_section_present() -> None:
     body = read_command()
     assert "Idempotency" in body, \
         "Body must document the orchestrator's idempotency behavior (partial-idempotency)"
+
+
+# --- Clay lead-list spec (§ 9e) + scaffold PR (§ 9f) ------------------------
+
+
+def test_lead_list_spec_documented() -> None:
+    """§ 9e must spec the Clay lead-list .md next to the manifest — the durable,
+    Clay-loadable rendering of the list-building issue body."""
+    section = _step9_section()
+    assert "### 9e" in section, "Step 9 must contain a § 9e lead-list spec sub-step"
+    assert "docs/campaigns/<entity>/<slug>/lead-list.md" in section, \
+        "§ 9e must use the canonical campaign-dir path for lead-list.md"
+    assert "Clay" in section, \
+        "§ 9e must orient the spec at Clay (MCP context loading)"
+    assert "Redundant by design" in section, \
+        "§ 9e must state the redundancy contract (Linear issue = tracking surface, file = artifact)"
+
+
+def test_lead_list_spec_single_drafting_pass() -> None:
+    """§ 9e renders from the SAME § 9a drafted content as the 9c issue body —
+    a second independent drafting pass would let the issue and spec drift."""
+    section = _step9_section()
+    assert "one drafting pass, two renderings" in section, \
+        "§ 9e must state the single-drafting-pass rule (issue body + spec from the same § 9a pass)"
+
+
+def test_scaffold_pr_step_documented() -> None:
+    """§ 9f must spec the campaign/<slug> branch + corinne-brewer reviewer.
+    Branch format decision 2026-06-04: the V×P×O×M slug IS the wave naming
+    convention's milestone form made git-ref-safe (the literal display format
+    contains spaces/pipes — invalid/hostile as a git ref)."""
+    section = _step9_section()
+    assert "### 9f" in section, "Step 9 must contain a § 9f scaffold-PR sub-step"
+    assert "campaign/<slug>" in section, "§ 9f must use the campaign/<slug> branch format"
+    assert "corinne-brewer" in section, "§ 9f must assign corinne-brewer as the PR reviewer"
+    assert "gh pr create" in section, "§ 9f must create the PR via gh pr create"
+
+
+def test_scaffold_pr_is_soft_fail() -> None:
+    """§ 9f failures must not halt scaffolding — Linear + manifest + lead-list.md
+    are the hard gates; git/gh is best-effort with a manual fallback block."""
+    _, body = split_frontmatter()
+    philosophy = extract_section(body, "## Soft-fail philosophy", "## Non-goals")
+    assert "9f" in philosophy, \
+        "Soft-fail philosophy must cover the § 9f scaffold-PR sub-step"
+    assert "lead-list.md" in philosophy, \
+        "Soft-fail philosophy must list lead-list.md among the hard-gate artifacts"
+
+
+def test_scaffold_pr_never_force_pushes() -> None:
+    """The scaffold push must be a plain push — force pushes are regex-blocked
+    repo-wide (workflows v3.31.0+ / BC-11889) and a fresh scaffold branch never
+    legitimately needs one."""
+    section = _step9_section()
+    assert "git push -u origin campaign/<slug>" in section, \
+        "§ 9f must push via plain `git push -u origin campaign/<slug>`"
+    assert "git push --force" not in section and "git push -f" not in section, \
+        "§ 9f must never spec a force push command"
+
+
+def test_scaffold_pr_stages_campaign_dir_only() -> None:
+    """§ 9f must stage ONLY the campaign directory — staging the whole tree
+    would sweep unrelated operator work into the scaffold commit."""
+    section = _step9_section()
+    assert "git add docs/campaigns/<entity>/<slug>/" in section, \
+        "§ 9f must stage exactly the campaign dir"
+    assert "git add -A" not in section and "git add ." not in section, \
+        "§ 9f must not stage the whole tree"
+
+
+def test_no_pr_flag_documented() -> None:
+    """--no-pr (skip § 9f) must appear in both the argument-hint and the
+    Step 1 flag table."""
+    frontmatter, body = split_frontmatter()
+    hint_line = next(
+        (line for line in frontmatter.splitlines() if line.startswith("argument-hint:")),
+        "",
+    )
+    assert "--no-pr" in hint_line, "--no-pr must be in argument-hint"
+    flag_table = extract_section(body, "### Flag table", "### Interactive prompt example")
+    assert "--no-pr" in flag_table, "--no-pr must have a row in the Step 1 flag table"

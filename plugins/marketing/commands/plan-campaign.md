@@ -1,6 +1,6 @@
 ---
-description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 2 substantive work issues (Deck Asset → Sarah, Data Sourcing & List Building → Corinne) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
-argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--deck-assignee <email>] [--list-assignee <email>] [--volume <small|medium|large>] [--dry-run]
+description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 2 substantive work issues (Deck Asset → Sarah, Data Sourcing & List Building → Corinne) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Clay lead-list spec (lead-list.md) + scaffold PR on branch campaign/{slug} with Corinne as reviewer (soft-fail) + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
+argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--deck-assignee <email>] [--list-assignee <email>] [--volume <small|medium|large>] [--no-pr] [--dry-run]
 allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_workflows_linear-server__create_issue_label, mcp__plugin_revops_salesforce__get_username, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__list_pages
 gbrain:
   schema: 1
@@ -30,7 +30,7 @@ The campaign-scaffolding orchestrator. One invocation creates one campaign acros
 
 | Layer | What lands | Source-of-truth |
 |---|---|---|
-| Plugin filesystem | `docs/campaigns/{entity}/{slug}/manifest.json` | Cross-layer index — the breadcrumb that ties Linear ↔ SF ↔ EB together |
+| Plugin filesystem | `docs/campaigns/{entity}/{slug}/manifest.json` + `lead-list.md` | Cross-layer index (manifest) + the Clay lead-list build spec Corinne reviews via the § 9f scaffold PR |
 | Linear | 1 project-milestone in "Brite GTM" + 2 substantive work issues (Deck Asset → Sarah Cullen, Data Sourcing & List Building → Corinne Brewer) | Orchestration + work-tracking surface |
 | Salesforce | 1 Campaign record (Status=Planned, custom fields populated) | Portfolio reporting surface (rollups, pipeline attribution) |
 | Email Bison | Workspace assignment recorded in manifest (NO EB campaign created here) | Sending-execution surface — actual EB campaign is created later by `/marketing:launch-campaign` once the deck + list are done |
@@ -52,9 +52,11 @@ Substitute `{vertical}` / `{persona}` / `{offer}` with this invocation's flags (
 
 **Outputs**:
 - `docs/campaigns/{entity}/{slug}/manifest.json` — fully populated per the schema in Step 7.
+- `docs/campaigns/{entity}/{slug}/lead-list.md` — Clay lead-list build spec, rendered from the same § 9a drafting pass as the list-building issue body (§ 9e).
 - 1 Linear milestone (with labels applied to the 2 work issues, not the milestone itself — see § Step 8a).
 - 2 substantive work issues: **Deck Asset** (→ Sarah Cullen) + **Data Sourcing & List Building** (→ Corinne Brewer), each with campaign-specific content drafted at scaffold time per § Step 9.
 - 1 Salesforce Campaign record (if `/revops:create-sf-campaign` succeeded; null `campaign_id` in manifest if it soft-failed).
+- 1 scaffold PR on branch `campaign/{slug}` with `corinne-brewer` as reviewer (soft-fail; absent if git/gh failed or `--no-pr` was passed — § 9f).
 - Operator-readable summary printed at Step 10.
 
 **Precedent + sources**:
@@ -67,7 +69,7 @@ Substitute `{vertical}` / `{persona}` / `{offer}` with this invocation's flags (
 
 ## Soft-fail philosophy
 
-The Salesforce auto-create step (Step 8b) is **soft-fail**: any error returned by `/revops:create-sf-campaign` (duplicate slug, missing owner, SF CLI error, invalid slug format) does NOT halt scaffolding. The manifest gets `salesforce.campaign_id: null`, a WARN line is logged, and the operator is told at Step 10 how to reconcile (manual re-run of `/revops:create-sf-campaign --slug=<slug> ...` once the underlying issue is resolved). Linear milestone + the 2 work issues + plugin manifest must always land — they are the gate that keeps the team able to plan against the campaign even if SF is temporarily unhealthy.
+The Salesforce auto-create step (Step 8b) is **soft-fail**: any error returned by `/revops:create-sf-campaign` (duplicate slug, missing owner, SF CLI error, invalid slug format) does NOT halt scaffolding. The manifest gets `salesforce.campaign_id: null`, a WARN line is logged, and the operator is told at Step 10 how to reconcile (manual re-run of `/revops:create-sf-campaign --slug=<slug> ...` once the underlying issue is resolved). The scaffold-PR sub-step (§ 9f) is soft-fail the same way: any git/gh error (branch create, push, `gh pr create`, reviewer assignment) logs a WARN and Step 10 prints a copy-pasteable manual command block — never a halt. Linear milestone + the 2 work issues + plugin manifest + `lead-list.md` must always land — they are the gate that keeps the team able to plan against the campaign even if SF or GitHub is temporarily unhealthy.
 
 Hard-fail paths (which DO halt scaffolding) are limited to:
 - Canonicality validation (Step 2) — invalid vertical/persona/offer tuple. Pointer to `/marketing:new-vertical|new-persona|new-offer` (BC-8725).
@@ -104,6 +106,7 @@ Parse the invocation arguments. Required flags: `--vertical`, `--persona`, `--of
 | `--deck-assignee` | no | Default `sarahc@britenites.com` (Sarah Cullen — owns all GTM deck assets; see BC-2816 et al.). |
 | `--list-assignee` | no | Default `corinne@britenites.com` (Corinne Brewer — owns all list-building; see BC-10178 et al.). |
 | `--volume` | no | Target list volume tier: `small` (Google 400 / Microsoft 200 / SMTP 200 → ~800 verified), `medium` (~1,500), `large` (~3,000). Default `small` — per BC-10178: "small launch, expand based on results". If omitted in interactive mode, prompt with the 3 tiers. |
+| `--no-pr` | no | Skip § 9f (branch + commit + PR). Files are still written; the operator commits via `/workflows:ship` or manually. |
 | `--dry-run` | no | Print the full preview at Step 5 and exit without writing anything. |
 
 ### Interactive prompt example
@@ -357,6 +360,15 @@ Print the operator-readable plan. Use this format (or a close variant — readab
   Plugin manifest:
     Path:         docs/campaigns/<entity>/<slug>/manifest.json
     Schema:       v1 (12 top-level keys per Step 7)
+
+  Lead-list spec:
+    Path:         docs/campaigns/<entity>/<slug>/lead-list.md
+    Rendering:    same § 9a drafting pass as the list-building issue body (§ 9e)
+
+  Scaffold PR (soft-fail; skipped when --no-pr):
+    Branch:       campaign/<slug>
+    Target:       origin default branch (this repo)
+    Reviewer:     corinne-brewer
 
   Linear milestone:
     Project:      "Brite GTM" (<gtm-project-id>)
@@ -782,9 +794,12 @@ Suggested section outline (proven ~11-section pattern from prior decks):
 
 Build enriched + SMTP-verified prospect list for `<milestone-name>` (`<slug>`). <persona-differentiation callout OR same-persona 180-day WARN from the § 9a prior-campaign mine; omit if no prior campaigns in this vertical> Deliver by **<launch-date minus 21 days, ISO date>**.
 
+**Spec file:** `docs/campaigns/<entity>/<slug>/lead-list.md` — the durable rendering of this issue (§ 9e); load it into Clay MCP context when building the table. PR link added by § 9f.
+
 ## Source stack
 
 <3-6 bullets drafted per vertical from ICP-research brain context + the tam-mapping source catalog — name SPECIFIC sources the way BC-10178 names NCES IPEDS / NACUBO / CASE for universities, with the signal each provides. Always end with:>
+* **Clay** — list build + enrichment workspace (Leadmagic / Prospeo / Icypeas / BounceBan per the handbook outbound stack); load `lead-list.md` (§ 9e) into Clay MCP context
 * **ZoomInfo + LinkedIn Sales Nav** — title-based contact sourcing for the cascade below
 * **MillionVerifier** — SMTP verify
 
@@ -826,6 +841,74 @@ Create #1 (deck) then #2 (list). If either `save_issue` fails, surface the parti
 
 For each successful `save_issue` response, capture the returned `id` + `identifier` (e.g. `BC-10178`). Pass both to Step 10 for the summary output.
 
+### 9e — Write the Clay lead-list spec (`lead-list.md`)
+
+After both issues exist (their `identifier`s are captured at 9d), `Write` `docs/campaigns/<entity>/<slug>/lead-list.md`. **Redundant by design**: the Data Sourcing & List Building issue (§ 9c) is the tracking surface; this file is the durable, machine-loadable artifact Corinne loads into Clay MCP context when building the table. Render it from the SAME § 9a drafted content as the 9c issue body — one drafting pass, two renderings; do NOT run a second drafting pass (drift between the issue and the spec is a defect).
+
+Template (every `<...>` is the § 9a drafted value, identical to its 9c counterpart):
+
+```markdown
+# Lead-list spec — <slug>
+
+> Tracking issue: <list-issue-identifier> (due <launch-date minus 21 days, ISO date>). This file is the
+> durable, Clay-loadable rendering of that issue — if they disagree, fix BOTH in the same edit.
+
+## ICP / account filters
+
+<account-level filter — same line as the 9c "ICP:" bullet>
+
+## Decision-maker titles (priority order)
+
+<numbered list = personas[<persona>].titles[] from {vertical}.yaml, verbatim, in YAML order>
+
+## Target volume
+
+<tier breakdown per --volume — same as 9c>
+
+## Exclusion / suppression
+
+<same numbered exclusion logic as 9c, with EB campaign IDs + the 180-day callout/WARN>
+
+## Output CSV contract
+
+`email, first_name, last_name, title, company, <2-3 vertical-specific qualifier columns>, state`
+SMTP-verified (MillionVerifier), bounce-risk <5%.
+
+## Using this spec with Clay
+
+1. Load this file into Clay MCP context when building the table.
+2. Map the title cascade above to Clay's title-filter / enrichment columns.
+3. Enrichment sources per the handbook outbound stack: Leadmagic, Prospeo, Icypeas, BounceBan.
+4. Export → MillionVerifier SMTP verify → suppression dedup → CSV per the contract above.
+```
+
+The § 9a "NEVER leave a section as a bare TODO" rule applies to this file exactly as it does to the issue bodies.
+
+### 9f — Scaffold branch + commit + PR (soft-fail)
+
+Skip this entire sub-step when `--no-pr` was passed (print: `Scaffold PR skipped (--no-pr). Commit docs/campaigns/<entity>/<slug>/ via /workflows:ship when ready.`).
+
+Every command below is **soft-fail** per the philosophy section: on any git/gh error, log the WARN, print the manual block at Step 10, and continue — the scaffold is still a success (Linear + manifest + `lead-list.md` are the hard gates).
+
+1. **Branch** — `git checkout -b campaign/<slug>` (from current HEAD; the new files are untracked and carry over). If the branch already exists (partial prior run), `git checkout campaign/<slug>` and WARN: "Branch campaign/<slug> already existed — reusing."
+2. **Stage** — `git add docs/campaigns/<entity>/<slug>/` — ONLY this directory. Never stage the whole tree (the operator's checkout may hold unrelated work).
+3. **Commit** — `git commit -m "feat(campaigns): scaffold <slug> — manifest + lead-list spec"`. Campaign-state commits touch only `docs/campaigns/**` — no `plugins/**` paths — so the version-bump pre-commit guard correctly does not fire.
+4. **Push** — `git push -u origin campaign/<slug>`. Plain push only — never a force push (`--force`/`-f` is regex-blocked repo-wide per workflows v3.31.0+, and a fresh scaffold branch never legitimately needs one).
+5. **PR** — `gh pr create --base <default-branch> --title "Campaign scaffold: <slug>" --reviewer corinne-brewer --body <body>`. The body must include: the milestone pointer (`<milestone-url>`), both work-issue identifiers, the lead-list spec path, and the line "Corinne's review of `lead-list.md` is the gate before list-build starts." If `gh pr create` fails because a PR already exists for the branch, treat like 8b's `duplicate_slug`: INFO, recover the URL via `gh pr view campaign/<slug> --json url -q .url`.
+6. **Capture** `<pr-url>` for the Step 10 summary. **Stay on `campaign/<slug>`** — do NOT switch back: the § 9a prior-campaign mine globs `docs/campaigns/*/*/manifest.json` in the working tree, and the new manifest exists only on this branch until the PR merges. Tell the operator: "Left you on campaign/<slug>; switch back after the PR merges."
+
+**Known gap (accepted)**: if a second campaign is scaffolded from a different checkout/branch before this PR merges, the § 9a mine won't see this campaign's manifest. Mitigation is the review SLA — scaffold PRs are small (2 files) and Corinne merges them promptly.
+
+Manual block (printed at Step 10 when this sub-step soft-fails):
+
+```
+git checkout -b campaign/<slug>
+git add docs/campaigns/<entity>/<slug>/
+git commit -m "feat(campaigns): scaffold <slug> — manifest + lead-list spec"
+git push -u origin campaign/<slug>
+gh pr create --base <default-branch> --title "Campaign scaffold: <slug>" --reviewer corinne-brewer
+```
+
 ## Step 10 — Summary output
 
 Print the operator-readable summary:
@@ -839,6 +922,9 @@ Campaign scaffolded — /marketing:plan-campaign
   Linear:         <milestone-url>
   SF Campaign:    <campaign-url>  (OR null + reconciliation reminder if soft-failed)
   Manifest:       docs/campaigns/<entity>/<slug>/manifest.json
+  Lead-list spec: docs/campaigns/<entity>/<slug>/lead-list.md
+  Branch:         campaign/<slug>  (you are left ON this branch — switch back after the PR merges)
+  Scaffold PR:    <pr-url>  (OR "skipped (--no-pr)" OR null + manual command block if soft-failed)
   Work issues:    2 created
                     #1  Deck Asset — <offer_display> (<vertical_display>)
                         <identifier>  → <deck-assignee>, due <launch-date - 14d>
@@ -857,6 +943,8 @@ If the σ3 SF auto-create soft-failed (`salesforce.campaign_id` is `null` in man
 > To reconcile manually:
 > `Skill(skill: "revops:create-sf-campaign", args: "--slug=<slug> --entity=<entity> --vertical=<vertical> --persona=<persona> --offer=<offer> --year=<year> --month=<month> --owner-email=<corrected-owner-email> --launch-date=<launch-date>")`
 
+If the § 9f scaffold PR soft-failed, append its WARN and the manual command block from § 9f so the operator can finish the branch + PR by hand.
+
 ### 10.2 — Status-transition guidance
 
 Append:
@@ -869,7 +957,7 @@ Append:
 
 End with:
 
-> Next steps: Sarah picks up the Deck Asset issue, Corinne picks up the Data Sourcing & List Building issue (both linked above). When both are done, run `/marketing:email-copywriting` then `/marketing:launch-campaign`.
+> Next steps: Corinne reviews + merges the scaffold PR (`<pr-url>`) — her review of `lead-list.md` is the gate before list-build starts — then picks up the Data Sourcing & List Building issue, building the list per `lead-list.md` via Clay. Sarah picks up the Deck Asset issue. When both are done, run `/marketing:email-copywriting` then `/marketing:launch-campaign`.
 
 ---
 
@@ -880,6 +968,7 @@ This orchestrator is **partially** idempotent:
 - **Step 3.3 collision check** + **Step 8b duplicate_slug handling** ensure repeated invocations with the same slug don't create duplicates in Linear or SF.
 - **Step 7 manifest write** is destructive (overwrites any existing manifest.json). If re-running plan-campaign on an existing slug, the prior manifest is lost — copy it aside first if needed for diff comparison.
 - **Step 9 issue create** is NOT idempotent — calling `save_issue` with the same title creates a NEW issue (Linear doesn't dedupe on title). Re-runs will produce duplicate Deck Asset / Data Sourcing issues.
+- **§ 9f branch + PR** tolerates partial re-runs: an existing `campaign/<slug>` branch is reused (WARN), and an existing open PR for the branch is recovered via `gh pr view campaign/<slug> --json url -q .url` (INFO — same spirit as 8b's `duplicate_slug`).
 
 If re-running plan-campaign is genuinely needed (rare — typically the operator should re-invoke specific sibling skills like `/revops:create-sf-campaign` directly):
 
