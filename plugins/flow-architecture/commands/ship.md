@@ -23,13 +23,13 @@ gbrain:
       render_as: "## Changelog patterns"
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: e3321a962e6bcf64b1659c8c4617c74fc34e184a. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). -->
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 0187a4c764757ca1cc0ce2cdebd6a5cd77363be4. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. -->
 
 # Ship & Compound
 
 You are shipping completed work on a Flow-Driven Architecture discipline-child and capturing what was learned. Your job is to run the pre-ship audit, create a clean FDA-shaped PR, route the Linear write through the Q46 ship-summary marker, run the compound + audit cycle, clean up, and close the session with a retro soft-notification if this shipped the last sub-flow in the domain.
 
-> **DO NOT re-derive** the 9-step structure, the per-step FDA-swap classification (Steps 0/7 verbatim; Steps 4/5/6 transitive-reuse; Steps 1/2/3/8 with FDA augments), or the Q46 ship-summary call signature. All three are locked at Q53 (`docs/design-rationale/fda-plugin-interview.md:1621` with sub-decisions at `:1625-1654` and refinement audit trail at `:1664`). The HTML-comment header above pins the workflows source SHA for drift detection per parking lot #45. Re-read those before drafting any change to this file.
+> **DO NOT re-derive** the 9-step structure, the per-step FDA-swap classification (Steps 0/7 verbatim; Steps 2b/4/5/6 transitive-reuse — Step 2b added per BC-12409, Q50 amendment 2; Steps 1/2/3/8 with FDA augments), or the Q46 ship-summary call signature. All three are locked at Q53 (`docs/design-rationale/fda-plugin-interview.md:1621` with sub-decisions at `:1625-1654` and refinement audit trail at `:1664`). The HTML-comment header above pins the workflows source SHA for drift detection per parking lot #45. Re-read those before drafting any change to this file.
 
 ## Context-load phase
 
@@ -154,13 +154,29 @@ If PR creation fails, use error recovery: AskUserQuestion with options: "Retry p
 
 Narrate: `Step 2/8: Creating pull request... done`
 
+## Step 2b: Greptile Gate
+
+Narrate: `Step 2b: Greptile gate...`
+
+The `greptile-gate` skill activates to read Greptile's verdict on the PR just created in Step 2 and converge it toward a 5/5 confidence score.
+
+- If Greptile isn't installed on the repo (or hasn't reviewed yet), the gate reports that and **skips** — it never blocks the ship.
+- If Greptile scored below 5/5, the gate runs up to 3 human-in-the-loop rounds (grill-with-docs → `/workflows:review` fix loop → push → `@greptile-apps` re-review → bounded wait), then a final independent review on 5/5.
+- **The gate never merges** — it converges and hands back; you merge manually.
+
+Because the gate runs *before* the terminal steps below, Steps 4–6 (compound-learnings, audit, handbook-drift) operate on the converged code. If the gate can't reach 5/5 in 3 rounds (or Greptile times out), it stops and hands you the remaining findings — decide whether to continue before the terminal steps run.
+
+This step is preserved near-verbatim from workflows ship.md (TRANSITIVE REUSE per Q50 amendment 2). The `greptile-gate` skill lives in the workflows plugin and is invoked transparently — FDA does not re-implement it.
+
+Narrate: `Step 2b: Greptile gate... done`
+
 ## Step 3: Update Linear
 
 Narrate: `Step 3/8: Updating Linear...`
 
 This is the **primary Q46 ship-summary consumer**. Single `linear_writeback` call per `/flow:ship` invocation routes the ship-summary comment through the writeback layer; status move + PR attachment stay direct Linear MCP per workflows pattern.
 
-1. **Move issue status** to "In Review" (or "Done" if team merges without separate review). Direct Linear MCP call — NOT Q46-routed.
+1. **Move issue status** to **In Review** and keep it there — the greptile-gate (Step 2b) does not merge, so the developer merges manually. Do not advance the status automatically after shipping. Direct Linear MCP call — NOT Q46-routed.
 2. **Link the PR** via `mcp__plugin_workflows_linear-server__create_attachment` if possible. Direct Linear MCP call — NOT Q46-routed.
 3. **Ship-summary comment via Q46** (per Q53 sub-decision 3 axis 4):
 
