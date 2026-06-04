@@ -24,6 +24,10 @@ COMMAND_PATH = ROOT / "commands" / "plan-campaign.md"
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 CANONICALS_DIR = ROOT / "data" / "canonicals"
+# Per-phase sub-issue templates extracted from § 9.1 (BC-12564). This file is
+# now the SOURCE OF TRUTH for the sub-issue chain: the command stamps from it
+# and these tests assert against it (instead of grepping the command body).
+REFERENCE_PATH = ROOT / "references" / "campaign-sub-issue-templates.md"
 # Sibling skill that plan-campaign composes via Skill tool — used for cross-file
 # parity assertions (slug regex, error catalog) so the two surfaces don't drift.
 REVOPS_CREATE_PATH = (
@@ -109,6 +113,114 @@ def extract_section(body: str, start_marker: str, end_marker: str | None = None)
             f"Section assertions need both markers to scope correctly."
         )
     return body[start:end]
+
+
+# --- Reference-file parser (BC-12564) --------------------------------------
+# The sub-issue templates live in references/campaign-sub-issue-templates.md as
+# one fenced ```yaml block per sub-issue (machine-critical fields) + a prose
+# description. These tests parse the YAML blocks with a stdlib-only mini-parser
+# rather than PyYAML: CLAUDE.md mandates stdlib-only (lint_canonicals.py
+# reimplements a YAML subset for the same reason), and the schema is flat
+# (scalars + inline int-lists), so a dedicated parser is exactly as
+# deterministic as yaml.safe_load for this subset.
+
+
+@lru_cache(maxsize=1)
+def read_reference() -> str:
+    """Read the sub-issue templates reference file once per session."""
+    return REFERENCE_PATH.read_text(encoding="utf-8")
+
+
+_YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)\n```", re.DOTALL)
+
+
+def _parse_scalar(raw: str) -> object:
+    """Parse one flat-YAML value: inline int-list, bool, int, or string.
+
+    Handles `[]` / `[1]` / `[1, 3]`, `true`/`false`, signed ints, and
+    quoted/bare strings. No nesting, anchors, or block scalars — the schema is
+    deliberately flat (see module note above).
+    """
+    raw = raw.strip()
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1].strip()
+        if not inner:
+            return []
+        return [int(x.strip()) for x in inner.split(",")]
+    if raw in ("true", "false"):
+        return raw == "true"
+    if re.fullmatch(r"-?\d+", raw):
+        return int(raw)
+    return raw.strip('"').strip("'")
+
+
+def _parse_block(raw: str) -> dict:
+    """Parse one fenced ```yaml block body into a flat dict.
+
+    A quoted value (`title: "..."`) is read as the content between its quotes, so
+    a value containing ` #` (e.g. `"Black Friday #promo"`) is NOT truncated; a
+    trailing ` #` comment is only stripped from unquoted scalars/lists (offsets,
+    `blockedBy`). Comment-only and blank lines are skipped.
+    """
+    rec: dict = {}
+    for line in raw.splitlines():
+        line = line.rstrip()
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#") or ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        val = val.strip()
+        if val[:1] in ('"', "'"):
+            # Quoted string: take content between the opening quote and its match;
+            # anything after (incl. a trailing ` #` comment) is ignored.
+            quote = val[0]
+            close = val.find(quote, 1)
+            rec[key.strip()] = val[1:close] if close != -1 else val[1:]
+        else:
+            # Unquoted scalar/list: drop a trailing ` #` comment, then parse.
+            if " #" in val:
+                val = val[: val.index(" #")]
+            rec[key.strip()] = _parse_scalar(val)
+    return rec
+
+
+@lru_cache(maxsize=1)
+def parse_subissue_blocks() -> list[dict]:
+    """Parse every fenced ```yaml block in the reference file into a dict.
+
+    Cached (like read_reference / read_command / split_frontmatter): 7 tests call
+    this and re-running the regex + line parse each time is wasted work. Callers
+    only read the result (they build local `{id: block}` dicts, never mutate the
+    shared list/dicts), so a single shared parse is safe.
+
+    Only fenced ```yaml blocks are sub-issue records — the file's schema-doc
+    header uses a non-yaml fence so it is not picked up here.
+    """
+    return [_parse_block(raw) for raw in _YAML_BLOCK_RE.findall(read_reference())]
+
+
+# The canonical sub-issue chain — the single model these tests assert the
+# reference file against. (title, dueDate_offset_days, blockedBy, optional,
+# labs_gated). Offsets per docs/gtm-campaign-orchestration-README.md § 3.6.5.
+#
+# Hand-maintained oracle: it is the TEST's canonical model, compared only
+# against the parsed reference file (the README § 3.6.5 cadence is English prose,
+# not machine-parsed). It catches a unilateral reference-file change, but a
+# schedule/chain change is a DELIBERATE two-place edit — to this constant AND the
+# reference file. Reviewers must confirm new values against README § 3.6.5; both
+# edits land in the same diff.
+_EXPECTED_SUBISSUES: dict[int, tuple] = {
+    1:  ("Brief approved",                    -21, [],  False, False),
+    2:  ("Target list built",                 -14, [1], False, False),
+    3:  ("Copy written + approved",           -10, [1], False, False),
+    4:  ("Salesforce setup",                   -7, [3], False, False),
+    5:  ("Pre-launch QA",                      -3, [4], False, False),
+    6:  ("Launch executed",                     0, [5], False, False),
+    7:  ("Active management — weekly reviews",  28, [6], False, False),
+    8:  ("Campaign closed + debrief",           40, [7], False, False),
+    9:  ("Situation Mining",                  -12, [1], True,  True),
+    10: ("Creative Angles",                   -12, [1], True,  False),
+}
 
 
 # --- File existence + frontmatter shape ------------------------------------
@@ -400,43 +512,242 @@ def test_scaffolded_by_field_value() -> None:
         "scaffolded_by field must literally state the orchestrator name for trace"
 
 
-# --- Sub-issue chain contract ----------------------------------------------
+# --- Sub-issue chain contract (BC-12564: reference file is source of truth) -
+# These tests were re-pointed from the command body to the reference file when
+# § 9.1's inline specs were extracted. The 8-label-set tests (below) STAY on the
+# command body — labels are a milestone-level constant applied by the stamping
+# loop, not per-sub-issue data, so they did NOT move to the reference file.
+
+
+def test_reference_file_exists() -> None:
+    assert REFERENCE_PATH.is_file(), (
+        f"Sub-issue templates reference file missing: {REFERENCE_PATH} (BC-12564)"
+    )
+
+
+def test_block_parser_quote_and_comment_handling() -> None:
+    """Regression guard (BC-12564 review): the block parser must read a quoted
+    value containing ` #` verbatim (no silent truncation), while still stripping
+    a trailing ` #` comment from unquoted scalars and lists.
+    """
+    block = _parse_block(
+        'id: 1\n'
+        'title: "Black Friday #promo"\n'
+        'dueDate_offset_days: -21   # T-21d\n'
+        'blockedBy: [1]   # NOT [2] — copy ∥ target list\n'
+        'optional: false\n'
+        'labs_gated: false\n'
+    )
+    assert block["title"] == "Black Friday #promo", "quoted value with ` #` must not truncate"
+    assert block["dueDate_offset_days"] == -21, "trailing ` #` comment on int must be stripped"
+    assert block["blockedBy"] == [1], "trailing ` #` comment on list must be stripped"
+    assert block["optional"] is False and block["labs_gated"] is False
+
+
+def test_reference_file_schema_valid() -> None:
+    """Parse-contract gate: the reference file is now a parsed data source, so
+    every block must carry the required keys with the right types, ids must be
+    unique and exactly 1..10, and labs_gated may only be true on optional
+    sub-issues. Guards a malformed future edit.
+    """
+    blocks = parse_subissue_blocks()
+    assert len(blocks) == 10, (
+        f"Expected 10 sub-issue yaml blocks (8 standard + 2 optional), found {len(blocks)}"
+    )
+    required = {
+        "id": int,
+        "title": str,
+        "dueDate_offset_days": int,
+        "blockedBy": list,
+        "optional": bool,
+        "labs_gated": bool,
+    }
+    seen_ids: set[int] = set()
+    for b in blocks:
+        for key, typ in required.items():
+            assert key in b, f"sub-issue block missing key {key!r}: {b}"
+            # bool is an int subclass — check bool first / exactly.
+            if typ is int:
+                assert isinstance(b[key], int) and not isinstance(b[key], bool), (
+                    f"sub-issue {b.get('id')} key {key!r} must be int, got {b[key]!r}"
+                )
+            else:
+                assert isinstance(b[key], typ), (
+                    f"sub-issue {b.get('id')} key {key!r} must be {typ.__name__}, got {b[key]!r}"
+                )
+        assert all(isinstance(x, int) and not isinstance(x, bool) for x in b["blockedBy"]), (
+            f"sub-issue {b['id']} blockedBy must be list[int], got {b['blockedBy']!r}"
+        )
+        assert b["id"] not in seen_ids, f"duplicate sub-issue id {b['id']}"
+        seen_ids.add(b["id"])
+        if b["labs_gated"]:
+            assert b["optional"], (
+                f"sub-issue {b['id']} has labs_gated:true but optional:false — "
+                f"labs gating is only legal on optional sub-issues"
+            )
+    assert seen_ids == set(range(1, 11)), (
+        f"sub-issue ids must be exactly 1..10, got {sorted(seen_ids)}"
+    )
 
 
 def test_eight_standard_sub_issues_present() -> None:
-    body = read_command()
-    titles = [
-        "Brief approved",
-        "Target list built",
-        "Copy written + approved",
-        "Salesforce setup",
-        "Pre-launch QA",
-        "Launch executed",
-        "Active management",
-        "Campaign closed + debrief",
-    ]
-    missing = [t for t in titles if t not in body]
-    assert not missing, f"Standard sub-issue titles missing: {missing}"
+    """The 8 standard sub-issues now live in the reference file (BC-12564 moved
+    them out of the command body). Assert exactly 8 non-optional sub-issues with
+    the canonical ids + titles.
+    """
+    standard = {b["id"]: b for b in parse_subissue_blocks() if not b["optional"]}
+    assert len(standard) == 8, (
+        f"Expected 8 standard (optional:false) sub-issues, found {len(standard)}"
+    )
+    for sid in range(1, 9):
+        assert sid in standard, f"standard sub-issue #{sid} missing from reference file"
+        expected_title = _EXPECTED_SUBISSUES[sid][0]
+        assert standard[sid]["title"] == expected_title, (
+            f"sub-issue #{sid} title drift: {standard[sid]['title']!r} != {expected_title!r}"
+        )
 
 
 def test_two_optional_sub_issues_present() -> None:
-    body = read_command()
-    assert "Situation Mining" in body, "Optional sub-issue #9 (Situation Mining) must be documented"
-    assert "Creative Angles" in body, "Optional sub-issue #10 (Creative Angles) must be documented"
+    """The 2 optional sub-issues (#9 Situation Mining, #10 Creative Angles) live
+    in the reference file under the optional section with optional:true.
+    """
+    optional = {b["id"]: b for b in parse_subissue_blocks() if b["optional"]}
+    assert len(optional) == 2, f"Expected 2 optional sub-issues, found {len(optional)}"
+    assert optional.get(9, {}).get("title") == "Situation Mining", (
+        "Optional sub-issue #9 must be Situation Mining (optional:true)"
+    )
+    assert optional.get(10, {}).get("title") == "Creative Angles", (
+        "Optional sub-issue #10 must be Creative Angles (optional:true)"
+    )
 
 
 def test_situation_mining_labs_gated() -> None:
-    body = read_command()
-    assert "Labs" in body and "--situation-mining" in body, \
-        "--situation-mining must be Labs-gated (HARD-FAIL on non-Labs entity)"
+    """#9 Situation Mining is Labs-gated; #10 Creative Angles is not. The flag is
+    the reference file's source of truth, AND the command must still ENFORCE the
+    Labs HARD-FAIL (Step 10) — gating enforcement stays orchestration.
+    """
+    blocks = {b["id"]: b for b in parse_subissue_blocks()}
+    assert blocks[9]["labs_gated"] is True, (
+        "#9 (Situation Mining) must be labs_gated:true in the reference file"
+    )
+    assert blocks[10]["labs_gated"] is False, (
+        "#10 (Creative Angles) must NOT be labs_gated in the reference file"
+    )
+    # Enforcement stays in the command. Scope to Step 10 so the check isn't
+    # satisfied incidentally by `labs` appearing elsewhere (it's an entity value
+    # enumerated all over the body) — require the HARD-FAIL to co-occur with the
+    # flag INSIDE Step 10.
+    _, body = split_frontmatter()
+    step10 = extract_section(body, "## Step 10 — Optional sub-issues", "## Step 11")
+    assert (
+        "--situation-mining" in step10
+        and "HARD-FAIL" in step10
+        and "labs" in step10.lower()
+    ), "Step 10 must enforce the Labs HARD-FAIL gate for --situation-mining"
 
 
 def test_blocked_by_chain_documented() -> None:
+    """The blockedBy chain is the authoritative dependency graph — only blockedBy
+    is written to Linear; the derivable `blocks` field was dropped (BC-12564).
+    Assert the chain matches the canonical edges, references only existing ids,
+    is acyclic, with #1 the root gate and #8 terminal.
+    """
+    blocks = {b["id"]: b for b in parse_subissue_blocks()}
+    # every referenced id exists
+    for sid, b in blocks.items():
+        for dep in b["blockedBy"]:
+            assert dep in blocks, f"sub-issue #{sid} blockedBy references missing id #{dep}"
+    # canonical edges
+    for sid, (_t, _o, expected_bb, _opt, _lg) in _EXPECTED_SUBISSUES.items():
+        assert blocks[sid]["blockedBy"] == expected_bb, (
+            f"sub-issue #{sid} blockedBy drift: {blocks[sid]['blockedBy']} != {expected_bb}"
+        )
+    # #1 is the root gate
+    assert blocks[1]["blockedBy"] == [], "#1 (Brief) must be the root gate (blockedBy [])"
+    # #8 is terminal: no sub-issue is blocked by #8
+    blockers = {dep for b in blocks.values() for dep in b["blockedBy"]}
+    assert 8 not in blockers, "#8 (Campaign closed) must be terminal — nothing is blockedBy #8"
+
+    # acyclic: no node transitively depends on itself
+    def reaches_self(start: int) -> bool:
+        stack, seen = list(blocks[start]["blockedBy"]), set()
+        while stack:
+            n = stack.pop()
+            if n == start:
+                return True
+            if n in seen:
+                continue
+            seen.add(n)
+            stack.extend(blocks[n]["blockedBy"])
+        return False
+
+    for sid in blocks:
+        assert not reaches_self(sid), f"cycle detected involving sub-issue #{sid}"
+
+
+def test_copy_parallels_target_list() -> None:
+    """Design intent: copy (#3) and target-list (#2) run in PARALLEL — #3 is
+    gated by the Brief (#1), NOT by #2. Encodes the explicit source note
+    ("NOT #2 — copy and target list can parallel") as its own test so the
+    parallelism can't silently regress into a serial chain.
+    """
+    blocks = {b["id"]: b for b in parse_subissue_blocks()}
+    assert blocks[3]["blockedBy"] == [1], (
+        "#3 (Copy) must be blocked only by #1 (Brief) — see the parallel-with-#2 design note"
+    )
+    assert 2 not in blocks[3]["blockedBy"], (
+        "#3 (Copy) must NOT be blocked by #2 (Target list) — they run in parallel"
+    )
+
+
+def test_duedate_offsets_locked() -> None:
+    """Per-phase dueDate offsets are load-bearing (T-21d … T+40d schedule, per
+    docs/gtm-campaign-orchestration-README.md § 3.6.5). Lock them so a silent
+    schedule edit fails CI. Asserted against literal canonical values: the README
+    cadence is English prose (not machine-readable), so a literal lock carrying
+    this citation is the low-fragility choice (BC-12564 grill).
+    """
+    blocks = {b["id"]: b for b in parse_subissue_blocks()}
+    for sid, (_t, expected_offset, _bb, _opt, _lg) in _EXPECTED_SUBISSUES.items():
+        assert blocks[sid]["dueDate_offset_days"] == expected_offset, (
+            f"sub-issue #{sid} dueDate offset drift: "
+            f"{blocks[sid]['dueDate_offset_days']} != {expected_offset} (README § 3.6.5)"
+        )
+
+
+def test_command_reads_reference_file() -> None:
+    """After BC-12564, § 9.1 stamps sub-issue bodies from the reference file
+    instead of carrying them inline. The command must name the file so the
+    Read+stamp seam is auditable and the rewire can't silently revert.
+    """
     body = read_command()
-    assert "blockedBy" in body, \
-        "Sub-issue chain must reference blockedBy relations explicitly"
-    assert "blocks #2" in body or "blocks: #2" in body or "blocks all downstream" in body.lower(), \
-        "Step 9 must document that sub-issue #1 (Brief) gates the rest"
+    assert "references/campaign-sub-issue-templates.md" in body, (
+        "§ 9.1 must reference references/campaign-sub-issue-templates.md as the "
+        "sub-issue template source (BC-12564 read+stamp seam)."
+    )
+
+
+def test_expected_plugin_command_routes_exist() -> None:
+    """Every /marketing: or /revops: slash command the reference file routes to
+    (notably the 'Expected plugin command' lines — the file's own header calls
+    command-routing machine-critical) must resolve to a real command OR skill on
+    disk. A typo would stamp a dead command reference into every campaign's Linear
+    issues with nothing else to catch it. The 8-label-style scalar fields are
+    guarded by schema/offset/chain tests; this guards the routing strings.
+    """
+    plugins_dir = ROOT.parents[0]  # plugins/
+    refs = set(re.findall(r"/(marketing|revops):([a-z0-9][a-z0-9-]*)", read_reference()))
+    assert refs, "expected at least one /<plugin>:<command> reference in the reference file"
+    missing = [
+        f"/{plugin}:{name}"
+        for plugin, name in sorted(refs)
+        if not (plugins_dir / plugin / "commands" / f"{name}.md").is_file()
+        and not (plugins_dir / plugin / "skills" / name / "SKILL.md").is_file()
+    ]
+    assert not missing, (
+        f"Reference file routes to non-existent commands/skills: {missing}. "
+        f"Fix the typo, or add the command/skill before referencing it."
+    )
 
 
 # --- EB workspace map + entity coverage ------------------------------------
