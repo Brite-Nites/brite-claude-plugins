@@ -1,6 +1,11 @@
 # 021. `raise-a-ticket` — Linear-native, cross-product intake that feeds `/triage`
 
-**Status:** Accepted
+**Status:** Accepted — *amended 2026-06-04 by [ADR-022](022-unified-intake-front-door.md)*,
+which supersedes the **"keep `raise-a-ticket` and `report-issue` separate"** consequence:
+`raise-a-ticket` is now the single intake **front door** with a Step-1 product-vs-tooling fork
+that dispatches tooling reports to `report-issue`. Everything else in this ADR (Linear-native,
+cross-product routing; `needs-triage`→`/triage`; existence-aware labels; `bug-report`
+deprecation) still stands.
 **Date:** 2026-06-02
 **Linear:** [BC-12394](https://linear.app/brite-nites/issue/BC-12394) (originated in a `/grill-with-docs` design session, 2026-06-02)
 **Related ADRs:** [ADR-003](003-plugin-distribution-architecture.md)
@@ -39,7 +44,7 @@ Ship **`/workflows:raise-a-ticket`** — a typed command in the `workflows` plug
 4. **Adopts the intake mechanics bug-report established** (now the sole home, since bug-report is reduced to a shim) — Linear-reachability check, duplicate search (+ comment-on-existing), secret redaction, and a draft preview before filing — and adds a **provenance footer**.
 5. Is **conversational in, structured preview out**, and deliberately **does not** reproduce, grill, or write agent briefs.
 
-`/workflows:bug-report` is **deprecated** and forwarded to `raise-a-ticket` via a shim. `/workflows:report-issue` (plugin misbehavior) is unaffected.
+`/workflows:bug-report` is **deprecated** and forwarded to `raise-a-ticket` via a shim. `/workflows:report-issue` (plugin misbehavior) is unaffected. *(Amended by [ADR-022](022-unified-intake-front-door.md): `report-issue` is now also reachable as the agent-tooling branch of the `raise-a-ticket` front door, while remaining a direct expert alias.)*
 
 ## Alternatives Considered
 
