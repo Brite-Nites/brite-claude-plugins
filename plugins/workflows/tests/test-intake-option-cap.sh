@@ -76,7 +76,9 @@ assert_no_anti() {
 # guarded by the NEGATIVE regex (which now includes the 'team' noun), not here.
 assert_contract_count() {
   local label="$1" file="$2" min="$3" n
-  n=$(grep -ociE 'reply with the number' "$file" || true)
+  # -c counts matching lines (one disambiguation site per line); avoid -o here
+  # (combining -o with -c is non-portable across grep implementations).
+  n=$(grep -ciE 'reply with the number' "$file" || true)
   if [ "$n" -ge "$min" ]; then
     pass "$label: numbered-list 'reply with the number' contract present (${n} >= ${min} sites)"
   else

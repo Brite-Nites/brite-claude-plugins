@@ -126,10 +126,12 @@ A resolved product project can belong to **more than one Linear team** (e.g. the
 project spans `[Brite Supply, Brite Company]`, Brite Supply listed first — yet every Brite Base
 issue actually lives in **Brite Company**). Do **not** blindly take the first team. When a
 resolved project has >1 team, default to the team where the project's issues **predominantly
-live**: call `list_issues({ project, limit: 20 })`, tally the team of the returned issues, and
-pick the modal (most-common) one. If the project has too few/no issues to tell, fall back to
-**Brite Company** (today's ground truth for every Brite product). Surface the chosen team in the
-Step 7 preview (`Team: …`) and let the reporter override — never silent.
+live**: call `list_issues({ project, limit: 20 })`, tally each returned issue's `team`, and pick
+the modal (most-common) one. **Tiebreaker:** if two teams tie on count, prefer **Brite Company**.
+**Fall back to Brite Company** when the probe is inconclusive — too few/no issues to tell, *or*
+the `list_issues` response carries no per-issue `team` field (it does today; this is the guard if
+that ever changes, so an empty tally never silently mis-defaults). Either way, surface the chosen
+team in the Step 7 preview (`Team: …`) and let the reporter override — never silent.
 
 ## Step 2: Pick the Report Kind
 
