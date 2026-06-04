@@ -35,7 +35,7 @@ Everything else degrades gracefully: missing fields are allowed (they drive the 
 
 ## The canonical concept template (source of truth)
 
-This template lives in the `[CONCEPT LIBRARY]` milestone description and is the contract this command fills. Do not invent fields.
+The **canonical** template is the handbook file `marketing/go-to-market/templates/concept-library-issue-template.md` (in `Brite-Nites/handbook`). This command and the `[CONCEPT LIBRARY]` milestone description are **synced mirrors** of it — the contract this command fills. Do not invent fields. The commercial-model vocabulary (field 7) is governed by [ADR-022](../../../docs/decisions/022-gtm-commercial-model-vocabulary.md); brand fit's `multi`/`unsure` are concept-tier provisional values that resolve to one brand at promotion.
 
 - **Required:** (1) Concept name — 5–10 word issue title · (2) One-sentence offer — what we'd sell, to whom, why they'd buy · (3) Brand fit — Brite Nites / Brite Labs / Brite Supply / multi / unsure · (4) Source / inspiration · (5) Status — `[Sketch]` / `[Maturing]` / `[Ready-to-promote]`
 - **Encouraged:** (6) Target ICP guess · (7) Commercial model guess — install fee / rev-share / ticketed / sponsor / co-invest / hybrid · (8) Cross-references · (9) Next move to mature
