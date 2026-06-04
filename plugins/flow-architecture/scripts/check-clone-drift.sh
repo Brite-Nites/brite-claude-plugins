@@ -45,7 +45,21 @@ section() { printf "\n\033[1m=== %s ===\033[0m\n" "$1"; }
 # FDA → workflows dependency declared at plugins/flow-architecture/CLAUDE.md
 # § Workflows plugin dependency. Adding a 4th clone in v1.1 stays inside the
 # FDA plugin directory.
-CLONES=(session-start review ship)
+#
+# CLONES_FILTER (additive, opt-in env seam — sibling to UPSTREAM_REF above):
+# a space-separated subset of the default clone names. The BC-12410 shift-left
+# wrapper sets it to check only the clone(s) whose upstream a PR actually edited,
+# so an unrelated clone's pre-existing drift is not blamed on that PR. Unset is
+# the default-preserving path — the `clone-drift-check` CI job and the BC-7060
+# regression test never set it, so they check the full set, behaviour unchanged
+# (BC-12410 AC#3). An out-of-set name simply FAILs the "clone file missing" guard
+# below, never crashes.
+if [ -n "${CLONES_FILTER:-}" ]; then
+  # shellcheck disable=SC2206  # intentional word-split of the space-separated filter
+  CLONES=($CLONES_FILTER)
+else
+  CLONES=(session-start review ship)
+fi
 # Match the HTML comment opener, not the bare phrase — `ship.md`'s frontmatter
 # description also contains "Cloned from workflows" (Q53 lock language). The
 # AC grep `grep -q "Cloned from workflows" ...` on this script is satisfied by
