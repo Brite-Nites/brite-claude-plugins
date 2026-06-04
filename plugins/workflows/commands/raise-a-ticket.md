@@ -327,11 +327,12 @@ either way intake is complete. If related issues were linked, add "Linked to: [I
 - Intake only — never reproduce, grill, or write an agent brief. Hand off to the triage stage.
 - Never file without the reporter confirming the preview.
 - Never skip the duplicate search.
-- Disambiguation never overflows the option cap: render any candidate set (duplicate matches,
-  the operator product picker, multi-team teams) as a **numbered text list + a single "reply
-  with the number, or none" follow-up** — never an `AskUserQuestion` with one entry per
-  candidate (BC-12400). For a multi-team project, default to the modal team (where its issues
-  predominantly live) and surface it in the preview for override.
+- Disambiguation never overflows the option cap: when the reporter must **pick from a candidate
+  set** (duplicate matches, the operator product picker), render it as a **numbered text list +
+  a single "reply with the number, or none" follow-up** — never an `AskUserQuestion` with one
+  entry per candidate (BC-12400). **A multi-team project is not a pick:** default to the modal
+  team (where its issues predominantly live; Step 1g) and surface it in the Step 7 preview for
+  override — no team-picker prompt.
 - Two reporter-facing kinds: Bug → `type:bug` (+ Reproduction section + severity + priority);
   Idea/Feedback → `type:task` (no severity). Both get `needs-triage` + `executor:hybrid`.
 - Apply only canonical labels that exist in the target team (`type:*`, `needs-triage`,
