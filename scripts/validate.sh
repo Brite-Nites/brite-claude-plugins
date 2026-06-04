@@ -450,13 +450,19 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 # Section 2b'''''''''''' — flow-architecture shift-left clone-drift regression (BC-12410)
 # ══════════════════════════════════════════════════════════════════════
+# Naming: the flow-architecture sub-sections chain off "2b" with one added
+# prime-tick (apostrophe) per section in landing order — 2b' (BC-10728), 2b''
+# (BC-11029), … through 2b''''''''''' (BC-11983). This is the 12th, so it carries
+# 12 ticks. The count is positional, not a copy-paste artifact; a plain letter
+# (e.g. 2b') would collide with an existing earlier section.
 # Runs plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh — the
 # regression lock for check-clone-drift-shiftleft.sh, the path-filtered gate that
 # surfaces the FDA-clone re-sync obligation ON the PR that edits a cloned upstream
 # command (session-start / review / ship), vs the lagging origin/main
-# clone-drift-check (BC-7060). Four hermetic cases: upstream-edited-not-resynced
-# → FAIL+obligation; re-synced → PASS; unrelated PR → no-run; FDA-clone-only edit
-# → no-run. Mutates a clone header in place, restores via .bak + EXIT trap.
+# clone-drift-check (BC-7060). Hermetic cases: list-agreement + upstream-edited-
+# not-resynced → FAIL+obligation (per arm); re-synced → PASS; unrelated PR →
+# no-run; FDA-clone-only edit → no-run; near-miss exact-match; cross-clone
+# scoping. Mutates a clone header in place, restores via .bak + EXIT trap.
 section "2b''''''''''''. flow-architecture shift-left clone-drift regression (BC-12410)"
 
 fda_shiftleft_test="$REPO_ROOT/plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh"

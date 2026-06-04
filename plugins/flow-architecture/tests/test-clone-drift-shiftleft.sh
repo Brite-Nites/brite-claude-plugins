@@ -36,18 +36,27 @@ SS_TARGET='Upstream-SHA: 1e9be24abb85bda0514795ece360fb26252b316f'
 REV_CLONE="plugins/flow-architecture/commands/review.md"
 REV_UPSTREAM="plugins/workflows/commands/review.md"
 REV_TARGET='Upstream-SHA: 60b8c67f400a2d059e358f01b721d4687897bd0f'
+SHIP_CLONE="plugins/flow-architecture/commands/ship.md"
+SHIP_UPSTREAM="plugins/workflows/commands/ship.md"
+SHIP_TARGET='Upstream-SHA: 0187a4c764757ca1cc0ce2cdebd6a5cd77363be4'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
-OUT='/tmp/shiftleft-test.out'
+# Unique per-invocation output file (portable mktemp template — trailing X's,
+# no suffix, works on both BSD/macOS and GNU/Linux). Avoids a fixed /tmp path
+# two concurrent runs could clobber. Removed by the EXIT trap.
+OUT="$(mktemp "${TMPDIR:-/tmp}/shiftleft-test.XXXXXX")"
 
 passes=0
 errors=0
 pass_t() { printf "  \033[32mPASS\033[0m  %s\n" "$1"; passes=$((passes + 1)); }
 fail_t() { printf "  \033[31mFAIL\033[0m  %s\n" "$1"; errors=$((errors + 1)); }
 
-# Always restore any clone file left mutated (covers a mid-run failure).
+# Always restore any clone file left mutated (covers a mid-run failure) and
+# remove the temp output file.
 cleanup() {
   [ -f "${SS_CLONE}.bak" ] && mv "${SS_CLONE}.bak" "${SS_CLONE}"
   [ -f "${REV_CLONE}.bak" ] && mv "${REV_CLONE}.bak" "${REV_CLONE}"
+  [ -f "${SHIP_CLONE}.bak" ] && mv "${SHIP_CLONE}.bak" "${SHIP_CLONE}"
+  [ -n "${OUT:-}" ] && rm -f "$OUT"
   return 0
 }
 trap cleanup EXIT
@@ -60,7 +69,7 @@ restore()    { mv "${1}.bak" "$1"; }
 if [ ! -f "$WRAPPER" ]; then
   echo "fatal: $WRAPPER missing — wrapper not built yet"; exit 2
 fi
-for pair in "$SS_CLONE|$SS_TARGET" "$REV_CLONE|$REV_TARGET"; do
+for pair in "$SS_CLONE|$SS_TARGET" "$REV_CLONE|$REV_TARGET" "$SHIP_CLONE|$SHIP_TARGET"; do
   f="${pair%%|*}"; t="${pair#*|}"
   if ! grep -q "$t" "$f"; then
     echo "fatal: $f missing expected baseline SHA — refusing to mutate"; exit 2
@@ -201,9 +210,27 @@ else
 fi
 restore "$REV_CLONE"
 
-# ── Final state: both clone files restored, baseline clean ────────────
-if grep -q "$SS_TARGET" "$SS_CLONE" && grep -q "$REV_TARGET" "$REV_CLONE"; then
-  pass_t "Post-test baseline restored (session-start + review)"
+# ── Case 8: ship arm stale-clone → FAIL + obligation ──────────────────
+# Cases 1/7 mutate session-start/review; this exercises the third (ship) arm's
+# "upstream edited, clone not re-synced → exit 1" path so a future break of the
+# ship path in check-clone-drift.sh can't pass all assertions undetected.
+mutate_sha "$SHIP_CLONE" "$SHIP_TARGET"
+EXIT=$(run_wrapper "$SHIP_UPSTREAM")
+if [ "$EXIT" -eq 1 ] \
+  && grep -q "clone re-sync required" "$OUT" \
+  && grep -q "Bump that clone header" "$OUT" \
+  && ! grep -q "not applicable" "$OUT"; then
+  pass_t "Case 8 (ship arm, upstream-edited not re-synced) → exit 1 + obligation recipe"
+else
+  fail_t "Case 8 expected exit=1 + 're-sync required' + recipe; got exit=$EXIT"
+  cat "$OUT"
+fi
+restore "$SHIP_CLONE"
+
+# ── Final state: all three clone files restored, baseline clean ───────
+if grep -q "$SS_TARGET" "$SS_CLONE" && grep -q "$REV_TARGET" "$REV_CLONE" \
+  && grep -q "$SHIP_TARGET" "$SHIP_CLONE"; then
+  pass_t "Post-test baseline restored (session-start + review + ship)"
 else
   fail_t "Post-test baseline NOT restored — a clone is still mutated"
 fi
