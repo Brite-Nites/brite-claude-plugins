@@ -235,6 +235,7 @@ def test_all_documented_flags_present() -> None:
         "--situation-mining",
         "--creative-angles",
         "--dry-run",
+        "--segment",
     ]
     missing = [f for f in flags if f not in body]
     assert not missing, f"Flags missing from command body: {missing}"
@@ -713,3 +714,83 @@ def test_idempotency_section_present() -> None:
     body = read_command()
     assert "Idempotency" in body, \
         "Body must document the orchestrator's idempotency behavior (partial-idempotency)"
+
+
+# --- Discovery ICP contract (ADR-024) ---------------------------------------
+
+
+def test_icp_source_resolution_documented() -> None:
+    """Step 2.5 must resolve the Discovery ICP from the single canonical
+    vertical icp file (collapsed resolution — no playbook branch, no MISSING
+    state) and classify ready vs stub."""
+    body = read_command()
+    assert "### 2.5" in body, (
+        "Spec must define the ICP-source resolution sub-step (2.5, ADR-024)."
+    )
+    section = extract_section(body, "### 2.5", "## Step 3")
+    assert "data/canonicals/icp/{vertical}.json" in section, (
+        "2.5 must resolve from the canonical vertical icp file path."
+    )
+    for state in ("ready", "stub"):
+        assert state in section, (
+            f"2.5 must classify the icp file as ready or stub (missing '{state}')."
+        )
+    assert "ADR-024" in section, "2.5 must cite ADR-024."
+
+
+def test_segment_flag_documented() -> None:
+    """--segment must appear in the flag table AND carry a Step 1b shape
+    validator (segment names flow into filesystem paths)."""
+    body = read_command()
+    flag_section = extract_section(body, "### Flag table", "### Interactive prompt example")
+    assert "--segment" in flag_section, "--segment missing from the flag table."
+    validator_section = extract_section(body, "### Step 1b", "## Step 2")
+    assert "--segment" in validator_section, (
+        "--segment must have a Step 1b parse-time shape validator "
+        "(path-traversal guard — segment names flow into the Step 7 copy path)."
+    )
+
+
+def test_icp_source_in_preview() -> None:
+    """The Step 5 dry-run preview must surface the resolved ICP source."""
+    body = read_command()
+    section = extract_section(body, "## Step 5", "## Step 6")
+    assert "ICP source:" in section, (
+        "Step 5 preview must carry an 'ICP source:' line (ready/segments vs STUB)."
+    )
+
+
+def test_segment_copy_path_documented() -> None:
+    """Step 7 must write uniform per-segment criteria copies."""
+    body = read_command()
+    section = extract_section(body, "## Step 7", "## Step 8")
+    assert "tam/<slug>/<segment>/icp.json" in section, (
+        "Step 7 must document the uniform per-segment copy path "
+        "docs/campaigns/<entity>/tam/<slug>/<segment>/icp.json (ADR-024)."
+    )
+    assert '"segments"' in section or "`segments`" in section, (
+        "Step 7 manifest must document the optional segments[] key (ADR-024)."
+    )
+
+
+def test_marketing_context_warn_documented() -> None:
+    """2.5 must WARN (advisory, never block) when docs/marketing-context.md
+    is absent, pointing at /marketing:product-marketing-context."""
+    body = read_command()
+    section = extract_section(body, "### 2.5", "## Step 3")
+    assert "docs/marketing-context.md" in section, (
+        "2.5 must check for docs/marketing-context.md (Input 1 of the dependency map)."
+    )
+    assert "/marketing:product-marketing-context" in section, (
+        "The WARN must point operators at /marketing:product-marketing-context."
+    )
+
+
+def test_handoff_carries_icp_status() -> None:
+    """The 11.3 hand-off must carry the per-segment criteria-file paths (ready)
+    or the stub warning, so the list-build owner never starts blind."""
+    body = read_command()
+    section = extract_section(body, "### 11.3", "## Idempotency notes")
+    assert "Discovery ICP" in section, (
+        "11.3 hand-off must include the Discovery ICP status line (ADR-024)."
+    )

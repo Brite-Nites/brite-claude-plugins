@@ -112,6 +112,34 @@ def _create_vertical_yaml(canonicals_dir: Path, slug: str, display: str,
     return yaml_path
 
 
+def _create_icp_stub(canonicals_dir: Path, slug: str,
+                     playbook_path: str | None = None) -> Path:
+    """Create the mandatory Discovery ICP stub for a new vertical (ADR-024).
+
+    Every registered vertical MUST have icp/{slug}.json (lint_canonicals.py
+    ERROR-enforces presence). The stub form is empty segments + non-empty
+    clarifications_needed — structurally distinguishable from ready.
+    """
+    icp_dir = canonicals_dir / "icp"
+    icp_dir.mkdir(exist_ok=True)
+    icp_path = icp_dir / f"{slug}.json"
+    stub = {
+        "vertical": slug,
+        "source": playbook_path or f"marketing/go-to-market/verticals/{slug}/README.md",
+        "clarifications_needed": [
+            "category / segment — account types (universes) in this vertical",
+            "size band — employee and/or revenue floor per universe",
+            "geography — confirm BN-territory regions",
+            "fit / intent signals — what separates a strong-fit account",
+            "seed accounts — 5-10 look-alike exemplars per universe",
+            "exclusions — account types to filter out",
+        ],
+        "segments": {},
+    }
+    icp_path.write_text(json.dumps(stub, indent=2, ensure_ascii=False) + "\n")
+    return icp_path
+
+
 def _read_vertical_yaml_text(canonicals_dir: Path, vertical: str) -> str:
     """Read the raw text of a vertical YAML file."""
     return (canonicals_dir / f"{vertical}.yaml").read_text()
@@ -243,6 +271,7 @@ def cmd_vertical(args: argparse.Namespace) -> int:
             "playbook_path": args.playbook_path or None,
             "manifest_insertion": f"  - {slug}  (alphabetized into _manifest.yaml)",
             "new_file": f"{slug}.yaml",
+            "new_icp_stub": f"icp/{slug}.json  (Discovery ICP stub per ADR-024)",
         }
         print(json.dumps({"ok": True, "preview": preview}))
         return 0
@@ -252,6 +281,8 @@ def cmd_vertical(args: argparse.Namespace) -> int:
         canonicals_dir, slug, display,
         aliases=aliases, playbook_path=args.playbook_path
     )
+    icp_path = _create_icp_stub(canonicals_dir, slug,
+                                playbook_path=args.playbook_path)
 
     handbook_draft = _handbook_draft_vertical(slug, display, args.playbook_path)
 
@@ -262,6 +293,7 @@ def cmd_vertical(args: argparse.Namespace) -> int:
         "display": display,
         "manifest_path": str(manifest_path),
         "yaml_path": str(yaml_path),
+        "icp_path": str(icp_path),
         "handbook_draft": handbook_draft,
         "resume": f"/marketing:plan-campaign --vertical={slug} ...",
     }

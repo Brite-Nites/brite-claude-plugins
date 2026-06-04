@@ -40,6 +40,20 @@ Checks performed:
    19. Every offer.replaced_by / .iterates_from refers to a sibling offer slug
        in the same vertical (when present).
 
+  Discovery ICP file family (ADR-024) — icp/{vertical}.json
+   20. Every manifest vertical has icp/{slug}.json (mandatory, ERROR).
+   21. Every icp/*.json filename matches a canonical vertical slug; an
+       alias-named file is rejected with a rename hint (one canonical home).
+   22. File shape: required keys (vertical, source, clarifications_needed,
+       segments), additionalProperties:false, vertical matches filename.
+   23. Stub rule: empty segments REQUIRES non-empty clarifications_needed.
+   24. Every segment block: required keys (display, persona, industries, geo,
+       size_band, exclusions), additionalProperties:false, kebab segment name.
+   25. Every segment.persona resolves to a persona.slug in the sibling
+       {vertical}.yaml.
+   26. seed_accounts entries (when present) require `name`; only name/domain
+       keys admitted.
+
 Supported YAML subset (intentional — stdlib only, no PyYAML per CLAUDE.md):
   - Top-level scalars and block-start keys.
   - Block list-of-strings: `key:\n  - "value"`.
@@ -63,6 +77,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -95,6 +110,28 @@ OFFER_KEYS = frozenset(
         "prose_path",
     }
 )
+# Mirrors schema.json#/definitions/discovery_icp + /icp_segment (ADR-024).
+ICP_FILE_KEYS = frozenset({"vertical", "source", "clarifications_needed", "segments"})
+ICP_SEGMENT_KEYS = frozenset(
+    {
+        "display",
+        "persona",
+        "industries",
+        "geo",
+        "size_band",
+        "tech_signals",
+        "intent_signals",
+        "exclusions",
+        "seed_accounts",
+    }
+)
+ICP_SEGMENT_REQUIRED = ("display", "persona", "industries", "geo", "size_band", "exclusions")
+ICP_GEO_KEYS = frozenset({"country", "regions", "zip_bands"})
+ICP_SIZE_BAND_KEYS = frozenset(
+    {"employee_min", "employee_max", "revenue_min", "revenue_max"}
+)
+ICP_SEED_KEYS = frozenset({"name", "domain"})
+
 # Mirrors schema.json#/definitions/manifest. BC-11852 added audience_tiers[].
 MANIFEST_KEYS = frozenset({"schema_version", "verticals", "audience_tiers"})
 AUDIENCE_TIER_ENTRY_KEYS = frozenset({"slug", "axis", "display", "description", "matches"})
@@ -717,6 +754,174 @@ def validate_vertical(path: Path) -> tuple[list[str], dict[str, object] | None]:
     return (errs, data)
 
 
+# ── Discovery ICP validation (ADR-024) ────────────────────────────────────
+
+
+def _check_str_list(value: object, where: str, field: str) -> list[str]:
+    """Validate `value` is a list of non-empty strings. Returns error list."""
+    if not isinstance(value, list):
+        return [f"{where}: {field} must be a list (got {type(value).__name__})"]
+    errs: list[str] = []
+    for j, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            errs.append(f"{where}: {field}[{j}] must be a non-empty string")
+    return errs
+
+
+def validate_icp_segment(
+    seg_name: str,
+    seg: object,
+    where: str,
+    persona_slug_set: frozenset[str] | None,
+) -> list[str]:
+    """Validate one segment block. persona_slug_set is None when the sibling
+    {vertical}.yaml failed to parse — the persona cross-ref check is skipped
+    (the yaml's own errors already explain the failure)."""
+    slabel = f"{where} segments[{seg_name!r}]"
+    if not SLUG_RE.match(seg_name):
+        return [f"{where}: segment name {seg_name!r} is not kebab-case"]
+    if not isinstance(seg, dict):
+        return [f"{slabel}: must be an object (got {type(seg).__name__})"]
+    errs: list[str] = _check_unknown_keys(seg, ICP_SEGMENT_KEYS, slabel)
+    missing = [k for k in ICP_SEGMENT_REQUIRED if k not in seg]
+    for k in missing:
+        errs.append(f"{slabel}: missing required key '{k}'")
+    if missing:
+        return errs
+    errs.extend(_check_non_empty_string(seg["display"], slabel, "display"))
+    persona = seg["persona"]
+    if not isinstance(persona, str) or not SLUG_RE.match(persona):
+        errs.append(f"{slabel}: persona {persona!r} is not a kebab-case string")
+    elif persona_slug_set is not None and persona not in persona_slug_set:
+        errs.append(
+            f"{slabel}: persona '{persona}' not defined in the sibling "
+            f"{{vertical}}.yaml personas[] (ADR-024 cross-ref)"
+        )
+    industries = seg["industries"]
+    errs.extend(_check_str_list(industries, slabel, "industries"))
+    if isinstance(industries, list) and len(industries) == 0:
+        errs.append(f"{slabel}: industries must have >=1 entry")
+    geo = seg["geo"]
+    if not isinstance(geo, dict):
+        errs.append(f"{slabel}: geo must be an object (got {type(geo).__name__})")
+    else:
+        errs.extend(_check_unknown_keys(geo, ICP_GEO_KEYS, f"{slabel} geo"))
+        if "country" not in geo:
+            errs.append(f"{slabel}: geo missing required key 'country'")
+        else:
+            errs.extend(_check_non_empty_string(geo["country"], slabel, "geo.country"))
+        for opt in ("regions", "zip_bands"):
+            if opt in geo:
+                errs.extend(_check_str_list(geo[opt], slabel, f"geo.{opt}"))
+    size_band = seg["size_band"]
+    if not isinstance(size_band, dict):
+        errs.append(
+            f"{slabel}: size_band must be an object (got {type(size_band).__name__})"
+        )
+    else:
+        errs.extend(_check_unknown_keys(size_band, ICP_SIZE_BAND_KEYS, f"{slabel} size_band"))
+        for k, v in size_band.items():
+            if v is None:
+                continue
+            # bool is an int subclass — reject explicitly (manifest precedent).
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                errs.append(
+                    f"{slabel}: size_band.{k} must be a number or null "
+                    f"(got {type(v).__name__})"
+                )
+            elif k.startswith("employee_") and not isinstance(v, int):
+                errs.append(f"{slabel}: size_band.{k} must be an integer or null")
+    for opt in ("tech_signals", "intent_signals"):
+        if opt in seg:
+            errs.extend(_check_str_list(seg[opt], slabel, opt))
+    errs.extend(_check_str_list(seg["exclusions"], slabel, "exclusions"))
+    seeds = seg.get("seed_accounts")
+    if seeds is not None:
+        if not isinstance(seeds, list):
+            errs.append(
+                f"{slabel}: seed_accounts must be a list (got {type(seeds).__name__})"
+            )
+        else:
+            for j, s in enumerate(seeds):
+                if not isinstance(s, dict):
+                    errs.append(f"{slabel}: seed_accounts[{j}] must be an object")
+                    continue
+                errs.extend(
+                    _check_unknown_keys(s, ICP_SEED_KEYS, f"{slabel} seed_accounts[{j}]")
+                )
+                if "name" not in s:
+                    errs.append(
+                        f"{slabel}: seed_accounts[{j}] missing required key 'name'"
+                    )
+                else:
+                    errs.extend(
+                        _check_non_empty_string(
+                            s["name"], slabel, f"seed_accounts[{j}].name"
+                        )
+                    )
+                if "domain" in s:
+                    errs.extend(
+                        _check_non_empty_string(
+                            s["domain"], slabel, f"seed_accounts[{j}].domain"
+                        )
+                    )
+    return errs
+
+
+def validate_icp_file(
+    path: Path, persona_slug_set: frozenset[str] | None
+) -> list[str]:
+    """Validate one icp/{vertical}.json Discovery ICP file (ADR-024)."""
+    where = f"icp/{path.name}"
+    try:
+        with path.open(encoding="utf-8-sig") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        return [f"{where}: invalid JSON — {e}"]
+    if not isinstance(data, dict):
+        return [f"{where}: top level must be an object (got {type(data).__name__})"]
+    errs: list[str] = _check_unknown_keys(data, ICP_FILE_KEYS, where)
+    for required in ("vertical", "source", "clarifications_needed", "segments"):
+        if required not in data:
+            errs.append(f"{where}: missing required key '{required}'")
+    if any("missing required" in e for e in errs):
+        return errs
+    vertical = data["vertical"]
+    if not isinstance(vertical, str) or not SLUG_RE.match(vertical):
+        errs.append(f"{where}: vertical {vertical!r} is not a kebab-case string")
+    elif path.stem != vertical:
+        errs.append(
+            f"{where}: filename stem {path.stem!r} does not match vertical {vertical!r}"
+        )
+    errs.extend(_check_non_empty_string(data["source"], where, "source"))
+    clar = data["clarifications_needed"]
+    clar_count = 0
+    if not isinstance(clar, list):
+        errs.append(
+            f"{where}: clarifications_needed must be a list (got {type(clar).__name__})"
+        )
+    else:
+        errs.extend(_check_str_list(clar, where, "clarifications_needed"))
+        clar_count = sum(1 for c in clar if isinstance(c, str) and c.strip())
+    segments = data["segments"]
+    if not isinstance(segments, dict):
+        errs.append(
+            f"{where}: segments must be an object (got {type(segments).__name__})"
+        )
+        return errs
+    # Stub rule (ADR-024): empty segments REQUIRES non-empty clarifications.
+    if len(segments) == 0 and clar_count == 0:
+        errs.append(
+            f"{where}: stub form requires non-empty clarifications_needed "
+            f"when segments is empty (ADR-024)"
+        )
+    for seg_name in sorted(segments):
+        errs.extend(
+            validate_icp_segment(seg_name, segments[seg_name], where, persona_slug_set)
+        )
+    return errs
+
+
 # ── main + manifest validation ────────────────────────────────────────────
 
 
@@ -981,9 +1186,63 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 alias_to_owner[alias] = slug
 
+    # ── Discovery ICP file family (ADR-024): icp/{vertical}.json ─────────
+    icp_dir = cdir / "icp"
+    icp_count = 0
+    if not icp_dir.is_dir():
+        all_errs.append(
+            "icp/: directory missing — every vertical requires icp/{slug}.json (ADR-024)"
+        )
+    else:
+        icp_file_slugs: set[str] = set()
+        for p in sorted(icp_dir.iterdir(), key=lambda x: x.name):
+            entry = p.name
+            if entry.startswith(".") or not entry.endswith(".json"):
+                continue
+            if p.is_symlink():
+                all_errs.append(f"icp/{entry}: symlinks not allowed in icp dir")
+                continue
+            if not p.is_file():
+                all_errs.append(
+                    f"icp/{entry}: not a regular file (directory/FIFO/socket rejected)"
+                )
+                continue
+            icp_file_slugs.add(entry[:-5])
+        for slug in sorted(manifest_set - icp_file_slugs):
+            all_errs.append(
+                f"icp/: missing icp/{slug}.json — Discovery ICP is mandatory "
+                f"per vertical (ADR-024)"
+            )
+        for slug in sorted(icp_file_slugs - manifest_set):
+            if slug in alias_to_owner:
+                all_errs.append(
+                    f"icp/{slug}.json: '{slug}' is an alias of "
+                    f"'{alias_to_owner[slug]}' — name the file "
+                    f"{alias_to_owner[slug]}.json (one canonical home per vertical)"
+                )
+            else:
+                all_errs.append(
+                    f"icp/{slug}.json present but '{slug}' is not a canonical "
+                    f"vertical in manifest"
+                )
+        for slug in sorted(icp_file_slugs & manifest_set):
+            data = parsed_by_slug.get(slug)
+            persona_set: frozenset[str] | None = None
+            if data is not None and isinstance(data.get("personas"), list):
+                persona_set = frozenset(
+                    p["slug"]
+                    for p in data["personas"]
+                    if isinstance(p, dict) and isinstance(p.get("slug"), str)
+                )
+            all_errs.extend(validate_icp_file(icp_dir / f"{slug}.json", persona_set))
+            icp_count += 1
+
     if all_errs:
         return _emit(all_errs)
-    print(f"Canonicals lint OK — {len(manifest_verticals)} verticals validated.")
+    print(
+        f"Canonicals lint OK — {len(manifest_verticals)} verticals validated, "
+        f"{icp_count} Discovery ICP files."
+    )
     return 0
 
 

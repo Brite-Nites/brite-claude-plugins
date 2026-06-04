@@ -142,6 +142,21 @@ personas: []
 offers: []
 YAML
 
+  # Discovery ICP stubs (ADR-024) — mandatory per vertical; lint ERRORs
+  # without them, which would mask the bootstrap scenarios' own assertions.
+  mkdir -p "$d/icp"
+  local v
+  for v in apartments hotels-resorts zoos; do
+    cat > "$d/icp/$v.json" <<JSON
+{
+  "vertical": "$v",
+  "source": "marketing/go-to-market/verticals/$v/README.md",
+  "clarifications_needed": ["category / segment", "size band", "geography"],
+  "segments": {}
+}
+JSON
+  done
+
   printf '%s' "$d"
 }
 

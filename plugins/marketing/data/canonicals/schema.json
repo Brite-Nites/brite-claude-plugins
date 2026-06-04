@@ -263,6 +263,15 @@
         "scaffolded_by": {
           "type": "string",
           "description": "Tool that scaffolded the manifest (e.g., /marketing:plan-campaign)."
+        },
+        "segments": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          },
+          "description": "Optional (ADR-024). Discovery-ICP segment names chosen at scaffold time — each must resolve to a segment key in plugins/marketing/data/canonicals/icp/{vertical}.json. Per-segment criteria copies live at docs/campaigns/{entity}/tam/{slug}/{segment}/icp.json."
         }
       }
     },
@@ -326,6 +335,110 @@
         "pending_classification": {
           "type": "boolean",
           "description": "Set true by migrate_manifest_v1_to_v2.py when a v1 launched-but-unclassified campaign is auto-migrated with a placeholder audience_tier. Operators clear this flag once they've classified the record via /marketing:import-campaign (BC-11849)."
+        }
+      }
+    },
+    "discovery_icp": {
+      "$comment": "Shape of plugins/marketing/data/canonicals/icp/{vertical}.json per ADR-024. One file per registered vertical — presence is ERROR-enforced by lint_canonicals.py. Segments-only: no base block; a single-audience vertical is the one-segment case. Stub form: segments empty REQUIRES clarifications_needed non-empty (lint-enforced). The contact half (personas + titles) stays in the sibling {vertical}.yaml; this file is the discovery half (which companies are in this market).",
+      "type": "object",
+      "required": ["vertical", "source", "clarifications_needed", "segments"],
+      "additionalProperties": false,
+      "properties": {
+        "vertical": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Must match the filename ({vertical}.json) and resolve to a canonical vertical slug in _manifest.yaml verticals[]."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Pointer to the prose source material — handbook vertical README path, or references/vertical-playbooks/{vertical}.md for the 6 playbook verticals."
+        },
+        "clarifications_needed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Operator-fill items. MUST be non-empty when segments is empty (stub form). May remain non-empty on a ready file to flag unresolved caveats."
+        },
+        "segments": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" },
+          "additionalProperties": { "$ref": "#/definitions/icp_segment" },
+          "description": "Named account universes. Each segment is a SELF-CONTAINED Discovery ICP — never a sparse override; no merge semantics (ADR-024)."
+        }
+      }
+    },
+    "icp_segment": {
+      "$comment": "One account universe inside a discovery_icp. Core keys mirror references/tam/icp-definition.md verbatim so the flattened campaign copy parses in the tam-map/*_client.py scripts unchanged; display/persona/seed_accounts are additive (clients access keys by name and ignore extras).",
+      "type": "object",
+      "required": ["display", "persona", "industries", "geo", "size_band", "exclusions"],
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable segment name."
+        },
+        "persona": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Cross-reference to the contact cascade that pairs with this account universe — must resolve to a persona.slug in the sibling {vertical}.yaml (enforced by lint_canonicals.py)."
+        },
+        "industries": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Primary + adjacent vertical keywords (icp-definition.md)."
+        },
+        "geo": {
+          "type": "object",
+          "required": ["country"],
+          "additionalProperties": false,
+          "properties": {
+            "country": { "type": "string", "minLength": 1 },
+            "regions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "zip_bands": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "size_band": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "employee_min": { "type": ["integer", "null"] },
+            "employee_max": { "type": ["integer", "null"] },
+            "revenue_min": { "type": ["number", "null"] },
+            "revenue_max": { "type": ["number", "null"] }
+          },
+          "description": "Null where the floor/ceiling is genuinely open. Proxy semantics (e.g., sq-ft GLA expressed via notes in intent_signals) belong in the authored values, not new keys."
+        },
+        "tech_signals": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "intent_signals": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "exclusions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "seed_accounts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/seed_account" },
+          "description": "Durable look-alike exemplars for this universe (ADR-024: vertical-level market knowledge; campaign copies may prune/extend). Optional — some universes are definable purely by criteria."
+        }
+      }
+    },
+    "seed_account": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "domain": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional at authoring time; what look-alike tooling keys on."
         }
       }
     },

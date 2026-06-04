@@ -43,6 +43,7 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-021: `raise-a-ticket` intake](docs/decisions/021-raise-a-ticket-intake.md) — Linear-native, cross-product product-feedback intake (Bug/Idea → `type:bug`/`type:task` + `needs-triage`) that reuses `docs/agents/issue-tracker.md` for routing and hands off to `/triage`; deprecates `bug-report` — *front-door consequence amended by ADR-022*
 - [ADR-022: Unified intake front door](docs/decisions/022-unified-intake-front-door.md) — `raise-a-ticket` becomes the single front door with a Step-1 product-vs-agent-tooling fork (tooling dispatches to `report-issue`, kept as a direct alias); content-aware switch replaces the location-only redirect; cap-proof numbered-list disambiguation + multi-team modal default (BC-12400). Supersedes ADR-021's "keep separate" consequence only
 - [ADR-023: GTM commercial-model vocabulary](docs/decisions/023-gtm-commercial-model-vocabulary.md) — campaign-level economic-axis vocabulary (`install-fee`/`rev-share`/`ticketed`/`sponsor`/`co-invest`/`hybrid`), distinct from offer-posture (ADR-017); resolves the `ticket`/`rev share` spelling drift; SF Campaign picklist declared as the future mapping target but not built (BC-12392)
+- [ADR-024: GTM canonical Discovery ICP layer](docs/decisions/024-gtm-canonical-discovery-icp.md) — per-vertical `data/canonicals/icp/{vertical}.json` (segments-only, persona cross-ref, mandatory + lint-enforced); plan-campaign single-source ICP resolution + per-segment campaign criteria copies (BC-11163)
 
 ## Company Context
 

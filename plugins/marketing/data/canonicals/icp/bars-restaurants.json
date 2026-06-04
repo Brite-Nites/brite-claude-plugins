@@ -1,0 +1,13 @@
+{
+  "vertical": "bars-restaurants",
+  "source": "marketing/go-to-market/verticals/bars-restaurants/README.md",
+  "clarifications_needed": [
+    "category / segment \u2014 account types (universes) in this vertical",
+    "size band \u2014 employee and/or revenue floor per universe",
+    "geography \u2014 confirm BN-territory regions",
+    "fit / intent signals \u2014 what separates a strong-fit account",
+    "seed accounts \u2014 5-10 look-alike exemplars per universe",
+    "exclusions \u2014 account types to filter out"
+  ],
+  "segments": {}
+}
