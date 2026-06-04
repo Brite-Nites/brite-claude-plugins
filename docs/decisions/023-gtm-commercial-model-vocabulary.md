@@ -1,4 +1,4 @@
-# 022. GTM `commercial-model` — campaign-level economic-axis vocabulary
+# 023. GTM `commercial-model` — campaign-level economic-axis vocabulary
 
 **Status:** Accepted
 **Date:** 2026-06-04
