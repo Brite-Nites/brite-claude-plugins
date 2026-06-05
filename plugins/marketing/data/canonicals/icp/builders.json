@@ -2,12 +2,106 @@
   "vertical": "builders",
   "source": "marketing/go-to-market/verticals/builders/README.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "geo.regions kept tight to README-stated year-round territories (CA, UT, FL sub-markets Miami/Orlando/Tampa/Naples, DC/MD/VA); confirm whether AZ, NY, NJ, CT, CO, WA, NC, TX are live or aspirational",
+    "size_band revenue values are proxied from home price point × annual volume (e.g., 5-50 homes × $1M+ = $5M–$50M+ revenue proxy for custom builders) — no verified annual-revenue figures in source; confirm before TAM queries",
+    "seed_accounts are real-name look-alike exemplars derived from public builder data per territory, not verified BN prospect lists — operator validate/replace before outbound use",
+    "volume ranges (5-50 homes/year custom; 20-200+ production) are README assumptions flagged low-confidence; employee bands derived from typical builder staffing ratios"
   ],
-  "segments": {}
+  "segments": {
+    "luxury-custom-builders": {
+      "display": "Luxury Custom Home Builders",
+      "persona": "owner-principal",
+      "industries": [
+        "residential construction",
+        "custom home building",
+        "luxury real estate development",
+        "single-family construction"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CA", "UT", "FL", "VA", "MD", "DC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 5,
+        "employee_max": 150,
+        "revenue_min": 5000000,
+        "revenue_max": 75000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "new custom home community or subdivision announced in BN territory",
+        "building permit filings for $1M+ single-family homes in active territories",
+        "model home grand opening or open-house event listing",
+        "job posting for construction superintendent or landscape architect role",
+        "new lot acquisition or land entitlement announcement in CA, UT, FL, or DMV",
+        "builder advertising evening or dusk exterior photography of new listings"
+      ],
+      "exclusions": [
+        "production volume builders building below $1M price point",
+        "commercial or multi-family developers",
+        "remodelers or retrofit contractors",
+        "builders operating exclusively outside year-round territories",
+        "existing Brite Nites builder partners"
+      ],
+      "seed_accounts": [
+        {"name": "Toll Brothers (luxury custom division)", "domain": "tollbrothers.com"},
+        {"name": "Woodbridge Pacific Group", "domain": "woodbridgepacific.com"},
+        {"name": "Taylor Morrison (luxury custom line)", "domain": "taylormorrison.com"},
+        {"name": "WCI Communities", "domain": "wcicommunities.com"},
+        {"name": "Kolter Homes", "domain": "kolterhomes.com"},
+        {"name": "Keystone Custom Homes", "domain": "keystonecustomhomes.com"},
+        {"name": "Drees Homes", "domain": "dreeshomes.com"}
+      ]
+    },
+    "premium-production-builders": {
+      "display": "Premium Production Builders",
+      "persona": "vp-operations",
+      "industries": [
+        "residential construction",
+        "production home building",
+        "master-planned community development",
+        "luxury subdivision development",
+        "single-family construction"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CA", "UT", "FL", "VA", "MD", "DC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 50,
+        "employee_max": 2000,
+        "revenue_min": 30000000,
+        "revenue_max": 500000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "new master-planned community or luxury subdivision groundbreaking in BN territory",
+        "model home park opening or grand opening announcement",
+        "builder hiring VP of Purchasing or Construction Manager in active territory",
+        "new community sales office opening in CA, UT, FL, or DMV",
+        "land acquisition or entitlement filing for 50+ lot community",
+        "builder adding premium product line or move-up collection to existing community",
+        "evening model home tour events or twilight open houses advertised",
+        "HOA management company partnership announcement tied to new community"
+      ],
+      "exclusions": [
+        "builders with product lines priced below $750K in target markets",
+        "affordable or workforce housing developers",
+        "commercial or industrial developers",
+        "builders operating exclusively outside year-round territories",
+        "existing Brite Nites builder partners"
+      ],
+      "seed_accounts": [
+        {"name": "Shea Homes", "domain": "sheahomes.com"},
+        {"name": "Meritage Homes (luxury line)", "domain": "meritagehomes.com"},
+        {"name": "GL Homes", "domain": "glhomes.com"},
+        {"name": "Pulte Homes / Del Webb (premium division)", "domain": "pulte.com"},
+        {"name": "K. Hovnanian Homes (luxury communities)", "domain": "khov.com"},
+        {"name": "Woodside Homes", "domain": "woodsidehomes.com"},
+        {"name": "Brookfield Residential", "domain": "brookfieldresidential.com"}
+      ]
+    }
+  }
 }

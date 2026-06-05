@@ -2,12 +2,145 @@
   "vertical": "sports-stadiums",
   "source": "plugins/marketing/references/vertical-playbooks/sports-stadiums.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "Brite has no confirmed stadium deployment at playbook authoring time — credibility anchors lean on zoos precedent (Hogle Zoo) and Boyne SkyBridge programmable-media scale proof; confirm whether any stadium pilot has since been installed before activating outbound",
+    "S4 Lights stadium-specific venue-portfolio name-drop rights are pending BC-5939 customer-list retrieval — do not include S4 stadium name-drops in outbound until confirmed",
+    "Ad revenue on stadium plaza pixel installations is unproven at US mid-market scale — label the plaza-ambient ad-revenue line as 'projected/novel' in Offer E decks until a comparable deployment validates it",
+    "Diamond Baseball Holdings (DBH) portfolio membership is a strong signal but confirm per-account whether DBH corporate approval is required or the local GM can sign independently"
   ],
-  "segments": {}
+  "segments": {
+    "milb-regional-ballparks": {
+      "display": "MiLB Regional Ballparks (AAA/AA + Independent League)",
+      "persona": "general-manager",
+      "industries": [
+        "Minor League Baseball",
+        "Independent League Baseball",
+        "Sports & Recreation"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX", "IN", "OH", "PA", "GA", "TN", "MI"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 25,
+        "employee_max": 250,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Diamond Baseball Holdings acquisition announcement (months 3–12 post-acquisition are prime outreach window)",
+        "New General Manager appointment in past 6 months (LinkedIn role-change, MiLB.com press release)",
+        "Non-sport event calendar announcement (300+ events/year band — TinCaps 388, Fluor Field 300+ benchmarks)",
+        "Holiday light show or off-season event program announced or returning (Enchant / Magic of Lights / regional holiday installer renewal pattern)",
+        "Capital project or facility refurbishment filing"
+      ],
+      "exclusions": [
+        "NFL / MLB / NBA / NHL franchises and their primary home venues (enterprise flagship tier — 12–24 month committee-driven procurement, out of ICP per BC-5923)",
+        "Power 4 FBS programs (same enterprise-flagship ceiling exclusion)",
+        "Properties with fewer than 150K annual event-day attendance (below ICP band)",
+        "VP Facilities / Director of Facilities / VP Operations titles (wrong P&L — capex maintenance, not revenue programming)",
+        "Pro-team front-office roles (sport-critical procurement, not non-sport event programming)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Fort Wayne TinCaps", "domain": "milb.com"},
+        {"name": "Greenville Drive (Fluor Field)", "domain": "milb.com"},
+        {"name": "Skylands Stadium (New Jersey)", "domain": "skylandsstadium.com"},
+        {"name": "Las Vegas Aviators (Las Vegas Ballpark)", "domain": "milb.com"},
+        {"name": "Amarillo Sod Poodles (Diamond Baseball Holdings)", "domain": "milb.com"},
+        {"name": "Hartford Yard Goats (Diamond Baseball Holdings)", "domain": "milb.com"},
+        {"name": "Rocket City Trash Pandas", "domain": "milb.com"},
+        {"name": "Bowling Green Hot Rods (Diamond Baseball Holdings)", "domain": "milb.com"}
+      ]
+    },
+    "mls-usl-regional-soccer": {
+      "display": "MLS / USL Championship Regional Soccer Venues",
+      "persona": "director-of-revenue",
+      "industries": [
+        "Major League Soccer",
+        "USL Championship",
+        "Sports & Recreation"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CA", "TX", "FL", "WA", "CO", "NC", "TN", "OH", "GA", "NY", "NJ", "VA", "MD", "DC", "UT"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 50,
+        "employee_max": 500,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "New MLS club expansion announcement or stadium opening window (18 months ahead of opening)",
+        "MLS All-Star Week or MLS Cup hosting announcement",
+        "Off-season plaza activation program announcement (yoga classes, farmer's markets, community events)",
+        "New Director of Revenue or Director of Non-Sport Events appointment",
+        "Concert or international soccer friendly booking at the venue",
+        "Holiday installer (Enchant Christmas PayPal Park model) renewal season"
+      ],
+      "exclusions": [
+        "Enterprise MLS flagship clubs with stadium capex >$300M and dedicated VP Non-Gameday Revenue org",
+        "VP Facilities / Director of Facilities roles",
+        "Pro-team front-office (team President, VP of Soccer Operations)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "PayPal Park (San Jose Earthquakes)", "domain": "sjearthquakes.com"},
+        {"name": "Phoenix Rising FC", "domain": "phoenixrisingfc.com"},
+        {"name": "New Mexico United", "domain": "newmexicoutd.com"},
+        {"name": "Sacramento Republic FC", "domain": "sacrepublicfc.com"},
+        {"name": "Louisville City FC", "domain": "loucityfc.com"},
+        {"name": "Colorado Rapids (Commerce City)", "domain": "coloradorapids.com"},
+        {"name": "San Antonio FC", "domain": "sanantoniofcsoccer.com"}
+      ]
+    },
+    "group-of-5-fbs-college": {
+      "display": "Group of 5 FBS College Athletic Programs",
+      "persona": "owner-operator",
+      "industries": [
+        "Higher Education",
+        "Collegiate Athletics",
+        "Sports & Recreation"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "TX", "NC", "VA", "WV", "OH", "IN", "MI", "KY", "TN", "LA", "MS", "AL", "GA", "CO", "WA", "CA", "NY", "NJ", "CT"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 100,
+        "employee_max": 2000,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "On-campus stadium capital project approval or greenfield stadium announcement (USF $348.5M 2027 opening pattern)",
+        "International soccer friendly booking announcement ($67K–$265K per match revenue comp)",
+        "New Athletic Director appointment",
+        "Conference realignment announcement creating new facility evaluation cycle",
+        "Non-sport event calendar expansion press release (graduations, concerts, corporate rentals)",
+        "New Director of Event Sales or Director of Non-Sport Events appointment"
+      ],
+      "exclusions": [
+        "Power 4 FBS programs (Alabama, Ohio State, Texas, Michigan, Penn State, Georgia, Notre Dame, LSU, etc.) — enterprise flagship tier, 12–24 month committee-driven procurement",
+        "FCS programs and Division II/III (below ICP venue scale)",
+        "Athletic department Facilities / Operations staff (wrong P&L)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "University of South Florida Athletics (USF)", "domain": "gousfbulls.com"},
+        {"name": "Marshall University Athletics", "domain": "herdzone.com"},
+        {"name": "Ball State Cardinals Athletics", "domain": "ballstatesports.com"},
+        {"name": "Western Kentucky Athletics", "domain": "wkusports.com"},
+        {"name": "University of Central Florida Athletics (UCF)", "domain": "ucfknights.com"},
+        {"name": "Appalachian State Athletics", "domain": "appstatesports.com"},
+        {"name": "University of Memphis Athletics", "domain": "gotigersgo.com"}
+      ]
+    }
+  }
 }

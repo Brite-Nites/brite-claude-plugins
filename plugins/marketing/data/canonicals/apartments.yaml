@@ -1,10 +1,57 @@
-# Canonical entry for the Apartments vertical (skeleton).
+# Canonical entry for the Apartments vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/apartments/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Pre-launch Research — single-ICP vertical playbook in early draft.
+# Thin-source draft — operator redline required. README is early-stage; all ICP/persona/offer
+# specifics are explicitly flagged as "Untested" assumptions. Offers exist as draft files only.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - "Resident Services / Property Manager" — named in holiday-event offer as secondary;
+#     purely executional, not a first-call list-building target.
+#   - "VP of Operations" — named as secondary on portfolio offer but reports-to only.
 slug: apartments
 display: "Apartments"
 playbook_path: "marketing/go-to-market/verticals/apartments/README.md"
-personas: []
-offers: []
+personas:
+  - slug: regional-property-manager
+    display: "Regional Property Manager"
+    titles:
+      - "Regional Property Manager"
+      - "Regional Director of Operations"
+      - "Director of Asset Management"
+      - "Regional Director, Property Management"
+      - "VP of Operations"
+      - "Director of Operations"
+  - slug: multifamily-marketing-director
+    display: "Marketing Director (Multi-Family)"
+    titles:
+      - "Director of Marketing"
+      - "VP of Marketing & Leasing"
+      - "Director of Marketing & Leasing"
+      - "VP of Marketing"
+offers:
+  - slug: leasing-office-curb-appeal
+    display: "Leasing Office Curb Appeal"
+    status: draft
+    posture: pilot
+    target_personas: [regional-property-manager, multifamily-marketing-director]
+    prose_path: "marketing/go-to-market/verticals/apartments/offers/leasing-office-curb-appeal.md"
+  - slug: amenity-pool-courtyard-permanent
+    display: "Amenity Pool & Courtyard Permanent"
+    status: draft
+    posture: pilot
+    target_personas: [regional-property-manager, multifamily-marketing-director]
+    prose_path: "marketing/go-to-market/verticals/apartments/offers/amenity-pool-and-courtyard-permanent.md"
+  - slug: holiday-resident-event-installation
+    display: "Holiday Resident Event Installation"
+    status: draft
+    posture: risk-reversal
+    target_personas: [regional-property-manager, multifamily-marketing-director]
+    prose_path: "marketing/go-to-market/verticals/apartments/offers/holiday-resident-event-installation.md"
+  - slug: multi-property-portfolio-program
+    display: "Multi-Property Portfolio Program"
+    status: draft
+    posture: pilot
+    target_personas: [regional-property-manager]
+    prose_path: "marketing/go-to-market/verticals/apartments/offers/multi-property-portfolio-program.md"

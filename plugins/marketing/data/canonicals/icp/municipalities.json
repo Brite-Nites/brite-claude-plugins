@@ -2,12 +2,164 @@
   "vertical": "municipalities",
   "source": "marketing/go-to-market/verticals/municipalities/README.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "geo.regions defaulted to hypothesized BN-territory set; README explicitly excludes Southern California and lists UT, AZ, NorCal, FL, DMV, PA, CT, NY, NJ, CO — PA added to default list, DMV split into VA/MD/DC; confirm full list with Dillon Williams",
+    "size_band.employee_min/max for city segments uses population as a proxy (population 8K–700K for established-program cities; 25K–120K for growth cities) mapped to approximate municipal FTE counts (~1:10 to population) — confirm whether employee bands should remain null and population tracked via list-building filters instead",
+    "size_band.revenue left null for all segments — README characterizes budget eligibility by median household income ($60K+/$80K+) and department budget presence rather than city revenue; confirm whether total city operating budget bands should be encoded",
+    "seed_accounts are best-fit exemplars drawn from cities named in the README (e.g., SLC, Madeira Beach, Scottsdale) plus look-alike peers; verify domain accuracy and prune any accounts that are already active pipeline or existing customers"
   ],
-  "segments": {}
+  "segments": {
+    "established-program-cities": {
+      "display": "Cities with Established Holiday Programs",
+      "persona": "parks-rec-director",
+      "industries": [
+        "municipal government",
+        "city government",
+        "parks and recreation",
+        "public administration",
+        "local government"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX", "PA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 50,
+        "employee_max": 5000,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Active or recently issued holiday lighting RFP on GovSpend, BidNet Direct, or municipal procurement portal",
+        "Existing annual holiday lighting contract with incumbent vendor (discoverable via public records / FOIA request)",
+        "Parks & Rec department with documented events budget in annual budget documents",
+        "Annual tree lighting ceremony, holiday parade, or downtown decoration program listed on city events calendar",
+        "Prior-year holiday lighting spend disclosed via addendum or public records request",
+        "Registration on BuyBoard or Omni Partners cooperative purchasing programs (enables sole-source without full RFP)",
+        "Job posting for Special Events Coordinator or Parks & Rec programming role"
+      ],
+      "exclusions": [
+        "Cities in Southern California (outside BN service territory per partner agreement)",
+        "Cities below 8,000 population (below minimum ICP threshold)",
+        "Cities above 700,000 population (procurement complexity exceeds current BN capacity)",
+        "Cities with no identifiable holiday programming budget or events calendar",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Salt Lake City, UT", "domain": "slcgov.com"},
+        {"name": "Park City, UT", "domain": "parkcity.org"},
+        {"name": "Delray Beach, FL", "domain": "mydelraybeach.com"},
+        {"name": "Coral Gables, FL", "domain": "coralgables.com"},
+        {"name": "Winter Park, FL", "domain": "cityofwinterpark.org"},
+        {"name": "Scottsdale, AZ", "domain": "scottsdaleaz.gov"},
+        {"name": "Alexandria, VA", "domain": "alexandriava.gov"},
+        {"name": "Madeira Beach, FL", "domain": "madeirabeachfl.gov"},
+        {"name": "Greenwood, SC", "domain": "greenwoodsc.gov"},
+        {"name": "Lauderdale Lakes, FL", "domain": "lauderdalelakes.org"}
+      ]
+    },
+    "growth-cities-investment-trigger": {
+      "display": "Growth Cities with Investment Trigger",
+      "persona": "city-manager",
+      "industries": [
+        "municipal government",
+        "city government",
+        "economic development",
+        "public administration",
+        "local government"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX", "PA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 100,
+        "employee_max": 800,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Recently passed parks or infrastructure bond measure (discoverable via local election records or news)",
+        "Active downtown revitalization or Main Street program announcement",
+        "New City Manager, Mayor, or Economic Development Director hired within past 12 months (LinkedIn, local news)",
+        "Capital Improvement Plan (CIP) that includes parks, public spaces, or downtown streetscape",
+        "Tourism push or destination marketing initiative announced by city or CVB",
+        "City enrolled in BuyBoard or Omni Partners (enables sole-source below threshold — BuyBoard contract #735-24 covers Holiday Lighting and Decoration)",
+        "Neighboring peer city recently launched or upgraded holiday lighting program (peer-city competitive signal)"
+      ],
+      "exclusions": [
+        "Cities in Southern California (outside BN service territory)",
+        "Cities below 25,000 population (below growth-city minimum threshold)",
+        "Cities above 120,000 population (procurement formality exceeds fast-path buying behavior for this segment)",
+        "Cities with no identifiable investment trigger (no bond, no new leadership, no downtown project)",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Lehi, UT", "domain": "lehi-ut.gov"},
+        {"name": "Draper, UT", "domain": "draper.utah.gov"},
+        {"name": "South Jordan, UT", "domain": "southjordanut.gov"},
+        {"name": "St. George, UT", "domain": "sgcity.org"},
+        {"name": "Frederick, MD", "domain": "cityoffrederickmd.gov"},
+        {"name": "Goodyear, AZ", "domain": "goodyearaz.gov"},
+        {"name": "Sarasota, FL", "domain": "sarasotafl.gov"},
+        {"name": "Apex, NC", "domain": "apexnc.org"},
+        {"name": "Castle Rock, CO", "domain": "crgov.com"},
+        {"name": "Herriman, UT", "domain": "herriman.org"}
+      ]
+    },
+    "bids-ddas-special-districts": {
+      "display": "Business Improvement Districts, DDAs & Special Districts",
+      "persona": "downtown-events-manager",
+      "industries": [
+        "business improvement district",
+        "downtown development authority",
+        "special district",
+        "county parks department",
+        "public administration"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX", "PA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "BID or DDA annual report or board agenda referencing holiday programming or foot traffic goals",
+        "Existing holiday lighting event listed on district events calendar (tree lighting, holiday walk, market)",
+        "Downtown revitalization or streetscape improvement project active or recently completed",
+        "Merchant satisfaction survey citing holiday season as key revenue period",
+        "BID assessment renewal cycle — directors under pressure to demonstrate visible value to members",
+        "Instagram or social media content showcasing holiday district ambiance (signal of existing program to upgrade)",
+        "County parks fairgrounds with annual holiday event (county segment: population 40K–1.2M per README)",
+        "Request for renderings or design proposals visible in board meeting minutes"
+      ],
+      "exclusions": [
+        "BIDs or DDAs in Southern California (outside BN service territory)",
+        "Districts with no identified events or seasonal programming budget",
+        "Single-merchant or micro-BIDs with fewer than 20 member businesses (contract value likely below minimum threshold)",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Delray Beach Community Redevelopment Agency, FL", "domain": "delraycra.org"},
+        {"name": "Georgetown BID, DC", "domain": "georgetowndc.com"},
+        {"name": "Scottsdale Downtown Alliance, AZ", "domain": "downtownscottsdale.com"},
+        {"name": "Salt Lake County Parks & Recreation, UT", "domain": "slco.org"},
+        {"name": "Downtown Winter Park / Park Avenue District, FL", "domain": "cityofwinterpark.org"},
+        {"name": "Old Town Alexandria Business Association, VA", "domain": "oldtownalexandria.org"},
+        {"name": "Downtown Fort Collins, CO", "domain": "downtownfortcollins.com"},
+        {"name": "Downtown Chandler Community Partnership, AZ", "domain": "downtownchandler.org"},
+        {"name": "Coral Gables Business Improvement District, FL", "domain": "coralgables.com"},
+        {"name": "Asheville Downtown Association, NC", "domain": "ashevilledowntown.org"}
+      ]
+    }
+  }
 }

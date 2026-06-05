@@ -2,12 +2,117 @@
   "vertical": "universities",
   "source": "marketing/go-to-market/verticals/universities/README.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "size_band for both segments uses employee count as an enrollment proxy (public: 5,000+ enrollment; private: 1,000+ enrollment) — confirm whether headcount-based employee bands are appropriate for list-building tools or whether enrollment-specific filters are available",
+    "geo coverage maps the handbook's territory list (UT, AZ, SoCal, NorCal, FL, DMV, PA, CT, NY, NJ, CO) to state abbreviations — confirm NorCal/SoCal collapse to CA and DMV collapse to DC/MD/VA, and whether PA is Tier 1 or Tier 2",
+    "revenue_min/max is null for both segments because the source specifies operating budget ($500M+) and endowment ($500M+) as capacity proxies, not annual revenue — confirm whether a revenue band should be derived or left null",
+    "private-universities financial capacity threshold ($500M+ endowment or operating budget) is handbook-sourced but existing references (BYU, Manhattan University) likely fall below it — confirm whether the floor applies to net-new targets only"
   ],
-  "segments": {}
+  "segments": {
+    "public-universities": {
+      "display": "Public Universities",
+      "persona": "vp-student-affairs",
+      "industries": [
+        "higher education",
+        "public university",
+        "state university",
+        "research university",
+        "land-grant university"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["UT", "AZ", "CA", "FL", "DC", "MD", "VA", "PA", "CT", "NY", "NJ", "CO"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 2000,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Job posting for VP of Student Affairs or Chief of Staff for Student Affairs — signals active Student Affairs leadership receptive to new programming initiatives",
+        "University issues or publicly posts an RFP/RFQ for campus experience, student programming, or event services",
+        "University website or social media references seasonal depression, student mental health, or finals wellness initiatives",
+        "State legislature finalizes annual budget and university system receives allocation (triggers department-level spending decisions)",
+        "University announces a new president or provost — new leadership often seeks visible quick wins",
+        "University social media shows dark or sparse campus imagery during November–December — signals no existing display program",
+        "University publishes a DEI strategic plan or diversity report referencing inclusive campus programming",
+        "Conference programming or association content (NASPA, ACPA) referencing student belonging or campus experience investment"
+      ],
+      "exclusions": [
+        "Community colleges and two-year institutions (no traditional residential campus experience)",
+        "Fully online universities with no physical campus",
+        "Universities outside Brite Nites operating territories",
+        "University of Maryland — existing customer (in progress)",
+        "Enrollment below 5,000 students",
+        "States with procurement thresholds under $25K where the RFP process makes year-one scope unviable without ghost-written RFP preparation (CT, PA) — deprioritize but do not exclude"
+      ],
+      "seed_accounts": [
+        {"name": "University of Florida", "domain": "ufl.edu"},
+        {"name": "University of Virginia", "domain": "virginia.edu"},
+        {"name": "University of Colorado Boulder", "domain": "colorado.edu"},
+        {"name": "Arizona State University", "domain": "asu.edu"},
+        {"name": "University of Utah", "domain": "utah.edu"},
+        {"name": "University of California Los Angeles", "domain": "ucla.edu"},
+        {"name": "Rutgers University", "domain": "rutgers.edu"},
+        {"name": "University of Connecticut", "domain": "uconn.edu"},
+        {"name": "University of North Carolina Chapel Hill", "domain": "unc.edu"},
+        {"name": "George Mason University", "domain": "gmu.edu"}
+      ]
+    },
+    "private-universities": {
+      "display": "Private Universities",
+      "persona": "chief-of-staff-student-affairs",
+      "industries": [
+        "higher education",
+        "private university",
+        "liberal arts college",
+        "religiously affiliated university",
+        "research university"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["UT", "AZ", "CA", "FL", "DC", "MD", "VA", "PA", "CT", "NY", "NJ", "CO"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 500,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "University issues a board-approved campus experience or student life initiative — signals budget has been authorized (mirrors GWU model where project was board-approved before engagement)",
+        "Inbound inquiry or web form submission referencing holiday display, lighting, or campus experience",
+        "University social media shows peer institutions (GWU, Manhattan, BYU) with professional unity displays — creates flywheel peer pressure",
+        "New Student Affairs leadership hire (VP or Chief of Staff) seeking to establish visible programming wins",
+        "University publishes a DEI commitment report or diversity strategic plan referencing inclusive campus traditions",
+        "University fundraising campaign or alumni engagement push during November–December suggesting active year-end donor touchpoints",
+        "University website references student wellness, mental health resources, or belonging initiatives for the fall semester"
+      ],
+      "exclusions": [
+        "For-profit universities",
+        "Fully online universities with no physical campus",
+        "Universities outside Brite Nites operating territories",
+        "George Washington University — existing customer",
+        "Manhattan University — existing customer",
+        "Brigham Young University — existing customer",
+        "Enrollment below 1,000 students"
+      ],
+      "seed_accounts": [
+        {"name": "Georgetown University", "domain": "georgetown.edu"},
+        {"name": "American University", "domain": "american.edu"},
+        {"name": "Fordham University", "domain": "fordham.edu"},
+        {"name": "Quinnipiac University", "domain": "qu.edu"},
+        {"name": "University of Denver", "domain": "du.edu"},
+        {"name": "Loyola University Maryland", "domain": "loyola.edu"},
+        {"name": "Fairfield University", "domain": "fairfield.edu"},
+        {"name": "University of San Diego", "domain": "sandiego.edu"},
+        {"name": "Seton Hall University", "domain": "shu.edu"},
+        {"name": "Pepperdine University", "domain": "pepperdine.edu"}
+      ]
+    }
+  }
 }

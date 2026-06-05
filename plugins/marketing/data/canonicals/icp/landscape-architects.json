@@ -2,12 +2,105 @@
   "vertical": "landscape-architects",
   "source": "marketing/go-to-market/verticals/landscape-architects/README.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "geo.regions trimmed to the README's named markets (CA, UT, FL, DMV) — confirm whether additional BN-territory states (AZ, NY, NJ, CT, CO, WA, NC, TX) are in scope for this vertical",
+    "size_band.employee bands derived from the README's '2-25 people with a dedicated residential practice' range — confirm whether the boutique band should be tightened as firmographic data from architect conversations lands",
+    "revenue bands not stated in the README; left null — values would be inferred from project design-fee range ($15K-$200K+); operator to supply if list-building requires them",
+    "seed_accounts are look-alike exemplars selected from publicly known residential landscape architecture firms in BN territories; confirm appropriateness as discovery anchors before list-building"
   ],
-  "segments": {}
+  "segments": {
+    "boutique-residential-principal": {
+      "display": "Boutique High-End Residential Firm — Principal",
+      "persona": "principal-firm-owner",
+      "industries": [
+        "landscape architecture",
+        "residential landscape design",
+        "estate garden design",
+        "outdoor living design",
+        "luxury residential construction"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CA", "UT", "FL", "MD", "VA", "DC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 2,
+        "employee_max": 25,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "ASLA chapter event attendance or speakership in CA, UT, FL, or Potomac chapter (DC/MD/VA)",
+        "APLD membership with residential focus listed on firm website",
+        "Portfolio featuring $750K+ residential properties with outdoor living or estate garden work",
+        "Project announcements or case studies citing $100K+ landscape construction budgets",
+        "ASLA Awards recognition for residential landscape design",
+        "Firm website or LinkedIn references to 'lighting design' without listing an in-house lighting installer",
+        "Job postings that do NOT include lighting installation or electrical roles (signals outsourcing)",
+        "Active hiring or project pipeline posts indicating new high-end residential work in BN territories"
+      ],
+      "exclusions": [
+        "Firms focused exclusively on commercial, municipal, or institutional projects",
+        "Firms with an in-house landscape lighting installer or electrician on staff",
+        "Firms that specify only commodity/big-box lighting products rather than premium manufacturers",
+        "Firms operating exclusively outside CA, UT, FL, and DMV year-round territories",
+        "Existing Brite Nites active partnership accounts"
+      ],
+      "seed_accounts": [
+        {"name": "Tichenor & Thorp Architects", "domain": "tichenorandthorp.com"},
+        {"name": "Campion Walker Landscapes", "domain": "campionwalker.com"},
+        {"name": "Dig Your Garden Landscape Design", "domain": "digyourgarden.com"},
+        {"name": "Lutsko Associates", "domain": "lutskoassociates.com"},
+        {"name": "Land Plus Associates", "domain": "landplusassociates.com"},
+        {"name": "Keith LeBlanc Landscape Architecture", "domain": "kllandarch.com"}
+      ]
+    },
+    "multidisciplinary-firm-senior-designer": {
+      "display": "Multi-Disciplinary Residential Firm — Senior Designer",
+      "persona": "senior-designer",
+      "industries": [
+        "landscape architecture",
+        "residential landscape design",
+        "estate garden design",
+        "outdoor living design",
+        "design-build landscape"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CA", "UT", "FL", "MD", "VA", "DC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 10,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Senior designer or project manager credit on ASLA Award-winning or award-nominated residential projects",
+        "LinkedIn activity referencing active high-end residential projects in BN territories",
+        "Firm portfolio featuring complex multi-zone outdoor spaces where lighting coordination would be required (pools, water features, specimen plantings)",
+        "Published project features in Architectural Digest, Landscape Architecture Magazine, or regional luxury shelter press",
+        "Firm announcements of new residential project wins in CA, UT, FL, or DMV markets",
+        "Job postings listing CAD/Vectorworks proficiency suggesting high documentation standards (signals fit for technical lighting documentation deliverables)",
+        "Conference presentations at ASLA or APLD focused on residential design excellence"
+      ],
+      "exclusions": [
+        "Firms focused exclusively on commercial, municipal, or institutional projects",
+        "Firms with an in-house landscape lighting installer or electrician on staff",
+        "Firms that specify only commodity/big-box lighting products rather than premium manufacturers",
+        "Firms operating exclusively outside CA, UT, FL, and DMV year-round territories",
+        "Existing Brite Nites active partnership accounts"
+      ],
+      "seed_accounts": [
+        {"name": "Surfacedesign", "domain": "surfacedesign.us"},
+        {"name": "EDSA", "domain": "edsaplan.com"},
+        {"name": "Studio-MLA (Mia Lehrer + Associates)", "domain": "studio-mla.com"},
+        {"name": "Pamela Burton & Company", "domain": "pamelaburton.com"},
+        {"name": "Terremoto", "domain": "weareterremoto.com"}
+      ]
+    }
+  }
 }

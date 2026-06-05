@@ -1,10 +1,72 @@
-# Canonical entry for the Botanical Gardens / Arboretums vertical (skeleton).
+# Canonical entry for the Botanical Gardens / Arboretums vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/botanical-gardens/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Draft — playbook and all three offers are Draft status.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - Director of Horticulture: ICP-1 influencer with informal-veto authority but NOT a
+#     first-call list-building target; internal referral only.
+#   - Director of Marketing: named influencer in 250th-anniversary offer target but no
+#     standalone persona section in the README; omitted pending handbook promotion.
+#   - Board of Directors: approver role, not a prospecting target.
+# Thin-source flag: contract-range estimate ($25K–$300K/year) is BN-internal; no closed-won
+#   botanical-gardens deals documented. Personas and segments are hypothesis-grade.
 slug: botanical-gardens
 display: "Botanical Gardens / Arboretums"
 playbook_path: "marketing/go-to-market/verticals/botanical-gardens/README.md"
-personas: []
-offers: []
+personas:
+  - slug: executive-director-garden
+    display: "Executive Director — Garden"
+    titles:
+      - "Executive Director"
+      - "President & CEO"
+      - "President and CEO"
+      - "Chief Executive Officer"
+      - "Executive Director & CEO"
+  - slug: director-of-events-garden
+    display: "Director of Events / Programming — Garden"
+    titles:
+      - "Director of Events"
+      - "Director of Programming"
+      - "VP of External Affairs"
+      - "Events Manager"
+      - "Director of Special Events"
+      - "Director of Public Programs"
+  # Director of Development is a standard nonprofit first-call target for earned/unrestricted
+  # revenue conversations; not explicitly named in a README persona section but implied by the
+  # 501(c)(3) mission-aligned revenue framing. Flagged thin — validate in discovery.
+  - slug: director-of-development-garden
+    display: "Director of Development — Garden"
+    titles:
+      - "Director of Development"
+      - "Chief Development Officer"
+      - "VP of Development"
+      - "Director of Advancement"
+      - "Director of Philanthropy"
+offers:
+  - slug: lightscape-style-light-experience
+    display: "Lightscape-Style Walking Light Experience"
+    status: draft
+    posture: pilot
+    target_personas: [executive-director-garden, director-of-events-garden]
+    prose_path: "marketing/go-to-market/verticals/botanical-gardens/offers/lightscape-style-light-experience.md"
+  - slug: seasonal-garden-of-lights
+    display: "Seasonal Garden of Lights (Year-1 Pilot)"
+    status: draft
+    posture: risk-reversal
+    target_personas: [executive-director-garden]
+    prose_path: "marketing/go-to-market/verticals/botanical-gardens/offers/seasonal-garden-of-lights.md"
+  - slug: americana-250th-anniversary
+    display: "250th Anniversary — Americana in the Gardens"
+    status: draft
+    posture: free-asset
+    target_personas: [director-of-events-garden]
+    prose_path: "marketing/go-to-market/verticals/botanical-gardens/offers/250th-anniversary.md"
+  # Cross-segment offer; currently parked under amusement-parks/; may relocate in Phase 2 reformat.
+  - slug: commercial-parks-gardens
+    display: "Commercial Parks & Gardens"
+    status: draft
+    posture: pilot
+    target_personas: [executive-director-garden, director-of-events-garden]
+    prose_path: "marketing/go-to-market/verticals/amusement-parks/offers/parks.md"

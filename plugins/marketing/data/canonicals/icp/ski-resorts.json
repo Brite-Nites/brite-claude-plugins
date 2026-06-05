@@ -2,12 +2,112 @@
   "vertical": "ski-resorts",
   "source": "plugins/marketing/references/vertical-playbooks/ski-resorts.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "Geography: playbook names VT/NH/NY/MI/MT as primary geographies for regional independents but does not explicitly exclude CO/UT/WA/ID mid-market independents; handbook names CO/UT as BN territory overlap — confirm whether CO/UT independents are in scope for cold outbound given dark-sky-ordinance complexity",
+    "Size-band proxy: skier visits is the playbook's scoping metric (75K–300K core, 300K–800K large mid-market) but is not queryable in standard enrichment databases — employee/revenue bands below are a working hypothesis (50–500 employees; $10M–$75M) for operator validation",
+    "Conglomerate-owned properties inside the skier-visit band: several Alterra/Boyne properties fall in the 75K–800K band — confirm whether property-level outbound is allowed when the GM has direct vendor authority, or conglomerate ownership is a hard exclusion",
+    "Seed accounts are draft exemplars pruned of known Vail/Alterra-owned resorts; validate current ownership and existing-client status before list-building (resort M&A churns yearly)"
   ],
-  "segments": {}
+  "segments": {
+    "core-mid-market-independent": {
+      "display": "Core Mid-Market Independent Ski Resorts",
+      "persona": "general-manager",
+      "industries": [
+        "Ski Resorts",
+        "Skiing Facilities",
+        "Traveler Accommodation",
+        "Hotels & Motels"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["VT", "NH", "NY", "MI", "MT", "ME", "MA", "WV"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 50,
+        "employee_max": 300,
+        "revenue_min": 10000000,
+        "revenue_max": 50000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "ownership transition or new GM appointment in last 12 months (SAM Snow People column)",
+        "Indy Pass member resort (strongest independent mid-market ICP proxy per playbook)",
+        "new village F&B tenant announcement in regional press",
+        "compression-week programming press release (NYE, Presidents Week, MLK) in Oct–Nov",
+        "bad-snow-year ancillary revenue decline press coverage",
+        "base-lodge refresh or village-infrastructure capital announcement"
+      ],
+      "exclusions": [
+        "existing customers",
+        "Vail Resorts portfolio properties",
+        "Alterra Mountain Company portfolio properties",
+        "Aspen Skiing Company properties",
+        "Boyne Resorts corporate flagships with centralized RFP motion",
+        "Powdr Corp properties with enterprise procurement gates",
+        "properties with fewer than 75K annual skier visits (limited village, limited F&B)",
+        "on-mountain-only or day-trip ski areas without branded village or base-area F&B operations"
+      ],
+      "seed_accounts": [
+        {"name": "Burke Mountain Resort", "domain": "skiburke.com"},
+        {"name": "Mad River Glen", "domain": "madriverglen.com"},
+        {"name": "Ragged Mountain Resort", "domain": "raggedmountainresort.com"},
+        {"name": "Jay Peak Resort", "domain": "jaypeakresort.com"},
+        {"name": "Bretton Woods", "domain": "brettonwoods.com"},
+        {"name": "Waterville Valley Resort", "domain": "waterville.com"},
+        {"name": "Smugglers' Notch Resort", "domain": "smuggs.com"},
+        {"name": "Whitefish Mountain Resort", "domain": "skiwhitefish.com"},
+        {"name": "Windham Mountain Club", "domain": "windhammountainclub.com"},
+        {"name": "Holiday Valley Resort", "domain": "holidayvalley.com"}
+      ]
+    },
+    "large-mid-market-independent": {
+      "display": "Large Mid-Market Independent Ski Resorts (300K–800K visits)",
+      "persona": "sr-director-village-ops",
+      "industries": [
+        "Ski Resorts",
+        "Skiing Facilities",
+        "Traveler Accommodation",
+        "Hotels & Motels"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["VT", "NH", "NY", "MI", "MT", "CO", "UT", "WA", "ID", "CA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 200,
+        "employee_max": 1000,
+        "revenue_min": 50000000,
+        "revenue_max": 250000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "village or base-area capital expansion announcement (new public square, pedestrian plaza, village development)",
+        "ownership transition to local investor group in last 24 months",
+        "new GM or Sr Director Village Operations appointment in last 12 months (SAM Snow People)",
+        "multi-season shoulder or summer programming investment announcement",
+        "village F&B tenant expansion or new concept opening",
+        "compression-week premium ticket or village-event programming announcement in Oct–Nov",
+        "Indy Pass membership or Indy Pass+ designation"
+      ],
+      "exclusions": [
+        "existing customers",
+        "Vail Resorts portfolio properties (e.g., Stowe, Okemo, Mount Snow, Hunter Mountain)",
+        "Alterra Mountain Company portfolio properties (e.g., Sugarbush, Stratton)",
+        "Aspen Skiing Company properties",
+        "Boyne Resorts flagships with centralized procurement",
+        "properties above 800K annual skier visits (enterprise flagship ceiling — Breckenridge, Park City)",
+        "resorts without a dedicated village or base-area pedestrian zone with F&B operations"
+      ],
+      "seed_accounts": [
+        {"name": "Killington Resort", "domain": "killington.com"},
+        {"name": "Big Sky Resort", "domain": "bigskyresort.com"},
+        {"name": "Boyne Mountain Resort", "domain": "boynemountain.com"},
+        {"name": "Crystal Mountain (MI)", "domain": "crystalmountain.com"},
+        {"name": "Alta Ski Area", "domain": "alta.com"},
+        {"name": "Snowbasin Resort", "domain": "snowbasin.com"},
+        {"name": "Schweitzer Mountain Resort", "domain": "schweitzer.com"}
+      ]
+    }
+  }
 }

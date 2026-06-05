@@ -2,12 +2,98 @@
   "vertical": "apartments",
   "source": "marketing/go-to-market/verticals/apartments/README.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "Geography not specified in README beyond 'Brite Tier 1 + Tier 2 territories' — default region list applied; confirm which metro clusters are in-service-area for crew dispatch before list-building",
+    "size_band is null on all four schema keys — the README's thresholds are unit-count (250+/property) and portfolio size (10+ properties; mid-tier 10–50), which don't map to employee/revenue; encode via list-building filters",
+    "Class A vs. Class B+ boundary is undefined — no firmographic proxy (average rent, year-built, amenity count) is given; list-build needs a manual quality pass or enrichment signal",
+    "Exclusion of student housing and affordable/subsidized housing is implied by 'lifestyle / luxury positioning' but not stated explicitly — confirm as hard exclusions",
+    "The 'portfolio of 10+ properties under one regional decision-maker' qualifier creates two list-building motions (property-level vs. operator-level ABM) — confirm whether cold outreach targets the property or the operator HQ"
   ],
-  "segments": {}
+  "segments": {
+    "class-a-b-plus-multifamily-operators": {
+      "display": "Class A / B+ Multi-Family Owner-Operators & Portfolio Managers",
+      "persona": "regional-property-manager",
+      "industries": [
+        "Real Estate — Multi-Family Residential",
+        "Property Management — Residential"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "NMHC, NAA, or IREM conference attendance or sponsorship",
+        "Active leasing advertising on ApartmentList, Zillow, or Google Business with dated listing photos",
+        "Job postings for Regional Property Manager or Regional Director of Operations",
+        "Property described as 'luxury,' 'Class A,' or 'resort-style' in leasing materials",
+        "Operator portfolio page listing 10+ properties under one brand"
+      ],
+      "exclusions": [
+        "Affordable / subsidized housing (HUD, LIHTC, Section 8 properties)",
+        "Student housing operators",
+        "Single-property owners with fewer than 250 units and no stated portfolio expansion",
+        "Owner-occupied condominiums and HOA-governed communities",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Greystar Real Estate Partners", "domain": "greystar.com"},
+        {"name": "Equity Residential", "domain": "equityapartments.com"},
+        {"name": "Camden Property Trust", "domain": "camdenliving.com"},
+        {"name": "AvalonBay Communities", "domain": "avaloncommunities.com"},
+        {"name": "Mid-America Apartment Communities (MAA)", "domain": "maac.com"},
+        {"name": "NexMetro Communities", "domain": "nexmetro.com"},
+        {"name": "Cortland", "domain": "cortland.com"},
+        {"name": "Bell Partners", "domain": "bellpartnersinc.com"},
+        {"name": "Willow Bridge Property Company", "domain": "willowbridgepc.com"}
+      ]
+    },
+    "mid-tier-regional-multifamily-operators": {
+      "display": "Mid-Tier Regional Multi-Family Operators (10–50 Properties)",
+      "persona": "regional-property-manager",
+      "industries": [
+        "Real Estate — Multi-Family Residential",
+        "Property Management — Residential"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Active advertising of Class B+ or lifestyle-branded properties on Zillow or Apartments.com",
+        "Regional Director or Asset Manager title visible on LinkedIn for the operator",
+        "Recent property acquisition or renovation announcement in local business press",
+        "Job posting for leasing staff citing 'resort-style amenities' or 'Class A community'"
+      ],
+      "exclusions": [
+        "Affordable / subsidized housing (HUD, LIHTC, Section 8 properties)",
+        "Student housing operators",
+        "Single-property independent landlords",
+        "Owner-occupied condominiums and HOA-governed communities",
+        "Operators outside Brite Tier 1 + Tier 2 service territories",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "ZRS Management", "domain": "zrsmanagement.com"},
+        {"name": "Pegasus Residential", "domain": "pegasusresidential.com"},
+        {"name": "Venterra Realty", "domain": "venterraliving.com"},
+        {"name": "Waterton Residential", "domain": "waterton.com"},
+        {"name": "Gables Residential", "domain": "gables.com"}
+      ]
+    }
+  }
 }

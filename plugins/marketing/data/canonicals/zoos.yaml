@@ -1,10 +1,65 @@
-# Canonical entry for the Zoos vertical (skeleton).
-# Source: handbook@main:marketing/go-to-market/verticals/zoos/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Canonical entry for the Zoos vertical.
+# Source: plugins/marketing/references/vertical-playbooks/zoos.md (BC-5879 research grounding)
+#         + handbook@main:marketing/go-to-market/verticals/zoos/README.md
+# Status (handbook taxonomy): Draft — no Active engagements yet.
+# History:
+#   2026-06-05 — personas+offers backfilled from references/vertical-playbooks/zoos.md
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - facilities-vp: playbook marks Offer B (their offer) as "Pending R-19" — not a funded
+#     go-to-market; persona excluded from list-building until R-19 closes (BC-5941).
+#   - director-animal-care: handbook marks them an internal influencer (informal veto),
+#     reached via referral from events team — not a cold-outbound target.
+#   - marketing-director: playbook labels Marketing a coalition-builder / secondary touch,
+#     not a first-call list-building target for Offer E.
 slug: zoos
 display: "Zoos"
 playbook_path: "marketing/go-to-market/verticals/zoos/README.md"
-personas: []
-offers: []
+personas:
+  - slug: director-of-events
+    display: "Director of Events / Programming"
+    titles:
+      - "Director of Events"
+      - "Director of Programming"
+      - "VP of External Affairs"
+      - "Events Manager"
+      - "Director of Guest Experience"
+      - "Director of Community Engagement"
+  - slug: executive-director-ceo
+    display: "Executive Director / CEO / President"
+    titles:
+      - "Executive Director"
+      - "President & CEO"
+      - "President and CEO"
+      - "Chief Executive Officer"
+      - "Zoo Director"
+  - slug: director-corporate-partnerships
+    display: "Director of Corporate Partnerships"
+    titles:
+      - "Director of Corporate Partnerships"
+      - "Director of Development"
+      - "VP of Development"
+      - "VP of Philanthropy"
+      - "Director of Institutional Advancement"
+      - "Director of Corporate Relations"
+offers:
+  - slug: production-finance
+    display: "Production Finance Program (Offer E)"
+    status: draft
+    posture: risk-reversal
+    target_personas: [executive-director-ceo, director-corporate-partnerships, director-of-events]
+  - slug: pilot-zone
+    display: "Pilot Zone Installation (Offer A)"
+    status: draft
+    posture: pilot
+    target_personas: [director-of-events, director-corporate-partnerships]
+  - slug: zoolights-style-holiday-experience
+    display: "ZooLights-Style Holiday Experience"
+    status: draft
+    posture: pilot
+    target_personas: [director-of-events, executive-director-ceo]
+  - slug: conservation-aligned-programming
+    display: "Conservation-Aligned Programming"
+    status: draft
+    posture: knowledge
+    target_personas: [executive-director-ceo, director-corporate-partnerships]

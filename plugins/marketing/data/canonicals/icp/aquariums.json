@@ -2,12 +2,105 @@
   "vertical": "aquariums",
   "source": "plugins/marketing/references/vertical-playbooks/aquariums.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "Revenue proxy: the playbook scopes mid-market aquariums by operating budget ($10M–$80M); most are 501(c)(3) nonprofits whose provider-reported 'revenue' reflects total operating expenses — confirm whether the band applies against provider revenue or whether a visitor-count gate (200K–1M annual visitors) is the more reliable list-building filter",
+    "Geography: the playbook does not name a Brite service-territory list for aquariums; the default mirrors the zoos priority-state list plus named mid-market account states — confirm whether the zoos SoCal exclusion applies to aquariums and whether OR/LA stay in scope (Oregon Coast Aquarium, Audubon New Orleans are playbook-named)",
+    "Offer 3 / Director of Operations gating: the playbook blocks Offer 3 (Permanent Canvas) pending R-19 / BC-5941 and marks Director of Operations secondary — if R-19 has since resolved, promote the persona and add a facilities-infrastructure segment",
+    "Enterprise flagship exclusion: confirm whether Aquarium of the Pacific (Long Beach, CA — mid-market by playbook usage but SoCal) is in-ICP or watch-list given the zoos-pattern SoCal exclusion"
   ],
-  "segments": {}
+  "segments": {
+    "adult-programming-operator": {
+      "display": "Mid-Market Aquarium — Active Adult Programming Operator",
+      "persona": "executive-director",
+      "industries": [
+        "Zoos & Aquariums",
+        "Museums & Institutions",
+        "Amusement Parks & Attractions",
+        "Nonprofit Organizations"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX", "SC", "OR", "LA", "PA", "KY", "OH"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 50,
+        "employee_max": 500,
+        "revenue_min": 10000000,
+        "revenue_max": 80000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "aquarium after dark / 21+ / night dive / glow nights program announcement (last 6 months)",
+        "new Executive Director or Director of Marketing hire (LinkedIn role-change, last 6 months)",
+        "ticket-on-sale announcement for 21+ after-hours event ($39.95–$59.99 range)",
+        "sponsor-title announcement for existing adult or holiday program",
+        "economic-impact study publication (last 24 months)"
+      ],
+      "exclusions": [
+        "Georgia Aquarium (Atlanta, GA) — enterprise flagship, architectural-lighting-design-firm incumbent",
+        "Monterey Bay Aquarium (Monterey, CA) — enterprise flagship",
+        "Shedd Aquarium (Chicago, IL) — enterprise flagship",
+        "New England Aquarium (Boston, MA) — enterprise flagship",
+        "Seattle Aquarium (Seattle, WA) — enterprise flagship, post-2024 Ocean Pavilion capital cycle",
+        "Aquariums with no adult-programming history (greenfield — too much market-creation lift for Offer 1)",
+        "Aquariums outside Brite service territory",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Newport Aquarium", "domain": "newportaquarium.com"},
+        {"name": "Adventure Aquarium", "domain": "adventureaquarium.com"},
+        {"name": "Aquarium of the Pacific", "domain": "aquariumofpacific.org"},
+        {"name": "South Carolina Aquarium", "domain": "scaquarium.org"},
+        {"name": "Virginia Aquarium & Marine Science Center", "domain": "virginiaaquarium.com"},
+        {"name": "National Aquarium Baltimore", "domain": "aqua.org"},
+        {"name": "Maritime Aquarium at Norwalk", "domain": "maritimeaquarium.org"},
+        {"name": "Oregon Coast Aquarium", "domain": "aquarium.org"},
+        {"name": "Texas State Aquarium", "domain": "texasstateaquarium.org"},
+        {"name": "Audubon Aquarium of the Americas", "domain": "audubonnatureinstitute.org"}
+      ]
+    },
+    "corporate-sponsor-pipeline": {
+      "display": "Mid-Market Aquarium — Mature Corporate Sponsor Pipeline",
+      "persona": "director-of-corporate-partnerships",
+      "industries": [
+        "Zoos & Aquariums",
+        "Museums & Institutions",
+        "Nonprofit Organizations"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "MD", "VA", "SC", "LA", "PA", "NJ", "CT", "NC", "TX", "CA", "WA", "NY", "OH", "KY"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 75,
+        "employee_max": 500,
+        "revenue_min": 15000000,
+        "revenue_max": 80000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "named title-sponsor announcement for seasonal or adult program (last 6 months)",
+        "published economic-impact study (last 24 months)",
+        "city or CVB co-funding relationship mentioned in press release or annual report",
+        "Director of Corporate Partnerships role-change or open hire (last 6 months)",
+        "sponsor-renewal announcement or 'presenting sponsor' credit in program PR"
+      ],
+      "exclusions": [
+        "Enterprise flagships (Georgia, Monterey Bay, Shedd, New England, Seattle aquariums)",
+        "Aquariums with no Director of Corporate Partnerships function (sponsor-pipeline too immature — 6–9 month close cycle requires existing pipeline infrastructure)",
+        "Aquariums with no published economic-impact study and no CVB relationship",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Florida Aquarium", "domain": "flaquarium.org"},
+        {"name": "National Aquarium Baltimore", "domain": "aqua.org"},
+        {"name": "South Carolina Aquarium", "domain": "scaquarium.org"},
+        {"name": "Virginia Aquarium & Marine Science Center", "domain": "virginiaaquarium.com"},
+        {"name": "Audubon Aquarium of the Americas", "domain": "audubonnatureinstitute.org"},
+        {"name": "Adventure Aquarium", "domain": "adventureaquarium.com"},
+        {"name": "Maritime Aquarium at Norwalk", "domain": "maritimeaquarium.org"}
+      ]
+    }
+  }
 }

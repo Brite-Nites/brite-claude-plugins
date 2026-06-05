@@ -2,12 +2,111 @@
   "vertical": "hotels-resorts",
   "source": "plugins/marketing/references/vertical-playbooks/hotels-resorts.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "Geography: BN service territory mapped from handbook README as FL, AZ, CA (NorCal only — SoCal excluded per handbook), UT, CO, WA, NC, NJ, NY, CT, PA, VA, MD, DC — confirm this region list and whether the SoCal exclusion should be encoded as a zip-band exclusion or handled in list-building filters",
+    "size_band employee counts are proxied from room counts (200-key boutique ≈ 100–350 employees; 150–500-key franchised resort ≈ 150–600 employees) — proxy not confirmed by BN engagement data; operator redline against first-season discovery calls",
+    "revenue bands are estimated from ADR bands in the playbook ($250–600 ADR, ~$5M–$75M gross revenue depending on occupancy and room count) and are unvalidated by BN engagement data",
+    "seed_accounts are drawn from playbook exemplars and publicly known properties in named competitive markets (Park City, Scottsdale, Naples, Miami, Aspen, Vail); some exemplars (Hotel del Coronado, Callaway) sit outside BN territory and are look-alike anchors only; verify Ambius is not an active incumbent before outreach"
   ],
-  "segments": {}
+  "segments": {
+    "independent-boutique-resorts": {
+      "display": "Independent & Boutique Resorts",
+      "persona": "director-of-resort-experience",
+      "industries": [
+        "hotels and resorts",
+        "boutique hotels",
+        "independent resort properties",
+        "destination resorts",
+        "spa resorts",
+        "historic inn and estate resorts"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "UT", "CO", "WA", "NC", "NJ", "NY", "CT", "PA", "VA", "MD", "DC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 75,
+        "employee_max": 400,
+        "revenue_min": 5000000,
+        "revenue_max": 75000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Press release or CVB announcement of a named seasonal program (e.g., 'Christmas at [Property]') within the past 6 months — signals existing programming muscle and YoY refresh candidacy",
+        "New GM appointment within the past 6–12 months — GM audit cycles run months 3–9 of tenure; outbound landing in that window fits the audit cadence",
+        "Capital renovation, F&B concept launch, pool-deck or lobby-refresh announcement within the past 6–18 months — signals property in a capital-spending window",
+        "STR/RevPAR data showing the property under-indexing the comp set on ADR — larger upside case for rate-premium programming",
+        "Property publicly discussing OTA commission pressure, direct-channel initiatives, or launching a package-only stay program",
+        "Peak-date or destination-weekend reservation windows published (Fri/Sat-only windows, compression-date pricing structures)",
+        "Job posting for Director of Revenue or Revenue Manager — signals property scaling revenue-management sophistication"
+      ],
+      "exclusions": [
+        "Corporate-managed enterprise chain flagships (Marriott Marquis, Waldorf Astoria, Four Seasons, Ritz-Carlton, Gaylord full-scale properties) — multi-year RFP procurement, brand-standard-constrained programming authority",
+        "Properties under 80 keys without luxury ADR positioning — below the room-count threshold where ADR-lift math produces program ROI",
+        "Properties with AV integrator already embedded in an active experiential-tech engagement (AVI-SPL XTG, Diversified)",
+        "Properties where Ambius holds an active plant-and-amenity contract that includes holiday decor (incumbent-lock pattern; qualify during discovery)",
+        "Existing BN customers"
+      ],
+      "seed_accounts": [
+        {"name": "Hotel del Coronado", "domain": "hoteldel.com"},
+        {"name": "Fairmont Scottsdale Princess", "domain": "fairmont.com"},
+        {"name": "Callaway Resort & Gardens", "domain": "callawaygardens.com"},
+        {"name": "The Biltmore Inn (Biltmore Estate)", "domain": "biltmore.com"},
+        {"name": "The Phoenician Resort", "domain": "thephoenician.com"},
+        {"name": "Montage Deer Valley", "domain": "montagehotels.com"},
+        {"name": "The Inn at Palmetto Bluff", "domain": "palmettobluff.com"},
+        {"name": "Hotel Drover (Fort Worth)", "domain": "hoteldrover.com"},
+        {"name": "Primland Resort (Blue Ridge Mountains)", "domain": "primland.com"}
+      ]
+    },
+    "franchised-chain-resort-properties": {
+      "display": "Franchised Chain Resort Properties",
+      "persona": "director-of-resort-experience",
+      "industries": [
+        "hotels and resorts",
+        "franchised hotel properties",
+        "branded resort properties",
+        "full-service hotel and conference centers",
+        "convention resort hotels"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "UT", "CO", "WA", "NC", "NJ", "NY", "CT", "PA", "VA", "MD", "DC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 150,
+        "employee_max": 700,
+        "revenue_min": 10000000,
+        "revenue_max": 150000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Franchised property (not corporate-managed) confirmed via franchise disclosure or operator registry — franchisees retain local vendor discretion below brand-standard thresholds",
+        "Property GM actively engaged on LinkedIn during Q1–Q2 planning season discussing guest experience initiatives or seasonal programming",
+        "Property posting a Director of Marketing or Guest Experience role — signals programming investment cycle underway",
+        "Renovation or repositioning announcement within the past 12 months — co-invested seasonal program fits the property's upgrade narrative",
+        "STR data showing the property trailing its brand-tier comp set in the local market on ADR",
+        "Property listed on AAHOA member directory or conference attendee list — owner-operator overlap signals local vendor authority",
+        "Package-marketing launch (stay-and-experience bundles) in the past 6 months"
+      ],
+      "exclusions": [
+        "Corporate-managed chain properties requiring HSM (Hilton Supply Management) or Avendra procurement approval before property can engage",
+        "Properties under 150 keys in secondary markets without event or F&B programming spend",
+        "Newly opened properties in first 12 months of operation — pre-stabilized RevPAR displaces programming investment",
+        "Existing BN customers"
+      ],
+      "seed_accounts": [
+        {"name": "Hilton Scottsdale Resort & Villas", "domain": "hilton.com"},
+        {"name": "Marriott Orlando World Center", "domain": "marriott.com"},
+        {"name": "Omni Grove Park Inn (Asheville)", "domain": "omnihotels.com"},
+        {"name": "Loews Miami Beach Hotel", "domain": "loewshotels.com"},
+        {"name": "The Vinoy Resort & Golf Club (St. Petersburg)", "domain": "marriott.com"},
+        {"name": "The Westin Kierland Resort & Spa (Scottsdale)", "domain": "marriott.com"},
+        {"name": "Hyatt Regency Coconut Point Resort & Spa (Naples)", "domain": "hyatt.com"},
+        {"name": "Grand Hyatt Denver", "domain": "hyatt.com"},
+        {"name": "The Otesaga Resort Hotel (Cooperstown)", "domain": "otesaga.com"}
+      ]
+    }
+  }
 }

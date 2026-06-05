@@ -1,10 +1,60 @@
-# Canonical entry for the Auto Dealerships vertical (skeleton).
+# Canonical entry for the Auto Dealerships vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/auto-dealerships/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Exploring — desk research complete, field validation pending.
+# Thin-source draft — operator redline required. Offer pricing tiers, OEM co-op eligibility
+# for seasonal lighting, per-rooftop seasonal-decor budgets, and foot-traffic-lift data are
+# all open research gaps per the handbook Assumptions Log. No offers have closed.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - Facilities / Operations Manager: gatekeeper/influencer, not a first-call target;
+#     surfaces after champion engagement.
+#   - Regional VP / Corporate CMO: above Regional Marketing Director; relevant only for
+#     portfolio-wide enterprise deals after a pilot is in market.
 slug: auto-dealerships
 display: "Auto Dealerships"
 playbook_path: "marketing/go-to-market/verticals/auto-dealerships/README.md"
-personas: []
-offers: []
+personas:
+  # Sole decision-maker at independents and small groups (1–5 rooftops); 1–4 week close cycle.
+  - slug: dealer-principal-owner
+    display: "Dealer Principal / Owner"
+    titles:
+      - "Dealer Principal"
+      - "Owner"
+      - "Managing Partner"
+      - "President"
+      - "Owner-Operator"
+  # P&L owner for the individual rooftop; decision-maker at independents when delegated,
+  # champion/internal sponsor at auto-group locations.
+  - slug: general-manager
+    display: "General Manager"
+    titles:
+      - "General Manager"
+      - "General Sales Manager"
+      - "Managing Director"
+      - "Dealership GM"
+  # Budget authority for seasonal programs across 10–30 rooftop clusters at large groups;
+  # primary cold-outbound first-call target for the auto-group segment (NADA Show, Digital
+  # Dealer Conference, LinkedIn).
+  - slug: regional-marketing-director
+    display: "Regional Marketing Director"
+    titles:
+      - "Regional Marketing Director"
+      - "Marketing Director"
+      - "Regional Marketing Manager"
+      - "VP of Marketing"
+      - "Director of Marketing"
+      - "Corporate Marketing Manager"
+offers:
+  # Professional lot, showroom, and signage lighting positioned as a year-end sales event
+  # amplifier for the OEM December campaign window (Nov–Jan). Two value motions: flagship
+  # single-rooftop install for dealer principals; one-MSA multi-rooftop program for groups.
+  # All pricing, co-op eligibility, and foot-traffic-lift assumptions untested per
+  # Assumptions Log.
+  - slug: year-end-sales-lot-activation
+    display: "Year-End Sales Lot Activation"
+    status: draft
+    posture: pilot
+    target_personas: [general-manager, dealer-principal-owner, regional-marketing-director]
+    prose_path: "marketing/go-to-market/verticals/auto-dealerships/offers/year-end-sales-visibility.md"

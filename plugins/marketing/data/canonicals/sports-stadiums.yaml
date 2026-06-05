@@ -1,10 +1,65 @@
-# Canonical entry for the Sports Stadiums vertical (skeleton).
-# Source: handbook@main:marketing/go-to-market/verticals/sports-stadiums/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Canonical entry for the Sports Stadiums vertical.
+# Source: plugins/marketing/references/vertical-playbooks/sports-stadiums.md
+#         (BC-5923 R-9 research grounding 2026-04-23; handbook README is a pre-research stub).
+# Status: draft — offers E and A confirmed V1 picks; Offer B pending Brite Facilities-VP
+#   sales-motion gate.
+# History:
+#   2026-06-05 — personas+offers backfilled from references/vertical-playbooks/sports-stadiums.md
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - sr-director-nongameday-revenue: optional/conditional per playbook — present only at larger
+#     MLS / Group of 5 FBS properties with dedicated non-sport event orgs; not a universal
+#     first-call target. Skip in list-building unless account research confirms the title exists.
 slug: sports-stadiums
 display: "Sports Stadiums"
 playbook_path: "marketing/go-to-market/verticals/sports-stadiums/README.md"
-personas: []
-offers: []
+personas:
+  - slug: general-manager
+    display: "General Manager"
+    titles:
+      - "General Manager"
+      - "President & General Manager"
+      - "VP and General Manager"
+      - "Executive Director"
+  - slug: director-of-revenue
+    display: "Director of Revenue"
+    titles:
+      - "Director of Revenue"
+      - "Director of Revenue Operations"
+      - "VP of Revenue"
+      - "Director of Business Development"
+      - "Director of Revenue Generation"
+  - slug: director-of-events
+    display: "Director of Events"
+    titles:
+      - "Director of Events"
+      - "Director of Event Sales"
+      - "Director of Private Events"
+      - "Director of Event Operations"
+      - "VP of Events"
+      - "Director of Entertainment"
+  - slug: owner-operator
+    display: "Owner-Operator / Principal Owner"
+    titles:
+      - "Owner"
+      - "Principal Owner"
+      - "Managing Partner"
+      - "Athletic Director"
+      - "President"
+      - "Chief Executive Officer"
+offers:
+  - slug: stadium-production-finance
+    display: "Stadium Production Finance (Offer E)"
+    status: draft
+    posture: risk-reversal
+    target_personas: [general-manager, director-of-revenue, owner-operator]
+  - slug: plaza-pilot-zone
+    display: "Plaza Pilot Zone (Offer A)"
+    status: draft
+    posture: pilot
+    target_personas: [general-manager, director-of-events]
+  - slug: permanent-plaza-backbone
+    display: "Permanent Plaza Backbone, Seasonal Dress (Offer B)"
+    status: draft
+    posture: pilot
+    target_personas: [general-manager, director-of-revenue, owner-operator]

@@ -2,12 +2,163 @@
   "vertical": "hospitals",
   "source": "marketing/go-to-market/verticals/hospitals/README.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "geo.regions defaults to hypothesized BN-territory set — confirm which states are currently serviceable for healthcare installs",
+    "size_band employee thresholds are proxied from bed-count conventions (300+ beds ≈ ~1,500+ employees for community hospitals, ~3,000+ for academic medical centers) — operator redline against actual prospect list pull",
+    "seed_accounts are look-alike exemplars drawn from the README's named references and peer institutions — confirm none are existing clients or active pipeline before using for list-building",
+    "multi-hospital-system segment employee_max is null (open ceiling) — confirm whether Brite Nites has a practical campus-count ceiling that should bound this segment"
   ],
-  "segments": {}
+  "segments": {
+    "independent-community-hospitals": {
+      "display": "Independent & Community Hospitals (300+ beds)",
+      "persona": "director-facilities",
+      "industries": [
+        "Hospitals & Health Systems",
+        "General Medical and Surgical Hospitals",
+        "Community Hospitals",
+        "Regional Health Systems",
+        "Faith-Based Health Systems"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 1500,
+        "employee_max": 10000,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "New or recently renovated patient tower or campus entrance opening (capital project completion announcement)",
+        "Magnet recognition application or re-designation in progress (HCAHPS / Press Ganey scores are strategic priority)",
+        "New CEO, COO, or VP Operations hire in trailing 12 months (leadership change drives vendor review)",
+        "Published Form 990 showing non-clinical operating-budget growth year-over-year",
+        "Community-health investment announcement or community-benefit program launch",
+        "Job posting for Director of Facilities or Director of Marketing & Communications (active program build-out)",
+        "Active holiday or seasonal community-events programming on public social channels"
+      ],
+      "exclusions": [
+        "For-profit HCA-owned or Tenet-owned facilities (no local budget authority for facility aesthetics — per handbook)",
+        "Hospitals with fewer than 300 beds (insufficient dedicated Facilities + MarCom staff)",
+        "Critical Access Hospitals under 100 beds (budget thresholds too small for viable engagement)",
+        "Existing Brite Nites clients",
+        "Hospitals flagged in active pipeline (defer to sales)"
+      ],
+      "seed_accounts": [
+        {"name": "Inova Fairfax Medical Campus", "domain": "inova.org"},
+        {"name": "Baptist Health South Florida — Baptist Hospital", "domain": "baptisthealth.net"},
+        {"name": "Cedars-Sinai Medical Center", "domain": "cedars-sinai.org"},
+        {"name": "Intermountain Medical Center", "domain": "intermountainhealthcare.org"},
+        {"name": "MedStar Georgetown University Hospital", "domain": "medstarhealth.org"},
+        {"name": "Overlake Medical Center & Clinics", "domain": "overlakehospital.org"},
+        {"name": "Novant Health Presbyterian Medical Center", "domain": "novanthealth.org"},
+        {"name": "Texas Health Presbyterian Hospital Dallas", "domain": "texashealth.org"},
+        {"name": "Carilion Roanoke Memorial Hospital", "domain": "carilionclinic.org"},
+        {"name": "UCHealth University of Colorado Hospital", "domain": "uchealth.org"}
+      ]
+    },
+    "academic-medical-centers": {
+      "display": "Academic Medical Centers (University-Affiliated, State & Private)",
+      "persona": "director-marketing-comms",
+      "industries": [
+        "Hospitals & Health Systems",
+        "Academic Medical Centers",
+        "University Hospitals",
+        "Teaching Hospitals",
+        "Research Hospitals"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 3000,
+        "employee_max": 30000,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "New campus construction or entrance renovation announced (capital project with public-facing exterior scope)",
+        "University or hospital strategic plan published citing community-anchor or institutional-identity goals",
+        "HCAHPS or Press Ganey score improvement initiative announced publicly or via leadership hire",
+        "Annual giving campaign or capital campaign publicly launched (Foundation budget activated)",
+        "New Dean, President, or VP of Community Affairs appointed (vendor review window)",
+        "State fiscal year budget passed with increased operating appropriations (state-university regime)",
+        "Job posting for Director of Marketing & Communications or Director of Community Engagement",
+        "Partnership or naming-rights announcement tied to donor programming (Foundation motion signal)"
+      ],
+      "exclusions": [
+        "VA / Veterans Affairs hospitals (federal procurement regime — outside current BN playbook)",
+        "Hospitals where Brite Nites already holds a contract (University of Utah Health — existing client, upsell handled separately)",
+        "Hospitals flagged in active pipeline (defer to sales)",
+        "Institutions with active state purchasing freeze or continuing-resolution budget hold"
+      ],
+      "seed_accounts": [
+        {"name": "UAB Medicine (University of Alabama at Birmingham Hospital)", "domain": "uabmedicine.org"},
+        {"name": "UCLA Health", "domain": "uclahealth.org"},
+        {"name": "UC San Diego Health", "domain": "health.ucsd.edu"},
+        {"name": "UCSF Health", "domain": "health.ucsf.edu"},
+        {"name": "Johns Hopkins Hospital", "domain": "hopkinsmedicine.org"},
+        {"name": "Stanford Health Care", "domain": "stanfordhealthcare.org"},
+        {"name": "UHealth — University of Miami Health System", "domain": "uhealth.miami.edu"},
+        {"name": "UNC Health (UNC Hospitals)", "domain": "unchealthcare.org"},
+        {"name": "Sharp HealthCare (nonprofit — San Diego regional system)", "domain": "sharp.com"}
+      ]
+    },
+    "multi-hospital-private-systems": {
+      "display": "Multi-Hospital Private Health Systems (5+ Campuses)",
+      "persona": "system-chief-facilities-officer",
+      "industries": [
+        "Hospitals & Health Systems",
+        "Multi-Hospital Health Systems",
+        "Integrated Delivery Networks",
+        "Regional Health Networks",
+        "Faith-Based Hospital Systems"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 10000,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "System merger or acquisition closed in trailing 12–24 months (vendor harmonization window per handbook)",
+        "New System Chief Facilities Officer, System COO, or System CMO appointed (vendor-consolidation motion triggered)",
+        "System-wide brand refresh or visual-standards initiative announced",
+        "System issues RFP for facilities services, environmental services, or campus aesthetics",
+        "New system headquarters campus or flagship hospital expansion announced",
+        "System publishes multi-year strategic plan referencing operational standardization or vendor consolidation",
+        "LinkedIn job postings for system-level Facilities VP or Corporate Facilities Director across multiple campuses simultaneously"
+      ],
+      "exclusions": [
+        "HCA Healthcare-owned systems and their individual campuses (corporate-controlled budgets — deprioritized per handbook)",
+        "Tenet Healthcare and Community Health Systems (same centralized-corporate pattern as HCA)",
+        "Systems with active federal antitrust review or merger injunction (procurement freeze likely)",
+        "Existing Brite Nites clients at system level",
+        "Systems where Brite Nites is already active in pipeline at system scale (defer to sales)"
+      ],
+      "seed_accounts": [
+        {"name": "MedStar Health (10-hospital system, DC/MD region)", "domain": "medstarhealth.org"},
+        {"name": "Inova Health System (5-hospital system, Northern Virginia)", "domain": "inova.org"},
+        {"name": "Intermountain Health (33 hospitals, UT/ID/NV/CO)", "domain": "intermountainhealthcare.org"},
+        {"name": "Baptist Health South Florida (12 hospitals)", "domain": "baptisthealth.net"},
+        {"name": "Novant Health (15+ hospitals, NC/VA/SC/GA)", "domain": "novanthealth.org"},
+        {"name": "CommonSpirit Health (Western US campuses)", "domain": "commonspirit.org"},
+        {"name": "Providence Health & Services (WA/OR/CA campuses)", "domain": "providence.org"},
+        {"name": "Northwell Health (21 hospitals, NY/NJ)", "domain": "northwell.edu"},
+        {"name": "AdventHealth (FL-heavy multi-campus system)", "domain": "adventhealth.com"},
+        {"name": "Sutter Health (28 hospitals, Northern California)", "domain": "sutterhealth.org"}
+      ]
+    }
+  }
 }

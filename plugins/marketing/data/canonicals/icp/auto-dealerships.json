@@ -2,12 +2,110 @@
   "vertical": "auto-dealerships",
   "source": "marketing/go-to-market/verticals/auto-dealerships/README.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "size_band rooftop-count thresholds moved out of size_band per schema: auto-group segment qualifies at 10+ rooftops in BN territory (regional marketing clusters of 10–30); independent segment at 1–5 rooftops — encode via list-building filters; employee bands below are staffing-ratio estimates",
+    "Per-rooftop seasonal-decor budget vs. BN deal minimums is an open research gap — revenue proxies draw on NADA per-rooftop ad-spend averages ($543K/rooftop), not seasonal-display line items",
+    "Utah auto-group footprint is a confirmed gap — no Top-10 group has a validated UT presence; UT excluded from the group segment pending field validation",
+    "OEM co-op eligibility for physical seasonal lighting (30–100% reimbursement) is explicitly unvalidated — surface as a discovery-call question before any campaign referencing co-op",
+    "Foot-traffic-lift data for seasonal lighting at dealerships does not exist in the handbook — flag any ROI claim in campaign copy as untested"
   ],
-  "segments": {}
+  "segments": {
+    "large-multi-brand-auto-groups": {
+      "display": "Large Multi-Brand Auto Groups",
+      "persona": "regional-marketing-director",
+      "industries": [
+        "Automotive Dealers",
+        "New Car Dealers (NAICS 441110)",
+        "Used Car Dealers (NAICS 441120)"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CO", "NC", "SC", "GA", "VA", "TX", "CA", "NY", "NJ", "CT", "MD", "DC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 1000,
+        "employee_max": null,
+        "revenue_min": 500000000,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "LinkedIn job postings for Regional Marketing Director or Director of Marketing at auto group",
+        "OEM facility-image program compliance (Mercedes Autohaus, BMW Retail.NEXT, Porsche Destination Porsche, Lexus L Studio) — signals premium-exterior-standards orientation",
+        "Preferred vendor program or MSA infrastructure visible in procurement job postings"
+      ],
+      "intent_signals": [
+        "Q3 budget planning cycle (July–September) — primary outreach window for year-end holiday installations",
+        "NADA Show attendance (February) — corporate marketing relationship building",
+        "Digital Dealer Conference attendance (September) — well-timed for Q4 planning conversations",
+        "New rooftop acquisitions or regional expansion announcements",
+        "OEM December campaign (Lexus December to Remember, Mercedes Winter Event, BMW Happier Holidays, Toyotathon) pre-season planning"
+      ],
+      "exclusions": [
+        "Single-rooftop or small-group operators (fewer than 10 locations) — route to independent segment",
+        "SoCal-only footprint (excluded from BN territory)",
+        "UT-only footprint (no validated Top-10 group presence)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "AutoNation", "domain": "autonation.com"},
+        {"name": "Lithia Motors", "domain": "lithia.com"},
+        {"name": "Penske Automotive Group", "domain": "penskeautomotive.com"},
+        {"name": "Hendrick Automotive Group", "domain": "hendrickcars.com"},
+        {"name": "Group 1 Automotive", "domain": "group1auto.com"},
+        {"name": "Asbury Automotive Group", "domain": "asburyauto.com"},
+        {"name": "Sonic Automotive", "domain": "sonicautomotive.com"},
+        {"name": "Ken Garff Automotive Group", "domain": "kengarff.com"},
+        {"name": "Rosenthal Automotive", "domain": "rosenthalautomotive.com"},
+        {"name": "JM Family Enterprises", "domain": "jmfamily.com"}
+      ]
+    },
+    "independent-premium-dealerships": {
+      "display": "Independent / Small-Group Premium Dealerships",
+      "persona": "dealer-principal-owner",
+      "industries": [
+        "New Car Dealers (NAICS 441110)",
+        "Automotive Dealers"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CO", "NC", "VA", "MD", "DC", "NJ", "CT", "NY", "TX", "CA", "UT", "WA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 50,
+        "employee_max": 1000,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "OEM luxury/premium brand franchise (BMW, Mercedes-Benz, Lexus, Porsche, Audi, Cadillac) — higher OEM facility-image standards and budgets",
+        "Significant street frontage on high-traffic corridors (visible via mapping / street-view review)",
+        "Investments in landscaping, architectural signage, or showroom renovation visible on dealership website"
+      ],
+      "intent_signals": [
+        "Q3 outreach window (July–September) — dealer principals planning year-end traffic",
+        "Post-holiday strike follow-up (January–February) — permanent lot lighting and facade upsell window",
+        "New dealership construction or acquisition announcements in local business press",
+        "OEM December campaign season approaching (Lexus December to Remember, Mercedes Winter Event, BMW Happier Holidays)",
+        "Dealership advertising or social media showing current lot appearance during evening hours"
+      ],
+      "exclusions": [
+        "Non-luxury/volume-only franchises in low-visibility suburban locations",
+        "Dealerships in markets outside BN service territory",
+        "Dealerships with fewer than 100 vehicles on lot (below BN commercial install minimum — flag for discovery validation)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Park Place Dealerships (Dallas-Fort Worth luxury group)", "domain": "parkplace.com"},
+        {"name": "Holman (multi-brand NJ/FL/PA)", "domain": "holman.com"},
+        {"name": "Napleton Automotive Group", "domain": "napleton.com"},
+        {"name": "Sewell Automotive Companies", "domain": "sewell.com"},
+        {"name": "Germain Motor Company", "domain": "germainmotorco.com"},
+        {"name": "Rick Case Automotive Group (South Florida)", "domain": "rickcase.com"},
+        {"name": "Braman Motorcars (Miami/Palm Beach luxury)", "domain": "bramanmotorcars.com"},
+        {"name": "Herb Chambers Companies (New England luxury)", "domain": "herbchambers.com"},
+        {"name": "Fields Automotive Group (FL/NC luxury)", "domain": "fieldsauto.com"}
+      ]
+    }
+  }
 }

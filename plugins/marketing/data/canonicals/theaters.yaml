@@ -1,10 +1,49 @@
-# Canonical entry for the Theaters vertical (skeleton).
+# Canonical entry for the Theaters vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/theaters/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Pre-launch Research — single-ICP vertical playbook in early draft.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - Executive Director: influencer/approver, not a list-building target per handbook
+#     ("Operations/Facilities Director + Artistic Director sign off; capital projects
+#     involve board").
+#   - Artistic Director: approver, not an outbound target.
+# Thin-source flag: the README offers table is entirely TBD and no offers/ subdirectory
+#   exists — offers below are inferred from the asset-gaps section and vertical description;
+#   treat as hypotheses until confirmed via /marketing:new-offer. No prose_path entries
+#   because no offer files exist to verify.
 slug: theaters
 display: "Theaters"
 playbook_path: "marketing/go-to-market/verticals/theaters/README.md"
-personas: []
-offers: []
+personas:
+  - slug: dir-operations-facilities
+    display: "Director of Operations / Facilities"
+    titles:
+      - "Director of Operations"
+      - "Director of Facilities"
+      - "General Manager"
+      - "Production Manager"
+      - "VP of Operations"
+      - "Building & Facilities Manager"
+offers:
+  - slug: facade-marquee-install
+    display: "Facade & Marquee Lighting Install"
+    status: draft
+    posture: pilot
+    target_personas: [dir-operations-facilities]
+  - slug: lobby-ceiling-install
+    display: "Lobby & Ceiling Lighting Install"
+    status: draft
+    posture: pilot
+    target_personas: [dir-operations-facilities]
+  - slug: seasonal-holiday-lighting
+    display: "Seasonal Holiday Lighting Enhancement"
+    status: draft
+    posture: risk-reversal
+    target_personas: [dir-operations-facilities]
+  - slug: venue-lighting-discovery-consult
+    display: "Venue Lighting Discovery Consult"
+    status: draft
+    posture: free-asset
+    target_personas: [dir-operations-facilities]

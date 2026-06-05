@@ -2,12 +2,104 @@
   "vertical": "historic-sites",
   "source": "marketing/go-to-market/verticals/historic-sites/README.md",
   "clarifications_needed": [
-    "category / segment \u2014 account types (universes) in this vertical",
-    "size band \u2014 employee and/or revenue floor per universe",
-    "geography \u2014 confirm BN-territory regions",
-    "fit / intent signals \u2014 what separates a strong-fit account",
-    "seed accounts \u2014 5-10 look-alike exemplars per universe",
-    "exclusions \u2014 account types to filter out"
+    "Geography is hypothesis-grade: README flags '[NEEDS RESEARCH: priority BN territories — PA, DMV, FL, VA, NC]' — the region list reflects default BN coverage plus README-named territories; validate against actual BN service footprint",
+    "size_band is null on all schema keys — the README sizes by annual visitors (50K+ estates / 75K+ living-history, both [NEEDS RESEARCH]) and org type (501(c)(3), government agency), which don't map to employee/revenue; encode via list-building filters; dedicated programming/events staff (typically 10–75 FTE org) is a qualifying requirement",
+    "Budget/deal-size range unvalidated: README hypothesizes $15K–$150K seasonal event budget; offer pages list $30K–$150K scopes — confirm minimum viable deal size before list-building",
+    "Living-history segment is derived from offer frontmatter in after-dark-heritage-activation.md but not explicitly built out as a named ICP in the vertical README — treat as provisional"
   ],
-  "segments": {}
+  "segments": {
+    "historic-estates-and-house-museums": {
+      "display": "Historic Estates and House Museums",
+      "persona": "executive-director",
+      "industries": [
+        "Museums and Historical Sites",
+        "Nonprofit Civic and Social Organizations",
+        "Historical Preservation Societies",
+        "Government Historic Properties",
+        "Private Nonprofit Heritage Organizations"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["PA", "VA", "MD", "DC", "FL", "NC", "CT", "NY", "NJ", "MA", "CA", "AZ", "CO", "UT", "WA", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Job posting for Director of Programming or Director of Visitor Experience",
+        "Ticketed evening events listed on site calendar (candlelight tours, holiday markets)",
+        "Heritage tourism grant application or award in public record",
+        "CVB or DMO feature in regional 'things to do' holiday guide",
+        "Anniversary milestone or centennial in site copy or press releases",
+        "AASLH or National Trust for Historic Preservation conference exhibitor or speaker"
+      ],
+      "exclusions": [
+        "Sites with fewer than 50K annual visitors and no existing public event programming",
+        "Sites operated solely as research archives with no public visitor program",
+        "Properties currently under active construction or closed for restoration",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Monticello (Thomas Jefferson Foundation)", "domain": "monticello.org"},
+        {"name": "Biltmore Estate", "domain": "biltmore.com"},
+        {"name": "George Washington's Mount Vernon", "domain": "mountvernon.org"},
+        {"name": "Winterthur Museum, Garden and Library", "domain": "winterthur.org"},
+        {"name": "Dumbarton Oaks", "domain": "doaks.org"},
+        {"name": "Stan Hywet Hall and Gardens", "domain": "stanhywet.org"},
+        {"name": "Vizcaya Museum and Gardens", "domain": "vizcaya.org"},
+        {"name": "Hildene, The Lincoln Family Home", "domain": "hildene.org"}
+      ]
+    },
+    "living-history-and-heritage-district-sites": {
+      "display": "Living History Museums and Heritage District Sites",
+      "persona": "director-of-visitor-experience",
+      "industries": [
+        "Museums and Historical Sites",
+        "Nonprofit Civic and Social Organizations",
+        "Living History Museums",
+        "Heritage Tourism Organizations",
+        "Cultural Preservation Nonprofits"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["VA", "MA", "PA", "NY", "CT", "MD", "NC", "FL", "OH", "IN", "CA", "CO", "TX", "WA", "TN"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Published seasonal evening events calendar (candlelight evenings, holiday programs)",
+        "CVB co-marketing partnership listed on site or CVB website",
+        "Job posting for evening or seasonal programming coordinator",
+        "State-heritage or NEH grant award in recent press releases",
+        "Anniversary or milestone programming listed in strategic plan or annual report"
+      ],
+      "exclusions": [
+        "Sites that are entirely indoor with no illuminable outdoor grounds or facades",
+        "Sites with no existing public evening event programming and no dedicated events staff",
+        "Purely digital or virtual heritage organizations with no physical site",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Colonial Williamsburg Foundation", "domain": "colonialwilliamsburg.org"},
+        {"name": "Old Sturbridge Village", "domain": "osv.org"},
+        {"name": "Plimoth Patuxet Museums", "domain": "plimoth.org"},
+        {"name": "Historic Deerfield", "domain": "historic-deerfield.org"},
+        {"name": "Conner Prairie", "domain": "connerprairie.org"},
+        {"name": "Mystic Seaport Museum", "domain": "mysticseaport.org"},
+        {"name": "Greenfield Village (The Henry Ford)", "domain": "thehenryford.org"},
+        {"name": "Strawbery Banke Museum", "domain": "strawberybanke.org"}
+      ]
+    }
+  }
 }
