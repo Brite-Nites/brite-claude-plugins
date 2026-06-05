@@ -49,13 +49,18 @@ priority carries it in the interim.
 _Avoid_: claiming priority replaces `severity:*` — they are distinct axes
 
 **Intake**:
-The act of getting a report onto the tracker as a well-formed `needs-triage`
-issue — routing, the Bug/Idea fork, canonical labels, duplicate check, secret
-redaction, and a draft preview. Intake is deliberately thin: it stops at
-`needs-triage` and hands deeper work to Triage. The `/workflows:raise-a-ticket`
-command is Intake.
-_Avoid_: doing reproduction, grilling, or agent-brief writing during Intake —
-that is Triage's job
+The act of getting a report onto the tracker as a well-formed issue. The
+`/workflows:raise-a-ticket` command is the single **front door**: it first asks
+whether the report is about a **Brite Product** or the **agent tooling itself**
+(a skill/command/hook), then routes. The **product** branch produces a thin
+`needs-triage` issue — routing, the Bug/Idea fork, canonical labels, duplicate
+check, secret redaction, draft preview — and hands deeper work to Triage. The
+**agent-tooling** branch hands off to `/workflows:report-issue`, which classifies
+the misbehavior and generates a regression test; `report-issue` is also reachable
+directly as an expert alias. Both branches enter through the one door.
+_Avoid_: doing reproduction, grilling, or agent-brief writing during product Intake
+(that is Triage's job); and don't call the agent-tooling branch "a kind of product
+feedback" — it is tooling misbehavior, a distinct branch of the same door
 
 **Triage**:
 The downstream, maintainer-facing stage (the `/triage` skill) that moves an

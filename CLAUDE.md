@@ -40,7 +40,9 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-008: tam-mapping enrichment pluggability](docs/decisions/008-tam-mapping-enrichment-pluggability.md) — provider selection via userConfig, shared input/output schema, swap path
 - [ADR-009: SF capability adoption framework](docs/decisions/009-sf-capability-adoption.md) — 6-check framework (runtime model, license, plugin slot, toolset breadth, GA gate, domain fit) with worked examples
 - [ADR-010: Plugin secret-config canon](docs/decisions/010-plugin-secret-config-canon.md) — Bitwarden + `bw-run.sh` broker for stdio MCPs and CLI scripts; HTTP MCPs covered by BC-5551 exception
-- [ADR-021: `raise-a-ticket` intake](docs/decisions/021-raise-a-ticket-intake.md) — Linear-native, cross-product product-feedback intake (Bug/Idea → `type:bug`/`type:task` + `needs-triage`) that reuses `docs/agents/issue-tracker.md` for routing and hands off to `/triage`; deprecates `bug-report`
+- [ADR-021: `raise-a-ticket` intake](docs/decisions/021-raise-a-ticket-intake.md) — Linear-native, cross-product product-feedback intake (Bug/Idea → `type:bug`/`type:task` + `needs-triage`) that reuses `docs/agents/issue-tracker.md` for routing and hands off to `/triage`; deprecates `bug-report` — *front-door consequence amended by ADR-022*
+- [ADR-022: Unified intake front door](docs/decisions/022-unified-intake-front-door.md) — `raise-a-ticket` becomes the single front door with a Step-1 product-vs-agent-tooling fork (tooling dispatches to `report-issue`, kept as a direct alias); content-aware switch replaces the location-only redirect; cap-proof numbered-list disambiguation + multi-team modal default (BC-12400). Supersedes ADR-021's "keep separate" consequence only
+- [ADR-023: GTM commercial-model vocabulary](docs/decisions/023-gtm-commercial-model-vocabulary.md) — campaign-level economic-axis vocabulary (`install-fee`/`rev-share`/`ticketed`/`sponsor`/`co-invest`/`hybrid`), distinct from offer-posture (ADR-017); resolves the `ticket`/`rev share` spelling drift; SF Campaign picklist declared as the future mapping target but not built (BC-12392)
 
 ## Company Context
 

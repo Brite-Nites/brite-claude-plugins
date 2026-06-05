@@ -385,6 +385,17 @@ Print the operator-readable plan. Use this format (or a close variant — readab
     #1  Deck Asset — <offer_display> (<vertical_display>)             → <deck-assignee>, due <launch-date> - 14d
     #2  Data Sourcing & List Building — <vertical_display> <offer_display> (M<month:02d>)
                                                                        → <list-assignee>, due <launch-date> - 21d
+  Sub-issues to create (8 standard + N optional — titles/schedule are illustrative;
+  canonical source is references/campaign-sub-issue-templates.md):
+    #1  Brief approved                              [gate, blocks #2-#8]
+    #2  Target list built                           [blocks #3; expects /marketing:list-building]
+    #3  Copy written + approved                     [blocks #4; expects /marketing:email-copywriting]
+    #4  Pre-launch QA                               [blocks #6]
+    #5  Launch executed                             [blocks #7; expects /marketing:launch-campaign]
+    #6  Active management — weekly reviews          [blocks #8]
+    #7  Campaign closed + debrief                   [terminal; expects /marketing:campaign-debrief]
+    #8  Situation Mining            <-- ONLY IF --situation-mining flag set AND entity=labs
+    #9 Creative Angles             <-- ONLY IF --creative-angles flag set
 
 =================================================================
 ```
@@ -700,6 +711,14 @@ Both `save_issue` calls share:
 - `labels`: the 8-label set from § Step 8a.6 (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`)
 - `priority`: 2 (High)
 - NO `parentId` (top-level milestone issues, not sub-issues)
+- `title`: the matching sub-issue's `title` from the reference file (§ 9.1)
+- `description`: the matching sub-issue's **Description** blockquote from the reference file, stamped verbatim as the issue body (§ 9.1)
+- `parentId`: see § 9.0 below (resolved at impl time)
+- `projectId`: `<gtm-project-id>`
+- `projectMilestoneId`: `<milestone-id>` from Step 8a
+- `labels`: the 8-label set from § Step 8a.6 (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`) — applied to EVERY sub-issue (this milestone-level label set lives in the command, NOT in the reference file)
+- `assignee`: omit (sub-issues are assigned at sub-issue start time, not scaffold time)
+- `dueDate`: `<launch-date>` + the sub-issue's `dueDate_offset_days` from the reference file (§ 9.1)
 
 ### 9a — Substance rules: draft the issue bodies at scaffold time
 
@@ -739,6 +758,27 @@ Interactive HTML deck for <vertical_display> sales outreach — a publicly viewa
 **Positioning:** <1-2 sentences drafted from offer posture + message-market-fit brain context — the angle this deck leads with, e.g. BC-2816's "Holiday lighting as a student wellness benefit during finals week.">
 
 **Branding:** <entity-mapped: nites → "Brite Nites throughout, one Brite Labs capability page near the end"; labs → "Brite Labs throughout"; supply → "Brite Supply"; cross-entity → per --theme>
+### 9.1 — Sub-issue specs (read + stamp from the reference file)
+
+The per-phase sub-issue specs live in **`plugins/marketing/references/campaign-sub-issue-templates.md`** — extracted in BC-12564 so they are maintained in one place and contract-tested as the source of truth, rather than inlined here. `Read` that file once and stamp each entry under its `## Standard sub-issues` heading, in `id` order. Each sub-issue section is one fenced `yaml` block (`id`, `title`, `dueDate_offset_days`, `blockedBy`, `optional`, `labs_gated`) followed by a **Description** blockquote.
+
+For each standard sub-issue (`optional: false`):
+
+1. Parse the `yaml` block.
+2. Call `save_issue` with the field mapping from Step 9 above:
+   - `title` ← the block's `title`.
+   - `description` ← the **Description** blockquote, stamped verbatim as the issue body.
+   - `dueDate` ← `<launch-date>` + `dueDate_offset_days` (e.g. `-21` → T-21d; `0` → launch day; `40` → T+40d). The reference file declares the offset integer; this command does the date arithmetic.
+   - `parentId` ← `<container-issue-id>` (§ 9.0); `projectId` ← `<gtm-project-id>`; `projectMilestoneId` ← `<milestone-id>`; `labels` ← the 8-label set (§ 8a.6, applied to every sub-issue).
+3. Capture the returned `id` + `identifier` (§ 9.2).
+
+The standard chain, by `id`: **#1 Brief approved** (gate) → **#2 Target list built** and **#3 Copy written + approved** (both gated only by #1 — copy and target list run in parallel) → **#4 Salesforce setup** → **#5 Pre-launch QA** → **#6 Launch executed** → **#7 Active management — weekly reviews** → **#8 Campaign closed + debrief** (terminal). The authoritative dependency graph is each entry's `blockedBy` field in the reference file — do NOT re-derive it here.
+
+**Second-pass `blockedBy` wiring** (per the two-pass note above): after all standard creates succeed, for each sub-issue call `save_issue(id=<sub-issue-id>, blockedBy=[<resolved-id(s)>])`, resolving each reference-file `blockedBy` index (e.g. `[1]`, `[3]`) to the Linear `id` captured for that index in pass 1. The reference file stores only `blockedBy` — the forward `blocks` edge is its exact inverse and is auto-rendered by Linear, so it is not stored (storing it previously caused a now-fixed inconsistency). The command writes only `blockedBy`.
+
+### 9.2 — Capture sub-issue IDs
+
+For each `save_issue` response, capture the returned `id` + `identifier` (e.g., `BC-9001`). Pass to Step 11 for the summary output.
 
 ## Design source
 
@@ -773,6 +813,11 @@ Suggested section outline (proven ~11-section pattern from prior decks):
 * Photography: <prior installs in this vertical if known from brain context; else "flag — no vertical-specific install photos on record">
 * Metrics: finalize stats for the credibility section
 * Contact info: CTA destination URLs / scheduling links
+The 2 optional sub-issues are defined under `## Optional sub-issues` in `plugins/marketing/references/campaign-sub-issue-templates.md` (`optional: true`): **#9 Situation Mining** (Labs-gated) and **#10 Creative Angles**. Create one ONLY when its flag is passed, stamping `title` / **Description** / `dueDate` (`<launch-date>` + `dueDate_offset_days`) and wiring `blockedBy` exactly as in § 9.1 — same 8-label set, same container parent, same second-pass wiring. When an optional sub-issue is created, also append its `id` to #1's downstream set so the gate blocks it too.
+
+### 10.1 — Situation Mining (Labs-gated)
+
+If `--situation-mining` was passed, enforce Labs entity. The reference file marks #9 `labs_gated: true`; this Step is where that gate is ENFORCED (the flag is data; the HARD-FAIL is orchestration).
 
 ## Acceptance criteria
 
@@ -838,12 +883,14 @@ N+1. SF Lead suppression
 ### 9d — Create order, failure handling, ID capture
 
 Create #1 (deck) then #2 (list). If either `save_issue` fails, surface the partial state plainly: the milestone (Step 8a) + manifest (Step 7) + any already-created issue all exist and are correct — do NOT roll them back. Tell the operator which issue failed and re-issue ONLY the failed `save_issue` call (the bodies are already drafted; re-running the whole command would duplicate the milestone-collision path).
+If `<entity> == "labs"`, create sub-issue #9 by stamping the reference file's `## Optional sub-issues` → #9 entry per § 9.1 (take its `blockedBy` and `dueDate_offset_days` from that entry — do not hardcode them here).
 
 For each successful `save_issue` response, capture the returned `id` + `identifier` (e.g. `BC-10178`). Pass both to Step 10 for the summary output.
 
 ### 9e — Write the Clay lead-list spec (`lead-list.md`)
 
 After both issues exist (their `identifier`s are captured at 9d), `Write` `docs/campaigns/<entity>/<slug>/lead-list.md`. **Redundant by design**: the Data Sourcing & List Building issue (§ 9c) is the tracking surface; this file is the durable, machine-loadable artifact Corinne loads into Clay MCP context when building the table. Render it from the SAME § 9a drafted content as the 9c issue body — one drafting pass, two renderings; do NOT run a second drafting pass (drift between the issue and the spec is a defect).
+If `--creative-angles` was passed, create sub-issue #10 by stamping the reference file's `## Optional sub-issues` → #10 entry per § 9.1 (take its `blockedBy` and `dueDate_offset_days` from that entry — do not hardcode them here). No entity restriction.
 
 Template (every `<...>` is the § 9a drafted value, identical to its 9c counterpart):
 
@@ -932,6 +979,19 @@ Campaign scaffolded — /marketing:plan-campaign
                         <identifier>  → <list-assignee>, due <launch-date - 21d>
   EB workspace:   <eb-workspace>  (EB campaign is created later via
                                    /marketing:launch-campaign once deck + list are done — NOT now)
+  Sub-issues:     <count> created  (titles from references/campaign-sub-issue-templates.md)
+                    #1  Brief approved                  <id>
+                    #2  Target list built               <id>
+                    #3  Copy written + approved         <id>
+                    #4  Salesforce setup                <id>
+                    #5  Pre-launch QA                   <id>
+                    #6  Launch executed                 <id>
+                    #7  Active management — weekly      <id>
+                    #8  Campaign closed + debrief       <id>
+                    #9  Situation Mining (Labs)         <id>   <-- if --situation-mining
+                    #10 Creative Angles                 <id>   <-- if --creative-angles
+  EB workspace:   <eb-workspace>  (campaign will be created at sub-issue #6
+                                   via /marketing:launch-campaign — NOT now)
 
 =================================================================
 ```
