@@ -1,9 +1,9 @@
 # 023. Artifact-class dimension for the SF capability-adoption framework
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-05
 **Linear:** [BC-12345](https://linear.app/brite-nites/issue/BC-12345) (deploy-integrity epic, item #4)
-**Decided by:** Kells Nixon (driving). **Proposed — pending Holden Halford (lead/owner) ratification.** Unlike [ADR-021](021-sfdx-hardis-adoption.md) (co-signed in-session), this ADR is authored solo, so it stays Proposed until the owner ratifies.
+**Decided by:** Kells Nixon (driving), **Holden Halford (lead/owner) ratifying** — authored solo, then owner-ratified 2026-06-05 (vs [ADR-021](021-sfdx-hardis-adoption.md)'s in-session co-sign).
 **Related:** [ADR-009](009-sf-capability-adoption.md) (the 6-check this **extends, not supersedes**), [ADR-021](021-sfdx-hardis-adoption.md) (§Consequences flag #1 + the reinterpretation table that exposed the gap), [ADR-022](022-revops-promotion-topology.md), [ADR-010](010-plugin-secret-config-canon.md) (the stdio-vs-HTTP MCP axis this ADR deliberately does **not** fold in).
 
 ## Context
