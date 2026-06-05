@@ -20,6 +20,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 COMMAND_PATH = ROOT / "commands" / "create-sf-campaign.md"
 SIBLING_COMMAND_PATH = ROOT / "commands" / "update-sf-campaign-status.md"
+# BC-12594: the marketing-side canonical EMAIL_REGEX source of truth, asserted
+# byte-identical to the revops owner-email guard below. ROOT.parents[0] is the
+# `plugins/` directory, so this resolves the sibling marketing plugin.
+MARKETING_PLAN_CAMPAIGN_PATH = (
+    ROOT.parents[0] / "marketing" / "commands" / "plan-campaign.md"
+)
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 
@@ -84,17 +90,21 @@ def test_all_required_input_flags_documented() -> None:
 
 def test_all_soft_fail_error_keys_present() -> None:
     """Soft-fail contract per BC-8724 design — orchestrators detect failure by
-    parsing the `error` key, not by exit code. All 6 documented error paths
+    parsing the `error` key, not by exit code. All 7 documented error paths
     must appear verbatim in the command body so the contract is auditable.
 
     BC-10511 added `invalid_target_org` as the 6th key (sibling parity with
     `/revops:update-sf-campaign-status` per ADR-015 amendment).
+    BC-12594 added `invalid_owner_email` as the 7th key (Phase 1
+    SOQL-injection guard on `--owner-email` before the Phase 3 `WHERE Email`
+    literal).
     """
     body = read_command()
     error_keys = [
         "missing_required_flag",
         "invalid_slug_format",
         "invalid_target_org",
+        "invalid_owner_email",
         "duplicate_slug",
         "missing_owner",
         "sf_cli_error",
@@ -276,4 +286,71 @@ def test_target_org_regex_byte_identical_to_sibling() -> None:
         f"found verbatim in sibling update-sf-campaign-status.md — sibling "
         f"source-of-truth may have drifted, re-sync required per ADR-015 "
         f"amendment."
+    )
+
+
+# ---------------------------------------------------------------------------
+# BC-12594 — `--owner-email` SOQL-injection guard. Phase 3 builds
+# `SELECT Id FROM User WHERE Email = '<owner-email>' AND IsActive = TRUE LIMIT 1`.
+# Phase 1 guards `--slug` and `--target-org` but did NOT guard `--owner-email`,
+# so a single-quote in the email broke out of the literal. Phase 1 now
+# validates `--owner-email` against the canonical EMAIL_REGEX (byte-identical
+# to the marketing-side callers) before it reaches the literal. Tests verify:
+#   - the regex appears verbatim in the command body (mirrors
+#     test_slug_regex_documented)
+#   - the regex is byte-identical to the marketing canonical source — the
+#     marketing<->revops drift guard (mirrors
+#     test_target_org_regex_byte_identical_to_sibling)
+# The `invalid_owner_email` error key is asserted in
+# test_all_soft_fail_error_keys_present above.
+# ---------------------------------------------------------------------------
+
+
+def test_owner_email_regex_documented() -> None:
+    """BC-12594: the `--owner-email` regex must appear verbatim in the command
+    body so reviewers can audit the SOQL-injection guard without re-deriving it
+    from prose. Mirrors test_slug_regex_documented.
+
+    The character class disallows the single-quote (and backslash / whitespace),
+    so a value that passes CANNOT break out of the Phase 3
+    `WHERE Email = '<owner-email>'` SOQL string literal.
+    """
+    body = read_command()
+    expected = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+    assert expected in body, (
+        f"BC-12594: --owner-email regex must appear verbatim. Expected: "
+        f"{expected!r}. The regex is a SOQL-injection guard for the Phase 3 "
+        f"`WHERE Email = '<owner-email>'` literal."
+    )
+
+
+def test_owner_email_regex_byte_identical_to_marketing() -> None:
+    """BC-12594: the revops owner-email guard must reuse the SAME canonical
+    EMAIL_REGEX as the marketing-side callers (`/marketing:plan-campaign`
+    Step 4.2) — a divergent regex would let a value accepted by the marketing
+    orchestrator fail at the revops sink (or vice-versa), breaking the
+    marketing->revops boundary. Mirrors
+    test_target_org_regex_byte_identical_to_sibling.
+
+    Source of truth: plugins/marketing/commands/plan-campaign.md Step 4.2,
+    where EMAIL_REGEX is defined once for reuse. If either side drifts to a
+    different character class, the substring check on the canonical form fails
+    on the drifted file.
+    """
+    canonical_regex = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+    create_body = read_command()
+    assert MARKETING_PLAN_CAMPAIGN_PATH.is_file(), (
+        f"BC-12594: marketing EMAIL_REGEX anchor moved — update "
+        f"MARKETING_PLAN_CAMPAIGN_PATH ({MARKETING_PLAN_CAMPAIGN_PATH})"
+    )
+    marketing_body = MARKETING_PLAN_CAMPAIGN_PATH.read_text()
+    assert canonical_regex in create_body, (
+        f"BC-12594: canonical EMAIL_REGEX {canonical_regex!r} not found "
+        f"verbatim in create-sf-campaign.md"
+    )
+    assert canonical_regex in marketing_body, (
+        f"BC-12594: canonical EMAIL_REGEX {canonical_regex!r} not found "
+        f"verbatim in marketing plan-campaign.md — the marketing source of "
+        f"truth may have drifted; re-sync required so the marketing->revops "
+        f"boundary stays consistent."
     )
