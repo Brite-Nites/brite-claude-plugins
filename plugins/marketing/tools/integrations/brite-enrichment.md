@@ -87,9 +87,10 @@ you found.
 - **`titles`** (BC-12405) is the preferred targeting input: a **ranked list** of target
   roles, highest priority first. Both discovery providers receive the list, but **consume it
   differently** — Prospeo OR-matches the array (`match_mode: CONTAINS`), while OpenMart takes
-  a single concise semantic title hint (top-N joined), **not** a boolean OR. So a long
-  multi-title list is fully OR-matched only by Prospeo; OpenMart leans on the highest-ranked
-  entries (see § Per-provider gotchas). **`title_seed`** is the legacy single-title form.
+  a single concise semantic title hint built from the highest-ranked entries, **not** a
+  boolean OR. So a long multi-title list is fully OR-matched only by Prospeo; OpenMart leans
+  on the top of the ranked list (see § Per-provider gotchas). **`title_seed`** is the legacy
+  single-title form.
   Omit both to fall back to category defaults.
 - **`city` / `state`** (BC-12405) scope discovery to a locality. (`geo` country is currently
   inert — BC-12420.)
@@ -278,7 +279,7 @@ the lag). Verify a just-written contact at the staging layer, not via `query_ent
 |---|---|---|
 | **BounceBan** | `verify_emails` (`email_validation`) | Returns `result` ∈ `deliverable`/`undeliverable`/risky/etc. `verify_emails` maps only exact `deliverable`/`undeliverable` to `true`/`false`; everything else → `null`. A disposable address comes back `undeliverable`. `score` (0–100) → `confidence_score` (÷100). |
 | **EmailGuard** | `verify_emails` (`email_provider`) | Returns only the ESP host; emits **no confidence** (deterministic from MX). Returns `NO_DATA` (→ `esp: null`) when it can't resolve a host — still bills. |
-| **OpenMart** | `enrich_contacts` (people discovery) | SMB-oriented; takes a **single semantic title string** (no boolean OR). Returns name + email + phone in one call (the email short-circuits the work-email waterfall). |
+| **OpenMart** | `enrich_contacts` (people discovery) | SMB-oriented; takes a **single semantic title string** (no boolean OR) — the engine builds it from the highest-ranked `titles`, so a long list is not fully OR-matched here (it is by Prospeo). Returns name + email + phone in one call (the email short-circuits the work-email waterfall). |
 | **Prospeo** | `enrich_contacts` (discovery + email + phone) | `person_job_title.include` is an OR-array (use `match_mode: CONTAINS`). **Never hardcode a `person_seniority` filter** — it AND-combines with title and silently drops matches (BC-12405). |
 | **IcyPeas / LeadMagic / Datagma** | `enrich_contacts` (email/phone waterfall) | Waterfall stops at first hit; a provider left unconfigured is skipped (not a failure) so a partial roster still enriches. A runtime 401 from a *configured* provider propagates. |
 
