@@ -364,7 +364,8 @@ Print the operator-readable plan. Use this format (or a close variant — readab
   Salesforce auto-create (via /revops:create-sf-campaign --dry-run):
     <output of /revops:create-sf-campaign --dry-run with the same args>
 
-  Sub-issues to create (8 standard + N optional):
+  Sub-issues to create (8 standard + N optional — titles/schedule are illustrative;
+  canonical source is references/campaign-sub-issue-templates.md):
     #1  Brief approved                              [gate, blocks #2-#8]
     #2  Target list built                           [blocks #3; expects /marketing:list-building]
     #3  Copy written + approved                     [blocks #4; expects /marketing:email-copywriting]
@@ -687,14 +688,14 @@ Same `Read` → JSON-mutate → `Write` pattern as Step 8a.5.
 For each of the 8 sub-issues, call `save_issue` with:
 
 - `team`: "Brite Company"
-- `title`: as in the table below
-- `description`: per the per-issue spec below
+- `title`: the matching sub-issue's `title` from the reference file (§ 9.1)
+- `description`: the matching sub-issue's **Description** blockquote from the reference file, stamped verbatim as the issue body (§ 9.1)
 - `parentId`: see § 9.0 below (resolved at impl time)
 - `projectId`: `<gtm-project-id>`
 - `projectMilestoneId`: `<milestone-id>` from Step 8a
-- `labels`: the 8-label set from § Step 8a.6 (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`)
+- `labels`: the 8-label set from § Step 8a.6 (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`) — applied to EVERY sub-issue (this milestone-level label set lives in the command, NOT in the reference file)
 - `assignee`: omit (sub-issues are assigned at sub-issue start time, not scaffold time)
-- `dueDate`: per the schedule (back-filled from `<launch-date>` — see per-issue spec)
+- `dueDate`: `<launch-date>` + the sub-issue's `dueDate_offset_days` from the reference file (§ 9.1)
 
 After all 8 creates succeed, do a second pass to wire `blockedBy` relations. The Linear MCP `save_issue` shape for the second pass is **MINIMAL** — `save_issue(id=<sub-issue-id>, blockedBy=[<id>])` ONLY. The field is `blockedBy` (plural, array of issue IDs/identifiers; append-only per MCP schema), NOT `blockedById`.
 
@@ -722,112 +723,23 @@ Rationale: gives the marketing operator a single "campaign" issue to track in th
 
 Explicit rollback guidance prevents the orchestrator from leaving an orphan milestone + manifest hanging in inconsistent state.
 
-### 9.1 — Sub-issue specs
+### 9.1 — Sub-issue specs (read + stamp from the reference file)
 
-For each row below, the description ALWAYS includes: (a) the handbook citation, (b) the expected plugin command, (c) the sub-issue role (1-2 sentences).
+The per-phase sub-issue specs live in **`plugins/marketing/references/campaign-sub-issue-templates.md`** — extracted in BC-12564 so they are maintained in one place and contract-tested as the source of truth, rather than inlined here. `Read` that file once and stamp each entry under its `## Standard sub-issues` heading, in `id` order. Each sub-issue section is one fenced `yaml` block (`id`, `title`, `dueDate_offset_days`, `blockedBy`, `optional`, `labs_gated`) followed by a **Description** blockquote.
 
-#### #1 — Brief approved (gate)
+For each standard sub-issue (`optional: false`):
 
-- **Title**: `Brief approved`
-- **Description**:
-  > Marketing brief author finalizes the brief in this milestone's description. GTM lead reviewer approves. Closes when the brief is approved.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/templates/campaign-brief-template.md`
-  > **Sub-issue role**: gate — blocks all downstream work. Per [D5](../../docs/decisions/) the brief template is 8 sections; the marketing brief author owns sections 2-8 content.
-  > **Expected plugin command**: none directly; brief is edited in Linear milestone description.
-- **dueDate**: `<launch-date> - 21 days` (T-21d per README § 3.6.5).
-- **blocks**: #2, #3, #4, #5, #6, #7, #8 (and #9, #10 if created)
+1. Parse the `yaml` block.
+2. Call `save_issue` with the field mapping from Step 9 above:
+   - `title` ← the block's `title`.
+   - `description` ← the **Description** blockquote, stamped verbatim as the issue body.
+   - `dueDate` ← `<launch-date>` + `dueDate_offset_days` (e.g. `-21` → T-21d; `0` → launch day; `40` → T+40d). The reference file declares the offset integer; this command does the date arithmetic.
+   - `parentId` ← `<container-issue-id>` (§ 9.0); `projectId` ← `<gtm-project-id>`; `projectMilestoneId` ← `<milestone-id>`; `labels` ← the 8-label set (§ 8a.6, applied to every sub-issue).
+3. Capture the returned `id` + `identifier` (§ 9.2).
 
-#### #2 — Target list built
+The standard chain, by `id`: **#1 Brief approved** (gate) → **#2 Target list built** and **#3 Copy written + approved** (both gated only by #1 — copy and target list run in parallel) → **#4 Salesforce setup** → **#5 Pre-launch QA** → **#6 Launch executed** → **#7 Active management — weekly reviews** → **#8 Campaign closed + debrief** (terminal). The authoritative dependency graph is each entry's `blockedBy` field in the reference file — do NOT re-derive it here.
 
-- **Title**: `Target list built`
-- **Description**:
-  > Outbound operator builds the enriched lead CSV for this campaign — typically via `/marketing:list-building` (which assumes a dbt audience view exists for this canonical persona+offer combo) OR `/marketing:tam-mapping` (if the TAM doesn't exist yet — Phase 1 source discovery → Phase 7 enrichment hand-off).
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/list-building.md`
-  > **Sub-issue role**: produces the enriched lead CSV that feeds Phase 1 of `/marketing:launch-campaign` at sub-issue #6.
-  > **Expected plugin command**: `/marketing:list-building` or `/marketing:tam-mapping`.
-- **dueDate**: `<launch-date> - 14 days`
-- **blockedBy**: [#1]
-- **blocks**: [#3]
-
-#### #3 — Copy written + approved
-
-- **Title**: `Copy written + approved`
-- **Description**:
-  > Marketing brief author runs `/marketing:email-copywriting` to produce the BC-5825 JSON copy artifact (step_1 + step_2 + custom_variables). GTM lead reviewer approves the rendered copy before Phase 1 of launch-campaign.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/email-copywriting.md`
-  > **Sub-issue role**: produces the copy artifact that feeds Phase 1 of `/marketing:launch-campaign` at sub-issue #6.
-  > **Expected plugin command**: `/marketing:email-copywriting`.
-- **dueDate**: `<launch-date> - 10 days`
-- **blockedBy**: [#1] (NOT #2 — copy and target list can parallel)
-- **blocks**: [#4]
-
-#### #4 — Salesforce setup
-
-- **Title**: `Salesforce setup`
-- **Description**:
-  > Verify the SF Campaign record created at scaffold time (σ3 / `/revops:create-sf-campaign`). Populate audience members (CampaignMember records linked from EB lead suppress export). Wire Opportunity links if the offer is a pilot/risk-reversal posture.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/sf-campaign-setup.md`
-  > **Sub-issue role**: SF reconciliation post-σ3 auto-create. If auto-create soft-failed at scaffold, manual `/revops:create-sf-campaign` re-run lands here.
-  > **Expected plugin command**: `/revops:create-sf-campaign` (reconciliation) + manual SF UI work.
-- **dueDate**: `<launch-date> - 7 days`
-- **blockedBy**: [#3]
-- **blocks**: [#5]
-
-#### #5 — Pre-launch QA
-
-- **Title**: `Pre-launch QA`
-- **Description**:
-  > Run the launch-campaign pre-flight checklist: copy renders correctly with sample leads, custom variables resolve, sender warm-up status, EB workspace health, SF Campaign linkage.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/pre-launch-qa.md`
-  > **Sub-issue role**: catches launch-blocking issues before sub-issue #6 fires sending.
-  > **Expected plugin command**: `/marketing:launch-campaign --preview` (dry-run mode) + manual review.
-- **dueDate**: `<launch-date> - 3 days`
-- **blockedBy**: [#4]
-- **blocks**: [#6]
-
-#### #6 — Launch executed
-
-- **Title**: `Launch executed`
-- **Description**:
-  > Outbound operator runs `/marketing:launch-campaign` (Phase 11 ACTIVATE) to create + activate the EB campaign. Single EB campaign per [D1] (no sender splits).
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/launch.md`
-  > **Sub-issue role**: the moment the campaign goes live. EB campaign_id flows back into manifest.email_bison.campaign_id at this point.
-  > **Expected plugin command**: `/marketing:launch-campaign --activate` (consumes copy artifact from #3 + enriched CSV from #2).
-- **dueDate**: `<launch-date>`
-- **blockedBy**: [#5]
-- **blocks**: [#7]
-
-#### #7 — Active management — weekly reviews
-
-- **Title**: `Active management — weekly reviews`
-- **Description**:
-  > Outbound operator runs `/marketing:campaign-analysis` weekly during the active sending window. GTM lead reviews. Adjustments (pause / unpause / sender swaps) per the analysis.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/active-management.md`
-  > **Sub-issue role**: weekly cadence during the ~4-week active window. Pause/kill decisions land here via `/marketing:sync-campaign-status` (T2-FA / BC-8752).
-  > **Expected plugin command**: `/marketing:campaign-analysis` weekly; `/marketing:sync-campaign-status` on status transitions.
-- **dueDate**: `<launch-date> + 28 days` (T+28d)
-- **blockedBy**: [#6]
-- **blocks**: [#8]
-
-#### #8 — Campaign closed + debrief
-
-- **Title**: `Campaign closed + debrief`
-- **Description**:
-  > Run `/marketing:campaign-debrief` to produce the learnings.md artifact and update the MSPA results log. Linear status flips to `completed` (or `killed`) which triggers σ3 status-sync (BC-8752) to update SF Campaign.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/debrief.md`
-  > **Sub-issue role**: terminal step. Closes the campaign loop into the compounding MSPA flywheel.
-  > **Expected plugin command**: `/marketing:campaign-debrief`.
-- **dueDate**: `<launch-date> + 40 days` (T+40d)
-- **blockedBy**: [#7]
-- **blocks**: none (terminal)
+**Second-pass `blockedBy` wiring** (per the two-pass note above): after all standard creates succeed, for each sub-issue call `save_issue(id=<sub-issue-id>, blockedBy=[<resolved-id(s)>])`, resolving each reference-file `blockedBy` index (e.g. `[1]`, `[3]`) to the Linear `id` captured for that index in pass 1. The reference file stores only `blockedBy` — the forward `blocks` edge is its exact inverse and is auto-rendered by Linear, so it is not stored (storing it previously caused a now-fixed inconsistency). The command writes only `blockedBy`.
 
 ### 9.2 — Capture sub-issue IDs
 
@@ -837,9 +749,11 @@ For each `save_issue` response, capture the returned `id` + `identifier` (e.g., 
 
 ## Step 10 — Optional sub-issues
 
+The 2 optional sub-issues are defined under `## Optional sub-issues` in `plugins/marketing/references/campaign-sub-issue-templates.md` (`optional: true`): **#9 Situation Mining** (Labs-gated) and **#10 Creative Angles**. Create one ONLY when its flag is passed, stamping `title` / **Description** / `dueDate` (`<launch-date>` + `dueDate_offset_days`) and wiring `blockedBy` exactly as in § 9.1 — same 8-label set, same container parent, same second-pass wiring. When an optional sub-issue is created, also append its `id` to #1's downstream set so the gate blocks it too.
+
 ### 10.1 — Situation Mining (Labs-gated)
 
-If `--situation-mining` was passed, enforce Labs entity:
+If `--situation-mining` was passed, enforce Labs entity. The reference file marks #9 `labs_gated: true`; this Step is where that gate is ENFORCED (the flag is data; the HARD-FAIL is orchestration).
 
 If `<entity> != "labs"`, HARD-FAIL (the operator clearly meant something else):
 
@@ -848,35 +762,11 @@ ERROR: --situation-mining is a Brite Labs framework (per docs/gtm-campaign-orche
 You passed --situation-mining with --entity=<entity>. Either drop the flag, OR re-run with --entity=labs.
 ```
 
-If `<entity> == "labs"`, create sub-issue #9:
-
-- **Title**: `Situation Mining`
-- **Description**:
-  > Run `/marketing:situation-mining` (Labs framework) to surface the latent situations that this campaign's persona is in BUT hasn't articulated yet. Output feeds the brief's Audience section (#1) and the copy artifact's angle hypotheses (#3).
-  >
-  > **Handbook citation**: `handbook@main:marketing/labs/situation-mining-framework.md`
-  > **Sub-issue role**: pre-launch discovery; parallel with #2 and #3.
-  > **Expected plugin command**: `/marketing:situation-mining`.
-- **dueDate**: `<launch-date> - 12 days`
-- **blockedBy**: [#1]
-- **blocks**: none directly (informs #2 and #3 informationally)
-- **Labels**: same 8-label set as the standard sub-issues.
+If `<entity> == "labs"`, create sub-issue #9 by stamping the reference file's `## Optional sub-issues` → #9 entry per § 9.1 (take its `blockedBy` and `dueDate_offset_days` from that entry — do not hardcode them here).
 
 ### 10.2 — Creative Angles (no entity restriction)
 
-If `--creative-angles` was passed, create sub-issue #10:
-
-- **Title**: `Creative Angles`
-- **Description**:
-  > Run `/marketing:creative-angles` to generate 3-5 angle hypotheses to test in copy. Output feeds the copy artifact at sub-issue #3.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/creative-angles.md`
-  > **Sub-issue role**: pre-copy discovery; parallel with #2. Especially important for NEW offers that haven't been tested yet.
-  > **Expected plugin command**: `/marketing:creative-angles`.
-- **dueDate**: `<launch-date> - 12 days`
-- **blockedBy**: [#1]
-- **blocks**: none directly (informs #3 informationally)
-- **Labels**: same 8-label set as the standard sub-issues.
+If `--creative-angles` was passed, create sub-issue #10 by stamping the reference file's `## Optional sub-issues` → #10 entry per § 9.1 (take its `blockedBy` and `dueDate_offset_days` from that entry — do not hardcode them here). No entity restriction.
 
 ---
 
@@ -893,7 +783,7 @@ Campaign scaffolded — /marketing:plan-campaign
   Linear:         <milestone-url>
   SF Campaign:    <campaign-url>  (OR null + reconciliation reminder if soft-failed)
   Manifest:       docs/campaigns/<entity>/<slug>/manifest.json
-  Sub-issues:     <count> created
+  Sub-issues:     <count> created  (titles from references/campaign-sub-issue-templates.md)
                     #1  Brief approved                  <id>
                     #2  Target list built               <id>
                     #3  Copy written + approved         <id>

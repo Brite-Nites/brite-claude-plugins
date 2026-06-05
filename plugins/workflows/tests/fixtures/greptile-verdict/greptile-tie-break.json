@@ -1,0 +1,16 @@
+{
+  "comments": [
+    {
+      "id": "IC_tie_a",
+      "author": { "login": "greptile-apps" },
+      "body": "Confidence score: 2/5",
+      "createdAt": "2026-06-01T12:00:00Z"
+    },
+    {
+      "id": "IC_tie_b",
+      "author": { "login": "greptile-apps" },
+      "body": "Confidence score: 4/5",
+      "createdAt": "2026-06-01T12:00:00Z"
+    }
+  ]
+}

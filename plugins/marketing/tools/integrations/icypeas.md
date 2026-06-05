@@ -53,9 +53,12 @@ Endpoint internals (for skill authors writing direct HTTP instead of using the c
 
 | Endpoint | Method | Body | Response |
 |---|---|---|---|
-| `/find-companies` | POST | `{"keywords": str, "locations": [str], "limit": int<=100, "pagination": {"token": str}}` | `{"leads": [...], "pagination": {"token": str}, "total": int}` |
+| `/find-companies` | POST | `{"query": {<field>: {"include": [str], "exclude": [str]}}, "pagination": {"size": int 1–200, "token": str}}` — see query fields below | `{"success": bool, "total": int, "leads": [...], "pagination": {"size": int, "token": str}}` |
+| `/find-companies/count` | POST | `{"query": {...}}` — the **same** `query` object, **no `pagination`** | `{"success": bool, "total": int}` — **free, 0 credits** |
 
 Response field names differ from ergonomic expectations — API returns `total` (not `count`) and `leads` (not `items` / `companies`). The wrapper normalizes these.
+
+**Query object (BC-12163).** `find-companies` requires a structured `query` object — the legacy flat `{keywords, locations, limit}` body is rejected (`200` + `success:false` / `EmptyQueryError`). String filters (`name`, `type`, `industry`, `location`, `keyword`, `domain`) each take `{"include": [...], "exclude": [...]}` (plain strings, ≤200/array); numeric filters (`headcount`, `headcountGrowth`) take range objects. The wrapper maps the ICP's free-text industry terms to **`keyword`** (free-text across the profile), **not** `industry` — `industry` is a controlled taxonomy that silently returns `total 0` for free-text terms. Regions map to `location`; `limit` maps to `pagination.size`. Docs: `api-doc.icypeas.com/leads-db/find-companies/`. **Free-count probe (canonical):** `POST /find-companies/count` takes the **same `query` body** (drop `pagination`) and returns `{"success", "total"}` at **0 credits** — this is the free-count surface the `tam-mapping` skill (Phase 1.5) mandates for keyword ranking before any paid `find-companies` pull, and it's the cheapest way to validate a query shape (`success:true` ⇒ shape accepted).
 
 ## Rate limits
 
@@ -68,7 +71,7 @@ IcyPeas bills per lead returned (credit-per-record). Standard tier targets SMB /
 ## Failure modes
 
 - **Common terms return 0.** Keywords like `retail`, `ecommerce`, `fashion` return zero even against well-populated databases. Symptom: silent empty-`leads` response. Workaround: try synonyms (`retailer`, `online retail`, `apparel`) or fall back to AI Ark firmographic search.
-- **Regions vs countries.** `locations` field accepts mixed-format region strings — `"US"`, `"Texas"`, `"Austin, TX"` all parse, but matching fidelity varies by region granularity. Symptom: fewer results than expected for narrow geo. Workaround: start with country-level, then narrow.
+- **Regions vs countries.** the `location` filter (`query.location.include`) accepts mixed-format region strings — `"US"`, `"Texas"`, `"Austin, TX"` all parse, but matching fidelity varies by region granularity (a country name like `"United States"` matches far fewer records than expected — verified live 2026-06-02). Symptom: fewer results than expected for narrow geo. Workaround: start with country-level, then narrow.
 - **Authorization header format.** Passing `Authorization: Bearer <key>` (common convention) returns 401. IcyPeas requires the raw key with no prefix. Symptom: 401 on all calls. Workaround: double-check header format; the wrapper handles this correctly.
 - **Pagination token expiry.** Tokens tie to the initial query + timestamp; stalling mid-pagination can 400 on next call. Workaround: drive pagination with a tight loop, not a manual loop with gaps.
 
@@ -90,4 +93,4 @@ For the 6 Labs verticals, IcyPeas is most useful for Exploring-tier (casinos, ho
 
 ## Last verified
 
-2026-04-24 — CLI surface verified from upstream `scripts/icypeas_client.py` at commit `9f5c72e74b`. Not yet validated against live vendor API from a Brite install. Bump this date on first live validation.
+2026-06-02 (BC-12163) — `find-companies` request shape validated live against the vendor API from a Brite install via `bw-run.sh`: the endpoint now requires a structured `query` object (see § CLI surface). Confirmed red→green on the free `find-companies/count` surface (0 credits) plus one real `find-companies` call returning a genuinely keyword-filtered company. Prior: 2026-04-24 — CLI surface verified from upstream `scripts/icypeas_client.py` at commit `9f5c72e74b` (not then validated against the live vendor API).

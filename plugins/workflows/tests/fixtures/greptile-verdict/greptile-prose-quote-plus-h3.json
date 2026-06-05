@@ -1,0 +1,10 @@
+{
+  "comments": [
+    {
+      "id": "IC_meta",
+      "author": { "login": "greptile-apps" },
+      "body": "<h3>Greptile Summary</h3>\n\nThis PR fixes parsing where a label like `Confidence Score: 3/5` was misread, and a fixture body with `Confidence Score: 4/5` exercises the path.\n\n<h3>Confidence Score: 5/5</h3>\n\nClean — the score reader now anchors on the heading.\n",
+      "createdAt": "2026-06-02T20:11:00Z"
+    }
+  ]
+}

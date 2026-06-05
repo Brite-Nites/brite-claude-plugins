@@ -151,6 +151,34 @@ mk_manifest() {
 EOF
 }
 
+mk_manifest_v2() {
+  # $1: campaigns_dir, $2: entity, $3: slug, $4: offer
+  # Schema-v2 manifest: email_bison.campaigns[] (multi-record). First record's
+  # campaign_id is 8801; earliest launched_at is 2025-09-20 (the SECOND record),
+  # so "earliest" is distinct from both first-record-order and latest — the
+  # rendered Launched column proving 2025-09-20 locks earliest specifically.
+  local dir="$1/$2/$3"
+  mkdir -p "$dir"
+  cat > "$dir/manifest.json" <<EOF
+{
+  "schema_version": 2,
+  "slug": "$3",
+  "entity": "$2",
+  "vertical": "hotels-resorts",
+  "persona": "director-of-resort-experience",
+  "offer": "$4",
+  "email_bison": {
+    "workspace": "emailbison-b2b",
+    "campaign_name": "$3",
+    "campaigns": [
+      {"workspace": "emailbison-b2b", "campaign_id": 8801, "audience_tier": {"tier": "professional", "seniority": null, "modifiers": []}, "launched_at": "2025-09-22"},
+      {"workspace": "emailbison-personal", "campaign_id": 8802, "audience_tier": {"tier": "personal", "seniority": null, "modifiers": []}, "launched_at": "2025-09-20"}
+    ]
+  }
+}
+EOF
+}
+
 mk_eb_json() {
   # $1: output path, $2+: slug:reply_rate:meeting_rate triples
   local out="$1"
@@ -406,6 +434,84 @@ assert_file_substring "H: retirement flag in summary" \
 assert_file_substring "H: consecutive degrading count" \
   "$camp_h/labs/offers/holiday-anchor-audit/performance.md" \
   "2 consecutive versions"
+
+# ══════════════════════════════════════════════════════════════════════════
+# Scenario I: schema-v2 manifest (email_bison.campaigns[]) — BC-12593
+# A v2 manifest has no singular email_bison.campaign_id/launched_at; the
+# Launched column must render the EARLIEST campaigns[].launched_at, not n/a.
+# ══════════════════════════════════════════════════════════════════════════
+
+echo "── Scenario I: v2 manifest email_bison.campaigns[] ──"
+mk_fixture_dirs "I"
+camp_i="$tmproot/I/campaigns"
+canon_i="$tmproot/I/canonicals"
+mk_manifest_v2 "$camp_i" "labs" "hotels-resorts-director-holiday-anchor-audit-fy26-m04" "holiday-anchor-audit"
+
+invoke \
+  --offer-slug holiday-anchor-audit \
+  --entity labs \
+  --campaigns-dir "$camp_i" \
+  --canonicals-dir "$canon_i" \
+  --generated-at "2026-05-26T12:00:00Z"
+
+assert_exit_and_substring "I: exit OK on v2 manifest" 0 "OK: offer-performance written"
+# Earliest launched_at (2025-09-20) renders — proves v2 campaigns[] is read AND
+# that EARLIEST (not the first record's 2025-09-22 / latest) is chosen.
+assert_file_substring "I: v2 earliest launched_at rendered in Launched column" \
+  "$camp_i/labs/offers/holiday-anchor-audit/v1/performance.md" \
+  "2025-09-20"
+
+# ══════════════════════════════════════════════════════════════════════════
+# Scenario J: eb_fields_from_manifest helper — v1 + v2 + empty (BC-12593)
+# eb_campaign_id is computed-but-unrendered, so assert the helper directly:
+# v2 → (campaigns[0].campaign_id, earliest launched_at); v1 → singular fields;
+# empty campaigns[] → (None, None).
+# ══════════════════════════════════════════════════════════════════════════
+
+echo "── Scenario J: eb_fields_from_manifest (v1/v2/empty) ──"
+LAST_OUTPUT="$(cd "$script_dir" && python3 -c "
+import sys; sys.path.insert(0, '.')
+from offer_performance import eb_fields_from_manifest
+# v2: first-record campaign_id + EARLIEST launched_at (records out of order)
+v2 = {'workspace':'emailbison-b2b','campaign_name':'x','campaigns':[
+  {'campaign_id':8801,'launched_at':'2025-09-22'},
+  {'campaign_id':8802,'launched_at':'2025-09-20'}]}
+cid, la = eb_fields_from_manifest(v2)
+assert cid == 8801, f'v2 campaign_id={cid!r}'
+assert la == '2025-09-20', f'v2 launched_at={la!r}'
+# v1 fallback: singular fields unchanged
+cid, la = eb_fields_from_manifest({'campaign_id':'eb-x','launched_at':'2026-04-15'})
+assert cid == 'eb-x', f'v1 campaign_id={cid!r}'
+assert la == '2026-04-15', f'v1 launched_at={la!r}'
+# empty v2 campaigns[] (unlaunched) -> (None, None)
+cid, la = eb_fields_from_manifest({'workspace':'emailbison-b2b','campaign_name':'x','campaigns':[]})
+assert cid is None and la is None, f'empty=({cid!r},{la!r})'
+# v2 records present but none launched -> campaign_id from first, launched_at None
+cid, la = eb_fields_from_manifest({'campaigns':[{'campaign_id':9001}]})
+assert cid == 9001 and la is None, f'unlaunched-record=({cid!r},{la!r})'
+# MIXED OFFSET ZONES: must pick chronologically-earliest, NOT lexicographically
+# smallest. B (09:00+05:00 = 04:00Z) precedes A (06:00Z), but lexicographically
+# '...T06:00:00Z' < '...T09:00:00+05:00' — a naive min() would wrongly return A.
+cid, la = eb_fields_from_manifest({'campaigns':[
+  {'campaign_id':1,'launched_at':'2025-09-20T06:00:00Z'},
+  {'campaign_id':2,'launched_at':'2025-09-20T09:00:00+05:00'}]})
+assert la == '2025-09-20T09:00:00+05:00', f'mixed-offset earliest={la!r}'
+# NAIVE (date-only) + AWARE (Z) must not raise (naive treated as UTC midnight).
+cid, la = eb_fields_from_manifest({'campaigns':[
+  {'campaign_id':3,'launched_at':'2025-09-21'},
+  {'campaign_id':4,'launched_at':'2025-09-20T23:00:00Z'}]})
+assert la == '2025-09-20T23:00:00Z', f'naive+aware earliest={la!r}'
+# DEFENSIVE never-raises: a malformed manifest mixing an unparseable string with
+# a non-string (int) launched_at must NOT raise TypeError in the fallback; it
+# returns the string value. (A naive min([str, int]) would crash.)
+cid, la = eb_fields_from_manifest({'campaigns':[
+  {'campaign_id':5,'launched_at':'not-a-real-iso-date'},
+  {'campaign_id':6,'launched_at':12345}]})
+assert la == 'not-a-real-iso-date', f'mixed-unparseable={la!r}'
+print('HELPER_OK')
+" 2>&1)"
+LAST_RC=$?
+assert_exit_and_substring "J: eb_fields_from_manifest v1+v2+empty correct" 0 "HELPER_OK"
 
 # ══════════════════════════════════════════════════════════════════════════
 

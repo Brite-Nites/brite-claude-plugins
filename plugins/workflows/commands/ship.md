@@ -113,13 +113,27 @@ If PR creation fails, use error recovery: AskUserQuestion with options: "Retry p
 
 Narrate: `Step 2/8: Creating pull request... done`
 
+## Step 2b: Greptile Gate
+
+Narrate: `Step 2b: Greptile gate...`
+
+The `greptile-gate` skill activates to read Greptile's verdict on the PR just created in Step 2 and converge it toward a 5/5 confidence score.
+
+- If Greptile isn't installed on the repo (or hasn't reviewed yet), the gate reports that and **skips** — it never blocks the ship.
+- If Greptile scored below 5/5, the gate runs up to 3 human-in-the-loop rounds (grill-with-docs → `/workflows:review` fix loop → push → `@greptile-apps` re-review → bounded wait), then a final independent review on 5/5.
+- **The gate never merges** — it converges and hands back; you merge manually.
+
+Because the gate runs *before* the terminal steps below, Steps 4–6 (compound-learnings, audit, handbook-drift) operate on the converged code. If the gate can't reach 5/5 in 3 rounds (or Greptile times out), it stops and hands you the remaining findings — decide whether to continue before the terminal steps run.
+
+Narrate: `Step 2b: Greptile gate... done`
+
 ## Step 3: Update Linear
 
 Narrate: `Step 3/8: Updating Linear...`
 
 Use the Linear MCP tools:
 
-1. **Move issue status** to "In Review" (or "Done" if team merges without separate review).
+1. **Move issue status** to **In Review** and keep it there — the greptile-gate (Step 2b) does not merge, so the developer merges manually. Do not advance the status automatically after shipping.
 2. **Add a comment** on the issue with PR link and summary of what was implemented.
 3. **Link the PR** via attachment if possible.
 

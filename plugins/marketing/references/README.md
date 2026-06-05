@@ -11,6 +11,7 @@ Shared reference library consumed by the Brite marketing plugin's skills. These 
 - `offer-design-frameworks.md` — Hormozi value equation, Brunson value ladder, Abraham risk-reversal, and B2B-outbound frontend/backend characteristics. Brite-originated; read by vertical playbooks and preset-composition issues to evaluate and design offers.
 - `shelf-life-patterns.md` — Five decay categories (Regulatory/Deadline, Competitive Move, Data Insight, Industry Pattern, Structural) for reasoning about signal timing.
 - `vertical-playbooks/` — Per-vertical playbooks distilling the vendor landscape, buyer personas, recency signals, program economics, offer evaluations, voice rules, and anti-slop rules for each targeted vertical. Entries: `zoos.md` (BC-5920), `hotels-resorts.md` (BC-5921), `ski-resorts.md` (BC-5922). Read by email-copywriting preset composition, tam-mapping, and situation-mining.
+- `campaign-sub-issue-templates.md` — The per-phase Linear sub-issue body templates `/marketing:plan-campaign` stamps when scaffolding a GTM campaign (8 standard + 2 optional), each as a fenced `yaml` block (id, title, dueDate offset, blockedBy, optional/labs-gated flags) + a verbatim Description. Brite-originated; extracted from the command's inline § 9.1 specs in BC-12564 so the chain is maintained in one place and contract-tested as source of truth. Read by `/marketing:plan-campaign` (§ 9.1 / Step 10); parsed by `tests/test_plan_campaign_contracts.py`. Unlike the human-filled campaign-brief template (handbook-canonical, fetched via `gh api`), these are machine-stamped orchestration scaffolds and stay plugin-local.
 
 ## Expected consumers
 
@@ -23,6 +24,7 @@ Future Brite marketing skills will pull from this library:
 - `campaign-debrief` — shelf-life-patterns for signal-decay attribution
 - `vertical-playbooks/*.md` + `email-copywriting/presets/*` — offer-design-frameworks + experiential-lighting-vendor-landscape (apply frontend/backend checklists when proposing or composing offers; apply vendor-archetype frame when positioning Brite against the prospect's incumbent)
 - `email-copywriting` preset composition (e.g., BC-5932 zoos, BC-5935 hotels & resorts, BC-5936 ski resorts) — `vertical-playbooks/<vertical>.md` § Offer candidates + § V1 offer picks + § Voice rules + § Anti-slop rules
+- `/marketing:plan-campaign` — `campaign-sub-issue-templates.md` (reads + stamps the sub-issue chain at scaffold time; § 9.1 / Step 10)
 
 ## Provenance
 

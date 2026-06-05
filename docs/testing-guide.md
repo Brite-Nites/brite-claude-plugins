@@ -34,7 +34,7 @@ Run these outside Claude, from a regular terminal or CI.
 | T0.1 Structural validation | `bash scripts/validate.sh` | 0 errors, 0 warnings |
 | T0.2 Hook regex tests | `bash scripts/test-hooks.sh` | 37/37 pass |
 | T0.3 Prerequisites check | `bash scripts/check-prereqs.sh` | All PASS (or explained SKIPs) |
-| T0.4 Command registration | `bash scripts/test-plugin-load.sh` | All 21 commands found |
+| T0.4 Command registration | `bash scripts/test-plugin-load.sh` | All 24 commands found |
 | T0.5 CI workflow | Push to branch, check GitHub Actions | All steps green |
 | T0.6 Scenario validation | `bash scripts/test-scenarios.sh` | 225/225 pass (60 scenarios + 12 FP regressions + 6 express mode, 7 categories) |
 
@@ -170,7 +170,7 @@ Behavioral tests run via `.github/workflows/behavioral-tests.yml`:
 
 | Test | Steps | Expected |
 |------|-------|----------|
-| T1.1 Plugin loads | Start `claude --plugin-dir ./plugins/workflows`, type `/workflows:` | 21 commands in autocomplete: `architecture-decision`, `audit-trail`, `bug-report`, `code-review`, `create-plugin`, `deployment-checklist`, `fact-check`, `flywheel-metrics`, `onboarding-checklist`, `project-start`, `promote-precedent`, `retrospective`, `review`, `scope`, `security-audit`, `session-start`, `setup-claude-md`, `ship`, `smoke-test`, `sprint-planning`, `tech-stack` |
+| T1.1 Plugin loads | Start `claude --plugin-dir ./plugins/workflows`, type `/workflows:` | 24 commands in autocomplete: `analytics`, `architecture-decision`, `audit-trail`, `bug-report`, `code-review`, `create-plugin`, `deployment-checklist`, `fact-check`, `flywheel-metrics`, `onboarding-checklist`, `project-start`, `promote-precedent`, `raise-a-ticket`, `report-issue`, `retrospective`, `review`, `scope`, `security-audit`, `session-start`, `setup-claude-md`, `ship`, `smoke-test`, `sprint-planning`, `tech-stack` |
 | T1.2 SessionStart hook | Observe session start output | Environment banner with git/node/gh/npx status + key commands listed |
 | T1.3 Smoke test | Run `/workflows:smoke-test` | Summary table with PASS/FAIL/SKIP/KNOWN ISSUE for 8 checks (env, MCP, hooks, agents) |
 
@@ -226,7 +226,7 @@ Note: T2.3–T2.6 are sequential — they trigger as part of the inner loop flow
 |------|---------|-------|----------|
 | T3.3 | `/workflows:session-start` | Run → Step 0 passes → issue table shows → select issue → plan generated | Abort after plan is presented (before worktree/execution). Verify: MCP check passes, issues load, plan has tasks with file paths |
 | T3.4 | `/workflows:scope` | Run → Step 0 passes → answer 2-3 interview questions → themes presented | Abort after themes. Verify: MCP check passes, Socratic questions asked via AskUserQuestion, themes use sequential-thinking |
-| T3.5 | `/workflows:bug-report` | Run with a test bug title → fill in details → approve draft | Verify: Linear issue created with Bug label, structured description, environment table. **Cleanup:** delete the test issue in Linear |
+| T3.5 | `/workflows:raise-a-ticket` | Run with a test bug title → pick Bug → fill in details → approve draft | Verify: Linear issue created with `type:bug` + `needs-triage` (+ `executor:hybrid`), structured description, routed to the resolved product's team/project. **Cleanup:** delete the test issue in Linear |
 | T3.16 | `/workflows:sprint-planning` | Run → Step 0 passes → project resolved → velocity shown → backlog displayed → select issues via sequential-thinking | Abort after selection. Verify: MCP prereqs pass, cycle data loads, backlog shows Todo + Backlog issues, velocity calculation uses completed cycles only |
 | T3.17 | `/workflows:retrospective` | Run → Step 0 passes → cycle resolved → delivery summary shown → retro discussion flows → status update draft presented | Abort before posting. Verify: MCP prereqs pass, cycle data loads, completed/carried-over tables render, sequential-thinking drives discussion, health indicator suggested |
 | T3.25 | `/workflows:project-start` MCP verification | Run → interview mentions data/analytics → confirm `involves-data` trait → observe MCP verification | Verify: table shows global MCPs + data warehouse status. Non-blocking — continues after WARN. |

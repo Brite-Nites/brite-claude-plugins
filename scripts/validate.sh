@@ -448,6 +448,38 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b'''''''''''' — flow-architecture shift-left clone-drift regression (BC-12410)
+# ══════════════════════════════════════════════════════════════════════
+# Naming: the flow-architecture sub-sections chain off "2b" with one added
+# prime-tick (apostrophe) per section in landing order — 2b' (BC-10728), 2b''
+# (BC-11029), … through 2b''''''''''' (BC-11983). This is the 12th, so it carries
+# 12 ticks. The count is positional, not a copy-paste artifact; a plain letter
+# (e.g. 2b') would collide with an existing earlier section.
+# Runs plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh — the
+# regression lock for check-clone-drift-shiftleft.sh, the path-filtered gate that
+# surfaces the FDA-clone re-sync obligation ON the PR that edits a cloned upstream
+# command (session-start / review / ship), vs the lagging origin/main
+# clone-drift-check (BC-7060). Hermetic cases: list-agreement + upstream-edited-
+# not-resynced → FAIL+obligation (per arm); re-synced → PASS; unrelated PR →
+# no-run; FDA-clone-only edit → no-run; near-miss exact-match; cross-clone
+# scoping. Mutates a clone header in place, restores via .bak + EXIT trap.
+section "2b''''''''''''. flow-architecture shift-left clone-drift regression (BC-12410)"
+
+fda_shiftleft_test="$REPO_ROOT/plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh"
+
+if [ ! -f "$fda_shiftleft_test" ]; then
+  warn "plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh not found — skipped"
+else
+  if fda_shiftleft_out=$(bash "$fda_shiftleft_test" 2>&1); then
+    fda_shiftleft_pass_count=$(printf '%s\n' "$fda_shiftleft_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture shift-left clone-drift regression (${fda_shiftleft_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture shift-left clone-drift regression failed — run plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh for details"
+    printf '%s\n' "$fda_shiftleft_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
@@ -544,6 +576,31 @@ else
     printf '%s\n' "$advisory_out" | tail -25 | sed 's/^/    /' >&2
   fi
 fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2e — workflows helper-script unit tests (BC-12248)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/workflows/tests/test-*.sh — bash unit tests for workflows
+# helper scripts (currently greptile-verdict.sh, the greptile-gate score
+# reader). Pass count auto-derived from each harness's RESULT contract line.
+# Mirrors Section 2b' (the flow-architecture helper-test pattern); kept as a
+# localized glob so future workflows bash harnesses are picked up automatically.
+section "2e. workflows helper-script unit tests (BC-12248)"
+
+wf_ran=0
+for wf_test in "$REPO_ROOT"/plugins/workflows/tests/test-*.sh; do
+  [ -e "$wf_test" ] || continue   # bash 3.2: glob stays literal when no match
+  wf_ran=1
+  wf_name="$(basename "$wf_test")"
+  if wf_out=$(bash "$wf_test" 2>&1); then
+    wf_pass_count=$(printf '%s\n' "$wf_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "workflows: $wf_name (${wf_pass_count:-?} assertions)"
+  else
+    fail "workflows: $wf_name failed — run $wf_test for details"
+    printf '%s\n' "$wf_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+done
+[ "$wf_ran" -eq 1 ] || warn "no plugins/workflows/tests/test-*.sh found — skipped"
 
 # ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
@@ -1795,6 +1852,37 @@ else
   else
     fail "canonicals bootstrap regression harness failed:"
     printf '%s\n' "$cb_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-11849 — Import-campaign regression harness (BC-11849)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_import_campaign.sh — exercises the
+# import_campaign.py classify-name + compose surfaces (ADR-020 worked
+# examples + cohort-1 reproduction + structural-error rejection) AND
+# static-grep checks against import-campaign.md for spec-drift defense.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-11849. Import-campaign regression harness (BC-11849)"
+
+ic_harness="$REPO_ROOT/plugins/marketing/scripts/test_import_campaign.sh"
+ic_helper="$REPO_ROOT/plugins/marketing/scripts/import_campaign.py"
+
+if [ ! -f "$ic_helper" ]; then
+  warn "plugins/marketing/scripts/import_campaign.py not found — import-campaign harness skipped"
+elif [ ! -f "$ic_harness" ]; then
+  warn "plugins/marketing/scripts/test_import_campaign.sh not found — import-campaign harness skipped"
+else
+  if ic_harness_out=$(bash "$ic_harness" "$ic_helper" 2>&1); then
+    ic_pass_count=$(printf '%s\n' "$ic_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$ic_pass_count" ]; then
+      pass "import-campaign regression harness (${ic_pass_count} assertions)"
+    else
+      pass "import-campaign regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "import-campaign regression harness failed:"
+    printf '%s\n' "$ic_harness_out" | tail -30 | sed 's/^/          /' >&2
   fi
 fi
 

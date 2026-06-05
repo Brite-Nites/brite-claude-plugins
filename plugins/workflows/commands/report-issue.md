@@ -1,8 +1,15 @@
 ---
-description: Capture plugin misbehavior as a regression test case and Linear issue with classification and reproduction steps
+description: Report the agent tooling itself misbehaving — a skill, command, or hook that misfired (NOT a Brite product bug; for that use /workflows:raise-a-ticket). Classifies the failure, generates a regression test into the trigger/behavioral registry, and files a Linear issue. The direct expert alias into raise-a-ticket's agent-tooling branch.
 ---
 
 # Report Issue
+
+> **This is the agent-tooling branch of the intake front door.** Reporting a bug or idea on a
+> Brite _product_ (Brite Base, Sites, Supply, a Labs site)? Use `/workflows:raise-a-ticket`
+> instead — or just answer "product" when its Step 1 fork asks. This command — reachable
+> directly as the expert alias, and as the hand-off target of raise-a-ticket's "agent tooling"
+> fork — is for **plugin / command / hook misbehavior**: a skill that misfired, a command step
+> that's wrong, a hook that fired (or didn't) when it shouldn't.
 
 You are capturing a plugin misbehavior report from a developer during a live work session. Your job is to gather structured details about what went wrong, classify the failure, auto-generate a regression test case for the appropriate test registry, and create a Linear issue — closing the loop between production usage and the test framework.
 
@@ -19,6 +26,21 @@ If it fails:
 - Do NOT proceed.
 
 Sequential-thinking is checked on first use in Step 2. If it fails there, fall back to inline reasoning.
+
+### 0a. Registry context (graceful-degrade guard)
+
+This command generates a regression test into the plugins repo's test registries
+(`trigger-registry.json` / `behavioral-registry.json`). Those only exist in the plugins repo —
+but this command is also reachable from anywhere (operator mode, or a product repo via
+`/workflows:raise-a-ticket`'s "agent tooling" fork). Detect the context: you are **in the
+plugins repo** if the repo root has `.claude-plugin/marketplace.json` **OR**
+`git remote get-url origin` is `brite-claude-plugins`.
+
+- **In the plugins repo** → full flow: classify, draft the test case, and append it (Steps 3 & 6b).
+- **Outside the plugins repo** → **graceful degrade**: still classify the failure and file the
+  Linear issue, but do **not** read or write the registries. Skip the Step 3 draft, record
+  "No test registry is reachable here — a maintainer can append the regression test later," and
+  show that note (not a JSON block) in the preview and Step 7. Never attempt a registry write.
 
 ## Step 1: Gather Misbehavior Details
 
@@ -81,6 +103,8 @@ Record the severity and its mapped Linear priority for use in Steps 5 and 6.
 ## Step 3: Generate Test Case
 
 **Skip this step** if the classification is hook-issue, subagent-issue, or command-flow. Proceed directly to Step 4.
+
+**Also skip the draft** if you are **outside the plugins repo** (Step 0a graceful-degrade): there is no registry to read or append to. Record "No test registry is reachable here — a maintainer can append the regression test later" and proceed to Step 4.
 
 Use sequential-thinking to draft a test case based on the misbehavior details.
 
@@ -153,9 +177,8 @@ Before creating the issue, search Linear for potential duplicates:
 | ...
 ```
 
-4. **Ask the developer** using AskUserQuestion:
-   - "Is this a duplicate of any of these issues?" with options for each match plus "None — create new issue"
-   - If they select a duplicate: offer to add a comment to the existing issue with the new reproduction details using `save_comment`. After commenting, display a confirmation:
+4. **Ask the developer to disambiguate** — the table above is already a numbered list, so ask in plain text: "Reply with the number of the issue this duplicates, or 'none' to create a new issue." Do **not** build an `AskUserQuestion` with one entry per match — a candidate set can exceed AskUserQuestion's 4-option cap (BC-12400); a numbered list plus a single free-text reply scales to any number of matches.
+   - If they reply with a number: offer to add a comment to that existing issue with the new reproduction details using `save_comment`. After commenting, display a confirmation:
      ```
      Comment added to [ISSUE-ID]: [title]
      Link: [issue URL]
@@ -163,7 +186,7 @@ Before creating the issue, search Linear for potential duplicates:
      The reproduction details have been added to the existing issue.
      ```
      Then stop — do not proceed to issue creation.
-   - If no matches or "None": proceed to Step 5.
+   - If they reply "none" (or the search returned no results): proceed to Step 5.
 
 If the search returns no results, skip the duplicate prompt and proceed directly.
 
@@ -212,7 +235,8 @@ Gather environment details automatically:
 
 ### Proposed Test Case
 
-[test case JSON block — or "No automated test case for this classification"]
+[test case JSON block — or "No automated test case for this classification" — or, outside the
+plugins repo, "No test registry reachable here — a maintainer can append the regression test later"]
 
 ### Environment
 
@@ -229,8 +253,8 @@ Gather environment details automatically:
 ```
 
 Ask for confirmation using AskUserQuestion:
-- "Create issue + append test case" — proceed to create the issue AND append the test case to the registry (only shown if a test case was generated)
-- "Create issue only" — create the Linear issue but skip test case append
+- "Create issue + append test case" — proceed to create the issue AND append the test case to the registry (only shown when a test case was generated — i.e. in the plugins repo with an appendable classification)
+- "Create issue only" — create the Linear issue but skip the test case append (the only file-creating option outside the plugins repo)
 - "Edit first" — ask what to change, update, and re-preview
 
 ## Step 6: Create Linear Issue and Append Test Case
@@ -249,7 +273,9 @@ Create the issue using `save_issue` with:
 
 ### 6b. Append Test Case (if confirmed)
 
-Only if the developer chose "Create issue + append test case":
+Only attempt this **in the plugins repo** (Step 0a). Outside it there is no registry to append
+to — skip Step 6b entirely and rely on the Linear issue + the maintainer note. Otherwise, only
+if the developer chose "Create issue + append test case":
 
 1. **Reuse** the registry content already read in Step 3 (do not re-read the file)
 2. **Parse** the JSON and **append** the new test case to the `test_cases` array
@@ -279,6 +305,8 @@ Run the relevant test to verify:
 ```
 
 If the classification was hook-issue, subagent-issue, or command-flow, add: "No automated regression test was generated for this classification. Consider adding a manual test case when the fix is implemented."
+
+If invoked **outside the plugins repo** (Step 0a graceful-degrade), the **Test case** line reads "not appended — filed from outside the plugins repo" and add: "A maintainer can append the regression test from the plugins repo using the classification + trigger captured above."
 
 ## Rules
 
