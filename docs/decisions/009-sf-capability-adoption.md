@@ -4,7 +4,7 @@
 **Date:** 2026-04-26
 **Linear:** [BC-5786](https://linear.app/brite-nites/issue/BC-5786)
 **Origin:** `docs/plans/revops-plugin-master-plan.md` §6 Issue 0.3
-**Related:** [ADR-007](007-revops-plugin-design.md), [BC-5534](https://linear.app/brite-nites/issue/BC-5534), [BC-5787](https://linear.app/brite-nites/issue/BC-5787), [BC-5789](https://linear.app/brite-nites/issue/BC-5789), [`salesforce-mcp-findings.md`](../research/salesforce-mcp-findings.md), [`tam-map-port-policy.md` §1](../research/tam-map-port-policy.md)
+**Related:** [ADR-007](007-revops-plugin-design.md), [ADR-023](023-sf-capability-adoption-artifact-class.md) (extends this framework with a per-class reading for non-MCP artifacts — CLI plugins, skill libraries), [BC-5534](https://linear.app/brite-nites/issue/BC-5534), [BC-5787](https://linear.app/brite-nites/issue/BC-5787), [BC-5789](https://linear.app/brite-nites/issue/BC-5789), [`salesforce-mcp-findings.md`](../research/salesforce-mcp-findings.md), [`tam-map-port-policy.md` §1](../research/tam-map-port-policy.md)
 
 ## Context
 

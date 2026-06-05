@@ -42,6 +42,7 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-010: Plugin secret-config canon](docs/decisions/010-plugin-secret-config-canon.md) — Bitwarden + `bw-run.sh` broker for stdio MCPs and CLI scripts; HTTP MCPs covered by BC-5551 exception
 - [ADR-021: sfdx-hardis selective adopt-as-tool](docs/decisions/021-sfdx-hardis-adoption.md) — per-capability ADR-009 6-check on sfdx-hardis; adopt deploy/CI/SFDMU/quality, phase-2 monitoring, skip GUI, F1 stays a revops build (BC-12346, keystone of BC-12345)
 - [ADR-022: revops promotion-topology command model & vocabulary](docs/decisions/022-revops-promotion-topology.md) — mirror of bn-salesforce ADR-016 (CI-driven deploy topology); dual-path, commands-as-orchestrators, intent-based command vocabulary, config-gated guidance (BC-12345)
+- [ADR-023: artifact-class dimension for the SF capability-adoption framework](docs/decisions/023-sf-capability-adoption-artifact-class.md) — **Proposed** — extends ADR-009 with a Step-0 artifact class (MCP server · CLI plugin · skill library) that selects each check's per-class reading, so non-MCP CLI tools/skill libraries score natively (no reinterpretation); GUI = Check-1 fail, class ⊥ capability granularity, sfdx-hardis re-run as the worked example (BC-12345 item #4)
 
 ## Company Context
 
