@@ -182,7 +182,11 @@ def _earliest_iso(values: list[str]) -> str | None:
     parseable = [(s, k) for s, k in parseable if k is not None]
     if parseable:
         return min(parseable, key=lambda pair: pair[1])[0]
-    return min(values) if values else None
+    # No parseable instant — lexicographic fallback over STRING values only, so a
+    # malformed manifest carrying a non-string launched_at can't raise TypeError
+    # (honors the never-raises contract). Returns None when nothing usable remains.
+    strings = [v for v in values if isinstance(v, str)]
+    return min(strings) if strings else None
 
 
 def eb_fields_from_manifest(manifest_eb: dict[str, Any]) -> tuple[Any, Any]:

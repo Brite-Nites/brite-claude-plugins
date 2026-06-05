@@ -501,6 +501,13 @@ cid, la = eb_fields_from_manifest({'campaigns':[
   {'campaign_id':3,'launched_at':'2025-09-21'},
   {'campaign_id':4,'launched_at':'2025-09-20T23:00:00Z'}]})
 assert la == '2025-09-20T23:00:00Z', f'naive+aware earliest={la!r}'
+# DEFENSIVE never-raises: a malformed manifest mixing an unparseable string with
+# a non-string (int) launched_at must NOT raise TypeError in the fallback; it
+# returns the string value. (A naive min([str, int]) would crash.)
+cid, la = eb_fields_from_manifest({'campaigns':[
+  {'campaign_id':5,'launched_at':'not-a-real-iso-date'},
+  {'campaign_id':6,'launched_at':12345}]})
+assert la == 'not-a-real-iso-date', f'mixed-unparseable={la!r}'
 print('HELPER_OK')
 " 2>&1)"
 LAST_RC=$?
