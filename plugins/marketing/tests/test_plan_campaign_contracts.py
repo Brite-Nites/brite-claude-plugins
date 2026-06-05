@@ -146,7 +146,15 @@ def _parse_scalar(raw: str) -> object:
         inner = raw[1:-1].strip()
         if not inner:
             return []
-        return [int(x.strip()) for x in inner.split(",")]
+        try:
+            return [int(x.strip()) for x in inner.split(",")]
+        except ValueError as exc:
+            # Surface a malformed list (e.g. a non-integer blockedBy element) as a
+            # clear, attributed failure rather than a bare int() traceback that
+            # would blow up every test calling parse_subissue_blocks().
+            raise AssertionError(
+                f"inline list contains a non-integer element in {raw!r}: {exc}"
+            ) from exc
     if raw in ("true", "false"):
         return raw == "true"
     if re.fullmatch(r"-?\d+", raw):
@@ -175,7 +183,16 @@ def _parse_block(raw: str) -> dict:
             # anything after (incl. a trailing ` #` comment) is ignored.
             quote = val[0]
             close = val.find(quote, 1)
-            rec[key.strip()] = val[1:close] if close != -1 else val[1:]
+            if close != -1:
+                rec[key.strip()] = val[1:close]
+            else:
+                # Unclosed quote (malformed): drop the opening quote and any
+                # trailing ` #` comment, matching the docstring + unquoted path
+                # so the comment is never absorbed into the value.
+                tail = val[1:]
+                if " #" in tail:
+                    tail = tail[: tail.index(" #")]
+                rec[key.strip()] = tail.rstrip()
         else:
             # Unquoted scalar/list: drop a trailing ` #` comment, then parse.
             if " #" in val:
@@ -542,6 +559,26 @@ def test_block_parser_quote_and_comment_handling() -> None:
     assert block["dueDate_offset_days"] == -21, "trailing ` #` comment on int must be stripped"
     assert block["blockedBy"] == [1], "trailing ` #` comment on list must be stripped"
     assert block["optional"] is False and block["labs_gated"] is False
+
+    # Unclosed quote is malformed, but the fallback must still strip a trailing
+    # ` #` comment (not absorb it) — consistent with the docstring (Greptile P2).
+    unclosed = _parse_block('title: "Brief approved  # note\n')
+    assert unclosed["title"] == "Brief approved", (
+        "unclosed-quote fallback must strip the trailing comment, not absorb it"
+    )
+
+
+def test_block_parser_rejects_non_integer_list_element() -> None:
+    """A malformed list value (e.g. a non-integer blockedBy element) must fail
+    with a clear, attributed AssertionError at parse time — not a bare int()
+    ValueError traceback that obscures which sub-issue is wrong (Greptile P2).
+    """
+    try:
+        _parse_block("id: 1\nblockedBy: [1, oops]\n")
+    except AssertionError as exc:
+        assert "non-integer" in str(exc), f"error message should name the cause, got: {exc}"
+    else:
+        raise AssertionError("expected an AssertionError for a non-integer blockedBy element")
 
 
 def test_reference_file_schema_valid() -> None:
