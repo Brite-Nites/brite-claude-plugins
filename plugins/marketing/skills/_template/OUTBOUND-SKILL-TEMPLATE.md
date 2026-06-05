@@ -164,6 +164,9 @@ MCP Tool Reference section guidance:
         Salesforce integration guide).
       - GitHub MCP: a low-cost repo-metadata read (e.g. `get_repository`) pending integration
         guide publication.
+      - Brite Enrichment (`enrichment` server): `check_enrichment_health` (read-only, $0 — no
+        provider calls; reports `ok` + `snowflake_reachable` + `providers_configured`). See the
+        [Brite Enrichment integration guide](../../tools/integrations/brite-enrichment.md).
   - Link to the integration guide at the top of each workflow block for deeper reference — it
     holds the canonical workflow recipes.
   - For each workflow, note any Email Bison limits (e.g. `bulk_create_leads` max 500 leads per
@@ -180,7 +183,7 @@ MCP Tool Reference section guidance:
 See [`plugins/marketing/tools/integrations/email-bison.md` §Common Workflows](../../../tools/integrations/email-bison.md#common-workflows) for the canonical 8-step recipe, API paths, and request body shapes.
 
 1. Availability check: call `get_active_workspace_info`. On failure, stop and report.
-2. Call `bulk_create_leads` (or `upsert_multiple_leads`) with lead data — max 500 per call, chunk larger lists. Store the returned lead IDs.
+2. Call `bulk_create_leads` with lead data — max 500 per call, chunk larger lists. Store the returned lead IDs. Re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8) — no upsert behavior; no `upsert_multiple_leads` endpoint exists (BC-6785 R-28 + BC-11072).
 3. Call `create_campaign` with `{name, max_emails_per_day, max_new_leads_per_day, tracking options}`. Store the returned campaign ID.
 4. Call `import_leads_to_campaign` with the lead IDs from step 2 — **MCP confirmation gate**. Do not auto-confirm. If the response flags leads already in another campaign, surface the `allow_parallel_sending` prompt to the user; never enable without explicit approval.
 5. Call `list_sender_emails`, filter `status: "connected"`, then call `attach_sender_emails_to_campaign` with the ID array.

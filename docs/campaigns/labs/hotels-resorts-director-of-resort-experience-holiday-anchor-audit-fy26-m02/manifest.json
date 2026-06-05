@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "slug": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "director-of-resort-experience",
+  "offer": "holiday-anchor-audit",
+  "year": 2026,
+  "month": 2,
+  "linear": {
+    "milestone_id": "17450de2-f8f2-4107-8625-c07594e06066",
+    "milestone_url": "https://linear.app/brite-nites/project/brite-gtm-fa8fc238ef28",
+    "project": "Brite GTM"
+  },
+  "salesforce": {
+    "campaign_id": null,
+    "campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02"
+  },
+  "email_bison": {
+    "workspace": "emailbison-b2b",
+    "campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+    "campaigns": []
+  },
+  "created_at": "2026-05-19T21:02:53Z",
+  "scaffolded_by": "/marketing:plan-campaign",
+  "migrated_from": {
+    "schema_version": 1,
+    "migrated_at": "2026-05-27T00:00:00Z",
+    "migrated_by": "plugins/marketing/scripts/migrate_manifest_v1_to_v2.py (BC-11852)"
+  }
+}

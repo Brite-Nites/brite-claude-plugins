@@ -1,7 +1,7 @@
 # 007. RevOps Plugin Design Decisions
 
-**Status:** Accepted
-**Date:** 2026-04-19
+**Status:** Accepted (2026-04-19); **amended 2026-06-02** — §3.3 + §3.4 reconciled to as-built (7 commands, 2 MCP servers); original locked decisions unchanged.
+**Date:** 2026-04-19 / amended 2026-06-02
 
 ## Context
 
@@ -38,11 +38,15 @@ Rationale: subtree is strictly more flexible than wholesale fork. If we never pu
 - 3 new `/revops:*` commands for SF-specific orchestration that workflows doesn't cover: `deploy-sandbox`, `deploy-prod`, `post-deploy-runbook`
 - Hooks that fire only in SFDX-adjacent contexts (cwd-aware)
 
+> **Update 2026-06-02 (as-built):** the command surface has grown from 3 to **7**. Original three: `deploy-sandbox`, `deploy-prod`, `post-deploy-runbook`. Added since: `setup-sandbox` (guided sandbox auth) and `doctor` (zero-mutation SF environment health check) — the onboarding → health lifecycle; plus `create-sf-campaign` and `update-sf-campaign-status` — the GTM campaign-sync seam, owned by `marketing` and governed by [ADR-015](015-gtm-sigma3-sf-campaign-sync.md), hosted here as commands. Per `CONTEXT.md`, campaign-sync is **not** part of revops's core charter (SF knowledge + deploy/ops discipline) — it is a seam revops hosts on marketing's behalf.
+
 ### 3.4 MCP scope: `data,metadata,testing --no-telemetry`, GA-only
 
 `plugins/revops/.mcp.json` registers `plugin:revops:salesforce` as `npx @salesforce/mcp@0.30.5 --orgs DEFAULT_TARGET_ORG --toolsets data,metadata,testing --no-telemetry`. No `--allow-non-ga-tools`. This is medium scope — broader than `plugins/marketing/`'s SOQL-read narrow scope, narrower than `brite-salesforce/.mcp.json`'s full dev scope (which adds `orgs,users` + non-GA tools).
 
 Claude Code project-scope precedence means the three MCP instances (marketing narrow, revops medium, brite-salesforce broad) don't conflict when a session sits inside `brite-salesforce` — the most-local config wins.
+
+> **Update 2026-06-02 (as-built):** `plugins/revops/.mcp.json` now registers a **second** server alongside `salesforce` — `plugin:revops:gbrain-team` (the Brite handbook "brain", via `${CLAUDE_PLUGIN_ROOT}/scripts/gbrain-team-broker.sh`). Two servers remains within the ADR-009 §3 soft cap (~5–6). The `salesforce` server is otherwise unchanged (`DEFAULT_TARGET_ORG`, `data,metadata,testing`, GA-only). The canonical owner of the gbrain-team registration is the `brite-core` plugin; revops and 4 other plugins (workflows, marketing, cadence, flow-architecture) currently self-register the same broker for standalone resilience. Whether to consolidate on `brite-core` vs keep self-registration is an open cross-plugin question — not settled by this ADR.
 
 ### 3.5 Skill filter: 13 customized, 1 deferred, 22 skip, 7 agents skip
 

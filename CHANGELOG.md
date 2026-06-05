@@ -6,7 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Removed
+- **workflows 3.32.0:** context7 MCP server, SessionStart context7-instruction hook, and all skill/agent/command paths that depended on it (BC-11891)
+  - ADR-001 marked Withdrawn; future gbrain-based replacement to land in a separate ADR
+  - CDR compliance reviewer + handbook lookups + org-level precedent search degrade with skip-and-continue narration
+  - URL-resolution work in cdr-compliance-reviewer is unaffected
+  - `handbook-drift-check` skill is unaffected — it already used `gh api` directly
+  - precedent-search SKILL.md.tmpl renumbered Phase 5 → Phase 4 (org-level INDEX phase deleted)
+  - cdr-compliance-reviewer agent's CDR-comparison spec sections wrapped in a `## CDR-compliance spec (currently deferred)` callout with an inline re-activation guide
+  - Plugin MCP count: 4 → 3 (under the advisory ~5-6 soft cap; budget headroom preserved for the future gbrain replacement)
+  - **Semver convention note:** this is a MINOR bump for a capability removal. CONTRIBUTING.md's semver definition treats MCP-server removal ambiguously — convention amendment (MAJOR vs MINOR for graceful-degradation removals) tracked as a follow-up.
+- Haiku LLM PreToolUse hooks from `workflows` plugin (BC-11889 — workflows 3.30.2 → 3.31.0)
+  - Dropped `type: "prompt"` security review on every Bash call (10s timeout, false-positive prone)
+  - Dropped `type: "prompt"` security review on every Write/Edit content scan
+  - Deleted `scripts/test_security_hook_classifier.sh` (dead-code test for removed classifier)
+  - Removed `validate.sh` Section 2d (invoked the deleted test)
+  - **Behavior change**: regex-only gating retained (`rm -rf`, `git push --force`/`-f`, `DROP TABLE`, `chmod 777`, piped downloads, common secret patterns). `git push --force-with-lease` now passes on all branches including `main` (was branch-aware via BC-11117 LLM carve-out).
+
+### Deprecated
+- **workflows 3.36.0:** `/workflows:bug-report` superseded by `/workflows:raise-a-ticket` (forwarding shim retained for one release; the successor adds cross-product routing, the Bug/Idea fork, canonical `type:bug`/`type:task` + `needs-triage` labels, and a `/triage` handoff).
+
 ### Added
+- **workflows 3.36.0:** `/workflows:raise-a-ticket` — Linear-native, cross-product product-feedback intake. Two reporter-facing kinds (Bug → `type:bug` / Idea-Feedback → `type:task`), `needs-triage` + `executor:hybrid`, existence-aware label reconciliation (falls back to Linear priority for severity and the built-in Triage state when `needs-triage` isn't provisioned). Routes via the per-repo `docs/agents/issue-tracker.md` (lazy-created on miss), is conversational-in / preview-out, and hands off to the triage stage. Adds the `bug`/`enhancement` → `type:bug`/`type:task` category mapping to `docs/agents/triage-labels.md`. See [ADR-021](docs/decisions/021-raise-a-ticket-intake.md).
 - Health scoring rubrics for 10 inner-loop skills (BC-2468)
   - LLM-as-judge rubric YAML format with weighted dimensions and pass thresholds
   - `scripts/score-skill-output.sh` and `scripts/score-behavioral.sh` scoring harnesses

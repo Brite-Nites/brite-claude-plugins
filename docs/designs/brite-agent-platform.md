@@ -1,9 +1,10 @@
 # Brite Agent Platform — Design Document
 
-**Status:** Draft
+**Status:** Superseded (2026-05-27) — see `docs/history/prd-m5-m8-archive.md`
 **Author:** Holden Halford + Claude
 **Date:** 2026-03-12
 **Supersedes:** BRI-1337 (Improve project-start with framework templates)
+**Superseded by:** 4-layer architecture re-org (Layer A Orchestration / Layer B Runtime / Layer C Skill Packs / Layer D Knowledge). PRD M5-M8 milestones were cancelled 2026-05-27. M1-M4 outcomes delivered as Linear milestones whose naming expanded beyond this doc's canonical M-numbering (both PRD-canonical names and operational labels coexist in the Linear historical-milestone list — see `docs/history/prd-m5-m8-archive.md` for detail). The Linear projects "Brite Skill Packs" (Layer C, renamed from "Brite Plugin Marketplace"), "Brite Orchestration Layer", "Brite Knowledge Layer", and "Brite Runtime & Harness" replace the original 8-milestone single-project framing. Sections below remain as historical context.
 
 ---
 

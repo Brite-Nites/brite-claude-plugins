@@ -1,0 +1,4770 @@
+{
+  "snapshot_date": "2026-05-27",
+  "linear_project": {
+    "id": "5e25e522-0700-4f0f-86a2-bdff965126f5",
+    "name": "Brite GTM"
+  },
+  "eb_workspaces": [
+    "b2b",
+    "personal"
+  ],
+  "row_count": 77,
+  "raw_record_counts": {
+    "linear_milestones": 50,
+    "eb_b2b": 109,
+    "eb_personal": 21
+  },
+  "rows": [
+    {
+      "logical_key": "fy??-m??-hotels resort holiday anchor audit m02-",
+      "fy": null,
+      "month": null,
+      "vertical_raw": "Hotels Resort Holiday Anchor Audit M02",
+      "vertical_slug": null,
+      "vertical_inference": "miss",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "17450de2-f8f2-4107-8625-c07594e06066",
+          "name": "[ARCHIVED] Hotels Resort Holiday Anchor Audit M02",
+          "progress": 0,
+          "target_date": null
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m09-bars-restaurants-",
+      "fy": "25",
+      "month": "09",
+      "vertical_raw": "Bars",
+      "vertical_slug": "bars-restaurants",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Bar Owners, GMs | General Emails",
+        "Managers+ | Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 8,
+          "workspace": "b2b",
+          "name": "FY25, M09 | Bars | Bar Owners, GMs | General Emails",
+          "esp": null,
+          "all_esps": false,
+          "audience_tier": "Bar Owners, GMs | General Emails",
+          "status": "archived",
+          "leads": 1619,
+          "sent": 70,
+          "replies": 6,
+          "bounced": 1
+        },
+        {
+          "id": 10,
+          "workspace": "b2b",
+          "name": "FY25, M09 | Bars | Bar Owners, GMs | General Emails",
+          "esp": null,
+          "all_esps": false,
+          "audience_tier": "Bar Owners, GMs | General Emails",
+          "status": "completed",
+          "leads": 13678,
+          "sent": 26670,
+          "replies": 651,
+          "bounced": 275
+        },
+        {
+          "id": 11,
+          "workspace": "b2b",
+          "name": "FY25, M09 | Bars | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 11890,
+          "sent": 23160,
+          "replies": 556,
+          "bounced": 270
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 27187,
+        "sent": 49900,
+        "replies": 1213,
+        "bounced": 546,
+        "reply_rate_pct": 2.43
+      },
+      "linear_milestones": [
+        {
+          "id": "c9f5e24a-0b4a-4206-9275-191a82620d8d",
+          "name": "[ARCHIVED] FY25, M09 | Bars | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-09-30"
+        },
+        {
+          "id": "db598bb0-e4c9-49d9-8742-7b89f854f619",
+          "name": "[ARCHIVED] FY25, M09 | Bars | Owners & GMs General",
+          "progress": 0,
+          "target_date": "2025-09-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m09-off-canon-community-management-",
+      "fy": "25",
+      "month": "09",
+      "vertical_raw": "Community Management",
+      "vertical_slug": "off-canon-community-management",
+      "vertical_inference": "bucket",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 7,
+          "workspace": "b2b",
+          "name": "FY25, M09 | Community Management | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 9240,
+          "sent": 17717,
+          "replies": 586,
+          "bounced": 365
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 9240,
+        "sent": 17717,
+        "replies": 586,
+        "bounced": 365,
+        "reply_rate_pct": 3.31
+      },
+      "linear_milestones": [
+        {
+          "id": "3710c0b4-796a-4781-97ef-ba6eeace0186",
+          "name": "[ARCHIVED] FY25, M09 | Community Management | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-09-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m09-??-",
+      "fy": "25",
+      "month": "09",
+      "vertical_raw": null,
+      "vertical_slug": null,
+      "vertical_inference": "miss",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Bars Owners, GMs | Personal Emails"
+      ],
+      "esps": [],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 9,
+          "workspace": "b2b",
+          "name": "FY25, M09 | Bars Owners, GMs | Personal Emails",
+          "esp": null,
+          "all_esps": false,
+          "audience_tier": "Bars Owners, GMs | Personal Emails",
+          "status": "archived",
+          "leads": 1887,
+          "sent": 65,
+          "replies": 3,
+          "bounced": 2
+        }
+      ],
+      "eb_status_set": [
+        "archived"
+      ],
+      "eb_stats": {
+        "leads": 1887,
+        "sent": 65,
+        "replies": 3,
+        "bounced": 2,
+        "reply_rate_pct": 4.62
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy25-m10-bars-restaurants-",
+      "fy": "25",
+      "month": "10",
+      "vertical_raw": "Drive-Thru",
+      "vertical_slug": "bars-restaurants",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Employees | Professional Emails"
+      ],
+      "esps": [],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 12,
+          "workspace": "b2b",
+          "name": "FY25, M10 | Drive-Thru | Employees | Professional Emails",
+          "esp": null,
+          "all_esps": false,
+          "audience_tier": "Employees | Professional Emails",
+          "status": "completed",
+          "leads": 2295,
+          "sent": 4581,
+          "replies": 17,
+          "bounced": 4
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 2295,
+        "sent": 4581,
+        "replies": 17,
+        "bounced": 4,
+        "reply_rate_pct": 0.37
+      },
+      "linear_milestones": [
+        {
+          "id": "a9b99032-e40e-46b8-bd31-ff4e2814dfb1",
+          "name": "[ARCHIVED] FY25, M10 | Drive-Thru | Employees Pro",
+          "progress": 0,
+          "target_date": "2025-10-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m10-hotels-resorts-",
+      "fy": "25",
+      "month": "10",
+      "vertical_raw": "Hotels",
+      "vertical_slug": "hotels-resorts",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 14,
+          "workspace": "b2b",
+          "name": "FY25, M10 | Hotels | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 67512,
+          "sent": 130036,
+          "replies": 3144,
+          "bounced": 3179
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 67512,
+        "sent": 130036,
+        "replies": 3144,
+        "bounced": 3179,
+        "reply_rate_pct": 2.42
+      },
+      "linear_milestones": [
+        {
+          "id": "cf52da59-411a-44a9-925f-032d6542c5cf",
+          "name": "[ARCHIVED] FY25, M10 | Hotels | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-10-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-apartments-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Apartments",
+      "vertical_slug": "apartments",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 15,
+          "workspace": "personal",
+          "name": "FY25, M11 | Apartments | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 295,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 37,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Apartments | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 3678,
+          "sent": 7179,
+          "replies": 248,
+          "bounced": 20
+        },
+        {
+          "id": 38,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Apartments | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "completed",
+          "leads": 3269,
+          "sent": 6357,
+          "replies": 159,
+          "bounced": 68
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 7242,
+        "sent": 13536,
+        "replies": 407,
+        "bounced": 88,
+        "reply_rate_pct": 3.01
+      },
+      "linear_milestones": [
+        {
+          "id": "1e7c8c1b-0114-49d8-aa2f-6933c04cb36b",
+          "name": "[ARCHIVED] FY25, M11 | Apartments | Role",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        },
+        {
+          "id": "239e978e-42a5-42ad-a406-488716e6c16d",
+          "name": "[ARCHIVED] FY25, M11 | Apartments | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-auto-dealerships-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Car Dealerships",
+      "vertical_slug": "auto-dealerships",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 5,
+          "workspace": "personal",
+          "name": "FY25, M11 | Car Dealerships | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 3959,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 15,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Car Dealerships | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "active",
+          "leads": 52468,
+          "sent": 35262,
+          "replies": 201,
+          "bounced": 760
+        },
+        {
+          "id": 16,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Car Dealerships | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "completed",
+          "leads": 3463,
+          "sent": 6809,
+          "replies": 79,
+          "bounced": 65
+        }
+      ],
+      "eb_status_set": [
+        "active",
+        "archived",
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 59890,
+        "sent": 42071,
+        "replies": 280,
+        "bounced": 825,
+        "reply_rate_pct": 0.67
+      },
+      "linear_milestones": [
+        {
+          "id": "8719f727-25ea-465a-bacc-a126968cdaf9",
+          "name": "[ARCHIVED] FY25, M11 | Car Dealerships | Role",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-bars-restaurants-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Drive-Thru Restaurants",
+      "vertical_slug": "bars-restaurants",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Personal Emails | All ESPs",
+        "Professional Emails | All ESPs",
+        "Professional Emails | All ESPs | Direct Question Offer",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 9,
+          "workspace": "personal",
+          "name": "FY25, M11 | Drive Thru Restaurants | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 10,
+          "workspace": "personal",
+          "name": "FY25, M11 | Restaurants & Bars | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 151,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 19,
+          "workspace": "personal",
+          "name": "FY25, M11 | Opentable Restaurants | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 681,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 39,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Restaurants & Bars | Professional Emails | All ESPs | Direct Question Offer",
+          "esp": null,
+          "all_esps": false,
+          "audience_tier": "Professional Emails | All ESPs | Direct Question Offer",
+          "status": "completed",
+          "leads": 6373,
+          "sent": 12363,
+          "replies": 290,
+          "bounced": 201
+        },
+        {
+          "id": 40,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Restaurants & Bars | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "paused",
+          "leads": 13055,
+          "sent": 19722,
+          "replies": 822,
+          "bounced": 272
+        },
+        {
+          "id": 43,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Drive-Thru Restaurants | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 44,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Drive-Thru Restaurants | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "draft",
+          "leads": 48,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed",
+        "draft",
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 20308,
+        "sent": 32085,
+        "replies": 1112,
+        "bounced": 473,
+        "reply_rate_pct": 3.47
+      },
+      "linear_milestones": [
+        {
+          "id": "3d513031-12f1-4de5-9d40-9bb42c5f47f2",
+          "name": "[ARCHIVED] FY25, M11 | Restaurants & Bars | Pro (Direct Q Offer)",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        },
+        {
+          "id": "2bfbcb2c-5cd3-4d1c-a04a-72b0206fb7f6",
+          "name": "[ARCHIVED] FY25, M11 | Restaurants & Bars | Role",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-casinos-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Casinos",
+      "vertical_slug": "casinos",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 1,
+          "workspace": "personal",
+          "name": "FY25, M11 | Casinos | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 1,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 47,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Casinos | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 787,
+          "sent": 1537,
+          "replies": 25,
+          "bounced": 23
+        },
+        {
+          "id": 48,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Casinos | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "completed",
+          "leads": 34,
+          "sent": 66,
+          "replies": 2,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 822,
+        "sent": 1603,
+        "replies": 27,
+        "bounced": 23,
+        "reply_rate_pct": 1.68
+      },
+      "linear_milestones": [
+        {
+          "id": "5521ef12-9811-4a56-ae99-247d0246a46d",
+          "name": "[ARCHIVED] FY25, M11 | Casinos | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        },
+        {
+          "id": "a7c43508-f1dc-4cbf-866b-05be2daff829",
+          "name": "[ARCHIVED] FY25, M11 | Casinos | Role",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-churches-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Churches",
+      "vertical_slug": "churches",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 7,
+          "workspace": "personal",
+          "name": "FY25, M11 | Churches | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 8246,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 33,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Churches | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "active",
+          "leads": 18976,
+          "sent": 32256,
+          "replies": 975,
+          "bounced": 185
+        },
+        {
+          "id": 34,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Churches | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "completed",
+          "leads": 10414,
+          "sent": 20330,
+          "replies": 627,
+          "bounced": 125
+        }
+      ],
+      "eb_status_set": [
+        "active",
+        "archived",
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 37636,
+        "sent": 52586,
+        "replies": 1602,
+        "bounced": 310,
+        "reply_rate_pct": 3.05
+      },
+      "linear_milestones": [
+        {
+          "id": "5651e96e-eec5-4a4c-b21e-ca37f64e2848",
+          "name": "[ARCHIVED] FY25, M11 | Churches | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        },
+        {
+          "id": "ea9079f3-452e-47c9-8d9f-71cf45028d92",
+          "name": "[ARCHIVED] FY25, M11 | Churches | Role",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-hospitals-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Healthcare Facilities",
+      "vertical_slug": "hospitals",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 12,
+          "workspace": "personal",
+          "name": "FY25, M11 | Healthcare Facilities | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 29,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Healthcare Facilities | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 998,
+          "sent": 1960,
+          "replies": 36,
+          "bounced": 22
+        },
+        {
+          "id": 30,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Healthcare Facilities | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 998,
+        "sent": 1960,
+        "replies": 36,
+        "bounced": 22,
+        "reply_rate_pct": 1.84
+      },
+      "linear_milestones": [
+        {
+          "id": "7978d80f-b480-4655-9cfa-89d0c3fa9301",
+          "name": "[ARCHIVED] FY25, M11 | Healthcare Facilities | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-hotels-resorts-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Hotels",
+      "vertical_slug": "hotels-resorts",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Personal Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 2,
+          "workspace": "personal",
+          "name": "FY25, M11 | Hotels | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 88,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived"
+      ],
+      "eb_stats": {
+        "leads": 88,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy25-m11-municipalities-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Municipalities",
+      "vertical_slug": "municipalities",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 16,
+          "workspace": "personal",
+          "name": "FY25, M11 | Municipalities | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 25,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Municipalities | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "draft",
+          "leads": 217,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 26,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Municipalities | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "draft",
+          "leads": 21,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 238,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy25-m11-off-canon-banks-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Banks",
+      "vertical_slug": "off-canon-banks",
+      "vertical_inference": "bucket",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 11,
+          "workspace": "personal",
+          "name": "FY25, M11 | Banks | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 21,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 35,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Banks | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 2014,
+          "sent": 3912,
+          "replies": 139,
+          "bounced": 35
+        },
+        {
+          "id": 36,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Banks | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "completed",
+          "leads": 727,
+          "sent": 1424,
+          "replies": 25,
+          "bounced": 12
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 2762,
+        "sent": 5336,
+        "replies": 164,
+        "bounced": 47,
+        "reply_rate_pct": 3.07
+      },
+      "linear_milestones": [
+        {
+          "id": "1c840d25-002e-467d-96a3-0f243a0658f9",
+          "name": "[ARCHIVED] FY25, M11 | Banks | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        },
+        {
+          "id": "1d9fcdff-2040-4879-94d3-f1d910842641",
+          "name": "[ARCHIVED] FY25, M11 | Banks | Role",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-off-canon-car-washes-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Car Washes",
+      "vertical_slug": "off-canon-car-washes",
+      "vertical_inference": "bucket",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Personal Emails | All ESPs",
+        "Professional Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 18,
+          "workspace": "personal",
+          "name": "FY25, M11 | Car Washes | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 45,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Car Washes | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "completed",
+          "leads": 496,
+          "sent": 944,
+          "replies": 41,
+          "bounced": 13
+        },
+        {
+          "id": 46,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Car Washes | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 496,
+        "sent": 944,
+        "replies": 41,
+        "bounced": 13,
+        "reply_rate_pct": 4.34
+      },
+      "linear_milestones": [
+        {
+          "id": "41b03af5-f64f-4cbc-bccd-670f9b1b9b28",
+          "name": "[ARCHIVED] FY25, M11 | Car Washes | Role",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-off-canon-community-management-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Community Management",
+      "vertical_slug": "off-canon-community-management",
+      "vertical_inference": "bucket",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Personal Emails | All ESPs",
+        "Professional Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 17,
+          "workspace": "personal",
+          "name": "FY25, M11 | Community Management | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 41,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Community Management | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 42,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Community Management | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 7744,
+          "sent": 15061,
+          "replies": 507,
+          "bounced": 135
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 7744,
+        "sent": 15061,
+        "replies": 507,
+        "bounced": 135,
+        "reply_rate_pct": 3.37
+      },
+      "linear_milestones": [
+        {
+          "id": "a346f77b-ec82-47ea-8659-5cadb1f896bb",
+          "name": "[ARCHIVED] FY25, M11 | Community Management | Pro",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-off-canon-museums-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Museums & Art Galleries",
+      "vertical_slug": "off-canon-museums",
+      "vertical_inference": "bucket",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 8,
+          "workspace": "personal",
+          "name": "FY25, M11 | Museums & Art Galleries | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 31,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 23,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Museums & Art Galleries | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 24,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Museums & Art Galleries | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 31,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy25-m11-off-canon-retail-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Luxury Retail Stores",
+      "vertical_slug": "off-canon-retail",
+      "vertical_inference": "bucket",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 3,
+          "workspace": "personal",
+          "name": "FY25, M11 | Luxury Retail Stores | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 1,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 27,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Luxury Retail Stores | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "draft",
+          "leads": 49,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 28,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Luxury Retail Stores | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 50,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy25-m11-shopping-centers-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Shopping Centers, Malls, Outlets",
+      "vertical_slug": "shopping-centers",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 6,
+          "workspace": "personal",
+          "name": "FY25, M11 | Shopping Centers, Malls, Outlets | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 8,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 21,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Shopping Centers, Malls, Outlets | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 3281,
+          "sent": 6380,
+          "replies": 163,
+          "bounced": 78
+        },
+        {
+          "id": 22,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Shopping Centers, Malls, Outlets | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "completed",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 3289,
+        "sent": 6380,
+        "replies": 163,
+        "bounced": 78,
+        "reply_rate_pct": 2.55
+      },
+      "linear_milestones": [
+        {
+          "id": "78e64de2-5af6-4453-ac41-d34ce08b5151",
+          "name": "[ARCHIVED] FY25, M11 | Shopping Centers, Malls, Outlets | Mgr+ Pro",
+          "progress": 0,
+          "target_date": "2025-11-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy25-m11-sports-stadiums-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Stadiums, Arenas & Sports Complexes",
+      "vertical_slug": "sports-stadiums",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Personal Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 13,
+          "workspace": "personal",
+          "name": "FY25, M11 | Stadiums, Arenas & Sports Complexes | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy25-m11-universities-",
+      "fy": "25",
+      "month": "11",
+      "vertical_raw": "Colleges & Universities",
+      "vertical_slug": "universities",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ | Professional Emails | All ESPs",
+        "Personal Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 14,
+          "workspace": "personal",
+          "name": "FY25, M11 | Colleges & Universities | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "archived",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 31,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Colleges & Universities | Managers+ | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | Professional Emails | All ESPs",
+          "status": "draft",
+          "leads": 8387,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 32,
+          "workspace": "b2b",
+          "name": "FY25, M11 | Colleges & Universities | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "archived",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 8387,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m02-municipalities-",
+      "fy": "26",
+      "month": "02",
+      "vertical_raw": "Municipalities",
+      "vertical_slug": "municipalities",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 53,
+          "workspace": "b2b",
+          "name": "FY26, M2 | Municipalities | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 11019,
+          "sent": 8460,
+          "replies": 442,
+          "bounced": 178
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 11019,
+        "sent": 8460,
+        "replies": 442,
+        "bounced": 178,
+        "reply_rate_pct": 5.22
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m02-off-canon-community-management-",
+      "fy": "26",
+      "month": "02",
+      "vertical_raw": "Community Management",
+      "vertical_slug": "off-canon-community-management",
+      "vertical_inference": "bucket",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 51,
+          "workspace": "b2b",
+          "name": "FY26, M2 | Community Management | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 6141,
+          "sent": 11650,
+          "replies": 335,
+          "bounced": 186
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 6141,
+        "sent": 11650,
+        "replies": 335,
+        "bounced": 186,
+        "reply_rate_pct": 2.88
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m02-universities-",
+      "fy": "26",
+      "month": "02",
+      "vertical_raw": "Colleges & Universities",
+      "vertical_slug": "universities",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 52,
+          "workspace": "b2b",
+          "name": "FY26, M2 | Colleges & Universities | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 4207,
+          "sent": 7804,
+          "replies": 296,
+          "bounced": 122
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 4207,
+        "sent": 7804,
+        "replies": 296,
+        "bounced": 122,
+        "reply_rate_pct": 3.79
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m03-bars-restaurants-",
+      "fy": "26",
+      "month": "03",
+      "vertical_raw": "Restaurants & Bars America 250",
+      "vertical_slug": "bars-restaurants",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Personal Emails | All ESPs",
+        "Professional Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 21,
+          "workspace": "personal",
+          "name": "FY26, M3 | Restaurants & Bars America 250 | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "completed",
+          "leads": 1233,
+          "sent": 2433,
+          "replies": 48,
+          "bounced": 4
+        },
+        {
+          "id": 57,
+          "workspace": "b2b",
+          "name": "FY26, M3 | Restaurants & Bars America 250 | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 2127,
+          "sent": 3794,
+          "replies": 82,
+          "bounced": 40
+        },
+        {
+          "id": 58,
+          "workspace": "b2b",
+          "name": "FY26, M3 | Restaurants & Bars America 250 | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "completed",
+          "leads": 1228,
+          "sent": 2075,
+          "replies": 35,
+          "bounced": 35
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 4588,
+        "sent": 8302,
+        "replies": 165,
+        "bounced": 79,
+        "reply_rate_pct": 1.99
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m03-casinos-",
+      "fy": "26",
+      "month": "03",
+      "vertical_raw": "Casinos",
+      "vertical_slug": "casinos",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 54,
+          "workspace": "b2b",
+          "name": "FY26, M3 | Casinos | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 1545,
+          "sent": 2883,
+          "replies": 75,
+          "bounced": 63
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 1545,
+        "sent": 2883,
+        "replies": 75,
+        "bounced": 63,
+        "reply_rate_pct": 2.6
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m03-hotels-resorts-",
+      "fy": "26",
+      "month": "03",
+      "vertical_raw": "Hotels Summer Activation",
+      "vertical_slug": "hotels-resorts",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Managers+ (Reverified) | All ESPs",
+        "Managers+ | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 56,
+          "workspace": "b2b",
+          "name": "FY26, M3 | Hotels Summer Activation | Managers+ | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ | All ESPs",
+          "status": "paused",
+          "leads": 7521,
+          "sent": 1218,
+          "replies": 51,
+          "bounced": 38
+        },
+        {
+          "id": 60,
+          "workspace": "b2b",
+          "name": "FY26, M3 | Hotels Summer Activation | Managers+ (Reverified) | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Managers+ (Reverified) | All ESPs",
+          "status": "completed",
+          "leads": 7513,
+          "sent": 14597,
+          "replies": 291,
+          "bounced": 267
+        }
+      ],
+      "eb_status_set": [
+        "completed",
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 15034,
+        "sent": 15815,
+        "replies": 342,
+        "bounced": 305,
+        "reply_rate_pct": 2.16
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m03-municipalities-",
+      "fy": "26",
+      "month": "03",
+      "vertical_raw": "Municipalities America 250",
+      "vertical_slug": "municipalities",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 59,
+          "workspace": "b2b",
+          "name": "FY26, M3 | Municipalities America 250 | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 706,
+          "sent": 1369,
+          "replies": 51,
+          "bounced": 16
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 706,
+        "sent": 1369,
+        "replies": 51,
+        "bounced": 16,
+        "reply_rate_pct": 3.73
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-amusement-parks-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Amusement Parks",
+      "vertical_slug": "amusement-parks",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 66,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Amusement Parks | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 209,
+          "sent": 127,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 209,
+        "sent": 127,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-apartments-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Apartments",
+      "vertical_slug": "apartments",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 70,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Apartments | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "active",
+          "leads": 1904,
+          "sent": 1183,
+          "replies": 16,
+          "bounced": 6
+        }
+      ],
+      "eb_status_set": [
+        "active"
+      ],
+      "eb_stats": {
+        "leads": 1904,
+        "sent": 1183,
+        "replies": 16,
+        "bounced": 6,
+        "reply_rate_pct": 1.35
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-aquariums-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Aquariums",
+      "vertical_slug": "aquariums",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 73,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Aquariums | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 321,
+          "sent": 585,
+          "replies": 19,
+          "bounced": 3
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 321,
+        "sent": 585,
+        "replies": 19,
+        "bounced": 3,
+        "reply_rate_pct": 3.25
+      },
+      "linear_milestones": [
+        {
+          "id": "eb93cd10-c0ad-4f45-bb12-c9dab515092d",
+          "name": "FY26, M04 | Aquariums | Holiday Lighting",
+          "progress": 0,
+          "target_date": "2026-04-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m04-auto-dealerships-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Car Dealerships",
+      "vertical_slug": "auto-dealerships",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 69,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Car Dealerships | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 5506,
+          "sent": 707,
+          "replies": 3,
+          "bounced": 2
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 5506,
+        "sent": 707,
+        "replies": 3,
+        "bounced": 2,
+        "reply_rate_pct": 0.42
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-botanical-gardens-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Botanical Gardens",
+      "vertical_slug": "botanical-gardens",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 63,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Botanical Gardens | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "completed",
+          "leads": 271,
+          "sent": 531,
+          "replies": 17,
+          "bounced": 4
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 271,
+        "sent": 531,
+        "replies": 17,
+        "bounced": 4,
+        "reply_rate_pct": 3.2
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-country-clubs-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Golf & Country Clubs",
+      "vertical_slug": "country-clubs",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 65,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Golf & Country Clubs | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "active",
+          "leads": 4618,
+          "sent": 4816,
+          "replies": 62,
+          "bounced": 44
+        }
+      ],
+      "eb_status_set": [
+        "active"
+      ],
+      "eb_stats": {
+        "leads": 4618,
+        "sent": 4816,
+        "replies": 62,
+        "bounced": 44,
+        "reply_rate_pct": 1.29
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-hospitals-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Hospitals & Healthcare Facilities",
+      "vertical_slug": "hospitals",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 67,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Hospitals & Healthcare Facilities | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "active",
+          "leads": 2094,
+          "sent": 3588,
+          "replies": 31,
+          "bounced": 25
+        }
+      ],
+      "eb_status_set": [
+        "active"
+      ],
+      "eb_stats": {
+        "leads": 2094,
+        "sent": 3588,
+        "replies": 31,
+        "bounced": 25,
+        "reply_rate_pct": 0.86
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-off-canon-museums-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Museums & Art Galleries",
+      "vertical_slug": "off-canon-museums",
+      "vertical_inference": "bucket",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 68,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Museums & Art Galleries | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "active",
+          "leads": 2510,
+          "sent": 4879,
+          "replies": 164,
+          "bounced": 43
+        }
+      ],
+      "eb_status_set": [
+        "active"
+      ],
+      "eb_stats": {
+        "leads": 2510,
+        "sent": 4879,
+        "replies": 164,
+        "bounced": 43,
+        "reply_rate_pct": 3.36
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-shopping-centers-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Shopping Centers",
+      "vertical_slug": "shopping-centers",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 72,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Shopping Centers | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 1968,
+          "sent": 600,
+          "replies": 9,
+          "bounced": 5
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 1968,
+        "sent": 600,
+        "replies": 9,
+        "bounced": 5,
+        "reply_rate_pct": 1.5
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-ski-resorts-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Ski Resorts",
+      "vertical_slug": "ski-resorts",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 61,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Ski Resorts | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 400,
+          "sent": 378,
+          "replies": 3,
+          "bounced": 1
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 400,
+        "sent": 378,
+        "replies": 3,
+        "bounced": 1,
+        "reply_rate_pct": 0.79
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-sports-stadiums-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Sports Stadiums",
+      "vertical_slug": "sports-stadiums",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 64,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Sports Stadiums | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 518,
+          "sent": 304,
+          "replies": 4,
+          "bounced": 3
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 518,
+        "sent": 304,
+        "replies": 4,
+        "bounced": 3,
+        "reply_rate_pct": 1.32
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m04-zoos-",
+      "fy": "26",
+      "month": "04",
+      "vertical_raw": "Zoos",
+      "vertical_slug": "zoos",
+      "vertical_inference": "canonical",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 62,
+          "workspace": "b2b",
+          "name": "FY26, M4 | Zoos | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "active",
+          "leads": 441,
+          "sent": 758,
+          "replies": 23,
+          "bounced": 3
+        }
+      ],
+      "eb_status_set": [
+        "active"
+      ],
+      "eb_stats": {
+        "leads": 441,
+        "sent": 758,
+        "replies": 23,
+        "bounced": 3,
+        "reply_rate_pct": 3.03
+      },
+      "linear_milestones": [
+        {
+          "id": "c679a128-f98a-465c-819b-6d693fe2c9b0",
+          "name": "FY26, M04 | Zoos | Holiday Lighting",
+          "progress": 0,
+          "target_date": "2026-04-30"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m05-auto-dealerships-year-end sales visibility",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Auto Dealerships",
+      "vertical_slug": "auto-dealerships",
+      "vertical_inference": "canonical",
+      "offer_raw": "Year-End Sales Visibility",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 85,
+          "workspace": "b2b",
+          "name": "Google | FY26, M05 | Auto Dealerships | Year-End Sales Visibility | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "completed",
+          "leads": 1066,
+          "sent": 2102,
+          "replies": 31,
+          "bounced": 4
+        },
+        {
+          "id": 88,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M05 | Auto Dealerships | Year-End Sales Visibility | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "active",
+          "leads": 2513,
+          "sent": 4987,
+          "replies": 14,
+          "bounced": 28
+        },
+        {
+          "id": 92,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M05 | Auto Dealerships | Year-End Sales Visibility | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "completed",
+          "leads": 1730,
+          "sent": 3423,
+          "replies": 32,
+          "bounced": 20
+        }
+      ],
+      "eb_status_set": [
+        "active",
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 5309,
+        "sent": 10512,
+        "replies": 77,
+        "bounced": 52,
+        "reply_rate_pct": 0.73
+      },
+      "linear_milestones": [
+        {
+          "id": "860089ba-cc75-4408-abf7-be3f6374bd8d",
+          "name": "FY26, M05 | Auto Dealerships | Year-End Sales Visibility",
+          "progress": 0,
+          "target_date": "2026-05-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m05-bars-restaurants-",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Opentable Restaurants",
+      "vertical_slug": "bars-restaurants",
+      "vertical_inference": "override",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 49,
+          "workspace": "b2b",
+          "name": "FY26, M5 | Opentable Restaurants | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "paused",
+          "leads": 4697,
+          "sent": 4544,
+          "replies": 47,
+          "bounced": 172
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 4697,
+        "sent": 4544,
+        "replies": 47,
+        "bounced": 172,
+        "reply_rate_pct": 1.03
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-botanical gardens-250th anniversary activation",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Botanical Gardens",
+      "vertical_slug": "botanical-gardens",
+      "vertical_inference": "canonical",
+      "offer_raw": "250th Anniversary Activation",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "c5b162d0-9a80-4ab0-9618-910fb32c3c0e",
+          "name": "FY26, M05 | Botanical Gardens | 250th Anniversary Activation",
+          "progress": 0,
+          "target_date": "2026-06-30"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-brite-recruiting-trade companies",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Brite Recruiting",
+      "vertical_slug": "brite-recruiting",
+      "vertical_inference": "bucket",
+      "offer_raw": "Trade Companies",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "cross-entity",
+      "audience_tiers": [
+        "Personal Emails | All ESPs",
+        "Professional Emails | All ESPs",
+        "Role Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 52,
+          "workspace": "personal",
+          "name": "FY26, M05 | Brite Recruiting | Trade Companies | Personal Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Personal Emails | All ESPs",
+          "status": "active",
+          "leads": 373,
+          "sent": 644,
+          "replies": 5,
+          "bounced": 1
+        },
+        {
+          "id": 130,
+          "workspace": "b2b",
+          "name": "FY26, M05 | Brite Recruiting | Trade Companies | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "active",
+          "leads": 663,
+          "sent": 664,
+          "replies": 8,
+          "bounced": 3
+        },
+        {
+          "id": 131,
+          "workspace": "b2b",
+          "name": "FY26, M05 | Brite Recruiting | Trade Companies | Role Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Role Emails | All ESPs",
+          "status": "active",
+          "leads": 377,
+          "sent": 617,
+          "replies": 11,
+          "bounced": 12
+        }
+      ],
+      "eb_status_set": [
+        "active"
+      ],
+      "eb_stats": {
+        "leads": 1413,
+        "sent": 1925,
+        "replies": 24,
+        "bounced": 16,
+        "reply_rate_pct": 1.25
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-casinos-collaborative creative partner",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Casinos",
+      "vertical_slug": "casinos",
+      "vertical_inference": "canonical",
+      "offer_raw": "Collaborative Creative Partner",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 91,
+          "workspace": "b2b",
+          "name": "Google | FY26, M05 | Casinos | Collaborative Creative Partner | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 32,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 94,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M05 | Casinos | Collaborative Creative Partner | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "active",
+          "leads": 721,
+          "sent": 1070,
+          "replies": 1,
+          "bounced": 2
+        },
+        {
+          "id": 95,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M05 | Casinos | Collaborative Creative Partner | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "active",
+          "leads": 815,
+          "sent": 1070,
+          "replies": 22,
+          "bounced": 1
+        }
+      ],
+      "eb_status_set": [
+        "active",
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 1568,
+        "sent": 2140,
+        "replies": 23,
+        "bounced": 3,
+        "reply_rate_pct": 1.07
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-corporate-campuses-year-end campus warmth",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Corporate Campuses",
+      "vertical_slug": "corporate-campuses",
+      "vertical_inference": "canonical",
+      "offer_raw": "Year-End Campus Warmth",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 87,
+          "workspace": "b2b",
+          "name": "Google | FY26, M05 | Corporate Campuses | Year-End Campus Warmth | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 90,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M05 | Corporate Campuses | Year-End Campus Warmth | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 93,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M05 | Corporate Campuses | Year-End Campus Warmth | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-cross-vertical-campaign-opentable restaurants",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "250th Anniversary",
+      "vertical_slug": "cross-vertical-campaign",
+      "vertical_inference": "bucket",
+      "offer_raw": "Opentable Restaurants",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "cross-entity",
+      "audience_tiers": [
+        "Professional Emails | All ESPs"
+      ],
+      "esps": [
+        "all-esps"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 50,
+          "workspace": "b2b",
+          "name": "FY26, M5 | 250th Anniversary | Opentable Restaurants | Professional Emails | All ESPs",
+          "esp": null,
+          "all_esps": true,
+          "audience_tier": "Professional Emails | All ESPs",
+          "status": "paused",
+          "leads": 2017,
+          "sent": 2991,
+          "replies": 19,
+          "bounced": 82
+        }
+      ],
+      "eb_status_set": [
+        "paused"
+      ],
+      "eb_stats": {
+        "leads": 2017,
+        "sent": 2991,
+        "replies": 19,
+        "bounced": 82,
+        "reply_rate_pct": 0.64
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-cross-vertical-reengagement-re-engagement",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Prior Year Interested",
+      "vertical_slug": "cross-vertical-reengagement",
+      "vertical_inference": "bucket",
+      "offer_raw": "Re-engagement",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "cross-entity",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 132,
+          "workspace": "b2b",
+          "name": "Google | FY26, M05 | Prior Year Interested | Re-engagement | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "active",
+          "leads": 802,
+          "sent": 801,
+          "replies": 44,
+          "bounced": 14
+        },
+        {
+          "id": 133,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M05 | Prior Year Interested | Re-engagement | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "active",
+          "leads": 324,
+          "sent": 323,
+          "replies": 9,
+          "bounced": 8
+        },
+        {
+          "id": 134,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M05 | Prior Year Interested | Re-engagement | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "active",
+          "leads": 383,
+          "sent": 381,
+          "replies": 33,
+          "bounced": 3
+        }
+      ],
+      "eb_status_set": [
+        "active"
+      ],
+      "eb_stats": {
+        "leads": 1509,
+        "sent": 1505,
+        "replies": 86,
+        "bounced": 25,
+        "reply_rate_pct": 5.71
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-shopping-centers-holiday foot traffic & tenant retention",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Shopping Centers",
+      "vertical_slug": "shopping-centers",
+      "vertical_inference": "canonical",
+      "offer_raw": "Holiday Foot Traffic & Tenant Retention",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 97,
+          "workspace": "b2b",
+          "name": "Google | FY26, M05 | Shopping Centers | Holiday Foot Traffic & Tenant Retention | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "completed",
+          "leads": 75,
+          "sent": 146,
+          "replies": 6,
+          "bounced": 0
+        },
+        {
+          "id": 99,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M05 | Shopping Centers | Holiday Foot Traffic & Tenant Retention | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "completed",
+          "leads": 1249,
+          "sent": 2429,
+          "replies": 5,
+          "bounced": 69
+        },
+        {
+          "id": 101,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M05 | Shopping Centers | Holiday Foot Traffic & Tenant Retention | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "completed",
+          "leads": 547,
+          "sent": 1070,
+          "replies": 29,
+          "bounced": 3
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 1871,
+        "sent": 3645,
+        "replies": 40,
+        "bounced": 72,
+        "reply_rate_pct": 1.1
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-ski-resorts-night-time event & wedding venue",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Ski Resorts",
+      "vertical_slug": "ski-resorts",
+      "vertical_inference": "canonical",
+      "offer_raw": "Night-Time Event & Wedding Venue",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 96,
+          "workspace": "b2b",
+          "name": "Google | FY26, M05 | Ski Resorts | Night-Time Event & Wedding Venue | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "completed",
+          "leads": 39,
+          "sent": 73,
+          "replies": 6,
+          "bounced": 0
+        },
+        {
+          "id": 98,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M05 | Ski Resorts | Night-Time Event & Wedding Venue | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "completed",
+          "leads": 346,
+          "sent": 688,
+          "replies": 5,
+          "bounced": 2
+        },
+        {
+          "id": 100,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M05 | Ski Resorts | Night-Time Event & Wedding Venue | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "active",
+          "leads": 270,
+          "sent": 269,
+          "replies": 3,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "active",
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 655,
+        "sent": 1030,
+        "replies": 14,
+        "bounced": 2,
+        "reply_rate_pct": 1.36
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m05-sports-stadiums-holiday & off-season activation",
+      "fy": "26",
+      "month": "05",
+      "vertical_raw": "Sports Stadiums",
+      "vertical_slug": "sports-stadiums",
+      "vertical_inference": "canonical",
+      "offer_raw": "Holiday & Off-Season Activation",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 84,
+          "workspace": "b2b",
+          "name": "Google | FY26, M05 | Sports Stadiums | Holiday & Off-Season Activation | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 20,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 86,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M05 | Sports Stadiums | Holiday & Off-Season Activation | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 204,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 89,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M05 | Sports Stadiums | Holiday & Off-Season Activation | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 133,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 357,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m06-municipalities-250th anniversary final call",
+      "fy": "26",
+      "month": "06",
+      "vertical_raw": "Municipalities",
+      "vertical_slug": "municipalities",
+      "vertical_inference": "canonical",
+      "offer_raw": "250th Anniversary Final Call",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "01b1ee94-fd59-43c2-aafd-fa968af72807",
+          "name": "FY26, M06 | Municipalities | 250th Anniversary Final Call",
+          "progress": 0,
+          "target_date": "2026-06-30"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m06-theaters-year-round",
+      "fy": "26",
+      "month": "06",
+      "vertical_raw": "Theaters",
+      "vertical_slug": "theaters",
+      "vertical_inference": "canonical",
+      "offer_raw": "Year-Round",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "06fd698a-89d5-4d7e-83e5-5413fc6759d7",
+          "name": "FY26, M06 | Theaters | Year-Round",
+          "progress": 0,
+          "target_date": "2026-06-30"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m06-wineries & breweries-summer programming",
+      "fy": "26",
+      "month": "06",
+      "vertical_raw": "Wineries & Breweries",
+      "vertical_slug": "wineries-breweries",
+      "vertical_inference": "override",
+      "offer_raw": "Summer Programming",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "b051d339-4b66-4c1c-b1a9-b1c1127c247d",
+          "name": "FY26, M06 | Wineries & Breweries | Summer Programming",
+          "progress": 0,
+          "target_date": "2026-06-30"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-amusement-parks-winter holiday takeover",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Amusement Parks",
+      "vertical_slug": "amusement-parks",
+      "vertical_inference": "canonical",
+      "offer_raw": "Winter Holiday Takeover",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 108,
+          "workspace": "b2b",
+          "name": "FY26, M07 | Amusement Parks | Winter Holiday Takeover | Professional Emails",
+          "esp": null,
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "9518a3c6-b67a-4f76-904a-186a83c98d62",
+          "name": "FY26, M07 | Amusement Parks | Winter Holiday Takeover",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-apartments-multi-property holiday portfolio program",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Apartments",
+      "vertical_slug": "apartments",
+      "vertical_inference": "canonical",
+      "offer_raw": "Multi-Property Holiday Portfolio Program",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 114,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M07 | Apartments | Multi-Property Holiday Portfolio Program | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 122,
+          "workspace": "b2b",
+          "name": "Google | FY26, M07 | Apartments | Multi-Property Holiday Portfolio Program | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 123,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M07 | Apartments | Multi-Property Holiday Portfolio Program | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "27427fcf-172a-40f5-b430-04afe365deb3",
+          "name": "FY26, M07 | Apartments | Multi-Property Holiday Portfolio Program",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-aquariums-holiday underwater festival",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Aquariums",
+      "vertical_slug": "aquariums",
+      "vertical_inference": "canonical",
+      "offer_raw": "Holiday Underwater Festival",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "982cf8fe-6212-4f37-bd4e-bf1df8a7ff3a",
+          "name": "FY26, M07 | Aquariums | Holiday Underwater Festival",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-brite supply s4-year-round installer partnership",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Brite Supply S4",
+      "vertical_slug": null,
+      "vertical_inference": "miss",
+      "offer_raw": "Year-Round Installer Partnership",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "dfd2f55f-04d6-4b63-9809-4e98cdd21281",
+          "name": "FY26, M07 | Brite Supply S4 | Year-Round Installer Partnership",
+          "progress": 0,
+          "target_date": "2026-07-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-casinos-casino floor holiday takeover",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Casinos",
+      "vertical_slug": "casinos",
+      "vertical_inference": "canonical",
+      "offer_raw": "Casino Floor Holiday Takeover",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "e99e9f06-cf50-463b-988c-1dc54e02c09c",
+          "name": "FY26, M07 | Casinos | Casino Floor Holiday Takeover",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-country clubs-members' christmas gala production",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Country Clubs",
+      "vertical_slug": "country-clubs",
+      "vertical_inference": "canonical",
+      "offer_raw": "Members' Christmas Gala Production",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "d76e1ae1-734a-494d-9237-048f14648c09",
+          "name": "FY26, M07 | Country Clubs | Members' Christmas Gala Production",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-flagship-retail-custom illuminated artwork",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Flagship Retail",
+      "vertical_slug": "flagship-retail",
+      "vertical_inference": "override",
+      "offer_raw": "Custom Illuminated Artwork",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "labs",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 138,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M07 | Flagship Retail | Custom Illuminated Artwork | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 139,
+          "workspace": "b2b",
+          "name": "Google | FY26, M07 | Flagship Retail | Custom Illuminated Artwork | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 140,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M07 | Flagship Retail | Custom Illuminated Artwork | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "9ea32701-376c-4b46-955a-07cc37bfdb36",
+          "name": "flagship-retail-vp-marketing-custom-illuminated-artwork-fy26-m07",
+          "progress": 0,
+          "target_date": null
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-historic-sites-heritage week & holiday tourism driver",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Historic Sites",
+      "vertical_slug": "historic-sites",
+      "vertical_inference": "canonical",
+      "offer_raw": "Heritage Week & Holiday Tourism Driver",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 111,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M07 | Historic Sites | Heritage Week & Holiday Tourism Driver | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 116,
+          "workspace": "b2b",
+          "name": "Google | FY26, M07 | Historic Sites | Heritage Week & Holiday Tourism Driver | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 117,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M07 | Historic Sites | Heritage Week & Holiday Tourism Driver | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "23d8b1a8-7a97-477f-ae87-4ca6a3fe7128",
+          "name": "FY26, M07 | Historic Sites | Heritage Week & Holiday Tourism Driver",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-hospitals-donor-recognition & foundation season",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Hospitals",
+      "vertical_slug": "hospitals",
+      "vertical_inference": "canonical",
+      "offer_raw": "Donor-Recognition & Foundation Season",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "f542bb56-8c8c-4bb0-9e58-480ee05c2b31",
+          "name": "FY26, M07 | Hospitals | Donor-Recognition & Foundation Season",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-hotels-resorts-custom illuminated artwork",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Hotels & Resorts",
+      "vertical_slug": "hotels-resorts",
+      "vertical_inference": "canonical",
+      "offer_raw": "Custom Illuminated Artwork",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "labs",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 135,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M07 | Hotels & Resorts | Custom Illuminated Artwork | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 136,
+          "workspace": "b2b",
+          "name": "Google | FY26, M07 | Hotels & Resorts | Custom Illuminated Artwork | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 137,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M07 | Hotels & Resorts | Custom Illuminated Artwork | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "cf1a7a5c-bfae-48c1-aad1-51852af56785",
+          "name": "FY26, M07 | Hotels & Resorts | Aman-Tier Bespoke Creative Direction",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        },
+        {
+          "id": "9a82a5b0-f6a7-4d14-94c0-58a4e3be01ef",
+          "name": "hotels-resorts-director-of-resort-experience-custom-illuminated-artwork-fy26-m07",
+          "progress": 0,
+          "target_date": null
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-local-retail-storefront seasonal & permanent illumination",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Local Retail (Utah)",
+      "vertical_slug": "local-retail",
+      "vertical_inference": "override",
+      "offer_raw": "Storefront Seasonal & Permanent Illumination",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 124,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M07 | Local Retail (Utah) | Storefront Seasonal & Permanent Illumination | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 126,
+          "workspace": "b2b",
+          "name": "Google | FY26, M07 | Local Retail (Utah) | Storefront Seasonal & Permanent Illumination | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 127,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M07 | Local Retail (Utah) | Storefront Seasonal & Permanent Illumination | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "dddaf314-e91b-457a-a85b-60c667e564cc",
+          "name": "FY26, M07 | Local Retail (Utah) | Storefront Seasonal & Permanent Illumination",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-shopping centers-anchor tenant holiday center-court",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Shopping Centers",
+      "vertical_slug": "shopping-centers",
+      "vertical_inference": "canonical",
+      "offer_raw": "Anchor Tenant Holiday Center-Court",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "ffc93c9e-1074-404a-b6ea-b20e0a811878",
+          "name": "FY26, M07 | Shopping Centers | Anchor Tenant Holiday Center-Court",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-ski resorts-village base-area holiday takeover",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Ski Resorts",
+      "vertical_slug": "ski-resorts",
+      "vertical_inference": "canonical",
+      "offer_raw": "Village Base-Area Holiday Takeover",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "c9f0af23-f2a5-4ff4-b749-15ead34c0424",
+          "name": "FY26, M07 | Ski Resorts | Village Base-Area Holiday Takeover",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-sports stadiums-gameday holiday fan-zone activation",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Sports Stadiums",
+      "vertical_slug": "sports-stadiums",
+      "vertical_inference": "canonical",
+      "offer_raw": "Gameday Holiday Fan-Zone Activation",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "b41149c4-6617-41ae-9559-bd515b7d2633",
+          "name": "FY26, M07 | Sports Stadiums | Gameday Holiday Fan-Zone Activation",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m07-supply-installer-network-training library & brite platform access",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Lighting Installers",
+      "vertical_slug": "supply-installer-network",
+      "vertical_inference": "bucket",
+      "offer_raw": "Training Library & Brite Platform Access",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "supply",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 125,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M07 | Lighting Installers | Training Library & Brite Platform Access | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 128,
+          "workspace": "b2b",
+          "name": "Google | FY26, M07 | Lighting Installers | Training Library & Brite Platform Access | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 129,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M07 | Lighting Installers | Training Library & Brite Platform Access | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "ce6a3c30-2f78-4bf3-80ea-db8766b59ae1",
+          "name": "FY26, M07 | Lighting Installers | Training Library & Brite Platform Access",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-theaters-producer's night gala & donor holiday",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Theaters",
+      "vertical_slug": "theaters",
+      "vertical_inference": "canonical",
+      "offer_raw": "Producer's Night Gala & Donor Holiday",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 113,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M07 | Theaters | Producer's Night Gala & Donor Holiday | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 120,
+          "workspace": "b2b",
+          "name": "Google | FY26, M07 | Theaters | Producer's Night Gala & Donor Holiday | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 121,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M07 | Theaters | Producer's Night Gala & Donor Holiday | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "262fa9be-6f9e-4d33-a08a-c59b25f12a59",
+          "name": "FY26, M07 | Theaters | Producer's Night Gala & Donor Holiday",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-tribes-reservations-cultural festival & holiday activation",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Tribes & Reservations",
+      "vertical_slug": "tribes-reservations",
+      "vertical_inference": "override",
+      "offer_raw": "Cultural Festival & Holiday Activation",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [
+        "Professional Emails"
+      ],
+      "esps": [
+        "Google",
+        "Microsoft",
+        "SMTP"
+      ],
+      "eb_workspaces": [
+        "b2b"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 112,
+          "workspace": "b2b",
+          "name": "SMTP | FY26, M07 | Tribes & Reservations | Cultural Festival & Holiday Activation | Professional Emails",
+          "esp": "SMTP",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 118,
+          "workspace": "b2b",
+          "name": "Google | FY26, M07 | Tribes & Reservations | Cultural Festival & Holiday Activation | Professional Emails",
+          "esp": "Google",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 119,
+          "workspace": "b2b",
+          "name": "Microsoft | FY26, M07 | Tribes & Reservations | Cultural Festival & Holiday Activation | Professional Emails",
+          "esp": "Microsoft",
+          "all_esps": false,
+          "audience_tier": "Professional Emails",
+          "status": "draft",
+          "leads": 0,
+          "sent": 0,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "draft"
+      ],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "b9c6deb5-be75-4efb-82d0-dee57bbc9744",
+          "name": "FY26, M07 | Tribes & Reservations | Cultural Festival & Holiday Activation",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "match",
+      "reconciliation_status": "complete"
+    },
+    {
+      "logical_key": "fy26-m07-universities-holiday lighting",
+      "fy": "26",
+      "month": "07",
+      "vertical_raw": "Universities",
+      "vertical_slug": "universities",
+      "vertical_inference": "canonical",
+      "offer_raw": "Holiday Lighting",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "0608871d-0a1c-447f-9a11-528f6b0aea5c",
+          "name": "FY26, M07 | Universities | Holiday Lighting",
+          "progress": 0,
+          "target_date": "2026-07-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m08-botanical gardens-holiday lighting",
+      "fy": "26",
+      "month": "08",
+      "vertical_raw": "Botanical Gardens",
+      "vertical_slug": "botanical-gardens",
+      "vertical_inference": "canonical",
+      "offer_raw": "Holiday Lighting",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "615e6393-4be0-44d9-8fa9-ec9d44ac8f4f",
+          "name": "FY26, M08 | Botanical Gardens | Holiday Lighting",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m08-zoos-holiday lighting",
+      "fy": "26",
+      "month": "08",
+      "vertical_raw": "Zoos",
+      "vertical_slug": "zoos",
+      "vertical_inference": "canonical",
+      "offer_raw": "Holiday Lighting",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "7ef43d09-2041-4fd0-b0f2-c185591bb2a7",
+          "name": "FY26, M08 | Zoos | Holiday Lighting",
+          "progress": 0,
+          "target_date": "2026-08-31"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy26-m09-hoas self-managed-holiday lighting",
+      "fy": "26",
+      "month": "09",
+      "vertical_raw": "HOAs Self-Managed",
+      "vertical_slug": "hoas",
+      "vertical_inference": "override",
+      "offer_raw": "Holiday Lighting",
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [],
+      "eb_campaigns": [],
+      "eb_status_set": [],
+      "eb_stats": {
+        "leads": 0,
+        "sent": 0,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [
+        {
+          "id": "41c8e21f-fb75-4577-abe5-7e8322cde916",
+          "name": "FY26, M09 | HOAs Self-Managed | Holiday Lighting",
+          "progress": 0,
+          "target_date": "2026-09-30"
+        }
+      ],
+      "cross_reference": "orphan-linear",
+      "reconciliation_status": "partial"
+    },
+    {
+      "logical_key": "fy??-m??-test campaign (outbound sales operations system)-",
+      "fy": "??",
+      "month": "??",
+      "vertical_raw": "Test Campaign (Outbound Sales Operations System)",
+      "vertical_slug": null,
+      "vertical_inference": "miss",
+      "offer_raw": null,
+      "offer_slug": null,
+      "persona_slug": null,
+      "entity": "nites",
+      "audience_tiers": [],
+      "esps": [],
+      "eb_workspaces": [
+        "b2b",
+        "personal"
+      ],
+      "eb_campaigns": [
+        {
+          "id": 20,
+          "workspace": "personal",
+          "name": "Test Campaign (Outbound Sales Operations System)",
+          "esp": null,
+          "all_esps": false,
+          "audience_tier": null,
+          "status": "completed",
+          "leads": 1,
+          "sent": 1,
+          "replies": 0,
+          "bounced": 0
+        },
+        {
+          "id": 55,
+          "workspace": "b2b",
+          "name": "Test Campaign (Outbound Sales Operations System)",
+          "esp": null,
+          "all_esps": false,
+          "audience_tier": null,
+          "status": "completed",
+          "leads": 1,
+          "sent": 1,
+          "replies": 0,
+          "bounced": 0
+        }
+      ],
+      "eb_status_set": [
+        "completed"
+      ],
+      "eb_stats": {
+        "leads": 2,
+        "sent": 2,
+        "replies": 0,
+        "bounced": 0,
+        "reply_rate_pct": 0.0
+      },
+      "linear_milestones": [],
+      "cross_reference": "orphan-eb",
+      "reconciliation_status": "partial"
+    }
+  ]
+}

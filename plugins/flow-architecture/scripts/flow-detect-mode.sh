@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# flow-detect-mode.sh — emit the FDA mode classification.
+#
+# Per Q30.6 (memory:292) + Q12.3 mode classification (memory:74) + Q36.3 step 4
+# heuristic (memory:357). Outputs exactly one of:
+#
+#   greenfield        no FDA artifacts AND (no Linear-issue-count signal OR count < 10)
+#   retrofit          intent + inventory but no flows yet  (Q12 edge: zero-domains-with-full-FDA)
+#                     OR no FDA artifacts AND LINEAR_ISSUE_COUNT >= 10  (Q36.3 step 4 heuristic)
+#   incremental-add   FDA shape complete (intent + inventory + flows) AND no in-flight breadcrumb
+#   resume            in-flight breadcrumb present AND not stale (per Q31.3)
+#
+# Linear-side issue count is NOT filesystem-derivable; orchestrator may pass it
+# via LINEAR_ISSUE_COUNT env var to honour the Q36.3 heuristic. User confirmation
+# (Q36.3 step 5) remains authoritative — this script emits a tentative mode only.
+#
+# Usage:
+#   flow-detect-mode.sh [REPO_ROOT]
+#   LINEAR_ISSUE_COUNT=42 flow-detect-mode.sh
+#
+# bash 3.2+ compatible (Q32).
+
+REPO_ROOT="${1:-}"
+if [ -z "$REPO_ROOT" ]; then
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT" ]; then
+  echo "flow-detect-mode: REPO_ROOT not resolvable (argv[1] or git)" >&2
+  exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Three-tier resolution for FDA-shape signals (cheapest first):
+#   1. Individual `_FLOW_SHAPE_*` env vars — set by flow-context-load.sh
+#      after its own probe; skips both the `find` walk AND the sed re-parse.
+#   2. `FLOW_SHAPE_CACHE` env var — bulk KEY=VALUE blob from a caller's
+#      prior probe; skips the `find` walk, still pays one sed pass.
+#   3. Fresh probe via `flow-detect-fda-shape.sh` — standalone invocation
+#      or caller that didn't cache.
+if [ -n "${_FLOW_SHAPE_INTENT_EXISTS:-}" ] \
+   && [ -n "${_FLOW_SHAPE_INVENTORY_EXISTS:-}" ] \
+   && [ -n "${_FLOW_SHAPE_FLOWS_DIR_EXISTS:-}" ] \
+   && [ -n "${_FLOW_SHAPE_BREADCRUMB_EXISTS:-}" ]; then
+  INTENT_EXISTS="$_FLOW_SHAPE_INTENT_EXISTS"
+  INVENTORY_EXISTS="$_FLOW_SHAPE_INVENTORY_EXISTS"
+  FLOWS_DIR_EXISTS="$_FLOW_SHAPE_FLOWS_DIR_EXISTS"
+  BREADCRUMB_EXISTS="$_FLOW_SHAPE_BREADCRUMB_EXISTS"
+else
+  if [ -n "${FLOW_SHAPE_CACHE:-}" ]; then
+    SHAPE_OUT="$FLOW_SHAPE_CACHE"
+  else
+    SHAPE_OUT="$("$SCRIPT_DIR/flow-detect-fda-shape.sh" "$REPO_ROOT")"
+  fi
+  INTENT_EXISTS=""; INVENTORY_EXISTS=""; FLOWS_DIR_EXISTS=""; BREADCRUMB_EXISTS=""
+  while IFS='=' read -r _key _val; do
+    case "$_key" in
+      INTENT_EXISTS)     INTENT_EXISTS="$_val" ;;
+      INVENTORY_EXISTS)  INVENTORY_EXISTS="$_val" ;;
+      FLOWS_DIR_EXISTS)  FLOWS_DIR_EXISTS="$_val" ;;
+      BREADCRUMB_EXISTS) BREADCRUMB_EXISTS="$_val" ;;
+    esac
+  done <<< "$SHAPE_OUT"
+fi
+
+# Breadcrumb-driven `resume` takes precedence (Q12.3 + Q31.3 stale check).
+if [ "$BREADCRUMB_EXISTS" = "yes" ]; then
+  BC_OUT="$("$SCRIPT_DIR/flow-resume-breadcrumb.sh" read "$REPO_ROOT/docs/plans/.flow-phase-state.json")"
+  BC_STATUS=""; BC_STALE=""
+  while IFS='=' read -r _key _val; do
+    case "$_key" in
+      STATUS) BC_STATUS="$_val" ;;
+      STALE)  BC_STALE="$_val" ;;
+    esac
+  done <<< "$BC_OUT"
+  if [ "$BC_STATUS" = "in_flight" ] && [ "$BC_STALE" = "no" ]; then
+    echo "resume"
+    exit 0
+  fi
+  # Stale or non-in_flight breadcrumb — fall through to artifact-driven classification.
+fi
+
+# Artifact-driven classification.
+if [ "$INTENT_EXISTS" = "yes" ] && [ "$INVENTORY_EXISTS" = "yes" ]; then
+  if [ "$FLOWS_DIR_EXISTS" = "yes" ]; then
+    echo "incremental-add"
+    exit 0
+  fi
+  # intent + inventory but no flows yet — Q12 edge: retrofit.
+  echo "retrofit"
+  exit 0
+fi
+
+# No FDA artifacts — Q36.3 step 4 heuristic (LINEAR_ISSUE_COUNT optional).
+LIC="${LINEAR_ISSUE_COUNT:-}"
+if [ -n "$LIC" ]; then
+  # Validate the count is a non-negative integer before comparing.
+  case "$LIC" in
+    ''|*[!0-9]*)
+      echo "flow-detect-mode: LINEAR_ISSUE_COUNT='$LIC' is not a non-negative integer; ignoring" >&2
+      ;;
+    *)
+      if [ "$LIC" -ge 10 ]; then
+        echo "retrofit"
+        exit 0
+      fi
+      ;;
+  esac
+fi
+
+echo "greenfield"

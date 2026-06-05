@@ -2,7 +2,7 @@
 name: gtm-strategy
 description: 5-phase net-new GTM motion scoping — research → segments (weighted scoring) → personas → messaging pillars → offer recommendations. Triggers "gtm strategy", "go-to-market plan", "new motion scoping", "segments and personas", "messaging pillars", "new market entry strategy". Distinct from launch-strategy (product launches) and content-strategy (content marketing).
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob
+allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob, mcp__plugin_marketing_gbrain-team__query, mcp__plugin_marketing_gbrain-team__get_page, mcp__plugin_marketing_gbrain-team__list_pages
 metadata:
   version: 0.1.0
   upstream: Revgrowth1/ai-gtm-workflows
@@ -11,7 +11,7 @@ metadata:
 
 # GTM Strategy
 
-A marketing lead, RevOps operator, or founder scoping a new outbound motion today has no repeatable discipline for going from "I think there's a market here" to "here are the segments we should target, who to talk to inside them, and what we'll say." This skill runs a 5-phase scoping pipeline — research → TAM segments with weighted scoring → personas + PQS rubric → messaging pillars + offer tier → output + proposed marketing-context patch — and produces a single Brite-entity-keyed strategy document (Nites residential, Supply B2B, or Labs venue partnership) that downstream skills consume. **Distinct from `launch-strategy` (product launches) and `content-strategy` (content marketing).** This skill produces strategy scaffolding, not copy — Phase 4 stops at pillars and hands copy generation to `email-copywriting`.
+A marketing lead, RevOps operator, or founder scoping a new outbound motion today has no repeatable discipline for going from "I think there's a market here" to "here are the segments we should target, who to talk to inside them, and what we'll say." This skill runs a 5-phase scoping pipeline — research → TAM segments with weighted scoring → personas + PQS rubric → messaging pillars + offer posture → output + proposed marketing-context patch — and produces a single Brite-entity-keyed strategy document (Nites residential, Supply B2B, or Labs venue partnership) that downstream skills consume. **Distinct from `launch-strategy` (product launches) and `content-strategy` (content marketing).** This skill produces strategy scaffolding, not copy — Phase 4 stops at pillars and hands copy generation to `email-copywriting`.
 
 ---
 
@@ -103,16 +103,16 @@ Per segment (start with top 3 by score, unless user requests otherwise):
 
 ### Phase 4: Messaging Pillars — NOT copy
 
-**This is the hardest scope line in this skill.** Phase 4 produces pillars (themes + value propositions) and an offer-tier recommendation per segment. **Phase 4 does not produce subject lines, email bodies, or copy of any kind.** Copy is `email-copywriting`'s (BC-5825) exclusive responsibility.
+**This is the hardest scope line in this skill.** Phase 4 produces pillars (themes + value propositions) and an offer-posture recommendation per segment. **Phase 4 does not produce subject lines, email bodies, or copy of any kind.** Copy is `email-copywriting`'s (BC-5825) exclusive responsibility.
 
 Per segment:
 
 - **2–3 messaging pillars.** Each pillar is (theme, value proposition, proof source). Themes are durable ideas ("predictable procurement"); value props are the promise tied to the theme ("eliminate 30-day lead times on commercial fixture orders"); proof sources are data or case evidence supporting the promise.
-- **Recommended offer tier** (aligned with BC-5825 offer framework):
-  - **T1 Knowledge** — educational content, benchmark reports, thought leadership.
-  - **T2 Free asset** — lead magnet with real utility (audit template, calculator).
-  - **T3 DFY trial** — done-for-you short engagement (single-property design, single-project procurement quote).
-  - **T4 Risk reversal** — money-back guarantee, performance-based pricing.
+- **Recommended offer posture** (aligned with BC-5825 offer framework; ADR-017 — legacy label "offer tier" with T1/T2/T3/T4 letter codes is deprecated):
+  - **`knowledge`** — educational content, benchmark reports, thought leadership. (Legacy: T1.)
+  - **`free-asset`** — lead magnet with real utility (audit template, calculator). (Legacy: T2.)
+  - **`pilot`** — done-for-you short engagement (single-property design, single-project procurement quote). (Legacy: T3.)
+  - **`risk-reversal`** — money-back guarantee, performance-based pricing. (Legacy: T4.)
 - **PQS triggers.** Name the Phase 3 signals that, when observed, fire an outreach moment for this pillar.
 
 **If the user asks for copy during Phase 4, hand off:** "Pillars ready. Pass to `email-copywriting` for subject + body generation." Do not produce copy inline under any circumstance.
@@ -162,14 +162,14 @@ Produce a **proposed patch** to `docs/marketing-context.md` — a markdown block
 |---|---|---|
 | `account-research` (BC-5827, not yet shipped) | Phase 1 delegate when available; fallback to inline WebSearch when absent | Input: domain + context. Output: `research.md` per segment candidate. |
 | `outbound-playbook` (BC-2722, not yet shipped) | Downstream consumer — the conductor | Reads segments + pillars + PQS triggers from the gtm-strategy artifact. |
-| `email-copywriting` (BC-5825, not yet shipped) | Downstream consumer — copy generation | Reads pillars + offer tier. Produces Email-Bison-formatted JSON. |
+| `email-copywriting` (BC-5825, not yet shipped) | Downstream consumer — copy generation | Reads pillars + offer posture. Produces Email-Bison-formatted JSON. |
 | [`message-market-fit`](../message-market-fit/SKILL.md) / MSPA ([BC-5829](https://linear.app/brite-nites/issue/BC-5829)) | Downstream consumer — experiment matrix (MAP mode) | Reads segments + personas + angles; MSPA §3 MAP Step 2 Lens 1 treats the `gtm-strategy` artifact as the customer-worldview input. Produces the MSPA matrix with gtm-strategy segments/personas populating M and P dimensions. |
 
 **Cross-link note.** `message-market-fit` now exists and cross-links back to `gtm-strategy` as a MAP-mode input; the remaining consumer skills (BC-5827 account-research, BC-2722 outbound-playbook) are still pending. A follow-up issue will track the remaining hookups (see Task 8 of the BC-5833 plan).
 
 ### Phase 4 SCOPE GUARD
 
-> **Phase 4 produces messaging PILLARS (themes + value props + offer tier + PQS triggers). It MUST NOT produce subject lines, email bodies, or copy of any kind. Copy generation is `email-copywriting` (BC-5825)'s exclusive responsibility. If a user asks for copy during Phase 4, hand off with: "Pillars ready. Pass to `email-copywriting` for subject + body generation." Do not produce copy inline under any circumstance — even an "example" subject line violates this rule, because examples get copy-pasted.**
+> **Phase 4 produces messaging PILLARS (themes + value props + offer posture + PQS triggers). It MUST NOT produce subject lines, email bodies, or copy of any kind. Copy generation is `email-copywriting` (BC-5825)'s exclusive responsibility. If a user asks for copy during Phase 4, hand off with: "Pillars ready. Pass to `email-copywriting` for subject + body generation." Do not produce copy inline under any circumstance — even an "example" subject line violates this rule, because examples get copy-pasted.**
 
 ---
 
@@ -222,7 +222,7 @@ The marketing plugin does not register a GitHub MCP (see `plugins/marketing/.mcp
 3. Run **Phase 2 TAM Segments**: identify 3–10 segments, apply the weighted formula, rank. Write segments table to state. Mark `phases_completed: [1, 2]`.
 4. Pause for user to review segment ranking before proceeding. (User may cut the list down before Phase 3 deep-dive to control scope.)
 5. Run **Phase 3 Deep Dive** for top segments (user-approved count). Generate personas + PQS rubric per segment. Validate every PQS signal via the **Phase 3 PQS grounding workflow**. Mark `phases_completed: [1, 2, 3]`.
-6. Run **Phase 4 Messaging Pillars** — 2–3 pillars + offer tier + PQS triggers per segment. **Scope guard: no copy.** Mark `phases_completed: [1, 2, 3, 4]`.
+6. Run **Phase 4 Messaging Pillars** — 2–3 pillars + offer posture + PQS triggers per segment. **Scope guard: no copy.** Mark `phases_completed: [1, 2, 3, 4]`.
 7. Run **Phase 5 Output**: write `docs/strategy/{entity}-{motion}-gtm-{YYYY-MM-DD}.md` + `.state.json`, produce the proposed `docs/marketing-context.md` patch block, cite handbook entity canon. Mark `phases_completed: [1, 2, 3, 4, 5]`.
 8. Report artifact path, state file path, and the proposed marketing-context patch for user review.
 
@@ -274,7 +274,7 @@ The marketing plugin does not register a GitHub MCP (see `plugins/marketing/.mcp
 1. Phase 1 runs abbreviated — 3 seed queries only, 1 `WebFetch` per hit max.
 2. Phase 2 identifies 3 candidate segments (not 3–10). Apply the scoring formula.
 3. Skip Phase 3 deep dive. Skip PQS grounding.
-4. Phase 4 produces one pillar per segment (not 2–3). No offer tier.
+4. Phase 4 produces one pillar per segment (not 2–3). No offer posture.
 5. Phase 5 writes a `{entity}-{motion}-gtm-{YYYY-MM-DD}-preview.md` artifact clearly labelled PREVIEW at the top.
 
 **Error handling:** preview output is labelled PREVIEW — the skill must not let downstream consumers treat it as canon. If a user asks to pass preview output to `email-copywriting`, refuse and suggest running the full workflow first.
@@ -314,7 +314,7 @@ skill: gtm-strategy
 ### Segment 1: <name>
 - Pillar 1: <theme, value prop, proof>
 - Pillar 2: <…>
-- Recommended offer tier: <T1 | T2 | T3 | T4> with rationale
+- Recommended offer posture: <knowledge | free-asset | pilot | risk-reversal> with rationale
 - PQS triggers: <which signals fire outreach>
 
 ## Phase 5: Proposed marketing-context.md Patch
@@ -367,7 +367,7 @@ State file: `docs/strategy/{entity}-{motion}-gtm-{YYYY-MM-DD}.state.json`.
       "pillars_by_segment": {
         "<segment_name>": {
           "pillars": [{ "theme": "string", "value_prop": "string", "proof": "string" }],
-          "offer_tier": "T1 | T2 | T3 | T4",
+          "offer_posture": "knowledge | free-asset | pilot | risk-reversal",
           "pqs_triggers": ["..."]
         }
       }
@@ -395,7 +395,7 @@ State file: `docs/strategy/{entity}-{motion}-gtm-{YYYY-MM-DD}.state.json`.
 - Do not fabricate statistics, case studies, or testimonials — always attribute to a source.
 - Do not produce output that ignores `docs/marketing-context.md`.
 - Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
-- **Do not produce copy in Phase 4 — ever.** Pillars stop at themes + value props + proof sources + offer tier + PQS triggers. Copy is `email-copywriting`'s job. Even "example" subject lines or bodies are forbidden, because examples get copy-pasted into production.
+- **Do not produce copy in Phase 4 — ever.** Pillars stop at themes + value props + proof sources + offer posture + PQS triggers. Copy is `email-copywriting`'s job. Even "example" subject lines or bodies are forbidden, because examples get copy-pasted into production.
 - **Do not reweight the scoring formula.** Fit is 2×; the other four dimensions are 1×. Deviating breaks comparability with prior gtm-strategy runs and with upstream Revgrowth.
 - **Do not invent PQS signals.** Every signal must name a SOQL query against Account/Opportunity/Contact/custom that would validate it. If a signal can't be grounded, remove it.
 - **Do not produce more than 10 segments.** More than 10 is an over-segmentation signal — consolidate, or stop and ask the user to prioritise.
@@ -415,11 +415,11 @@ Minimum 6 scenarios covering Tier 1 (free assertions) and Tier 2 (tool-assisted)
 
 #### Scenario 1: Happy-path full run
 
-Given user invokes `--client brite-supply --domain "HOA landscape lighting"`, output must run all 5 phases in order, produce ≥3 ranked segments with the weighted scoring formula (Fit × 2), Phase 3 deep dives with 3 personas per segment and a 5–8-signal PQS rubric, Phase 4 pillars with offer tier + PQS triggers and zero copy, and a Phase 5 artifact at `docs/strategy/supply-hoa-landscape-lighting-gtm-{YYYY-MM-DD}.md` plus matching state file.
+Given user invokes `--client brite-supply --domain "HOA landscape lighting"`, output must run all 5 phases in order, produce ≥3 ranked segments with the weighted scoring formula (Fit × 2), Phase 3 deep dives with 3 personas per segment and a 5–8-signal PQS rubric, Phase 4 pillars with offer posture + PQS triggers and zero copy, and a Phase 5 artifact at `docs/strategy/supply-hoa-landscape-lighting-gtm-{YYYY-MM-DD}.md` plus matching state file.
 
 #### Scenario 2: Phase 4 scope-guard
 
-Given the skill is mid-Phase-4 and the user asks "write me the first email for pillar 1", output must refuse copy generation, explicitly name `email-copywriting` (BC-5825) as the correct skill, and offer to hand off pillars + offer tier + PQS triggers. Output must NOT contain any subject line or email body, not even as an example.
+Given the skill is mid-Phase-4 and the user asks "write me the first email for pillar 1", output must refuse copy generation, explicitly name `email-copywriting` (BC-5825) as the correct skill, and offer to hand off pillars + offer posture + PQS triggers. Output must NOT contain any subject line or email body, not even as an example.
 
 #### Scenario 3: Resume after Phase 2
 

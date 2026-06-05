@@ -1,5 +1,8 @@
 # Audit artifacts
 AUDIT.md
+# Negation: case-insensitive filesystems (macOS APFS default) match the rule
+# above against `audit.md` too — keep the FDA-plugin audit command tracked.
+!plugins/flow-architecture/commands/audit.md
 
 # OS
 .DS_Store
@@ -30,3 +33,9 @@ tests/evals/behavioral-*.json
 # Python bytecode from scripts/_lib/ linters (lint_hooks.py, lint_cadence_gates.py, …)
 __pycache__/
 *.pyc
+
+# Node dependencies — tam-map ships package.json + lockfile; deps install locally.
+**/node_modules/
+
+# Worktree mountpoints created by /workflows:session-start (per-session, never committed).
+.claude/worktrees/

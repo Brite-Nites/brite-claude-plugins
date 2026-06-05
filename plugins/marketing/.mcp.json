@@ -15,28 +15,64 @@
     },
     "spider": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "spider-cloud-mcp@2.1.1"],
-      "env": {
-        "SPIDER_API_KEY": "${SPIDER_API_KEY}"
-      }
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "args": [
+        "SPIDER_API_KEY=tam-map-spider-api-key",
+        "--",
+        "npx",
+        "-y",
+        "spider-cloud-mcp@2.1.1"
+      ]
     },
     "aiark": {
       "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/aiark-mcp.js"],
-      "env": {
-        "AIARK_API_KEY": "${AIARK_API_KEY}"
-      }
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "args": [
+        "AIARK_API_KEY=tam-map-aiark-api-key",
+        "--",
+        "node",
+        "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/aiark-mcp.js"
+      ]
     },
     "discolike": {
       "type": "stdio",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js"],
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "args": [
+        "DISCOLIKE_API_KEY=tam-map-discolike-api-key",
+        "--",
+        "node",
+        "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js"
+      ]
+    },
+    "gbrain-team": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gbrain-team-broker.sh",
+      "args": [
+        "https://brite-team-gbrain-serve-production.up.railway.app/mcp"
+      ]
+    },
+    "enrichment": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "args": [
+        "OPENMART_API_KEY=enrichment-openmart-api-key",
+        "PROSPEO_API_KEY=enrichment-prospeo-api-key",
+        "ICYPEAS_API_KEY=enrichment-icypeas-api-key",
+        "LEADMAGIC_API_KEY=enrichment-leadmagic-api-key",
+        "DATAGMA_API_KEY=enrichment-datagma-api-key",
+        "BOUNCEBAN_API_KEY=enrichment-bounceban-api-key",
+        "EMAILGUARD_API_KEY=enrichment-emailguard-api-key",
+        "--",
+        "uvx",
+        "--from",
+        "git+https://github.com/Brite-Nites/brite-data-platform@685444636f65fc567dfc9a348c8e8035646fa794#subdirectory=tools/enrichment-mcp",
+        "brite-enrichment-mcp"
+      ],
       "env": {
-        "DISCOLIKE_API_KEY": "${DISCOLIKE_API_KEY}"
+        "USE_MOCK_PROVIDERS": "False",
+        "MARTS_DATABASE": "ANALYTICS",
+        "MARTS_SCHEMA": "MARTS"
       }
     }
-
   }
 }

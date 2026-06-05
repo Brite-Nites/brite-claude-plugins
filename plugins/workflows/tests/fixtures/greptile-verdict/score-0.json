@@ -1,0 +1,11 @@
+{
+  "comments": [
+    {
+      "id": "IC_greptile_0",
+      "author": { "login": "greptile-apps" },
+      "body": "## Greptile Summary\n\nSeveral blocking issues found.\n\n**Confidence score: 0/5**\n",
+      "createdAt": "2026-06-01T12:00:00Z",
+      "url": "https://github.com/brite/repo/pull/1#issuecomment-2"
+    }
+  ]
+}

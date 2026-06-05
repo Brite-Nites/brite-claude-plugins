@@ -1,4 +1,4 @@
-# BC-11972 — Author ADR-021: per-account reply-triggered creative-asset policy
+# BC-11972 — Author ADR-029: per-account reply-triggered creative-asset policy
 
 **Issue:** [BC-11972](https://linear.app/brite-nites/issue/BC-11972) (High, Brite Skill Packs)
 **Type:** Documentation / decision record. No code, no MCP, no version bump (ADR doc + CLAUDE.md index line only).
@@ -6,14 +6,14 @@
 
 ## Scope
 
-Author one ADR (`docs/decisions/021-per-account-reply-triggered-creative-assets.md`) and add its index line to `CLAUDE.md`. Modeled on ADR-009/008 format (ADR-020 not yet on disk).
+Author one ADR (`docs/decisions/029-per-account-reply-triggered-creative-assets.md`) and add its index line to `CLAUDE.md`. Modeled on ADR-009/008 format (ADR-020 not yet on disk).
 
 ## Tasks
 
-### Task 1 — Write `docs/decisions/021-per-account-reply-triggered-creative-assets.md`
+### Task 1 — Write `docs/decisions/029-per-account-reply-triggered-creative-assets.md`
 
 Header block (per ADR-009 format):
-- `# 021. Per-Account Reply-Triggered Creative Assets`
+- `# 029. Per-Account Reply-Triggered Creative Assets`
 - **Status:** Accepted · **Date:** 2026-05-29 · **Linear:** BC-11972
 - **Origin:** scoping session 2026-05-28
 - **Related:** ADR-013 (handbook — 3-layer split), BC-11973 (creative-asset-brief skill), BC-11974 (escalation queue + n8n contract), BC-11106 (Churches LP / IndustryPageTemplate precedent), DRO-486 (Droidor co-branded-PDF — related-but-distinct)
@@ -35,10 +35,10 @@ Body sections:
 4. **Phase-numbering reconciliation** — canonical: Brite GTM Phase 5 = "GTM Asset Development", Phase 6 = "Landing Page(s)"; in-issue descriptions number one step ahead — document canonical numbering.
 5. **Consequences** — Positive (reusable brief contract, designer bandwidth protected, clear layer boundary) / Negative + mitigations (n8n track is separate repo coordination; per-account LP volume risk → escalation gate bounds it).
 
-### Task 2 — Add ADR-021 index line to `CLAUDE.md`
+### Task 2 — Add ADR-029 index line to `CLAUDE.md`
 
 Insert after line 40 (the ADR-009 entry) in the `## Architecture Decisions` list:
-`- [ADR-021: Per-account reply-triggered creative assets](docs/decisions/021-per-account-reply-triggered-creative-assets.md) — commercial→PDF / enterprise→LP routing, auto-draft-vs-escalate tiers, ADR-013 layer split`
+`- [ADR-029: Per-account reply-triggered creative assets](docs/decisions/029-per-account-reply-triggered-creative-assets.md) — commercial→PDF / enterprise→LP routing, auto-draft-vs-escalate tiers, ADR-013 layer split`
 
 ### Task 3 — Verify
 
@@ -48,13 +48,13 @@ Insert after line 40 (the ADR-009 entry) in the `## Architecture Decisions` list
 
 ## Acceptance Criteria (from BC-11972)
 
-- [ ] `docs/decisions/021-*.md` exists in ADR format.
+- [ ] `docs/decisions/029-*.md` exists in ADR format.
 - [ ] Routing rule stated unambiguously with segment definitions.
 - [ ] Target-path convention documented, cross-referencing IndustryPageTemplate + BC-11106.
 - [ ] Escalation tiers documented with the "saves more designer time than it costs" bar as the criterion.
 - [ ] ADR-013 layer-assignment table included.
 - [ ] Phase 5/6 numbering reconciliation captured.
-- [ ] CLAUDE.md Architecture Decisions list cites ADR-021.
+- [ ] CLAUDE.md Architecture Decisions list cites ADR-029.
 
 ## Out of scope
 

@@ -2,7 +2,7 @@
 
 > **PRD**: `docs/designs/brite-agent-platform.md`
 > **Status**: Draft — review before creating in Linear
-> **Project**: Brite Plugin Marketplace
+> **Project**: Brite Skill Packs
 > **Total**: ~64 new issues + 9 moves + 1 close across 8 milestones
 
 ## Table of Contents

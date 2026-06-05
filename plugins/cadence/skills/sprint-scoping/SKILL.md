@@ -2,7 +2,7 @@
 name: sprint-scoping
 description: Phase 2 of /cadence:weekly. Sequential per-project scope interview (5 carry-over Qs + 5 scope Qs, one at a time) with brainstorming and the issue-quality-gate. Triggers on "sprint planning", "weekly scope", "what ships this week", "scope the next cycle", or "/cadence:weekly phase 2".
 user-invocable: false
-allowed-tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__list_comments, AskUserQuestion, Read, Write, Edit, Bash, Skill, Agent
+allowed-tools: mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, mcp__plugin_workflows_linear-server__list_comments, AskUserQuestion, Read, Write, Edit, Bash, Skill, Agent, mcp__plugin_cadence_gbrain-team__query, mcp__plugin_cadence_gbrain-team__get_page, mcp__plugin_cadence_gbrain-team__list_pages
 ---
 
 # Phase 2 — Sprint Scoping

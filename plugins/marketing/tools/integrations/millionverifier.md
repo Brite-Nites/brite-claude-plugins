@@ -93,14 +93,14 @@ Treat 429 and 5xx as retryable with exponential backoff: base 1s, double per att
 
 ## Brite usage
 
-Invoked as **step 7** of `/marketing:tam-map <vertical>`. The output JSONL has one row per original record with an added `smtp` sub-object; downstream `tier_and_segment.py` (step 8) reads `smtp.keep` + `smtp.catch_all` to route into `tier-a.csv` / `tier-b.csv` / `catch-all.csv`.
+Invoked as **step 7** of `/marketing:tam-map <vertical>`. The output JSONL has one row per original record with an added `smtp` sub-object; downstream `tam-mapping` Phase 7 owns the JSONL→flat-CSV reshape (drops rows with `smtp.keep=false`, flattens `smtp.catch_all` to a top-level `catch_all` column) before delegating to the `icp-scoring` skill's `abc` rubric (step 8, per BC-6907), which routes rows with `catch_all=true` to `catch-all.csv` and remaining rows by tier letter into `tier-a.csv` / `tier-b.csv` / `tier-c.csv`.
 
 For Brite Labs verticals, catch-all rates vary sharply: Active-tier venues (zoos, aquariums) running on mainstream mail providers have catch-all rates of 5–10%; Exploring-tier with corporate IT-heavy targets (hotel groups, stadium operators) can hit 30–40%. Plan campaign volume accordingly — the catch-all segment is real volume that requires its own sequence.
 
 ## Related skills
 
 - **Primary consumers:** `tam-mapping` (BC-5832, Phase 6 SMTP verify).
-- **Upstream / downstream:** MillionVerifier consumes the enriched output from the BlitzAPI → Prospeo waterfall; emits to `tier_and_segment.py` for final routing.
+- **Upstream / downstream:** MillionVerifier consumes the enriched output from the BlitzAPI → Prospeo waterfall; emits to the `icp-scoring` skill (`abc` rubric) for final routing.
 - **Alternatives:** Kickbox (rejected — 3× cost at Brite volumes), ZeroBounce (rejected — weaker catch-all detection), NeverBounce (reasonable alternative, parity pricing — retained as a hot swap if vendor quality drifts).
 
 ## Last verified

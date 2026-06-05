@@ -8,6 +8,8 @@ target-pr: docs/dogfood + transcript artifact only — no command-spec changes i
 
 # BC-6308 — Round-3 Launch Dogfood Plan
 
+> **Note (2026-05-05, BC-6654):** segmentation references in this plan reflect the pre-multiplicative ESP-axis spec. The current spec uses (email-type × ESP) cell segmentation per BC-6514 (`docs/designs/BC-6514-segmentation-axis-decision.md`); the metadata schema, naming convention, and `--no-segment` flag all changed. This plan is preserved as historical execution record.
+
 3rd iteration of the convergent-dogfood chain on `/marketing:launch-campaign` (round-1 BC-5826, round-2 BC-5906, round-3 THIS). Re-walks Phases 3–9 against `emailbison-personal` workspace 13 with all 9 round-2 follow-ups now landed (BC-6298–6304 + BC-6306–6307). The new dimension this round: **fix-validation** — every shipped follow-up gets a paired R-row to verify the corrections behave correctly in practice.
 
 The walk also resolves two BC-6299 carryover unknowns (R-2a case-sensitivity, R-2b empty-value rendering) that the design doc explicitly deferred to round-3 with locked-in spot-check requirements.

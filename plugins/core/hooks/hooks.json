@@ -1,0 +1,73 @@
+{
+  "description": "brite-core hooks — brain-first guidance injection (SessionStart plain text + SubagentStart JSON envelope) plus the centralized security/quality guardrails shared across Brite plugins.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/team-gbrain-usage.md\" 2>/dev/null || true",
+            "timeout": 3,
+            "statusMessage": "Loading brain-first guidance..."
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "GUIDANCE=\"${CLAUDE_PLUGIN_ROOT}/team-gbrain-usage.md\"; if ! command -v jq >/dev/null 2>&1; then echo 'brite-core SubagentStart: jq not found — brain-first guidance not injected' >&2; exit 0; fi; if [ ! -r \"$GUIDANCE\" ]; then echo \"brite-core SubagentStart: guidance file unreadable ($GUIDANCE)\" >&2; exit 0; fi; jq -Rs '{hookSpecificOutput: {hookEventName: \"SubagentStart\", additionalContext: .}}' \"$GUIDANCE\"",
+            "timeout": 3,
+            "statusMessage": "Injecting brain-first guidance (subagent)..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); printf '%s\\n' \"$INPUT\" | grep -Eiq 'rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*f|rm[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*r|git[[:space:]]+push.*[[:space:]]-f|git[[:space:]]+push.*--force([[:space:]]|\"|$)|drop[[:space:]]+(table|database)|chmod[[:space:]]+777|(curl|wget)[^\"]*[|][[:space:]]*(bash|sh|zsh)' && echo '{\"ok\":false,\"reason\":\"Blocked: destructive command detected (rm -rf, force push, DROP, chmod 777, or piped download)\"}' || echo '{\"ok\":true}'",
+            "timeout": 5,
+            "statusMessage": "Scanning for destructive commands..."
+          },
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); CMD=$(printf '%s\\n' \"$INPUT\" | grep -o '\"command\":\"[^\"]*\"' | head -1 | sed 's/\"command\":\"//;s/\"//'); if ! printf '%s\\n' \"$CMD\" | grep -Eq '(^|[;&|[:space:]])git[[:space:]]+commit([[:space:]]|$)'; then echo '{\"ok\":true}'; exit 0; fi; advised=0; advise(){ if [ \"$advised\" -eq 0 ]; then printf '%s\\n' '⚠️  Pre-commit advisory: quality checks reported issues below (commit will proceed). Run linters locally or check CI to verify.' >&2; advised=1; fi; }; OLD_IFS=$IFS; IFS=$'\\n'; staged=$(git diff --cached --name-only --diff-filter=d 2>/dev/null || true); if [ -z \"$staged\" ]; then IFS=$OLD_IFS; echo '{\"ok\":true}'; exit 0; fi; if [ -f package.json ]; then js_files=''; for f in $staged; do case \"$f\" in *.js|*.jsx|*.ts|*.tsx) if [ -n \"$js_files\" ]; then js_files=\"$js_files\\0$f\"; else js_files=\"$f\"; fi ;; esac; done; if [ -n \"$js_files\" ]; then if command -v npx >/dev/null 2>&1 && npx --no-install eslint --version >/dev/null 2>&1; then eslint_out=$(printf '%b' \"$js_files\" | xargs -0 npx --no-install eslint --no-error-on-unmatched-pattern -- 2>&1) || { advise; printf '── ESLint ──\\n%s\\n' \"$eslint_out\" >&2; }; fi; if [ -f tsconfig.json ] && command -v npx >/dev/null 2>&1 && npx --no-install tsc --version >/dev/null 2>&1; then tsc_out=$(npx --no-install tsc --noEmit 2>&1) || { advise; printf '── tsc --noEmit ──\\n%s\\n' \"$tsc_out\" >&2; }; fi; fi; fi; if [ -f pyproject.toml ] || [ -f setup.py ]; then py_files=''; for f in $staged; do case \"$f\" in *.py) if [ -n \"$py_files\" ]; then py_files=\"$py_files\\0$f\"; else py_files=\"$f\"; fi ;; esac; done; if [ -n \"$py_files\" ] && command -v ruff >/dev/null 2>&1; then ruff_out=$(printf '%b' \"$py_files\" | xargs -0 ruff check -- 2>&1) || { advise; printf '── ruff check ──\\n%s\\n' \"$ruff_out\" >&2; }; fi; fi; IFS=$OLD_IFS; echo '{\"ok\":true}'",
+            "timeout": 60,
+            "statusMessage": "Pre-commit advisory (warn-only)..."
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); printf '%s\\n' \"$INPUT\" | grep -Eq 'sk-[a-zA-Z0-9]{20,}|sk-proj-[a-zA-Z0-9]{10,}|AKIA[A-Z0-9]{12,}|gh[ps]_[a-zA-Z0-9]{20,}|sk_(live|test)_[a-zA-Z0-9]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[abprs]-[a-zA-Z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}' && echo '{\"ok\":false,\"reason\":\"Blocked: potential secret or API key detected in file content\"}' || echo '{\"ok\":true}'",
+            "timeout": 5,
+            "statusMessage": "Scanning for secrets..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); file_path=$(printf '%s\\n' \"$INPUT\" | grep -o '\"file_path\":\"[^\"]*\"' | head -1 | sed 's/\"file_path\":\"//;s/\"//'); [ -z \"$file_path\" ] && exit 0; ext=\"${file_path##*.}\"; case \"$ext\" in js|jsx|ts|tsx) command -v npx >/dev/null 2>&1 && npx --no-install eslint --no-error-on-unmatched-pattern -- \"$file_path\" 2>/dev/null || true ;; py) command -v ruff >/dev/null 2>&1 && ruff check --fix -- \"$file_path\" 2>/dev/null || true ;; esac; exit 0",
+            "timeout": 30,
+            "statusMessage": "Running linter..."
+          }
+        ]
+      }
+    ]
+  }
+}

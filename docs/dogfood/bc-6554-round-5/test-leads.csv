@@ -1,0 +1,10 @@
+email,first_name,last_name,company_domain,job_title,company_name
+dogfood-test-01@gmail.com,Alex,Testlead,gmail.com,Mayor,Test Denver City
+dogfood-test-02@gmail.com,Sam,Testlead,gmail.com,Parks Director,Test Aurora City
+dogfood-test-03@outlook.com,Jordan,Testlead,outlook.com,CFO,Test Boulder City
+dogfood-test-04@outlook.com,Taylor,Testlead,outlook.com,Downtown Coord,Test Lakewood City
+dogfood-test-05@brite.co,Casey,Testlead,brite.co,Master Planner,Test Fort Collins
+dogfood-test-06@brite.co,Morgan,Testlead,brite.co,Cultural Officer,Test Colorado Springs
+info@dogfoodtest.com,Info,Account,dogfoodtest.com,Operations Manager,Test Dogfood Aquarium
+sales@dogfoodtest.com,Sales,Account,dogfoodtest.com,Sales Director,Test Dogfood Stadium
+contact@dogfoodtest.com,Contact,Account,dogfoodtest.com,General Manager,Test Dogfood Zoo

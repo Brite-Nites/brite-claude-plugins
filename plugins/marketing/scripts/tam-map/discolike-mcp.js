@@ -4,6 +4,12 @@
 // License: MIT — see plugins/marketing/references/tam/UPSTREAM.md
 // Upstream path: scripts/discolike-mcp.js
 // Changes: verbatim port, no functional edits
+// Verified against api.discolike.com/v1/docs/api/endpoints/discover on
+// 2026-05-11 (BC-7011): URL, GET method, x-discolike-key header, and all
+// 9 wrapper query params (icp_text, country, category, employee_range,
+// min_digital_footprint, max_records, offset, phrase_match, domain) match
+// current docs. Upstream exposes additional optional params (negate_*,
+// tech_stack, social, etc.) we don't surface — preserving port shape.
 
 /**
  * Discolike MCP wrapper.

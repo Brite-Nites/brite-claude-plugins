@@ -5,16 +5,16 @@
     {
       "id": "post-analysis-happy-path",
       "tier": 1,
-      "description": "Post-analysis debrief on a Nites campaign with a well-formed analysis artifact produces a verdict-SCALE entry appended to learnings.md with all 5 Q-sections, all 4 tag families lowercase-hyphenated, populated metrics frontmatter, and a marketing-context-proposal handoff when transferable is true.",
+      "description": "Post-analysis debrief on a Nites campaign with a well-formed analysis artifact produces a verdict-SCALE entry appended to learnings.md (short-form path per BC-8719) with all 5 Q-sections, all 4 tag families lowercase-hyphenated, populated metrics frontmatter, and a marketing-context-proposal handoff when transferable is true.",
       "input": {
         "entity": "brite-nites",
         "campaign_name": "spring-promo",
-        "mocked_analysis_artifact": "docs/campaigns/brite-nites/analysis-spring-promo-2026-04-15.md with Reply Rate 1.4%, Interested Rate 28%, Bounce Rate 2%, sent=1200, days=14, §2 top row verdict=SCALE, §5 Attribution row for Segment=hoa-boards, §6 Next Iteration='test capital-expenditure-timing angle on brite-labs'",
+        "mocked_analysis_artifact": "docs/campaigns/nites/analysis-spring-promo-2026-04-15.md with Reply Rate 1.4%, Interested Rate 28%, Bounce Rate 2%, sent=1200, days=14, §2 top row verdict=SCALE, §5 Attribution row for Segment=hoa-boards, §6 Next Iteration='test capital-expenditure-timing angle on brite-labs'",
         "mocked_marketing_context": "docs/marketing-context.md absent (degraded mode — warning emitted at Gate 1)",
         "mocked_transferable_answer": "true"
       },
       "assertions": [
-        "output entry appended to docs/campaigns/brite-nites/learnings.md",
+        "output entry appended to docs/campaigns/nites/learnings.md (short-form canonical per BC-8719)",
         "entry frontmatter contains verdict: SCALE",
         "entry frontmatter contains metrics.reply_rate == 0.014",
         "entry frontmatter contains metrics.interested_rate == 0.28",
@@ -23,7 +23,7 @@
         "entry frontmatter contains metrics.days == 14",
         "entry frontmatter source_analysis points to the consumed analysis-*.md path",
         "entry body contains all 5 Q-sections (Q1 Hypothesis / Q2 Result / Q3 What worked / Q4 Surprise / Q5 Transferable)",
-        "entry tags array contains exactly one #entity/brite-nites, one #vertical/*, one #persona/*, one #angle/* — all lowercase-hyphenated"
+        "entry tags array contains exactly one #entity/brite-nites, one #vertical/*, one #persona/*, one #angle/* — all lowercase-hyphenated (tags stay long-form per § Tag scheme)"
       ]
     },
     {
@@ -41,7 +41,7 @@
         "mocked_days_elapsed": 10
       },
       "assertions": [
-        "output entry appended to docs/campaigns/brite-supply/learnings.md",
+        "output entry appended to docs/campaigns/supply/learnings.md (short-form per BC-8719)",
         "entry frontmatter contains verdict: KILL",
         "entry frontmatter metrics.reply_rate < 0.005",
         "entry frontmatter metrics.sent >= 500",
@@ -61,7 +61,7 @@
         "mocked_operator_draft_verdict": "pretty good"
       },
       "assertions": [
-        "no Write tool call to docs/campaigns/brite-nites/learnings.md",
+        "no Write tool call to docs/campaigns/nites/learnings.md or any other learnings.md path",
         "output response cites the four permitted tokens (SCALE, ITERATE, PAUSE, KILL)",
         "output response includes the §3 rubric threshold table or a reference to it",
         "§8 anti-slop guardrail 'Do not use subjective verdicts' is invoked in the response",
@@ -76,12 +76,12 @@
       "input": {
         "entity": "brite-nites",
         "campaign_name": "spring-promo",
-        "mocked_existing_entry": "learnings.md already contains an entry with campaign: spring-promo, debrief_at: 2026-04-15, verdict: ITERATE",
+        "mocked_existing_entry": "docs/campaigns/nites/learnings.md already contains an entry with campaign: spring-promo, debrief_at: 2026-04-15, verdict: ITERATE",
         "mocked_new_debrief_at": "2026-04-22",
         "mocked_new_verdict": "SCALE"
       },
       "assertions": [
-        "docs/campaigns/brite-nites/learnings.md contains two entries with campaign: spring-promo after the second debrief",
+        "docs/campaigns/nites/learnings.md contains two entries with campaign: spring-promo after the second debrief",
         "the 2026-04-15 entry body is byte-for-byte identical before and after the second debrief",
         "the new entry carries debrief_at: 2026-04-22 and verdict: SCALE",
         "the ## Campaign log section has the 2026-04-22 entry at the top and the 2026-04-15 entry below",
@@ -91,13 +91,52 @@
       ]
     },
     {
+      "id": "short-form-write-default",
+      "tier": 1,
+      "description": "Post-BC-8719: Gate 3 answer in either long-form (brite-labs) or short-form (labs) lands the entry at docs/campaigns/labs/learnings.md. The skill never writes to a brite-prefixed campaigns directory.",
+      "input": {
+        "entity": "brite-labs",
+        "campaign_name": "winter-pilot-2026-02",
+        "mocked_analysis_artifact": "docs/campaigns/labs/analysis-winter-pilot-2026-02-01.md present",
+        "mocked_marketing_context": "docs/marketing-context.md present"
+      },
+      "assertions": [
+        "every Write tool call has path beginning with docs/campaigns/labs/ (short-form derived from brite-labs by stripping brite- prefix)",
+        "zero Write tool calls to any path beginning with docs/campaigns/brite-",
+        "the entry appended at docs/campaigns/labs/learnings.md",
+        "entry tags array contains #entity/brite-labs (long-form tag preserved per § Tag scheme)"
+      ]
+    },
+    {
+      "id": "legacy-long-form-read-warn",
+      "tier": 2,
+      "description": "Workflow 4 Step 1 backward-compat read: when short-form learnings.md is missing but the pre-BC-8719 long-form file exists, the skill reads the legacy file, emits a [BC-8719] stderr warning, and writes the next entry to the short-form canonical path.",
+      "input": {
+        "entity": "brite-labs",
+        "campaign_name": "fall-installer-2026-09",
+        "mocked_short_form_learnings_md": "docs/campaigns/labs/learnings.md absent (Read returns file-not-found)",
+        "mocked_long_form_learnings_md": "docs/campaigns/brite-labs/learnings.md present with one prior entry (legacy pre-BC-8719 layout)",
+        "mocked_analysis_artifact": "docs/campaigns/labs/analysis-fall-installer-2026-09-01.md present"
+      },
+      "assertions": [
+        "first Read attempt targets docs/campaigns/labs/learnings.md and returns file-not-found",
+        "second Read attempt (backward-compat probe) targets docs/campaigns/brite-labs/learnings.md and succeeds",
+        "stderr contains the literal substring '[BC-8719]'",
+        "stderr contains a pointer to plugins/marketing/scripts/migrate_entity_slugs.py",
+        "the [BC-8719] warning fires exactly once per debrief run",
+        "Write target is docs/campaigns/labs/learnings.md (short-form canonical, never the legacy long-form)",
+        "docs/campaigns/brite-labs/learnings.md is byte-for-byte unchanged after this run (legacy file is read-only)",
+        "the new entry plus the prior legacy entry both appear in the short-form learnings.md after the run"
+      ]
+    },
+    {
       "id": "under-5-minute-autosuggest",
       "tier": 1,
       "description": "When analysis-*.md exists, Q1/Q2/Q3/Q5 auto-suggest from the artifact; the skill does not free-text-prompt for these questions.",
       "input": {
         "entity": "brite-nites",
         "campaign_name": "spring-promo",
-        "mocked_analysis_artifact": "docs/campaigns/brite-nites/analysis-spring-promo-2026-04-15.md with §5 Attribution, §2 Segment Ranking, §6 Next Iteration all populated"
+        "mocked_analysis_artifact": "docs/campaigns/nites/analysis-spring-promo-2026-04-15.md with §5 Attribution, §2 Segment Ranking, §6 Next Iteration all populated"
       },
       "assertions": [
         "exactly 5 AskUserQuestion tool calls total (one per question)",
@@ -131,22 +170,21 @@
     {
       "id": "transferable-cross-entity-flag",
       "tier": 2,
-      "description": "A transferable Supply insight with no matching pattern in Labs learnings triggers an AskUserQuestion proposing marketing-context update; the payload handoff to product-marketing-context contains the expected fields.",
+      "description": "A transferable Supply insight with no matching pattern in Labs learnings triggers an AskUserQuestion proposing marketing-context update; the payload handoff to product-marketing-context contains the expected fields. The cross-entity Grep matches across both short-form and any legacy long-form layouts.",
       "input": {
         "entity": "brite-supply",
         "campaign_name": "capex-push-2026-04",
         "mocked_new_entry_flag": "transferable: true, #angle/capital-expenditure-timing",
-        "mocked_labs_learnings_glob": "docs/campaigns/brite-labs/learnings.md exists but contains zero entries with #angle/capital-expenditure-timing",
+        "mocked_labs_learnings_glob": "docs/campaigns/labs/learnings.md exists but contains zero entries with #angle/capital-expenditure-timing",
         "mocked_operator_response": "Yes, propose update"
       },
       "assertions": [
-        "Glob executed on docs/campaigns/brite-labs/learnings.md",
-        "Read executed on docs/campaigns/brite-labs/learnings.md",
+        "Grep executed across docs/campaigns/*/learnings.md (covers both short-form labs/ and any legacy brite-labs/ in one call)",
         "AskUserQuestion fired with three options (Yes propose / No skip propagation / No keep entity-specific)",
         "handoff payload names product-marketing-context as target",
-        "handoff payload entity_pair contains [brite-supply, brite-labs]",
+        "handoff payload entity_pair contains [brite-supply, brite-labs] (long-form tag-level identifiers preserved)",
         "handoff payload transferable_note is populated from the entry's transferable_note field",
-        "handoff payload source_entry points to the brite-supply learnings.md entry",
+        "handoff payload source_entry points to the supply learnings.md entry (docs/campaigns/supply/learnings.md#entry-N)",
         "no Write to docs/marketing-context.md from this skill"
       ]
     },
@@ -164,7 +202,7 @@
         "zero Read tool calls on docs/marketing-context.md",
         "entry frontmatter does not contain a marketing_context_version field",
         "entry body does not cite marketing-context.md as a source",
-        "debrief still completes end-to-end (entry appended to learnings.md)",
+        "debrief still completes end-to-end (entry appended to learnings.md at docs/campaigns/nites/learnings.md)",
         "Gate 1 warning emitted at most once per invocation"
       ]
     },

@@ -56,6 +56,29 @@ A skill that calls an external service (Linear, Email Bison, Salesforce, etc.) f
 
 Every tool-using PR must pass the 6-item checklist at the end of the pattern guide.
 
+## Naming Convention (commands & skills)
+
+Name from the user's **intent**, not the machine's **mechanism**. Derived in [ADR-026](docs/decisions/026-revops-promotion-topology.md) when the revops `deploy-*` command names were found to mis-describe a CI-driven deploy world (the human no longer "deploys" — CI does). Applies to **all plugins**, *apply-forward + opportunistic cleanup*: don't mass-rename established commands; keep deprecation aliases when you do rename.
+
+**Six rules:**
+
+1. **Name from the user's intent, not the machine's mechanism.**
+2. **Verb + object** — every name answers *"do what, to what?"* No bare verbs (`try`, `ship`), no bare nouns (`doctor`, `weekly`).
+3. **The verb encodes the side-effect class** (see lexicon) — the reader knows before running whether it's safe.
+4. **The namespace is the first word; don't repeat it.** `/revops:` already says "SF" — spend the name's words on the specific action, not `sf`.
+5. **Plain English over domain jargon/idiom** — no `break-glass`, no `runbook`.
+6. **Stakes legible in the name** — `preview` < `submit` < `push-to-production` < `emergency-…`.
+
+**Verb lexicon** (controlled vocabulary — the same verb means the same thing in every plugin), grouped by the three side-effect classes:
+
+| Class | Verbs | Meaning |
+|-------|-------|---------|
+| **Read-only** (safe) | `check-` · `show-` · `list-` · `report-` | inspects/reports, changes nothing |
+| **Throwaway-mutate** | `preview-` | changes only a disposable/personal thing (blast radius ≈ nil) |
+| **Real-mutate** | `setup-` · `create-`/`new-` · `submit-` · `push-` · `promote-` · `run-` · `sync-` · `update-` · `delete-` | changes shared/persistent state |
+
+Names that already satisfy this (e.g. marketing's `new-offer`, `plan-campaign`; flow-architecture's `add-domain`) need no change; mechanism-named ones (`deploy-*`) are the cleanup targets. Rationale + the worked revops example live in [ADR-026](docs/decisions/026-revops-promotion-topology.md).
+
 ## plugin.json Schema (STRICT — read before editing)
 
 **Claude Code validates plugin.json against a strict Zod schema. Any unrecognized field causes a silent hard failure — the entire plugin won't load (no commands, no skills, nothing). There is no error message shown to the user.**
@@ -113,9 +136,9 @@ metadata:                      # Optional. Only for skills from external sources
 
 The plugin includes hooks in `plugins/workflows/hooks/hooks.json` (auto-loaded by Claude Code — do NOT add a `hooks` field to `plugin.json`):
 
-- **PreToolUse (Bash)**: Two-layer security — regex command hook (deterministic, blocks `rm -rf`, `--force`, `DROP`, `chmod 777`, piped downloads) runs first, then Haiku prompt hook as fallback
-- **PreToolUse (Bash)**: Pre-commit quality — intercepts `git commit` commands, detects project type (`package.json` → JS/TS, `pyproject.toml`/`setup.py` → Python), runs linters on staged files only (ESLint, `tsc --noEmit`, Ruff). Degrades gracefully if no linters installed. Note: inactive from plugins until upstream [#6305](https://github.com/anthropics/claude-code/issues/6305) is fixed.
-- **PreToolUse (Write/Edit)**: Two-layer security — regex command hook (deterministic, blocks `sk-proj-`, `AKIA`, `ghp_`, `sk_live/test` patterns) runs first, then Haiku prompt hook as fallback
+- **PreToolUse (Bash)**: Regex command hook (deterministic, blocks `rm -rf`, `git push --force`/`-f`, `DROP TABLE/DATABASE`, `chmod 777`, piped downloads). Haiku-prompt fallback was retired in BC-11889 (workflows v3.31.0).
+- **PreToolUse (Bash)**: Pre-commit quality — intercepts `git commit` commands, detects project type (`package.json` → JS/TS, `pyproject.toml`/`setup.py` → Python), runs linters on staged files only (ESLint, `tsc --noEmit`, Ruff). Degrades gracefully if no linters installed.
+- **PreToolUse (Write/Edit)**: Regex command hook (deterministic, blocks `sk-`, `sk-proj-`, `AKIA`, `gh[ps]_`, `sk_live/test_`, PEM private keys, Slack `xox[abprs]-`, Google `AIza`).
 - **PostToolUse (Write/Edit)**: Auto-linter — runs ESLint (JS/TS) or Ruff (Python) if available
 - **SessionStart**: Team context — runs environment health checks (git, node, gh, npx) and shows key commands
 
@@ -169,6 +192,31 @@ Email Bison exposes two vendor-hosted HTTP MCP endpoints (`emailbison-b2b`, `ema
 **Why not plugin-scoped?** Claude Code bugs [#6204](https://github.com/anthropics/claude-code/issues/6204) / [#9427](https://github.com/anthropics/claude-code/issues/9427) prevent env-var substitution in plugin-scoped HTTP `headers`. The `${user_config.*}` keychain-backed alternative was tested and also found broken (2026-04-19 validation: token-via-curl = 200, same-token-via-Claude-Code = Failed to connect). We'll migrate to plugin-scoped when fixes land upstream. Full investigation + all workarounds that failed are documented in `email-bison.md` § Known Claude Code limitation.
 
 Full onboarding flow, workspace-routing rules, 141-tool inventory, confirmation-gate list, and known gotchas live in [`plugins/marketing/tools/integrations/email-bison.md`](plugins/marketing/tools/integrations/email-bison.md).
+
+## Plugin secret-config canon
+
+Stdio MCPs and CLI scripts read credentials from OS environment variables — that's the Anthropic-recommended pattern (`@anthropics/claude-code/plugins/plugin-dev/skills/mcp-integration/references/authentication.md`). The friction is *how secrets reach env* without each developer hand-editing `~/.zshrc` and rotating values across machines. The canonical Brite answer is `bw-run.sh`: a thin wrapper that fetches values from Bitwarden's Engineering collection at MCP/CLI spawn time, exports them as env, and execs the wrapped command. Vault is the single source of truth; rotated values reach the next process spawn — instantly for one-shot CLI invocations via Bash, and at the next Claude Code re-launch for long-lived stdio MCPs (see Tradeoffs below). Decision-record source (alternatives considered, drivers, reversibility): [ADR-010](docs/decisions/010-plugin-secret-config-canon.md). This section is the operational guide for *how to apply* the canon; ADR-010 is *why*.
+
+**Reference implementation:** [`plugins/marketing/scripts/bw-run.sh`](plugins/marketing/scripts/bw-run.sh) plus [`plugins/marketing/scripts/bw-run.test.sh`](plugins/marketing/scripts/bw-run.test.sh) (small single-file pure-POSIX-bash wrapper + pure-bash test suite; see [ADR-010 § Wrapper contract](docs/decisions/010-plugin-secret-config-canon.md) for the full contract). Spike validation findings: [`docs/research/bw-run-spike.md`](docs/research/bw-run-spike.md) (BC-6905).
+
+**Authority and scope.** The marketing-plugin copy at `plugins/marketing/scripts/bw-run.sh` is canonical until a second plugin adopts the pattern. On the second adoption, promote the script to `scripts/bw-run.sh` (repo-level) and have each plugin reference it via a thin shim or relative path; that's the right time to formalize the decision in an ADR (see `## ADR Convention`). The single-adopter framing keeps the script's ownership inside the marketing plugin's release cycle today; plugin-version bumps for this script's edits follow the marketing plugin's CHANGELOG.
+
+**Adopt in a new plugin:**
+
+1. **Provision N items** in the Engineering Bitwarden collection — one Login entry per env-var key. Use a deterministic prefix (`<plugin>-<env-name>-` or similar) so the wrapper's batch-fetch path engages.
+2. **Copy the script** to your plugin: `cp plugins/marketing/scripts/bw-run.sh plugins/<plugin>/scripts/bw-run.sh` — and on this second adoption, also propose promoting the script to `scripts/bw-run.sh` (repo-level) so the canon has one source of truth going forward. Until then, fixes to the marketing copy must be cherry-picked into yours.
+3. **Wrap stdio MCP entries** in your plugin's `.mcp.json`: `command: "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh", args: ["KEY=item-name", "--", <original cmd>...]`. Drop the `env: { KEY: "${KEY}" }` block — the wrapper fills env at runtime.
+4. **Wrap Bash CLI invocations** in your skills: `bw-run.sh KEY=item -- <original cmd>`. The skill's instruction text is the spec; just prepend the wrapper invocation in each `Bash`-tool call site.
+5. **Add `bw-run.test.sh`** mirroring the marketing plugin's shape: 4 mandated cases (locked vault, missing item, multi-key batch, divergent naming) + 1 usage-error case. Tests use a PATH-mocked `bw` stub via `mktemp -d`; no bats / no external test runner.
+
+**Tradeoffs (be honest about these in your plugin's setup command):**
+
+- Adds `bw` (`brew install bitwarden-cli`) and `jq` (`brew install jq`) as runtime requirements. Both are widely available; the marketing plugin's setup-tam-map detects them in Phase 1.
+- **Vault-lock-mid-session UX:** ~30s recovery cost per lock event in restart-based env-propagation mode (BC-5947 task-3 Pattern A; BC-6905 Q5 measurement). Aggressive idle-lock policies compound this — document expected unlock cadence in onboarding.
+- **Rotation propagation:** values are fetched per-MCP-process-spawn, not per-tool-call. MCP server processes are persistent for the Claude Code session; tool calls reuse the running process and its in-memory env. **`/reload-plugins` does NOT re-spawn MCP processes** (measured in BC-6906 T14: it reloads plugin metadata only). To pick up a rotated Bitwarden value, the user must trigger a real MCP-process re-spawn — typically by re-launching Claude Code from a shell where `BW_SESSION` is exported (or, if your Claude Code version exposes it, a per-server `claude mcp restart <name>` command). This is still cheaper than the pre-wrapper world (which required `~/.zshrc` edits *and* a re-launch); it just isn't zero-touch.
+- **Privacy:** wrapper memory holds vault items matching the auto-detected common prefix (e.g., `tam-map-*`), not the entire user-accessible vault. If your plugin needs broader access, prefer fan-out to multiple wrapper invocations rather than widening the search prefix.
+
+**Exception — HTTP MCPs.** This canon applies to **stdio MCPs and CLI scripts only.** For HTTP MCPs with credentialed `Authorization: Bearer ${...}` headers, both `${ENV_VAR}` and `${user_config.*}` substitution into headers are broken in current Claude Code (BC-5551 / upstream issues [#6204](https://github.com/anthropics/claude-code/issues/6204), [#9427](https://github.com/anthropics/claude-code/issues/9427)). Ship user-level registration with guided onboarding (the Email Bison pattern at `/marketing:setup-email-bison`) until upstream lands fixes — see § Email Bison MCP Onboarding above.
 
 ## ADR Convention
 

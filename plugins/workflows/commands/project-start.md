@@ -157,7 +157,7 @@ Store as `detected-conventions`.
 
 #### Sub-step 3: CDR Reconciliation
 
-Advisory only — flags conflicts, never blocks. Query Context7 handbook for CDRs matching the detected stack. Use only generic technology names in the query (e.g., "TypeScript", "Prisma") — do not include project-specific names. Flag conflicts for user attention, log alignments silently. If Context7 unavailable, skip with: "CDR reconciliation skipped." See error handling in workflow-spec.md.
+Skipped in v1. The handbook-CDR retrieval mechanism is not currently wired. Log: "CDR reconciliation skipped — retrieval mechanism unavailable." See error handling in workflow-spec.md.
 
 #### Sub-step 4: Pre-Fill Trait Docs
 
@@ -601,32 +601,29 @@ After infrastructure dispatch but before generating CLAUDE.md, verify that requi
 |-------|-------|------------|-------------|-------------------|
 | Global | — | Linear | `list_teams` (limit 1) | "Linear MCP unavailable. Linear project creation will be skipped. Run `/workflows:smoke-test` to diagnose." |
 | Global | — | Sequential-thinking | Trivial thought: `"MCP verification"`, thoughtNumber 1, totalThoughts 1, nextThoughtNeeded false | "Sequential-thinking unavailable. Planning quality will be degraded." |
-| Global | — | Context7 | `resolve-library-id` query "react" | "Context7 unavailable. Library docs and handbook context missing. Authorize Context7 when prompted, or restart your session." |
 | Trait-gated | `involves-data` | Data warehouse | Attempt any available data MCP tool (e.g., Snowflake list schemas, BigQuery list datasets) | "No data warehouse MCP configured. `involves-data` active but no Snowflake/BigQuery MCP found. See Brite Handbook data platform setup." |
 
 ### Verification Algorithm
 
-1. **Run global checks** — all 3 in parallel (Linear, Sequential-thinking, Context7).
-2. **If Context7 OK**, also check handbook: `resolve-library-id` query "brite-nites handbook". Record handbook status alongside Context7.
-3. **Run trait-gated checks** — for each active trait with a trait-gated entry above, run the ping.
-4. **Classify each result**:
+1. **Run global checks** — both in parallel (Linear, Sequential-thinking).
+2. **Run trait-gated checks** — for each active trait with a trait-gated entry above, run the ping.
+3. **Classify each result**:
    - **OK** — ping succeeded
    - **NOT CONFIGURED** — no MCP tools available for that server
    - **UNAVAILABLE** — tools exist but ping failed
-5. **Present results** as a checklist table:
+4. **Present results** as a checklist table:
 
 ```
 | MCP Server | Status | Notes |
 |------------|--------|-------|
 | Linear | OK | |
 | Sequential-thinking | OK | |
-| Context7 | OK | Handbook: OK |
 | Data warehouse | NOT CONFIGURED | involves-data active — add Snowflake MCP |
 ```
 
-6. **Report setup instructions** for any non-OK entry as checklist items below the table.
-7. **Store results** in conversation context as `mcp-status: { linear: OK, sequential-thinking: OK, context7: OK, handbook: OK, data-warehouse: NOT CONFIGURED }` for downstream CLAUDE.md generation.
-8. **Non-blocking** — all failures are WARN level. Continue to CLAUDE.md generation regardless.
+5. **Report setup instructions** for any non-OK entry as checklist items below the table.
+6. **Store results** in conversation context as `mcp-status: { linear: OK, sequential-thinking: OK, data-warehouse: NOT CONFIGURED }` for downstream CLAUDE.md generation.
+7. **Non-blocking** — all failures are WARN level. Continue to CLAUDE.md generation regardless.
 
 ---
 
@@ -1053,7 +1050,6 @@ Format results as a markdown table. Use PASS / FAIL / WARN / SKIP for status:
 | Linear | Project created | PASS | BC project |
 | Linear | Trait labels | PASS | 4 labels |
 | MCP | Linear | OK | |
-| MCP | Context7 | OK | Handbook: OK |
 | MCP | Data warehouse | WARN | Not configured |
 | Git | GitHub repo | PASS | Brite-Nites/project-name |
 | Git | Pre-commit hook | PASS | |

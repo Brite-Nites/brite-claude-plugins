@@ -126,7 +126,7 @@ Full CRUD over cold-email campaigns including create, import leads, attach sende
 
 ### Leads (15 tools)
 
-Lead create, bulk create (up to 500 per call), upsert, blacklist. See rate limits below for the 500-per-call cap ([WIP §6 Q6](../../../../docs/research/outbound-pipeline-findings.md#6-open-design-questions)).
+Lead create, bulk create (up to 500 per call), blacklist. No upsert operation — re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8 + BC-11072). See rate limits below for the 500-per-call cap ([WIP §6 Q6](../../../../docs/research/outbound-pipeline-findings.md#6-open-design-questions)).
 
 Lead-create responses (`POST /api/leads`, `POST /api/leads/multiple`) include both `id` (integer) and `uuid` (string) fields; use `id` for downstream API calls — every other EB endpoint that takes a lead reference accepts the integer form. The `uuid` field is forward-compatible additive (verified live 2026-05-01 — added in the ~3-day window between BC-5906 round-2 (2026-04-27) and BC-6308 round-3 (2026-04-30)).
 
@@ -209,7 +209,7 @@ Verified against the live API spec via `search_api_spec` on 2026-04-14 (step 2a 
 | # | Tool | Category | API path | What it does |
 |---|---|---|---|---|
 | 0 | `get_active_workspace_info` | workspace | `GET /api/workspaces/active` | Availability probe per ADR 2c — never skip |
-| 1 | `bulk_create_leads` *(or `upsert_multiple_leads`, `bulk_create_leads_csv`)* | leads | `POST /api/leads` *(variants)* | Create lead records **before** the campaign exists. Max 500 per call — chunk larger lists. Response returns the lead IDs used in step 3. |
+| 1 | `bulk_create_leads` *(or `bulk_create_leads_csv` for CSV upload)* | leads | `POST /api/leads/multiple` *(JSON)* or `POST /api/leads/bulk/csv` *(CSV)* | Create lead records **before** the campaign exists. Max 500 per call — chunk larger lists. Response returns the lead IDs used in step 3. Re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8); no upsert behavior. No `upsert_multiple_leads` endpoint exists (BC-6785 R-28). Verified BC-11072 spike, 2026-05-22. |
 | 2 | `create_campaign` | campaigns | `POST /api/campaigns` | Create an empty campaign shell. No leads / senders / schedule / sequence yet. Returns a campaign ID. |
 | 2a | `update_campaign` | campaigns | `PATCH /api/campaigns/{id}/update` | Apply deliverability defaults for cold outreach — set `plain_text: true`. EB defaults `plain_text: false` (HTML mode), which carries tracking pixels + link rewrites that signal "automated marketing" to spam filters. Single PATCH per campaign — not on the two-call confirmation gate list. Idempotent on re-send (each PATCH must include every boolean to preserve — EB resets omitted booleans to `false` per API spec wording *"If nothing sent, false is assumed."*; verified BC-6544). |
 | 3 | `import_leads_to_campaign` | campaigns | `POST /api/campaigns/{id}/leads/attach-leads` | Attach the lead IDs from step 1 to the campaign from step 2. **Confirmation-gated** (see below). Fires HTTP 422 with `allow_parallel_sending` conflict when any lead is already in another campaign (any status — verified BC-6545); see gotchas for path-specific response shape. |
@@ -256,7 +256,7 @@ This pattern is **stronger** than a skill-level "ask the user" step — when inv
 
 ## Rate limits and quotas
 
-- **Bulk lead import:** `bulk_create_leads` and `upsert_multiple_leads` both accept **500 leads per call** (verified against the live API spec on 2026-04-14 — note the exact tool name is `bulk_create_leads`, not `bulk_create`, despite the abbreviated reference in [WIP §6 Q6](../../../../docs/research/outbound-pipeline-findings.md#6-open-design-questions)). Skills doing larger imports must chunk.
+- **Bulk lead import:** `bulk_create_leads` accepts **500 leads per call** (verified against the live API spec on 2026-04-14 — note the exact tool name is `bulk_create_leads`, not `bulk_create`, despite the abbreviated reference in [WIP §6 Q6](../../../../docs/research/outbound-pipeline-findings.md#6-open-design-questions)). Re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8) — no upsert behavior; no `upsert_multiple_leads` endpoint exists (BC-6785 R-28 + BC-11072 mixed-batch spike; see § Common workflows row 1). Skills doing larger imports must chunk; deduplicating against already-existing leads is the caller's responsibility.
 - **Per-minute / per-hour rate limits:** not documented in the research WIP. UNVERIFIED — a skill author should check `discover_tools` output or vendor docs for the current API spec before doing any high-volume work.
 - **Sending volume caps** (Gmail / Yahoo / Outlook post-2024 enforcement): not an Email Bison limit but a deliverability constraint — the `campaign-orchestration` skill owns caps like "30–50 emails/day per mailbox" per [WIP §7 Key Principles](../../../../docs/research/outbound-pipeline-findings.md#key-principles).
 
@@ -273,16 +273,115 @@ This pattern is **stronger** than a skill-level "ask the user" step — when inv
 - **`plain_text` defaults to `false` on `create_campaign`.** EB sends in HTML mode by default; for cold outreach the spec follow-up is `update_campaign` with `plain_text: true` (single PATCH; idempotent on re-send only when the same body is repeated, see BC-6544 — `update_campaign` is NOT on the two-call confirmation gate list). The `/marketing:launch-campaign` command's Phase 5 applies this automatically (see § Common workflows step 2a above); any net-new spec doing cold outreach should mirror that pattern. HTML mode for cold-B2B carries tracking pixels + link rewrites that signal "automated marketing" to spam filters and degrade deliverability. Surfaced by BC-5906 round-2 dogfood (Sx-15); spec fix shipped in BC-6306. The "PATCH treats omitted booleans as `false`" gotcha was added 2026-05-01 (BC-6544); details under § Common workflows row 2a.
 - **`search_api_spec` doesn't match natural-language phrases.** Phrases like "custom variable list", "create-schedule", "sequence-steps" return `not found`. Only URL-path queries (`/api/custom-variables`) or short keywords (`custom-variables`, `schedule template`, `variables`) work. Surfaced by BC-5906 round-2 (Sx-1); spec fix shipped in BC-6298.
 - **API spec "required" fields are advisory.** `/api/leads` POST schema marks `{first_name, last_name, email}` as required; reality silently accepts requests without `last_name` (verified — lead created with `last_name: null`). Never trust required-vs-optional markings without a ground-truth test call. Surfaced by BC-5906 round-2 (Sx-5); spec fix shipped in BC-6298.
-- **Bulk POST is all-or-nothing on validation failure.** A single bad row (duplicate email, invalid format) in a `bulk_create_leads` batch fails the whole batch with HTTP 422; valid rows are NOT created. The `call_api` wrapper exposes only `{"error": "HTTP 422 Error"}` — no per-lead detail. Recovery requires inspecting EB UI for the offending row(s). Skills cannot offer per-row diagnostics from the response alone. Surfaced by BC-5906 round-2 (Sx-8); spec fix shipped in BC-6298.
+- **Bulk POST is all-or-nothing on validation failure.** A single bad row (email matching an already-existing lead in the workspace, invalid format) in a `bulk_create_leads` batch fails the whole batch with HTTP 422; valid rows are NOT created. The `call_api` wrapper exposes only `{"error": "HTTP 422 Error"}` — no per-lead detail. Recovery requires inspecting EB UI for the offending row(s). Skills cannot offer per-row diagnostics from the response alone. Mixed-batch behavior verified BC-11072 spike (1 existing + 1 new email → 422 atomic, neither created; 2026-05-22). *(Distinct from the within-chunk-duplicate case in the next bullet: same email twice in one chunk → silent dedup, returns HTTP 201, not 422.)* Surfaced by BC-5906 round-2 (Sx-8); spec fix shipped in BC-6298; re-POST-existing framing corrected in BC-11072.
+- **Within-chunk duplicate emails are silently deduplicated, not rejected (verified BC-7667 round-6, 2026-05-22).** `POST /api/leads/multiple` with the same email appearing twice or more in a single chunk returns HTTP 201 success and creates exactly ONE lead — the first occurrence wins, subsequent rows are silently dropped from the response `data[]`. **Distinct from the Sx-8 bullet above:** Sx-8's atomic-422 fires when a row's email matches an ALREADY-EXISTING lead in the workspace (re-POST of existing); within-chunk duplicates of a NEW email do NOT trigger 422. Workspace 13 verification: 2 rows with `bc7667r6-dup-test@dogfoodtest.com` in one POST → HTTP 201, 1 lead (id 15152) created, 2nd occurrence dropped silently. Agent implication — if upstream dedup of caller-supplied lead lists matters, do it client-side before POST; don't rely on EB to reject within-chunk dupes or to round-trip the input row count in the response. Surfaced by BC-7667 round-6 R-6 Side-finding A; spec fix shipped in BC-11071.
 - **`?per_page=N` query param is silently ignored.** EB hardcodes `per_page: 15` regardless of the parameter. Pagination loops are N/15 pages and not operator-configurable — plan iteration counts accordingly (e.g., 500 senders ≈ 34 pages; 772 senders = 52 pages). Surfaced by BC-5906 round-2 (Sx-10); spec fix shipped in BC-6298.
 - **Status filter is case-sensitive in a non-obvious direction.** `?status=connected` (lowercase) succeeds; `?status=Connected` (capitalized — matching the response `status: "Connected"` data field) returns 422. Operators reading the response payload and copying the value into a filter will hit 422 with no useful diagnostic. Always lowercase the filter value. Surfaced by BC-5906 round-2 (Sx-11); spec fix shipped in BC-6298.
 - **Lead-body field names diverge from common-CSV-column names.** EB's `/api/leads/multiple` endpoint expects `title` (not `job_title`), `company` (not `company_name`), and has NO `company_domain` field at all. CSV columns named `job_title`/`company_name`/`company_domain` must be remapped at lead-body construction time: `csv.job_title → eb.title`, `csv.company_name → eb.company`, `csv.company_domain → custom_variable` (or drop). Sending the CSV-column names verbatim silently creates leads with `title: null` / `company: null` — data loss disguised as success. Surfaced by BC-5906 round-2 (Sx-6); spec fix shipped in BC-6300.
 - **Custom variables have no `default` field at the API.** `POST /api/custom-variables` accepts only `{name}` (string, required). Response body is `{id, name, created_at, updated_at}` — no `default` field, ever. Workspace-level fallback text does NOT exist; defaults live per-lead via `bulk_create_leads`'s `custom_variables: [{name, value}]` array. The `/marketing:launch-campaign` command's Phase 4 step 2 consumes the artifact's `default` field as the per-lead fill-in when the CSV row lacks a column for that variable. Sending `default` to `POST /api/custom-variables` is silently ignored — no error, no warning. Surfaced by BC-5906 round-2 (Sx-2); spec fix shipped in BC-6299.
-- **Custom variable names are silently lowercased on store.** Sent `RECENCY_ANCHOR` (uppercase, per the email-copywriting artifact convention); EB stores `recency_anchor` (lowercase). Same for all SCREAMING_SNAKE_CASE names. Per-lead `custom_variables` array values must use lowercase names to match EB's stored form (verified Phase 4 round-2 — uppercase per-lead names round-trip but match against EB's lowercase store). Render-engine case-sensitivity verified BC-6308 round-3 R-2a: UPPERCASE `{UPPERCASE_TOKEN}` resolves correctly against the lowercased store (case-insensitive match); lowercase `{lowercase_token}` does NOT resolve and renders as literal text — see token-case render gotcha below. Surfaced by BC-5906 round-2 (Sx-3); spec fix shipped in BC-6299.
+- **Custom variable names are silently lowercased on store.** Sent `RECENCY_ANCHOR` (uppercase, per the email-copywriting artifact convention); EB stores `recency_anchor` (lowercase). Same for all SCREAMING_SNAKE_CASE names. Per-lead `custom_variables[].name` MUST be lowercase at `POST /api/leads/multiple` — UPPERCASE returns HTTP 422 and rejects the whole chunk (verified BC-6554 round-4 S-4 — supersedes the round-2 narrative claim that uppercase round-tripped; precedent BC-6780). The `/marketing:launch-campaign` Phase 4 step 2 lowercases automatically; manual API users must do the same. Render-engine case-sensitivity verified BC-6308 round-3 R-2a: UPPERCASE `{UPPERCASE_TOKEN}` in body/subject resolves correctly against the lowercased store (case-insensitive match); lowercase `{lowercase_token}` does NOT resolve and renders as literal text — see token-case render gotcha below. Surfaced by BC-5906 round-2 (Sx-3); spec fix shipped in BC-6299; lead-bind-422 correction shipped in BC-6780.
 - **Token render is UPPERCASE-only.** EB's render engine recognizes ONLY UPPERCASE `{TOKEN}` references as variable references (e.g., `{FIRST_NAME}`, `{RECENCY_ANCHOR}`). UPPERCASE tokens resolve via case-insensitive lookup against the lead's `custom_variables` (which EB stores with lowercased names per Sx-3). Lowercase or mixed-case tokens (`{first_name}`, `{First_Name}`) are NOT resolved — they render as literal text without braces (e.g., `{first_name}` becomes the string `first_name` in the delivered email). Always use UPPERCASE in copy artifacts. Verified BC-6308 round-3 R-2a Preview Body output (workspace 13 test campaigns ids 29 + 30, deleted at T14 cleanup). Surfaced by BC-6308 round-3 (R-2a); spec fix shipped in BC-6548.
+- **Case-rule asymmetry: four endpoints, four rules** (BC-6780, BC-7980). The same `custom_variables[].name` field follows different case rules at different points in the EB workflow. Cross-reference table:
+
+  | Endpoint / surface | Rule | Source |
+  |---|---|---|
+  | `POST /api/custom-variables` (Phase 3 — variable creation) | EB silently lowercases on store. Sending UPPERCASE → stored lowercase. No error, no warning. | BC-6299 (Sx-3) |
+  | Render-engine token lookup (`{TOKEN}` in subject/body) | Case-insensitive match against the lowercased store, BUT the `{TOKEN}` MUST be UPPERCASE in the body — lowercase tokens render as literal text (no resolution). | BC-6548 / BC-6308 round-3 R-2a |
+  | `POST /api/leads/multiple` `custom_variables[].name` (Phase 4 — lead-create binding, JSON) | **Strict exact lowercase required.** UPPERCASE → HTTP 422; whole chunk rejects via the bulk-POST all-or-nothing rule (Sx-8). | BC-6780 |
+  | `POST /api/leads/bulk/csv` `columnsToMap[]` keys (Phase 4 — lead-create binding, multipart CSV) | **`columnsToMap[]` key case preserved at lead-display layer** — `custom_variables[].name` on the resulting lead matches the `columnsToMap` key case exactly (UPPERCASE stays UPPERCASE). Workspace schema (`GET /api/custom-variables`) unaffected — lowercase canonical, no new entry. **Render-time:** follows the existing render-engine rule above — UPPERCASE `{TOKEN}` resolves case-insensitively against the case-preserved name; lowercase token renders as literal text (matches BC-6548). Case-preservation is purely cosmetic at the lead-display layer. | BC-7980 |
+
+  The asymmetry is not documented in EB's external API spec. Inconsistent case-handling is a recurring class for EB; treat any new endpoint touching custom-variable names as untrusted-case until verified live. Four endpoints verified live: `POST /api/custom-variables` (BC-6299), render-engine (BC-6548 / BC-6308 round-3 R-2a), `POST /api/leads/multiple` (BC-6780), `POST /api/leads/bulk/csv` (BC-7980 — UI Preview Body verdict, draft campaign 51, lead 14768, cleaned up at test close). No separate `upsert_multiple_leads` endpoint exists (BC-6785 round-5 R-28 verified all variants 405/422/404 with no `search_api_spec` matches; phantom path removed from the matrix BC-7597). Surfaced by BC-6554 round-4 S-4 + BC-6785 round-5 R-28; rule extensions shipped in BC-6780 + BC-7980.
+- **`{SENDER_*}` render-time resolution shadows artifact** (BC-6784). EB's render engine has built-in `{SENDER_*}` resolution (`SENDER_FIRST_NAME`, `SENDER_EMAIL`, `SENDER_ROLE`, etc.) that pulls from the **sender record being used at the moment of send** and shadows any lead-level `custom_variables[].value` or campaign-level `custom_variables[].default` with the same name. Under sender rotation (multiple senders attached to one campaign), each individual delivery resolves `{SENDER_*}` from a potentially different mailbox — the recipient's email reflects the actual sender's first_name / email / role at send time, not the artifact's authored value. Implication for `/marketing:launch-campaign`: the Phase 1 step 7 sender-resolution priority chain (artifact-default → marketing-context → Salesforce → operator-prompt) governs **local Phase 10 spot-check display only**, not what recipients see. The `custom_variables[].default` block for `{SENDER_*}` variables in the artifact is essentially advisory — EB always wins. Production behavior is correct (sign-off matches who's actually sending); this is a docs/spec gap that misled operators reviewing local previews. Verified via UI Preview Body, BC-6554 round-4 (campaign 36 / Personal|Microsoft / lead 14739): agent spot-check rendered `"Amanuel"` (artifact-default), EB preview rendered `"Rainer"` (sender record's first_name). Surfaced by BC-6554 round-4 Phase 10 implicit row; spec fix shipped in BC-6784.
 - **No DELETE endpoint for `/api/custom-variables`.** `search_api_spec(method=DELETE)` against custom-variables paths returns no match. Custom variables persist workspace-scoped indefinitely; only the EB UI can remove them. Cleanup wording in any spec referencing `/api/custom-variables` should reframe as "vars persist; document the retained set" rather than "delete via API". Practical implication: workspaces accumulate custom variables across campaigns; duplicate-name `POST` returns 422 (idempotent enough to safely re-run a Phase 3 from scratch). Surfaced by BC-5906 round-2 (Sx-4); spec fix shipped in BC-6299.
 - **`variant` field on sequence steps is BOOLEAN, not a string.** EB's `POST /api/campaigns/v1.1/{id}/sequence-steps` request body marks `variant` as boolean (`false` / `true`) — A/B variant flag, not a label. Sending `"A"` or `"B"` (string A/B label borrowed from other platforms' terminology) will silently coerce or 422; reliable contract is boolean. Non-variant steps send `false`. Surfaced by BC-5906 round-2 (Sx-13); spec fix shipped in BC-6301.
 - **EB auto-prepends `Re: ` to subjects when `thread_reply: true`.** When a sequence step carries `thread_reply: true` (always the case for step 2 of a 2-step sequence), EB inserts `Re: ` at delivery regardless of whether the `email_subject` already starts with `Re:`. Sending `"Re: Quick question"` produces `"Re: Re: Quick question"` in the recipient's inbox — double-prefix, deliverability-degrading. Always send the BARE subject for `thread_reply: true` steps; let EB prepend. Surfaced by BC-5906 round-2 (Sx-14); spec fix shipped in BC-6301.
+- **EB silently prepends `[test] ` to test-send subjects.** `POST /api/campaigns/sequence-steps/{id}/test-email` (the endpoint behind `/marketing:launch-campaign` Phase 10 Mode 2) delivers emails with `[test] ` prepended to the subject. Authored subject `"Quick idea"` arrives as `"[test] Quick idea"` in the operator's inbox. Useful operator UX (test emails visually distinct from real-campaign sends), but undocumented at the API level. Real-campaign sends do NOT carry this prefix (deferred verification via BC-6785 carry-over campaign 48 delivery; round-6 will confirm). Surfaced by BC-6785 round-5 R-21★; spec fix shipped in BC-7598.
+- **`resume_campaign` state machine — `Queued` is transient.** `PATCH /api/campaigns/{id}/resume` returns campaign with `status: "Queued"`, but the campaign progresses `draft → queued → launching → active` over a few seconds. A `get_campaign` call within ~5s after `resume_campaign` may return `status: "Active"` instead of `"Queued"`. Both indicate successful activation — operators verifying post-activate state should accept either. Surfaced by BC-6785 round-5 R-23★; spec fix shipped in BC-7598.
+
+## Liquid + spintax + whitespace
+
+EB's render engine supports Liquid templating (a popular text-templating language) plus spintax. Per the substitution-order rule, EB token substitution runs FIRST, then Liquid evaluates against the post-substitution result. Authors writing per-lead graceful fallback patterns (BC-6613) rely on this ordering — without it, the patterns would not compose.
+
+### Authoritative sources
+
+- **EmailBison article 184** — vendor-of-record help article with verbatim working code examples: https://help.bisonsphere.com/en/articles/184-liquid-syntax-spintax-how-to-use-and-templates
+- **Shopify Liquid whitespace docs** — upstream Liquid spec EB references: https://shopify.github.io/liquid/basics/whitespace/
+
+### Canonical patterns
+
+**Pattern A — assign + filter chain fallback** (single-line per-variable safety net):
+
+```
+{%- assign name = '{FIRST_NAME}' | strip | default: 'there' | downcase | capitalize -%}
+```
+
+Use in body: `Hey {{ name }}, ...`. The filter chain handles whitespace-only values (`strip`), empty/nil (`default:`), and case normalization (`downcase | capitalize`) in one expression.
+
+**Pattern B — conditional + spintax fallback** (whole-clause swap when empty case warrants different sentence structure):
+
+```
+{%- assign city = '{CITY}' -%}
+{%- if city -%}
+I'm helping several clients in {CITY} who need guidance with insurance.
+{%- else -%}
+I'm helping several clients in {your area|the region} who need guidance with insurance.
+{%- endif -%}
+```
+
+The `{% else %}` clause can contain spintax (`{your area|the region}`), which EB rotates per-send.
+
+**Pattern C — keyword-branched value-prop** (branch a paragraph by job title or other keyword signal):
+
+```
+{%- assign title = '{TITLE}' | downcase | strip -%}
+{%- if title contains "founder" or title contains "ceo" -%}
+I'll keep this brief given your schedule.
+{%- elsif title contains "sales" or title contains "revops" -%}
+Happy to share a quick pipeline impact summary.
+{%- else -%}
+I can tailor this to your team's priorities.
+{%- endif -%}
+```
+
+**Pattern D — whitespace-stripped compact form** (Shopify whitespace doc reference):
+
+```
+{% assign username = "John G. Chalmers-Smith" -%}
+{%- if username and username.size > 10 -%}
+  Wow, {{ username -}} , you have a long name!
+{%- else -%}
+  Hello there!
+{%- endif %}
+```
+
+Output: `Wow, John G. Chalmers-Smith, you have a long name!` (no leading or trailing blank lines).
+
+### Documented filters
+
+EB documents these filters in article 184:
+
+- `strip` — removes whitespace
+- `downcase` — converts to lowercase
+- `capitalize` — capitalizes the first character
+- `default: '<value>'` — fallback when empty/nil
+- `date: '<format>'` — formats dates/times (e.g., `"now" | date: "%A"`)
+- `plus: <number>` — mathematical addition
+
+Conditional operators: `==`, `!=`, `contains` (substring; case-sensitive), `or`, `and`, `<`, `>`, `<=`, `>=`.
+
+### Documented gotchas
+
+- **Substitution order:** EB substitutes `{TOKEN}` references BEFORE Liquid parses the template. Authors should write `{% assign x = '{TOKEN}' %}` and rely on EB substituting `{TOKEN}` to a value (or empty string) before Liquid sees it.
+- **Case-sensitivity in `contains`:** EB's docs verbatim: *"The downcase in the first line of code is used to make all text in the variable lower case as matching is case sensitive."* Without `| downcase`, "Founder" won't match "founder" in `contains` comparisons. Always chain `| downcase | strip` before keyword matching.
+- **Whitespace in rendered output:** Shopify's docs verbatim: *"Any line of Liquid in your template will still print a blank line in your rendered HTML."* Without hyphens, every `{% ... %}` line emits a blank line in the rendered email. Always use `{%- ... -%}` (or `{{- ... -}}` for output tags) unless the author explicitly wants a line break.
+- **Quoting custom variables in conditionals:** EB's docs verbatim: *"if you're using custom variables, and you're looking to make comparisons in 'if' statements, you must put them in quotes."* Pattern: `{% if '{FIRST_NAME}' == 'Cody' %}`. Comparing assigned locals: no quotes needed. Pattern: `{% if name == 'cody' %}` after `{% assign name = '{FIRST_NAME}' | downcase %}`.
+- **Liquid local variable naming convention:** Liquid local variables in this codebase MUST be lowercase (snake_case acceptable, e.g., `name`, `first_name`, `recency`) per the anti-slop typo-detection convention — see `plugins/marketing/skills/email-copywriting/SKILL.md` § Anti-Slop Guardrails. Uppercase Liquid locals (e.g., `{{ NAME }}`) ARE caught by the `\{\{\s*[A-Z_]+\s*\}\}` typo regex (intentional — the lowercase rule keeps Liquid output unambiguously distinct from EB-token typos regardless of authoring whitespace).
+
+### Cross-references
+
+- `plugins/marketing/skills/email-copywriting/SKILL.md` § Liquid + spintax for graceful per-lead fallback — the authoritative pattern reference for skill authors and future generators
+- `plugins/marketing/commands/launch-campaign.md` Phase 1 step 5 — gate-relax accepting Liquid fallback as a 5th resolution path
+- `plugins/marketing/commands/launch-campaign.md` Phase 1 step 6 — sanity checklist `{{TOKEN}}` typo regex (allows Liquid output `{{ var }}` while still catching EB-token typos)
 
 ## Related skills
 
@@ -295,7 +394,7 @@ This pattern is **stronger** than a skill-level "ask the user" step — when inv
 - `list-building` (`plugins/marketing/skills/list-building/`, BC-2717) — Workflow 2 cross-workspace exclusion (dual `list_leads` against both b2b + personal workspaces) for Sources 2 + 3; emits `enriched_leads.csv` for `launch-campaign` / `campaign-orchestration` to consume
 - `campaign-analysis` (BC-2721) — pulls reply / open / bounce analytics
 
-**Upstream integration (feeds into Email Bison):** Brite enrichment engine (`brite-data-platform`, custom Python CLI — see [WIP §1 Layer 1](../../../../docs/research/outbound-pipeline-findings.md#layer-1-list-building--enrichment)). No MCP server exists for the enrichment engine.
+**Upstream integration (feeds into Email Bison):** Brite enrichment engine (`brite-data-platform`, custom Python CLI — see [WIP §1 Layer 1](../../../../docs/research/outbound-pipeline-findings.md#layer-1-list-building--enrichment)). Exposed to skills via the [Brite Enrichment MCP](brite-enrichment.md) (`enrichment` server, 3-tool scaffold — BC-5537); full surface deferred to BC-5538.
 
 **Downstream integration (consumes Email Bison events):** OutboundSync webhooks → Salesforce Contacts → Master Inbox classification → Front for BDR handoff ([WIP §1 Layers 2–5](../../../../docs/research/outbound-pipeline-findings.md#layer-2-sending--sequencing)).
 

@@ -2,7 +2,7 @@
 name: narrative-writer
 description: Draft w<NN>-sprint-narrative.md from Cadence Phase 1-3 artifacts. Voice-bound to docs/designs/cadence-plugin.md § 1. Called inline by /cadence:weekly Phase 4.
 model: opus
-tools: Read
+tools: Read, mcp__plugin_cadence_gbrain-team__query, mcp__plugin_cadence_gbrain-team__get_page, mcp__plugin_cadence_gbrain-team__list_pages
 ---
 
 You draft one weekly sprint narrative and return only the markdown. No preamble, no JSON wrapper, no explanation — the dispatcher writes your output to a file verbatim.

@@ -1,5 +1,6 @@
 ---
 description: Production deploy orchestration for brite-salesforce — pre-flight (cwd + branch + clean tree + intent), prod dry-run, double-confirmation gate, actual deploy, coverage check, Tooling API post-deploy verification, runbook trigger. Use after `/revops:deploy-sandbox` has verified cleanly and the PR is merged to `main`. Closes the production-deploy discipline gap that `/workflows:ship` alone doesn't cover.
+argument-hint: [--reconcile]
 allowed-tools: Bash, AskUserQuestion
 ---
 
@@ -11,9 +12,71 @@ Execute the phases below sequentially. Use `AskUserQuestion` at every gate so th
 
 Canonical invocation pattern comes from `brite-salesforce/CLAUDE.md` §Development Flow step 4 (Deploy to Production) + §Apex & Automation (Prod deploy verification: always SOQL-verify target components). Production alias is `brite-prod`. Always pass `--target-org brite-prod` explicitly — never rely on a default org. Always use `sf`, never legacy `sfdx`.
 
+**Deploy scope.** Defaults to PR-diff-scoped `--source-dir` (computed from `git diff main~1..main`) to avoid Flow Draft pile-up and unrelated drift surprises — see [BC-11030](https://linear.app/brite-nites/issue/BC-11030). Pass `--reconcile` to opt into full-tree behavior for explicit drift sync (sandbox-refresh follow-up, mass drift fix, first-time deploy of a long-paused branch). The diff range assumes BC-6000 squash-merge discipline — one squash commit per PR on `main`.
+
 Out of scope for this command: sandbox deploy (use `/revops:deploy-sandbox`), manual post-deploy runbook (use `/revops:post-deploy-runbook`), automating browser verification, rollback automation. If deploy fails, user diagnoses manually.
 
 See the **Rules** section at the bottom for the enforcement contract (mutating-phase discipline, `--json` parsing, CLI field verification, etc.).
+
+---
+
+## Phase 0 — Deploy-mode resolution
+
+Inspect the invocation arguments. The command supports one optional positional flag:
+
+- `--reconcile` — opt into the legacy full-tree deploy (`--source-dir force-app`). Documented use cases: sandbox-refresh follow-up (the prod side of a mass-restore), drift mass-fix (e.g., `BC-10741`-shape reconciliation), or the first-time deploy of a long-paused branch where you genuinely want every component re-evaluated.
+
+If `--reconcile` is in the invocation, set deploy mode to `reconcile` for the rest of the run and skip the diff resolution below. Otherwise the deploy mode is `pr-diff` and the bash blocks in Phase 2 / Phase 4 compute the `--source-dir` set from `git diff main~1..main`.
+
+Tell the user which mode is active before Phase 1 starts:
+
+> Mode: `pr-diff` — deploying only paths changed in `main~1..main`. Pass `--reconcile` to deploy the full tree.
+
+or, if `--reconcile` was passed:
+
+> Mode: `reconcile` — deploying the full `force-app/` tree. This will create Draft versions of every Flow in source and may incidentally redeploy any source-vs-prod drift. Use only when you intend exactly that.
+
+---
+
+## Phase 0.5 — Recent-deploy detector
+
+Narrate: `Phase 0.5: Checking for recent deploys...`
+
+Query the Tooling API for recent DeployRequest records so the operator knows whether a teammate already deployed recently. This prevents the "two deploys landed minutes apart without coordination" scenario (see [BC-11037](https://linear.app/brite-nites/issue/BC-11037)).
+
+Run:
+
+```bash
+sf data query --use-tooling-api --target-org brite-prod --json \
+  --query "SELECT Id, CreatedBy.Name, CreatedDate, Status, NumberComponentsTotal
+           FROM DeployRequest
+           WHERE CreatedDate = LAST_N_HOURS:24
+           ORDER BY CreatedDate DESC
+           LIMIT 5"
+```
+
+Parse the JSON response. Read `result.records` (an array of DeployRequest rows).
+
+- **Non-empty result set** — format the records as an operator-readable table:
+
+  ```
+  Recent prod deploys in the last 24h:
+    - {Id} | {CreatedDate} | {CreatedBy.Name} | {Status} ({NumberComponentsTotal} components)
+    - ...
+  ```
+
+  Then ask via `AskUserQuestion`:
+
+  - Question: `Recent deploys detected (see above). Have you coordinated with the prior deployer?`
+  - Options:
+    - `Yes — coordinated` — proceed to Phase 1.
+    - `No — sync with teammate first` — **halt** cleanly. Print: *"Stopped before pre-flight. Coordinate with the prior deployer and re-run `/revops:deploy-prod` when ready."* Exit.
+
+- **Empty result set** (`result.records` is empty or `result.totalSize === 0`) — narrate: *"No prod deploys in last 24h — proceeding."* Skip the gate and continue to Phase 1.
+
+- **Query failure** (`status !== 0` or unexpected shape) — do **not** halt the deploy over an advisory check. Print the raw JSON and narrate: *"Recent-deploy check failed (Tooling API query error). Proceeding — verify manually in Setup → Deployment Status if needed."* Continue to Phase 1.
+
+Narrate: `Phase 0.5: Recent-deploy check done`
 
 ---
 
@@ -100,11 +163,92 @@ Narrate: `Phase 1/7: Pre-flight checks... done`
 
 Narrate: `Phase 2/7: Prod dry-run...`
 
-Run:
+### 2.1 Resolve deploy scope
+
+The deploy invocation is assembled from the Phase 0 mode. Run **one** of the two blocks below.
+
+**Mode `reconcile`** (full-tree, opt-in):
 
 ```bash
 sf project deploy start --source-dir force-app --dry-run --target-org brite-prod --json
 ```
+
+**Mode `pr-diff`** (default — compute `--source-dir` set from the squash commit on `main`):
+
+```bash
+set -e
+
+# Computed from the PR's squash commit. BC-6000 squash discipline (one
+# squash commit per PR) means main~1..main is the diff of the PR that
+# just landed. Phase 1.2 already pinned branch=main.
+RANGE="main~1..main"
+
+# Capture `git diff` exit status separately from the grep filter — without
+# this split, a git failure (shallow clone, unresolvable ref) would propagate
+# as an empty diff and the script would mis-route the operator to --reconcile.
+# Run `git diff` first, check $?, then filter.
+if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
+  echo "ERROR: \`git diff $RANGE\` failed — output below."
+  printf '%s\n' "$RAW_CHANGED"
+  echo "Is main~1 reachable in this clone? (A shallow clone or fresh single-commit"
+  echo "main would fail here.) Re-fetch with \`git fetch --unshallow origin main\`"
+  echo "if shallow, or investigate the working tree state."
+  exit 2
+fi
+if ! RAW_DELETED=$(git diff "$RANGE" --name-only --diff-filter=D 2>&1); then
+  echo "ERROR: \`git diff $RANGE --diff-filter=D\` failed — output below."
+  printf '%s\n' "$RAW_DELETED"
+  exit 2
+fi
+
+# --diff-filter=ACMRT excludes deletions (D) — sf can't deploy a path
+# that no longer exists. True deletions must be handled via
+# destructiveChanges.xml — surface them but don't try to deploy them.
+CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
+DELETED=$(printf '%s\n' "$RAW_DELETED" | grep '^force-app/' || true)
+
+if [ -z "$CHANGED" ]; then
+  echo "ERROR: No force-app/** files changed in $RANGE — nothing to deploy."
+  echo "If you intended to reconcile drift, re-run: /revops:deploy-prod --reconcile"
+  exit 2
+fi
+
+# Coalesce multi-file LWC and Aura bundles to their bundle root —
+# sf project deploy start --source-dir on a single LWC file fails because
+# the metadata API treats the bundle as the deployable unit. Custom-object
+# sub-files (objects/Foo__c/fields/Bar__c.field-meta.xml) are file-level
+# deployable, so we leave them as-is.
+COALESCED=$(printf '%s\n' "$CHANGED" | awk -F/ '
+  NF>=5 && $1=="force-app" && $2=="main" && $3=="default" && ($4=="lwc" || $4=="aura") {
+    print $1"/"$2"/"$3"/"$4"/"$5; next
+  }
+  { print $0 }
+' | sort -u)
+
+echo "Resolved deploy targets from $RANGE ($(printf '%s\n' "$COALESCED" | wc -l | tr -d ' ') paths):"
+printf '%s\n' "$COALESCED" | sed 's/^/  /'
+
+if [ -n "$DELETED" ]; then
+  echo
+  echo "WARNING: $(printf '%s\n' "$DELETED" | wc -l | tr -d ' ') deletion(s) detected — NOT included in --source-dir."
+  echo "Metadata deletions must be expressed via destructiveChanges.xml in the PR."
+  echo "Deleted paths:"
+  printf '%s\n' "$DELETED" | sed 's/^/  /'
+fi
+
+# Build --source-dir argv. Force-app paths are whitespace-free in practice
+# (Salesforce metadata API forbids it) and the bash word-split below is
+# acceptable. If a future SF release allowed spaces, this would need to
+# move to a "$@"-array form.
+ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
+
+# shellcheck disable=SC2086  # word-splitting is intentional here
+sf project deploy start $ARGS --dry-run --target-org brite-prod --json
+```
+
+If any deletions were surfaced above, decide before continuing: do they belong in this deploy via `destructiveChanges.xml`? If yes, fold the destructive manifest into the PR and re-run `/revops:deploy-prod`. If no (e.g., the file was moved/renamed and the new path is in the deploy set), continue.
+
+### 2.2 Parse response
 
 Parse the JSON response. Treat top-level `status === 0` as success:
 
@@ -152,10 +296,45 @@ Narrate: `Phase 3/7: Double-confirmation gate... done` only after both gates ret
 
 Narrate: `Phase 4/7: Actual prod deploy...`
 
-Run (same command as Phase 2, without `--dry-run`):
+Use the same deploy-mode branch chosen at Phase 0. Re-compute the `--source-dir` set in this phase (do not cache state across the Phase 3 confirmation gates — re-resolving from `git diff` keeps the deploy honest if the working tree changed unexpectedly between dry-run and real deploy; if it did, Phase 1.3's clean-tree check would have caught it, but re-resolution is the belt-and-suspenders).
+
+**Mode `reconcile`** (same as Phase 2, without `--dry-run`):
 
 ```bash
 sf project deploy start --source-dir force-app --target-org brite-prod --json
+```
+
+**Mode `pr-diff`** (same logic as Phase 2.1, without `--dry-run`):
+
+```bash
+set -e
+
+RANGE="main~1..main"
+
+if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
+  echo "ERROR: \`git diff $RANGE\` failed at Phase 4 — output below."
+  printf '%s\n' "$RAW_CHANGED"
+  exit 2
+fi
+CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
+
+if [ -z "$CHANGED" ]; then
+  echo "ERROR: Re-resolved diff is empty at Phase 4 — refusing to deploy."
+  echo "This indicates the working tree changed between Phase 2 and Phase 4."
+  exit 2
+fi
+
+COALESCED=$(printf '%s\n' "$CHANGED" | awk -F/ '
+  NF>=5 && $1=="force-app" && $2=="main" && $3=="default" && ($4=="lwc" || $4=="aura") {
+    print $1"/"$2"/"$3"/"$4"/"$5; next
+  }
+  { print $0 }
+' | sort -u)
+
+ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
+
+# shellcheck disable=SC2086  # word-splitting is intentional here
+sf project deploy start $ARGS --target-org brite-prod --json
 ```
 
 Parse the JSON (same `status === 0` check as Phase 2):
@@ -252,10 +431,10 @@ Report any field expected in the deploy but missing from the query result.
 If any successes have `componentType: "Flow"`, collect their `fullName` values into `{names}`. The Tooling API `Flow` sObject is per-**version** (one row per version, not per definition) — filter to current states only, excluding historical `Obsolete` versions that would skew Phase 6.4's denominator:
 
 ```bash
-sf data query --use-tooling-api --query "SELECT Id, DeveloperName, Status FROM Flow WHERE DeveloperName IN ({names}) AND Status IN ('Active','Draft')" --target-org brite-prod --json
+sf data query --use-tooling-api --query "SELECT Id, Status, Definition.DeveloperName FROM Flow WHERE Definition.DeveloperName IN ({names}) AND Status IN ('Active','Draft')" --target-org brite-prod --json
 ```
 
-For each returned record: confirm `Status = 'Active'`. **Flag any Flow with `Status = 'Draft'`** — these deployed but require manual activation (this is a known Salesforce platform behavior for Screen Flows via metadata API). Report the full list:
+Each returned record exposes the Flow name at `Definition.DeveloperName` (the Tooling API `Flow` entity itself does not have a `DeveloperName` field — only `FlowDefinition` does, traversed via the `Definition` relationship). For each returned record: confirm `Status = 'Active'`. **Flag any Flow with `Status = 'Draft'`** — these deployed but require manual activation (this is a known Salesforce platform behavior for Screen Flows via metadata API). Report the full list:
 
 > ⚠️ Flow(s) deployed as Draft — require manual activation in Setup → Flows. Affected: `{names}`. Run `/revops:post-deploy-runbook` to walk the activation steps.
 

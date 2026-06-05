@@ -9,7 +9,6 @@ Discolike is the **lookalike-expansion layer** of the tam-map pipeline. Given a 
 ## Consumed by
 
 - `plugins/marketing/skills/tam-mapping/SKILL.md` (BC-5832) — Phase 3c Labs collection (lookalike expansion)
-- `plugins/marketing/scripts/tam-map/discolike_client.py` — ported Python wrapper
 - `plugins/marketing/scripts/tam-map/discolike-mcp.js` — ported stdio MCP wrapper
 
 ## Auth
@@ -92,4 +91,4 @@ For Brite Labs Active-tier verticals (zoos, aquariums), 5–10 flagship venue se
 
 ## Last verified
 
-2026-04-24 — Tool inventory verified from upstream `scripts/discolike-mcp.js` + `discolike_client.py` at commit `9f5c72e74b`. Not yet validated against live vendor API from a Brite install (blocked on BC-5947). Bump this date on first live validation.
+2026-04-24 — Tool inventory verified from upstream `scripts/discolike-mcp.js` + `discolike_client.py` (the latter removed from the Brite port per BC-12130; `discolike-mcp.js` is the live integration) at commit `9f5c72e74b`. Not yet validated against live vendor API from a Brite install (blocked on BC-5947). Bump this date on first live validation.

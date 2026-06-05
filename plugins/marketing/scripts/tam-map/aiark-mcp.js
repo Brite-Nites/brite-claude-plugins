@@ -3,7 +3,7 @@
 // Ported: 2026-04-24
 // License: MIT — see plugins/marketing/references/tam/UPSTREAM.md
 // Upstream path: scripts/aiark-mcp.js
-// Changes: verbatim port, no functional edits
+// Local deviations: BC-7011 (2026-05-11), BC-7157 (2026-05-31) — see § Local deviations in UPSTREAM.md
 
 /**
  * AI Ark MCP wrapper.
@@ -11,19 +11,40 @@
  * Exposes AI Ark's HTTP API as MCP tools so Claude Code can call it
  * directly from the /tam-map skill.
  *
- * !! VERIFY BEFORE USING !!
- * AI Ark's public docs hub lists these product surfaces (Company Search API,
- * People Search API, Reverse People Lookup), but the full endpoint schema
- * lives behind docs.ai-ark.com/reference and wasn't fetchable at write time.
- * The exact paths/fields below are conventional guesses. Before shipping:
- *   1. Open docs.ai-ark.com/reference
- *   2. Update BASE_URL, endpoint paths, and field names
- *   3. Confirm auth is Authorization: Bearer (vs X-API-KEY)
+ * Verified against docs.ai-ark.com on 2026-05-11 (BC-7011):
+ *   Base URL  https://api.ai-ark.com/api/developer-portal/v1
+ *   Auth      X-TOKEN: <key>  (no prefix)
+ *   Endpoint  POST /companies — serves both firmographic search and
+ *             lookalike search (the latter via the `lookalikeDomains` body
+ *             field, ≤5 entries). There is no separate /similarity endpoint.
+ *   Body keys {account, lookalikeDomains, lists, page, size}; `size` is
+ *             clamped to 0..100 per docs.
+ *   Rate     5 rps / 300 rpm / 18 000 rph
+ *
+ * Sources: docs.ai-ark.com/reference/company-search-1,
+ *          docs.ai-ark.com/docs/authentication,
+ *          help.ai-ark.com/en/articles/112-how-does-the-api-work
+ *
+ * account sub-schema (BC-7157, verified 2026-05-31 against the OpenAPI export
+ * at docs.ai-ark.com/reference/company-search-1.md): every AccountFilter field
+ * is an all/any → include/exclude tree, not a bare list. `industries` takes a
+ * {mode, content} object (mode ∈ WORD|SMART|STRICT); the geo field is named
+ * `location` (plain string[] of country/region names, e.g. "United States");
+ * headcount is `employeeSize` ({type:"RANGE", range:[{start,end}]}). Pre-BC-7157
+ * the wrapper passed bare string[]/scalars, which the Spring backend rejected as
+ * 400 "request not readable" (body deserialization — wrong JSON container type).
+ * Unknown sub-fields ARE still silently ignored (return the unfiltered default).
  *
  * Tools:
- *   aiark_search      — firmographic company search
- *   aiark_similarity  — similarity search from a seed list of domains
- *   aiark_enrich      — single-company enrichment
+ *   aiark_search      — firmographic company search via POST /companies
+ *   aiark_similarity  — lookalike expansion via POST /companies + lookalikeDomains
+ *
+ * Not exposed:
+ *   aiark_enrich — AI Ark has no domain-keyed enrich endpoint as of
+ *   2026-05-11. The closest documented surface is Reverse People Lookup
+ *   (email→person, not domain→company). The wrapper's pre-BC-7011 stub
+ *   POSTed to a guessed /enrich path and returned nginx 404 in production.
+ *   Removed in BC-7011; re-add if upstream ships a real endpoint.
  */
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -33,18 +54,24 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 const AIARK_API_KEY = process.env.AIARK_API_KEY;
-const BASE_URL = "https://api.ai-ark.com/v1";
+const BASE_URL = "https://api.ai-ark.com/api/developer-portal/v1";
+const MAX_SIZE = 100; // per docs.ai-ark.com — `size` is 0..100
 
 if (!AIARK_API_KEY) {
   console.error("AIARK_API_KEY not set");
   process.exit(1);
 }
 
+function clampSize(n) {
+  const v = typeof n === "number" ? n : 100;
+  return Math.max(0, Math.min(MAX_SIZE, v));
+}
+
 async function aiarkPost(endpoint, body) {
   const r = await fetch(`${BASE_URL}${endpoint}`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${AIARK_API_KEY}`,
+      "X-TOKEN": AIARK_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -54,7 +81,7 @@ async function aiarkPost(endpoint, body) {
 }
 
 const server = new Server(
-  { name: "aiark", version: "0.1.0" },
+  { name: "aiark", version: "0.3.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -62,37 +89,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: "aiark_search",
-      description: "Search for companies by firmographic filters (industry, geo, size).",
+      description: "Search for companies by firmographic filters (industry, geo, headcount). Hits POST /companies; size is capped at 100. All filters are optional; with none, returns an unfiltered page.",
       inputSchema: {
         type: "object",
         properties: {
-          industries: { type: "array", items: { type: "string" } },
-          regions: { type: "array", items: { type: "string" } },
-          employee_min: { type: "number" },
-          employee_max: { type: "number" },
-          limit: { type: "number", default: 100 },
+          industries: {
+            type: "array",
+            items: { type: "string" },
+            description: 'Industry names to match (any-of), e.g. ["software development"]. Sent WORD-mode via account.industries.any.include.',
+          },
+          regions: {
+            type: "array",
+            items: { type: "string" },
+            description: 'Location names to match (any-of), e.g. ["United States", "Texas"]. Mapped to the API\'s account.location.any.include filter.',
+          },
+          employee_min: { type: "number", description: "Minimum headcount. Lower bound of account.employeeSize RANGE (supply min and/or max — half-open ranges are accepted)." },
+          employee_max: { type: "number", description: "Maximum headcount. Upper bound of account.employeeSize RANGE (supply min and/or max — half-open ranges are accepted)." },
+          limit: { type: "number", default: 100, maximum: 100 },
         },
       },
     },
     {
       name: "aiark_similarity",
-      description: "Find lookalike companies from a seed list of domains.",
+      description: "Find lookalike companies from a seed list of up to 5 domains. Hits POST /companies with the lookalikeDomains body field.",
       inputSchema: {
         type: "object",
         properties: {
-          seed_domains: { type: "array", items: { type: "string" } },
-          limit: { type: "number", default: 100 },
+          seed_domains: { type: "array", items: { type: "string" }, maxItems: 5 },
+          limit: { type: "number", default: 100, maximum: 100 },
         },
         required: ["seed_domains"],
-      },
-    },
-    {
-      name: "aiark_enrich",
-      description: "Enrich a single company by domain.",
-      inputSchema: {
-        type: "object",
-        properties: { domain: { type: "string" } },
-        required: ["domain"],
       },
     },
   ],
@@ -102,25 +128,41 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params;
   try {
     if (name === "aiark_search") {
-      const data = await aiarkPost("/search", {
-        filters: {
-          industries: args.industries || [],
-          geo: { regions: args.regions || [] },
-          size_band: { employee_min: args.employee_min, employee_max: args.employee_max },
-        },
-        limit: args.limit || 100,
+      // Build the AccountFilter tree (BC-7157). Each field is an
+      // all/any → include/exclude object; sending bare string[]/scalars (the
+      // pre-BC-7157 shape) 400s with "request not readable". Only populate the
+      // sub-fields the caller actually filtered on — an empty account {} is a
+      // valid unfiltered search.
+      const account = {};
+      if (Array.isArray(args.industries) && args.industries.length > 0) {
+        account.industries = {
+          any: { include: { mode: "WORD", content: args.industries } },
+        };
+      }
+      if (Array.isArray(args.regions) && args.regions.length > 0) {
+        account.location = { any: { include: args.regions } };
+      }
+      const hasMin = typeof args.employee_min === "number";
+      const hasMax = typeof args.employee_max === "number";
+      if (hasMin || hasMax) {
+        const band = {};
+        if (hasMin) band.start = args.employee_min;
+        if (hasMax) band.end = args.employee_max;
+        account.employeeSize = { type: "RANGE", range: [band] };
+      }
+      const data = await aiarkPost("/companies", {
+        account,
+        page: 0,
+        size: clampSize(args.limit ?? 100),
       });
       return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
     if (name === "aiark_similarity") {
-      const data = await aiarkPost("/similarity", {
-        seed_domains: args.seed_domains,
-        limit: args.limit || 100,
+      const data = await aiarkPost("/companies", {
+        lookalikeDomains: args.seed_domains,
+        page: 0,
+        size: clampSize(args.limit ?? 100),
       });
-      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-    }
-    if (name === "aiark_enrich") {
-      const data = await aiarkPost("/enrich", { domain: args.domain });
       return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
     throw new Error(`Unknown tool: ${name}`);

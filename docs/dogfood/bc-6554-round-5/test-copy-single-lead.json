@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "entity": "brite-labs",
+  "template_preset": "list-building",
+  "vertical": "municipalities",
+  "offer_tier": 2,
+  "offer_summary": "Single-lead activate-test artifact for BC-6785 round-5 Phase 11. Mirrors test-copy.json with same defaults; the only lead is corinne+bc-6785-r5@britenites.com.",
+  "custom_variables": [
+    {"name": "RECENCY_ANCHOR",        "default": "downtown master-plan announcement"},
+    {"name": "VERTICAL_DESCRIPTOR",   "default": "municipalities"},
+    {"name": "SPECIFIC_FRICTION",     "default": "downtown lighting specs getting stuck at design review"},
+    {"name": "PROOF_POINT_COMPANY",   "default": "Boulder Pearl Street"},
+    {"name": "PROOF_POINT_NUMBER",    "default": "ran 38% higher evening foot traffic"},
+    {"name": "PROOF_POINT_TIMEFRAME", "default": "2024"},
+    {"name": "FREE_ASSET_NOUN",       "default": "architectural lighting preview"},
+    {"name": "SENDER_FIRST_NAME",     "default": "Amanuel"}
+  ],
+  "step_1": {
+    "subject": "{Quick|Fast|30s} {question|check|idea}",
+    "body": "Saw the {RECENCY_ANCHOR} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked closely|it mapped well} with a pattern we've been watching across {VERTICAL_DESCRIPTOR}.<br><br>{Most|A few|Several} {VERTICAL_DESCRIPTOR} teams we work with run into {SPECIFIC_FRICTION}, and one that {solved|shortcut|sidestepped} it was {PROOF_POINT_COMPANY}, who {PROOF_POINT_NUMBER} in {PROOF_POINT_TIMEFRAME}.<br><br>{Happy|Glad} to {pull|share|send} a {short|quick|focused} {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|interesting}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}",
+    "wait_in_days": 0
+  },
+  "step_2": {
+    "subject": "{Quick|Fast|30s} {question|check|idea}",
+    "body": "{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. {Still happy|Glad still} to send the {FREE_ASSET_NOUN} whenever it's {useful|helpful|timely}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}",
+    "wait_in_days": 4
+  },
+  "single_lead_target": {
+    "email": "corinne+bc-6785-r5@britenites.com",
+    "first_name": "Corinne",
+    "last_name": "Brewer",
+    "company": "Brite Nites",
+    "title": "Operations",
+    "note": "Phase 11 ACTIVATE single-lead test campaign per BC-6785 round-5 plan Task 11. Lead-record tagged bc-6785-r5; campaign name `BC-6785 | SINGLE-LEAD | activate-test`. Operator email; plus-addressed for Isolation Discipline."
+  },
+  "generated_at": "2026-05-11T10:00:00Z",
+  "round_5_notes": "Artifact mirrors docs/dogfood/bc-6554-round-5/test-copy.json verbatim; only addition is the single_lead_target block which is metadata-only (not consumed by EB API)."
+}

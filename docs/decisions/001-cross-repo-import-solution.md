@@ -1,7 +1,11 @@
 # 001. Cross-Repo @Import Solution: Context7
 
-**Status:** Accepted
+**Status:** Withdrawn (2026-05-27 — see Withdrawal note)
 **Date:** 2026-03-13
+
+## Withdrawal note
+
+Context7 was removed from this repo on 2026-05-27 ([BC-11891](https://linear.app/brite-nites/issue/BC-11891)). Cross-repo handbook + CDR-INDEX access is currently UNAVAILABLE; skills and agents that previously relied on Context7 now degrade gracefully (narrate skip + continue). A future ADR will document the gbrain-based replacement when ready; this ADR is preserved as historical context for the original 2026-03-13 decision and the alternatives evaluated.
 
 ## Context
 

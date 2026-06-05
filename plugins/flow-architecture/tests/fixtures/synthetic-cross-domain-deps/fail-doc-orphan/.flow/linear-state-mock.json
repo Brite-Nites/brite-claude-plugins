@@ -1,0 +1,10 @@
+{
+  "_comment": "FAIL fixture — doc references blockedBy ops-hardening-99 that has no matching Linear relation. The doc → Linear half of cross-domain-deps-bidirectional fails.",
+  "parents": {
+    "BC-10360": {
+      "flow_id": "asset-unification-02",
+      "domain": "asset-unification",
+      "blockedBy": []
+    }
+  }
+}

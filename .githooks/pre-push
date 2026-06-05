@@ -1,3 +1,23 @@
 #!/usr/bin/env bash
+# Resolve the worktree root. The primary checkout of this repo is bare
+# (core.bare=true; all work happens in worktrees), so a push issued from the
+# bare root has no worktree and `git rev-parse --show-toplevel` fails. Ref-only
+# pushes from there (e.g. branch deletions) have nothing to validate — skip
+# cleanly rather than collapsing to an absolute "/scripts/validate.sh" path and
+# aborting the push (BC-11951). Worktree pushes still run the full gate.
+toplevel="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -z "$toplevel" ]; then
+  echo "pre-push: no worktree resolved (bare repo root); skipping plugin validation." >&2
+  exit 0
+fi
+
 echo "Running plugin validation before push..."
-"$(git rev-parse --show-toplevel)/scripts/validate.sh"
+
+# Scrub the git env that `git push` injects into hooks (GIT_DIR / GIT_INDEX_FILE
+# / GIT_WORK_TREE etc. point at the caller's repo). Left set, they leak into
+# validate.sh's hermetic sub-tests that build their own temp repos — corrupting
+# checks that pass standalone and in CI (e.g. test_precommit_advisory.sh). Done
+# AFTER worktree resolution above so $toplevel is already captured. Recurring
+# pre-push env-leak class — see BC-11951 and test-pre-push-hook.sh.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR GIT_PREFIX
+exec "$toplevel/scripts/validate.sh"

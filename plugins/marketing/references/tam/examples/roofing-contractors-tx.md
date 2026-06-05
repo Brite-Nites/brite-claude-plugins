@@ -33,6 +33,8 @@ Claude converts the prompt into `output/roofing-tx/icp.json`:
 
 ## 3. Discovery (parallel)
 
+> **Brite note (BC-12130):** this block shows the **upstream CLI** discovery flow. In Brite's pipeline, AI Ark and Discolike discovery run through their **MCP wrappers** (`mcp__plugin_marketing_aiark__*` / `mcp__plugin_marketing_discolike__*`) — the `aiark_client.py` / `discolike_client.py` CLI scripts shown below were **removed** (never wired; see [`UPSTREAM.md`](../UPSTREAM.md) § Local deviations). Only `icypeas_client.py` remains a live CLI script. A faithful Brite rewrite of this whole example (command name, MCP discovery, JSONL data-flow) is tracked in **BC-12278**.
+
 ```bash
 python scripts/aiark_client.py --icp output/roofing-tx/icp.json > output/roofing-tx/aiark.jsonl &
 python scripts/discolike_client.py --icp output/roofing-tx/icp.json > output/roofing-tx/discolike.jsonl &
@@ -64,11 +66,48 @@ python scripts/verify_smtp.py \
 
 ## 6. Tier + segment
 
+The Labs Phase 7 LLM-scoring step runs inline in the Claude Code session via the `icp-scoring` skill's `abc` rubric — delegated from `tam-mapping` Phase 7 per BC-6907. No standalone CLI invocation. Two pieces in order:
+
+First, reshape `verified.jsonl` to the flat CSV `abc` expects (free-mail rows excluded, `smtp.catch_all` flattened to a top-level `catch_all` column — the caller owns the reshape per icp-scoring's delegation contract):
+
 ```bash
-python scripts/tier_and_segment.py \
-  --in output/roofing-tx/verified.jsonl \
-  --out-dir output/roofing-tx/segments/
+python3 - <<'PY'
+import json, csv
+FREE = {"gmail.com","yahoo.com","hotmail.com","outlook.com","icloud.com"}
+src = "output/roofing-tx/verified.jsonl"
+dst = "output/roofing-tx/verified-flat.csv"
+fields = ["domain","company_name","industry","employees","geography","catch_all"]
+with open(src) as f, open(dst, "w", newline="") as g:
+    w = csv.DictWriter(g, fieldnames=fields); w.writeheader()
+    for line in f:
+        r = json.loads(line)
+        smtp = r.get("smtp", {})
+        if not smtp.get("keep"): continue
+        email = r.get("email","")
+        if "@" in email and email.split("@",1)[1].lower() in FREE: continue
+        w.writerow({
+            "domain": r.get("domain",""),
+            "company_name": r.get("company_name","") or r.get("name",""),
+            "industry": r.get("industry",""),
+            "employees": r.get("employees",""),
+            "geography": r.get("geography",""),
+            "catch_all": "true" if smtp.get("catch_all") else "false",
+        })
+PY
 ```
+
+Then invoke the skill against the same `--output-dir` (it reads `verified-flat.csv` from there and writes the four tier CSVs back):
+
+```
+icp-scoring \
+  --rubric abc \
+  --client brite-labs \
+  --output-dir output/roofing-tx/ \
+  --criteria-file output/roofing-tx/icp.json \
+  --max-records <N>
+```
+
+`<N>` should be ≥ the row count of `verified-flat.csv` so the cost gate is skipped (per icp-scoring `abc` mode: gate fires above 10000 rows when `--max-records` is unset).
 
 ## 7. Final output
 

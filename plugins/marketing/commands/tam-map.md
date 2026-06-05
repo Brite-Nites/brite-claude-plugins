@@ -141,14 +141,14 @@ Run this block before Phase 0. Every input that flows into `Bash`, the skill's `
 
    ```bash
    REPO=$(git rev-parse --show-toplevel) && \
-   for script in icypeas_client.py spider_crawl.py enrich_waterfall.py verify_smtp.py tier_and_segment.py; do
+   for script in icypeas_client.py spider_crawl.py enrich_waterfall.py verify_smtp.py; do
      python3 "$REPO/plugins/marketing/scripts/tam-map/${script}" --help >/dev/null 2>&1 \
        && echo "OK: ${script}" \
        || echo "MISSING: ${script}"
    done
    ```
 
-   The 5 scripts here mirror `setup-tam-map.md` Phase 6c verbatim — `enrich_waterfall.py` is the BlitzAPI→Prospeo waterfall (Prospeo is invoked from inside, not a standalone client); `spider_crawl.py` is the Spider.cloud entry point. `--help` doubles as an importability check (catches missing Python deps that `test -x` would miss). Halt with a clear list if any print `MISSING:` — operator runs `/marketing:setup-tam-map` Phase 4.
+   The 4 scripts here mirror `setup-tam-map.md` Phase 6c verbatim — `enrich_waterfall.py` is the BlitzAPI→Prospeo waterfall (Prospeo is invoked from inside, not a standalone client); `spider_crawl.py` is the Spider.cloud entry point. `--help` doubles as an importability check (catches missing Python deps that `test -x` would miss). Halt with a clear list if any print `MISSING:` — operator runs `/marketing:setup-tam-map` Phase 4. The Phase 7 LLM-scoring step (previously `tier_and_segment.py`) now runs inline via the `icp-scoring` skill (`abc` rubric) and has no probeable CLI surface — removed from this list per BC-6907.
 
 3. **Cost-aware `--max-records` validation.** If `--max-records` is set AND `< 100`, warn the operator that Phase 1 SCOPE source-discovery typically needs ≥100 records to produce a representative TAM (skill rule per BC-5832 §Behavioral Tests). Render the warning but do NOT halt — the cap applies to per-phase processing, not absolute scope. The operator's gate 1 acknowledges.
 
@@ -507,7 +507,7 @@ Operator option-pick mapping: "Yes" → invoke skill in step 4 (per BC-2707, the
 
 **Purpose.** Final phase. Routes operator to the next command based on entity. **Does NOT auto-chain** — prints the next-command invocation string for the operator to copy/run. Auto-invocation would defeat the operator-intent contract that separates TAM construction from campaign activation (per BC-5950 brainstorm decision).
 
-**Single 3-option menu, parameterized by entity.** Phase 7 renders exactly 3 options via `AskUserQuestion`. The menu shape is identical across entities; the per-entity parameters table below substitutes `{entity}`, `{handoff-input-csv}`, `{campaign-name-suffix}`, `{phase-just-completed}`, `{handoff-leads-summary}`, `{option-1-suffix}`, `{launch-campaign-supported}`, and `{ws}`. The Labs path's input is `tier-a.csv` (no reshape needed); the Nites path's input is `leads.csv` produced by a stdlib JSONL→CSV reshape; the Supply path's Option 1 is currently deferred per handbook canon (see Supply note below) — the recovery path is Option 2 BC-2717 list-building. The reshape one-liner uses no external deps, no `ANTHROPIC_API_KEY`, no `smtp.keep` filter trap (`tier_and_segment.py` is the Labs Phase 7 LLM-scoring step and explicitly cannot be reused for the Nites reshape).
+**Single 3-option menu, parameterized by entity.** Phase 7 renders exactly 3 options via `AskUserQuestion`. The menu shape is identical across entities; the per-entity parameters table below substitutes `{entity}`, `{handoff-input-csv}`, `{campaign-name-suffix}`, `{phase-just-completed}`, `{handoff-leads-summary}`, `{option-1-suffix}`, `{launch-campaign-supported}`, and `{ws}`. The Labs path's input is `tier-a.csv` (no reshape needed); the Nites path's input is `leads.csv` produced by a stdlib JSONL→CSV reshape; the Supply path's Option 1 is currently deferred per handbook canon (see Supply note below) — the recovery path is Option 2 BC-2717 list-building. The reshape one-liner uses no external deps, no `smtp.keep` filter trap (the Labs Phase 7 LLM-scoring step lives in the `icp-scoring` skill's `abc` mode and explicitly cannot be reused for the Nites reshape).
 
 ### Per-entity parameters
 

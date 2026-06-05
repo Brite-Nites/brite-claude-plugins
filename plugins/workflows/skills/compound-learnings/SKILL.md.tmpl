@@ -120,14 +120,7 @@ Convert each qualifying entry to decision trace markdown per spec Section 1:
 
 ### 2d. CDR Cross-Reference
 
-For each trace, query the Brite Handbook via Context7 MCP for related Company Decision Records:
-
-1. `resolve-library-id` → `/brite-nites/handbook`
-2. `query-docs` with the decision summary as the topic, looking for CDR matches
-3. If a CDR is found, include it in the **Precedent Referenced** field (e.g., `CDR-001: "All new databases use Supabase"`)
-4. If no CDR matches, set Precedent Referenced to `None — first time encountering this pattern`
-
-**Degradation**: If Context7 MCP is unavailable, log: "Context7 unavailable — CDR cross-reference skipped" and continue. Traces are written without CDR lookup.
+CDR cross-reference against the Brite Handbook is currently unavailable (no handbook-query mechanism is wired). Set the **Precedent Referenced** field to `None — first time encountering this pattern` for all traces, then proceed to ADR cross-reference. ADR cross-reference (Section 2e) still runs and may populate the field.
 
 ### 2e. ADR Cross-Reference
 

@@ -137,8 +137,8 @@ Organized by phase + reason. Every row cites an ADR or a source file.
 | EB-exclusion availability check (Sources 2/3) | `mcp__emailbison-b2b__get_active_workspace_info` + `mcp__emailbison-personal__get_active_workspace_info` + `mcp__plugin_marketing_salesforce__run_soql_query` (`SELECT Id FROM User LIMIT 1`) | EB workspaces 55/13 + brite-salesforce prod | ADR 2a (Salesforce CRM SoR; EB sole sequencer); 3-probe parallel batch mirrors tam-mapping § 3 Phase 4.5 |
 | EB-exclusion bulk pagination (Sources 2/3) | `mcp__emailbison-b2b__list_leads` + `mcp__emailbison-personal__list_leads` | both EB workspaces | ADR 2a (two-workspace requirement) |
 | SF Lead suppression read (Sources 2/3) | `mcp__plugin_marketing_salesforce__run_soql_query` with `SELECT Id, Email, Status FROM Lead WHERE Email IN (:emails) LIMIT 2000` | brite-salesforce prod | `salesforce.md` § Common workflows → Lead suppression read |
-| Contact-discovery enrichment (provider-routed) | `Bash` → `enrich_waterfall.py` (default) OR `mcp__plugin_marketing_enrichment__*` (when GA via BC-5538 + BC-6170) | BlitzAPI + Prospeo (default) OR brite-enrichment (future) | [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pluggability.md) enrichment pluggability |
-| SMTP verify | `Bash` → `verify_smtp.py` | MillionVerifier | Same script as tam-mapping § 3 Phase 6 (single source of truth) |
+| Contact-discovery enrichment (provider-routed) | `Bash` → `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py` (default) OR `mcp__plugin_marketing_enrichment__*` (when GA via BC-5538 + BC-6170) | BlitzAPI + Prospeo (default) OR brite-enrichment (future) | [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pluggability.md) enrichment pluggability |
+| SMTP verify | `Bash` → `plugins/marketing/scripts/bw-run.sh MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key -- python plugins/marketing/scripts/tam-map/verify_smtp.py` | MillionVerifier | Same script as tam-mapping § 3 Phase 6 (single source of truth) |
 | Contact-context augmentation (Step 1 fallback when enrichment provider returns no LinkedIn URL) | `mcp__plugin_marketing_spider__*` | Spider.cloud | Crawl homepage + `/about` + `/contact` for an inline LinkedIn link; only invoked when enrichment provider misses Step 1 |
 
 ### Architectural rules that apply
@@ -169,6 +169,58 @@ Organized by phase + reason. Every row cites an ADR or a source file.
   - Sequence design + EB campaign activation → `campaign-orchestration` (BC-2718) + `launch-campaign` (BC-5826).
   - dbt model design + Snowflake materialization → `brite-data-platform`.
   - Enrichment provider implementation → `services/enrichment/cli.py` in brite-data-platform (or BC-5538 future MCP).
+
+---
+
+## Discoveries — title-discovery signals
+
+This skill's contact-discovery pipeline (Workflow 3, Step 2) routinely surfaces decision-maker titles that are not in the entity's ICP title cascade (§ Methodology → ICP title cascade) — a venue with a "Director of Guest Experience" instead of the expected "Events Director", or a hotel chain that puts the buying decision under "Director of F&B Operations" rather than "Catering Director". These observations are signal: they should flow back into the handbook's title cascades + canonicals so the next campaign in the same vertical/persona stops missing the pattern.
+
+The skill emits these observations as **`title-discovery`** signals to `docs/campaigns/{entity}/{slug}/discoveries.json` so BC-8726 (`/marketing:icp-refinement-review`) and humans can later promote them to `plugins/marketing/data/canonicals/{vertical}.yaml` via PR. See [`plugins/marketing/references/discoveries-promotion.md`](../../references/discoveries-promotion.md) for the full signal → review → handbook PR flow; the schema lives at [`plugins/marketing/data/discoveries-schema.json`](../../data/discoveries-schema.json) and is enforced by `plugins/marketing/scripts/lint_discoveries.py` (wired into `scripts/validate.sh`).
+
+### When to emit
+
+Emit a `title-discovery` signal when ALL three conditions hold for a contact-discovery hit:
+
+1. The returned `contact_title` does NOT appear in the entity's ICP title cascade (default cascade OR the cascade supplied by `--criteria-file`).
+2. The contact still ranked highly enough to land in `enriched_leads.csv` (i.e., the title is operationally useful even though it isn't canonical yet — operator already accepted the contact, the title pattern is the value).
+3. The pattern recurs at ≥2 distinct companies in the same run (one-off junior-title spelling variants are noise; cross-company repetition is the signal).
+
+Do NOT emit a signal for: simple alias variations the title-normalization layer should catch (`VP of Marketing` ↔ `VP Marketing`); titles inside an already-active canonical alias chain; or single occurrences that read as one-off labelling quirks.
+
+### Confirm gate (one `AskUserQuestion` + one `Write`)
+
+The emit path is operator-confirmed, never automatic. Mirror the gate `campaign-debrief` uses for transferable-insight propagation (§3 Transferable-insight flagging there).
+
+1. **Surface the candidate.** After Workflow 5 emits `enriched_leads.csv`, scan the output for titles meeting the § When to emit conditions. Group by `{vertical}/{persona}` (operator-confirmed at invocation or inferred from `--criteria-file`). For each grouping with ≥2 distinct-company occurrences, fire `AskUserQuestion`:
+   > "The run surfaced N contacts with title `{contact_title}` at {company_1}, {company_2}, … under vertical `{vertical}` + persona `{persona}` — this title is not in the canonical cascade. Log a `title-discovery` signal for human review?"
+   With options: `Yes, log it` / `No, skip` / `No — title is alias of existing canonical entry (operator notes which)`.
+2. **Append the signal on `Yes`.** Read `docs/campaigns/{entity}/{slug}/discoveries.json` (file-not-found branches to a fresh `{schema_version: 1, signals: []}` shape; do NOT use `Glob` first — a single `Read` is cheaper). Append one signal to `signals[]` with this payload shape:
+
+   ```jsonc
+   {
+     "category": "title-discovery",
+     "emitted_at": "<ISO-8601 datetime — Z or +00:00 normalized>",
+     "emitted_by_skill": "list-building",
+     "payload": {
+       "vertical": "<vertical-slug>",
+       "persona": "<persona-slug>",
+       "candidate_title": "<contact_title-as-returned>",
+       "occurrences": <integer ≥2>,
+       "example_companies": ["company_1", "company_2"],
+       "notes": "<optional operator-supplied note from the AskUserQuestion fallback>"
+     },
+     "promotion_status": "pending"
+   }
+   ```
+
+   Write the file back with a single `Write` call. The `payload` keys above are the convention this skill uses; the [`discoveries-schema.json`](../../data/discoveries-schema.json) deliberately holds `payload` open (`type: object`) so downstream `/marketing:icp-refinement-review` (BC-8726) can evolve the shape per category. **No other path is allowed to mutate `discoveries.json`** — neither this skill nor any sibling writes to the file outside the confirmed-emit gate.
+
+3. **On `No, skip` or `No — alias of canonical`**, do NOT write to `discoveries.json`. The operator's alias note (when supplied) should be surfaced to the operator at the end of the run as a reminder to file a handbook-canonicals follow-up if appropriate — list-building does NOT create that PR itself.
+
+### Where this lands
+
+Emitted signals collect in the per-campaign-run `discoveries.json`. Downstream, BC-8726 (`/marketing:icp-refinement-review`) reads all `category: "title-discovery"` signals across runs, presents them as candidates for promotion into `plugins/marketing/data/canonicals/{vertical}.yaml` `personas[].titles[]`, and produces the canonicals PR. The discoveries-promotion reference doc carries the canonical flow.
 
 ---
 
@@ -226,7 +278,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 1. Resolve `enrichment_provider` per § Before Starting → Enrichment-provider selection (priority: `--enrichment-provider` flag → `${user_config.enrichment_provider}` → auto-detect cascade).
 2. **Cost gate** before invocation: read MillionVerifier balance; compute `estimated enrichment cost: $X.XX for N records (BlitzAPI: $A, Prospeo: $B, MillionVerifier: $C)`. This verbatim string MUST appear in output before any enrichment call (grep test in evals). Then apply the gate per `--max-records` state (defined in § Before Starting → Invocation flags): if `--max-records` is set and `N >= record_count`, gate is skipped (caller pre-approved); if `--max-records` is set and `N < record_count`, HALT with overflow report (no silent truncation); if `--max-records` is unset and `estimated cost > $20`, fire `AskUserQuestion` confirmation; if `--max-records` is unset and `estimated cost <= $20`, proceed.
 3. Switch on `enrichment_provider` enum. The 4-row enum table is the canonical source — see [tam-mapping § 3 Phase 5](../tam-mapping/SKILL.md) for per-value invocation, fallback message, and status. Quick reference:
-   - `blitz_waterfall` (default): `Bash` → `python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input.jsonl> --out enriched.jsonl`. The script accepts only `--in` + `--out` (verify against the script's argparse before invocation). Title-tier filtering and `--max-contacts-per-company` are **skill-layer concerns**: pre-filter the input JSONL to drop non-target titles before invoking the script, and post-filter `enriched.jsonl` to dedup by `domain` keeping the top-N entries by tier rank (T1 > T2 > T3).
+   - `blitz_waterfall` (default): `Bash` → `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input.jsonl> --out enriched.jsonl`. The script accepts only `--in` + `--out` (verify against the script's argparse before invocation). Title-tier filtering and `--max-contacts-per-company` are **skill-layer concerns**: pre-filter the input JSONL to drop non-target titles before invoking the script, and post-filter `enriched.jsonl` to dedup by `domain` keeping the top-N entries by tier rank (T1 > T2 > T3).
    - `brite_cli`: `Bash` → shell to `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` (subcommand and flags TBD per ADR-008 — verify against the actual `cli.py` argparse surface before invocation; falls through to `blitz_waterfall` if `$BRITE_DATA_PLATFORM` unset).
    - `brite_mcp`: emit "pending BC-5537/5538 GA" message, fall through to `blitz_waterfall`. (Will flip when BC-6170 lands.)
    - `skip`: pass-through unenriched (testing only).
@@ -234,7 +286,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 
 ### Workflow 4 — SMTP verify
 
-1. `Bash` → `python plugins/marketing/scripts/tam-map/verify_smtp.py --in enriched.jsonl --out verified.jsonl` (same script tam-mapping Phase 6 uses — single source of truth).
+1. `Bash` → `plugins/marketing/scripts/bw-run.sh MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key -- python plugins/marketing/scripts/tam-map/verify_smtp.py --in enriched.jsonl --out verified.jsonl` (same script tam-mapping Phase 6 uses — single source of truth).
 2. Keep result codes 1 + 2 (with `catch_all` flag preserved); drop 3+ (`unknown`, `error`, `disposable`, `invalid`, and any future codes — forward-compatible).
 
 ### Workflow 5 — Free-email filter + final emission
@@ -285,6 +337,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 2. Workflow 3 (enrichment, provider-routed, cost-gated).
 3. Workflow 4 (SMTP verify).
 4. Workflow 5 (free-email filter + `enriched_leads.csv` emission).
+5. Run § Discoveries title-discovery gate against the emitted `enriched_leads.csv` per § When to emit conditions (≥2 distinct-company occurrences of a non-canonical title). Each operator-confirmed emit appends one signal to `docs/campaigns/{entity}/{slug}/discoveries.json`; on operator decline, no write.
 
 **Expected output dir contents:**
 
@@ -297,6 +350,8 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 ├── enriched_leads.csv
 └── list_stats.json
 ```
+
+(Zero or more `title-discovery` signals may also be appended to `docs/campaigns/{entity}/{slug}/discoveries.json` per § Discoveries; the file lives outside this output-dir tree per the discoveries-promotion contract.)
 
 **Error handling:**
 
@@ -320,6 +375,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 3. Workflow 3 (enrichment).
 4. Workflow 4 (SMTP verify).
 5. Workflow 5 (free-email filter + emission).
+6. Run § Discoveries title-discovery gate (same as Task A step 5).
 
 **Expected output dir contents:**
 
@@ -333,6 +389,8 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 ├── enriched_leads.csv
 └── list_stats.json
 ```
+
+(Zero or more `title-discovery` signals to `docs/campaigns/{entity}/{slug}/discoveries.json` per § Discoveries — same as Task A.)
 
 **Error handling:** same as Task A + Workflow 2 HARD-FAIL on any unreachable EB workspace or SF.
 
@@ -353,6 +411,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 3. Workflow 3 (enrichment).
 4. Workflow 4 (SMTP verify).
 5. Workflow 5 (free-email filter + emission).
+6. Run § Discoveries title-discovery gate (same as Task A step 5).
 
 **Expected output dir contents:** same as Task B.
 

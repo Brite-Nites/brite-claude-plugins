@@ -2,7 +2,7 @@
 name: campaign-orchestration
 description: Designs outbound email sequences and orchestrates end-to-end campaign launches in Email Bison. Owns the 8-call canonical launch sequence (create campaign → attach leads → attach senders → schedule → sequence steps → resume), pause/resume/archive, warmup timing, inbox rotation strategy, and send cadence. Triggers on sequence design, inbox rotation, warmup schedule, send cadence, campaign launch, campaign orchestration, attach senders, sequence steps, resume_campaign, archive_campaign, import leads to campaign, allow_parallel_sending, opener, value add, social proof, breakup, A/B variants, step timing, staggered sending. Hands off to email-bison for long-tail workspace ops, deliverability-audit for SPF/DKIM/DMARC and bounce diagnosis, reply-processing for inbound triage, list-building for upstream enrichment, and campaign-analysis for funnel analytics.
 user-invocable: true
-allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep
+allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep, mcp__plugin_marketing_gbrain-team__query, mcp__plugin_marketing_gbrain-team__get_page, mcp__plugin_marketing_gbrain-team__list_pages
 metadata:
   version: 0.1.0
   category: Outbound Lead Gen
@@ -61,7 +61,7 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 | What the skill needs to do | MCP server / tool | Reaches | Source |
 |---|---|---|---|
 | Verify the target workspace before any mutation | `emailbison-{b2b,personal}` (`get_active_workspace_info`) | Email Bison workspace 55 or 13 | ADR 2c — availability probe; `email-bison.md` §Auth |
-| Create lead records before the campaign exists | `emailbison-{b2b,personal}` (`bulk_create_leads`, `upsert_multiple_leads`, `bulk_create_leads_csv`) | Active workspace | `email-bison.md` §Common workflows → Launch a campaign end-to-end step 1 |
+| Create lead records before the campaign exists | `emailbison-{b2b,personal}` (`bulk_create_leads` or `bulk_create_leads_csv`; re-POSTing with any existing-lead email returns HTTP 422 atomic rejection (Sx-8) — no upsert; no `upsert_multiple_leads` endpoint exists, BC-6785 R-28 + BC-11072) | Active workspace | `email-bison.md` §Common workflows → Launch a campaign end-to-end step 1 |
 | Create the empty campaign shell | `emailbison-{b2b,personal}` (`create_campaign`) | Active workspace | `email-bison.md` §Common workflows step 2 |
 | Attach leads to the campaign (gated) | `emailbison-{b2b,personal}` (`import_leads_to_campaign`) | Active workspace | `email-bison.md` §MCP confirmation gates; §Known gotchas → allow_parallel_sending |
 | Attach connected senders to the campaign | `emailbison-{b2b,personal}` (`list_sender_emails`, `attach_sender_emails_to_campaign`) | Active workspace | `email-bison.md` §Common workflows steps 4a/4b |
@@ -80,7 +80,7 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 - **Workspace disambiguation gates every mutating call** — b2b vs personal are distinct data domains with distinct recipient sets; cross-posting leaks personal contacts into business campaigns or vice versa. `email-bison.md` §Auth.
 - **The canonical launch order is 8 calls, not 6** — `get_active_workspace_info` → `bulk_create_leads` → `create_campaign` → `import_leads_to_campaign` → `list_sender_emails` + `attach_sender_emails_to_campaign` → `create_schedule_from_template` → `create_sequence_steps` → `resume_campaign`. Skipping steps produces a campaign that either sends to the wrong leads, from the wrong senders, or on the wrong schedule. `email-bison.md` §Common workflows → Launch a campaign end-to-end.
 - **The MCP itself gates 8 consequential tools** — `resume_campaign`, `archive_campaign`, `import_leads_to_campaign`, `enable_warmup` are the four this skill touches. Mirror the two-call confirmation pattern; do not introduce a parallel skill-level confirmation layer. `email-bison.md` §MCP confirmation gates.
-- **Bulk lead imports cap at 500 per call** — `bulk_create_leads` and `upsert_multiple_leads` are documented at 500 per call in `email-bison.md` §Rate limits; chunk larger lists. For any other tool whose name starts with `bulk_`, check `email-bison.md` §Rate limits or run `discover_tools` for the documented cap — do not infer caps from naming patterns.
+- **Bulk lead imports cap at 500 per call** — `bulk_create_leads` is documented at 500 per call in `email-bison.md` §Rate limits. Re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8) — no upsert behavior; no `upsert_multiple_leads` endpoint exists (BC-6785 R-28 + BC-11072). Chunk larger lists. For any other tool whose name starts with `bulk_`, check `email-bison.md` §Rate limits or run `discover_tools` for the documented cap — do not infer caps from naming patterns.
 - **Never auto-enable `allow_parallel_sending`** — if `import_leads_to_campaign` returns the parallel-sending prompt because leads are already in another active sequence, surface the prompt verbatim and offer to split the list. Parallel sending over-contacts prospects across campaigns and is a deliverability risk. `email-bison.md` §Known gotchas bullet 6.
 - **Prefer the v1.1 sequence-steps endpoint** — `create_sequence_steps` may tool-name-alias either the deprecated path (`/api/campaigns/{id}/sequence-steps`) or the v1.1 path (`/api/campaigns/v1.1/{id}/sequence-steps`). When tool-name stability matters, run `search_api_spec` on the sequence-steps endpoint before the call to confirm which path is active. `email-bison.md` §Known gotchas bullet 7.
 - **OutboundSync owns the event sync to Salesforce** — do not subscribe to campaign webhooks here for CRM syncing. `email-bison.md` §Known gotchas bullet 4.
@@ -141,7 +141,7 @@ The first six of the eight canonical launch calls. Produces a campaign in `Draft
 
 1. Run Workflow 1 (availability check + workspace confirmation).
 2. **Optional prerequisite:** if the sequence references custom variables (e.g. `{HOOK}`, `{SITUATION}`), call `create_custom_variable` for each before step 3 so `bulk_create_leads` can carry the values. `email-bison.md` §Common workflows → optional prerequisite note.
-3. `bulk_create_leads` (or `upsert_multiple_leads` / `bulk_create_leads_csv`) with the prospect list. Chunk at 500 per call. Capture returned lead IDs.
+3. `bulk_create_leads` (or `bulk_create_leads_csv` for CSV upload) with the prospect list. Chunk at 500 per call. Capture returned lead IDs. Re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8) — no upsert behavior; no `upsert_multiple_leads` endpoint exists (BC-6785 R-28 + BC-11072).
 4. `create_campaign` with name, description, tags. Capture the returned `campaign_id`.
 5. **First gate — `import_leads_to_campaign`.** Attach the lead IDs from step 3 to the campaign. This is a confirmation-gated tool (`email-bison.md` §MCP confirmation gates). Apply Workflow 8's two-call pattern. If the vendor returns `allow_parallel_sending` prompt (some leads already in another active sequence), surface the prompt verbatim, **never auto-enable**, and offer to split the list — re-call with only the leads that are not in other sequences.
 6. `list_sender_emails` with `status: "connected"`. Filter out any in warmup ramp under day 14 (cross-check `get_warmup_details` for any sender whose `warmup_age` is ambiguous). Cache the chosen sender IDs.
@@ -181,7 +181,7 @@ Used when a sender email exists but has not been warmed yet — new domain, new 
 Mid-flight additions after Workflow 4 has launched. This is distinct from Workflow 3 step 5 because the campaign is `Queued` / `Running`, not `Draft`.
 
 1. Availability check — `get_active_workspace_info`.
-2. `bulk_create_leads` (or upsert variant) with the new prospects. Chunk at 500.
+2. `bulk_create_leads` with the new prospects. Chunk at 500. No upsert variant exists — re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8 + BC-11072).
 3. **Fourth gate — `import_leads_to_campaign` on the live campaign.** Apply Workflow 8's two-call pattern. Handle the `allow_parallel_sending` prompt exactly as in Workflow 3 step 5 — surface verbatim, never auto-enable, offer to split the list.
 4. Report the new total lead count, the added batch size, and the projected send window for the additions based on the schedule template.
 

@@ -1,8 +1,8 @@
 ---
 name: campaign-debrief
-description: Structured 5-question post-campaign learning capture (Q1 hypothesis, Q2 result, Q3 what-worked, Q4 surprise, Q5 transferable) that assigns one of four objective verdicts (SCALE / ITERATE / PAUSE / KILL) against concrete numeric thresholds and appends an entry to `docs/campaigns/{entity}/learnings.md`. Serves BDRs, RevOps, and marketing operators closing the loop between campaign execution and campaign intelligence. Triggers on debrief, campaign debrief, retro, log campaign, capture learnings. Receives primary input from `campaign-analysis` via `analysis-*.md`; retroactive path pulls metrics standalone from Email Bison when no analysis artifact exists. Hands off transferable learnings to `message-market-fit` (ITERATE Notes column), `product-marketing-context` (cross-entity propagation proposals), and `/workflows:handbook-drift-check` (handbook-contradiction signals). Append-only, forever. Under 5 minutes per debrief. Adapted from Revgrowth1/ai-gtm-workflows workflow 12 (MIT).
+description: Structured 5-question post-campaign learning capture (Q1 hypothesis, Q2 result, Q3 what-worked, Q4 surprise, Q5 transferable) that assigns one of four objective campaign verdicts (SCALE / ITERATE / PAUSE / KILL per ADR-018) against concrete numeric thresholds and appends an entry to `docs/campaigns/{short_entity}/learnings.md`. Serves BDRs, RevOps, and marketing operators closing the loop between campaign execution and campaign intelligence. Triggers on debrief, campaign debrief, retro, log campaign, capture learnings. Receives primary input from `campaign-analysis` via `analysis-*.md`; retroactive path pulls metrics standalone from Email Bison when no analysis artifact exists. Hands off transferable learnings to `message-market-fit` (ITERATE Notes column), `product-marketing-context` (cross-entity propagation proposals), and `/workflows:handbook-drift-check` (handbook-contradiction signals). Append-only, forever. Under 5 minutes per debrief. Adapted from Revgrowth1/ai-gtm-workflows workflow 12 (MIT).
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep
+allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep, Skill
 metadata:
   version: 0.1.0
   upstream: Revgrowth1/ai-gtm-workflows
@@ -11,17 +11,17 @@ metadata:
 
 # Campaign Debrief
 
-You are the debrief facilitator for Brite's marketing flywheel — the keystone skill that closes the loop between campaign execution and campaign intelligence. This skill serves BDRs, RevOps, and marketing operators whose problem is not that Brite lacks post-campaign analysis, but that today's insights from `campaign-analysis` evaporate before they shape the next campaign. Engineering runs a compound-knowledge flywheel through decision traces, a precedents INDEX, and the `/workflows:compound-learnings` command; marketing has had no parallel — this skill fills that gap with domain-native conventions. The outcome is an append-only `docs/campaigns/{entity}/learnings.md` per Brite entity, with each entry carrying one of four objective verdicts, four tag families, and a transferable-insight flag that routes cross-entity patterns to `product-marketing-context` proposals or handbook-drift signals. Under 5 minutes per debrief. Data suggests answers; operator confirms. Append-only, forever.
+You are the debrief facilitator for Brite's marketing flywheel — the keystone skill that closes the loop between campaign execution and campaign intelligence. This skill serves BDRs, RevOps, and marketing operators whose problem is not that Brite lacks post-campaign analysis, but that today's insights from `campaign-analysis` evaporate before they shape the next campaign. Engineering runs a compound-knowledge flywheel through decision traces, a precedents INDEX, and the `/workflows:compound-learnings` command; marketing has had no parallel — this skill fills that gap with domain-native conventions. The outcome is an append-only `docs/campaigns/{short_entity}/learnings.md` per Brite entity, with each entry carrying one of four objective campaign verdicts (per ADR-018), four tag families, and a transferable-insight flag that routes cross-entity patterns to `product-marketing-context` proposals or handbook-drift signals. Under 5 minutes per debrief. Data suggests answers; operator confirms. Append-only, forever.
 
 ---
 
 ## Before Starting
 
-Four gates resolve in order before any append to `docs/campaigns/{entity}/learnings.md`. Cross-references elsewhere in this skill (e.g. "§2 Gate 2" in §6 Procedure preconditions) point to the numbered gates below.
+Four gates resolve in order before any append to `docs/campaigns/{short_entity}/learnings.md`. Cross-references elsewhere in this skill (e.g. "§2 Gate 2" in §6 Procedure preconditions) point to the numbered gates below.
 
-**Input validation.** Two tokens reach `Write` destinations and `Glob` patterns: `{entity}` (from operator confirmation at Gate 3) and `{campaign-name}` (from Gate 4 or the matched `analysis-*.md` filename at Gate 2). Both must pass the rules below before any `Write`, `Glob`, or MCP tool interpolation — a poisoned token must not reach any tool call.
+**Input validation.** Two tokens reach `Write` destinations and `Glob` patterns: `{entity}` (from operator confirmation at Gate 3) and `{campaign-name}` (from Gate 4 or the matched `analysis-*.md` filename at Gate 2). Both must pass the rules below before any `Read`, `Write`, `Glob`, or MCP tool interpolation — a poisoned token must not reach any tool call. `Read` is gated because Workflow 4 Step 5 (BC-8752) interpolates both tokens into the σ3 manifest read path.
 
-- **`{entity}`** — must match `^(brite-nites|brite-supply|brite-labs)$`. Long-form slugs only; reject `nites`, `supply`, `labs`, or any other form. Gates every `Write` path under `docs/campaigns/{entity}/` and the workspace-routing dispatch at Gate 3.
+- **`{entity}`** — must match `^(brite-nites|brite-supply|brite-labs|nites|supply|labs)$`. Both long-form (`brite-nites`/`brite-supply`/`brite-labs`) and short-form (`nites`/`supply`/`labs`) slugs are accepted for one release cycle per [BC-8719](https://linear.app/brite-nites/issue/BC-8719) (O15 migration). The skill internally normalizes to short-form `{short_entity}` by stripping the `brite-` prefix (`brite-nites` → `nites`; `nites` → `nites`) before any `Write` interpolation. Reject any other form. Gates every `Write` path under `docs/campaigns/{short_entity}/` and the workspace-routing dispatch at Gate 3. Backward-compat acceptance retires one release cycle after BC-8719.
 - **`{campaign-name}`** — must match `^[a-z0-9-]{1,80}$`. Reject spaces, path separators (`/`, `\`), `..`, single quotes, semicolons, NUL, or any value longer than 80 characters (a 5,000-char hyphen-only value would pass character-class but breach SOQL length limits and produce oversized learnings.md entries). Gates the `analysis-*.md` `Glob` pattern at Gate 2 and the `Write` destination for learnings.md entries.
 
 ### Gate 1 — Marketing context (soft gate)
@@ -32,17 +32,17 @@ Check for product marketing context first. `Glob` for `docs/marketing-context.md
 
 This gate decides which procedure runs. It does NOT halt on failure — both paths are first-class.
 
-1. **Glob for analysis artifacts** — once `{entity}` is confirmed at Gate 3, run `Glob` for `docs/campaigns/{entity}/analysis-*.md`. On ≥1 match, route to §6 Procedure 1 (post-analysis debrief — happy path); auto-suggestions for Q1/Q2/Q3 draw from the matched artifact. On zero matches, route to §6 Procedure 2 (retroactive debrief — no artifact); metrics pull standalone from Email Bison at §5 Workflow 2.
+1. **Glob for analysis artifacts** — once `{entity}` is confirmed at Gate 3, run `Glob` for `docs/campaigns/{short_entity}/analysis-*.md`. On ≥1 match, route to §6 Procedure 1 (post-analysis debrief — happy path); auto-suggestions for Q1/Q2/Q3 draw from the matched artifact. On zero matches, route to §6 Procedure 2 (retroactive debrief — no artifact); metrics pull standalone from Email Bison at §5 Workflow 2.
 2. **Do not halt.** Retroactive debrief is a first-class flow per the Scope doc — operators routinely run this skill on campaigns that pre-date the `campaign-analysis` ship, or on campaigns whose analysis artifact was lost. Missing artifact is not an error; it selects Procedure 2.
 
 ### Gate 3 — Entity identification
 
 Use `AskUserQuestion` to confirm the Brite entity for this debrief (Nites / Supply / Labs). The answer gates two downstream behaviors:
 
-- **Output path.** Every `Write` targets `docs/campaigns/{entity}/` where `{entity}` is the validated long-form slug (`brite-nites` / `brite-supply` / `brite-labs`). The directory is created on first write.
+- **Output path.** Every `Write` targets `docs/campaigns/{short_entity}/` where `{short_entity}` is the short-form slug derived by stripping the `brite-` prefix from the validated `{entity}` answer (`brite-nites` → `nites`, `brite-supply` → `supply`, `brite-labs` → `labs`; short-form inputs pass through unchanged). The directory is created on first write. Per BC-8719 (O15 migration), the canonical filesystem layout is short-form; legacy long-form (`docs/campaigns/brite-{short_entity}/`) is read-compatible for one release cycle via two backward-compat shims — (1) Workflow 4 Step 1's legacy-long-form `Read` fallback (retires entirely one release cycle after BC-8719) and (2) Procedure 3 Step 1's exclusion filter's `brite-{short_entity}` branch (the Grep itself stays — only the long-form half of the self-exclusion filter retires).
 - **Workspace routing** (for the retroactive path only). Nites → `emailbison-personal` (consumer recipients, workspace 11). Supply + Labs → `emailbison-b2b` (business recipients, workspace 52). This matches the canonical routing pattern in `campaign-analysis` §4 and `message-market-fit` Gate 3 — never hardcode a workspace, always dispatch from the `{entity}` answer.
 
-Cite the answer in the learnings.md entry's `tags:` array as `#entity/{entity}`.
+Cite the answer in the learnings.md entry's `tags:` array as `#entity/brite-{short_entity}` (always long-form per § Tag scheme — re-expand from `{short_entity}` regardless of whether the operator typed long- or short-form at Gate 1; the tag-level identifier is canonical long-form and stable across the BC-8719 path migration).
 
 ### Gate 4 — Campaign focus selection
 
@@ -55,7 +55,7 @@ Use `AskUserQuestion` to identify which campaign the debrief is about, by name. 
 
 ## Methodology
 
-Three frameworks govern this skill. First, a **5-question debrief format** (Q1 hypothesis, Q2 result, Q3 what worked / didn't, Q4 surprise, Q5 transferable) that suggests answers from upstream data when present and defaults to operator-authored when not. Second, a **4-verdict objective rubric** (`SCALE` / `ITERATE` / `PAUSE` / `KILL`) assigned against entity-scoped numeric thresholds anchored to `campaign-analysis` §3.3 b2b and §4 b2c benchmarks — every verdict resolves by rule, never by prose. Third, an **append-only tagged learnings file** per entity, with four required tag families (`#entity` / `#vertical` / `#persona` / `#angle`) that make cross-entity and cross-angle search deterministic. Under-5-minute operator time is load-bearing: suggest first, ask only when auto-suggest fails, never re-prompt an answered field.
+Three frameworks govern this skill. First, a **5-question debrief format** (Q1 hypothesis, Q2 result, Q3 what worked / didn't, Q4 surprise, Q5 transferable) that suggests answers from upstream data when present and defaults to operator-authored when not. Second, a **Campaign verdict rubric (4 tokens)** — `SCALE` / `ITERATE` / `PAUSE` / `KILL` per ADR-018 — assigned against entity-scoped numeric thresholds anchored to `campaign-analysis` §3.3 b2b and §4 b2c benchmarks — every campaign verdict resolves by rule, never by prose. Third, an **append-only tagged learnings file** per entity, with four required tag families (`#entity` / `#vertical` / `#persona` / `#angle`) that make cross-entity and cross-angle search deterministic. Under-5-minute operator time is load-bearing: suggest first, ask only when auto-suggest fails, never re-prompt an answered field.
 
 ### 5-question debrief format
 
@@ -71,28 +71,30 @@ The five questions are fixed in order and format. Auto-suggest sources are named
 
 **Q5. What's transferable?** Entity-specific vs cross-entity pattern. Auto-suggest from `analysis-*.md` §6 Next Iteration Recommendations. Tag for cross-entity propagation by setting `transferable: true` in the entry frontmatter. If the transferable flag is true, §6 Procedure 3 runs; if false, the entry is entity-specific only and the procedure chain halts after append.
 
-### 4-verdict rubric
+### Campaign verdict rubric (4 tokens)
 
-Verdicts resolve against entity-scoped numeric thresholds. Prose substitutes ("pretty good", "meh", "worth another shot") are refused by §8 Anti-Slop — every cell in the table below is objective.
+Campaign verdicts resolve against entity-scoped numeric thresholds. Prose substitutes ("pretty good", "meh", "worth another shot") are refused by §8 Anti-Slop — every cell in the table below is objective.
 
-| Verdict | b2b rule (Supply, Labs) | b2c rule (Nites) | Action |
+| Campaign Verdict | b2b rule (Supply, Labs) | b2c rule (Nites) | Action |
 |---|---|---|---|
 | `SCALE` | Reply Rate >1% **AND** Interested Rate >25% **AND** sent ≥500 | Reply Rate >0.5% **AND** Interested Rate >15% **AND** sent ≥500 | Expand volume + senders next cycle |
 | `ITERATE` | Mixed signals — one metric Healthy, one Attention, no Critical | Same pattern at softer b2c thresholds | Swap one variable (segment OR angle), keep on experiment side |
 | `PAUSE` | Bounce Rate in Attention band (3–5%) **OR** sub-floor run (<500 sent OR <7 days) | Same rules | Wait + re-measure; no strategy change |
 | `KILL` | Reply Rate <0.5% **AND** sent ≥500 **AND** days ≥7 | Reply Rate <0.25% **AND** sent ≥500 **AND** days ≥7 | Remove from matrix; log failure evidence in the entry's Q3 Didn't bullet |
 
-Entity scoping matches `campaign-analysis` §3.3 (b2b) and §4 (b2c) verbatim — never fabricate a threshold, and never apply a b2b rule to a Nites run or vice versa. The b2b-vs-b2c split is dispatched from the Gate 3 `{entity}` answer: `brite-nites` → b2c column; `brite-supply` / `brite-labs` → b2b column.
+Entity scoping matches `campaign-analysis` §3.3 (b2b) and §4 (b2c) verbatim — never fabricate a threshold, and never apply a b2b rule to a Nites run or vice versa. The b2b-vs-b2c split is dispatched from the Gate 3 `{entity}` answer: `brite-nites` / `nites` → b2c column; `brite-supply` / `supply` / `brite-labs` / `labs` → b2b column. Routing is on the normalized `{short_entity}` (Input-validation block), so both long- and short-form Gate-3 answers reach the same column.
+
+**Frontmatter field stays `verdict:`** (single-vocab artifact). Per [ADR-018](../../../../docs/decisions/018-gtm-verdict-vocabularies.md) Consequences, the YAML frontmatter field name `verdict:` is preserved in entry artifacts — only the parent label in prose and section headers becomes "campaign verdict." There is no collision in the artifact because each `learnings.md` is single-vocabulary by construction.
 
 **Sub-floor rule.** Any campaign with <500 sent OR <7 days elapsed resolves to `PAUSE` regardless of other metrics — the sample is too small to distinguish signal from noise, and statistical-significance floors match the `campaign-analysis` artifact §1 Quick Health Check sub-floor header convention.
 
-**Precedence when multiple rules match.** When metrics satisfy both `KILL` and `PAUSE` (e.g. Reply <0.5% AND sent ≥500 AND days ≥7 AND Bounce 3–5%), apply verdict precedence: `KILL` > `SCALE` > `ITERATE` > `PAUSE`. Rationale: `KILL` requires the statistical-significance floor to be met, so failure evidence is actionable; `PAUSE` is the default for floor-not-met or deliverability-suspect runs. The sub-floor rule above wins only when the KILL floor conditions (sent ≥500 AND days ≥7) are NOT met.
+**Precedence when multiple rules match.** When metrics satisfy both `KILL` and `PAUSE` (e.g. Reply <0.5% AND sent ≥500 AND days ≥7 AND Bounce 3–5%), apply campaign verdict precedence: `KILL` > `SCALE` > `ITERATE` > `PAUSE`. Rationale: `KILL` requires the statistical-significance floor to be met, so failure evidence is actionable; `PAUSE` is the default for floor-not-met or deliverability-suspect runs. The sub-floor rule above wins only when the KILL floor conditions (sent ≥500 AND days ≥7) are NOT met.
 
 ### Tag scheme
 
 Every entry carries four required tag families, all lowercase-hyphenated. TitleCase, spaces, underscores, camelCase, or punctuation other than `/` and `-` are refused by §8 Anti-Slop.
 
-- **`#entity/{brite-nites|brite-supply|brite-labs}`** (required, exactly one per entry). Long-form slugs only, matching the Gate 3 `{entity}` validator. Short-form (`nites`/`supply`/`labs`) is refused.
+- **`#entity/{brite-nites|brite-supply|brite-labs}`** (required, exactly one per entry). Long-form slugs only at the content level — this is the canonical entity identifier and is intentionally independent of the filesystem-path slug normalization at BC-8719 (which stripped `brite-` from the path only). Tags are searched cross-run via `Grep` on file *contents*, not paths, so the long-form `#entity/brite-*` lexicon stays stable across the path migration. Short-form (`#entity/nites`/`supply`/`labs`) is refused at the tag level.
 - **`#vertical/{v}`** (required, exactly one per entry). Examples: `#vertical/municipalities`, `#vertical/hoas`, `#vertical/commercial-real-estate`, `#vertical/venue-partnerships`. Match the vertical convention used elsewhere in the entity's campaigns directory for cross-run searchability.
 - **`#persona/{p}`** (required, exactly one per entry). Examples: `#persona/facilities-director`, `#persona/hoa-board-president`, `#persona/venue-operations-manager`. Persona granularity matches the `gtm-strategy` persona rollup for the entity.
 - **`#angle/{a}`** (required, exactly one per entry). Examples: `#angle/capital-expenditure-timing`, `#angle/shoulder-season-revenue`, `#angle/insurance-premium-offset`. If a `creative-angles` artifact seeded the campaign, the angle tag matches its slug; if operator-authored, slug the tagline.
@@ -106,7 +108,7 @@ The `transferable: true` flag signals that an insight crosses entity boundaries 
 
 ### Append-only invariant
 
-`docs/campaigns/{entity}/learnings.md` is append-only, forever. A later debrief that contradicts an earlier one is a new entry, not an overwrite. Re-running a debrief for the same campaign on a different `debrief_at` date produces a new entry (the prior entry stays). This mirrors `message-market-fit`'s matrix append-only rule — history is never rewritten.
+`docs/campaigns/{short_entity}/learnings.md` is append-only, forever. A later debrief that contradicts an earlier one is a new entry, not an overwrite. Re-running a debrief for the same campaign on a different `debrief_at` date produces a new entry (the prior entry stays). This mirrors `message-market-fit`'s matrix append-only rule — history is never rewritten.
 
 **Carve-out for auto-regenerated sections.** The file has four top-level sections defined by the §4 Brite Implementation template: `## Summary stats`, `## What works`, `## What doesn't`, and `## Campaign log`. The **Campaign log is strict-append** — entries are added in reverse-chronological order, never edited, never removed. The other three sections — `Summary stats`, `What works`, `What doesn't` — **regenerate in place** on each append: the skill recomputes the summary-stats counters, re-extracts the `What works` cross-entry pattern bullets (from entries where `verdict: SCALE` or `verdict: ITERATE` AND `transferable: true`), and re-extracts the `What doesn't` cross-entry failure bullets (from entries where `verdict: KILL`). The carve-out exists because the alternative — hand-editing those summaries on every debrief — breaks the under-5-minute constraint. The carve-out applies ONLY to those three sections; editing a Campaign-log entry is a §7 Rubric 1–3 hard failure.
 
@@ -121,7 +123,7 @@ Three sibling skills use three verdict vocabularies. Only `SCALE` overlaps inten
 | Deferred — wait and re-measure | `MONITOR`, `TEST MORE` | `DEFERRED`, `PENDING` | `PAUSE` |
 | Dead — remove | `UNDERPERFORM` | `DOESN'T WORK` | `KILL` |
 
-Three vocabularies exist because each skill owns a different decision surface: `campaign-analysis` reports per-segment performance; `message-market-fit` classifies experiments against a 5-category matrix; `campaign-debrief` captures a learning entry with a 4-verdict action rubric. Cross-skill translation is the operator's responsibility — the vocabulary mapping table above is the canonical source.
+Three vocabularies exist because each skill owns a different decision surface: `campaign-analysis` reports per-segment performance; `message-market-fit` classifies experiments against a 5-category matrix; `campaign-debrief` captures a learning entry with a 4-token campaign verdict action rubric. Cross-skill translation is the operator's responsibility — the vocabulary mapping table above is the canonical source; ADR-018 carries the parent-label translation (Angle / Experiment / Campaign Verdict).
 
 ---
 
@@ -131,11 +133,12 @@ Three vocabularies exist because each skill owns a different decision surface: `
 
 | What the skill needs to do | MCP / tool | Reaches | Reason (ADR / source) |
 |---|---|---|---|
-| Read upstream `analysis-*.md` (primary input) | `Read` + `Glob` | Local `docs/campaigns/{entity}/analysis-*.md` | §6 Procedure 1 Step 1 — primary input per Scope |
+| Read upstream `analysis-*.md` (primary input) | `Read` + `Glob` | Local `docs/campaigns/{short_entity}/analysis-*.md` | §6 Procedure 1 Step 1 — primary input per Scope |
 | Pull Opportunity outcomes for campaign → pipeline attribution | Salesforce MCP (`run_soql_query`) | `brite-salesforce` production org | ADR 2a — SF is CRM SoR; Q3 + Q5 data-backing |
 | Pull campaign metrics standalone (retroactive path) | EB MCP (`get_active_workspace_info`, `get_campaign_stats`, `get_replies_analytics`) | Entity-routed EB workspace | §6 Procedure 2; workspace routing per Gate 3 |
 | Read prior `learnings.md` (cross-entity lookup) | `Read` + `Glob` | Local `docs/campaigns/{*}/learnings.md` | §6 Procedure 3 — novelty check before transferable-insight propagation |
-| Append to or create `learnings.md` | `Write` | Local `docs/campaigns/{entity}/learnings.md` | §3 Append-only invariant; §6 Procedure 1/2 final step |
+| Append to or create `learnings.md` | `Write` | Local `docs/campaigns/{short_entity}/learnings.md` | §3 Append-only invariant; §6 Procedure 1/2 final step |
+| Sync SF Campaign status to `Completed` (σ3 trigger on sub-issue 8 close) | `Skill` → `/revops:update-sf-campaign-status` | Salesforce (via the sibling slash command — soft-fail on missing manifest / missing SF record) | BC-8752 — Workflow 4 Step 5 post-append sync |
 
 **EB namespace (load-bearing).** All Email Bison calls use the **short form** — `mcp__emailbison-b2b__*` and `mcp__emailbison-personal__*` — NOT `mcp__plugin_marketing_emailbison-*__*`. The EB MCP servers are registered at the repo-root `.mcp.json`, not inside `plugins/marketing/.mcp.json`. This matches `campaign-analysis` line 5 and `message-market-fit` line 5; the plugin-scoped namespace form will silent-fail at runtime per the CLAUDE.md gotcha ("listing a server that isn't registered fails silently").
 
@@ -143,10 +146,10 @@ Three vocabularies exist because each skill owns a different decision surface: `
 
 ### Entity-keyed output paths
 
-Every `Write` targets a path scoped to the validated `{entity}` slug:
+Every `Write` targets a path scoped to the validated and normalized `{short_entity}` slug (the short-form derivation from the Gate 1 Input-validation block):
 
-- **Output file.** `docs/campaigns/{entity}/learnings.md` — single file per entity, append-only (see §3 Append-only invariant).
-- **Directory creation.** On first write, the `docs/campaigns/` parent and the `{entity}` subdirectory are created via `Write`'s implicit `mkdir -p` semantics. `message-market-fit` is the first sibling to produce under `docs/campaigns/{entity}/`; campaign-debrief writes to the same directory tree.
+- **Output file.** `docs/campaigns/{short_entity}/learnings.md` — single file per entity, append-only (see §3 Append-only invariant). Per BC-8719, the directory segment is the short-form slug (`nites` / `supply` / `labs`), not the long-form (`brite-nites` / `brite-supply` / `brite-labs`).
+- **Directory creation.** On first write, the `docs/campaigns/` parent and the `{short_entity}` subdirectory are created via `Write`'s implicit `mkdir -p` semantics. After BC-8719, this skill and `message-market-fit` share the same short-form directory tree (`docs/campaigns/{short_entity}/`) — pre-BC-8719 the two skills wrote to parallel `brite-*` vs unprefixed directories; post-BC-8719 they converge.
 
 ### learnings.md file template (create-on-missing)
 
@@ -159,10 +162,10 @@ Append-only knowledge base. Each entry is one debriefed campaign. Entries are st
 
 ## Summary stats
 
-_Regenerated on each append. Counters: total debriefs, verdicts breakdown, last debrief date._
+_Regenerated on each append. Counters: total debriefs, campaign verdicts breakdown, last debrief date._
 
 - Total debriefs: {N}
-- Verdicts: SCALE={s}, ITERATE={i}, PAUSE={p}, KILL={k}
+- Campaign verdicts: SCALE={s}, ITERATE={i}, PAUSE={p}, KILL={k}
 - Last debrief: {YYYY-MM-DD}
 
 ## What works
@@ -197,7 +200,7 @@ Entry schema (appended beneath `## Campaign log`):
 campaign: {campaign-name}
 analyzed_at: {YYYY-MM-DD}      # date of the source analysis-*.md artifact (omit on retroactive path)
 debrief_at: {YYYY-MM-DD}       # date this debrief ran
-source_analysis: docs/campaigns/{entity}/analysis-{campaign-name}-{YYYY-MM-DD}.md   # omit on retroactive path
+source_analysis: docs/campaigns/{short_entity}/analysis-{campaign-name}-{YYYY-MM-DD}.md   # omit on retroactive path
 verdict: SCALE | ITERATE | PAUSE | KILL
 metrics:
   reply_rate: 0.012            # decimal, matches campaign-analysis numeric form
@@ -239,7 +242,7 @@ Each rule below cites its source so a reader can trace the claim.
 
 - **Append-only learnings.md with carve-out.** Campaign log is strict-append; Summary / What works / What doesn't regenerate in place. Source: §3 Append-only invariant.
 - **Entity-driven workspace routing.** Nites → `emailbison-personal`; Supply + Labs → `emailbison-b2b`. Source: `campaign-analysis` §4 canonical pattern; `message-market-fit` Gate 3.
-- **Verdicts are numeric, not prose.** `SCALE`/`ITERATE`/`PAUSE`/`KILL` only; thresholds from §3 rubric table. Source: §3 4-verdict rubric; enforced by §8.
+- **Campaign verdicts are numeric, not prose.** `SCALE`/`ITERATE`/`PAUSE`/`KILL` only; thresholds from §3 rubric table. Source: §3 Campaign verdict rubric; enforced by §8.
 - **Under-5-minute operator constraint.** Data suggests first, ask only when auto-suggest fails, never re-prompt. Source: issue Non-Goals; enforced by §8.
 - **EB MCP is short-form.** `mcp__emailbison-b2b__*` and `mcp__emailbison-personal__*` — not the plugin-scoped form. Source: sibling allowed-tools frontmatter; CLAUDE.md gotcha about unregistered-server silent-fail.
 - **Marketing-context and handbook edits go through proposal, not direct write.** Skill calls `AskUserQuestion` and hands off to `/marketing:product-marketing-context` or `/workflows:handbook-drift-check` on confirmation. Source: issue Scope — Transferable insight flow.
@@ -248,7 +251,7 @@ Each rule below cites its source so a reader can trace the claim.
 
 **Receives from:**
 
-- **[BC-2721](https://linear.app/brite-nites/issue/BC-2721) `campaign-analysis`** (primary) — `docs/campaigns/{entity}/analysis-*.md` is the §6 Procedure 1 input and the Q1/Q2/Q3 auto-suggest source. Handoff already live at campaign-analysis §4 Cross-skill boundaries (the MANDATORY clause pointing to this skill).
+- **[BC-2721](https://linear.app/brite-nites/issue/BC-2721) `campaign-analysis`** (primary) — `docs/campaigns/{short_entity}/analysis-*.md` is the §6 Procedure 1 input and the Q1/Q2/Q3 auto-suggest source. Handoff already live at campaign-analysis §4 Cross-skill boundaries (the MANDATORY clause pointing to this skill).
 - **Operator directly** (retroactive path) — §6 Procedure 2 runs when no `analysis-*.md` exists; operator supplies campaign name; metrics pull standalone from Email Bison.
 
 **Hands off to:**
@@ -265,9 +268,114 @@ Each rule below cites its source so a reader can trace the claim.
 - Next-experiment design (`message-market-fit` owns the matrix and batch-design).
 - Marketing-context editing (`product-marketing-context` owns the file and its freshness cadence).
 
-**Known cross-skill asymmetry — entity-slug divergence with MSPA.** This skill writes to `docs/campaigns/{entity}/learnings.md` where `{entity}` is long-form (`brite-nites` / `brite-supply` / `brite-labs`, enforced by the Gate 3 validator). Sibling `message-market-fit` (BC-5829) writes to `docs/campaigns/{entity}/mmf-*.md` with SHORT-form entity (`nites` / `supply` / `labs`). Result: the two sibling skills write to parallel directories (`docs/campaigns/brite-nites/` vs `docs/campaigns/nites/`) that do NOT overlap on disk. Procedure 3 Step 1's cross-entity novelty `Grep` pattern must glob `docs/campaigns/*/learnings.md` (both forms) to catch cross-form matches, or explicitly restrict to long-form. The issue-body canonical form is long-form; MSPA short-form will be normalized in a follow-up per BC-5830 plan Risks §1. Until then: do NOT assume MSPA artifacts share this skill's directory.
+**Entity-slug normalization (post-BC-8719).** This skill and sibling `message-market-fit` (BC-5829) now both write to short-form `docs/campaigns/{short_entity}/` (BC-8719 / O15 migration normalized the layout). `campaign-debrief` writes `learnings.md`; MSPA writes `mmf-*.md`; both files share the same `docs/campaigns/{short_entity}/` directory. Backward-compat read-shim: Procedure 3 Step 1's cross-entity novelty `Grep` and Workflow 4 Step 1's `Read` both try the short-form path first and fall back to the legacy long-form (`docs/campaigns/brite-{short_entity}/`) once with a warning if the short-form is missing — that shim retires one release cycle after BC-8719. Operators with pre-BC-8719 artifacts on disk should run `python3 plugins/marketing/scripts/migrate_entity_slugs.py` once to relocate them.
 
 **Engineering-side parallel.** `docs/precedents/INDEX.md` is the engineering-side decision-trace pattern; this skill is the marketing-flywheel cognate. Each debrief is a marketing-domain decision trace. The two indexes are structurally analogous: append-only, tag-keyed, cross-run searchable.
+
+**Three-verdict translation table (per [ADR-018](../../../../docs/decisions/018-gtm-verdict-vocabularies.md)).** Three sibling skills emit verdicts at different lifecycle gates. Parent labels are renamed so each gating semantic is explicit at the source — vocabularies stay distinct, decision surfaces stay separate.
+
+| Term | Source skill | Decision surface | Timing |
+|---|---|---|---|
+| Angle Verdict | creative-angles | pre-experiment | before mmf |
+| Experiment Verdict | message-market-fit | post-batch | during campaign |
+| Campaign Verdict | campaign-debrief | post-campaign | after campaign closes |
+
+This skill owns the **Campaign Verdict** (Gate 3, post-campaign — `SCALE` / `ITERATE` / `PAUSE` / `KILL`). The §3 vocabulary mapping table above translates token-by-token across `campaign-analysis` / `message-market-fit` / `campaign-debrief`; see [handbook/marketing/frameworks/verdicts-cross-reference.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/verdicts-cross-reference.md) for the canonical cross-vocabulary reference.
+
+---
+
+## Discoveries — icp-refinement / offer-retirement / persona-discovery signals
+
+The post-campaign retro is the single richest moment for surfacing handbook-canonicals drift: ICP rules that no longer fit, offers that have aged out of the lineup, and entirely new personas that the campaign exposed. This skill emits three discovery categories to `docs/campaigns/{short_entity}/{slug}/discoveries.json` (per Phase 2 architectural pivot) so BC-8726 (`/marketing:icp-refinement-review`) and humans can later promote them to handbook canonicals + prose via PR. See [`plugins/marketing/references/discoveries-promotion.md`](../../references/discoveries-promotion.md) for the full signal → review → handbook PR flow; the schema lives at [`plugins/marketing/data/discoveries-schema.json`](../../data/discoveries-schema.json) and is enforced by `plugins/marketing/scripts/lint_discoveries.py` (wired into `scripts/validate.sh`).
+
+The list-building skill emits the fourth category (`title-discovery`) at contact-discovery time; the campaign-debrief skill owns the post-campaign three.
+
+**Common confirm gate** (one `AskUserQuestion` + one `Write` per category). All three categories use the same pattern: the skill surfaces the candidate via `AskUserQuestion`; on `Yes` it `Read`s `docs/campaigns/{short_entity}/{slug}/discoveries.json` (file-not-found branches to a fresh `{schema_version: 1, signals: []}` shape — mirrors the §5 Workflow 4 Step 1 file-not-found pattern; do NOT use `Glob` first), appends a single signal to `signals[]`, and `Write`s the file back. Per-category payload shapes are spelled out below; `payload` is held open at the schema layer (`type: object`) so downstream consumers can evolve per category. `promotion_status` defaults to `"pending"` at emit time.
+
+The discovery-emission gates fire from **Procedure 1 step 10 / Procedure 2 step 8** — after Workflow 4 completes (learnings.md written) and independent of Procedure 3's transferable-insight dispatch. Discoveries route to handbook-canonicals refinement; Procedure 3 routes to `docs/marketing-context.md`. The two flows can both fire on the same debrief.
+
+### Category 1 — icp-refinement
+
+**When to emit.** The campaign's actual responders diverge from the segment / firmographic profile the ICP-template targeted. Examples: targeted "facility directors at 50k+ enrolment universities" but the responders were almost exclusively "ops directors at 10-30k enrolment" (firmographic mismatch); the persona slug + titles match canon but Reply Rate splits sharply along a sub-segment the ICP doesn't carve (e.g., Catholic vs. secular hospitals, or coastal vs. interior resorts).
+
+**Payload shape.**
+
+```jsonc
+{
+  "category": "icp-refinement",
+  "emitted_at": "<ISO-8601 datetime>",
+  "emitted_by_skill": "campaign-debrief",
+  "payload": {
+    "vertical": "<vertical-slug from #vertical/ tag>",
+    "persona": "<persona-slug from #persona/ tag>",
+    "current_icp_summary": "<one-line description of the ICP template the campaign used>",
+    "observed_pattern": "<one-line description of who actually responded / converted>",
+    "evidence_metric": "<numeric backing — e.g. 'Reply Rate 1.9% on N=480 sub-segment vs 0.4% on N=720 non-sub-segment'>",
+    "refinement_proposal": "<short prose — operator's proposed ICP carve, e.g. 'split persona into hoa-board-president-active-amenity vs hoa-board-president-passive-amenity'>"
+  },
+  "promotion_status": "pending"
+}
+```
+
+**Gate prompt.** "This campaign's responders diverged from the ICP template (`{summary}`). Log an `icp-refinement` signal for handbook review?" Options: `Yes, log refinement proposal` / `No, skip — within ICP noise` / `No, defer — need more campaigns before refining`.
+
+### Category 2 — offer-retirement
+
+**When to emit.** The campaign's offer earned a `KILL` campaign verdict, AND the same offer has earned `KILL` or `PAUSE` in at least one prior debrief on `docs/campaigns/{short_entity}/learnings.md` (cross-run pattern, not single-run noise). The signal recommends moving the offer from `status: active` to `status: retired` in `plugins/marketing/data/canonicals/{vertical}.yaml`.
+
+**Payload shape.**
+
+```jsonc
+{
+  "category": "offer-retirement",
+  "emitted_at": "<ISO-8601 datetime>",
+  "emitted_by_skill": "campaign-debrief",
+  "payload": {
+    "vertical": "<vertical-slug>",
+    "offer_slug": "<offer-slug from canonicals/{vertical}.yaml>",
+    "kill_count": <integer — count of KILL verdicts across learnings.md entries for this offer>,
+    "pause_count": <integer — count of PAUSE verdicts across learnings.md entries for this offer>,
+    "last_kill_at": "<YYYY-MM-DD — debrief_at of the most recent KILL>",
+    "recommended_replacement": "<optional offer-slug to set on canonicals replaced_by:; omit when no successor is ready>",
+    "rationale": "<one-line summary — e.g. 'asymmetric-anchor angle stalled; venue-partnerships pivot replaces value capture'>"
+  },
+  "promotion_status": "pending"
+}
+```
+
+**Gate prompt.** "Offer `{offer_slug}` has earned KILL on this debrief and {kill_count - 1} prior KILL(s) + {pause_count} PAUSE(s) on `docs/campaigns/{short_entity}/learnings.md`. Log an `offer-retirement` signal recommending `status: retired` for the handbook canonicals PR?" Options: `Yes, log retirement proposal` / `Yes, log with a proposed replacement (operator fills it in)` / `No, keep active — this run was an outlier`.
+
+### Category 3 — persona-discovery
+
+**When to emit.** The campaign exposed a buying contact whose title and decision authority do not fit any persona currently in `plugins/marketing/data/canonicals/{vertical}.yaml` for the vertical — and the pattern is not a title-discovery (which would be list-building's category, handling title aliases inside an existing persona). The signal proposes adding a NEW persona to canonicals.
+
+**When NOT to emit.** If the new title belongs inside an existing persona's `titles[]` array (e.g., "Director of Event Operations" added to an existing `venue-operations-manager` persona), that's a `title-discovery` signal at list-building time, not a `persona-discovery` here. Only emit `persona-discovery` when the decision authority is structurally different (e.g., a CFO-tier signoff layer that wasn't represented in any existing persona for the vertical).
+
+**Payload shape.**
+
+```jsonc
+{
+  "category": "persona-discovery",
+  "emitted_at": "<ISO-8601 datetime>",
+  "emitted_by_skill": "campaign-debrief",
+  "payload": {
+    "vertical": "<vertical-slug>",
+    "proposed_persona_slug": "<kebab-case slug for the new persona>",
+    "proposed_display_name": "<human-readable display name>",
+    "observed_titles": ["<title-1>", "<title-2>"],
+    "decision_authority": "<one-line description of what this persona controls — e.g. 'capex sign-off for installations >$50k'>",
+    "evidence_metric": "<numeric backing — e.g. 'Opportunity attribution: 3 of 4 Closed Won this cycle attributed to contacts in this role'>",
+    "differs_from_existing": "<one-line — name the closest existing persona and explain why this one isn't a sub-role of it>"
+  },
+  "promotion_status": "pending"
+}
+```
+
+**Gate prompt.** "This debrief surfaced a buying role that doesn't map to any persona in `canonicals/{vertical}.yaml` (`{proposed_display_name}` — controls `{decision_authority}`). Log a `persona-discovery` signal for handbook review?" Options: `Yes, log new persona proposal` / `No — this is a title variant of an existing persona (route to list-building's title-discovery instead)` / `No, skip — insufficient data`.
+
+### Where these signals land
+
+All three categories collect in the per-campaign-run `discoveries.json` under `docs/campaigns/{short_entity}/{slug}/`. Downstream, BC-8726 (`/marketing:icp-refinement-review`) reads signals across runs by category, groups them per `{vertical}/{persona}`, surfaces them as PR candidates, and produces the handbook-canonicals PR. Until BC-8726 ships, signals accumulate in `pending` status; the discoveries-promotion reference doc carries the full lifecycle.
 
 ---
 
@@ -279,7 +387,7 @@ Each rule below cites its source so a reader can trace the claim.
 
 1. `Read` the `analysis-*.md` file resolved at Gate 2 / Gate 4. No availability probe — file read only.
 2. Parse the analysis artifact (the `analysis-*.md` file, which has 6 sections per `campaign-analysis` §6 Report Spec): artifact §2 Segment Performance Ranking for the focal campaign's verdict token (→ Q2 auto-suggest); artifact §5 Attribution Analysis for the focal row (→ Q1 auto-suggest) and top-2 rows (→ Q3 auto-suggest Worked side); artifact §6 Next Iteration Recommendations (→ Q5 auto-suggest).
-3. Extract numeric metrics from artifact §1 Quick Health Check (aggregate `Reply Rate`, `Interested Rate`, `Bounce Rate`, plus the run-window header for `sent` count and `days` elapsed) and artifact §2 Segment Performance Ranking (per-campaign rates on the focal row when segment-level granularity is needed). These feed this skill's §3 4-verdict rubric. *Note: do NOT pull metrics from artifact §3 Infrastructure Analysis — that section holds cohort comparisons (Google vs Microsoft senders), not headline rates.*
+3. Extract numeric metrics from artifact §1 Quick Health Check (aggregate `Reply Rate`, `Interested Rate`, `Bounce Rate`, plus the run-window header for `sent` count and `days` elapsed) and artifact §2 Segment Performance Ranking (per-campaign rates on the focal row when segment-level granularity is needed). These feed this skill's §3 Campaign verdict rubric. *Note: do NOT pull metrics from artifact §3 Infrastructure Analysis — that section holds cohort comparisons (Google vs Microsoft senders), not headline rates.*
 
 ### Workflow 2 — Standalone EB metrics fetch (retroactive path)
 
@@ -289,7 +397,7 @@ See [`plugins/marketing/tools/integrations/email-bison.md` §Common Workflows](.
 2. **Resolve campaign** — call `list_campaigns`. `list_campaigns` has no server-side date filter, so apply a client-side filter on `created_at` or `updated_at` if the operator's campaign name is ambiguous across time (e.g. "spring-promo" ran in 2025 and 2026). Match `{campaign-name}` against the result list; if multiple matches, re-prompt with dates.
 3. **Fetch stats** — call `get_campaign_stats` on the resolved campaign ID for `sent`, `bounce_rate`, and raw reply count.
 4. **Fetch reply sentiment** — call `get_replies_analytics` (NOT `list_replies`) on the same campaign ID for `interested_rate` / positive-reply count. `get_replies_analytics` is the canonical reply-sentiment tool; `list_replies` returns reply bodies, not sentiment aggregates.
-5. Derive `days` elapsed from campaign `created_at` to `today`. Apply the §3 4-verdict rubric against the entity-scoped threshold column.
+5. Derive `days` elapsed from campaign `created_at` to `today`. Apply the §3 Campaign verdict rubric against the entity-scoped threshold column.
 
 ### Workflow 3 — Salesforce Opportunity attribution (optional)
 
@@ -306,10 +414,28 @@ Runs when the operator wants to correlate the campaign with downstream pipeline.
 
 The final mutating step of every debrief run. Both create-on-missing and append-to-existing flow through this workflow.
 
-1. **Attempt Read** — `Read` `docs/campaigns/{entity}/learnings.md`. On file-not-found, branch to create-from-template: Write the §4 template plus the first entry, done. On Read success, proceed to step 2. (No separate `Glob` probe — `Read`'s not-found branch is cheaper than the Glob+Read pair.)
+1. **Attempt Read (short-form canonical, post-BC-8719).** `Read` `docs/campaigns/{short_entity}/learnings.md`. On Read success, proceed to step 2. On file-not-found, run a single backward-compat probe: `Read` `docs/campaigns/brite-{short_entity}/learnings.md` (legacy long-form layout). If the long-form Read succeeds, log to stderr `[BC-8719] Reading legacy long-form learnings.md at "docs/campaigns/brite-{short_entity}/learnings.md"; this run's Write goes to the short-form canonical at "docs/campaigns/{short_entity}/learnings.md". Run "python3 plugins/marketing/scripts/migrate_entity_slugs.py" to relocate the legacy file.` and proceed to step 2 with the long-form contents loaded. If BOTH reads return file-not-found, branch to create-from-template at the short-form path: Write the §4 template plus the first entry to `docs/campaigns/{short_entity}/learnings.md`, done. (No separate `Glob` probe — `Read`'s not-found branch is cheaper than Glob+Read. The backward-compat read shim retires one release cycle after BC-8719.)
 2. **Regenerate summary sections** — rewrite `## Summary stats` counters; re-extract `## What works` bullets from entries where `verdict: SCALE` or `verdict: ITERATE` AND `transferable: true`; re-extract `## What doesn't` bullets from entries where `verdict: KILL`.
 3. **Append new entry** — insert the new entry at the TOP of the `## Campaign log` section (reverse-chronological), with the existing entries below.
 4. **Write full file** — single `Write` call overwrites the file with the regenerated summary sections plus the full Campaign log. The regenerate-in-place carve-out (§3 Append-only invariant) makes this a single-Write operation — no separate mutation call per section.
+5. **Sync Salesforce Campaign status to `Completed` (BC-8752, soft-fail).** After the learnings.md append succeeds, mirror the closed state into SF via the σ3 trigger per the BC-8752 design (Linear sub-issue 8 close → SF `Completed`). Fires on every successful append — repeated debriefs against the same campaign land on the underlying `/revops:update-sf-campaign-status` Phase 5 idempotency noop, so re-runs are cheap.
+   1. **Resolve the GTM slug from the manifest.** `/marketing:plan-campaign` writes manifest at `docs/campaigns/<short-entity>/<slug>/manifest.json` using the SHORT-form entity slug it accepts (`nites` / `supply` / `labs` / `cross-entity`), while this skill's Gate-3 `{entity}` is the LONG-form slug (`brite-nites` / `brite-supply` / `brite-labs`). This is the same long-vs-short asymmetry documented at § Known cross-skill asymmetry below. Normalize at read time: derive `<short-entity>` by stripping the `brite-` prefix from `{entity}` (`brite-nites` → `nites`, `brite-supply` → `supply`, `brite-labs` → `labs`; this skill's Gate-3 set does not include cross-entity, so the normalization is total). Then try `Read` `docs/campaigns/<short-entity>/{campaign-name}/manifest.json`. Both path segments are safe: `<short-entity>` is the mechanically-stripped form of the Gate-3-validated `{entity}` enum (containment proof identical to the original); `{campaign-name}` is regex-gated by the Before-Starting Input-validation block (matches `^[a-z0-9-]{1,80}$`, blocking `..` / `/` / `\` traversal). If the file does not exist OR JSON parse fails OR `.slug` is absent, log to stderr `[BC-8752] No GTM manifest at "docs/campaigns/<short-entity>/{campaign-name}/manifest.json"; skipping σ3 SF sync. If /marketing:plan-campaign was used to scaffold, {campaign-name} must equal the strict-kebab slug it produced. Otherwise this is a retroactive debrief — expected.` and exit Workflow 4 normally. The learnings.md append already landed — that's the marketing-flywheel source of truth; SF mirroring is downstream cosmetic state.
+   2. **Re-validate the manifest slug** (defense-in-depth against manifest tampering). After extracting `<slug>` from `manifest.slug`, check it against the canonical regex `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$` (same regex as `/revops:update-sf-campaign-status` Phase 1 and ADR-012 canonicals lint). Apply the regex without the multiline (`m`) flag — `^` and `$` must match input boundaries, not line boundaries; a manifest slug containing an embedded newline must FAIL the check. On regex mismatch, log `[BC-8752] Manifest slug failed canonical regex — refusing σ3 SF sync. Manifest at "docs/campaigns/<short-entity>/{campaign-name}/manifest.json" may be tampered or out-of-date.` (the slug VALUE is intentionally omitted from this log to avoid echoing potentially poisoned content into the agent context) and exit Workflow 4 normally. Without this guard a whitespace-bearing manifest slug could inject an extra `--linear-status` flag into the args string constructed in step 3.
+   3. **Invoke the sibling slash command** (BC-8717 / BC-8723 respec pattern):
+
+      ```
+      Skill(
+        skill: "revops:update-sf-campaign-status",
+        args: "--slug=<manifest.slug> --linear-status=completed"
+      )
+      ```
+
+   4. **Parse the single-line JSON response.** Branch in this exact order — the first matching case wins (mirrors `/marketing:launch-campaign` Phase 11 step 7 fan-out for consistency):
+      - **`error: <kind>`** (any `error` key) → log `[BC-8752] σ3 SF sync soft-fail: <kind>. Detail: <stringified error>. Debrief succeeded; SF status is stale until reconciliation.`
+      - **`warning: campaign_not_found`** (warning key, no `campaign_id`) → log `[BC-8752] SF Campaign for slug "<slug>" not found — σ3 auto-create at plan-campaign Step 8b may have failed. Reconcile manually via /revops:create-sf-campaign + /marketing:sync-campaign-status --slug=<slug> --status=completed.`
+      - **Success with degradation** (`campaign_id` AND `warning` key both present — typically `warning: "instance_url_unknown"` or `warning: "updated_at_unavailable"` per the underlying command's Phase 7 / Phase 6 fall-through) → log `[BC-8752] SF Campaign synced with degradation: <slug> → Completed (campaign_id=<id>, warning=<kind>).`
+      - **Success or noop** (`campaign_id` present, no `warning` key) → log `[BC-8752] SF Campaign synced: <slug> → Completed (campaign_id=<id>).`
+   5. **Soft-fail invariant.** No SF response halts the debrief. The learnings.md entry IS the marketing flywheel's source of truth; SF mirroring is downstream effect. This matches the philosophy in `/marketing:launch-campaign` Phase 11 step 7 and `/marketing:plan-campaign` Step 8b.
 
 ---
 
@@ -329,12 +455,13 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 4. Present Q3 via `AskUserQuestion` with the auto-suggested Worked bullets from §5 top-2 rows; operator authors the Didn't side in free text.
 5. Present Q4 via `AskUserQuestion` with free-text input only (no auto-suggest — surprise is operator-authored).
 6. Present Q5 via `AskUserQuestion` with the auto-suggested transferable insight from §6 Next Iteration Recommendations plus a Yes/No for the `transferable:` flag.
-7. Assemble tags: `#entity/{entity}` from Gate 3; `#vertical/` proposed from the focal campaign's segment dimension (operator confirms); `#persona/` proposed from the gtm-strategy persona rollup (operator confirms); `#angle/` proposed from the creative-angles slug if seeded, else operator slugs.
-8. Compute verdict from §3 rubric table using the Workflow 1 metrics. Echo the computed verdict to the operator for sanity-check (optional `AskUserQuestion` override only if the computed verdict contradicts operator's gut-read).
+7. Assemble tags: `#entity/brite-{short_entity}` from Gate 3 (always long-form per § Tag scheme — re-expand from `{short_entity}` regardless of input form per Gate 3 line above); `#vertical/` proposed from the focal campaign's segment dimension (operator confirms); `#persona/` proposed from the gtm-strategy persona rollup (operator confirms); `#angle/` proposed from the creative-angles slug if seeded, else operator slugs.
+8. Compute campaign verdict from §3 Campaign verdict rubric using the Workflow 1 metrics. Echo the computed campaign verdict to the operator for sanity-check (optional `AskUserQuestion` override only if the computed campaign verdict contradicts operator's gut-read).
 9. Run §5 Workflow 4 to append the entry.
-10. On `transferable: true`, dispatch §6 Procedure 3.
+10. Run § Discoveries gates for each of the three categories (`icp-refinement` / `offer-retirement` / `persona-discovery`) — fire each gate only when its per-category When-to-emit conditions hold. Each emit appends one signal to `docs/campaigns/{short_entity}/{slug}/discoveries.json`; on operator decline, no write. Independent of step 11 below.
+11. On `transferable: true`, dispatch §6 Procedure 3.
 
-**Expected output:** One new entry appended to `docs/campaigns/{entity}/learnings.md` with the `## Campaign log` section starting with this entry and the prior entries below. Summary stats / What works / What doesn't sections regenerated. Debrief completed in under 5 minutes of operator time.
+**Expected output:** One new entry appended to `docs/campaigns/{short_entity}/learnings.md` with the `## Campaign log` section starting with this entry and the prior entries below. Summary stats / What works / What doesn't sections regenerated. Debrief completed in under 5 minutes of operator time. Zero or more signals appended to `docs/campaigns/{short_entity}/{slug}/discoveries.json` per § Discoveries gates (only categories whose When-to-emit conditions hold and that the operator confirmed).
 
 **Error handling:**
 - `analysis-*.md` parse failure (unexpected section headers or missing §2/§5/§6) → fall through to Procedure 2 (retroactive path) and note the artifact-corruption in the entry Q4 bullets.
@@ -351,15 +478,16 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 
 **Steps:**
 1. Run §5 Workflow 2 to pull metrics from Email Bison. On availability failure, halt with operator message and route to `/marketing:setup-email-bison`.
-2. Apply §3 rubric against pulled metrics to pre-compute verdict.
+2. Apply §3 Campaign verdict rubric against pulled metrics to pre-compute campaign verdict.
 3. Present Q1 via `AskUserQuestion` — operator authors the hypothesis from memory (no auto-suggest for retroactive path's Q1).
-4. Present Q2 via `AskUserQuestion` with auto-suggested result token derived from the pre-computed verdict (`SCALE`/`ITERATE` → `CONFIRMED`; `PAUSE` → `PARTIAL`; `KILL` → `REJECTED`). Operator confirms or overrides.
+4. Present Q2 via `AskUserQuestion` with auto-suggested result token derived from the pre-computed campaign verdict (`SCALE`/`ITERATE` → `CONFIRMED`; `PAUSE` → `PARTIAL`; `KILL` → `REJECTED`). Operator confirms or overrides.
 5. Present Q3 / Q4 / Q5 via `AskUserQuestion` — all operator-authored (retroactive path has no §5 Attribution rows to seed).
 6. Assemble tags as in Procedure 1 step 7. Operator confirms all four families.
 7. Run §5 Workflow 4 to append the entry.
-8. On `transferable: true`, dispatch §6 Procedure 3.
+8. Run § Discoveries gates for each of the three categories (`icp-refinement` / `offer-retirement` / `persona-discovery`) — fire each gate only when its per-category When-to-emit conditions hold. Same emit-path as Procedure 1 step 10. Independent of step 9 below.
+9. On `transferable: true`, dispatch §6 Procedure 3.
 
-**Expected output:** Same as Procedure 1 — one appended entry. Retroactive paths typically take longer (5–8 minutes) because Q3–Q5 lack auto-suggest; operator-authored in full.
+**Expected output:** Same as Procedure 1 — one appended entry plus zero or more discoveries.json signals per § Discoveries gates. Retroactive paths typically take longer (5–8 minutes) because Q3–Q5 lack auto-suggest; operator-authored in full.
 
 **Error handling:**
 - EB availability probe failure → halt with setup pointer, do not fall through to a fabricated-metrics path.
@@ -376,10 +504,10 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 **Ordering:** Steps 1 and 2 run BEFORE Procedure 1 Step 9 / Procedure 2 Step 7 (the final `Write`), so the `transferable:` flag and Q5 body are finalized pre-Write — this preserves the §3 Append-only invariant. Steps 3–5 may run before or after the Write.
 
 **Steps:**
-1. `Grep` for cross-entity matches — run a single `Grep` with pattern `#angle/{a}` and `glob: "docs/campaigns/*/learnings.md"` (where `{a}` is the just-assembled angle-slug). In post-processing, filter out any match line whose path contains `/{entity}/` to exclude the current entity. A single `Grep` call replaces an N+1 `Glob`+`Read` loop over growing `learnings.md` files.
+1. `Grep` for cross-entity matches — run a single `Grep` with pattern `#angle/{a}` and `glob: "docs/campaigns/*/learnings.md"` (where `{a}` is the just-assembled angle-slug). The `*` segment captures both short-form (`nites`/`supply`/`labs` — post-BC-8719 canonical) and any residual legacy long-form (`brite-nites`/`brite-supply`/`brite-labs`) in a single call. In post-processing, filter out any match line whose path contains `/{short_entity}/` OR `/brite-{short_entity}/` (both forms) to exclude the current entity across the migration window. A single `Grep` call replaces an N+1 `Glob`+`Read` loop over growing `learnings.md` files.
 2. If Grep returns ≥1 match whose entry also carries the same `#vertical/` + `#persona/` combination, the insight is not novel cross-entity — set `transferable: false` in the entry YAML and rewrite Q5 body to "pattern already logged in `docs/campaigns/{other-entity}/learnings.md`" BEFORE the Write in Procedure 1 Step 9 / Procedure 2 Step 7. This is a pre-Write revision of the entry content, not a post-Write mutation.
 3. On novel insight (zero matches, or matches lacking the full tag triple), `AskUserQuestion`: "This insight may apply cross-entity (e.g. from `{entity}` to `{other-entity}`). Propose an update to `docs/marketing-context.md`?" with options `Yes, propose update` / `No, skip propagation` / `No, keep entity-specific`.
-4. On `Yes`, hand off to `/marketing:product-marketing-context` with the proposal payload: `{ entity_pair: [entity, other-entity], transferable_note: "...", source_entry: "docs/campaigns/{entity}/learnings.md#entry-{N}" }`.
+4. On `Yes`, hand off to `/marketing:product-marketing-context` with the proposal payload: `{ entity_pair: [entity, other-entity], transferable_note: "...", source_entry: "docs/campaigns/{short_entity}/learnings.md#entry-{N}" }`.
 5. On `No`, skip propagation and note the skip in the entry's Q5 free-text ("operator declined cross-entity propagation").
 
 **Expected output:** Either a `product-marketing-context` invocation or a skip-note in the entry. No write to `docs/marketing-context.md` from this skill.
@@ -397,7 +525,7 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 
 **Steps:**
 1. `AskUserQuestion` confirming the contradiction: "This insight appears to contradict the handbook at `{anchor}`. Raise a handbook-drift issue?" Include the handbook anchor URL in the question body for operator review.
-2. On `Yes`, hand off to `/workflows:handbook-drift-check` with the payload `{ entry_path: "docs/campaigns/{entity}/learnings.md#entry-{N}", handbook_anchor: "{anchor}", contradiction_summary: "..." }`.
+2. On `Yes`, hand off to `/workflows:handbook-drift-check` with the payload `{ entry_path: "docs/campaigns/{short_entity}/learnings.md#entry-{N}", handbook_anchor: "{anchor}", contradiction_summary: "..." }`.
 3. On `No`, note the operator's justification in the entry Q5 free-text ("operator declined handbook-drift issue: {reason}") — parallel to Procedure 3 Step 5's skip-note routing. Q4 is reserved for genuine surprise findings, not post-hoc justifications.
 
 **Expected output:** Either a drift-check invocation or a notation in the entry. No direct handbook edits.
@@ -413,10 +541,10 @@ The final mutating step of every debrief run. Both create-on-missing and append-
 
 | Score | Criteria |
 |------:|----------|
-| 10 | All 5 questions asked, answered, and recorded in the entry body verbatim (Q1 in fixed-format sentence, Q2 as token+summary, Q3 as worked/didn't pair, Q4 as 1–3 surprise bullets, Q5 as sentence-or-"entity-specific"). Verdict computed from the §3 4-verdict rubric with exact numeric metrics cited in the entry frontmatter (`metrics.reply_rate`, `metrics.interested_rate`, `metrics.bounce_rate`, `metrics.sent`, `metrics.days` populated). All four tag families present, all lowercase-hyphenated. Entry appended to `docs/campaigns/{entity}/learnings.md` (never overwritten); `## Summary stats`, `## What works`, `## What doesn't` sections regenerated in place; `## Campaign log` strict-append with new entry at top. `transferable:` flag set correctly (true when cross-entity pattern evident; false otherwise). Debrief conversation under 5 minutes of operator time. Q1/Q2/Q3 auto-suggestions drawn verbatim from the `analysis-*.md` artifact when Gate 2 matched. Retroactive path EB availability probe hit the correct entity-routed workspace (never cross-workspace). On `transferable: true`, `product-marketing-context` or `handbook-drift-check` proposal surfaced via `AskUserQuestion` — never auto-written. |
-| 7–9 | One gap from the 10-tier list. Examples: 4 of 5 questions recorded (Q4 skipped); verdict numerically correct but the threshold rule not cited in the entry frontmatter; 3 of 4 tag families present (missing `#angle/`); conversation ran 5–7 minutes (still acceptable, but exceeded target). `transferable:` flag set but the cross-entity novelty check (§6 Procedure 3 Step 1–2) was skipped. |
-| 4–6 | Functional but missing structural elements. Verdict assigned without citing the numeric threshold check (operator read the table but no metrics in `metrics:` frontmatter). Tags written in TitleCase or with spaces ("Commercial Real Estate" instead of `commercial-real-estate`) — entry would fail the §8 lowercase-hyphenated gate on re-check. Entry written without the `source_analysis` frontmatter field on post-analysis path. `## Summary stats` section drifted (last debrief date not updated). `list_campaigns` client-side date filter skipped on an ambiguous retroactive match (operator picked wrong year's campaign). |
-| 1–3 | Hard failure — any ONE drops the run. Subjective verdict ("pretty good" instead of `SCALE`/`ITERATE`/`PAUSE`/`KILL`). Learnings.md entry overwritten rather than appended (a prior entry's body mutated). Auto-wrote to `docs/marketing-context.md` or handbook content without `AskUserQuestion` confirmation. Skipped a §2 gate (e.g. no entity confirmation before the `Write`). Invented a tag family outside the 4-family scheme (e.g. `#channel/`, `#cycle/`). Under-5-minute constraint violated AND operator did not approve a scope extension. Retroactive-path EB call hit the wrong workspace (Supply campaign probed on `emailbison-personal`). Fabricated `Campaign_Source__c` Opportunity data without running the §5 Workflow 3 FieldDefinition preflight. |
+| 10 | All 5 questions asked, answered, and recorded in the entry body verbatim (Q1 in fixed-format sentence, Q2 as token+summary, Q3 as worked/didn't pair, Q4 as 1–3 surprise bullets, Q5 as sentence-or-"entity-specific"). Campaign verdict computed from the §3 Campaign verdict rubric with exact numeric metrics cited in the entry frontmatter (`metrics.reply_rate`, `metrics.interested_rate`, `metrics.bounce_rate`, `metrics.sent`, `metrics.days` populated). All four tag families present, all lowercase-hyphenated. Entry appended to `docs/campaigns/{short_entity}/learnings.md` (never overwritten); `## Summary stats`, `## What works`, `## What doesn't` sections regenerated in place; `## Campaign log` strict-append with new entry at top. `transferable:` flag set correctly (true when cross-entity pattern evident; false otherwise). Debrief conversation under 5 minutes of operator time. Q1/Q2/Q3 auto-suggestions drawn verbatim from the `analysis-*.md` artifact when Gate 2 matched. Retroactive path EB availability probe hit the correct entity-routed workspace (never cross-workspace). On `transferable: true`, `product-marketing-context` or `handbook-drift-check` proposal surfaced via `AskUserQuestion` — never auto-written. |
+| 7–9 | One gap from the 10-tier list. Examples: 4 of 5 questions recorded (Q4 skipped); campaign verdict numerically correct but the threshold rule not cited in the entry frontmatter; 3 of 4 tag families present (missing `#angle/`); conversation ran 5–7 minutes (still acceptable, but exceeded target). `transferable:` flag set but the cross-entity novelty check (§6 Procedure 3 Step 1–2) was skipped. |
+| 4–6 | Functional but missing structural elements. Campaign verdict assigned without citing the numeric threshold check (operator read the table but no metrics in `metrics:` frontmatter). Tags written in TitleCase or with spaces ("Commercial Real Estate" instead of `commercial-real-estate`) — entry would fail the §8 lowercase-hyphenated gate on re-check. Entry written without the `source_analysis` frontmatter field on post-analysis path. `## Summary stats` section drifted (last debrief date not updated). `list_campaigns` client-side date filter skipped on an ambiguous retroactive match (operator picked wrong year's campaign). |
+| 1–3 | Hard failure — any ONE drops the run. Subjective campaign verdict ("pretty good" instead of `SCALE`/`ITERATE`/`PAUSE`/`KILL`). Learnings.md entry overwritten rather than appended (a prior entry's body mutated). Auto-wrote to `docs/marketing-context.md` or handbook content without `AskUserQuestion` confirmation. Skipped a §2 gate (e.g. no entity confirmation before the `Write`). Invented a tag family outside the 4-family scheme (e.g. `#channel/`, `#cycle/`). Under-5-minute constraint violated AND operator did not approve a scope extension. Retroactive-path EB call hit the wrong workspace (Supply campaign probed on `emailbison-personal`). Fabricated `Campaign_Source__c` Opportunity data without running the §5 Workflow 3 FieldDefinition preflight. |
 
 ---
 
@@ -435,8 +563,8 @@ Skill-specific hard failures (each drops to §7 Rubric 1–3 band):
 - **Do not overwrite `learnings.md` entries.** Append-only, strict. Re-running a debrief on the same `{campaign-name}` with a new `debrief_at` date produces a new entry — the prior entry's body stays untouched. The three summary sections (`## Summary stats`, `## What works`, `## What doesn't`) regenerate in place; the `## Campaign log` section is strict-append. Mutating a past Campaign-log entry's body is the worst-case failure mode for this skill because it rewrites organizational memory silently.
 - **Do not skip data-first suggestion.** When `analysis-*.md` exists at Gate 2, Q1 must auto-suggest from §5 Attribution, Q2 from §2 Segment Ranking verdict, Q3 Worked side from §5 top-2 rows, Q5 from §6 Next Iteration Recommendations. Hand-cranking questions without suggestion when the artifact exists wastes operator time and violates the under-5-minute constraint. Retroactive path is exempt because no artifact exists.
 - **Do not use non-lowercase-hyphenated tags.** `#Entity/BriteNites`, `#vertical/Commercial Real Estate`, `#angle/CapEx_Timing`, `#persona/facilitiesDirector` are all refused. Tag values are lowercase-hyphenated slugs matching `^[a-z0-9-]+$`. The four tag families are the ONLY permitted keys: `#entity/`, `#vertical/`, `#persona/`, `#angle/`. Inventing a fifth family (e.g. `#channel/`, `#cycle/`, `#cohort/`) is refused.
-- **Do not use subjective verdicts.** The four verdict tokens (`SCALE`, `ITERATE`, `PAUSE`, `KILL`) are the only permitted `verdict:` frontmatter values. Prose substitutes ("pretty good", "meh", "worth another shot", "solid", "looking promising") are refused. Every verdict must trace to the §3 rubric table — if the metrics don't clearly resolve to one cell, the default is `PAUSE` (sub-floor / ambiguous signal) until more data arrives, never a prose token.
-- **Do not `Write` to any path other than the two allowlisted destinations.** This skill's `Write` allowlist is exactly two paths: `docs/campaigns/{entity}/learnings.md` (primary output, §6 Procedure 1/2) and `docs/campaigns/proposed-context-updates.md` (Procedure 3 error-fallback only). Any other `Write` destination — especially `docs/marketing-context.md`, handbook content, Linear issue descriptions via any path other than `mcp__linear__save_issue`, or another skill's artifacts — is a §7 Rubric 1–3 hard failure. The marketing-context and handbook-drift procedures route through `AskUserQuestion` confirmation + skill/workflow handoff, never direct Write.
+- **Do not use subjective campaign verdicts.** The four campaign verdict tokens (`SCALE`, `ITERATE`, `PAUSE`, `KILL`) are the only permitted `verdict:` frontmatter values (the frontmatter field name stays `verdict:` per ADR-018 Consequences — single-vocab artifact). Prose substitutes ("pretty good", "meh", "worth another shot", "solid", "looking promising") are refused. Every campaign verdict must trace to the §3 Campaign verdict rubric — if the metrics don't clearly resolve to one cell, the default is `PAUSE` (sub-floor / ambiguous signal) until more data arrives, never a prose token.
+- **Do not `Write` to any path other than the three allowlisted destinations.** This skill's `Write` allowlist is exactly three paths: `docs/campaigns/{short_entity}/learnings.md` (primary output, §6 Procedure 1/2 — short-form canonical per BC-8719), `docs/campaigns/{short_entity}/{slug}/discoveries.json` (per-campaign-run discovery signals, § Discoveries gates), and `docs/campaigns/proposed-context-updates.md` (Procedure 3 error-fallback only). Any other `Write` destination — especially the legacy long-form `docs/campaigns/brite-{short_entity}/learnings.md` (read-compat only, never Write), `docs/marketing-context.md`, handbook content, Linear issue descriptions via any path other than `mcp__linear__save_issue`, or another skill's artifacts — is a §7 Rubric 1–3 hard failure. The marketing-context and handbook-drift procedures route through `AskUserQuestion` confirmation + skill/workflow handoff, never direct Write.
 
 ---
 
@@ -446,15 +574,19 @@ Nine scenarios across Tier 1 (free assertions, no tool calls required) and Tier 
 
 ### Tier 1 — Free assertions
 
-- **`post-analysis-happy-path`** — Given a Nites analysis artifact at `docs/campaigns/brite-nites/analysis-spring-promo-2026-04-15.md` reporting Reply Rate 1.4%, Interested Rate 28%, Bounce Rate 2%, sent=1200, days=14, the skill proposes verdict `SCALE` against the b2c column (sub-1% threshold exceeded) and writes an entry to `docs/campaigns/brite-nites/learnings.md`. Output must contain: all 5 Q-sections populated, all 4 tag families lowercase-hyphenated, `metrics:` frontmatter with the five numeric fields from Workflow 1, `source_analysis:` pointing to the consumed artifact, `verdict: SCALE`, and a handoff prompt to marketing-context-proposal when `transferable: true`.
-- **`retroactive-manual-stats`** — Given zero `analysis-*.md` matches for `brite-supply`, operator-supplied `{campaign-name}` of `summer-installer-2026-03`, EB availability probe on `emailbison-b2b` succeeds, `get_campaign_stats` returns sent=800 / bounce_rate=0.04, `get_replies_analytics` returns interested_rate=0.12 / reply_rate=0.003, days elapsed=10. Output must assign verdict `KILL` (Reply Rate <0.5% AND sent ≥500 AND days ≥7 against b2b column), with `metrics:` frontmatter populated from the standalone pulls, `source_analysis:` omitted (retroactive path has no artifact), and no auto-suggest source cited in Q1/Q3/Q4/Q5 bodies.
-- **`subjective-verdict-refused`** — Given an operator-drafted entry body containing `verdict: "pretty good"` or `verdict: "meh"` or any other non-token value in the frontmatter, the skill refuses to `Write` and responds with the four permitted tokens plus the §3 rubric table. Output must show: §8 guardrail invoked, entry not appended to `learnings.md`, retry prompt offering a numeric-resolved token.
-- **`append-only-refuses-overwrite`** — Given an existing entry for `{campaign-name}: spring-promo` already in `docs/campaigns/brite-nites/learnings.md` with `debrief_at: 2026-04-15`, and a fresh debrief invocation on the same campaign with `debrief_at: 2026-04-22`, the skill appends a new entry with the 2026-04-22 date and leaves the prior 2026-04-15 entry body unchanged. Output must show: two entries visible in `## Campaign log` after the second debrief, both with identical `campaign:` frontmatter but different `debrief_at:` dates, neither body mutated.
+- **`post-analysis-happy-path`** — Given a Nites analysis artifact at `docs/campaigns/nites/analysis-spring-promo-2026-04-15.md` reporting Reply Rate 1.4%, Interested Rate 28%, Bounce Rate 2%, sent=1200, days=14, the skill proposes campaign verdict `SCALE` against the b2c column (sub-1% threshold exceeded) and writes an entry to `docs/campaigns/nites/learnings.md` (short-form canonical per BC-8719). Output must contain: all 5 Q-sections populated, all 4 tag families lowercase-hyphenated, `metrics:` frontmatter with the five numeric fields from Workflow 1, `source_analysis:` pointing to the consumed artifact, `verdict: SCALE`, and a handoff prompt to marketing-context-proposal when `transferable: true`.
+- **`retroactive-manual-stats`** — Given zero `analysis-*.md` matches for `brite-supply`, operator-supplied `{campaign-name}` of `summer-installer-2026-03`, EB availability probe on `emailbison-b2b` succeeds, `get_campaign_stats` returns sent=800 / bounce_rate=0.04, `get_replies_analytics` returns interested_rate=0.12 / reply_rate=0.003, days elapsed=10. Output must assign campaign verdict `KILL` (Reply Rate <0.5% AND sent ≥500 AND days ≥7 against b2b column), with `metrics:` frontmatter populated from the standalone pulls, `source_analysis:` omitted (retroactive path has no artifact), and no auto-suggest source cited in Q1/Q3/Q4/Q5 bodies.
+- **`subjective-verdict-refused`** — Given an operator-drafted entry body containing `verdict: "pretty good"` or `verdict: "meh"` or any other non-token value in the frontmatter, the skill refuses to `Write` and responds with the four permitted campaign verdict tokens plus the §3 Campaign verdict rubric. Output must show: §8 guardrail invoked, entry not appended to `learnings.md`, retry prompt offering a numeric-resolved token.
+- **`append-only-refuses-overwrite`** — Given an existing entry for `{campaign-name}: spring-promo` already in `docs/campaigns/nites/learnings.md` with `debrief_at: 2026-04-15`, and a fresh debrief invocation on the same campaign with `debrief_at: 2026-04-22`, the skill appends a new entry with the 2026-04-22 date and leaves the prior 2026-04-15 entry body unchanged. Output must show: two entries visible in `## Campaign log` after the second debrief, both with identical `campaign:` frontmatter but different `debrief_at:` dates, neither body mutated.
+
+- **`short-form-write-default`** — Given Gate 3 returns `brite-labs` (long-form input, accepted per BC-8719 backward-compat window), the skill normalizes to `{short_entity}=labs` and writes the entry to `docs/campaigns/labs/learnings.md` — never to the legacy long-form `docs/campaigns/brite-labs/learnings.md`. The same invocation with Gate 3 returning short-form `labs` writes to the same short-form path. Output must show: zero `Write` calls to any path beginning with `docs/campaigns/brite-`; the entry lands at `docs/campaigns/labs/learnings.md`.
+
+- **`legacy-long-form-read-warn`** — Given a pre-BC-8719 `docs/campaigns/brite-labs/learnings.md` exists on disk AND no short-form `docs/campaigns/labs/learnings.md` exists, the skill's Workflow 4 Step 1 short-form `Read` returns file-not-found, the legacy long-form fallback `Read` succeeds, and stderr emits the literal token `[BC-8719]` along with a pointer to `plugins/marketing/scripts/migrate_entity_slugs.py`. The Write target remains the short-form canonical (`docs/campaigns/labs/learnings.md`); the legacy long-form file is NOT mutated by this run. Output must show: warning fired exactly once; the new `learnings.md` at the short-form path contains the prior long-form entries plus the freshly appended entry.
 - **`under-5-minute-autosuggest`** — Given `analysis-*.md` present and well-formed, the skill must NOT call `AskUserQuestion` for Q1 hypothesis free-text when the §5 Attribution row provides it — instead, it calls `AskUserQuestion` with the auto-suggested text as the first option and "Edit" as the second option. Operator can confirm with one tap per question. Output trace must show: 5 `AskUserQuestion` calls total (one per question), each with an auto-suggested option as the first choice for Q1/Q2/Q3/Q5, and a free-text option as the first choice for Q4.
 - **`tag-format-hyphenated`** — Given operator typing "Commercial Real Estate" into a `#vertical/` tag prompt, the skill normalizes before append: the written tag is `#vertical/commercial-real-estate`. Similarly, "Facilities Director" becomes `#persona/facilities-director`, "CapEx_Timing" becomes `#angle/capex-timing` (mechanical normalization only: lowercase + whitespace-and-underscore to hyphen). The skill does NOT expand abbreviations semantically — if the operator wants `capital-expenditure-timing`, they type `Capital Expenditure Timing`. Output must show: no tag in the entry frontmatter contains spaces, underscores, capitals, or punctuation other than `/` and `-`.
 
 ### Tier 2 — Tool-assisted
 
-- **`transferable-cross-entity-flag`** — Given a new debrief entry on `brite-supply` with `transferable: true` and `#angle/capital-expenditure-timing`, when §6 Procedure 3 Step 1 globs `docs/campaigns/brite-labs/learnings.md` and that file either doesn't exist or contains no matching `#angle/capital-expenditure-timing` entry, the skill surfaces an `AskUserQuestion` proposing a marketing-context update with the three-option response set (Yes propose / No skip propagation / No keep entity-specific). On "Yes", the skill must emit a handoff payload naming `product-marketing-context` as the target, with `entity_pair: [brite-supply, brite-labs]`, `transferable_note`, and `source_entry` fields populated. On "No skip", the entry's Q5 body must include the explicit skip note "operator declined cross-entity propagation".
+- **`transferable-cross-entity-flag`** — Given a new debrief entry on `brite-supply` (long-form input) with `transferable: true` and `#angle/capital-expenditure-timing`, when §6 Procedure 3 Step 1 runs the cross-entity `Grep` over `docs/campaigns/*/learnings.md` (which matches both short-form `labs/` and any legacy `brite-labs/`) and finds no entry carrying the same `#angle/capital-expenditure-timing` outside `{short_entity}=supply`, the skill surfaces an `AskUserQuestion` proposing a marketing-context update with the three-option response set (Yes propose / No skip propagation / No keep entity-specific). On "Yes", the skill must emit a handoff payload naming `product-marketing-context` as the target, with `entity_pair: [brite-supply, brite-labs]` (long-form tag-level identifiers preserved per § Tag scheme — independent of path normalization), `transferable_note`, and `source_entry` fields populated. On "No skip", the entry's Q5 body must include the explicit skip note "operator declined cross-entity propagation".
 - **`missing-context-degraded-mode`** — Given `docs/marketing-context.md` absent (verified by `Glob` at Gate 1), the skill warns with the verbatim Gate 1 string ("Marketing context doc not found — proceeding with reduced context. Run `/marketing:product-marketing-context` to generate it.") and continues with operator-only context. `learnings.md` is still written correctly with all required fields. Output must show: warning emitted once at Gate 1; no `Read` attempt on `docs/marketing-context.md`; entry frontmatter populated without any `marketing_context_version:` or equivalent reference.
 - **`eb-short-form-namespace`** — Given the retroactive path (Procedure 2) for a Nites campaign, every EB tool call in the resulting trace uses the SHORT form `mcp__emailbison-personal__*` (short form for Nites per workspace routing). Zero calls to `mcp__plugin_marketing_emailbison-*__*`. If the skill mistakenly uses the plugin-scoped form, the availability probe silent-fails per the CLAUDE.md gotcha and the skill should halt with the setup pointer — NOT continue with a fabricated-metrics path.

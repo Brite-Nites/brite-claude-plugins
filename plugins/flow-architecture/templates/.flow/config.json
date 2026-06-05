@@ -1,0 +1,16 @@
+{
+  "_comment": "Schema-reference template. The runtime .flow/config.json is written by flow-preflight Section 4.4 per Q12.4 lock; this file is NOT copied into the project at retrofit time. It exists in the plugin templates/ tree as canonical schema documentation.",
+  "_schema_version": "1",
+  "_required_fields": [
+    "linear_project_id",
+    "linear_project_name",
+    "linear_team_key",
+    "fda_first_setup_at",
+    "fda_plugin_version"
+  ],
+  "linear_project_id": "<LINEAR_PROJECT_ID>",
+  "linear_project_name": "<PROJECT_NAME>",
+  "linear_team_key": "<LINEAR_TEAM_KEY>",
+  "fda_first_setup_at": "<ISO-8601 timestamp>",
+  "fda_plugin_version": "<plugin semver at first-setup time>"
+}

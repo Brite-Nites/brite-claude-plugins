@@ -1,0 +1,242 @@
+[
+  {
+    "id": "MC-01",
+    "description": "empty repo + no LINEAR_ISSUE_COUNT signal → greenfield (Q12.3 default)",
+    "fixture_state": {
+      "intent": false,
+      "inventory": false,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": null
+    },
+    "expected_mode": "greenfield"
+  },
+  {
+    "id": "MC-02",
+    "description": "empty repo + LINEAR_ISSUE_COUNT=5 → greenfield (below Q36.3 threshold)",
+    "fixture_state": {
+      "intent": false,
+      "inventory": false,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": 5
+    },
+    "expected_mode": "greenfield"
+  },
+  {
+    "id": "MC-03",
+    "description": "empty repo + LINEAR_ISSUE_COUNT=9 → greenfield (boundary -1; Q36.3 strict >= 10)",
+    "fixture_state": {
+      "intent": false,
+      "inventory": false,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": 9
+    },
+    "expected_mode": "greenfield"
+  },
+  {
+    "id": "MC-04",
+    "description": "empty repo + LINEAR_ISSUE_COUNT=10 → retrofit (boundary; Q36.3 step 4)",
+    "fixture_state": {
+      "intent": false,
+      "inventory": false,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": 10
+    },
+    "expected_mode": "retrofit"
+  },
+  {
+    "id": "MC-05",
+    "description": "empty repo + LINEAR_ISSUE_COUNT=42 → retrofit (Q36.3 step 4 heuristic)",
+    "fixture_state": {
+      "intent": false,
+      "inventory": false,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": 42
+    },
+    "expected_mode": "retrofit"
+  },
+  {
+    "id": "MC-06",
+    "description": "intent + inventory present, no flows dir → retrofit (Q12 edge: zero-domains-with-full-FDA)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": null
+    },
+    "expected_mode": "retrofit"
+  },
+  {
+    "id": "MC-07",
+    "description": "intent + inventory + flows + no breadcrumb → incremental-add (full FDA shape, no active run)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": null,
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-08",
+    "description": "full FDA + breadcrumb status=completed → incremental-add (Q31.3 stale-completed fallthrough)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "completed", "age_days": 1, "malformed": false},
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-09",
+    "description": "full FDA + breadcrumb status=abandoned → incremental-add (Q31.3 stale-abandoned fallthrough)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "abandoned", "age_days": 1, "malformed": false},
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-10",
+    "description": "full FDA + breadcrumb in_flight aged 14 days → incremental-add (Q31.3 stale-age fallthrough)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 14, "malformed": false},
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-11",
+    "description": "full FDA + breadcrumb malformed JSON → incremental-add (Q31.3 parse-error stale fallthrough)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 0, "malformed": true},
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-12",
+    "description": "full FDA + breadcrumb in_flight fresh (1h old) → resume (Q12.3 + Q31.3)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 0, "malformed": false},
+      "linear_issue_count": null
+    },
+    "expected_mode": "resume"
+  },
+  {
+    "id": "MC-13",
+    "description": "full FDA + breadcrumb in_flight fresh + LINEAR_ISSUE_COUNT=50 → resume (resume precedence over LIC heuristic)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 0, "malformed": false},
+      "linear_issue_count": 50
+    },
+    "expected_mode": "resume"
+  },
+  {
+    "id": "MC-14",
+    "description": "full FDA + no breadcrumb + LINEAR_ISSUE_COUNT=50 → incremental-add (artifact-driven precedence over LIC)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": null,
+      "linear_issue_count": 50
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-15",
+    "description": "empty repo + LINEAR_ISSUE_COUNT='not-a-number' → greenfield (malformed count ignored per flow-detect-mode.sh validation)",
+    "fixture_state": {
+      "intent": false,
+      "inventory": false,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": "not-a-number"
+    },
+    "expected_mode": "greenfield"
+  },
+  {
+    "id": "MC-16",
+    "description": "full FDA + breadcrumb in_flight aged 8 days → incremental-add (stale-age boundary +1 from 7d threshold)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 8, "malformed": false},
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-17",
+    "description": "full FDA + breadcrumb in_flight aged 6 days → resume (fresh boundary -1 from 7d threshold)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 6, "malformed": false},
+      "linear_issue_count": null
+    },
+    "expected_mode": "resume"
+  },
+  {
+    "id": "MC-18",
+    "description": "full FDA + breadcrumb valid JSON + last_updated='not-a-timestamp' → incremental-add (Q31.3 STALE_REASON=timestamp-unparseable fallthrough, distinct path from MC-11)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": true,
+      "flows": true,
+      "breadcrumb": {"status": "in_flight", "age_days": 0, "malformed": false, "malformed_timestamp": true},
+      "linear_issue_count": null
+    },
+    "expected_mode": "incremental-add"
+  },
+  {
+    "id": "MC-19",
+    "description": "intent only (no inventory, no flows) → greenfield (partial-FDA: Q12.3 AND gate requires intent AND inventory; single artifact falls through to LIC heuristic)",
+    "fixture_state": {
+      "intent": true,
+      "inventory": false,
+      "flows": false,
+      "breadcrumb": null,
+      "linear_issue_count": null
+    },
+    "expected_mode": "greenfield"
+  },
+  {
+    "id": "MC-20",
+    "description": "flows only (no intent, no inventory) → greenfield (partial-FDA: Q12.3 AND gate requires intent AND inventory; flows-without-intent falls through)",
+    "fixture_state": {
+      "intent": false,
+      "inventory": false,
+      "flows": true,
+      "breadcrumb": null,
+      "linear_issue_count": null
+    },
+    "expected_mode": "greenfield"
+  }
+]

@@ -1,6 +1,6 @@
 ---
 name: creative-angles
-description: Generate non-obvious outbound angles for the 10% experiment allocation of Brite's barbell GTM strategy, scored on an Asymmetry rubric and verdict-mapped (ALPHA / PROMISING / INTERESTING / COMMODITY) with shelf-life warnings on the alpha-bearing tiers. Serves BDRs, RevOps, and marketing operators running experimental campaigns. Triggers on creative gtm, creative angles, hidden signals for, GTM alpha, creative outbound for, non-obvious angles, experimental campaigns. Hands off to email-copywriting (ALPHA angles), message-market-fit / MSPA (populates the A dimension of an MSPA matrix), and content workflows (INTERESTING redirect); receives from situation-mining (Deep Mode prereq). Adapted from Revgrowth1/ai-gtm-workflows workflow 06 (MIT).
+description: Generate non-obvious outbound angles for the 10% experiment allocation of Brite's barbell GTM strategy, scored on an Asymmetry rubric and angle-verdict-mapped (ALPHA / PROMISING / INTERESTING / COMMODITY per ADR-018) with shelf-life warnings on the alpha-bearing tiers. Serves BDRs, RevOps, and marketing operators running experimental campaigns. Triggers on creative gtm, creative angles, hidden signals for, GTM alpha, creative outbound for, non-obvious angles, experimental campaigns. Hands off to email-copywriting (ALPHA angles), message-market-fit / MSPA (populates the A dimension of an MSPA matrix), and content workflows (INTERESTING redirect); receives from situation-mining (Deep Mode prereq). Adapted from Revgrowth1/ai-gtm-workflows workflow 06 (MIT).
 user-invocable: true
 allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob
 metadata:
@@ -11,7 +11,7 @@ metadata:
 
 # Creative Angles
 
-You are the creative-angle generator for Brite's 10% experiment allocation — the barbell bet against the 90% that ships through `outbound-playbook` via `email-copywriting` and `/marketing:launch-campaign`. This skill serves BDRs, RevOps, and marketing operators whose problem is not that Brite lacks proven patterns, but that the experimental slice of the pipeline needs a disciplined way to turn hidden signals into angles competitors have not discovered yet. The outcome is a ranked list of 3–8 angles per domain, each scored on a reproducible Asymmetry rubric and verdict-mapped to ALPHA, PROMISING, INTERESTING, or COMMODITY, with mandatory shelf-life warnings on the alpha-bearing tiers. **GTM alpha** is the go-to-market version of financial alpha: knowing something competitors do not. If an angle already lives in a Clay template or a LinkedIn thought-leadership thread, the alpha is priced in and the angle is a commodity by definition.
+You are the creative-angle generator for Brite's 10% experiment allocation — the barbell bet against the 90% that ships through `outbound-playbook` via `email-copywriting` and `/marketing:launch-campaign`. This skill serves BDRs, RevOps, and marketing operators whose problem is not that Brite lacks proven patterns, but that the experimental slice of the pipeline needs a disciplined way to turn hidden signals into angles competitors have not discovered yet. The outcome is a ranked list of 3–8 angles per domain, each scored on a reproducible Asymmetry rubric and angle-verdict-mapped to ALPHA, PROMISING, INTERESTING, or COMMODITY, with mandatory shelf-life warnings on the alpha-bearing tiers. **GTM alpha** is the go-to-market version of financial alpha: knowing something competitors do not. If an angle already lives in a Clay template or a LinkedIn thought-leadership thread, the alpha is priced in and the angle is a commodity by definition.
 
 ---
 
@@ -74,7 +74,7 @@ On `WebSearch` rate-limit or transient failure for any single query, retry once 
 
 See `plugins/marketing/references/creative-thinking-models.md` for worked examples, common mistakes, and the "combining functions" table (the most powerful angles use 2+ functions). The names above are load-bearing — BC-5797's factual-anchor rule applies, and any drift from these exact strings (e.g. "Munger Inversion" instead of "Inversion (Munger)") is a §8 Anti-Slop violation.
 
-**Step 4 — Generate 3–5 angles, score each with the §3 Asymmetry Score, and emit via the §4 output artifact shape.** Every angle attributes to at least one forcing function; angles that cite 2+ functions are more likely to land in the ALPHA or PROMISING band per §3 Verdict mapping.
+**Step 4 — Generate 3–5 angles, score each with the §3 Asymmetry Score, and emit via the §4 output artifact shape.** Every angle attributes to at least one forcing function; angles that cite 2+ functions are more likely to land in the ALPHA or PROMISING band per §3 Angle verdict mapping.
 
 ### Deep Mode — requires situation-mining output less than 14 days old
 
@@ -102,43 +102,15 @@ Requires a situation-mining artifact at `docs/research/situations/{domain}-{YYYY
 
 ### Asymmetry Score
 
-Every angle gets a reproducible number. The score weights Novelty and Evidence Density highest because they are the two dimensions that most often separate alpha from noise; Timing matters less only because the other five already constrain it; Downside carries the lowest weight because the worst case for a well-framed creative angle is usually "they ignore the email." Formula:
+See [handbook/marketing/frameworks/asymmetry-rubric.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/asymmetry-rubric.md) for the canonical rubric definition. Formula: `Score = (Novelty*2 + Evidence*2 + Timing*1.5 + Simplicity*1 + ShelfLife*1 + Downside*0.5) / 8`. Each dimension scores 1–10. A reviewer reading a finished artifact can apply the rubric and arrive at the same score — that is the decidability guarantee.
 
-```
-Score = (Novelty*2 + Evidence*2 + Timing*1.5 + Simplicity*1 + ShelfLife*1 + Downside*0.5) / 8
-```
+### Angle verdict mapping
 
-Each dimension scores on a 1–10 band using the per-dimension rubric below.
-
-- **Novelty (2x weight).** Low (1–3) = angle appears in Clay templates or common playbooks. Medium (4–6) = uncommon but discoverable. High (7–10) = no one is using this angle.
-- **Evidence Density (2x weight).** Low (1–3) = single data point, high speculation. Medium (4–6) = 2–3 data points, moderate inference. High (7–10) = 4+ data points, strong inference chain.
-- **Timing Urgency (1.5x weight).** Low (1–3) = evergreen, no time pressure. Medium (4–6) = seasonal or cyclical. High (7–10) = deadline-driven, narrow window.
-- **Execution Simplicity (1x weight).** Low (1–3) = custom tooling needed. Medium (4–6) = manual research. High (7–10) = build list in under 1 hour.
-- **Shelf Life (1x weight).** Low (1–3) = under 1 month. Medium (4–6) = 3–6 months. High (7–10) = 6+ months.
-- **Downside Cap (0.5x weight).** Low (1–3) = risk of negative brand perception. Medium (4–6) = neutral worst case. High (7–10) = worst case = they ignore the email.
-
-A reviewer reading a finished artifact can apply this rubric and arrive at the same score the skill assigned — that is the decidability guarantee. If two reviewers disagree by more than 1.0 on a total score, the angle's evidence chain is underspecified and §7 Rubric drops the run a band.
-
-### Verdict mapping
-
-Every scored angle maps to exactly one verdict tier. The bounds are fixed — do not round, do not split a band.
-
-- **Score 8.0+ → ALPHA.** Test immediately. Small batch (50–100 prospects). Measure response rate before scaling.
-- **Score 6.0–7.9 → PROMISING.** Refine evidence density or timing, then test.
-- **Score 4.0–5.9 → INTERESTING.** Too creative for cold outbound. Redirect to content as a thought-leadership piece.
-- **Score below 4.0 → COMMODITY.** Discard entirely. Use standard campaign ideation via `outbound-playbook` instead.
-
-The verdict labels (`ALPHA`, `PROMISING`, `INTERESTING`, `COMMODITY`) are the only permitted tokens in the output artifact's verdict column — no "pretty strong," no "maybe worth a shot," no hedged prose substitutes. §8 Anti-Slop will refuse subjective verdicts.
+See [handbook/marketing/frameworks/asymmetry-rubric.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/asymmetry-rubric.md) for the canonical verdict mapping. Score 8.0+ → `ALPHA`; 6.0–7.9 → `PROMISING`; 4.0–5.9 → `INTERESTING`; below 4.0 → `COMMODITY`. These four labels are the only permitted tokens.
 
 ### Shelf-life requirements
 
-Every **ALPHA** and **PROMISING** angle MUST include three sub-fields. Missing any of the three drops the run to §7 Rubric 1–3 band; a scored ALPHA or PROMISING row without shelf-life metadata is a hard failure.
-
-1. **Shelf life estimate** — cite a decay category from `plugins/marketing/references/shelf-life-patterns.md`. The five categories are **Regulatory / Deadline**, **Competitive Move**, **Data Insight**, **Industry Pattern**, and **Structural**. Use the category's typical shelf-life band as the starting estimate, then adjust based on the cross-check section of that reference (Clay templates, LinkedIn thought-leaders, conference talks, blog posts, competitor outreach).
-2. **Decay trigger** — one sentence naming the specific event that would kill this angle. Examples: "when the first competitor blog post on SimilarWeb+tariff correlations publishes" or "when CMS finalizes the Q3 2026 rate update" or "when a Clay template for food-service permit monitoring ships." A generic trigger ("when it becomes common knowledge") is insufficient — name the event.
-3. **Refresh date** — a specific ISO date to re-evaluate the angle. Default: generation date + 90 days, or shelf-life expiry, whichever is sooner. Example: `2026-07-01`. Round to the nearest quarter-end only when the decay category is Structural (12+ months).
-
-INTERESTING and COMMODITY verdicts do NOT require shelf-life metadata — they are either redirected to content workflows (INTERESTING) or discarded (COMMODITY), so shelf-life is irrelevant to the decision. Only the alpha-bearing tiers carry the metadata burden, because only the alpha-bearing tiers produce angles the operator will ship.
+See [handbook/marketing/frameworks/asymmetry-rubric.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/asymmetry-rubric.md) for the canonical shelf-life requirements. Every ALPHA and PROMISING angle must include: (1) shelf life estimate citing a decay category, (2) decay trigger naming the specific event that would kill the angle, (3) refresh date (ISO date). INTERESTING and COMMODITY angles do not require shelf-life metadata.
 
 ---
 
@@ -174,8 +146,8 @@ Per [`plugins/marketing/references/hidden-signals-library.md`](../../../referenc
 
 **Hands off to:**
 
-- **[BC-5825](https://linear.app/brite-nites/issue/BC-5825) `email-copywriting`** — fires when the operator selects an ALPHA angle plus an offer tier. `email-copywriting` receives the tuple `{angle, situation-mining-artifact-if-deep, offer-tier}` and emits the Email-Bison-formatted subject + body that `/marketing:launch-campaign` consumes.
-- **[BC-5829](https://linear.app/brite-nites/issue/BC-5829) `message-market-fit` / MSPA** — fires when the operator wants to populate the A (angle) dimension of an MSPA experiment matrix. The verdict-mapped angle list is the input.
+- **[BC-5825](https://linear.app/brite-nites/issue/BC-5825) `email-copywriting`** — fires when the operator selects an ALPHA angle plus an offer posture. `email-copywriting` receives the tuple `{angle, situation-mining-artifact-if-deep, offer-posture}` (per ADR-017; legacy term: offer tier) and emits the Email-Bison-formatted subject + body that `/marketing:launch-campaign` consumes.
+- **[BC-5829](https://linear.app/brite-nites/issue/BC-5829) `message-market-fit` / MSPA** — fires when the operator wants to populate the A (angle) dimension of an MSPA experiment matrix. The angle-verdict-mapped angle list is the input.
 - **Content workflows (no skill yet)** — fires for INTERESTING angles. Brite does not have a content-workflow skill today; save INTERESTING angles to `docs/content/ideas/{domain}-{YYYY-MM-DD}.md` per §6 Flow 5 and hand back to the operator.
 
 **Receives from:**
@@ -190,6 +162,16 @@ Per [`plugins/marketing/references/hidden-signals-library.md`](../../../referenc
 - Copy generation (that's `email-copywriting`).
 - Launch mechanics (that's `/marketing:launch-campaign`).
 - Test design or next-batch experimentation (that's MSPA).
+
+**Three-verdict translation table (per [ADR-018](../../../../docs/decisions/018-gtm-verdict-vocabularies.md)).** Three sibling skills emit verdicts at different lifecycle gates. Parent labels are renamed so each gating semantic is explicit at the source — vocabularies stay distinct, decision surfaces stay separate.
+
+| Term | Source skill | Decision surface | Timing |
+|---|---|---|---|
+| Angle Verdict | creative-angles | pre-experiment | before mmf |
+| Experiment Verdict | message-market-fit | post-batch | during campaign |
+| Campaign Verdict | campaign-debrief | post-campaign | after campaign closes |
+
+This skill owns the **Angle Verdict** (Gate 1, pre-experiment). See [handbook/marketing/frameworks/verdicts-cross-reference.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/verdicts-cross-reference.md) for the canonical cross-vocabulary token-by-token translation.
 
 ### Output artifact
 
@@ -210,7 +192,7 @@ situation_mining_source: docs/research/situations/example.com-2026-04-15.md  # d
 Body sections (in order):
 
 1. **Signal Clusters** — one entry per cluster, each with 2+ data points and source URLs inline.
-2. **Generated Angles** — 3–8 rows. Each row lists the angle (one sentence), the forcing function(s) attributed, the Asymmetry Score (total plus the per-dimension breakdown), and the verdict label.
+2. **Generated Angles** — 3–8 rows. Each row lists the angle (one sentence), the forcing function(s) attributed, the Asymmetry Score (total plus the per-dimension breakdown), and the angle verdict label (Angle Verdict column).
 3. **Shelf-Life Block** — ALPHA and PROMISING angles only. Three sub-fields per angle: estimate (citing a `shelf-life-patterns.md` decay category), decay trigger, refresh date.
 4. **Worldview Conflicts** — Deep Mode only. Minimum 1 conflict; each framed as a curiosity opening, not a gotcha.
 5. **Handoff Block** — ALPHA angles → pointer to `email-copywriting`; INTERESTING angles → saved to `docs/content/ideas/`; COMMODITY angles → discarded (named only, not carried forward).
@@ -258,16 +240,16 @@ This section turns §3 Methodology + §5 MCP Tool Reference into five concrete f
 1. Run §5 Workflow 1 — five parallel `WebSearch` queries.
 2. Extract signal clusters per §3 Quick Mode Step 2 (2+ data points per cluster, sources diverse).
 3. Apply the 5 forcing functions per §3 Quick Mode Step 3 (Inversion, Adjacent Transfer, Timing Arbitrage, Specificity Escalator, Ecosystem Gap Analysis).
-4. Score each candidate angle per §3 Asymmetry Score; verdict-map per §3 Verdict mapping (ALPHA / PROMISING / INTERESTING / COMMODITY).
+4. Score each candidate angle per §3 Asymmetry Score; angle-verdict-map per §3 Angle verdict mapping (ALPHA / PROMISING / INTERESTING / COMMODITY).
 5. Attach shelf-life metadata to every ALPHA and PROMISING angle per §3 Shelf-life requirements (estimate, decay trigger, refresh date).
 6. Write the output artifact to `docs/research/angles/{domain}-{YYYY-MM-DD}.md` per the §4 Output artifact shape.
-7. Offer handoff per Flow 4 (ALPHA → `email-copywriting`) and Flow 5 (INTERESTING → content), conditional on the verdict mix in the artifact.
+7. Offer handoff per Flow 4 (ALPHA → `email-copywriting`) and Flow 5 (INTERESTING → content), conditional on the angle verdict mix in the artifact.
 
-**Expected output:** artifact with 3–5 angles, verdict-mapped, shelf-life metadata populated on every alpha-tier row, no `situation_mining_source` frontmatter.
+**Expected output:** artifact with 3–5 angles, angle-verdict-mapped, shelf-life metadata populated on every alpha-tier row, no `situation_mining_source` frontmatter.
 
 **Error handling:** `WebSearch` rate-limit → retry once with backoff, then degrade the affected cluster's Evidence band per §5 Workflow 1. No hard halt on partial query failure — partial signal is still scorable.
 
-**Handoff:** per Flow 4 / Flow 5, conditional on verdict mix.
+**Handoff:** per Flow 4 / Flow 5, conditional on angle verdict mix.
 
 ### Flow 2 — Deep Mode with situation-mining
 
@@ -280,7 +262,7 @@ This section turns §3 Methodology + §5 MCP Tool Reference into five concrete f
 3. Run the §3 Deep Mode Step 3 worldview-conflict analysis against the stated worldviews in the situation-mining §Situations section. Minimum 1 conflict surfaced, framed as a curiosity opening.
 4. Cross-reference `plugins/marketing/references/hidden-signals-library.md` Brite-entity tables when the prospect is Nites or Labs (Municipalities §11, HOAs §12, Universities §13).
 5. Apply all 5 forcing functions plus the worldview conflicts to generate 5–8 angles. Angles combining 2+ forcing functions — or a forcing function plus a worldview conflict — are the highest-asymmetry candidates.
-6. Score every angle per §3 Asymmetry Score, verdict-map, and attach shelf-life metadata to every ALPHA and PROMISING row.
+6. Score every angle per §3 Asymmetry Score, angle-verdict-map, and attach shelf-life metadata to every ALPHA and PROMISING row.
 7. Write the output artifact with the `situation_mining_source` frontmatter field populated.
 8. Offer handoff per Flow 4 / Flow 5.
 
@@ -311,16 +293,16 @@ This section turns §3 Methodology + §5 MCP Tool Reference into five concrete f
 
 ### Flow 4 — ALPHA-to-email-copywriting handoff
 
-**Preconditions:** Flow 1 or Flow 2 has completed and written an artifact; at least 1 angle in the artifact has verdict = ALPHA.
+**Preconditions:** Flow 1 or Flow 2 has completed and written an artifact; at least 1 angle in the artifact has angle verdict = ALPHA.
 
 **Steps:**
 
 1. Present each ALPHA angle to the operator with its Asymmetry Score per-dimension breakdown and its shelf-life metadata.
-2. Use `AskUserQuestion` to ask the operator (a) which ALPHA angle to ship first and (b) which offer tier to pair it with (T1 Knowledge / T2 Free Asset / T3 DFY Trial / T4 Risk Reversal). One question per field per the BC-5761 one-question-per-field rule.
-3. On operator selection, hand off to `email-copywriting` (BC-5825) with the tuple `{angle, situation-mining-artifact-if-deep, offer-tier}`. `email-copywriting` owns copy generation from here.
+2. Use `AskUserQuestion` to ask the operator (a) which ALPHA angle to ship first and (b) which offer posture to pair it with (`knowledge` / `free-asset` / `pilot` / `risk-reversal` per ADR-017; legacy T1/T2/T3/T4 codes still accepted as input). One question per field per the BC-5761 one-question-per-field rule.
+3. On operator selection, hand off to `email-copywriting` (BC-5825) with the tuple `{angle, situation-mining-artifact-if-deep, offer-posture}`. `email-copywriting` owns copy generation from here.
 4. If the operator declines (wants to sit on the angle before committing), save the artifact and record the declination in the run log.
 
-**Expected output:** one ALPHA angle plus one offer tier selected, and the handoff to `email-copywriting` fires.
+**Expected output:** one ALPHA angle plus one offer posture selected, and the handoff to `email-copywriting` fires.
 
 **Error handling:** if no ALPHA angle exists in the artifact (only PROMISING or below), skip this flow entirely and offer Flow 5 or no handoff.
 
@@ -328,7 +310,7 @@ This section turns §3 Methodology + §5 MCP Tool Reference into five concrete f
 
 ### Flow 5 — INTERESTING-to-content redirect
 
-**Preconditions:** Flow 1 or Flow 2 has completed and written an artifact; at least 1 angle in the artifact has verdict = INTERESTING.
+**Preconditions:** Flow 1 or Flow 2 has completed and written an artifact; at least 1 angle in the artifact has angle verdict = INTERESTING.
 
 **Steps:**
 
@@ -348,10 +330,10 @@ This section turns §3 Methodology + §5 MCP Tool Reference into five concrete f
 
 | Score | Criteria |
 |------:|----------|
-| 10 | Both modes correct — Quick Mode ran 4 ordered steps with all 5 parallel `WebSearch` queries; Deep Mode ran 6 ordered steps with all 7 additional `WebSearch` queries on top of Quick's 5; all 5 forcing functions named verbatim per `creative-thinking-models.md` §1–§5 (`Inversion (Munger)`, `Adjacent Transfer`, `Timing Arbitrage`, `Specificity Escalator`, `Ecosystem Gap Analysis`); Asymmetry Score formula applied with all 6 dimensions at the correct weights (Novelty 2x, Evidence 2x, Timing 1.5x, Simplicity 1x, ShelfLife 1x, Downside 0.5x, divided by 8); verdict assignment matches the 4 score bounds exactly (ALPHA 8.0+, PROMISING 6.0–7.9, INTERESTING 4.0–5.9, COMMODITY below 4.0); every ALPHA and PROMISING angle has all three shelf-life sub-fields (estimate citing a `shelf-life-patterns.md` decay category, decay trigger, refresh date); every signal cluster has ≥ 2 data points each with a source URL; Deep Mode worldview-conflict analysis ran and names ≥ 1 conflict framed as a curiosity opening; Brite-entity signals from `hidden-signals-library.md` §11–§13 cited when the prospect is Nites/Labs (Municipalities / HOAs / Universities tables); Flow 4 (ALPHA → `email-copywriting`) or Flow 5 (INTERESTING → content) handoff surfaced per §6. |
-| 7-9 | Mostly excellent with one gap — e.g. one forcing function applied but referenced as "Munger Inversion" instead of the exact "Inversion (Munger)"; one ALPHA angle missing the refresh date but has estimate + decay trigger; shelf-life cites a decay category but not a specific row in `shelf-life-patterns.md`; handoff block names the target skill but not the offer-tier prompt; Deep Mode ran 6 of 7 additional queries and degraded one cluster's Evidence band accordingly; worldview conflict surfaced but framed as a generic observation rather than the three-part "Stated / Evidence / Curiosity opening" pattern. |
+| 10 | Both modes correct — Quick Mode ran 4 ordered steps with all 5 parallel `WebSearch` queries; Deep Mode ran 6 ordered steps with all 7 additional `WebSearch` queries on top of Quick's 5; all 5 forcing functions named verbatim per `creative-thinking-models.md` §1–§5 (`Inversion (Munger)`, `Adjacent Transfer`, `Timing Arbitrage`, `Specificity Escalator`, `Ecosystem Gap Analysis`); Asymmetry Score formula applied with all 6 dimensions at the correct weights (Novelty 2x, Evidence 2x, Timing 1.5x, Simplicity 1x, ShelfLife 1x, Downside 0.5x, divided by 8); angle verdict assignment matches the 4 score bounds exactly (ALPHA 8.0+, PROMISING 6.0–7.9, INTERESTING 4.0–5.9, COMMODITY below 4.0); every ALPHA and PROMISING angle has all three shelf-life sub-fields (estimate citing a `shelf-life-patterns.md` decay category, decay trigger, refresh date); every signal cluster has ≥ 2 data points each with a source URL; Deep Mode worldview-conflict analysis ran and names ≥ 1 conflict framed as a curiosity opening; Brite-entity signals from `hidden-signals-library.md` §11–§13 cited when the prospect is Nites/Labs (Municipalities / HOAs / Universities tables); Flow 4 (ALPHA → `email-copywriting`) or Flow 5 (INTERESTING → content) handoff surfaced per §6. |
+| 7-9 | Mostly excellent with one gap — e.g. one forcing function applied but referenced as "Munger Inversion" instead of the exact "Inversion (Munger)"; one ALPHA angle missing the refresh date but has estimate + decay trigger; shelf-life cites a decay category but not a specific row in `shelf-life-patterns.md`; handoff block names the target skill but not the offer-posture prompt; Deep Mode ran 6 of 7 additional queries and degraded one cluster's Evidence band accordingly; worldview conflict surfaced but framed as a generic observation rather than the three-part "Stated / Evidence / Curiosity opening" pattern. |
 | 4-6 | Functional but missing structural elements — e.g. Quick Mode ran with 4 searches instead of 5; Asymmetry Score computed but one dimension (e.g. Downside Cap) weighted at 1.0 instead of 0.5; INTERESTING angles pitched into cold outbound instead of redirected to content per Flow 5; missing the `situation_mining_source` frontmatter key on a Deep Mode run; worldview-conflict analysis produced a conflict but framed it as a gotcha instead of a curiosity opening; artifact written to the wrong path (missing date stamp, pluralized filename, or outside `docs/research/angles/`); signal cluster documented but sources not inline URLs. |
-| 1-3 | Hard failure — any ONE of these drops the run to 1-3: angle generated from a single data point (violates the 2+ cluster rule); angle score emitted without a cited evidence chain; worldview contradiction weaponized against the prospect (gotcha framing); ALPHA or PROMISING angle missing shelf-life metadata; Deep Mode ran after §2 Gate 3 failed (graceful-degrade violation — §2 is a hard halt with no fall-back to Quick Mode); invented forcing function name not in `creative-thinking-models.md` §1–§5; invented shelf-life decay category not in `shelf-life-patterns.md` (the five are Regulatory / Deadline, Competitive Move, Data Insight, Industry Pattern, Structural); subjective verdict language ("pretty strong", "maybe worth a shot", "looks interesting") in place of the four fixed verdict labels. |
+| 1-3 | Hard failure — any ONE of these drops the run to 1-3: angle generated from a single data point (violates the 2+ cluster rule); angle score emitted without a cited evidence chain; worldview contradiction weaponized against the prospect (gotcha framing); ALPHA or PROMISING angle missing shelf-life metadata; Deep Mode ran after §2 Gate 3 failed (graceful-degrade violation — §2 is a hard halt with no fall-back to Quick Mode); invented forcing function name not in `creative-thinking-models.md` §1–§5; invented shelf-life decay category not in `shelf-life-patterns.md` (the five are Regulatory / Deadline, Competitive Move, Data Insight, Industry Pattern, Structural); subjective angle verdict language ("pretty strong", "maybe worth a shot", "looks interesting") in place of the four fixed angle verdict labels. |
 
 ---
 
@@ -383,10 +365,10 @@ Six scenarios covering the core paths. Structured assertions + fixtures live in 
 
 ### Tier 1 — Free assertions (no tool calls needed)
 
-- **`quick-mode-happy-path`** — Given a dense-signal prospect with `company_name` and `domain` supplied and Quick Mode selected at §2 Gate 2, the output artifact contains 3–5 angles in §Generated Angles; every angle has one of the four §3 verdict labels (`ALPHA` / `PROMISING` / `INTERESTING` / `COMMODITY`); every angle attributes to at least one §3 forcing function; every signal cluster in §Signal Clusters has ≥ 2 data points each with an inline source URL; every ALPHA and PROMISING row carries a §Shelf-Life Block entry with all three sub-fields.
+- **`quick-mode-happy-path`** — Given a dense-signal prospect with `company_name` and `domain` supplied and Quick Mode selected at §2 Gate 2, the output artifact contains 3–5 angles in §Generated Angles; every angle has one of the four §3 angle verdict labels (`ALPHA` / `PROMISING` / `INTERESTING` / `COMMODITY`); every angle attributes to at least one §3 forcing function; every signal cluster in §Signal Clusters has ≥ 2 data points each with an inline source URL; every ALPHA and PROMISING row carries a §Shelf-Life Block entry with all three sub-fields.
 - **`deep-mode-missing-prereq-halt`** — Given Deep Mode selected at §2 Gate 2 but no `docs/research/situations/{domain}-*.md` file < 14 days old on disk, the skill's first response is the verbatim halt message ("Deep Mode requires situation-mining output less than 14 days old for `{domain}`. Run `situation-mining` first, then resume.") and zero `WebSearch` calls fire. The skill does NOT silently fall back to Quick Mode; no artifact is written.
 - **`shelf-life-mandate`** — Given a completed run producing at least one ALPHA angle, every ALPHA row has all three shelf-life sub-fields: (a) an estimate citing one of the five `shelf-life-patterns.md` decay categories (Regulatory / Deadline, Competitive Move, Data Insight, Industry Pattern, Structural), (b) a one-sentence decay trigger naming a specific event, (c) a specific ISO refresh date. Missing any sub-field on any ALPHA row fails the scenario. Same rule applies to every PROMISING row.
-- **`commodity-discard`** — Given an angle whose Asymmetry Score computes below 4.0, the verdict column in §Generated Angles reads `COMMODITY`; the recommended action is "Discard entirely" (per §3 Verdict mapping); the angle is listed by name in §Handoff Block as "discarded" but is NOT carried forward to any downstream output (no entry in §Shelf-Life Block, no handoff to `email-copywriting`, no save to `docs/content/ideas/`).
+- **`commodity-discard`** — Given an angle whose Asymmetry Score computes below 4.0, the Angle Verdict column in §Generated Angles reads `COMMODITY`; the recommended action is "Discard entirely" (per §3 Angle verdict mapping); the angle is listed by name in §Handoff Block as "discarded" but is NOT carried forward to any downstream output (no entry in §Shelf-Life Block, no handoff to `email-copywriting`, no save to `docs/content/ideas/`).
 
 ### Tier 2 — Tool-assisted (requires file read or MCP call)
 

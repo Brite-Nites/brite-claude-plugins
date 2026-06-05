@@ -196,9 +196,9 @@ Run in parallel; merge + dedup by domain at completion.
 | Provider | Tool | Script reference | Pagination |
 |---|---|---|---|
 | Spider.cloud | `mcp__plugin_marketing_spider__*` | `plugins/marketing/scripts/tam-map/spider_crawl.py` | crawls homepage + `/about` + `/contact` |
-| AI Ark | `mcp__plugin_marketing_aiark__*` | `plugins/marketing/scripts/tam-map/aiark_client.py` + `aiark-mcp.js` | paginated, no stated rate limit |
-| Discolike | `mcp__plugin_marketing_discolike__*` | `plugins/marketing/scripts/tam-map/discolike_client.py` + `discolike-mcp.js` | offset-based, X-Total-Count header |
-| IcyPeas | `Bash` → `python plugins/marketing/scripts/tam-map/icypeas_client.py --icp ./output/{slug}/icp.json` | (no MCP — script-only per BC-5946) | max 100/page |
+| AI Ark | `mcp__plugin_marketing_aiark__*` | `plugins/marketing/scripts/tam-map/aiark-mcp.js` | paginated, no stated rate limit |
+| Discolike | `mcp__plugin_marketing_discolike__*` | `plugins/marketing/scripts/tam-map/discolike-mcp.js` | offset-based, X-Total-Count header |
+| IcyPeas | `Bash` → `plugins/marketing/scripts/bw-run.sh ICYPEAS_API_KEY=tam-map-icypeas-api-key -- python plugins/marketing/scripts/tam-map/icypeas_client.py --icp ./output/{slug}/icp.json` | (no MCP — script-only per BC-5946) | max 100/page |
 
 Output:
 
@@ -296,7 +296,7 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 
 | `enrichment_provider` | Implementation | Status |
 |---|---|---|
-| `blitz_waterfall` | Shells to `python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input> --out enriched.jsonl` (BlitzAPI 5 req/s serialized, Prospeo fallback max 20 workers) | **Default. Production-ready.** |
+| `blitz_waterfall` | Shells to `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input> --out enriched.jsonl` (BlitzAPI 5 req/s serialized, Prospeo fallback max 20 workers) | **Default. Production-ready.** |
 | `brite_cli` | Shells to `services/enrichment/cli.py` in brite-data-platform | Pending repo wiring; falls through to `blitz_waterfall` if repo missing locally |
 | `brite_mcp` | Calls `mcp__plugin_marketing_enrichment__*` (brite-enrichment MCP) | **Pending BC-5537/5538 GA.** Currently NOT in `allowed-tools`; falls through to `blitz_waterfall` with `pending BC-5537/5538 GA` message |
 | `skip` | No enrichment — pass through unenriched | Opt-in for testing or for handing off to BC-2717 list-building (which has its own enrichment pre-flight) |
@@ -336,7 +336,7 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 
 > Nites/Supply paths skip this phase. Downstream consumers (BC-2717 or BC-5826) handle SMTP verification.
 
-- Tool: `Bash` → `python plugins/marketing/scripts/tam-map/verify_smtp.py --in enriched.jsonl --out verified.jsonl`.
+- Tool: `Bash` → `plugins/marketing/scripts/bw-run.sh MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key -- python plugins/marketing/scripts/tam-map/verify_smtp.py --in enriched.jsonl --out verified.jsonl`.
 - Throughput: 160 req/sec (MillionVerifier rate limit).
 - Filter result codes:
   - **Keep** code `1` (`valid`).
@@ -403,7 +403,7 @@ Organized by phase + reason:
 | Phase 5 — enrichment (future swap) | `mcp__plugin_marketing_enrichment__*` | brite-enrichment | ADR-008 + BC-5537/5538 (NOT in `allowed-tools` until GA) |
 | Phase 6 — SMTP verify (Labs) | `Bash` → `verify_smtp.py` | MillionVerifier | tam-map upstream |
 | Phase 7 — tier delegation (Labs) | invoke `icp-scoring` skill | n/a (in-plugin delegation) | BC-5831 + tam-map-port-policy.md §4 |
-| Cross-repo handbook reads | `Bash` → `gh api repos/Brite-Nites/handbook/contents/...` | Brite-Nites/handbook (private repo) | `reference_handbook_access.md` (Context7 doesn't resolve private repo) |
+| Cross-repo handbook reads | `Bash` → `gh api repos/Brite-Nites/handbook/contents/...` | Brite-Nites/handbook (private repo) | `reference_handbook_access.md` |
 
 ### Architectural rules that apply
 
@@ -456,7 +456,7 @@ See [§3 Phase 4.5](#phase-45--exclusion-mandatory--never-skipped) for the full 
 
 ### Workflow 4 — Phase 6 SMTP verify (Labs)
 
-1. `Bash` → `python plugins/marketing/scripts/tam-map/verify_smtp.py --in enriched.jsonl --out verified.jsonl`.
+1. `Bash` → `plugins/marketing/scripts/bw-run.sh MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key -- python plugins/marketing/scripts/tam-map/verify_smtp.py --in enriched.jsonl --out verified.jsonl`.
 2. Filter result codes 1 + 2 (with explicit `catch_all` flag); drop 3–6.
 
 ### Workflow 5 — Phase 7 tier delegation (Labs)

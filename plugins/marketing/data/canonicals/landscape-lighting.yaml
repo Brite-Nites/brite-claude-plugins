@@ -1,0 +1,21 @@
+# Canonical entry for the Landscape Lighting vertical.
+# Source: handbook@main:marketing/go-to-market/verticals/landscape-lighting/README.md
+# README points to 4 ICP sub-playbooks; persona listed here is the headline
+# direct-buyer KDM. Offer mirrors the README's single in-vertical offer.
+slug: landscape-lighting
+display: "Landscape Lighting"
+playbook_path: "marketing/go-to-market/verticals/landscape-lighting/README.md"
+personas:
+  - slug: luxury-homeowner
+    display: "Luxury Homeowner"
+    titles:
+      - "Homeowner"
+      - "Estate Owner"
+      - "Property Owner"
+offers:
+  - slug: luxury-homeowner-direct
+    display: "Luxury Homeowner Direct"
+    status: draft
+    posture: free-asset
+    target_personas: [luxury-homeowner]
+    prose_path: "marketing/go-to-market/verticals/landscape-lighting/offers/luxury-homeowner-direct.md"
