@@ -85,8 +85,12 @@ provider credit.** Does **not** persist — pair with `ingest_enriched_contacts`
 you found.
 
 - **`titles`** (BC-12405) is the preferred targeting input: a **ranked list** of target
-  roles, highest priority first — both discovery providers honor it (OR-match). **`title_seed`**
-  is the legacy single-title form. Omit both to fall back to category defaults.
+  roles, highest priority first. Both discovery providers receive the list, but **consume it
+  differently** — Prospeo OR-matches the array (`match_mode: CONTAINS`), while OpenMart takes
+  a single concise semantic title hint (top-N joined), **not** a boolean OR. So a long
+  multi-title list is fully OR-matched only by Prospeo; OpenMart leans on the highest-ranked
+  entries (see § Per-provider gotchas). **`title_seed`** is the legacy single-title form.
+  Omit both to fall back to category defaults.
 - **`city` / `state`** (BC-12405) scope discovery to a locality. (`geo` country is currently
   inert — BC-12420.)
 - The per-company contact cap + ranking-sort are skill-layer concerns.
