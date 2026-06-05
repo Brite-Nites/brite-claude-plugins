@@ -79,13 +79,20 @@ For a **product** report, determine where it routes — repo-context-first. Run
 - **A product repo** — developer mode. Go to **1d**.
 - **Not in a repo** (or the repo is unrelated to any Brite product) — operator mode. Go to **1f**.
 
-**Content-aware switch (both directions).** The 1a fork is a hint, not a cage. If — here, or
-while gathering the report — the description **clearly** reads as the *other* kind (a "product"
-report that's plainly a skill/command/hook misfiring, or a "tooling" report that's plainly a
-product bug), **offer to switch** branches with a single confirm: "This sounds like the
-*<other>* path — switch to `<flow>`?" Never silently reroute; the reporter decides. This
-**replaces** the old location-only redirect (which fired on repo location alone, regardless of
-what was being described).
+**Content-aware switch (product → tooling).** The 1a fork is a hint, not a cage. You are on the
+**product** branch here. If — at this point, or while gathering the report — the description
+**clearly** reads as **agent-tooling** misbehavior (a skill/command/hook that fired wrong, a
+slash-command misbehaving) rather than a product bug, **offer to switch** with a single confirm:
+"This sounds like the **agent tooling** — switch to `/workflows:report-issue`?" On yes, hand off to
+the tooling branch (read [`report-issue.md`](./report-issue.md) and run it). Never silently reroute;
+the reporter decides. This **replaces** the old location-only redirect (which fired on repo location
+alone, regardless of what was being described).
+
+This switch is **one-directional by construction**: only the product branch reaches Step 1c (picking
+"agent tooling" at Step 1a dispatches to `report-issue` at Step 1b, *before* this point, so a
+tooling→product clause here would be unreachable). The reverse direction — a *tooling* report that's
+plainly a *product* bug — is handled **inside `report-issue.md`** (its Step 1d content-aware switch
+back to product intake). Both directions are covered, each on the branch that can actually reach it.
 
 ### 1d. Product repo with a routing config
 
@@ -322,8 +329,9 @@ either way intake is complete. If related issues were linked, add "Linked to: [I
 
 - Front door first: Step 1 always asks **product vs agent tooling** and routes on the answer;
   a tooling report hands off to `/workflows:report-issue`, not product intake. The fork is
-  content-aware — offer to switch branches if the description clearly reads as the other kind,
-  but never reroute silently.
+  content-aware: on the **product** branch (Step 1c), offer to switch to `/workflows:report-issue`
+  if the description clearly reads as agent-tooling; the **reverse** switch (a tooling report that's
+  plainly a product bug) lives in `report-issue.md` Step 1d. Never reroute silently — confirm first.
 - Intake only — never reproduce, grill, or write an agent brief. Hand off to the triage stage.
 - Never file without the reporter confirming the preview.
 - Never skip the duplicate search.

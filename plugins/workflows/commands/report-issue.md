@@ -70,6 +70,31 @@ Ask: "Any additional context? (error messages, which command was running, logs �
   - After automated redaction, always warn: "I scanned for common secret patterns and redacted matches. Review the output below for any secrets I may have missed before confirming."
 - If they mention related Linear issues (e.g., "BC-2462"), note them for the `relatedTo` field.
 
+### 1d. Content-aware switch — is this actually a product bug?
+
+This command is the **agent-tooling** branch of the intake front door. The reporter reached it
+either by typing `/workflows:report-issue` (the direct alias) or by picking "agent tooling" at
+`/workflows:raise-a-ticket`'s Step-1 fork — but a pick is a hint, not a cage. Now that you have the
+trigger / actual / expected from Step 1b, judge what's actually being described.
+
+If the report **clearly** reads as a **Brite product** bug — a user-facing software surface
+misbehaving (Brite Base, Brite Sites, Brite Supply, a Brite Labs site), e.g. "the quote PDF exports
+blank" or "the property gallery won't load" — rather than the agent tooling (a skill / command /
+hook), **offer to switch** with a single confirm (AskUserQuestion): "This sounds like a **Brite
+product** bug, not agent-tooling — switch to `/workflows:raise-a-ticket` product intake?" →
+**Switch** / **Stay here**.
+
+- **Switch** → do **not** run the tooling flow (no classification, no test case). Read
+  [`raise-a-ticket.md`](./raise-a-ticket.md) and run its **product branch** from **Step 1c onward**,
+  treating **product as already chosen** — do **not** re-ask raise-a-ticket's Step-1a
+  product-vs-tooling fork (accepting this switch *is* the product choice; re-asking would loop). Pass
+  along the description gathered above. Stop here.
+- **Stay here** (or the report does not *clearly* read as a product bug) → continue to Step 2.
+
+Never silently reroute — the reporter decides. This is the reverse of raise-a-ticket Step 1c's
+product→tooling switch; placing it here covers **both** entry paths (the direct alias *and* the
+raise-a-ticket→Tooling→dispatch route), since both run this command.
+
 ## Step 2: Classify Failure Type
 
 Use the sequential-thinking MCP to analyze the misbehavior details from Step 1 and propose a classification. Consider which category best fits based on the trigger, actual behavior, and expected behavior.
@@ -310,6 +335,9 @@ If invoked **outside the plugins repo** (Step 0a graceful-degrade), the **Test c
 
 ## Rules
 
+- Content-aware (Step 1d): this is the agent-tooling branch, but if the report **clearly** reads as a
+  Brite product bug, offer to switch to `/workflows:raise-a-ticket` product intake (confirm-gated,
+  hand off to its product branch from Step 1c — never re-ask the fork). Never silently reroute.
 - Never create an issue without the developer reviewing and confirming the draft first.
 - Never skip the duplicate check — even if it finds no matches, the search must run.
 - Always apply the "Bug" label.
