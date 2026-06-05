@@ -1,4 +1,4 @@
-# BC-11924 — ADR-010 Anti-Spam Guardrails Consolidation
+# BC-11924 — ADR-031 Anti-Spam Guardrails Consolidation
 
 **Linear:** [BC-11924](https://linear.app/brite-nites/issue/BC-11924)
 **Milestone:** Marketing Plugin v0.1 — GTM Workflows (Revgrowth)
@@ -7,7 +7,7 @@
 
 ## Goal
 
-Author `docs/decisions/010-anti-spam-guardrails.md` consolidating the five TAM-protection rules currently scattered across `prospect-temporal-gate` skill body, `handbook/marketing/go-to-market/campaign-rules.md`, and operator memory.
+Author `docs/decisions/031-anti-spam-guardrails.md` consolidating the five TAM-protection rules currently scattered across `prospect-temporal-gate` skill body, `handbook/marketing/go-to-market/campaign-rules.md`, and operator memory.
 
 ## Tasks
 
@@ -17,7 +17,7 @@ Author `docs/decisions/010-anti-spam-guardrails.md` consolidating the five TAM-p
    - BC-10198 description (already pulled) for CampaignMember history rationale
    - Optional: `gh api repos/Brite-Nites/handbook/contents/marketing/go-to-market/campaign-rules.md` if accessible — confirm handbook rule wording
 
-2. **Draft ADR-010**
+2. **Draft ADR-031**
    - Status: Proposed
    - Context: scattered rules + 2026-05-28 user intent
    - Decision: 5 rules with statement / scope / exceptions / enforcement layer for each
@@ -26,7 +26,7 @@ Author `docs/decisions/010-anti-spam-guardrails.md` consolidating the five TAM-p
    - Cross-links: BC-10190, BC-10198, BC-10191, BC-10192, campaign-rules.md
 
 3. **Update CLAUDE.md ADR list**
-   - Add `ADR-010: Anti-spam guardrails consolidation` entry under `## Architecture Decisions`
+   - Add `ADR-031: Anti-spam guardrails consolidation` entry under `## Architecture Decisions`
 
 4. **Validate**
    - `./scripts/check-guardrails.sh --claude-md CLAUDE.md` (size + anti-slop)
@@ -34,7 +34,7 @@ Author `docs/decisions/010-anti-spam-guardrails.md` consolidating the five TAM-p
    - Manual: ensure all 5 rules + 4 cross-links present
 
 5. **Commit + PR**
-   - Commit: `BC-11924: ADR-010 — anti-spam guardrails consolidation`
+   - Commit: `BC-11924: ADR-031 — anti-spam guardrails consolidation`
    - PR title same
    - Use HEREDOC for commit message; Co-Authored-By footer
 
@@ -42,7 +42,7 @@ Author `docs/decisions/010-anti-spam-guardrails.md` consolidating the five TAM-p
 
 - Rewriting `prospect-temporal-gate` skill (separate issue BC-11930)
 - Handbook PR to `campaign-rules.md` (cross-repo, separate)
-- ADR-011 (Snowflake access) — next issue in this session
+- ADR-030 (Snowflake access) — next issue in this session
 - Audience-view catalog or Source 4 design — later in this session
 
 ## Acceptance Criteria

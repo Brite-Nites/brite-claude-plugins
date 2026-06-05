@@ -20,20 +20,20 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 | `icp-definition.md` | `prompts/icp-definition.md` | Verbatim (+ frontmatter) |
 | `fit-scoring.md` | `prompts/fit-scoring.md` | Verbatim (+ frontmatter) |
 | `segment-routing.md` | `prompts/segment-routing.md` | Verbatim (+ frontmatter) |
-| `examples/roofing-contractors-tx.md` | `examples/roofing-contractors-tx.md` | Verbatim (+ frontmatter) |
+| `examples/roofing-contractors-tx.md` | `examples/roofing-contractors-tx.md` | Adapted (frontmatter + BC-6907 § 6 skill-delegation + BC-12130 § 3 note) — see § Local deviations |
 
 ## Per-file manifest — scripts
 
 | Target path (under `plugins/marketing/scripts/tam-map/`) | Upstream path | Verbatim vs adapted |
 |----------------------------------------------------------|---------------|---------------------|
-| `aiark_client.py` | `scripts/aiark_client.py` | Verbatim (+ 5-line `#` header after shebang) |
-| `discolike_client.py` | `scripts/discolike_client.py` | Verbatim (+ 5-line `#` header after shebang) |
-| `icypeas_client.py` | `scripts/icypeas_client.py` | Verbatim (+ 5-line `#` header after shebang) |
+| `aiark_client.py` | `scripts/aiark_client.py` | **Removed** per BC-12130 — see § Local deviations |
+| `discolike_client.py` | `scripts/discolike_client.py` | **Removed** per BC-12130 — see § Local deviations |
+| `icypeas_client.py` | `scripts/icypeas_client.py` | Verbatim (+ 5-line `#` header) + find-companies query-object remap (BC-12163) — see § Local deviations |
 | `spider_crawl.py` | `scripts/spider_crawl.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7050) — see § Local deviations |
-| `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
+| `enrich_waterfall.py` | `scripts/enrich_waterfall.py` | Verbatim (+ 5-line `#` header) + local fixes (BC-7051 async/sync split; BC-12128 BlitzAPI redesign re-application) — see § Local deviations |
 | `verify_smtp.py` | `scripts/verify_smtp.py` | Verbatim (+ 5-line `#` header) + local fix (BC-7051) — see § Local deviations |
 | `tier_and_segment.py` | `scripts/tier_and_segment.py` | **Removed** per BC-6907 — see § Local deviations |
-| `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header) + endpoint-drift fixes (BC-7011) — see § Local deviations |
+| `aiark-mcp.js` | `scripts/aiark-mcp.js` | Verbatim (+ 5-line `//` header) + endpoint-drift fixes (BC-7011) + `aiark_search` account-filter sub-schema (BC-7157) — see § Local deviations |
 | `discolike-mcp.js` | `scripts/discolike-mcp.js` | Verbatim (+ 5-line `//` header + verification comment for BC-7011 — no functional drift) |
 | `package.json` | `scripts/package.json` | Verbatim (+ top-level `_source` + `_license` + `_ported` JSON fields — see § JSON attribution exception) |
 | `requirements.txt` | `scripts/requirements.txt` | Verbatim (+ 5-line `#` header) + local change (BC-6907) — see § Local deviations |
@@ -48,7 +48,7 @@ MIT. See upstream [LICENSE](https://github.com/Revgrowth1/tam-map/blob/9f5c72e74
 
 If upstream improvements are ever pulled, the operation is manual:
 
-1. Diff the target file against the pinned SHA (e.g., `git show 9f5c72e74b:scripts/aiark_client.py` against the local file, ignoring the Brite attribution header).
+1. Diff the target file against the pinned SHA (e.g., `git show 9f5c72e74b:scripts/spider_crawl.py` against the local file, ignoring the Brite attribution header).
 2. Re-apply Brite additions (`_source` JSON fields, adaptations from future R-4/R-5 issues) on top of the new upstream body.
 3. Bump the SHA references in this manifest + the per-file headers.
 4. Re-run `./scripts/validate.sh` + `./scripts/check-guardrails.sh --claude-md CLAUDE.md`.
@@ -104,6 +104,21 @@ Brite removes the script and folds its responsibility into the existing `icp-sco
 
 **Re-port action:** if a future upstream pull at a newer SHA still ships `scripts/tier_and_segment.py`, do not re-introduce the script — let it stay in upstream and continue absorbing its body into `icp-scoring` `abc` mode (prompt-only changes re-port to `fit-scoring.md`).
 
+### `aiark_client.py` + `discolike_client.py` — removed (dead ported clients, never wired) (BC-12130)
+
+Upstream ships `scripts/aiark_client.py` and `scripts/discolike_client.py` as standalone Python CLI discovery wrappers. Brite never wired either into its pipeline: the live AI Ark and Discolike integrations are the stdio MCP wrappers (`aiark-mcp.js`, `discolike-mcp.js`), which the `tam-mapping` skill and `/marketing:setup-tam-map` actually use. The two `*_client.py` files sat as verbatim ports carrying stale, pre-drift API shapes — e.g. `aiark_client.py` still POSTed `/v1/search` with `Authorization: Bearer` and a `filters{}` body, wrong on every axis vs the BC-7011 / BC-7157-verified contract (`POST /companies`, `X-TOKEN`, `account`/`page`/`size`). Beyond dead weight, the divergent `aiark_client.py` shape actively obscured the 2026-05-31 aiark diagnosis. Confirmed zero runtime callers (no Python `import`, no skill/command invocation) before removal.
+
+**Net effect:**
+
+- `plugins/marketing/scripts/tam-map/aiark_client.py` deleted.
+- `plugins/marketing/scripts/tam-map/discolike_client.py` deleted.
+- Per-file manifest rows above marked **Removed**.
+- Active references updated to the surviving MCP wrappers: `skills/tam-mapping/SKILL.md` provider table (drops the `*_client.py` halves, keeps `aiark-mcp.js` / `discolike-mcp.js`); `tools/integrations/ai-ark.md` + `discolike.md` "Consumed by" lists (drop the `*_client.py` bullets).
+- `icypeas_client.py` is **untouched by this removal** — it shares the `_client.py` suffix but is an **active** CLI script (SKILL.md provider table + the env-var table). _(Its `find-companies` request shape was later remapped by BC-12163 — see the § Local deviations subsection below; the manifest row reflects that as "Adapted".)_
+- The example `references/tam/examples/roofing-contractors-tx.md` (§ "3. Discovery") still shows upstream's `python scripts/aiark_client.py` / `discolike_client.py` invocations. A **Brite note** was added inline at that block pointing to the MCP wrappers (Brite's actual aiark/discolike path) and to **BC-12278** (full example rewrite). That example was **already** Brite-adapted — BC-6907 reworked § 6 to the in-session `icp-scoring` skill delegation — so its manifest row above is corrected here from "Verbatim" to **Adapted** (the label had been stale since BC-6907). The `icypeas_client.py` invocation in the same block remains valid (icypeas is still a CLI script). A faithful end-to-end rewrite — command name (§ 1 `/marketing:tam-map`), MCP-driven discovery (§ 3), and the JSONL data-flow contract — is tracked in **BC-12278**.
+
+**Re-port action:** if a future upstream pull at a newer SHA still ships `scripts/aiark_client.py` / `scripts/discolike_client.py`, do **not** re-introduce them — the MCP wrappers (`aiark-mcp.js`, `discolike-mcp.js`) are the Brite integrations. Treat any aiark/discolike API-shape drift as a wrapper (`*-mcp.js`) fix, per BC-7011 / BC-7157.
+
 ### `aiark-mcp.js` — endpoint drift fixes (BC-7011)
 
 Upstream shipped this wrapper with an explicit `!! VERIFY BEFORE USING !!` warning admitting its endpoint paths, field names, and auth header form were "conventional guesses." BC-6906 Stage 2b live validation (2026-05-10) confirmed the wrapper returned nginx 404 in production — credential plumbing worked, the paths were wrong. BC-7011 verified the current API surface against `docs.ai-ark.com` (Company Search reference, Authentication doc, and `help.ai-ark.com/en/articles/112-how-does-the-api-work`) on 2026-05-11.
@@ -119,7 +134,72 @@ One tool removed: `aiark_enrich` — AI Ark has no domain-keyed enrich endpoint 
 
 **Validated:** live MCP smoke through `bw-run.sh` + the reloaded plugin (captured in the BC-7011 PR description).
 
-**Re-port action:** if a future upstream pull at a newer SHA includes the same path/auth fixes, drop this local diff. If upstream restores an `aiark_enrich` tool because a new endpoint shipped, restore that handler. The `account` sub-schema (firmographic filter field names) is the one remaining "unknown" — if AI Ark publishes the full shape, re-map this wrapper's pass-through fields to match.
+**Re-port action:** if a future upstream pull at a newer SHA includes the same path/auth fixes, drop this local diff. If upstream restores an `aiark_enrich` tool because a new endpoint shipped, restore that handler. The `account` sub-schema (firmographic filter field names) was the one remaining "unknown" — resolved in BC-7157 (see next section).
+
+### `aiark-mcp.js` — `aiark_search` account-filter sub-schema (BC-7157)
+
+BC-7011 corrected AI Ark's envelope (base URL, `POST /companies`, `X-TOKEN`, top-level `{account, lookalikeDomains, page, size}`) but left the `account` **interior** unmapped — the wrapper passed `account.industries`/`regions` as bare `string[]` and `employee_min/max` as scalars. Three of four smoke calls were green; `aiark_search` with any real filter returned `400 "request not readable"`. BC-7011 knowingly deferred this gap to BC-7157.
+
+**Root cause (verified live 2026-05-31):** the backend is Spring Boot and every `AccountFilter` field is an `all`/`any` → `include`/`exclude` **object** tree, not a list. A bare `string[]`/scalar (even an empty `[]`) can't bind to the target POJO, so Jackson raises `HttpMessageNotReadableException` → `400 "request not readable"`. Unknown field **names** are still silently ignored — which is why earlier guesses (`sectors`, `naics_codes`, …) returned the unfiltered default rather than 400ing, and why the diagnosis was non-obvious.
+
+**Schema source:** the public reference page renders `account` only as "object", but ReadMe's markdown export at `docs.ai-ark.com/reference/company-search-1.md` embeds the full OpenAPI spec (request example + `#/components/schemas/AccountFilter`). The springdoc/swagger endpoints under `…/developer-portal/v1/` return `401` to the `X-TOKEN` API key (they are web-session-gated), so the `.md` export — not a live spec endpoint — is the obtainable source.
+
+**Mapping applied to `aiark_search`** (the three surfaced filters):
+
+| wrapper input | AI Ark `account` field | shape sent |
+|---|---|---|
+| `industries: string[]` | `industries` | `{ any: { include: { mode: "WORD", content: [...] } } }` |
+| `regions: string[]` | `location` (note: **not** `regions`) | `{ any: { include: [...] } }` — plain string list of country/region names ("United States", "Texas") |
+| `employee_min` / `employee_max` | `employeeSize` | `{ type: "RANGE", range: [{ start, end }] }` — half-open ranges accepted |
+
+The wrapper builds `account` conditionally — only populating sub-fields the caller filtered on; an empty `account {}` remains a valid unfiltered search. `mode` is fixed to `WORD` (the docs' industries example default; `STRICT` returned identical results in verification). Input-schema param names (`industries`, `regions`, `employee_min`, `employee_max`, `limit`) are unchanged for consumer compatibility; `regions` maps onto the `location` field.
+
+**Validated (live, via `bw-run.sh`, captured in the BC-7157 PR):** driving the freshly-spawned wrapper over stdio — `industries:["software development"]` → 200, `totalElements` 2,236,141 (was 70,841,359 unfiltered), all results `software development` (Amazon, Google, Microsoft…); combined `software + United States + 50–500 employees` → 200, `totalElements` 9,925, all software; `aiark_similarity` regression (`stripe.com`) → 200 with records. Pre-fix the same calls returned `400 "request not readable"`.
+
+**Re-port action:** if a future upstream pull at a newer SHA maps the `account` interior the same way, drop this local diff. If AI Ark changes the `AccountFilter` shape, re-map against the then-current `…/reference/company-search-1.md` export.
+
+### `enrich_waterfall.py` — BlitzAPI redesign re-application (BC-12128)
+
+The wrapper used BlitzAPI as the primary owner-discovery provider via a single call `POST https://api.blitz-api.ai/v2/enrich {website}` → `{email}` with `Authorization: Bearer`. As of **2026-05-31** that endpoint returns an auth-independent `railway-edge 404`: BlitzAPI **redesigned its API** (now served by ElysiaJS) — a vendor redesign, not endpoint drift.
+
+**New contract (verified live 2026-05-31 against the OpenAPI spec at `api.blitz-api.ai/openapi`):**
+- **Auth:** `x-api-key: <key>` header (was `Authorization: Bearer`). The key is credit-metered (1000/period, 5 req/s observed) — the prior "unlimited credits" assumption no longer holds.
+- **The one-shot `/v2/enrich` is gone.** Enrichment is decomposed into granular `/v2/enrichment/*` endpoints plus people search under `/v2/search/*`.
+
+**Re-application (preserves the `blitz_enrich(company) → {email}|None` contract + the Blitz→Prospeo→(MillionVerifier) waterfall + JSONL I/O + the BC-7051 async/sync fix):** `blitz_enrich` is rewritten internally as a 3-call chain:
+1. `POST /v2/enrichment/domain-to-linkedin` `{domain}` → `company_linkedin_url`
+2. `POST /v2/search/employee-finder` `{company_linkedin_url, job_level:["C-Team","VP","Director"], max_results:5}` → decision-makers (owner/C-level first)
+3. `POST /v2/enrichment/email` `{person_linkedin_url}` → work email — iterated over candidates until one resolves.
+
+A new `_blitz_post` helper centralizes `x-api-key` auth + a 5 req/s throttle and **logs every non-200/error to stderr** (the pre-BC-12128 code swallowed non-200s silently with a bare `return None` — which is how this endpoint death went unnoticed). A `_clean_domain` helper normalizes full-URL domain fields to a bare host. Owner-email hit-rate is company-dependent (the first decision-maker often has no findable email); misses fall through to the unchanged Prospeo path.
+
+**Validated (live, via `bw-run.sh`, captured in the BC-12128 PR):** `enrich_waterfall.py` on one record `{"domain":"vercel.com"}` → `{"email":"behzod.sirjani@vercel.com","source":"blitzapi","person_name":"Behzod Sirjani"}`. Loud-logging confirmed (a non-resolving domain prints `[blitz] no company LinkedIn for …` to stderr instead of failing silently). The Prospeo fallback path and `verify_smtp.py` (MillionVerifier) are unchanged (0 diff); Prospeo confirmed live (HTTP 200).
+
+**Re-port action:** Brite-owned (upstream `Revgrowth1/tam-map` never advanced past its scaffold). **BC-6170** (brite-enrichment MCP, 14-provider) supersedes this interim shell-script waterfall — when it lands, this chain can be retired for `brite_mcp` enrichment. If BlitzAPI changes its surface again, re-map against the then-current `api.blitz-api.ai/openapi` spec.
+
+### `icypeas_client.py` — find-companies query-object remap (BC-12163)
+
+`search()` POSTed `find-companies` with the flat body `{"keywords": <industry>, "locations": <regions>, "limit": 100}`. As of **2026-06-01** IcyPeas redesigned the endpoint to require a structured **`query` object**: the flat body returns `200` + `{"success": false, "validationErrors": [{"field": "query", "type": "EmptyQueryError"}]}`. Because the wrapper only called `r.raise_for_status()` (which passes on a 200) and read `data.get("leads", [])`, the rejection surfaced as a **silent zero-company result** — caught by the BC-12129 Phase-3d live round-trip smoke (the false-green it was built to kill).
+
+**Schema source (docs-first, per the BC-7157 win):** the current contract is documented at `api-doc.icypeas.com/leads-db/find-companies/` (+ `getting-started/`) — no login or vendor conversation required. Verified live 2026-06-02 against the **free** `find-companies/count` surface (0 credits) plus one real `find-companies` call.
+
+**New contract:** request body is `{"query": {…}, "pagination": {"size": 1–200 (default 100), "token": "…"}}`. Each string filter (`name`, `type`, `industry`, `location`, `keyword`, `domain`) takes an `{"include": [...], "exclude": [...]}` object (plain strings, ≤200/array); numeric filters (`headcount`, `headcountGrowth`) take range / min-max objects. Response shape is unchanged: `{"success": bool, "total": int, "leads": [...], "pagination": {…}}`.
+
+**Mapping applied to `search()`** (preserves the consumer ICP inputs — `icp["industries"]`, `icp["geo"]["regions"]` — translating internally, per the BC-7157 pattern):
+
+| wrapper input | IcyPeas `query` field | shape sent |
+|---|---|---|
+| `industries: string[]` (one request per industry) | `keyword` (**not** `industry`) | `{ "include": [<industry>] }` |
+| `geo.regions: string[]` | `location` | `{ "include": [<regions…>] }` — omitted entirely when `regions` is empty |
+| `limit: 100` | `pagination.size` | `100` (token chained across pages, `size` preserved) |
+
+`keyword` (free-text across the profile) is the faithful mapping of the old top-level `keywords` — and the correct one: `query.industry` is a **controlled taxonomy**, so a free-text term there returns `success:true` + `total 0` (verified live: `industry.include:["software"]` → 0 vs `keyword.include:["software"]` → 957,619) — the same silent-unfiltered trap as the BC-7157 aiark `account` case.
+
+**Loud-failure (mirrors BC-12128):** a `200 + success:false` is no longer treated as an empty result — `search()` logs `  [icypeas] ⚠ find-companies rejected the query for '<industry>' (success=false): <validationErrors>` to stderr and skips that industry (**non-fatal** — IcyPeas is one of several discovery sources; the missing-key `sys.exit(1)` is reserved for the genuinely-fatal case).
+
+**Validated (live, via `bw-run.sh`, 2026-06-02 — captured in the BC-12163 PR):** red→green on the free `find-companies/count` surface (old flat body → `success:false` / `EmptyQueryError`; `query.keyword` body → `success:true`, `total 957,619`); one real `find-companies size:1` → `success:true`, returned **Kobalt Associates** (industry "Technology, Information and Internet"; profile mentions "software support / web development") — a genuinely keyword-matched company, not the unfiltered default. One lead credit spent total. The BC-12129 Phase-3d `icypeas` probe flips `⚠ → ✓` (its inline curl remapped to the same `query` shape, assertion strengthened to `success==true and total>0`).
+
+**Re-port action:** Brite-owned (upstream `Revgrowth1/tam-map` never advanced past its 2026-04-20 scaffold — no upstream fix to pull). If IcyPeas changes the `find-companies` contract again, re-map against the then-current `api-doc.icypeas.com/leads-db/find-companies/` docs.
 
 ## Relationship to the broader marketing plugin
 

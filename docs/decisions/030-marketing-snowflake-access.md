@@ -1,4 +1,4 @@
-# 022. Snowflake Access for Marketing Plugin
+# 030. Snowflake Access for Marketing Plugin
 
 **Status:** Proposed
 **Date:** 2026-05-28

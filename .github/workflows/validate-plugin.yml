@@ -142,3 +142,39 @@ jobs:
 
       - name: Detect FDA clone drift vs workflows-plugin
         run: bash plugins/flow-architecture/scripts/check-clone-drift.sh
+
+  shift-left-clone-drift:
+    # BC-12410 shift-left prevention: surfaces the FDA-clone re-sync obligation
+    # ON the PR that edits a cloned upstream command (session-start / review /
+    # ship), instead of (lagging, silent-at-source) on the next, unrelated PR —
+    # which is all the clone-drift-check job above (origin/main, every PR) can
+    # do. Thin path-filtered gate over the check-clone-drift.sh core (reused via
+    # its additive CLONES_FILTER + UPSTREAM_REF env seams — the core's default
+    # behaviour is unchanged), compared against the PR's HEAD: it does nothing
+    # (and emits no noise) on PRs that don't touch a clone source, so the signal
+    # is targeted, not cry-wolf. The clone-drift-check job above is intentionally
+    # left untouched (BC-12410 AC#3 — no regression to the lagging backstop).
+    #
+    # PR-scoped: the "editing PR" is a pull_request concept, so this job is
+    # gated to pull_request events (skipped on push-to-main, where there is no
+    # PR to surface the obligation on and the origin/main backstop already runs).
+    #
+    # Advisory (continue-on-error) per BC-7060's advisory-v1.0 contract. To
+    # promote to hard-block (BC-7060 v1.1 criterion — "if drift-rate empirically
+    # motivates it"), drop the continue-on-error line below; no script change.
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    continue-on-error: true
+    permissions:
+      contents: read  # least-privilege — script only reads in-repo files
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history for blob SHA lookups + base diff
+
+      - name: Surface FDA clone re-sync obligation on upstream-editing PRs
+        run: bash plugins/flow-architecture/scripts/check-clone-drift-shiftleft.sh
+        env:
+          BASE_REF: origin/main
+          HEAD_REF: HEAD

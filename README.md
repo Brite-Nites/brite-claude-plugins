@@ -89,7 +89,8 @@ Verify installation by typing `/workflows:` in Claude Code — you should see th
 |---------|-------------|
 | `/workflows:code-review` | Standardized code review for Brite projects |
 | `/workflows:security-audit` | Comprehensive project security audit |
-| `/workflows:bug-report` | Standardized bug reporting with Linear integration |
+| `/workflows:raise-a-ticket` | Report a bug or idea/feedback on a Brite product — routes to the right Linear team/project, files as `needs-triage` |
+| `/workflows:bug-report` | _Deprecated — use `/workflows:raise-a-ticket`_ |
 | `/workflows:deployment-checklist` | Pre-deployment validation checklist |
 | `/workflows:tech-stack` | Display the Brite technology stack |
 | `/workflows:onboarding-checklist` | Guide for setting up a new dev environment |

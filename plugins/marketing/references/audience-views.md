@@ -2,7 +2,7 @@
 
 Catalog of Snowflake views the marketing plugin's skills read from when assembling outbound lists. View design + refresh are owned by the **GTM Intelligence** Linear project (Corinne Brewer, lead); the marketing plugin is a **consumer**, not an author.
 
-This catalog is the canonical answer to "what view should `list-building` point at?" Skills that pass `--audience-view-name <name>` (Source 2 manual export today; Source 4 direct query per [ADR-022](../../../docs/decisions/022-marketing-snowflake-access.md) tomorrow) MUST cite a view from this catalog.
+This catalog is the canonical answer to "what view should `list-building` point at?" Skills that pass `--audience-view-name <name>` (Source 2 manual export today; Source 4 direct query per [ADR-030](../../../docs/decisions/030-marketing-snowflake-access.md) tomorrow) MUST cite a view from this catalog.
 
 ## What is an audience view?
 
@@ -16,7 +16,7 @@ The `brite-data-platform` dbt project ([repo](https://github.com/Brite-Nites/bri
 - An **audience view** is the right input when the campaign's segment matches a published view exactly (e.g., generic commercial outreach → `audience_commercial_outreach`). Filtering is already done in dbt; the skill just consumes.
 - A **golden record** read (`dim_people` / `dim_companies`) is the right input when the campaign needs a one-off slice that no view yet covers, OR when the skill is doing its own quality gate (e.g., `prospect-temporal-gate` checking domain coverage). The skill applies its own WHERE predicate.
 
-Per [ADR-022](../../../docs/decisions/022-marketing-snowflake-access.md), the marketing plugin reads Snowflake via a `snow` CLI wrapper (`plugins/marketing/scripts/snowflake/query_audience.py`) credentialed through `bw-run.sh`. The wrapper validates the view name against the **allowlist** below before issuing the query.
+Per [ADR-030](../../../docs/decisions/030-marketing-snowflake-access.md), the marketing plugin reads Snowflake via a `snow` CLI wrapper (`plugins/marketing/scripts/snowflake/query_audience.py`) credentialed through `bw-run.sh`. The wrapper validates the view name against the **allowlist** below before issuing the query.
 
 ## Catalog
 
@@ -110,7 +110,7 @@ A proposed view that doesn't fit the pattern is a signal that the schema needs a
 ## How to consume
 
 - **Today (Source 2 — manual CSV export).** Operator runs `snow sql -q "SELECT ... FROM <view> WHERE ..."` out-of-band, exports rows to CSV, passes `--audience-csv` + `--audience-view-name <view_name>` to `list-building`. The view name MUST appear in the catalog above.
-- **Tomorrow (Source 4 — direct query per [BC-11929](https://linear.app/brite-nites/issue/BC-11929)).** Operator passes `--snowflake-audience <view_name>` to `list-building`. The skill calls `plugins/marketing/scripts/snowflake/query_audience.py` (per [ADR-022](../../../docs/decisions/022-marketing-snowflake-access.md)) which validates the name against this catalog before issuing the SQL.
+- **Tomorrow (Source 4 — direct query per [BC-11929](https://linear.app/brite-nites/issue/BC-11929)).** Operator passes `--snowflake-audience <view_name>` to `list-building`. The skill calls `plugins/marketing/scripts/snowflake/query_audience.py` (per [ADR-030](../../../docs/decisions/030-marketing-snowflake-access.md)) which validates the name against this catalog before issuing the SQL.
 
 In both modes, the view name is validated; arbitrary view names or arbitrary SQL is rejected.
 

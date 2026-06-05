@@ -1,0 +1,25 @@
+{
+  "comments": [
+    {
+      "id": "IC_greptile_early",
+      "author": { "login": "greptile-apps" },
+      "body": "## Greptile Summary\n\nFirst pass.\n\n**Confidence score: 2/5**\n",
+      "createdAt": "2026-06-01T10:00:00Z",
+      "url": "https://github.com/brite/repo/pull/1#issuecomment-4"
+    },
+    {
+      "id": "IC_human_mid",
+      "author": { "login": "holdeeno" },
+      "body": "Pushed fixes, re-running.",
+      "createdAt": "2026-06-01T13:00:00Z",
+      "url": "https://github.com/brite/repo/pull/1#issuecomment-5"
+    },
+    {
+      "id": "IC_greptile_late",
+      "author": { "login": "greptile-apps" },
+      "body": "## Greptile Summary\n\nAll concerns resolved.\n\n**Confidence score: 5/5**\n",
+      "createdAt": "2026-06-01T14:00:00Z",
+      "url": "https://github.com/brite/repo/pull/1#issuecomment-6"
+    }
+  ]
+}

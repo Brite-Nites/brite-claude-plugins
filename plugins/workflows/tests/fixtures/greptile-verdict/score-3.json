@@ -1,0 +1,11 @@
+{
+  "comments": [
+    {
+      "id": "IC_greptile_3",
+      "author": { "login": "greptile-apps" },
+      "body": "## Greptile Summary\n\nThis PR wires the greptile-gate skill into ship.\n\n**Confidence score: 3/5**\n\nThe score reflects a couple of unresolved edge cases.\n",
+      "createdAt": "2026-06-01T12:00:00Z",
+      "url": "https://github.com/brite/repo/pull/1#issuecomment-1"
+    }
+  ]
+}

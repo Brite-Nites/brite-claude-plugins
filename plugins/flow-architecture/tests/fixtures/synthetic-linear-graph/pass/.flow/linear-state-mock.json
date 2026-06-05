@@ -1,0 +1,59 @@
+{
+  "_comment": "Clean baseline for the WS-A Linear-graph lints (A-4/A-5/A-6/A-7). Static mock of the per-domain batched list_issues + get_issue response shape; live /flow:audit Phase C and WS-E remediation read the same schema via Linear MCP, not from this file. Two FDA domains (seo-foundation, content-model). Every child carries the type:* label matching its [Discipline] title prefix; every child's milestone matches its parent's; exactly one child per discipline per parent; the one cross-domain blockedBy edge (BC-100 blockedBy BC-200) is mirrored by the seo-foundation-01 story doc's ## Cross-domain dependencies bullet.",
+  "parents": {
+    "BC-100": {
+      "flow_id": "seo-foundation-01",
+      "domain": "seo-foundation",
+      "title": "SEO-01: Sitemap & robots",
+      "milestone": "SEO Foundation",
+      "blockedBy": ["BC-200"],
+      "labels": ["type:parent", "domain:seo-foundation"]
+    },
+    "BC-200": {
+      "flow_id": "content-model-01",
+      "domain": "content-model",
+      "title": "CON-01: Page model",
+      "milestone": "Content Model",
+      "blockedBy": [],
+      "labels": ["type:parent", "domain:content-model"]
+    }
+  },
+  "children": {
+    "BC-101": {
+      "parent": "BC-100",
+      "title": "[Story] SEO-01 Sitemap & robots",
+      "milestone": "SEO Foundation",
+      "labels": ["type:story", "domain:seo-foundation"]
+    },
+    "BC-102": {
+      "parent": "BC-100",
+      "title": "[Design] SEO-01 Sitemap & robots",
+      "milestone": "SEO Foundation",
+      "labels": ["type:design", "domain:seo-foundation"]
+    },
+    "BC-103": {
+      "parent": "BC-100",
+      "title": "[Eng] SEO-01 Sitemap & robots",
+      "milestone": "SEO Foundation",
+      "labels": ["type:eng", "domain:seo-foundation"]
+    },
+    "BC-104": {
+      "parent": "BC-100",
+      "title": "[QA] SEO-01 Sitemap & robots",
+      "milestone": "SEO Foundation",
+      "labels": ["type:qa", "domain:seo-foundation"]
+    },
+    "BC-105": {
+      "parent": "BC-100",
+      "title": "[Docs] SEO-01 Sitemap & robots",
+      "milestone": "SEO Foundation",
+      "labels": ["type:docs", "domain:seo-foundation"]
+    },
+    "BC-201": {
+      "parent": "BC-200",
+      "title": "[Story] CON-01 Page model",
+      "milestone": "Content Model",
+      "labels": ["type:story", "domain:content-model"]
+    }
+  }
+}

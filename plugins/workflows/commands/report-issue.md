@@ -1,8 +1,15 @@
 ---
-description: Capture plugin misbehavior as a regression test case and Linear issue with classification and reproduction steps
+description: Report the agent tooling itself misbehaving — a skill, command, or hook that misfired (NOT a Brite product bug; for that use /workflows:raise-a-ticket). Classifies the failure, generates a regression test into the trigger/behavioral registry, and files a Linear issue. The direct expert alias into raise-a-ticket's agent-tooling branch.
 ---
 
 # Report Issue
+
+> **This is the agent-tooling branch of the intake front door.** Reporting a bug or idea on a
+> Brite _product_ (Brite Base, Sites, Supply, a Labs site)? Use `/workflows:raise-a-ticket`
+> instead — or just answer "product" when its Step 1 fork asks. This command — reachable
+> directly as the expert alias, and as the hand-off target of raise-a-ticket's "agent tooling"
+> fork — is for **plugin / command / hook misbehavior**: a skill that misfired, a command step
+> that's wrong, a hook that fired (or didn't) when it shouldn't.
 
 You are capturing a plugin misbehavior report from a developer during a live work session. Your job is to gather structured details about what went wrong, classify the failure, auto-generate a regression test case for the appropriate test registry, and create a Linear issue — closing the loop between production usage and the test framework.
 
@@ -10,7 +17,8 @@ You are capturing a plugin misbehavior report from a developer during a live wor
 
 ## Step 0: Verify Prerequisites
 
-Confirm Linear MCP is reachable:
+Confirm Linear MCP is reachable — run the shared **reachability probe** (see
+[`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md) § Reachability probe):
 
 1. **Linear MCP** — Call `list_projects` (limit 1). Confirms auth and connectivity.
 
@@ -19,6 +27,22 @@ If it fails:
 - Do NOT proceed.
 
 Sequential-thinking is checked on first use in Step 2. If it fails there, fall back to inline reasoning.
+
+### 0a. Registry context (graceful-degrade guard)
+
+This command generates a regression test into the plugins repo's test registries
+(`trigger-registry.json` / `behavioral-registry.json`). Those only exist in the plugins repo —
+but this command is also reachable from anywhere (operator mode, or a product repo via
+`/workflows:raise-a-ticket`'s "agent tooling" fork). Detect whether you are **in the plugins repo**
+using the shared signal in [`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md)
+§ Plugins-repo detection (`.claude-plugin/marketplace.json` at root **OR** origin
+`brite-claude-plugins`).
+
+- **In the plugins repo** → full flow: classify, draft the test case, and append it (Steps 3 & 6b).
+- **Outside the plugins repo** → **graceful degrade**: still classify the failure and file the
+  Linear issue, but do **not** read or write the registries. Skip the Step 3 draft, record
+  "No test registry is reachable here — a maintainer can append the regression test later," and
+  show that note (not a JSON block) in the preview and Step 7. Never attempt a registry write.
 
 ## Step 1: Gather Misbehavior Details
 
@@ -43,10 +67,41 @@ If the developer provides a single paragraph, help structure it into these three
 
 Ask: "Any additional context? (error messages, which command was running, logs — or skip)"
 
-- If the developer provides log output or error messages, scan for potential secrets before including. Redact any matches with `[REDACTED]`.
-  - Patterns: `Bearer `, `password=`, `password:`, `token=`, `token:`, `sk-`, `AKIA`, `postgres://`, `mongodb+srv://`, `redis://`, `ghp_`, `gho_`, `glpat-`, `xoxb-`, `xoxp-`, `hooks.slack.com`, `PRIVATE KEY`, `-----BEGIN`
-  - After automated redaction, always warn: "I scanned for common secret patterns and redacted matches. Review the output below for any secrets I may have missed before confirming."
+- If the developer provides log output or error messages, scan for potential secrets before including and redact matches with `[REDACTED]`, applying the **canonical secret-redaction list** in [`_shared/intake-redaction.md`](./_shared/intake-redaction.md) — the single source of truth for the patterns and the warn-then-code-block guidance (shared with the product branch). Do **not** inline a pattern list here; add any new pattern to that file once.
 - If they mention related Linear issues (e.g., "BC-2462"), note them for the `relatedTo` field.
+
+### 1d. Content-aware switch — is this actually a product bug?
+
+This command is the **agent-tooling** branch of the intake front door. The reporter reached it via
+one of three routes: (a) typing `/workflows:report-issue` (the direct alias), (b) picking "agent
+tooling" at `/workflows:raise-a-ticket`'s Step-1a fork, or (c) accepting raise-a-ticket's Step-1c
+**product→tooling** content-aware switch — but a pick is a hint, not a cage. Now that you have the
+trigger / actual / expected from Step 1b, judge what's actually being described.
+
+**Arrival guard (no round-trip).** If you reached this command via route (c) — raise-a-ticket's
+Step-1c product→tooling switch, i.e. the reporter *already* declined product by switching to
+tooling — do **not** offer the tooling→product switch below; that round-trip was just declined.
+Proceed straight to Step 2.
+
+If the report **clearly** reads as a **Brite product** bug — a user-facing software surface
+misbehaving (Brite Base, Brite Sites, Brite Supply, a Brite Labs site), e.g. "the quote PDF exports
+blank" or "the property gallery won't load" — rather than the agent tooling (a skill / command /
+hook), **offer to switch** with a single confirm (AskUserQuestion): "This sounds like a **Brite
+product** bug, not agent-tooling — switch to `/workflows:raise-a-ticket` product intake?" →
+**Switch** / **Stay here**.
+
+- **Switch** → do **not** run the tooling flow (no classification, no test case). Read
+  [`raise-a-ticket.md`](./raise-a-ticket.md) and run its **product branch** from **Step 1c onward**,
+  treating **product as already chosen** — do **not** re-ask raise-a-ticket's Step-1a
+  product-vs-tooling fork (accepting this switch *is* the product choice; re-asking would loop). Tell
+  the product branch you arrived via this Step 1d switch so it honors its **arrival guard** and does
+  not re-offer the product→tooling switch back (no round-trip). Pass along the description gathered
+  above. Stop here.
+- **Stay here** (or the report does not *clearly* read as a product bug) → continue to Step 2.
+
+Never silently reroute — the reporter decides. This is the reverse of raise-a-ticket Step 1c's
+product→tooling switch; placing it here covers **both** entry paths (the direct alias *and* the
+raise-a-ticket→Tooling→dispatch route), since both run this command.
 
 ## Step 2: Classify Failure Type
 
@@ -58,6 +113,7 @@ Present the classification to the developer via AskUserQuestion. Show your recom
 |---------------|-------------|---------------|
 | wrong-skill | A skill fired but it was the wrong one | trigger-registry.json |
 | skill-not-fired | Expected a skill to fire but none did | trigger-registry.json |
+| skill-over-fired | A skill fired when **none** should have (e.g. brainstorming on a trivial one-line rename) | trigger-registry.json |
 | bad-output | Correct skill fired but output quality was poor | behavioral-registry.json |
 | hook-issue | Security/quality hook misfired or didn't fire | Linear only |
 | subagent-issue | Review agent or subagent produced wrong results | Linear only |
@@ -82,9 +138,11 @@ Record the severity and its mapped Linear priority for use in Steps 5 and 6.
 
 **Skip this step** if the classification is hook-issue, subagent-issue, or command-flow. Proceed directly to Step 4.
 
+**Also skip the draft** if you are **outside the plugins repo** (Step 0a graceful-degrade): there is no registry to read or append to. Record "No test registry is reachable here — a maintainer can append the regression test later" and proceed to Step 4.
+
 Use sequential-thinking to draft a test case based on the misbehavior details.
 
-### For wrong-skill or skill-not-fired → trigger-registry.json
+### For wrong-skill, skill-not-fired, or skill-over-fired → trigger-registry.json
 
 Read `plugins/workflows/skills/_shared/trigger-registry.json` and locate the `test_cases` array. Draft a new entry:
 
@@ -99,6 +157,7 @@ Read `plugins/workflows/skills/_shared/trigger-registry.json` and locate the `te
 
 - For wrong-skill: populate both `expected` (correct skill) and `not_expected` (wrong skill that fired).
 - For skill-not-fired: populate `expected` with the skill that should have fired. Leave `not_expected` as `[]` unless a different skill incorrectly fired.
+- For skill-over-fired: a skill fired when **none** should have — leave `expected` as `[]` and populate `not_expected` with the skill that wrongly fired.
 - The `phrase` should be a concise, representative version of the trigger prompt — not the full paragraph.
 - Sanitize the `phrase` value: strip shell metacharacters (`$`, `` ` ``, `\`, `"`, `'`) and ensure it is plain natural-language text. If the trigger contains code blocks or shell syntax, extract only the natural-language description.
 
@@ -138,7 +197,8 @@ Apply any edits before proceeding.
 
 ## Step 4: Check for Duplicate Issues
 
-Before creating the issue, search Linear for potential duplicates:
+Before creating the issue, search Linear for potential duplicates — the shared **duplicate search**
+(see [`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md) § Duplicate search):
 
 1. **Search by keywords** — Extract 2-4 significant words from the description. Use `list_issues` with a `query` parameter containing these keywords, scoped to team "Brite Company". Limit to 10 results.
 2. **Filter to open issues** — Only show issues that are not completed or cancelled.
@@ -153,9 +213,8 @@ Before creating the issue, search Linear for potential duplicates:
 | ...
 ```
 
-4. **Ask the developer** using AskUserQuestion:
-   - "Is this a duplicate of any of these issues?" with options for each match plus "None — create new issue"
-   - If they select a duplicate: offer to add a comment to the existing issue with the new reproduction details using `save_comment`. After commenting, display a confirmation:
+4. **Ask the developer to disambiguate** — the table above is already a numbered list, so ask in plain text: "Reply with the number of the issue this duplicates, or 'none' to create a new issue." Do **not** build an `AskUserQuestion` with one entry per match — a candidate set can exceed AskUserQuestion's 4-option cap (BC-12400); a numbered list plus a single free-text reply scales to any number of matches.
+   - If they reply with a number: offer to add a comment to that existing issue with the new reproduction details using `save_comment`. After commenting, display a confirmation:
      ```
      Comment added to [ISSUE-ID]: [title]
      Link: [issue URL]
@@ -163,7 +222,7 @@ Before creating the issue, search Linear for potential duplicates:
      The reproduction details have been added to the existing issue.
      ```
      Then stop — do not proceed to issue creation.
-   - If no matches or "None": proceed to Step 5.
+   - If they reply "none" (or the search returned no results): proceed to Step 5.
 
 If the search returns no results, skip the duplicate prompt and proceed directly.
 
@@ -178,7 +237,17 @@ Gather environment details automatically:
 1. **OS**: Run `sw_vers -productName -productVersion 2>/dev/null || uname -sr`
 2. **Node.js version**: Run `node -v`
 3. **Git branch**: Run `git branch --show-current`
-4. **Plugin version**: Read `version` from `plugins/workflows/.claude-plugin/plugin.json`
+4. **Plugin version (the *running* version)**: read `version` from
+   `$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json` — the running plugin's manifest, resolved
+   regardless of cwd. `CLAUDE_PLUGIN_ROOT` is exported by the Claude Code plugin runner for every
+   plugin command/skill (it points at the plugin's install dir, **not** the cwd), so it stays set in
+   operator mode and out-of-repo — this does **not** silently degrade there. It is the same
+   convention `skills/greptile-gate` (`${CLAUDE_PLUGIN_ROOT}/scripts/greptile-verdict.sh`) and the
+   flow-architecture commands already rely on. **Fallbacks** (defensive, for a non-plugin invocation
+   where the var is somehow unset): read the working-tree
+   `plugins/workflows/.claude-plugin/plugin.json` **only when in the plugins repo** (Step 0a);
+   otherwise stamp `unknown (running from plugin cache)`. Do **not** stamp the working-tree version
+   when out-of-repo — it is wrong (out-of-repo) or stale (drifted checkout).
 
 ### Preview
 
@@ -189,7 +258,7 @@ Gather environment details automatically:
 **Team**: Brite Company
 **Project**: Brite Skill Packs
 **Priority**: [severity → priority mapping from Step 2b]
-**Labels**: Bug
+**Labels**: type:bug, needs-triage, executor:hybrid[, severity:sevN if provisioned]
 
 ---
 
@@ -212,7 +281,8 @@ Gather environment details automatically:
 
 ### Proposed Test Case
 
-[test case JSON block — or "No automated test case for this classification"]
+[test case JSON block — or "No automated test case for this classification" — or, outside the
+plugins repo, "No test registry reachable here — a maintainer can append the regression test later"]
 
 ### Environment
 
@@ -229,27 +299,50 @@ Gather environment details automatically:
 ```
 
 Ask for confirmation using AskUserQuestion:
-- "Create issue + append test case" — proceed to create the issue AND append the test case to the registry (only shown if a test case was generated)
-- "Create issue only" — create the Linear issue but skip test case append
+- "Create issue + append test case" — proceed to create the issue AND append the test case to the registry (only shown when a test case was generated — i.e. in the plugins repo with an appendable classification)
+- "Create issue only" — create the Linear issue but skip the test case append (the only file-creating option outside the plugins repo)
 - "Edit first" — ask what to change, update, and re-preview
 
 ## Step 6: Create Linear Issue and Append Test Case
 
 ### 6a. Create the Linear Issue
 
-Create the issue using `save_issue` with:
+**First, reconcile labels against the target team (Brite Company).** Brite's label canon
+(CDR-016/CDR-018) is mid-rollout, so not every group is provisioned (e.g. `severity:*` is absent in
+Brite Company today). Call `list_issue_labels({ team: "Brite Company" })`, apply the canonical labels
+that exist, and fall back as noted for any that don't — **never** use the legacy flat `"Bug"` label,
+and **never** auto-create workspace label groups from a report. This mirrors raise-a-ticket Step 8 so
+both branches of the front door file under one label convention.
+
+Intended labels:
+- **Type** (always): `type:bug` — a tooling misbehavior is a defect (per CDR-016). Never the legacy
+  flat `"Bug"`.
+- **Triage state** (always, load-bearing): `needs-triage` (canonical string from
+  [docs/agents/triage-labels.md](../../../docs/agents/triage-labels.md)). This signal must NOT be
+  dropped: if the `needs-triage` label isn't provisioned in Brite Company, set Linear's built-in
+  **Triage** workflow state instead (`save_issue(state: "Triage")`). Only if neither is available,
+  warn prominently in the confirmation.
+- **Executor** (always): `executor:hybrid` — the default executor axis (CDR-016/CDR-018).
+- **Severity** (from Step 2b): map to a `severity:sevN` label **if the group exists** (Critical→`sev0`,
+  High→`sev1`, Medium→`sev2`, Low→`sev3`). It is **not** provisioned in Brite Company today, so skip
+  the label and rely on `priority` (set below) — note "severity:* not provisioned; captured via
+  priority" in the confirmation.
+
+Then create with `save_issue`:
 
 - `title`: "[classification]: [short description]" (e.g., "wrong-skill: brainstorming fired for trivial rename")
 - `team`: "Brite Company"
 - `project`: "Brite Skill Packs"
 - `priority`: Mapped from severity (Critical→1, High→2, Medium→3, Low→4)
-- `labels`: `["Bug"]`
+- `labels`: the reconciled set above (the labels that actually exist in Brite Company)
 - `description`: The full formatted markdown from the preview (classification, trigger, actual/expected, proposed test case, environment, additional context)
 - `relatedTo`: Any related issue IDs mentioned by the developer
 
 ### 6b. Append Test Case (if confirmed)
 
-Only if the developer chose "Create issue + append test case":
+Only attempt this **in the plugins repo** (Step 0a). Outside it there is no registry to append
+to — skip Step 6b entirely and rely on the Linear issue + the maintainer note. Otherwise, only
+if the developer chose "Create issue + append test case":
 
 1. **Reuse** the registry content already read in Step 3 (do not re-read the file)
 2. **Parse** the JSON and **append** the new test case to the `test_cases` array
@@ -280,11 +373,19 @@ Run the relevant test to verify:
 
 If the classification was hook-issue, subagent-issue, or command-flow, add: "No automated regression test was generated for this classification. Consider adding a manual test case when the fix is implemented."
 
+If invoked **outside the plugins repo** (Step 0a graceful-degrade), the **Test case** line reads "not appended — filed from outside the plugins repo" and add: "A maintainer can append the regression test from the plugins repo using the classification + trigger captured above."
+
 ## Rules
 
+- Content-aware (Step 1d): this is the agent-tooling branch, but if the report **clearly** reads as a
+  Brite product bug, offer to switch to `/workflows:raise-a-ticket` product intake (confirm-gated,
+  hand off to its product branch from Step 1c — never re-ask the fork). Never silently reroute.
 - Never create an issue without the developer reviewing and confirming the draft first.
 - Never skip the duplicate check — even if it finds no matches, the search must run.
-- Always apply the "Bug" label.
+- Apply canonical CDR-016/CDR-018 labels, existence-aware against Brite Company (`type:bug` +
+  `needs-triage` + `executor:hybrid`; `severity:sevN` when provisioned, else priority carries it).
+  Never use the legacy flat `"Bug"` label; never auto-create workspace label groups. Mirrors
+  raise-a-ticket Step 8.
 - Structure free-form input — if the developer gives a wall of text, help break it into trigger/actual/expected sections.
 - Include auto-detected environment info in every report. Let the developer correct it, don't skip it.
 - When appending to a JSON registry, write to a `.tmp` file first, validate with `python3 -m json.tool`, then atomically move into place. If validation fails, remove the tmp file.

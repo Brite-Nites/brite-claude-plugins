@@ -309,6 +309,177 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b''''''' — flow-architecture story-doc quality vslice (BC-11985)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-story-quality-vslice.sh — the
+# regression lock for the story-doc-author quality rewrite (BC-11985/BC-11986).
+# Greps fixture story docs and FAILS on any of four quality defects: (a) job-story
+# When/I want to/so I can grammar collapse (verb-less "so I can <noun>" or
+# "I want to a/the <noun>"), (b) circular boilerplate AC ("the outcome
+# described in" / "holds true"), (c) fewer than 3 Gherkin Scenario blocks,
+# (d) a generic project-wide default persona repeated verbatim (T0-2/A-2 seed).
+# A GOOD BriteBase-grade fixture passes all four; each BAD fixture trips exactly
+# its named defect. Pass count auto-derived from the harness's RESULT line.
+section "2b'''''''. flow-architecture story-doc quality vslice (BC-11985)"
+
+fda_story_quality_test="$REPO_ROOT/plugins/flow-architecture/tests/run-story-quality-vslice.sh"
+
+if [ ! -f "$fda_story_quality_test" ]; then
+  warn "plugins/flow-architecture/tests/run-story-quality-vslice.sh not found — skipped"
+else
+  if fda_story_quality_out=$(bash "$fda_story_quality_test" 2>&1); then
+    fda_story_quality_pass_count=$(printf '%s\n' "$fda_story_quality_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture story-doc quality vslice (${fda_story_quality_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture story-doc quality vslice failed — run plugins/flow-architecture/tests/run-story-quality-vslice.sh for details"
+    printf '%s\n' "$fda_story_quality_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b'''''''' — flow-architecture WS-A reusable doc-lint vslice (BC-11983)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh — the
+# regression lock for the reusable, multi-line-aware story-doc lint lib
+# (scripts/lib/flow_doc_lint.sh) used by WS-E remediation to lint any consumer
+# repo's flows. Asserts lint_story_doc returns the right verdict on the shared
+# synthetic-story-quality fixtures: GOOD (human job-story + constraint-spec +
+# human-mentions-infra) → PASS; each BAD fixture → its named defect (A-1 GRAMMAR
+# / A-3 BOILERPLATE / FEW_SCENARIOS / A-2 GENERIC_PERSONA / D11 FRAME_MISMATCH).
+# Pass count auto-derived from the harness's RESULT line.
+section "2b''''''''. flow-architecture WS-A doc-lint vslice (BC-11983)"
+
+fda_doclint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh"
+
+if [ ! -f "$fda_doclint_test" ]; then
+  warn "plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh not found — skipped"
+else
+  if fda_doclint_out=$(bash "$fda_doclint_test" 2>&1); then
+    fda_doclint_pass_count=$(printf '%s\n' "$fda_doclint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture WS-A doc-lint vslice (${fda_doclint_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture WS-A doc-lint vslice failed — run plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh for details"
+    printf '%s\n' "$fda_doclint_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b''''''''' — flow-architecture WS-A inventory lints (BC-11983)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh — the
+# regression lock for the inventory lints (scripts/lib/flow_inventory_lint.sh):
+# A-8 inventory ↔ doc two-identifier consistency (orphan docs / orphan rows /
+# UPPERCASE-vs-kebab scheme mix, handling both Q20-amendment-2 schemes) and A-9
+# flow-ID immutability (a removed/renamed flow-ID is the FK-fragility breach;
+# `-a`/`-b` splits and [DEPRECATED]-but-present IDs are allowed). Fixtures built
+# in a temp dir. Pass count auto-derived from the harness's RESULT line.
+section "2b'''''''''. flow-architecture WS-A inventory lints (BC-11983)"
+
+fda_invlint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh"
+
+if [ ! -f "$fda_invlint_test" ]; then
+  warn "plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh not found — skipped"
+else
+  if fda_invlint_out=$(bash "$fda_invlint_test" 2>&1); then
+    fda_invlint_pass_count=$(printf '%s\n' "$fda_invlint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture WS-A inventory lints vslice (${fda_invlint_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture WS-A inventory lints vslice failed — run plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh for details"
+    printf '%s\n' "$fda_invlint_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b'''''''''' — flow-architecture WS-A Linear-graph lints (BC-11983)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-flow-linear-lint-vslice.sh — the
+# regression lock for the Linear-graph lints (scripts/lib/flow_linear_lint.py):
+# A-4 label↔title-prefix contamination (a [Discipline] child carrying a
+# contradictory type:* label, e.g. brite-supply's 33 [Design]→type:eng), A-5
+# blockedBy-wiring (story-doc ## Cross-domain dependencies ↔ Linear blockedBy —
+# reuses the BC-10729 bidirectional predicate), A-6 child-milestone-inheritance
+# (NO_MILESTONE + child≠parent), and A-7 duplicate-discipline-child. Unlike the
+# doc/inventory lints these consume a Linear-state JSON snapshot (synthetic
+# fixtures here; live MCP→JSON at WS-E / /flow:audit Phase C per the fixtures
+# README serialize contract). Pass count auto-derived from the harness's RESULT line.
+section "2b''''''''''. flow-architecture WS-A Linear-graph lints (BC-11983)"
+
+fda_lglint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-linear-lint-vslice.sh"
+
+if [ ! -f "$fda_lglint_test" ]; then
+  warn "plugins/flow-architecture/tests/run-flow-linear-lint-vslice.sh not found — skipped"
+else
+  if fda_lglint_out=$(bash "$fda_lglint_test" 2>&1); then
+    fda_lglint_pass_count=$(printf '%s\n' "$fda_lglint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture WS-A Linear-graph lints vslice (${fda_lglint_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture WS-A Linear-graph lints vslice failed — run plugins/flow-architecture/tests/run-flow-linear-lint-vslice.sh for details"
+    printf '%s\n' "$fda_lglint_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b''''''''''' — flow-architecture journey/story template alignment (BC-11983 WS-E precursor)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-template-alignment-vslice.sh — the
+# regression lock that keeps the journey-doc-author / story-doc-author agents
+# AND the canonical templates the plugin seeds into consumers
+# (templates/docs/templates/{domain-journey,job-story}.md) from drifting away
+# from the canonical handbook structure (the brite-sites teardown root cause:
+# missing consumer template file + drifted agent fallback prose). Grep-triad
+# per file (catchphrase + structural-clause + negative-case): restores Decision
+# points / Open questions / Preconditions / QA history, forbids the domain-level
+# duplicate sections, and asserts both orchestrators COPY the templates into the
+# consumer's docs/templates/. Pass count auto-derived from the harness RESULT line.
+section "2b'''''''''''. flow-architecture journey/story template alignment (BC-11983)"
+
+fda_tmpl_align_test="$REPO_ROOT/plugins/flow-architecture/tests/run-template-alignment-vslice.sh"
+
+if [ ! -f "$fda_tmpl_align_test" ]; then
+  warn "plugins/flow-architecture/tests/run-template-alignment-vslice.sh not found — skipped"
+else
+  if fda_tmpl_align_out=$(bash "$fda_tmpl_align_test" 2>&1); then
+    fda_tmpl_align_pass_count=$(printf '%s\n' "$fda_tmpl_align_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture journey/story template alignment vslice (${fda_tmpl_align_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture journey/story template alignment vslice failed — run plugins/flow-architecture/tests/run-template-alignment-vslice.sh for details"
+    printf '%s\n' "$fda_tmpl_align_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b'''''''''''' — flow-architecture shift-left clone-drift regression (BC-12410)
+# ══════════════════════════════════════════════════════════════════════
+# Naming: the flow-architecture sub-sections chain off "2b" with one added
+# prime-tick (apostrophe) per section in landing order — 2b' (BC-10728), 2b''
+# (BC-11029), … through 2b''''''''''' (BC-11983). This is the 12th, so it carries
+# 12 ticks. The count is positional, not a copy-paste artifact; a plain letter
+# (e.g. 2b') would collide with an existing earlier section.
+# Runs plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh — the
+# regression lock for check-clone-drift-shiftleft.sh, the path-filtered gate that
+# surfaces the FDA-clone re-sync obligation ON the PR that edits a cloned upstream
+# command (session-start / review / ship), vs the lagging origin/main
+# clone-drift-check (BC-7060). Hermetic cases: list-agreement + upstream-edited-
+# not-resynced → FAIL+obligation (per arm); re-synced → PASS; unrelated PR →
+# no-run; FDA-clone-only edit → no-run; near-miss exact-match; cross-clone
+# scoping. Mutates a clone header in place, restores via .bak + EXIT trap.
+section "2b''''''''''''. flow-architecture shift-left clone-drift regression (BC-12410)"
+
+fda_shiftleft_test="$REPO_ROOT/plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh"
+
+if [ ! -f "$fda_shiftleft_test" ]; then
+  warn "plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh not found — skipped"
+else
+  if fda_shiftleft_out=$(bash "$fda_shiftleft_test" 2>&1); then
+    fda_shiftleft_pass_count=$(printf '%s\n' "$fda_shiftleft_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture shift-left clone-drift regression (${fda_shiftleft_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture shift-left clone-drift regression failed — run plugins/flow-architecture/tests/test-clone-drift-shiftleft.sh for details"
+    printf '%s\n' "$fda_shiftleft_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
@@ -405,6 +576,31 @@ else
     printf '%s\n' "$advisory_out" | tail -25 | sed 's/^/    /' >&2
   fi
 fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2e — workflows helper-script unit tests (BC-12248)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/workflows/tests/test-*.sh — bash unit tests for workflows
+# helper scripts (currently greptile-verdict.sh, the greptile-gate score
+# reader). Pass count auto-derived from each harness's RESULT contract line.
+# Mirrors Section 2b' (the flow-architecture helper-test pattern); kept as a
+# localized glob so future workflows bash harnesses are picked up automatically.
+section "2e. workflows helper-script unit tests (BC-12248)"
+
+wf_ran=0
+for wf_test in "$REPO_ROOT"/plugins/workflows/tests/test-*.sh; do
+  [ -e "$wf_test" ] || continue   # bash 3.2: glob stays literal when no match
+  wf_ran=1
+  wf_name="$(basename "$wf_test")"
+  if wf_out=$(bash "$wf_test" 2>&1); then
+    wf_pass_count=$(printf '%s\n' "$wf_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "workflows: $wf_name (${wf_pass_count:-?} assertions)"
+  else
+    fail "workflows: $wf_name failed — run $wf_test for details"
+    printf '%s\n' "$wf_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+done
+[ "$wf_ran" -eq 1 ] || warn "no plugins/workflows/tests/test-*.sh found — skipped"
 
 # ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
@@ -1656,6 +1852,37 @@ else
   else
     fail "canonicals bootstrap regression harness failed:"
     printf '%s\n' "$cb_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-11849 — Import-campaign regression harness (BC-11849)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_import_campaign.sh — exercises the
+# import_campaign.py classify-name + compose surfaces (ADR-020 worked
+# examples + cohort-1 reproduction + structural-error rejection) AND
+# static-grep checks against import-campaign.md for spec-drift defense.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-11849. Import-campaign regression harness (BC-11849)"
+
+ic_harness="$REPO_ROOT/plugins/marketing/scripts/test_import_campaign.sh"
+ic_helper="$REPO_ROOT/plugins/marketing/scripts/import_campaign.py"
+
+if [ ! -f "$ic_helper" ]; then
+  warn "plugins/marketing/scripts/import_campaign.py not found — import-campaign harness skipped"
+elif [ ! -f "$ic_harness" ]; then
+  warn "plugins/marketing/scripts/test_import_campaign.sh not found — import-campaign harness skipped"
+else
+  if ic_harness_out=$(bash "$ic_harness" "$ic_helper" 2>&1); then
+    ic_pass_count=$(printf '%s\n' "$ic_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$ic_pass_count" ]; then
+      pass "import-campaign regression harness (${ic_pass_count} assertions)"
+    else
+      pass "import-campaign regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "import-campaign regression harness failed:"
+    printf '%s\n' "$ic_harness_out" | tail -30 | sed 's/^/          /' >&2
   fi
 fi
 

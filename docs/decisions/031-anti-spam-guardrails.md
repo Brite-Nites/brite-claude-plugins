@@ -1,4 +1,4 @@
-# 023. Anti-Spam Guardrails Consolidation
+# 031. Anti-Spam Guardrails Consolidation
 
 **Status:** Proposed
 **Date:** 2026-05-28
@@ -17,7 +17,7 @@ Brite Labs operates a milestone-driven outbound model (`Brite GTM` Linear projec
 - **Handbook** — [`handbook/marketing/go-to-market/campaign-lifecycle.md`](https://github.com/Brite-Nites/handbook/blob/main/marketing/go-to-market/campaign-lifecycle.md) § 2 (Touchpoint Frequency) is the closest existing canonical source. It states: *"No prospect receives more than two cycles per year, regardless of vertical or offer mix... Cycle-to-cycle gap defaults to roughly six months."* It also defines an exception: *"a once-in-a-decade external moment... may justify a third cycle for the affected cohort in that year only."* The handbook is operator-facing; it does not specify enforcement, suppression mechanics, or per-vertical exception schemas.
 - **`prospect-temporal-gate` skill** (`plugins/marketing/skills/prospect-temporal-gate/SKILL.md`, published v0.3.22 as DRAFT) — encodes Rules 1-4 below in Phase 5 suppression logic + Phase 7 halt gates. The skill is the enforcement layer but it predates the handbook reconciliation; its rule text and the handbook's drift.
 - **Operator memory** — the calendar-year vertical offer-rotation discipline (Rule 5) lives only in planning conversations. The handbook does not address per-vertical offer rotation; it addresses per-prospect touchpoint count.
-- **A planned-but-not-yet-written** `handbook/marketing/go-to-market/campaign-rules.md` — referenced from BC-10192 (`campaign-calendar` skill) as a future consolidated rules page. **This file does not currently exist in the handbook repo** (`gh api repos/Brite-Nites/handbook/contents/marketing/go-to-market/campaign-rules.md` returns 404 as of 2026-05-28). This ADR is the **precondition** for that page — once accepted, a follow-up handbook PR creates `campaign-rules.md` as a back-pointer to ADR-023.
+- **A planned-but-not-yet-written** `handbook/marketing/go-to-market/campaign-rules.md` — referenced from BC-10192 (`campaign-calendar` skill) as a future consolidated rules page. **This file does not currently exist in the handbook repo** (`gh api repos/Brite-Nites/handbook/contents/marketing/go-to-market/campaign-rules.md` returns 404 as of 2026-05-28). This ADR is the **precondition** for that page — once accepted, a follow-up handbook PR creates `campaign-rules.md` as a back-pointer to ADR-031.
 
 Three failure modes follow:
 
@@ -98,7 +98,7 @@ This metric is **distinct from** the handbook's "four touchpoints per prospect p
 
 **Enforcement.** `prospect-temporal-gate` Phase 5 step 4.5 (NEW — added in [BC-11930](https://linear.app/brite-nites/issue/BC-11930)). Counts distinct `Campaign.Offer__c` values per `(domain, fiscal_year)` against the budget. HARD-FAIL at Phase 7 when budget exceeded.
 
-> **This rule is new policy introduced by ADR-023.** Operator review must explicitly ratify the `N = 4` default before merge; downstream skills ([BC-10191](https://linear.app/brite-nites/issue/BC-10191) `offer-catalog`, [BC-10192](https://linear.app/brite-nites/issue/BC-10192) `campaign-calendar`) consume it as canonical.
+> **This rule is new policy introduced by ADR-031.** Operator review must explicitly ratify the `N = 4` default before merge; downstream skills ([BC-10191](https://linear.app/brite-nites/issue/BC-10191) `offer-catalog`, [BC-10192](https://linear.app/brite-nites/issue/BC-10192) `campaign-calendar`) consume it as canonical.
 
 ## Consequences
 
@@ -117,9 +117,9 @@ This metric is **distinct from** the handbook's "four touchpoints per prospect p
 
 **Future work.**
 
-- **Land handbook back-pointer** — Create `handbook/marketing/go-to-market/campaign-rules.md` as a back-pointer to ADR-023. Update `campaign-lifecycle.md` § 2 (Touchpoint Frequency) to cite ADR-023 as the canonical machine-enforced statement, keeping the operator-facing prose but linking to the ADR for the precise rule text + exceptions. Handbook PR separate from this work.
+- **Land handbook back-pointer** — Create `handbook/marketing/go-to-market/campaign-rules.md` as a back-pointer to ADR-031. Update `campaign-lifecycle.md` § 2 (Touchpoint Frequency) to cite ADR-031 as the canonical machine-enforced statement, keeping the operator-facing prose but linking to the ADR for the precise rule text + exceptions. Handbook PR separate from this work.
 - **Backfill per-vertical exception schema** — Per-vertical exception files (Rule 1 `lookback_override_days`, Rule 5 `annual_offer_budget`) referenced in this ADR do not exist in the handbook today. [BC-10192](https://linear.app/brite-nites/issue/BC-10192) (`campaign-calendar` skill) ships the schema + first verticals.
-- **Planning-time enforcement** — Extend [BC-10191](https://linear.app/brite-nites/issue/BC-10191) (`offer-catalog`) and [BC-10192](https://linear.app/brite-nites/issue/BC-10192) (`campaign-calendar`) to surface ADR-023 violations at planning time, not just launch time.
+- **Planning-time enforcement** — Extend [BC-10191](https://linear.app/brite-nites/issue/BC-10191) (`offer-catalog`) and [BC-10192](https://linear.app/brite-nites/issue/BC-10192) (`campaign-calendar`) to surface ADR-031 violations at planning time, not just launch time.
 - **Revisit N = 4 in Rule 5** — After one full FY of enforcement data. Adjust if per-vertical exception traffic exceeds 30% of verticals OR if the exception cap of 6 proves insufficient (both first-FY estimates).
 
 ## Alternatives Considered

@@ -3,7 +3,7 @@
 **Linear:** [BC-11928](https://linear.app/brite-nites/issue/BC-11928) (design) → [BC-11929](https://linear.app/brite-nites/issue/BC-11929) (implementation)
 **Status:** Proposed
 **Date:** 2026-05-28
-**Depends on:** [ADR-022](../decisions/022-marketing-snowflake-access.md) (Snowflake-access mechanism), [`plugins/marketing/references/audience-views.md`](../../plugins/marketing/references/audience-views.md) (allowlist)
+**Depends on:** [ADR-030](../decisions/030-marketing-snowflake-access.md) (Snowflake-access mechanism), [`plugins/marketing/references/audience-views.md`](../../plugins/marketing/references/audience-views.md) (allowlist)
 **Affects:** [`plugins/marketing/skills/list-building/SKILL.md`](../../plugins/marketing/skills/list-building/SKILL.md)
 
 ## Scope
@@ -35,7 +35,7 @@ The view name is validated against the catalog at [`plugins/marketing/references
 1. **Skill (advisory).** Before invoking the wrapper, the skill reads `audience-views.md`, parses the deterministic catalog block (first table immediately following the exact heading `## Catalog` — if no table or multiple matching tables, the parse FAILS and the skill HALTs), and rejects view names not in column 1. This is an early-fail UX check.
 2. **Wrapper (authoritative).** The wrapper at `plugins/marketing/scripts/snowflake/query_audience.py` re-derives the allowlist independently and rejects out-of-allowlist names with its own structured-stderr error. The skill's advisory check is an optimization; the wrapper is the security boundary.
 
-Both layers MUST reject view names that don't match `^[a-z][a-z0-9_]{0,62}$`. Per [ADR-022](../decisions/022-marketing-snowflake-access.md), this two-layer pattern is the SQL-injection guardrail for the operator-supplied identifier; arbitrary view names cannot reach Snowflake.
+Both layers MUST reject view names that don't match `^[a-z][a-z0-9_]{0,62}$`. Per [ADR-030](../decisions/030-marketing-snowflake-access.md), this two-layer pattern is the SQL-injection guardrail for the operator-supplied identifier; arbitrary view names cannot reach Snowflake.
 
 **Future work.** Markdown-table parsing is fragile under doc-reformatting tools. [BC-11929](https://linear.app/brite-nites/issue/BC-11929) follow-up: extract the catalog table into a typed data file (`plugins/marketing/references/audience-views.yaml` or `.json`), have `audience-views.md` render from / link to that source, and have both skill + wrapper read the typed file. Adds CI lint to detect catalog ↔ `brite-data-platform/main` drift.
 
@@ -125,7 +125,7 @@ This prevents the silent-divergence failure mode where an operator tweaks `--sno
 
 ## 4. Error modes
 
-All errors HALT (non-zero exit) — Source 4 NEVER degrades silently to an empty list or a partial result. Per [ADR-022](../decisions/022-marketing-snowflake-access.md), the `query_audience.py` wrapper emits structured JSON to stderr; the skill surfaces the operator-actionable message.
+All errors HALT (non-zero exit) — Source 4 NEVER degrades silently to an empty list or a partial result. Per [ADR-030](../decisions/030-marketing-snowflake-access.md), the `query_audience.py` wrapper emits structured JSON to stderr; the skill surfaces the operator-actionable message.
 
 | Code | Trigger | Skill HALT message |
 |---|---|---|
@@ -175,7 +175,7 @@ One line per attempt (including resume-skip cases — which log `"wrapper_exit":
 What this design **owns**:
 
 - The `--snowflake-audience` / `--snowflake-where` / `--snowflake-limit` invocation contract on `list-building`
-- Wrapper invocation pattern (per [ADR-022](../decisions/022-marketing-snowflake-access.md))
+- Wrapper invocation pattern (per [ADR-030](../decisions/030-marketing-snowflake-access.md))
 - Cost-gate behavior + audit trail
 - Resume detection extensions
 - Error-code → HALT message mapping
