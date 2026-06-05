@@ -109,9 +109,17 @@ Supporting decisions:
   and the reachability/dedup/preview mechanics remain duplicated between the two commands (the
   product branch keeps its own copies). Extracting them to a single canonical source under the
   `commands/_shared` convention is **BC-12535** (out of scope here); this ADR deliberately ships
-  the front door first so the comms/map describe the final shape.
+  the front door first so the comms/map describe the final shape. *(Resolved 2026-06-05 by BC-12535:
+  the redaction list lives in `_shared/intake-redaction.md` and the reachability/dedup/preview +
+  plugins-repo-detection mechanics in `_shared/intake-mechanics.md`, both cited by the two commands
+  and lint-enforced; the cap-proof disambiguation contract stays inline, guarded per-site by the M3
+  lint.)*
 - The content-aware switch leans on a model judgment ("clearly the other kind"); it is
-  confirm-gated, so a wrong inference costs one extra prompt, never a silent mis-file.
+  confirm-gated, so a wrong inference costs one extra prompt, never a silent mis-file. *(The
+  "(and vice-versa)" reverse direction is now a coded step — BC-12591 added a confirm-gated
+  tooling→product switch in `report-issue.md` Step 1d; raise-a-ticket Step 1c's switch is
+  one-directional product→tooling by construction, since picking "tooling" at Step 1a dispatches
+  before Step 1c is reached.)*
 - ADR-021's other consequences are unaffected: Linear-native cross-product routing,
   existence-aware labels, the `needs-triage`→`/triage` boundary, and `bug-report`'s deprecation
   all stand.

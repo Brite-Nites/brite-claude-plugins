@@ -17,7 +17,8 @@ You are capturing a plugin misbehavior report from a developer during a live wor
 
 ## Step 0: Verify Prerequisites
 
-Confirm Linear MCP is reachable:
+Confirm Linear MCP is reachable — run the shared **reachability probe** (see
+[`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md) § Reachability probe):
 
 1. **Linear MCP** — Call `list_projects` (limit 1). Confirms auth and connectivity.
 
@@ -32,9 +33,10 @@ Sequential-thinking is checked on first use in Step 2. If it fails there, fall b
 This command generates a regression test into the plugins repo's test registries
 (`trigger-registry.json` / `behavioral-registry.json`). Those only exist in the plugins repo —
 but this command is also reachable from anywhere (operator mode, or a product repo via
-`/workflows:raise-a-ticket`'s "agent tooling" fork). Detect the context: you are **in the
-plugins repo** if the repo root has `.claude-plugin/marketplace.json` **OR**
-`git remote get-url origin` is `brite-claude-plugins`.
+`/workflows:raise-a-ticket`'s "agent tooling" fork). Detect whether you are **in the plugins repo**
+using the shared signal in [`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md)
+§ Plugins-repo detection (`.claude-plugin/marketplace.json` at root **OR** origin
+`brite-claude-plugins`).
 
 - **In the plugins repo** → full flow: classify, draft the test case, and append it (Steps 3 & 6b).
 - **Outside the plugins repo** → **graceful degrade**: still classify the failure and file the
@@ -65,9 +67,7 @@ If the developer provides a single paragraph, help structure it into these three
 
 Ask: "Any additional context? (error messages, which command was running, logs — or skip)"
 
-- If the developer provides log output or error messages, scan for potential secrets before including. Redact any matches with `[REDACTED]`.
-  - Patterns: `Bearer `, `password=`, `password:`, `token=`, `token:`, `sk-`, `AKIA`, `postgres://`, `mongodb+srv://`, `redis://`, `ghp_`, `gho_`, `glpat-`, `xoxb-`, `xoxp-`, `hooks.slack.com`, `PRIVATE KEY`, `-----BEGIN`
-  - After automated redaction, always warn: "I scanned for common secret patterns and redacted matches. Review the output below for any secrets I may have missed before confirming."
+- If the developer provides log output or error messages, scan for potential secrets before including and redact matches with `[REDACTED]`, applying the **canonical secret-redaction list** in [`_shared/intake-redaction.md`](./_shared/intake-redaction.md) — the single source of truth for the patterns and the warn-then-code-block guidance (shared with the product branch). Do **not** inline a pattern list here; add any new pattern to that file once.
 - If they mention related Linear issues (e.g., "BC-2462"), note them for the `relatedTo` field.
 
 ### 1d. Content-aware switch — is this actually a product bug?
@@ -189,7 +189,8 @@ Apply any edits before proceeding.
 
 ## Step 4: Check for Duplicate Issues
 
-Before creating the issue, search Linear for potential duplicates:
+Before creating the issue, search Linear for potential duplicates — the shared **duplicate search**
+(see [`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md) § Duplicate search):
 
 1. **Search by keywords** — Extract 2-4 significant words from the description. Use `list_issues` with a `query` parameter containing these keywords, scoped to team "Brite Company". Limit to 10 results.
 2. **Filter to open issues** — Only show issues that are not completed or cancelled.
