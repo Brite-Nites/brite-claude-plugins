@@ -4,6 +4,7 @@ Canonical checklist for building agent tooling in this repo. Derived from Anthro
 
 **Enforcement tags** (Phase 1):
 - **[GATE]** — blocking on a created/changed skill-command (fails CI).
+- **[GATE-existing]** — already-enforced blocking check that pre-dates ADR-025 (e.g. plugin-layout, version-bump); not new, listed here for completeness.
 - **[ADV]** — advisory WARN now; promotable to [GATE] in Phase 2.
 - **[REF]** — reference principle; not linted, but reviewers should apply it.
 
@@ -12,7 +13,7 @@ Canonical checklist for building agent tooling in this repo. Derived from Anthro
 ## 0. The two non-negotiables (Phase 1 gates)
 
 - **[GATE] A side-effecting command sets `disable-model-invocation: true`.** If running it creates/edits/sends/deploys anything (Linear issues, SF records, emails, git/PRs), the model must not be able to fire it unprompted. **Detection (M1):** the lint scans `allowed-tools` + body for mutating-tool patterns (`mcp__*__(save|create|update|delete|deploy|send)_*`, `gh pr create`, `git push|commit|branch`); a hit without the flag is a GATE finding. Override a false positive only with a visible `# lint:not-side-effecting <reason>` marker — no silent opt-out. An emit mode does **not** clear the flag (the *default* run still mutates).
-- **[GATE] A created/changed command ships a side-effect-free emit mode + ≥1 behavioral eval in CI.** The eval fixtures inputs → runs emit mode → asserts on the produced artifact (schema + key fields + golden compare). See §5.
+- **[GATE] A created/changed command ships a side-effect-free emit mode + ≥1 behavioral eval in CI.** The eval fixtures inputs → runs emit mode → asserts on the produced artifact's **stable structure** (schema + key fields + golden compare), not free-text prose. See §5. **The gate is never unsatisfiable:** assert on deterministic structure first (covers most LLM-judged commands); an `llm-rubric` eval via the reserved LLM tier counts as an *advisory* eval; a rare genuinely-unevaluable command uses an explicit `# eval-waiver: <reason>` marker (advisory + debt-listed, never silent).
 
 ---
 
