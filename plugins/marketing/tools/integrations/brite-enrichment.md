@@ -46,7 +46,7 @@ consumer adds the wildcard to its own `allowed-tools` as part of its activation 
 | `list-building` | [BC-6170](https://linear.app/brite-nites/issue/BC-6170) | `check_enrichment_health` + `enrich_contacts` | Interactive only — **bulk waits on the REST batch door** (BC-5296) |
 | `tam-mapping` | [BC-6170](https://linear.app/brite-nites/issue/BC-6170) | `check_enrichment_health` + `enrich_contacts` | Interactive only — bulk waits on BC-5296 |
 | `icp-scoring` | [BC-8174](https://linear.app/brite-nites/issue/BC-8174) | `query_entity` (industry / employees / geo) | **Yes** (tool exists; consumer activates whenever) |
-| `launch-campaign` | [BC-8173](https://linear.app/brite-nites/issue/BC-8173) | `verify_emails` (`is_deliverable` / `is_role` / `is_free` / `esp`) | **Yes — `verify_emails` shipped (BC-5538)** |
+| `launch-campaign` | [BC-8173](https://linear.app/brite-nites/issue/BC-8173) | `verify_emails` — **deferred** | **No — `verify_emails` is single-email; Phase 2 classifies a whole lead list, so list-scale verify waits on the bulk door (BC-5296). See ADR-024.** |
 
 ## Tool inventory (5 tools, production)
 
@@ -307,8 +307,10 @@ the lag). Verify a just-written contact at the staging layer, not via `query_ent
   batch door ([BC-6170](https://linear.app/brite-nites/issue/BC-6170) / BC-5296).
 - `icp-scoring` — `query_entity` for firmographic lookup
   ([BC-8174](https://linear.app/brite-nites/issue/BC-8174)).
-- `launch-campaign` — uses `verify_emails` for per-email validation
-  ([BC-8173](https://linear.app/brite-nites/issue/BC-8173)).
+- `launch-campaign` — Phase 2 classification stays on the free static-list + `dig` path;
+  the `verify_emails` swap ([BC-8173](https://linear.app/brite-nites/issue/BC-8173)) is
+  **deferred** to the bulk-verify door (BC-5296), since the shipped tool is single-email
+  (ADR-024).
 
 ## Last verified
 
