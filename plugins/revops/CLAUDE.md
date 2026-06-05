@@ -8,7 +8,7 @@ The Salesforce **engineering** layer — a portable plugin bundling SF dev knowl
 2. **SF deploy/ops discipline** — the `/revops:*` command lifecycle (onboard → health → deploy → post-deploy).
 3. **GTM campaign-sync seam** — `create-sf-campaign` + `update-sf-campaign-status`. **Owned by `marketing`** ([ADR-015](../../docs/decisions/015-gtm-sigma3-sf-campaign-sync.md)), hosted here as commands. NOT part of the core charter — defer GTM logic to marketing.
 
-Locked decisions: [ADR-007](../../docs/decisions/007-revops-plugin-design.md) (design), [ADR-009](../../docs/decisions/009-sf-capability-adoption.md) (capability-adoption 6-check), [ADR-010](../../docs/decisions/010-plugin-secret-config-canon.md) (secret config), [ADR-015](../../docs/decisions/015-gtm-sigma3-sf-campaign-sync.md) (campaign-sync), [ADR-021](../../docs/decisions/021-sfdx-hardis-adoption.md) (sfdx-hardis selective adopt-as-tool).
+Locked decisions: [ADR-007](../../docs/decisions/007-revops-plugin-design.md) (design), [ADR-009](../../docs/decisions/009-sf-capability-adoption.md) (capability-adoption 6-check), [ADR-010](../../docs/decisions/010-plugin-secret-config-canon.md) (secret config), [ADR-015](../../docs/decisions/015-gtm-sigma3-sf-campaign-sync.md) (campaign-sync), [ADR-021](../../docs/decisions/021-sfdx-hardis-adoption.md) (sfdx-hardis selective adopt-as-tool), [ADR-022](../../docs/decisions/022-revops-promotion-topology.md) (promotion-topology command model & vocabulary).
 
 ## Commands (7)
 

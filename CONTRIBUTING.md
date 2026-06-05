@@ -56,6 +56,29 @@ A skill that calls an external service (Linear, Email Bison, Salesforce, etc.) f
 
 Every tool-using PR must pass the 6-item checklist at the end of the pattern guide.
 
+## Naming Convention (commands & skills)
+
+Name from the user's **intent**, not the machine's **mechanism**. Derived in [ADR-022](docs/decisions/022-revops-promotion-topology.md) when the revops `deploy-*` command names were found to mis-describe a CI-driven deploy world (the human no longer "deploys" — CI does). Applies to **all plugins**, *apply-forward + opportunistic cleanup*: don't mass-rename established commands; keep deprecation aliases when you do rename.
+
+**Six rules:**
+
+1. **Name from the user's intent, not the machine's mechanism.**
+2. **Verb + object** — every name answers *"do what, to what?"* No bare verbs (`try`, `ship`), no bare nouns (`doctor`, `weekly`).
+3. **The verb encodes the side-effect class** (see lexicon) — the reader knows before running whether it's safe.
+4. **The namespace is the first word; don't repeat it.** `/revops:` already says "SF" — spend the name's words on the specific action, not `sf`.
+5. **Plain English over domain jargon/idiom** — no `break-glass`, no `runbook`.
+6. **Stakes legible in the name** — `preview` < `submit` < `push-to-production` < `emergency-…`.
+
+**Verb lexicon** (controlled vocabulary — the same verb means the same thing in every plugin), grouped by the three side-effect classes:
+
+| Class | Verbs | Meaning |
+|-------|-------|---------|
+| **Read-only** (safe) | `check-` · `show-` · `list-` · `report-` | inspects/reports, changes nothing |
+| **Throwaway-mutate** | `preview-` | changes only a disposable/personal thing (blast radius ≈ nil) |
+| **Real-mutate** | `setup-` · `create-`/`new-` · `submit-` · `push-` · `promote-` · `run-` · `sync-` · `update-` · `delete-` | changes shared/persistent state |
+
+Names that already satisfy this (e.g. marketing's `new-offer`, `plan-campaign`; flow-architecture's `add-domain`) need no change; mechanism-named ones (`deploy-*`) are the cleanup targets. Rationale + the worked revops example live in [ADR-022](docs/decisions/022-revops-promotion-topology.md).
+
 ## plugin.json Schema (STRICT — read before editing)
 
 **Claude Code validates plugin.json against a strict Zod schema. Any unrecognized field causes a silent hard failure — the entire plugin won't load (no commands, no skills, nothing). There is no error message shown to the user.**

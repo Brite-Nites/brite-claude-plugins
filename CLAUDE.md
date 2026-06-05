@@ -41,6 +41,7 @@ On-demand references — read when working on these subsystems, not auto-loaded 
 - [ADR-009: SF capability adoption framework](docs/decisions/009-sf-capability-adoption.md) — 6-check framework (runtime model, license, plugin slot, toolset breadth, GA gate, domain fit) with worked examples
 - [ADR-010: Plugin secret-config canon](docs/decisions/010-plugin-secret-config-canon.md) — Bitwarden + `bw-run.sh` broker for stdio MCPs and CLI scripts; HTTP MCPs covered by BC-5551 exception
 - [ADR-021: sfdx-hardis selective adopt-as-tool](docs/decisions/021-sfdx-hardis-adoption.md) — per-capability ADR-009 6-check on sfdx-hardis; adopt deploy/CI/SFDMU/quality, phase-2 monitoring, skip GUI, F1 stays a revops build (BC-12346, keystone of BC-12345)
+- [ADR-022: revops promotion-topology command model & vocabulary](docs/decisions/022-revops-promotion-topology.md) — mirror of bn-salesforce ADR-016 (CI-driven deploy topology); dual-path, commands-as-orchestrators, intent-based command vocabulary, config-gated guidance (BC-12345)
 
 ## Company Context
 
