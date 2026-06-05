@@ -1,10 +1,10 @@
 # Skill / Command / Plugin / Subagent — design standards
 
-Canonical checklist for building agent tooling in this repo. Derived from Anthropic's Agent Skills best-practices, "Building effective agents," and the Claude Code docs (skills / sub-agents / plugins), reconciled with this repo's hard-won gotchas. Enforcement model: **[ADR-025](../decisions/025-skill-engineering-discipline.md)** (phased ratchet). Terminology: `CONTEXT.md` § Agent tooling & evaluation.
+Canonical checklist for building agent tooling in this repo. Derived from Anthropic's Agent Skills best-practices, "Building effective agents," and the Claude Code docs (skills / sub-agents / plugins), reconciled with this repo's hard-won gotchas. Enforcement model: **[ADR-028](../decisions/028-skill-engineering-discipline.md)** (phased ratchet). Terminology: `CONTEXT.md` § Agent tooling & evaluation.
 
 **Enforcement tags** (Phase 1):
 - **[GATE]** — blocking on a created/changed skill-command (fails CI).
-- **[GATE-existing]** — already-enforced blocking check that pre-dates ADR-025 (e.g. plugin-layout, version-bump); not new, listed here for completeness.
+- **[GATE-existing]** — already-enforced blocking check that pre-dates ADR-028 (e.g. plugin-layout, version-bump); not new, listed here for completeness.
 - **[ADV]** — advisory WARN now; promotable to [GATE] in Phase 2.
 - **[REF]** — reference principle; not linted, but reviewers should apply it.
 
@@ -64,10 +64,10 @@ Canonical checklist for building agent tooling in this repo. Derived from Anthro
 - **[REF] Enforce must-do rules with hooks, not prose.** Prose is should-do.
 - **[REF] Measurement → improve → re-measure** from real usage; no feedback loop = the same mistakes recur (and adoption failures go unseen).
 - **Test taxonomy (don't conflate):** *structural* (greps the spec — proves prose), *unit* (deterministic helper logic — legit but not behavioral), *behavioral* (emit mode → artifact — the only proof of behavior). See `CONTEXT.md`.
-- **Deprecated:** `evals/evals.json` — non-executing seed specs (ADR-025 D3), not runnable evals. Do not author new ones.
+- **Deprecated:** `evals/evals.json` — non-executing seed specs (ADR-028 D3), not runnable evals. Do not author new ones.
 
 ---
 
 ## Self-audit snapshot (2026-06-05, marketing plugin)
 
-From the originating audit: behavioral coverage ≈ 0% (prompt-command tests are ~95% structural; `test_plan_campaign_contracts.py` is markdown-grep and not in CI); 113 decorative `evals.json` cases across 14 skills; one cron-only `claude -p` runner covering 3 skills (activation only). Deterministic helpers are properly unit-tested. The mechanical canon (§1–4 hygiene) is largely followed; the §5 eval discipline is the gap ADR-025 closes. First harness pilot: `plan-campaign`.
+From the originating audit: behavioral coverage ≈ 0% (prompt-command tests are ~95% structural; `test_plan_campaign_contracts.py` is markdown-grep and not in CI); 113 decorative `evals.json` cases across 14 skills; one cron-only `claude -p` runner covering 3 skills (activation only). Deterministic helpers are properly unit-tested. The mechanical canon (§1–4 hygiene) is largely followed; the §5 eval discipline is the gap ADR-028 closes. First harness pilot: `plan-campaign`.

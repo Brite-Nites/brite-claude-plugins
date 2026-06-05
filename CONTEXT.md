@@ -77,7 +77,7 @@ _Avoid_: implying "ticket" is a different object type than a Linear issue
 
 ### Agent tooling & evaluation
 
-> Terminology for how we build and test the plugins themselves (per [ADR-025](docs/decisions/025-skill-engineering-discipline.md)). These were conflated before, which produced false confidence ("tests pass" on a command that never ran).
+> Terminology for how we build and test the plugins themselves (per [ADR-028](docs/decisions/028-skill-engineering-discipline.md)). These were conflated before, which produced false confidence ("tests pass" on a command that never ran).
 
 **Skill**:
 A `SKILL.md` (+ optional bundled files) the model loads on demand to perform a
@@ -133,11 +133,11 @@ artifacts are written.
 
 **Gate**:
 A *blocking* CI check (fails the build). Distinct from an **advisory lint**
-(WARN only). Per ADR-025, a small set of checks are gates; the rest are advisory
+(WARN only). Per ADR-028, a small set of checks are gates; the rest are advisory
 until promoted.
 
 **Fixture / Golden file**:
 A fixture is a canned input for an eval; a golden file is the expected artifact
 the eval compares the produced one against.
 _Avoid_: calling `evals/evals.json` "evals" — they are deprecated, non-executing
-seed specs (ADR-025 D3), not runnable behavioral evals.
+seed specs (ADR-028 D3), not runnable behavioral evals.

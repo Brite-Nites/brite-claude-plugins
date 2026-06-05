@@ -1,4 +1,4 @@
-# 025. Skill/command engineering discipline — behavioral evals + tiered forward gate
+# 028. Skill/command engineering discipline — behavioral evals + tiered forward gate
 
 **Status:** Proposed
 **Date:** 2026-06-05
