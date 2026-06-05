@@ -73,6 +73,73 @@ the action; the artifact is a normal Linear issue. There is no separate
 ticketing system.
 _Avoid_: implying "ticket" is a different object type than a Linear issue
 
+### Agent tooling & evaluation
+
+> Terminology for how we build and test the plugins themselves (per [ADR-028](docs/decisions/028-skill-engineering-discipline.md)). These were conflated before, which produced false confidence ("tests pass" on a command that never ran).
+
+**Skill**:
+A `SKILL.md` (+ optional bundled files) the model loads on demand to perform a
+reusable task. Activated by its `description`. In current Claude Code, **custom
+slash commands are merged into Skills** — `.claude/commands/x.md` and
+`.claude/skills/x/SKILL.md` both create `/x` and behave the same way.
+_Avoid_: treating "command" and "skill" as different runtime mechanisms — they're
+the same thing; "command" = the slash-invoked framing of a skill.
+
+**Command**:
+A slash-invoked skill (`/plugin:name`). Used for operator-triggered, often
+side-effecting actions. See Skill.
+_Avoid_: implying a command has a separate execution model from a skill.
+
+**Plugin**:
+A versioned, namespaced bundle of skills/commands/agents/hooks/MCP servers
+distributed via the marketplace. Identity = its `name`, which is also the skill
+namespace (`/<name>:<skill>`).
+
+**Subagent**:
+An agent that runs in its own context window and returns only a summary. Used to
+keep verbose side work out of the main context. One subagent = one task.
+
+**Hook**:
+A deterministic enforcement mechanism that fires on an event (e.g. PreToolUse).
+The "must-do" lever — reliable where a prose instruction is merely suggestive.
+_Avoid_: relying on prose in a skill to GUARANTEE a critical behavior — that's a
+should-do; use a hook.
+
+**Structural test**:
+A check that greps the spec text, checks a file exists, or lints frontmatter. It
+proves the *prose*, not the behavior. Useful for drift, but passing it says
+nothing about what the command produces.
+_Avoid_: calling a structural markdown-grep a "test" of behavior.
+
+**Behavioral eval**:
+The only check that proves behavior: it fixtures inputs, runs the command in
+**emit mode**, and asserts on the **produced artifact** (schema + key fields +
+golden compare). This is what "is it sound?" actually requires.
+
+**Unit test**:
+A test of a deterministic helper's (python/bash) logic. Legitimate and valuable,
+but it tests the *gadget*, not the command's behavior.
+_Avoid_: counting helper unit tests as behavioral coverage of a command.
+
+**Emit mode**:
+A command's side-effect-free run: computes and writes all its artifacts
+(`manifest.json`, issue payloads, copy JSON, …) to a sandbox temp dir, making
+**no external MCP writes** (no real Linear/SF/EB mutations). The testable seam a
+behavioral eval runs against.
+_Avoid_: conflating emit mode with the legacy `--dry-run`, which exits before the
+artifacts are written.
+
+**Gate**:
+A *blocking* CI check (fails the build). Distinct from an **advisory lint**
+(WARN only). Per ADR-028, a small set of checks are gates; the rest are advisory
+until promoted.
+
+**Fixture / Golden file**:
+A fixture is a canned input for an eval; a golden file is the expected artifact
+the eval compares the produced one against.
+_Avoid_: calling `evals/evals.json` "evals" — they are deprecated, non-executing
+seed specs (ADR-028 D3), not runnable behavioral evals.
+
 ### Salesforce / RevOps
 
 **revops**:
