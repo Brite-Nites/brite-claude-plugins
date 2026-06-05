@@ -115,35 +115,44 @@ assert_no_inline "raise-a-ticket" "$RAISE"
 assert_no_inline "report-issue"   "$REPORT"
 
 # ── Self-test (mutation guard): the negative must discriminate ───────
-tmp_copy="$(mktemp 2>/dev/null || echo /tmp/m1copy.$$)"
-tmp_uat="$(mktemp 2>/dev/null || echo /tmp/m1uat.$$)"
-tmp_cite="$(mktemp 2>/dev/null || echo /tmp/m1cite.$$)"
-tmp_example="$(mktemp 2>/dev/null || echo /tmp/m1ex.$$)"
-printf 'Patterns: `Bearer `, `AKIA`, `postgres://`, `ghp_`\n' > "$tmp_copy"     # full-style divergent copy
-printf 'Patterns: `eyJ`, `api_key=`, `AIza`\n'              > "$tmp_uat"      # re-inline of JUST the 3 UAT patterns
-printf 'Redact secrets per the shared list — see %s\n' "$CITE" > "$tmp_cite"  # bare citation
+# Create scratch fixtures and guarantee cleanup even on an early/`set -e` exit.
+tmp_copy="$(mktemp 2>/dev/null || echo "/tmp/m1copy.$$")"
+tmp_uat="$(mktemp 2>/dev/null || echo "/tmp/m1uat.$$")"
+tmp_cite="$(mktemp 2>/dev/null || echo "/tmp/m1cite.$$")"
+tmp_example="$(mktemp 2>/dev/null || echo "/tmp/m1ex.$$")"
+trap 'rm -f "$tmp_copy" "$tmp_uat" "$tmp_cite" "$tmp_example"' EXIT
+
+printf 'Patterns: `Bearer `, `AKIA`, `postgres://`, `ghp_`\n' > "$tmp_copy"      # full-style divergent copy
+printf 'Patterns: `eyJ`, `api_key=`, `AIza`\n'               > "$tmp_uat"       # re-inline of JUST the 3 UAT patterns
+printf 'Redact secrets per the shared list — see %s\n' "$CITE" > "$tmp_cite"    # bare citation
 printf 'redact bearer headers like `Bearer ` before filing\n' > "$tmp_example"  # single backticked example
-if [ "$(count_wrapped "$tmp_copy")" -ge 3 ]; then
-  pass "self-test: divergent-copy string is flagged ($(count_wrapped "$tmp_copy") wrapped patterns)"
+
+# count_wrapped runs the 21-pattern loop, so evaluate it ONCE per fixture.
+n_copy=$(count_wrapped "$tmp_copy")
+n_uat=$(count_wrapped "$tmp_uat")
+n_cite=$(count_wrapped "$tmp_cite")
+n_example=$(count_wrapped "$tmp_example")
+
+if [ "$n_copy" -ge 3 ]; then
+  pass "self-test: divergent-copy string is flagged ($n_copy wrapped patterns)"
 else
   fail "self-test: divergent-copy string was NOT flagged (negative rotted)"
 fi
-if [ "$(count_wrapped "$tmp_uat")" -ge 3 ]; then
-  pass "self-test: re-inline of the 3 UAT patterns is flagged (the gap the M1 lint exists to close)"
+if [ "$n_uat" -ge 3 ]; then
+  pass "self-test: re-inline of the 3 UAT patterns is flagged ($n_uat wrapped — the gap M1 exists to close)"
 else
   fail "self-test: re-inline of the 3 UAT patterns was NOT flagged (recall gap reopened)"
 fi
-if [ "$(count_wrapped "$tmp_cite")" -lt 3 ]; then
-  pass "self-test: bare-citation string is allowed"
+if [ "$n_cite" -lt 3 ]; then
+  pass "self-test: bare-citation string is allowed ($n_cite wrapped)"
 else
   fail "self-test: bare-citation string was false-flagged (negative too broad)"
 fi
-if [ "$(count_wrapped "$tmp_example")" -lt 3 ]; then
-  pass "self-test: single backticked example is allowed (precision held)"
+if [ "$n_example" -lt 3 ]; then
+  pass "self-test: single backticked example is allowed ($n_example wrapped — precision held)"
 else
   fail "self-test: single backticked example was false-flagged (threshold too tight)"
 fi
-rm -f "$tmp_copy" "$tmp_uat" "$tmp_cite" "$tmp_example"
 
 # ── Result ───────────────────────────────────────────────────────────
 echo ""

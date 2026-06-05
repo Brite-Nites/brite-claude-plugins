@@ -97,6 +97,11 @@ tooling→product clause here would be unreachable). The reverse direction — a
 plainly a *product* bug — is handled **inside `report-issue.md`** (its Step 1d content-aware switch
 back to product intake). Both directions are covered, each on the branch that can actually reach it.
 
+**Arrival guard (no round-trip).** If you reached Step 1c via `report-issue`'s Step 1d switch — i.e.
+the reporter *already* declined tooling by switching to product — do **not** offer the product→tooling
+switch above. That branch was just exercised and declined; re-offering it would risk a confirm
+ping-pong. Proceed straight into product intake.
+
 ### 1d. Product repo with a routing config
 
 Read `docs/agents/issue-tracker.md` in the current repo. If it names a Linear team +

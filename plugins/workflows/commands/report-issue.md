@@ -87,8 +87,10 @@ product** bug, not agent-tooling — switch to `/workflows:raise-a-ticket` produ
 - **Switch** → do **not** run the tooling flow (no classification, no test case). Read
   [`raise-a-ticket.md`](./raise-a-ticket.md) and run its **product branch** from **Step 1c onward**,
   treating **product as already chosen** — do **not** re-ask raise-a-ticket's Step-1a
-  product-vs-tooling fork (accepting this switch *is* the product choice; re-asking would loop). Pass
-  along the description gathered above. Stop here.
+  product-vs-tooling fork (accepting this switch *is* the product choice; re-asking would loop). Tell
+  the product branch you arrived via this Step 1d switch so it honors its **arrival guard** and does
+  not re-offer the product→tooling switch back (no round-trip). Pass along the description gathered
+  above. Stop here.
 - **Stay here** (or the report does not *clearly* read as a product bug) → continue to Step 2.
 
 Never silently reroute — the reporter decides. This is the reverse of raise-a-ticket Step 1c's
@@ -231,11 +233,15 @@ Gather environment details automatically:
 3. **Git branch**: Run `git branch --show-current`
 4. **Plugin version (the *running* version)**: read `version` from
    `$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json` — the running plugin's manifest, resolved
-   regardless of cwd (`CLAUDE_PLUGIN_ROOT` is set for plugin commands). **Fallbacks:** if
-   `$CLAUDE_PLUGIN_ROOT` is unset, read the working-tree `plugins/workflows/.claude-plugin/plugin.json`
-   **only when in the plugins repo** (Step 0a); otherwise stamp `unknown (running from plugin cache)`.
-   Do **not** stamp the working-tree version when out-of-repo — it is wrong (out-of-repo) or stale
-   (drifted checkout).
+   regardless of cwd. `CLAUDE_PLUGIN_ROOT` is exported by the Claude Code plugin runner for every
+   plugin command/skill (it points at the plugin's install dir, **not** the cwd), so it stays set in
+   operator mode and out-of-repo — this does **not** silently degrade there. It is the same
+   convention `skills/greptile-gate` (`${CLAUDE_PLUGIN_ROOT}/scripts/greptile-verdict.sh`) and the
+   flow-architecture commands already rely on. **Fallbacks** (defensive, for a non-plugin invocation
+   where the var is somehow unset): read the working-tree
+   `plugins/workflows/.claude-plugin/plugin.json` **only when in the plugins repo** (Step 0a);
+   otherwise stamp `unknown (running from plugin cache)`. Do **not** stamp the working-tree version
+   when out-of-repo — it is wrong (out-of-repo) or stale (drifted checkout).
 
 ### Preview
 
