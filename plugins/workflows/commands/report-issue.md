@@ -105,6 +105,7 @@ Present the classification to the developer via AskUserQuestion. Show your recom
 |---------------|-------------|---------------|
 | wrong-skill | A skill fired but it was the wrong one | trigger-registry.json |
 | skill-not-fired | Expected a skill to fire but none did | trigger-registry.json |
+| skill-over-fired | A skill fired when **none** should have (e.g. brainstorming on a trivial one-line rename) | trigger-registry.json |
 | bad-output | Correct skill fired but output quality was poor | behavioral-registry.json |
 | hook-issue | Security/quality hook misfired or didn't fire | Linear only |
 | subagent-issue | Review agent or subagent produced wrong results | Linear only |
@@ -133,7 +134,7 @@ Record the severity and its mapped Linear priority for use in Steps 5 and 6.
 
 Use sequential-thinking to draft a test case based on the misbehavior details.
 
-### For wrong-skill or skill-not-fired → trigger-registry.json
+### For wrong-skill, skill-not-fired, or skill-over-fired → trigger-registry.json
 
 Read `plugins/workflows/skills/_shared/trigger-registry.json` and locate the `test_cases` array. Draft a new entry:
 
@@ -148,6 +149,7 @@ Read `plugins/workflows/skills/_shared/trigger-registry.json` and locate the `te
 
 - For wrong-skill: populate both `expected` (correct skill) and `not_expected` (wrong skill that fired).
 - For skill-not-fired: populate `expected` with the skill that should have fired. Leave `not_expected` as `[]` unless a different skill incorrectly fired.
+- For skill-over-fired: a skill fired when **none** should have — leave `expected` as `[]` and populate `not_expected` with the skill that wrongly fired.
 - The `phrase` should be a concise, representative version of the trigger prompt — not the full paragraph.
 - Sanitize the `phrase` value: strip shell metacharacters (`$`, `` ` ``, `\`, `"`, `'`) and ensure it is plain natural-language text. If the trigger contains code blocks or shell syntax, extract only the natural-language description.
 
@@ -226,7 +228,13 @@ Gather environment details automatically:
 1. **OS**: Run `sw_vers -productName -productVersion 2>/dev/null || uname -sr`
 2. **Node.js version**: Run `node -v`
 3. **Git branch**: Run `git branch --show-current`
-4. **Plugin version**: Read `version` from `plugins/workflows/.claude-plugin/plugin.json`
+4. **Plugin version (the *running* version)**: read `version` from
+   `$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json` — the running plugin's manifest, resolved
+   regardless of cwd (`CLAUDE_PLUGIN_ROOT` is set for plugin commands). **Fallbacks:** if
+   `$CLAUDE_PLUGIN_ROOT` is unset, read the working-tree `plugins/workflows/.claude-plugin/plugin.json`
+   **only when in the plugins repo** (Step 0a); otherwise stamp `unknown (running from plugin cache)`.
+   Do **not** stamp the working-tree version when out-of-repo — it is wrong (out-of-repo) or stale
+   (drifted checkout).
 
 ### Preview
 
@@ -237,7 +245,7 @@ Gather environment details automatically:
 **Team**: Brite Company
 **Project**: Brite Skill Packs
 **Priority**: [severity → priority mapping from Step 2b]
-**Labels**: Bug
+**Labels**: type:bug, needs-triage, executor:hybrid[, severity:sevN if provisioned]
 
 ---
 
@@ -286,13 +294,34 @@ Ask for confirmation using AskUserQuestion:
 
 ### 6a. Create the Linear Issue
 
-Create the issue using `save_issue` with:
+**First, reconcile labels against the target team (Brite Company).** Brite's label canon
+(CDR-016/CDR-018) is mid-rollout, so not every group is provisioned (e.g. `severity:*` is absent in
+Brite Company today). Call `list_issue_labels({ team: "Brite Company" })`, apply the canonical labels
+that exist, and fall back as noted for any that don't — **never** use the legacy flat `"Bug"` label,
+and **never** auto-create workspace label groups from a report. This mirrors raise-a-ticket Step 8 so
+both branches of the front door file under one label convention.
+
+Intended labels:
+- **Type** (always): `type:bug` — a tooling misbehavior is a defect (per CDR-016). Never the legacy
+  flat `"Bug"`.
+- **Triage state** (always, load-bearing): `needs-triage` (canonical string from
+  [docs/agents/triage-labels.md](../../../docs/agents/triage-labels.md)). This signal must NOT be
+  dropped: if the `needs-triage` label isn't provisioned in Brite Company, set Linear's built-in
+  **Triage** workflow state instead (`save_issue(state: "Triage")`). Only if neither is available,
+  warn prominently in the confirmation.
+- **Executor** (always): `executor:hybrid` — the default executor axis (CDR-016/CDR-018).
+- **Severity** (from Step 2b): map to a `severity:sevN` label **if the group exists** (Critical→`sev0`,
+  High→`sev1`, Medium→`sev2`, Low→`sev3`). It is **not** provisioned in Brite Company today, so skip
+  the label and rely on `priority` (set below) — note "severity:* not provisioned; captured via
+  priority" in the confirmation.
+
+Then create with `save_issue`:
 
 - `title`: "[classification]: [short description]" (e.g., "wrong-skill: brainstorming fired for trivial rename")
 - `team`: "Brite Company"
 - `project`: "Brite Skill Packs"
 - `priority`: Mapped from severity (Critical→1, High→2, Medium→3, Low→4)
-- `labels`: `["Bug"]`
+- `labels`: the reconciled set above (the labels that actually exist in Brite Company)
 - `description`: The full formatted markdown from the preview (classification, trigger, actual/expected, proposed test case, environment, additional context)
 - `relatedTo`: Any related issue IDs mentioned by the developer
 
@@ -340,7 +369,10 @@ If invoked **outside the plugins repo** (Step 0a graceful-degrade), the **Test c
   hand off to its product branch from Step 1c — never re-ask the fork). Never silently reroute.
 - Never create an issue without the developer reviewing and confirming the draft first.
 - Never skip the duplicate check — even if it finds no matches, the search must run.
-- Always apply the "Bug" label.
+- Apply canonical CDR-016/CDR-018 labels, existence-aware against Brite Company (`type:bug` +
+  `needs-triage` + `executor:hybrid`; `severity:sevN` when provisioned, else priority carries it).
+  Never use the legacy flat `"Bug"` label; never auto-create workspace label groups. Mirrors
+  raise-a-ticket Step 8.
 - Structure free-form input — if the developer gives a wall of text, help break it into trigger/actual/expected sections.
 - Include auto-detected environment info in every report. Let the developer correct it, don't skip it.
 - When appending to a JSON registry, write to a `.tmp` file first, validate with `python3 -m json.tool`, then atomically move into place. If validation fails, remove the tmp file.
