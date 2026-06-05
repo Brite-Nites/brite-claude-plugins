@@ -158,6 +158,66 @@ def load_sf_json(path: str | None) -> dict[str, Any]:
 # ── Metric extraction ──────────────────────────────────────────────────
 
 
+def _earliest_iso(values: list[str]) -> str | None:
+    """Return the chronologically earliest ISO-8601 string, preserving its
+    original display form.
+
+    `launched_at` legitimately spans date-only, fractional-second, `Z`, and
+    numeric-offset (`±HH:MM`) forms (see the sibling contract guard
+    `import_campaign.CREATED_AT_RE`). Plain `min()` over raw strings orders
+    lexicographically, which diverges from chronological order across offset
+    zones (e.g. `...10:00:00+05:00` is 05:00Z, earlier than `...06:00:00Z`).
+    Parse to an instant before comparing; naive values (date-only) are treated
+    as UTC so naive/aware never mix in the comparison. Unparseable input falls
+    back to lexicographic min (never raises).
+    """
+    def instant(s: str):
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except (ValueError, AttributeError, TypeError):
+            return None
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+    parseable = [(s, instant(s)) for s in values]
+    parseable = [(s, k) for s, k in parseable if k is not None]
+    if parseable:
+        return min(parseable, key=lambda pair: pair[1])[0]
+    # No parseable instant — lexicographic fallback over STRING values only, so a
+    # malformed manifest carrying a non-string launched_at can't raise TypeError
+    # (honors the never-raises contract). Returns None when nothing usable remains.
+    strings = [v for v in values if isinstance(v, str)]
+    return min(strings) if strings else None
+
+
+def eb_fields_from_manifest(manifest_eb: dict[str, Any]) -> tuple[Any, Any]:
+    """Return ``(eb_campaign_id, launched_at)`` from a manifest's email_bison block.
+
+    Schema-v2-aware (BC-11852 / BC-12593): when ``email_bison.campaigns[]`` is a
+    non-empty list, ``eb_campaign_id`` is the FIRST record's id (mirrors
+    ``portfolio_snapshot.eb_render_fields``) and ``launched_at`` is the EARLIEST
+    non-null ``campaigns[].launched_at`` — the campaign's first-live date, matching
+    ``/marketing:import-campaign``'s ``created_at`` derivation. (ISO-8601 strings
+    sort chronologically under ``min``.) Falls back to the v1 singular
+    ``email_bison.campaign_id`` / ``.launched_at`` when no ``campaigns[]`` array is
+    present, so existing v1 manifests behave exactly as before. An empty/unlaunched
+    v2 block yields ``(None, None)``.
+    """
+    eb = manifest_eb or {}
+    campaigns = eb.get("campaigns")
+    if isinstance(campaigns, list) and campaigns:
+        first = campaigns[0] if isinstance(campaigns[0], dict) else {}
+        campaign_id = first.get("campaign_id")
+        launched_dates = [
+            la
+            for c in campaigns
+            if isinstance(c, dict) and (la := c.get("launched_at"))
+        ]
+        launched_at = _earliest_iso(launched_dates)
+        return campaign_id, launched_at
+    # v1 fallback — singular fields (unchanged behavior for legacy manifests).
+    return eb.get("campaign_id"), eb.get("launched_at")
+
+
 def extract_version_metrics(
     manifests: list[dict[str, Any]],
     eb_by_slug: dict[str, Any],
@@ -171,6 +231,9 @@ def extract_version_metrics(
         sf = sf_by_slug.get(slug, {})
         eb = eb_by_slug.get(slug, {})
         manifest_eb = m.get("email_bison") or {}
+        # Schema-v1/v2-aware read (BC-12593): v2 manifests carry
+        # email_bison.campaigns[] instead of the singular campaign_id/launched_at.
+        manifest_campaign_id, manifest_launched_at = eb_fields_from_manifest(manifest_eb)
 
         metrics: dict[str, Any] = {
             "version": version,
@@ -185,8 +248,8 @@ def extract_version_metrics(
             "eb_meeting_rate": eb.get("meeting_rate"),
             "eb_total_sent": eb.get("total_sent"),
             "eb_total_replies": eb.get("total_replies"),
-            "eb_campaign_id": manifest_eb.get("campaign_id") or eb.get("campaign_id"),
-            "launched_at": manifest_eb.get("launched_at"),
+            "eb_campaign_id": manifest_campaign_id or eb.get("campaign_id"),
+            "launched_at": manifest_launched_at,
         }
         versions.append(metrics)
     versions.sort(key=lambda x: x["version"])
