@@ -46,9 +46,16 @@ CAMPAIGN_SLUG_RE = re.compile(
 # Strict kebab-case for the vertical/persona/offer slug fields — mirrors the
 # schema.json#/definitions/campaign_manifest component patterns.
 KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
-# created_at must be an ISO-8601 date or UTC timestamp (schema declares a string;
+# created_at must be an ISO-8601 date or timestamp (schema declares a string;
 # this shape guard keeps a non-conforming upstream value out of the contract).
-CREATED_AT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?$")
+# Accepts: date-only; T-time with OPTIONAL fractional seconds and OPTIONAL zone
+# (Z or ±HH:MM / ±HHMM) — real Email Bison launched_at values commonly carry
+# fractional seconds (e.g. 2025-09-20T08:00:00.000Z) and offset zones, and
+# Step 6.5 copies launched_at straight into created_at, so the guard must admit
+# them while still rejecting free-form garbage ("now", "2026/02/01", ...).
+CREATED_AT_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$"
+)
 # Campaign-manifest year bounds — must match schema.json (minimum 2025).
 YEAR_MIN, YEAR_MAX = 2025, 2099
 
@@ -325,6 +332,13 @@ def compose_manifest(
             f"eb_workspace must be one of {ALLOWED_WORKSPACES}; got {eb_workspace!r}"
         )
     eb_campaign_name = _require(payload, "eb_campaign_name")
+    # Type/non-empty guard — _require only checks key presence; without this a
+    # null/non-string would flow straight into email_bison.campaign_name (every
+    # other required string field carries this guard).
+    if not isinstance(eb_campaign_name, str) or not eb_campaign_name.strip():
+        raise ValueError(
+            f"eb_campaign_name required (non-empty string); got {eb_campaign_name!r}"
+        )
 
     raw_records = payload.get("eb_records", [])
     if not isinstance(raw_records, list):

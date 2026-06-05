@@ -676,9 +676,12 @@ EOF
   # written by /marketing:import-campaign).
   cohort_manifest="$script_dir/../../../docs/campaigns/labs/hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02/manifest.json"
   if [ -f "$cohort_manifest" ]; then
-    cohort_keys=$(python3 -c "
-import json, sys
-with open('$cohort_manifest') as f:
+    # Path passed via env var (COHORT_MANIFEST) — never interpolated into the
+    # python -c source — so a path containing a quote can't break the inline
+    # script (matches the assert_json_value / Scenario O convention).
+    cohort_keys=$(COHORT_MANIFEST="$cohort_manifest" python3 -c "
+import json, os, sys
+with open(os.environ['COHORT_MANIFEST']) as f:
     d = json.load(f)
 keys = sorted(k for k in d.keys() if k != 'migrated_from')
 sys.stdout.write(','.join(keys))
@@ -993,6 +996,28 @@ run_q_compose_error_branches() {
   invoke_compose '{"slug":"x-y-z-fy26-m02","entity":"labs","vertical":"hotels-resorts","persona":"director-of-resort-experience","offer":"holiday-anchor-audit","year":"2026","month":2,"linear":{"milestone_id":"m","milestone_url":"https://x","project":"Brite GTM"},"eb_workspace":"emailbison-b2b","eb_campaign_name":"x","eb_records":[],"created_at":"2026-02-01T00:00:00Z"}'
   assert_rc "Q7: string year rejected rc=1" 1
   assert_substr "Q7: 'year must be an integer'" "year must be an integer"
+
+  # Q8 — created_at with FRACTIONAL seconds + Z must be ACCEPTED (rc=0). Real EB
+  # launched_at values carry fractional seconds; Step 6.5 copies them into
+  # created_at. Regression lock so CREATED_AT_RE can't narrow back to whole-second.
+  invoke_compose '{"slug":"x-y-z-fy26-m02","entity":"labs","vertical":"hotels-resorts","persona":"director-of-resort-experience","offer":"holiday-anchor-audit","year":2026,"month":2,"linear":{"milestone_id":"m","milestone_url":"https://x","project":"Brite GTM"},"eb_workspace":"emailbison-b2b","eb_campaign_name":"x","eb_records":[],"created_at":"2025-09-20T08:00:00.000Z"}'
+  assert_rc "Q8: fractional-second created_at accepted rc=0" 0
+  assert_json_value "Q8: created_at preserved verbatim" "created_at" "2025-09-20T08:00:00.000Z"
+
+  # Q8b — created_at with an offset zone (+00:00) must also be accepted.
+  invoke_compose '{"slug":"x-y-z-fy26-m02","entity":"labs","vertical":"hotels-resorts","persona":"director-of-resort-experience","offer":"holiday-anchor-audit","year":2026,"month":2,"linear":{"milestone_id":"m","milestone_url":"https://x","project":"Brite GTM"},"eb_workspace":"emailbison-b2b","eb_campaign_name":"x","eb_records":[],"created_at":"2025-09-20T08:00:00+00:00"}'
+  assert_rc "Q8b: offset-zone created_at accepted rc=0" 0
+
+  # Q8c — but free-form garbage created_at is still REJECTED (guard still bites).
+  invoke_compose '{"slug":"x-y-z-fy26-m02","entity":"labs","vertical":"hotels-resorts","persona":"director-of-resort-experience","offer":"holiday-anchor-audit","year":2026,"month":2,"linear":{"milestone_id":"m","milestone_url":"https://x","project":"Brite GTM"},"eb_workspace":"emailbison-b2b","eb_campaign_name":"x","eb_records":[],"created_at":"last tuesday"}'
+  assert_rc "Q8c: garbage created_at rejected rc=1" 1
+  assert_substr "Q8c: 'created_at must be ISO-8601'" "created_at must be ISO-8601"
+
+  # Q9 — null eb_campaign_name rejected (type/non-empty guard; _require alone
+  # would let null through into the manifest).
+  invoke_compose '{"slug":"x-y-z-fy26-m02","entity":"labs","vertical":"hotels-resorts","persona":"director-of-resort-experience","offer":"holiday-anchor-audit","year":2026,"month":2,"linear":{"milestone_id":"m","milestone_url":"https://x","project":"Brite GTM"},"eb_workspace":"emailbison-b2b","eb_campaign_name":null,"eb_records":[],"created_at":"2026-02-01T00:00:00Z"}'
+  assert_rc "Q9: null eb_campaign_name rejected rc=1" 1
+  assert_substr "Q9: 'eb_campaign_name required'" "eb_campaign_name required"
 }
 
 # ════════════════════════════════════════════════════════════════════════
