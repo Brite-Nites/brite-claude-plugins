@@ -41,5 +41,6 @@ offers:
     display: "Custom Permanent Illuminated Artwork"
     status: draft
     posture: free-asset
+    # prose_path: "marketing/go-to-market/verticals/hotels-resorts/offers/custom-illuminated-artwork.md"  # TODO: add when promoting draft → active
     target_personas:
       - director-of-resort-experience
