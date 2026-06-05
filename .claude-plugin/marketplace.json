@@ -24,6 +24,7 @@
       "source": "./plugins/marketing",
       "description": "Marketing domain plugin \u2014 brand-aware marketing skills ported from coreyhaines31/marketingskills",
       "version": "0.12.0"
+      "version": "0.11.5"
     },
     {
       "name": "cadence",

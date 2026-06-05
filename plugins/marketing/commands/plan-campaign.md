@@ -401,7 +401,8 @@ Print the operator-readable plan. Use this format (or a close variant — readab
   Salesforce auto-create (via /revops:create-sf-campaign --dry-run):
     <output of /revops:create-sf-campaign --dry-run with the same args>
 
-  Sub-issues to create (8 standard + N optional):
+  Sub-issues to create (8 standard + N optional — titles/schedule are illustrative;
+  canonical source is references/campaign-sub-issue-templates.md):
     #1  Brief approved                              [gate, blocks #2-#8]
     #2  Target list built                           [blocks #3; expects /marketing:list-building]
     #3  Copy written + approved                     [blocks #4; expects /marketing:email-copywriting]
@@ -736,14 +737,14 @@ Same `Read` → JSON-mutate → `Write` pattern as Step 8a.5.
 For each of the 8 sub-issues, call `save_issue` with:
 
 - `team`: "Brite Company"
-- `title`: as in the table below
-- `description`: per the per-issue spec below
+- `title`: the matching sub-issue's `title` from the reference file (§ 9.1)
+- `description`: the matching sub-issue's **Description** blockquote from the reference file, stamped verbatim as the issue body (§ 9.1)
 - `parentId`: see § 9.0 below (resolved at impl time)
 - `projectId`: `<gtm-project-id>`
 - `projectMilestoneId`: `<milestone-id>` from Step 8a
-- `labels`: the 8-label set from § Step 8a.6 (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`)
+- `labels`: the 8-label set from § Step 8a.6 (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`) — applied to EVERY sub-issue (this milestone-level label set lives in the command, NOT in the reference file)
 - `assignee`: omit (sub-issues are assigned at sub-issue start time, not scaffold time)
-- `dueDate`: per the schedule (back-filled from `<launch-date>` — see per-issue spec)
+- `dueDate`: `<launch-date>` + the sub-issue's `dueDate_offset_days` from the reference file (§ 9.1)
 
 After all 8 creates succeed, do a second pass to wire `blockedBy` relations. The Linear MCP `save_issue` shape for the second pass is **MINIMAL** — `save_issue(id=<sub-issue-id>, blockedBy=[<id>])` ONLY. The field is `blockedBy` (plural, array of issue IDs/identifiers; append-only per MCP schema), NOT `blockedById`.
 
@@ -879,6 +880,23 @@ For each row below, the description ALWAYS includes: (a) the handbook citation, 
 - **dueDate**: `<launch-date> + 40 days` (T+40d)
 - **blockedBy**: [#7]
 - **blocks**: none (terminal)
+### 9.1 — Sub-issue specs (read + stamp from the reference file)
+
+The per-phase sub-issue specs live in **`plugins/marketing/references/campaign-sub-issue-templates.md`** — extracted in BC-12564 so they are maintained in one place and contract-tested as the source of truth, rather than inlined here. `Read` that file once and stamp each entry under its `## Standard sub-issues` heading, in `id` order. Each sub-issue section is one fenced `yaml` block (`id`, `title`, `dueDate_offset_days`, `blockedBy`, `optional`, `labs_gated`) followed by a **Description** blockquote.
+
+For each standard sub-issue (`optional: false`):
+
+1. Parse the `yaml` block.
+2. Call `save_issue` with the field mapping from Step 9 above:
+   - `title` ← the block's `title`.
+   - `description` ← the **Description** blockquote, stamped verbatim as the issue body.
+   - `dueDate` ← `<launch-date>` + `dueDate_offset_days` (e.g. `-21` → T-21d; `0` → launch day; `40` → T+40d). The reference file declares the offset integer; this command does the date arithmetic.
+   - `parentId` ← `<container-issue-id>` (§ 9.0); `projectId` ← `<gtm-project-id>`; `projectMilestoneId` ← `<milestone-id>`; `labels` ← the 8-label set (§ 8a.6, applied to every sub-issue).
+3. Capture the returned `id` + `identifier` (§ 9.2).
+
+The standard chain, by `id`: **#1 Brief approved** (gate) → **#2 Target list built** and **#3 Copy written + approved** (both gated only by #1 — copy and target list run in parallel) → **#4 Salesforce setup** → **#5 Pre-launch QA** → **#6 Launch executed** → **#7 Active management — weekly reviews** → **#8 Campaign closed + debrief** (terminal). The authoritative dependency graph is each entry's `blockedBy` field in the reference file — do NOT re-derive it here.
+
+**Second-pass `blockedBy` wiring** (per the two-pass note above): after all standard creates succeed, for each sub-issue call `save_issue(id=<sub-issue-id>, blockedBy=[<resolved-id(s)>])`, resolving each reference-file `blockedBy` index (e.g. `[1]`, `[3]`) to the Linear `id` captured for that index in pass 1. The reference file stores only `blockedBy` — the forward `blocks` edge is its exact inverse and is auto-rendered by Linear, so it is not stored (storing it previously caused a now-fixed inconsistency). The command writes only `blockedBy`.
 
 ### 9.2 — Capture sub-issue IDs
 
@@ -888,9 +906,11 @@ For each `save_issue` response, capture the returned `id` + `identifier` (e.g., 
 
 ## Step 10 — Optional sub-issues
 
+The 2 optional sub-issues are defined under `## Optional sub-issues` in `plugins/marketing/references/campaign-sub-issue-templates.md` (`optional: true`): **#9 Situation Mining** (Labs-gated) and **#10 Creative Angles**. Create one ONLY when its flag is passed, stamping `title` / **Description** / `dueDate` (`<launch-date>` + `dueDate_offset_days`) and wiring `blockedBy` exactly as in § 9.1 — same 8-label set, same container parent, same second-pass wiring. When an optional sub-issue is created, also append its `id` to #1's downstream set so the gate blocks it too.
+
 ### 10.1 — Situation Mining (Labs-gated)
 
-If `--situation-mining` was passed, enforce Labs entity:
+If `--situation-mining` was passed, enforce Labs entity. The reference file marks #9 `labs_gated: true`; this Step is where that gate is ENFORCED (the flag is data; the HARD-FAIL is orchestration).
 
 If `<entity> != "labs"`, HARD-FAIL (the operator clearly meant something else):
 
@@ -899,35 +919,11 @@ ERROR: --situation-mining is a Brite Labs framework (per docs/gtm-campaign-orche
 You passed --situation-mining with --entity=<entity>. Either drop the flag, OR re-run with --entity=labs.
 ```
 
-If `<entity> == "labs"`, create sub-issue #9:
-
-- **Title**: `Situation Mining`
-- **Description**:
-  > Run `/marketing:situation-mining` (Labs framework) to surface the latent situations that this campaign's persona is in BUT hasn't articulated yet. Output feeds the brief's Audience section (#1) and the copy artifact's angle hypotheses (#3).
-  >
-  > **Handbook citation**: `handbook@main:marketing/labs/situation-mining-framework.md`
-  > **Sub-issue role**: pre-launch discovery; parallel with #2 and #3.
-  > **Expected plugin command**: `/marketing:situation-mining`.
-- **dueDate**: `<launch-date> - 12 days`
-- **blockedBy**: [#1]
-- **blocks**: none directly (informs #2 and #3 informationally)
-- **Labels**: same 8-label set as the standard sub-issues.
+If `<entity> == "labs"`, create sub-issue #9 by stamping the reference file's `## Optional sub-issues` → #9 entry per § 9.1 (take its `blockedBy` and `dueDate_offset_days` from that entry — do not hardcode them here).
 
 ### 10.2 — Creative Angles (no entity restriction)
 
-If `--creative-angles` was passed, create sub-issue #10:
-
-- **Title**: `Creative Angles`
-- **Description**:
-  > Run `/marketing:creative-angles` to generate 3-5 angle hypotheses to test in copy. Output feeds the copy artifact at sub-issue #3.
-  >
-  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/creative-angles.md`
-  > **Sub-issue role**: pre-copy discovery; parallel with #2. Especially important for NEW offers that haven't been tested yet.
-  > **Expected plugin command**: `/marketing:creative-angles`.
-- **dueDate**: `<launch-date> - 12 days`
-- **blockedBy**: [#1]
-- **blocks**: none directly (informs #3 informationally)
-- **Labels**: same 8-label set as the standard sub-issues.
+If `--creative-angles` was passed, create sub-issue #10 by stamping the reference file's `## Optional sub-issues` → #10 entry per § 9.1 (take its `blockedBy` and `dueDate_offset_days` from that entry — do not hardcode them here). No entity restriction.
 
 ---
 
@@ -944,7 +940,7 @@ Campaign scaffolded — /marketing:plan-campaign
   Linear:         <milestone-url>
   SF Campaign:    <campaign-url>  (OR null + reconciliation reminder if soft-failed)
   Manifest:       docs/campaigns/<entity>/<slug>/manifest.json
-  Sub-issues:     <count> created
+  Sub-issues:     <count> created  (titles from references/campaign-sub-issue-templates.md)
                     #1  Brief approved                  <id>
                     #2  Target list built               <id>
                     #3  Copy written + approved         <id>
