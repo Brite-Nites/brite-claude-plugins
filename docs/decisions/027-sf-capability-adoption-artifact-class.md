@@ -1,10 +1,10 @@
-# 023. Artifact-class dimension for the SF capability-adoption framework
+# 027. Artifact-class dimension for the SF capability-adoption framework
 
 **Status:** Accepted
 **Date:** 2026-06-05
 **Linear:** [BC-12345](https://linear.app/brite-nites/issue/BC-12345) (deploy-integrity epic, item #4)
-**Decided by:** Kells Nixon (driving), **Holden Halford (lead/owner) ratifying** — authored solo, then owner-ratified 2026-06-05 (vs [ADR-021](021-sfdx-hardis-adoption.md)'s in-session co-sign).
-**Related:** [ADR-009](009-sf-capability-adoption.md) (the 6-check this **extends, not supersedes**), [ADR-021](021-sfdx-hardis-adoption.md) (§Consequences flag #1 + the reinterpretation table that exposed the gap), [ADR-022](022-revops-promotion-topology.md), [ADR-010](010-plugin-secret-config-canon.md) (the stdio-vs-HTTP MCP axis this ADR deliberately does **not** fold in).
+**Decided by:** Kells Nixon (driving), **Holden Halford (lead/owner) ratifying** — authored solo, then owner-ratified 2026-06-05 (vs [ADR-025](025-sfdx-hardis-adoption.md)'s in-session co-sign).
+**Related:** [ADR-009](009-sf-capability-adoption.md) (the 6-check this **extends, not supersedes**), [ADR-025](025-sfdx-hardis-adoption.md) (§Consequences flag #1 + the reinterpretation table that exposed the gap), [ADR-026](026-revops-promotion-topology.md), [ADR-010](010-plugin-secret-config-canon.md) (the stdio-vs-HTTP MCP axis this ADR deliberately does **not** fold in).
 
 ## Context
 
@@ -15,13 +15,13 @@
 - **Check 4 (Toolset Breadth)** — "tool-schema context cost"
 - **Check 5 (GA Gate)** — "Salesforce GA vs beta/pilot"
 
-When [ADR-021](021-sfdx-hardis-adoption.md) ran the framework on **sfdx-hardis** — an `sf` **CLI plugin** that registers nothing in `.mcp.json` and adds zero tool-schema context — those same 4 checks had to be **reinterpreted to their underlying intent**, by hand, in a reinterpretation table. ADR-021 §Consequences flag #1 deferred the fix to a follow-up ADR, honouring [ADR-009](009-sf-capability-adoption.md)'s own Consequences note: *"add a seventh check via a follow-up ADR rather than amending this one in place."* **This is that follow-up.**
+When [ADR-025](025-sfdx-hardis-adoption.md) ran the framework on **sfdx-hardis** — an `sf` **CLI plugin** that registers nothing in `.mcp.json` and adds zero tool-schema context — those same 4 checks had to be **reinterpreted to their underlying intent**, by hand, in a reinterpretation table. ADR-025 §Consequences flag #1 deferred the fix to a follow-up ADR, honouring [ADR-009](009-sf-capability-adoption.md)'s own Consequences note: *"add a seventh check via a follow-up ADR rather than amending this one in place."* **This is that follow-up.**
 
 ### Shape: a dimension, not a seventh check
 
-ADR-009's note proposed a *"seventh check."* But the lived problem ADR-021 hit was not a missing question — it was that **4 of the existing 6 checks read wrong for a non-MCP artifact.** A 7th check would merely *classify* the artifact; it would leave checks 1/3/4/5 still MCP-shaped, so the reinterpretation step would survive. A 7th check would not have let sfdx-hardis score natively.
+ADR-009's note proposed a *"seventh check."* But the lived problem ADR-025 hit was not a missing question — it was that **4 of the existing 6 checks read wrong for a non-MCP artifact.** A 7th check would merely *classify* the artifact; it would leave checks 1/3/4/5 still MCP-shaped, so the reinterpretation step would survive. A 7th check would not have let sfdx-hardis score natively.
 
-The fix that actually closes the gap is a **cross-cutting dimension**: classify the artifact *first*, then let each existing check read itself in that class's column. This promotes ADR-021's ad-hoc reinterpretation table from "something we improvised once" to "the framework's standing structure." ADR-009's *"seventh check"* phrasing predates the CLI case that exposed the problem as cross-cutting; ADR-021 already hedged it to *"seventh check / artifact-class dimension."* This ADR commits to the **dimension** reading and records the why so a future reader does not think ADR-009's note was ignored.
+The fix that actually closes the gap is a **cross-cutting dimension**: classify the artifact *first*, then let each existing check read itself in that class's column. This promotes ADR-025's ad-hoc reinterpretation table from "something we improvised once" to "the framework's standing structure." ADR-009's *"seventh check"* phrasing predates the CLI case that exposed the problem as cross-cutting; ADR-025 already hedged it to *"seventh check / artifact-class dimension."* This ADR commits to the **dimension** reading and records the why so a future reader does not think ADR-009's note was ignored.
 
 ## Decision
 
@@ -42,7 +42,7 @@ Before running the 6 checks, label the capability with its **artifact class**. T
 
 Two things that *look* like they need their own class but do **not**:
 
-- **A human-facing GUI / wizard is not a fourth class.** It is the **Check-1 (Runtime Model) FAIL outcome for any class** — Check 1 already asks "does an *agent* invoke this?" ADR-021 handled hardis's VS Code GUI exactly this way: SKIP-via-Check-1-fail, recommended to the human dev team instead of hosted in revops.
+- **A human-facing GUI / wizard is not a fourth class.** It is the **Check-1 (Runtime Model) FAIL outcome for any class** — Check 1 already asks "does an *agent* invoke this?" ADR-025 handled hardis's VS Code GUI exactly this way: SKIP-via-Check-1-fail, recommended to the human dev team instead of hosted in revops.
 - **stdio-MCP vs HTTP-MCP is not a sub-split of the MCP class.** That distinction is a *secret-config* concern owned by [ADR-010](010-plugin-secret-config-canon.md) (`bw-run.sh` env vs the BC-5551 header-substitution exception). Checks 1/3/4/5/6 read identically for both transports, so the adoption framework treats them as one class.
 
 ### The 6 checks, by class
@@ -63,7 +63,7 @@ The class selects each check's **reading**. **4 checks vary by class; 2 are inva
 The class axis does **not** decide whether you run the checklist once or many times. That is a *second, independent* axis — **capability granularity** — set by the artifact's internal shape, not its class:
 
 ```
- AXIS 1 · artifact class (this ADR)        AXIS 2 · capability granularity (ADR-021)
+ AXIS 1 · artifact class (this ADR)        AXIS 2 · capability granularity (ADR-025)
  ──────────────────────────────────        ────────────────────────────────────────
  WHAT KIND is it?                           is it ONE thing or a TOOLBOX?
  🤖 MCP / ⌨️ CLI / 📄 skill                  → if a toolbox, run Check 6 (and Check 1)
@@ -80,7 +80,7 @@ This ADR generalizes **only the artifact-class axis**. The checks themselves rem
 
 ## Worked re-run — sfdx-hardis through the generalized framework
 
-The proof that the dimension works: the 4 reinterpretations ADR-021 did by hand become *"read the CLI column."*
+The proof that the dimension works: the 4 reinterpretations ADR-025 did by hand become *"read the CLI column."*
 
 **Step 0 — classify:** sfdx-hardis = **⌨️ CLI plugin** (an `sf` plugin; nothing in `.mcp.json`; zero tool schemas).
 
@@ -93,16 +93,16 @@ The proof that the dimension works: the 4 reinterpretations ADR-021 did by hand 
  Check 5 · Maturity    → CLI column: OSS cadence/maintainer health → pin v7.15.0, standing-monitor → PASS
 ```
 
-These are exactly ADR-021's tool-wide verdicts — but where ADR-021 had to *argue its way* from the MCP-shaped wording to the CLI reading, ADR-023 just reads the column. **Same verdicts, zero improvisation.**
+These are exactly ADR-025's tool-wide verdicts — but where ADR-025 had to *argue its way* from the MCP-shaped wording to the CLI reading, ADR-027 just reads the column. **Same verdicts, zero improvisation.**
 
-**Per-capability checks (Check 1 + Check 6)** drop out unchanged via Axis 2. The per-cluster ADOPT / ADOPT-phase-2 / SKIP table (smart-deploy, CI/CD, SFDMU, quality → ADOPT; monitoring → phase 2; **VS Code GUI → SKIP via Check-1 FAIL**; package-mgmt → SKIP) lives in [ADR-021 §"The 6-check, run"](021-sfdx-hardis-adoption.md) and is referenced, not re-derived here — it is unaffected by the generalization.
+**Per-capability checks (Check 1 + Check 6)** drop out unchanged via Axis 2. The per-cluster ADOPT / ADOPT-phase-2 / SKIP table (smart-deploy, CI/CD, SFDMU, quality → ADOPT; monitoring → phase 2; **VS Code GUI → SKIP via Check-1 FAIL**; package-mgmt → SKIP) lives in [ADR-025 §"The 6-check, run"](025-sfdx-hardis-adoption.md) and is referenced, not re-derived here — it is unaffected by the generalization.
 
 ## Consequences
 
 **Positive**
 
-- A non-MCP artifact (CLI plugin, skill library) now scores **natively** — no reinterpretation step, no risk that someone re-runs the raw MCP-shaped checklist on a CLI tool and re-improvises ADR-021's table.
-- ADR-021's reinterpretation table is preserved as durable structure rather than a one-off.
+- A non-MCP artifact (CLI plugin, skill library) now scores **natively** — no reinterpretation step, no risk that someone re-runs the raw MCP-shaped checklist on a CLI tool and re-improvises ADR-025's table.
+- ADR-025's reinterpretation table is preserved as durable structure rather than a one-off.
 - The GUI-as-Check-1-fail and class ⊥ granularity rules are pinned, so future adoptions don't re-litigate them.
 
 **Negative / mitigations**
@@ -116,4 +116,4 @@ These are exactly ADR-021's tool-wide verdicts — but where ADR-021 had to *arg
 
 ## Reversibility
 
-Pure documentation. The dimension is additive — removing it reverts to running ADR-009's 6 checks in their native MCP reading (with per-non-MCP reinterpretation, as ADR-021 did). No code or config is coupled to this ADR.
+Pure documentation. The dimension is additive — removing it reverts to running ADR-009's 6 checks in their native MCP reading (with per-non-MCP reinterpretation, as ADR-025 did). No code or config is coupled to this ADR.

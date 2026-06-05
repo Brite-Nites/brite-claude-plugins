@@ -1,4 +1,4 @@
-# 021. sfdx-hardis: selective adopt-as-tool
+# 025. sfdx-hardis: selective adopt-as-tool
 
 **Status:** Accepted
 **Date:** 2026-06-02

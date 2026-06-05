@@ -1,9 +1,9 @@
-# 022. revops: promotion-topology command model & vocabulary
+# 026. revops: promotion-topology command model & vocabulary
 
 **Status:** Accepted
 **Date:** 2026-06-05
 **Linear:** [BC-12345](https://linear.app/brite-nites/issue/BC-12345) (deploy-integrity epic) · children [BC-12347](https://linear.app/brite-nites/issue/BC-12347) (F1), [BC-12348](https://linear.app/brite-nites/issue/BC-12348) (F2)
-**Related:** [ADR-021](021-sfdx-hardis-adoption.md) (hardis adoption — the keystone), [ADR-007](007-revops-plugin-design.md) (revops design), [ADR-009](009-sf-capability-adoption.md) (6-check), [ADR-010](010-plugin-secret-config-canon.md) (secret canon); **bn-salesforce ADR-016** (the authoritative promotion topology this mirrors), **bn-salesforce ADR-014** (pins `revops` as methodology, not a data boundary).
+**Related:** [ADR-025](025-sfdx-hardis-adoption.md) (hardis adoption — the keystone), [ADR-007](007-revops-plugin-design.md) (revops design), [ADR-009](009-sf-capability-adoption.md) (6-check), [ADR-010](010-plugin-secret-config-canon.md) (secret canon); **bn-salesforce ADR-016** (the authoritative promotion topology this mirrors), **bn-salesforce ADR-014** (pins `revops` as methodology, not a data boundary).
 
 ## Context
 
@@ -45,4 +45,4 @@ Org aliases: `brite-sandbox` → `brite-integration` · per-dev `brite-dev-<name
 
 ## Reversibility
 
-Command renames keep deprecation aliases; config-gated guidance no-ops in any repo without the pipeline config; nothing couples revops to hardis internals (per ADR-021). Each piece is individually revertible.
+Command renames keep deprecation aliases; config-gated guidance no-ops in any repo without the pipeline config; nothing couples revops to hardis internals (per ADR-025). Each piece is individually revertible.

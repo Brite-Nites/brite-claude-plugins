@@ -58,7 +58,7 @@ Every tool-using PR must pass the 6-item checklist at the end of the pattern gui
 
 ## Naming Convention (commands & skills)
 
-Name from the user's **intent**, not the machine's **mechanism**. Derived in [ADR-022](docs/decisions/022-revops-promotion-topology.md) when the revops `deploy-*` command names were found to mis-describe a CI-driven deploy world (the human no longer "deploys" — CI does). Applies to **all plugins**, *apply-forward + opportunistic cleanup*: don't mass-rename established commands; keep deprecation aliases when you do rename.
+Name from the user's **intent**, not the machine's **mechanism**. Derived in [ADR-026](docs/decisions/026-revops-promotion-topology.md) when the revops `deploy-*` command names were found to mis-describe a CI-driven deploy world (the human no longer "deploys" — CI does). Applies to **all plugins**, *apply-forward + opportunistic cleanup*: don't mass-rename established commands; keep deprecation aliases when you do rename.
 
 **Six rules:**
 
@@ -77,7 +77,7 @@ Name from the user's **intent**, not the machine's **mechanism**. Derived in [AD
 | **Throwaway-mutate** | `preview-` | changes only a disposable/personal thing (blast radius ≈ nil) |
 | **Real-mutate** | `setup-` · `create-`/`new-` · `submit-` · `push-` · `promote-` · `run-` · `sync-` · `update-` · `delete-` | changes shared/persistent state |
 
-Names that already satisfy this (e.g. marketing's `new-offer`, `plan-campaign`; flow-architecture's `add-domain`) need no change; mechanism-named ones (`deploy-*`) are the cleanup targets. Rationale + the worked revops example live in [ADR-022](docs/decisions/022-revops-promotion-topology.md).
+Names that already satisfy this (e.g. marketing's `new-offer`, `plan-campaign`; flow-architecture's `add-domain`) need no change; mechanism-named ones (`deploy-*`) are the cleanup targets. Rationale + the worked revops example live in [ADR-026](docs/decisions/026-revops-promotion-topology.md).
 
 ## plugin.json Schema (STRICT — read before editing)
 

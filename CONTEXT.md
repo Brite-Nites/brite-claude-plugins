@@ -19,7 +19,7 @@ The two Salesforce **org aliases** revops commands target. `brite-sandbox` is th
 _Avoid_: "the org", "default org" (revops never relies on an implicit default).
 
 **Integration (org)**:
-The CI-deployed persistent org at the first stage of the promotion topology — the shared target the pipeline rebuilds from `main` on merge, replacing the manual shared-sandbox model. In Phase 1 this is the `bndev` org repurposed; its alias migrates `brite-sandbox` → `brite-integration` ([ADR-022](docs/decisions/022-revops-promotion-topology.md); bn-salesforce ADR-016).
+The CI-deployed persistent org at the first stage of the promotion topology — the shared target the pipeline rebuilds from `main` on merge, replacing the manual shared-sandbox model. In Phase 1 this is the `bndev` org repurposed; its alias migrates `brite-sandbox` → `brite-integration` ([ADR-026](docs/decisions/026-revops-promotion-topology.md); bn-salesforce ADR-016).
 _Avoid_: "the sandbox" — ambiguous now that Integration, UAT, and per-dev orgs are all sandboxes.
 
 **promotion · push · deploy** (keep distinct):
@@ -31,5 +31,5 @@ The sanctioned break-from-normal route to production (`emergency-deploy-to-produ
 _Avoid_: "break-glass" (jargon/idiom — superseded; see the naming convention in [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 **config-gated guardrail**:
-A revops guidance/guard mechanism (status line, advisory nudge, pre-flight) that reads a repo-local pipeline config and stays silent where it is absent — so the portable `revops` plugin carries the *capability* while a repo's config *activates* it ([ADR-022](docs/decisions/022-revops-promotion-topology.md)).
+A revops guidance/guard mechanism (status line, advisory nudge, pre-flight) that reads a repo-local pipeline config and stays silent where it is absent — so the portable `revops` plugin carries the *capability* while a repo's config *activates* it ([ADR-026](docs/decisions/026-revops-promotion-topology.md)).
 _Avoid_: hardcoding brite-salesforce branch names into revops — that breaks portability ([ADR-007](docs/decisions/007-revops-plugin-design.md) §3.1).
