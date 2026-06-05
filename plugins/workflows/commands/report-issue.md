@@ -72,10 +72,16 @@ Ask: "Any additional context? (error messages, which command was running, logs �
 
 ### 1d. Content-aware switch — is this actually a product bug?
 
-This command is the **agent-tooling** branch of the intake front door. The reporter reached it
-either by typing `/workflows:report-issue` (the direct alias) or by picking "agent tooling" at
-`/workflows:raise-a-ticket`'s Step-1 fork — but a pick is a hint, not a cage. Now that you have the
+This command is the **agent-tooling** branch of the intake front door. The reporter reached it via
+one of three routes: (a) typing `/workflows:report-issue` (the direct alias), (b) picking "agent
+tooling" at `/workflows:raise-a-ticket`'s Step-1a fork, or (c) accepting raise-a-ticket's Step-1c
+**product→tooling** content-aware switch — but a pick is a hint, not a cage. Now that you have the
 trigger / actual / expected from Step 1b, judge what's actually being described.
+
+**Arrival guard (no round-trip).** If you reached this command via route (c) — raise-a-ticket's
+Step-1c product→tooling switch, i.e. the reporter *already* declined product by switching to
+tooling — do **not** offer the tooling→product switch below; that round-trip was just declined.
+Proceed straight to Step 2.
 
 If the report **clearly** reads as a **Brite product** bug — a user-facing software surface
 misbehaving (Brite Base, Brite Sites, Brite Supply, a Brite Labs site), e.g. "the quote PDF exports

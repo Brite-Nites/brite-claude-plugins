@@ -87,9 +87,11 @@ For a **product** report, determine where it routes — repo-context-first. Dete
 **clearly** reads as **agent-tooling** misbehavior (a skill/command/hook that fired wrong, a
 slash-command misbehaving) rather than a product bug, **offer to switch** with a single confirm:
 "This sounds like the **agent tooling** — switch to `/workflows:report-issue`?" On yes, hand off to
-the tooling branch (read [`report-issue.md`](./report-issue.md) and run it). Never silently reroute;
-the reporter decides. This **replaces** the old location-only redirect (which fired on repo location
-alone, regardless of what was being described).
+the tooling branch (read [`report-issue.md`](./report-issue.md) and run it); tell report-issue you
+arrived via this Step-1c product→tooling switch so it honors its **arrival guard** and does not
+re-offer the switch back (no round-trip). Never silently reroute; the reporter decides. This
+**replaces** the old location-only redirect (which fired on repo location alone, regardless of what
+was being described).
 
 This switch is **one-directional by construction**: only the product branch reaches Step 1c (picking
 "agent tooling" at Step 1a dispatches to `report-issue` at Step 1b, *before* this point, so a
