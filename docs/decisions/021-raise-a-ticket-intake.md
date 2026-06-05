@@ -57,7 +57,7 @@ Ship **`/workflows:raise-a-ticket`** — a typed command in the `workflows` plug
 
 ## Consequences
 
-- One canonical product-intake path; `bug-report` retired (shim points to the successor). The legacy `"Bug"` label drift is fixed **in the product-intake path** — `report-issue` still emits `"Bug"` and is left as a separate follow-up (this ADR scopes it out).
+- One canonical product-intake path; `bug-report` retired (shim points to the successor). The legacy `"Bug"` label drift is fixed **in the product-intake path** — `report-issue` still emits `"Bug"` and is left as a separate follow-up (this ADR scopes it out). *(Resolved 2026-06-05 by BC-12592: `report-issue` now files `type:bug` + `needs-triage` + `executor:hybrid`, existence-aware, mirroring the product branch — both branches of the front door file under one label convention.)*
 - Product repos gain a (lazy-created, committable) `docs/agents/issue-tracker.md` as their routing config — the same per-repo config the mattpocock `/triage` and `/to-issues` skills consume. Those consumers are **user-level vendored skills** (`~/.claude/skills/`), not Brite plugins, so the shared-consumer benefit holds only where they're installed.
 - Intake quality leans on the triage stage downstream (by design). The `needs-triage` → `ready-for-agent`/`ready-for-human` pipeline is now fed by a Linear-native, cross-product front door.
 - **`/triage` is an external dependency.** The handoff target is the user-level mattpocock `/triage` skill, not a Brite plugin command. Where it isn't installed, `needs-triage` tickets simply wait for manual triage — intake is still complete, but the automated pickup the flow implies requires that skill present. The command's confirmation says so rather than promising pickup.
