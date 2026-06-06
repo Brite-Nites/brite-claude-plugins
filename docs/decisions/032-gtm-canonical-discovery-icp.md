@@ -1,4 +1,4 @@
-# 024. GTM canonical Discovery ICP layer — per-vertical, segments-only, mandatory
+# 032. GTM canonical Discovery ICP layer — per-vertical, segments-only, mandatory
 
 **Status:** Accepted
 **Date:** 2026-06-04

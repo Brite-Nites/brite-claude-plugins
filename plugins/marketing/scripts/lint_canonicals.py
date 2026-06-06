@@ -40,7 +40,7 @@ Checks performed:
    19. Every offer.replaced_by / .iterates_from refers to a sibling offer slug
        in the same vertical (when present).
 
-  Discovery ICP file family (ADR-024) — icp/{vertical}.json
+  Discovery ICP file family (ADR-032) — icp/{vertical}.json
    20. Every manifest vertical has icp/{slug}.json (mandatory, ERROR).
    21. Every icp/*.json filename matches a canonical vertical slug; an
        alias-named file is rejected with a rename hint (one canonical home).
@@ -110,7 +110,7 @@ OFFER_KEYS = frozenset(
         "prose_path",
     }
 )
-# Mirrors schema.json#/definitions/discovery_icp + /icp_segment (ADR-024).
+# Mirrors schema.json#/definitions/discovery_icp + /icp_segment (ADR-032).
 ICP_FILE_KEYS = frozenset({"vertical", "source", "clarifications_needed", "segments"})
 ICP_SEGMENT_KEYS = frozenset(
     {
@@ -754,7 +754,7 @@ def validate_vertical(path: Path) -> tuple[list[str], dict[str, object] | None]:
     return (errs, data)
 
 
-# ── Discovery ICP validation (ADR-024) ────────────────────────────────────
+# ── Discovery ICP validation (ADR-032) ────────────────────────────────────
 
 
 def _check_str_list(value: object, where: str, field: str) -> list[str]:
@@ -795,7 +795,7 @@ def validate_icp_segment(
     elif persona_slug_set is not None and persona not in persona_slug_set:
         errs.append(
             f"{slabel}: persona '{persona}' not defined in the sibling "
-            f"{{vertical}}.yaml personas[] (ADR-024 cross-ref)"
+            f"{{vertical}}.yaml personas[] (ADR-032 cross-ref)"
         )
     industries = seg["industries"]
     errs.extend(_check_str_list(industries, slabel, "industries"))
@@ -871,7 +871,7 @@ def validate_icp_segment(
 def validate_icp_file(
     path: Path, persona_slug_set: frozenset[str] | None
 ) -> list[str]:
-    """Validate one icp/{vertical}.json Discovery ICP file (ADR-024)."""
+    """Validate one icp/{vertical}.json Discovery ICP file (ADR-032)."""
     where = f"icp/{path.name}"
     try:
         with path.open(encoding="utf-8-sig") as f:
@@ -909,11 +909,11 @@ def validate_icp_file(
             f"{where}: segments must be an object (got {type(segments).__name__})"
         )
         return errs
-    # Stub rule (ADR-024): empty segments REQUIRES non-empty clarifications.
+    # Stub rule (ADR-032): empty segments REQUIRES non-empty clarifications.
     if len(segments) == 0 and clar_count == 0:
         errs.append(
             f"{where}: stub form requires non-empty clarifications_needed "
-            f"when segments is empty (ADR-024)"
+            f"when segments is empty (ADR-032)"
         )
     for seg_name in sorted(segments):
         errs.extend(
@@ -1186,12 +1186,12 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 alias_to_owner[alias] = slug
 
-    # ── Discovery ICP file family (ADR-024): icp/{vertical}.json ─────────
+    # ── Discovery ICP file family (ADR-032): icp/{vertical}.json ─────────
     icp_dir = cdir / "icp"
     icp_count = 0
     if not icp_dir.is_dir():
         all_errs.append(
-            "icp/: directory missing — every vertical requires icp/{slug}.json (ADR-024)"
+            "icp/: directory missing — every vertical requires icp/{slug}.json (ADR-032)"
         )
     else:
         icp_file_slugs: set[str] = set()
@@ -1211,7 +1211,7 @@ def main(argv: list[str] | None = None) -> int:
         for slug in sorted(manifest_set - icp_file_slugs):
             all_errs.append(
                 f"icp/: missing icp/{slug}.json — Discovery ICP is mandatory "
-                f"per vertical (ADR-024)"
+                f"per vertical (ADR-032)"
             )
         for slug in sorted(icp_file_slugs - manifest_set):
             if slug in alias_to_owner:

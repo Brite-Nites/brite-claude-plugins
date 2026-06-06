@@ -142,7 +142,7 @@ personas: []
 offers: []
 YAML
 
-  # Discovery ICP stubs (ADR-024) — mandatory per vertical; lint ERRORs
+  # Discovery ICP stubs (ADR-032) — mandatory per vertical; lint ERRORs
   # without them, which would mask the bootstrap scenarios' own assertions.
   mkdir -p "$d/icp"
   local v

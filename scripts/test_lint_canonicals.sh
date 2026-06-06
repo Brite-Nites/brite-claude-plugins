@@ -79,7 +79,7 @@
 #   BN string-list item appearing in a locked dict-list (parser)     expect 1
 #   BO indented line outside any block (parser orphan)               expect 1
 #   BP manifest missing required key                                 expect 1
-#   BQ icp/{slug}.json missing for a manifest vertical (ADR-024)      expect 1
+#   BQ icp/{slug}.json missing for a manifest vertical (ADR-032)      expect 1
 #   BR icp stub-rule violation (empty segments + empty clarifs)       expect 1
 #   BS icp segment persona dangling cross-ref                         expect 1
 #   BT icp unknown top-level key                                      expect 1
@@ -181,7 +181,7 @@ display: "Bravo"
 personas: []
 offers: []
 YAML
-  # Discovery ICP files (ADR-024) — mandatory per vertical. alpha exercises
+  # Discovery ICP files (ADR-032) — mandatory per vertical. alpha exercises
   # the ready form (one segment, persona cross-ref); bravo the stub form.
   mkdir -p "$dir/icp"
   cat > "$dir/icp/alpha.json" <<'JSON'
@@ -1444,7 +1444,7 @@ YAML
   assert_exit_and_substring "BP: manifest missing schema_version" 1 "_manifest.yaml: missing required key 'schema_version'"
 }
 
-# ── Scenario BQ: icp file missing for a manifest vertical (ADR-024) ─────
+# ── Scenario BQ: icp file missing for a manifest vertical (ADR-032) ─────
 run_bq() {
   local dir
   dir="$(mkdir_scenario BQ)"

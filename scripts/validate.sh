@@ -1856,6 +1856,37 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-11849 — Import-campaign regression harness (BC-11849)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_import_campaign.sh — exercises the
+# import_campaign.py classify-name + compose surfaces (ADR-020 worked
+# examples + cohort-1 reproduction + structural-error rejection) AND
+# static-grep checks against import-campaign.md for spec-drift defense.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-11849. Import-campaign regression harness (BC-11849)"
+
+ic_harness="$REPO_ROOT/plugins/marketing/scripts/test_import_campaign.sh"
+ic_helper="$REPO_ROOT/plugins/marketing/scripts/import_campaign.py"
+
+if [ ! -f "$ic_helper" ]; then
+  warn "plugins/marketing/scripts/import_campaign.py not found — import-campaign harness skipped"
+elif [ ! -f "$ic_harness" ]; then
+  warn "plugins/marketing/scripts/test_import_campaign.sh not found — import-campaign harness skipped"
+else
+  if ic_harness_out=$(bash "$ic_harness" "$ic_helper" 2>&1); then
+    ic_pass_count=$(printf '%s\n' "$ic_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$ic_pass_count" ]; then
+      pass "import-campaign regression harness (${ic_pass_count} assertions)"
+    else
+      pass "import-campaign regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "import-campaign regression harness failed:"
+    printf '%s\n' "$ic_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"

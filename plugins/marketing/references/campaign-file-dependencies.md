@@ -1,7 +1,7 @@
 # Campaign file-dependency map
 
 What `/marketing:plan-campaign` → `tam-mapping` → `list-building` actually read,
-per ADR-024. Three inputs back any campaign; this table says which file backs
+per ADR-032. Three inputs back any campaign; this table says which file backs
 each, who creates it, and whether it already exists for your vertical.
 
 ## The 3 inputs → their backing files
@@ -13,7 +13,7 @@ each, who creates it, and whether it already exists for your vertical.
 | 2. Vertical — contact half | `plugins/marketing/data/canonicals/{vertical}.yaml` | One per vertical (personas + title cascades + offers) | `/marketing:new-vertical` / `new-persona` / `new-offer` |
 | 3. ICP — discovery half | `plugins/marketing/data/canonicals/icp/{vertical}.json` | One per vertical, **mandatory** (lint-enforced) | Hand-authored; stubs scaffolded at vertical creation |
 
-**The two halves are complementary, never substitutes** (ADR-024): the
+**The two halves are complementary, never substitutes** (ADR-032): the
 canonical `{vertical}.yaml` answers *"who at those companies?"* (contact
 cascade); the icp file answers *"which companies are in this market?"*
 (Discovery ICP — industries, geo, size band, signals, exclusions). A vertical

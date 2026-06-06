@@ -31,7 +31,9 @@ describe the issue instead.
 
 ## Step 0: Verify Prerequisites
 
-Confirm the Linear MCP is reachable: call `list_projects` (limit 1).
+Run the shared **reachability probe** (see
+[`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md) § Reachability probe): call
+`list_projects` (limit 1).
 
 If it fails:
 - Stop immediately: "Cannot reach Linear MCP. Run `/workflows:smoke-test` to diagnose."
@@ -68,24 +70,39 @@ here — everything below is the **product** branch.
 
 ### 1c. Product → classify the current location
 
-For a **product** report, determine where it routes — repo-context-first. Run
+For a **product** report, determine where it routes — repo-context-first. Detect repo presence with
 `git rev-parse --is-inside-work-tree 2>/dev/null` and, if inside a repo,
-`git remote get-url origin 2>/dev/null`. Then:
+`git remote get-url origin 2>/dev/null`; identify the **plugins repo** via the shared signal in
+[`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md) § Plugins-repo detection
+(`.claude-plugin/marketplace.json` at root **OR** origin `brite-claude-plugins`). Then:
 
-- **Plugin / tooling repo** — if the repo root has `.claude-plugin/marketplace.json` OR the
-  origin remote is `brite-claude-plugins`, this is NOT a product. The reporter chose "product"
-  in 1a, so treat the location as unknown and go to **1f** (ask which product). (If the report
-  actually reads as tooling misbehavior, see the **content-aware switch** below.)
+- **Plugin / tooling repo** (per that shared signal) — this is NOT a product. The reporter chose
+  "product" in 1a, so treat the location as unknown and go to **1f** (ask which product). (If the
+  report actually reads as tooling misbehavior, see the **content-aware switch** below.)
 - **A product repo** — developer mode. Go to **1d**.
 - **Not in a repo** (or the repo is unrelated to any Brite product) — operator mode. Go to **1f**.
 
-**Content-aware switch (both directions).** The 1a fork is a hint, not a cage. If — here, or
-while gathering the report — the description **clearly** reads as the *other* kind (a "product"
-report that's plainly a skill/command/hook misfiring, or a "tooling" report that's plainly a
-product bug), **offer to switch** branches with a single confirm: "This sounds like the
-*<other>* path — switch to `<flow>`?" Never silently reroute; the reporter decides. This
-**replaces** the old location-only redirect (which fired on repo location alone, regardless of
-what was being described).
+**Content-aware switch (product → tooling).** The 1a fork is a hint, not a cage. You are on the
+**product** branch here. If — at this point, or while gathering the report — the description
+**clearly** reads as **agent-tooling** misbehavior (a skill/command/hook that fired wrong, a
+slash-command misbehaving) rather than a product bug, **offer to switch** with a single confirm:
+"This sounds like the **agent tooling** — switch to `/workflows:report-issue`?" On yes, hand off to
+the tooling branch (read [`report-issue.md`](./report-issue.md) and run it); tell report-issue you
+arrived via this Step-1c product→tooling switch so it honors its **arrival guard** and does not
+re-offer the switch back (no round-trip). Never silently reroute; the reporter decides. This
+**replaces** the old location-only redirect (which fired on repo location alone, regardless of what
+was being described).
+
+This switch is **one-directional by construction**: only the product branch reaches Step 1c (picking
+"agent tooling" at Step 1a dispatches to `report-issue` at Step 1b, *before* this point, so a
+tooling→product clause here would be unreachable). The reverse direction — a *tooling* report that's
+plainly a *product* bug — is handled **inside `report-issue.md`** (its Step 1d content-aware switch
+back to product intake). Both directions are covered, each on the branch that can actually reach it.
+
+**Arrival guard (no round-trip).** If you reached Step 1c via `report-issue`'s Step 1d switch — i.e.
+the reporter *already* declined tooling by switching to product — do **not** offer the product→tooling
+switch above. That branch was just exercised and declined; re-offering it would risk a confirm
+ping-pong. Proceed straight into product intake.
 
 ### 1d. Product repo with a routing config
 
@@ -168,13 +185,10 @@ If they give one paragraph, structure it for them; don't force a Q&A.
 ### 3a. Secret redaction
 
 Scan **all reporter-supplied free text** (the narrative, not just pasted log blocks — a
-credential can appear anywhere) and redact matches with `[REDACTED]`. Patterns (kept in sync
-with the canonical list in `report-issue.md` — update both together): `Bearer `, `password=`,
-`password:`, `token=`, `token:`, `sk-`, `AKIA`, `postgres://`, `mongodb+srv://`, `redis://`,
-`ghp_`, `gho_`, `glpat-`, `xoxb-`, `xoxp-`, `hooks.slack.com`, `PRIVATE KEY`, `-----BEGIN`.
-Then warn: "I scanned for common secret patterns and redacted matches — review the output
-below before confirming." Put any sanitized log/error text in a code block. Screenshots: note
-they exist but aren't attached (attachments are out of scope).
+credential can appear anywhere) and redact matches with `[REDACTED]`, applying the **canonical
+secret-redaction list** in [`_shared/intake-redaction.md`](./_shared/intake-redaction.md) — the
+single source of truth for the patterns and the warn-then-code-block guidance (shared with the
+agent-tooling branch). Do **not** inline a pattern list here; add any new pattern to that file once.
 
 If they mention related issues (e.g. `BC-1234`), note them for `relatedTo`.
 
@@ -220,8 +234,10 @@ NOT a CDR-018 workspace label — so only use it when it actually exists on the 
 
 ## Step 6: Check for Duplicates
 
-Before filing, search Linear: extract 2–4 keywords from the title, call `list_issues` with
-`query`, scoped to the resolved team, limit 10, filter to open (not Done/Canceled).
+Before filing, run the shared **duplicate search** (see
+[`_shared/intake-mechanics.md`](./_shared/intake-mechanics.md) § Duplicate search): extract 2–4
+keywords from the title, call `list_issues` with `query`, scoped to the resolved team, limit 10,
+filter to open (not Done/Canceled).
 
 If matches exist, render them as a **numbered text list** in the prompt body (most relevant
 first) — e.g. `1. BC-1234 — title (status)` — then ask in plain text: "Reply with the number
@@ -322,8 +338,9 @@ either way intake is complete. If related issues were linked, add "Linked to: [I
 
 - Front door first: Step 1 always asks **product vs agent tooling** and routes on the answer;
   a tooling report hands off to `/workflows:report-issue`, not product intake. The fork is
-  content-aware — offer to switch branches if the description clearly reads as the other kind,
-  but never reroute silently.
+  content-aware: on the **product** branch (Step 1c), offer to switch to `/workflows:report-issue`
+  if the description clearly reads as agent-tooling; the **reverse** switch (a tooling report that's
+  plainly a product bug) lives in `report-issue.md` Step 1d. Never reroute silently — confirm first.
 - Intake only — never reproduce, grill, or write an agent brief. Hand off to the triage stage.
 - Never file without the reporter confirming the preview.
 - Never skip the duplicate search.

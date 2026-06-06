@@ -202,7 +202,7 @@ The schema's `additionalProperties:false` (enforced by `scripts/lint_canonicals.
 
 Empty or absent `target_personas` = "all personas in this vertical are valid for this offer" — skip the membership check.
 
-### 2.5 — ICP-source resolution (Discovery ICP, ADR-024)
+### 2.5 — ICP-source resolution (Discovery ICP, ADR-032)
 
 Resolve the campaign's Discovery ICP from the single canonical source:
 `plugins/marketing/data/canonicals/icp/{vertical}.json`. This is the
@@ -384,7 +384,7 @@ Print the operator-readable plan. Use this format (or a close variant — readab
   EB workspace:   <eb-workspace>       (entity-mapped)
   Owner email:    <owner-email>        (resolved via <method>: get_username | --owner-email | AskUserQuestion)
   ICP source:     <ready (segments: <seg1>, <seg2>) | STUB — author segments in data/canonicals/icp/<vertical>.json before list-build>
-                  (Discovery ICP per Step 2.5 / ADR-024; per-segment criteria copies written at Step 7)
+                  (Discovery ICP per Step 2.5 / ADR-032; per-segment criteria copies written at Step 7)
 
   Plugin manifest:
     Path:         docs/campaigns/<entity>/<slug>/manifest.json
@@ -481,11 +481,11 @@ Then `Write` `docs/campaigns/<entity>/<slug>/manifest.json` with the FULL schema
 
 Initial state: `linear.milestone_id` and `salesforce.campaign_id` are `null`. These get backfilled in Step 8a + Step 8b respectively via `Read` → mutate JSON → `Write`.
 
-`segments` (optional, ADR-024) records the Discovery-ICP segments chosen at Step 2.5 — omit the key entirely when the icp file was a stub (absent ≠ empty; downstream consumers distinguish "no segments chosen" from "scaffolded pre-ADR-024").
+`segments` (optional, ADR-032) records the Discovery-ICP segments chosen at Step 2.5 — omit the key entirely when the icp file was a stub (absent ≠ empty; downstream consumers distinguish "no segments chosen" from "scaffolded pre-ADR-032").
 
 For cross-entity campaigns, `vertical` / `persona` / `offer` are still recorded for the (vertical, persona, offer) triple if provided (cross-entity campaigns may still have them); otherwise set to `null` (NOT empty string — empty string would break downstream parsers that distinguish "absent" from "empty").
 
-**Per-segment Discovery-ICP criteria copies** (ADR-024). For each segment chosen at Step 2.5 (skip entirely when the icp file was a stub): flatten the segment block from `plugins/marketing/data/canonicals/icp/<vertical>.json` to the criteria-file root (the block's own keys become the file's top-level keys — `display`/`persona`/`seed_accounts` ride along harmlessly; the `tam-map/*_client.py` scripts read keys by name) and `Write`:
+**Per-segment Discovery-ICP criteria copies** (ADR-032). For each segment chosen at Step 2.5 (skip entirely when the icp file was a stub): flatten the segment block from `plugins/marketing/data/canonicals/icp/<vertical>.json` to the criteria-file root (the block's own keys become the file's top-level keys — `display`/`persona`/`seed_accounts` ride along harmlessly; the `tam-map/*_client.py` scripts read keys by name) and `Write`:
 
 ```
 docs/campaigns/<entity>/tam/<slug>/<segment>/icp.json

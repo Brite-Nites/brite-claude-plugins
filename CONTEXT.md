@@ -1,9 +1,6 @@
-# Brite Plugins — Context
+# Brite Claude Plugins
 
-Glossary for the Brite plugin bundle. Captures terms that are easy to confuse
-across (1) the bug-reporting / feedback / triage surface area and the Brite
-product landscape it routes into, and (2) the GTM data model behind the
-campaign pipeline. Glossary only — no implementation details.
+Brite's Claude Code plugin monorepo — process, org, and domain plugins under `plugins/`. This glossary fixes the vocabulary for concepts that recur across plugins and are easy to conflate. It is a glossary only: no implementation detail, no architecture — those live in `docs/decisions/` (ADRs).
 
 ## Language
 
@@ -130,3 +127,100 @@ ski-resorts, sports-stadiums, zoos). Source material for authoring that
 vertical's ICP segments — NOT an alternate resolution path; tam-mapping's
 playbook auto-load is legacy for manual runs only.
 _Avoid_: pre-loaded vertical, plug-and-play vertical
+
+### Agent tooling & evaluation
+
+> Terminology for how we build and test the plugins themselves (per [ADR-028](docs/decisions/028-skill-engineering-discipline.md)). These were conflated before, which produced false confidence ("tests pass" on a command that never ran).
+
+**Skill**:
+A `SKILL.md` (+ optional bundled files) the model loads on demand to perform a
+reusable task. Activated by its `description`. In current Claude Code, **custom
+slash commands are merged into Skills** — `.claude/commands/x.md` and
+`.claude/skills/x/SKILL.md` both create `/x` and behave the same way.
+_Avoid_: treating "command" and "skill" as different runtime mechanisms — they're
+the same thing; "command" = the slash-invoked framing of a skill.
+
+**Command**:
+A slash-invoked skill (`/plugin:name`). Used for operator-triggered, often
+side-effecting actions. See Skill.
+_Avoid_: implying a command has a separate execution model from a skill.
+
+**Plugin**:
+A versioned, namespaced bundle of skills/commands/agents/hooks/MCP servers
+distributed via the marketplace. Identity = its `name`, which is also the skill
+namespace (`/<name>:<skill>`).
+
+**Subagent**:
+An agent that runs in its own context window and returns only a summary. Used to
+keep verbose side work out of the main context. One subagent = one task.
+
+**Hook**:
+A deterministic enforcement mechanism that fires on an event (e.g. PreToolUse).
+The "must-do" lever — reliable where a prose instruction is merely suggestive.
+_Avoid_: relying on prose in a skill to GUARANTEE a critical behavior — that's a
+should-do; use a hook.
+
+**Structural test**:
+A check that greps the spec text, checks a file exists, or lints frontmatter. It
+proves the *prose*, not the behavior. Useful for drift, but passing it says
+nothing about what the command produces.
+_Avoid_: calling a structural markdown-grep a "test" of behavior.
+
+**Behavioral eval**:
+The only check that proves behavior: it fixtures inputs, runs the command in
+**emit mode**, and asserts on the **produced artifact** (schema + key fields +
+golden compare). This is what "is it sound?" actually requires.
+
+**Unit test**:
+A test of a deterministic helper's (python/bash) logic. Legitimate and valuable,
+but it tests the *gadget*, not the command's behavior.
+_Avoid_: counting helper unit tests as behavioral coverage of a command.
+
+**Emit mode**:
+A command's side-effect-free run: computes and writes all its artifacts
+(`manifest.json`, issue payloads, copy JSON, …) to a sandbox temp dir, making
+**no external MCP writes** (no real Linear/SF/EB mutations). The testable seam a
+behavioral eval runs against.
+_Avoid_: conflating emit mode with the legacy `--dry-run`, which exits before the
+artifacts are written.
+
+**Gate**:
+A *blocking* CI check (fails the build). Distinct from an **advisory lint**
+(WARN only). Per ADR-028, a small set of checks are gates; the rest are advisory
+until promoted.
+
+**Fixture / Golden file**:
+A fixture is a canned input for an eval; a golden file is the expected artifact
+the eval compares the produced one against.
+_Avoid_: calling `evals/evals.json` "evals" — they are deprecated, non-executing
+seed specs (ADR-028 D3), not runnable behavioral evals.
+
+### Salesforce / RevOps
+
+**revops**:
+The Salesforce **engineering** layer — a portable plugin bundling SF dev knowledge (skills), deploy discipline (commands), and the org MCP, usable from any repo. Its charter is concerns 1–2 only: SF knowledge + deploy/ops discipline. The CRM-write surface it also hosts (`create-sf-campaign`, `update-sf-campaign-status`) is a **GTM seam owned by `marketing`**, implemented here as commands per [ADR-015](docs/decisions/015-gtm-sigma3-sf-campaign-sync.md) — not part of revops's core identity.
+_Avoid_: "the Salesforce plugin" (revops scopes to the revenue-ops function, not one tool — [ADR-007](docs/decisions/007-revops-plugin-design.md) §3.1); "RevOps seat" (was the withdrawn `revenue-rhythm` L10 plugin, not this).
+
+**brite-salesforce**:
+Brite's live Salesforce DX (SFDX) metadata **repository** (`github.com/Brite-Nites/brite-salesforce`) — the thing deploys actually ship to. Its own `CLAUDE.md` is the authoritative source for Brite deploy discipline; `revops` mirrors that discipline outward so agents in other repos inherit it. Authority is one-way: brite-salesforce defines, revops reflects.
+_Avoid_: "bn-salesforce" (only a local clone's folder name); "the SF repo".
+
+**brite-sandbox / brite-prod**:
+The two Salesforce **org aliases** revops commands target. `brite-sandbox` is the deploy/validation target; `brite-prod` is production. Commands always pass `--target-org` explicitly — never the CLI default org. Under the promotion topology, `brite-sandbox` is being renamed **`brite-integration`** (its role becomes the CI-deployed Integration org) — see **Integration (org)**.
+_Avoid_: "the org", "default org" (revops never relies on an implicit default).
+
+**Integration (org)**:
+The CI-deployed persistent org at the first stage of the promotion topology — the shared target the pipeline rebuilds from `main` on merge, replacing the manual shared-sandbox model. In Phase 1 this is the `bndev` org repurposed; its alias migrates `brite-sandbox` → `brite-integration` ([ADR-026](docs/decisions/026-revops-promotion-topology.md); bn-salesforce ADR-016).
+_Avoid_: "the sandbox" — ambiguous now that Integration, UAT, and per-dev orgs are all sandboxes.
+
+**promotion · push · deploy** (keep distinct):
+**promotion** = advancing a change up the environment chain (e.g. integration → uat → prod); the order is the topology's invariant. **push** (as in `push-to-production`) = the human command that *triggers* a prod promotion — CI performs the actual deploy. **deploy** = the machine action CI runs. The human promotes/pushes; CI deploys.
+_Avoid_: calling the human action "deploy" — under the CI-driven topology the human no longer deploys.
+
+**emergency path**:
+The sanctioned break-from-normal route to production (`emergency-deploy-to-production`) — re-triggers the *enforced* CI deploy rather than bypassing it.
+_Avoid_: "break-glass" (jargon/idiom — superseded; see the naming convention in [CONTRIBUTING.md](CONTRIBUTING.md)).
+
+**config-gated guardrail**:
+A revops guidance/guard mechanism (status line, advisory nudge, pre-flight) that reads a repo-local pipeline config and stays silent where it is absent — so the portable `revops` plugin carries the *capability* while a repo's config *activates* it ([ADR-026](docs/decisions/026-revops-promotion-topology.md)).
+_Avoid_: hardcoding brite-salesforce branch names into revops — that breaks portability ([ADR-007](docs/decisions/007-revops-plugin-design.md) §3.1).

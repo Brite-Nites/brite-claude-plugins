@@ -65,7 +65,7 @@ The skill builds a TAM for ONE Brite entity per invocation (Nites / Supply / Lab
 Both written to the resolved `--output-dir`:
 
 - **Nites/Supply path:** `docs/research/tam/{vertical}-{YYYY-MM-DD}/{manifest.json,tam-config.json}`.
-- **Labs path:** `docs/campaigns/labs/tam/{slug}/{segment}/{icp.json,tam-config.json}` — one subdir per Discovery-ICP segment (ADR-024; `/marketing:plan-campaign` Step 7 writes the per-segment `icp.json` criteria copies at scaffold time; a single-audience campaign is the one-segment case). Run this skill once per segment with that subdir as `--output-dir` and its `icp.json` as `--criteria-file`. Dependency map: [`references/campaign-file-dependencies.md`](../../references/campaign-file-dependencies.md).
+- **Labs path:** `docs/campaigns/labs/tam/{slug}/{segment}/{icp.json,tam-config.json}` — one subdir per Discovery-ICP segment (ADR-032; `/marketing:plan-campaign` Step 7 writes the per-segment `icp.json` criteria copies at scaffold time; a single-audience campaign is the one-segment case). Run this skill once per segment with that subdir as `--output-dir` and its `icp.json` as `--criteria-file`. Dependency map: [`references/campaign-file-dependencies.md`](../../references/campaign-file-dependencies.md).
 
 The skill writes; downstream consumers read.
 

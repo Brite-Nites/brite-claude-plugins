@@ -114,7 +114,7 @@ def _create_vertical_yaml(canonicals_dir: Path, slug: str, display: str,
 
 def _create_icp_stub(canonicals_dir: Path, slug: str,
                      playbook_path: str | None = None) -> Path:
-    """Create the mandatory Discovery ICP stub for a new vertical (ADR-024).
+    """Create the mandatory Discovery ICP stub for a new vertical (ADR-032).
 
     Every registered vertical MUST have icp/{slug}.json (lint_canonicals.py
     ERROR-enforces presence). The stub form is empty segments + non-empty
@@ -271,7 +271,7 @@ def cmd_vertical(args: argparse.Namespace) -> int:
             "playbook_path": args.playbook_path or None,
             "manifest_insertion": f"  - {slug}  (alphabetized into _manifest.yaml)",
             "new_file": f"{slug}.yaml",
-            "new_icp_stub": f"icp/{slug}.json  (Discovery ICP stub per ADR-024)",
+            "new_icp_stub": f"icp/{slug}.json  (Discovery ICP stub per ADR-032)",
         }
         print(json.dumps({"ok": True, "preview": preview}))
         return 0

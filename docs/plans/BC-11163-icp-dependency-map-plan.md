@@ -17,14 +17,14 @@
 
 ## Tasks
 
-### Task 1 — ADR-024: canonical Discovery ICP layer
-**File**: `docs/decisions/024-gtm-canonical-discovery-icp.md` (next free number; match repo ADR format)
+### Task 1 — ADR-032: canonical Discovery ICP layer
+**File**: `docs/decisions/032-gtm-canonical-discovery-icp.md` (next free number; match repo ADR format)
 Record decisions 1–5 + alternatives rejected (per-campaign home; base+segments; optional files; playbook dual-path; flat copy paths).
 **Verify**: `./scripts/validate.sh`.
 
 ### Task 2 — Schema: `#/definitions/discovery_icp`
 **File**: `plugins/marketing/data/canonicals/schema.json`
-Top-level icp-file shape (`vertical`, `source`, `clarifications_needed`, `segments`) + `#/definitions/icp_segment` (block per design 6, `additionalProperties: false`). Add optional `segments[]` to `#/definitions/campaign_manifest`. `$comment` cross-refs ADR-024.
+Top-level icp-file shape (`vertical`, `source`, `clarifications_needed`, `segments`) + `#/definitions/icp_segment` (block per design 6, `additionalProperties: false`). Add optional `segments[]` to `#/definitions/campaign_manifest`. `$comment` cross-refs ADR-032.
 **Verify**: JSON parses; linter tests (Task 3) consume it.
 
 ### Task 3 — Linter: icp file family

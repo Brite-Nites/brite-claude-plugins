@@ -271,7 +271,7 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
           },
-          "description": "Optional (ADR-024). Discovery-ICP segment names chosen at scaffold time — each must resolve to a segment key in plugins/marketing/data/canonicals/icp/{vertical}.json. Per-segment criteria copies live at docs/campaigns/{entity}/tam/{slug}/{segment}/icp.json."
+          "description": "Optional (ADR-032). Discovery-ICP segment names chosen at scaffold time — each must resolve to a segment key in plugins/marketing/data/canonicals/icp/{vertical}.json. Per-segment criteria copies live at docs/campaigns/{entity}/tam/{slug}/{segment}/icp.json."
         }
       }
     },
@@ -339,7 +339,7 @@
       }
     },
     "discovery_icp": {
-      "$comment": "Shape of plugins/marketing/data/canonicals/icp/{vertical}.json per ADR-024. One file per registered vertical — presence is ERROR-enforced by lint_canonicals.py. Segments-only: no base block; a single-audience vertical is the one-segment case. Stub form: segments empty REQUIRES clarifications_needed non-empty (lint-enforced). The contact half (personas + titles) stays in the sibling {vertical}.yaml; this file is the discovery half (which companies are in this market).",
+      "$comment": "Shape of plugins/marketing/data/canonicals/icp/{vertical}.json per ADR-032. One file per registered vertical — presence is ERROR-enforced by lint_canonicals.py. Segments-only: no base block; a single-audience vertical is the one-segment case. Stub form: segments empty REQUIRES clarifications_needed non-empty (lint-enforced). The contact half (personas + titles) stays in the sibling {vertical}.yaml; this file is the discovery half (which companies are in this market).",
       "type": "object",
       "required": ["vertical", "source", "clarifications_needed", "segments"],
       "additionalProperties": false,
@@ -363,7 +363,7 @@
           "type": "object",
           "propertyNames": { "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" },
           "additionalProperties": { "$ref": "#/definitions/icp_segment" },
-          "description": "Named account universes. Each segment is a SELF-CONTAINED Discovery ICP — never a sparse override; no merge semantics (ADR-024)."
+          "description": "Named account universes. Each segment is a SELF-CONTAINED Discovery ICP — never a sparse override; no merge semantics (ADR-032)."
         }
       }
     },
@@ -425,7 +425,7 @@
         "seed_accounts": {
           "type": "array",
           "items": { "$ref": "#/definitions/seed_account" },
-          "description": "Durable look-alike exemplars for this universe (ADR-024: vertical-level market knowledge; campaign copies may prune/extend). Optional — some universes are definable purely by criteria."
+          "description": "Durable look-alike exemplars for this universe (ADR-032: vertical-level market knowledge; campaign copies may prune/extend). Optional — some universes are definable purely by criteria."
         }
       }
     },

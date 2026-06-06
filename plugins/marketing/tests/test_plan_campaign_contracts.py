@@ -1064,7 +1064,7 @@ def test_idempotency_section_present() -> None:
         "Body must document the orchestrator's idempotency behavior (partial-idempotency)"
 
 
-# --- Discovery ICP contract (ADR-024) ---------------------------------------
+# --- Discovery ICP contract (ADR-032) ---------------------------------------
 
 
 def test_icp_source_resolution_documented() -> None:
@@ -1073,7 +1073,7 @@ def test_icp_source_resolution_documented() -> None:
     state) and classify ready vs stub."""
     body = read_command()
     assert "### 2.5" in body, (
-        "Spec must define the ICP-source resolution sub-step (2.5, ADR-024)."
+        "Spec must define the ICP-source resolution sub-step (2.5, ADR-032)."
     )
     section = extract_section(body, "### 2.5", "## Step 3")
     assert "data/canonicals/icp/{vertical}.json" in section, (
@@ -1083,7 +1083,7 @@ def test_icp_source_resolution_documented() -> None:
         assert state in section, (
             f"2.5 must classify the icp file as ready or stub (missing '{state}')."
         )
-    assert "ADR-024" in section, "2.5 must cite ADR-024."
+    assert "ADR-032" in section, "2.5 must cite ADR-032."
 
 
 def test_segment_flag_documented() -> None:
@@ -1114,10 +1114,10 @@ def test_segment_copy_path_documented() -> None:
     section = extract_section(body, "## Step 7", "## Step 8")
     assert "tam/<slug>/<segment>/icp.json" in section, (
         "Step 7 must document the uniform per-segment copy path "
-        "docs/campaigns/<entity>/tam/<slug>/<segment>/icp.json (ADR-024)."
+        "docs/campaigns/<entity>/tam/<slug>/<segment>/icp.json (ADR-032)."
     )
     assert '"segments"' in section or "`segments`" in section, (
-        "Step 7 manifest must document the optional segments[] key (ADR-024)."
+        "Step 7 manifest must document the optional segments[] key (ADR-032)."
     )
 
 
@@ -1140,5 +1140,5 @@ def test_handoff_carries_icp_status() -> None:
     body = read_command()
     section = extract_section(body, "### 11.3", "## Idempotency notes")
     assert "Discovery ICP" in section, (
-        "11.3 hand-off must include the Discovery ICP status line (ADR-024)."
+        "11.3 hand-off must include the Discovery ICP status line (ADR-032)."
     )
