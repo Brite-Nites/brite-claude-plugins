@@ -1,0 +1,106 @@
+{
+  "vertical": "shopping-centers",
+  "source": "marketing/go-to-market/verticals/shopping-centers/README.md",
+  "clarifications_needed": [
+    "flagship-brands size_band floors are draft values — operator redline (BC-11163)",
+    "geo regions are the hypothesized BN-territory set (handbook README has NEEDS RESEARCH here) — confirm",
+    "seed_accounts are draft exemplars — operator redline (BC-11163)"
+  ],
+  "segments": {
+    "flagship-brands": {
+      "display": "Flagship brands",
+      "persona": "vp-marketing",
+      "industries": [
+        "luxury retail brands",
+        "experiential retail brands",
+        "flagship DTC brands",
+        "premium lifestyle and apparel brands"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 100,
+        "employee_max": null,
+        "revenue_min": 50000000,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "flagship store opening announcements",
+        "experiential retail or brand-activation capex",
+        "brand repositioning or identity refresh",
+        "permanent installation / placemaking investments"
+      ],
+      "exclusions": [
+        "commodity mall-tenant chains",
+        "discount and off-price retail",
+        "franchise-operated brands without national marketing authority",
+        "existing customers"
+      ],
+      "seed_accounts": [
+        { "name": "Nike", "domain": "nike.com" },
+        { "name": "Apple", "domain": "apple.com" },
+        { "name": "Gentle Monster", "domain": "gentlemonster.com" },
+        { "name": "Aritzia", "domain": "aritzia.com" },
+        { "name": "Tiffany & Co.", "domain": "tiffany.com" },
+        { "name": "RH (Restoration Hardware)", "domain": "rh.com" },
+        { "name": "Bass Pro Shops", "domain": "basspro.com" },
+        { "name": "American Girl", "domain": "americangirl.com" },
+        { "name": "Louis Vuitton", "domain": "louisvuitton.com" },
+        { "name": "Starbucks Reserve", "domain": "starbucksreserve.com" }
+      ]
+    },
+    "destination-centers": {
+      "display": "Destination centers & districts",
+      "persona": "center-owner-asset-manager",
+      "industries": [
+        "destination shopping centers",
+        "lifestyle centers",
+        "premium mixed-use retail districts",
+        "retail REITs",
+        "retail property management"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "500K+ sq ft GLA (size proxy — employee counts are unreliable for property entities)",
+        "anchor vacancy or re-tenanting announcements",
+        "renovation / repositioning capex",
+        "experiential or seasonal programming investments",
+        "flagship tenant presence",
+        "dedicated on-site marketing team"
+      ],
+      "exclusions": [
+        "commodity strip malls",
+        "non-destination neighborhood retail",
+        "power centers without common-area programming",
+        "existing customers"
+      ],
+      "seed_accounts": [
+        { "name": "Simon Property Group", "domain": "simon.com" },
+        { "name": "Brookfield Properties", "domain": "brookfieldproperties.com" },
+        { "name": "Macerich", "domain": "macerich.com" },
+        { "name": "Caruso", "domain": "caruso.com" },
+        { "name": "Related Companies", "domain": "related.com" },
+        { "name": "Howard Hughes Holdings", "domain": "howardhughes.com" },
+        { "name": "Unibail-Rodamco-Westfield", "domain": "urw.com" },
+        { "name": "Taubman Centers", "domain": "taubman.com" },
+        { "name": "Irvine Company Retail", "domain": "shopirvinecompany.com" },
+        { "name": "Federal Realty", "domain": "federalrealty.com" }
+      ]
+    }
+  }
+}

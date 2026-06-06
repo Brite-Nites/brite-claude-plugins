@@ -1,0 +1,62 @@
+{
+  "vertical": "tribes-reservations",
+  "source": "marketing/go-to-market/verticals/tribes-reservations/README.md",
+  "clarifications_needed": [
+    "Casinos routing boundary: the README defines 'tribal casino properties → casinos vertical' but does not address mixed-use tribal enterprise sites (casino floor + separate cultural center/amphitheater on the same land) — clarify whether the non-gaming facility routes here or stays in casinos",
+    "size_band is null on all schema keys — the README's capacity proxy is 1,000+ enrolled members with existing cultural programming, which doesn't map to employee/revenue; encode via list-building filters",
+    "Geography: README references 'Brite Tier 1 + Tier 2 territories' without defining them — region list defaults to states with high tribal-land concentration; validate against the actual territory map",
+    "Warm-intro sourcing: README states cold outreach is 'rarely effective without prior introduction' and names NIEA, NCAI, AIANTA conferences as preferred channels — clarify whether any warm-intro infrastructure exists before first outreach wave",
+    "Semiquincentennial timing gate: the 250th Anniversary near-term opening is flagged as an untested assumption — confirm whether it is still a live 2026 trigger"
+  ],
+  "segments": {
+    "tribal-cultural-community": {
+      "display": "Tribal Cultural & Community Event Venues",
+      "persona": "cultural-affairs-director",
+      "industries": [
+        "Tribal Government",
+        "Cultural Organizations",
+        "Tribal Tourism",
+        "Indigenous Cultural Centers",
+        "Tribal Museums"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["AZ", "NM", "OK", "CA", "WA", "OR", "MT", "SD", "ND", "MN", "WI", "NY", "CT", "FL", "NC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Active cultural programming calendar or annual powwow",
+        "Existing visitor center, cultural museum, or tribal tourism office",
+        "Recent capital improvement announcements for cultural or community facilities",
+        "Participation in NIEA, NCAI, or AIANTA conferences",
+        "Public communications referencing 250th Anniversary or Semiquincentennial programming"
+      ],
+      "exclusions": [
+        "Tribal casino properties — route to casinos vertical",
+        "Tribes without a dedicated cultural affairs or tourism office (insufficient organizational capacity)",
+        "State-recognized-only tribes with no demonstrated cultural programming budget",
+        "Properties outside Brite Tier 1 + Tier 2 service territories",
+        "Existing Brite customers"
+      ],
+      "seed_accounts": [
+        {"name": "Navajo Nation Tourism Department", "domain": "navajo-nsn.gov"},
+        {"name": "Cherokee Nation Cultural Tourism", "domain": "cherokee.org"},
+        {"name": "Pueblo of Acoma — Sky City Cultural Center & Haak'u Museum", "domain": "acomaskycity.org"},
+        {"name": "Confederated Salish and Kootenai Tribes", "domain": "cskt.org"},
+        {"name": "Oneida Indian Nation — Shako:wi Cultural Center", "domain": "oneidaindiannation.com"},
+        {"name": "Seminole Tribe of Florida — Cultural Department", "domain": "semtribe.com"},
+        {"name": "Eastern Band of Cherokee Indians — Museum of the Cherokee People", "domain": "cherokeemuseum.org"},
+        {"name": "Muckleshoot Indian Tribe — Cultural Resources", "domain": "muckleshoot.nsn.us"},
+        {"name": "Standing Rock Sioux Tribe", "domain": "standingrock.org"},
+        {"name": "Tohono O'odham Nation — Cultural Center and Museum", "domain": "tonation-nsn.gov"}
+      ]
+    }
+  }
+}

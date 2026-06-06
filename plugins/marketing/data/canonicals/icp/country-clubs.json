@@ -1,0 +1,118 @@
+{
+  "vertical": "country-clubs",
+  "source": "marketing/go-to-market/verticals/country-clubs/README.md",
+  "clarifications_needed": [
+    "Sub-playbook files (private-clubs/README.md, semi-private-resort-clubs/README.md) were not independently verified — persona role-in-buying-process detail and ICP-specific qualification criteria should be checked against those files before promoting personas to Active",
+    "Geo weighting is inferred from README narrative (FL highest concentration, UT/DMV strongest seasonal alignment, CA year-round); no explicit state-priority ranking exists in source — vertical owner Dillon Williams to confirm",
+    "size_band revenue floors are NCA-derived ($1M+ private clubs — 5,659 nationally; $500K+ semi-private; typical contracts $30K–$100K+ private, $15K–$50K semi-private; club operating budgets avg $8.5M/yr); employee bands are staffing estimates — operator redline",
+    "Seed accounts are real clubs drawn from README market context and high-profile clubs in focus markets; NOT verified against existing-customer lists — apply exclusion before list use",
+    "Management-company portfolio deals (Troon: 1,110 facilities; Invited: 170 owned clubs; Concert Golf: 39 clubs) are high-priority enterprise targets — confirm whether they get a dedicated motion"
+  ],
+  "segments": {
+    "private-country-clubs": {
+      "display": "Private Country Clubs",
+      "persona": "general-manager",
+      "industries": [
+        "Country Clubs",
+        "Private Golf Clubs",
+        "Member-Owned Social Clubs"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 25,
+        "employee_max": 200,
+        "revenue_min": 1000000,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "Jonas Club Software",
+        "Northstar Club Management",
+        "ClubHouse Online",
+        "Clubessential",
+        "MembersFirst"
+      ],
+      "intent_signals": [
+        "CMAA membership or conference attendance",
+        "NCA member club listing",
+        "Job posting for Director of Events or Social Director",
+        "Club website references holiday gala or holiday events",
+        "Recent clubhouse renovation or property improvement announcement",
+        "Club Benchmarking participation",
+        "LinkedIn posts about member events or property improvements"
+      ],
+      "exclusions": [
+        "Public golf courses",
+        "Municipal courses",
+        "Semi-private or resort-operated courses (see segment: semi-private-resort-clubs)",
+        "Clubs with revenue under $1M annually",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Promontory Club", "domain": "promontoryclub.com"},
+        {"name": "Red Ledges", "domain": "redledges.com"},
+        {"name": "Congressional Country Club", "domain": "ccclub.org"},
+        {"name": "Chevy Chase Club", "domain": "chevychaseclub.org"},
+        {"name": "Baltusrol Golf Club", "domain": "baltusrol.org"},
+        {"name": "Los Angeles Country Club", "domain": "thelacc.org"},
+        {"name": "Seminole Golf Club", "domain": "seminolegolfclub.com"},
+        {"name": "Old Collier Golf Club", "domain": "oldcolliergolfclub.com"}
+      ]
+    },
+    "semi-private-resort-clubs": {
+      "display": "Semi-Private / Resort Golf Courses",
+      "persona": "general-manager",
+      "industries": [
+        "Semi-Private Golf Courses",
+        "Resort Golf Courses",
+        "Golf Course Management Companies"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 15,
+        "employee_max": 150,
+        "revenue_min": 500000,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "Troon managed facility indicator",
+        "Invited (ClubCorp) property listing",
+        "Concert Golf Partners portfolio listing",
+        "GolfNow partnership listing",
+        "Lightspeed Golf POS"
+      ],
+      "intent_signals": [
+        "Active wedding or event venue marketing (banquet / event rental revenue)",
+        "NGCOA (National Golf Course Owners Association) membership",
+        "Job posting for Events Coordinator or Banquet Manager",
+        "Recent management company acquisition or rebrand announcement",
+        "Tourism-market location (FL, AZ resort corridors)",
+        "Club website references holiday parties or corporate events"
+      ],
+      "exclusions": [
+        "Fully private member-owned clubs (see segment: private-country-clubs)",
+        "Miniature golf or par-3 only facilities",
+        "Driving ranges without full course",
+        "Facilities under $500K annual revenue",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Troon North Golf Club", "domain": "troonnorthgolf.com"},
+        {"name": "TPC Sawgrass", "domain": "tpc.com"},
+        {"name": "Golf Club of the Everglades (Concert Golf)", "domain": "golfcluboftheeverglades.com"},
+        {"name": "Tiburón Golf Club at The Ritz-Carlton Naples", "domain": "tiburongolfnaples.com"},
+        {"name": "Whisper Rock Golf Club", "domain": "whisperrockgolf.com"},
+        {"name": "Reunion Resort Golf", "domain": "reunionresort.com"},
+        {"name": "Eagle Landing Golf Club", "domain": "eaglelandinggolf.com"},
+        {"name": "Hammock Beach Golf Resort & Spa", "domain": "hammockbeach.com"}
+      ]
+    }
+  }
+}

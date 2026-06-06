@@ -1,10 +1,54 @@
-# Canonical entry for the Churches / Houses of Worship vertical (skeleton).
+# Canonical entry for the Churches / Houses of Worship vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/churches/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Future — not ready for outreach; README content is
+#   hypothetical and marked [NEEDS RESEARCH] throughout.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - Senior Pastor: influencer/approver only; explicitly not the vendor-selection entry
+#     point per README decision-structure table.
+#   - Communications Director: listed as secondary in offer frontmatter but absent from the
+#     ICP/persona section; omitted until validated.
+#   - Director of Development: narrow scope (donor-funded offer only); included as a title
+#     variant under executive-pastor-campus-director rather than a standalone persona.
+# Thin-source flag: all persona attributes, budget ranges, and geographic priorities are
+#   hypotheses, not validated data. Treat as draft scaffolding only.
 slug: churches
 display: "Churches / Houses of Worship"
 playbook_path: "marketing/go-to-market/verticals/churches/README.md"
-personas: []
-offers: []
+personas:
+  - slug: executive-pastor-campus-director
+    display: "Executive Pastor / Campus Director"
+    titles:
+      - "Executive Pastor"
+      - "Campus Pastor"
+      - "Campus Director"
+      - "Director of Operations"
+      - "Facilities Director"
+      - "Director of Development"
+offers:
+  - slug: advent-christmas-eve-presence
+    display: "Advent & Christmas Eve Presence"
+    status: draft
+    posture: risk-reversal
+    target_personas: [executive-pastor-campus-director]
+    prose_path: "marketing/go-to-market/verticals/churches/offers/advent-christmas-eve-presence.md"
+  - slug: christmas-season-illumination
+    display: "Christmas Season Illumination"
+    status: draft
+    posture: pilot
+    target_personas: [executive-pastor-campus-director]
+    prose_path: "marketing/go-to-market/verticals/churches/offers/christmas-season-illumination.md"
+  - slug: easter-and-cross-seasonal
+    display: "Easter & Cross Seasonal"
+    status: draft
+    posture: pilot
+    target_personas: [executive-pastor-campus-director]
+    prose_path: "marketing/go-to-market/verticals/churches/offers/easter-and-cross-seasonal.md"
+  - slug: donor-funded-architectural-permanent
+    display: "Donor-Funded Architectural Permanent"
+    status: draft
+    posture: free-asset
+    target_personas: [executive-pastor-campus-director]
+    prose_path: "marketing/go-to-market/verticals/churches/offers/donor-funded-architectural-permanent.md"

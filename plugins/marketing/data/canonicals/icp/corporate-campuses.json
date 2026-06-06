@@ -1,0 +1,119 @@
+{
+  "vertical": "corporate-campuses",
+  "source": "marketing/go-to-market/verticals/corporate-campuses/README.md",
+  "clarifications_needed": [
+    "No active offers yet — all 11 offers are Draft; vertical is Exploring. ICP firmographic thresholds are secondary-research hypotheses, not discovery-validated",
+    "REIT segment size_band is null on all schema keys — the README's threshold is portfolio square footage (500K+ SF Class A, ≥10% amenity allocation per BOMA benchmark), which doesn't map to employee/revenue; encode via list-building filters. REIT CapEx approval thresholds ($5K–$25K property-level) are industry-wide estimates",
+    "Budget benchmarks are a research gap: dollar-per-SF seasonal-program line items are not publicly reported; the $10K–$500K+ range is BN-published commercial range, not a vertical benchmark",
+    "Geography default applied — README names BN territory clusters (Bay Area, Seattle, Silicon Slopes UT, Denver Tech Center, Phoenix/Scottsdale, DMV/NoVA, Charlotte/Raleigh, Florida, Tri-State); zip_bands pending territory operations data"
+  ],
+  "segments": {
+    "large-employer-corporate-campuses": {
+      "display": "Large Employer Corporate Campuses",
+      "persona": "director-of-facilities-workplace",
+      "industries": [
+        "Technology",
+        "Financial Services",
+        "Aerospace & Defense",
+        "Healthcare & Life Sciences",
+        "Professional Services"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 1000,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "Facilities management software (ServiceNow, IBM TRIRIGA, Planon)",
+        "Workplace experience platform (Envoy, Robin, Density)",
+        "Return-to-office mandate published or publicly announced",
+        "Active employer-brand investment (Glassdoor employer profile, LinkedIn Life page)",
+        "ESG / sustainability reporting (CDP, GRI, SASB)"
+      ],
+      "intent_signals": [
+        "Job postings for Director/VP of Workplace Experience or Head of Facilities in BN territory",
+        "RTO policy announcement or campus expansion news in past 12 months",
+        "Campus renovation or new HQ construction permit in BN territory",
+        "Holiday-event or campus-experience content on company LinkedIn or employer brand channels",
+        "IFMA or CoreNet Global membership or event sponsorship",
+        "Vendor qualification / RFP for facilities services posted publicly"
+      ],
+      "exclusions": [
+        "Single-building tenants (no campus-scale footprint)",
+        "Organizations with no dedicated facilities or workplace team",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Apple", "domain": "apple.com"},
+        {"name": "Google (Alphabet)", "domain": "google.com"},
+        {"name": "Microsoft", "domain": "microsoft.com"},
+        {"name": "Meta Platforms", "domain": "meta.com"},
+        {"name": "Salesforce", "domain": "salesforce.com"},
+        {"name": "Adobe", "domain": "adobe.com"},
+        {"name": "Qualtrics", "domain": "qualtrics.com"},
+        {"name": "Booz Allen Hamilton", "domain": "boozallen.com"},
+        {"name": "Bank of America", "domain": "bankofamerica.com"},
+        {"name": "Northrop Grumman", "domain": "northropgrumman.com"}
+      ]
+    },
+    "reit-managed-office-parks": {
+      "display": "REIT-Managed Multi-Tenant Office Parks",
+      "persona": "property-management-director",
+      "industries": [
+        "Real Estate Investment Trusts (Office)",
+        "Commercial Property Management",
+        "Mixed-Use Commercial Development"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC", "TX"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "Tenant experience platform (HqO, Equiem, VTS, Building Engines)",
+        "COI and vendor compliance management (NetVendor, BCS)",
+        "Property management software (Yardi, MRI, RealPage)",
+        "Active tenant amenity programming visible on property website or LinkedIn",
+        "Preferred vendor / approved supplier program publicly referenced"
+      ],
+      "intent_signals": [
+        "Job posting for Tenant Experience Manager or Tenant Engagement Coordinator at a BN-territory property",
+        "New Class A office park announced, opened, or repositioned in past 24 months in BN territory",
+        "RFP or vendor qualification for amenity services posted on procurement portal",
+        "Tenant satisfaction survey or NPS program announced",
+        "BOMA membership, award application, or event sponsorship",
+        "Property manager or tenant-experience staff active on BOMA or LinkedIn with amenity-programming content"
+      ],
+      "exclusions": [
+        "Class B and Class C properties not competing on amenity experience",
+        "Single-tenant owner-occupied buildings",
+        "Industrial / warehouse REITs",
+        "Residential REITs",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "BXP (Boston Properties)", "domain": "bxp.com"},
+        {"name": "Kilroy Realty Corporation", "domain": "kilroyrealty.com"},
+        {"name": "Cousins Properties", "domain": "cousins.com"},
+        {"name": "Brandywine Realty Trust", "domain": "brandywinerealty.com"},
+        {"name": "Cushman & Wakefield (property management)", "domain": "cushmanwakefield.com"},
+        {"name": "JLL Property Management", "domain": "jll.com"},
+        {"name": "CBRE Property Management", "domain": "cbre.com"},
+        {"name": "Irvine Company Office Properties", "domain": "irvinecompany.com"},
+        {"name": "Hines", "domain": "hines.com"}
+      ]
+    }
+  }
+}

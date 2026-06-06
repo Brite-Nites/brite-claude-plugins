@@ -1,10 +1,85 @@
-# Canonical entry for the Casinos vertical (skeleton).
-# Source: handbook@main:marketing/go-to-market/verticals/casinos/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Canonical entry for the Casinos vertical.
+# Source: plugins/marketing/references/vertical-playbooks/casinos.md
+#         (BC-5930 R-6 research grounding 2026-04-23; cited sources inline in playbook).
+# Status: draft — personas + offers backfilled; no Active engagements yet.
+# History:
+#   2026-06-05 — personas+offers backfilled from references/vertical-playbooks/casinos.md
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - VP Non-Gaming Revenue: unverified as a formal title at in-scope tier per BC-5930 R-6
+#     title-prevalence research; named at Caesars/MGM/Wynn flagships only (out-of-scope).
+#   - Marketing Director / Events Director: explicitly excluded per playbook § Buyer personas
+#     + voice rule #2 — wrong P&L (comp-offer/loyalty-promotion owner, not non-gaming
+#     infrastructure). NOTE: the handbook README (Brite Labs motion) uses Marketing/Events
+#     Director as PRIMARY — see clarifications_needed in icp/casinos.json for the
+#     Labs-vs-Nites motion divergence flag.
+#   - Facilities Director: excluded per playbook — buys capex energy retrofits, not
+#     non-gaming retention programming.
+#   - Tribal Board Representative: not reachable via outbound; access via GM channel only.
+#   - Corporate Procurement / VP Partnerships: corporate-gate persona; champion-referral only.
 slug: casinos
 display: "Casinos"
 playbook_path: "marketing/go-to-market/verticals/casinos/README.md"
-personas: []
-offers: []
+personas:
+  - slug: regional-commercial-gm
+    display: "General Manager / VP Casino Operations (Regional Commercial)"
+    titles:
+      - "General Manager"
+      - "VP Casino Operations"
+      - "VP of Operations"
+      - "Assistant General Manager"
+      - "Property General Manager"
+      - "Regional Vice President of Operations"
+  - slug: tribal-casino-gm
+    display: "Casino GM / Executive Officer Gaming & Hospitality (Tribal Class III)"
+    titles:
+      - "General Manager"
+      - "Casino General Manager"
+      - "Executive Officer Gaming & Hospitality"
+      - "VP of Gaming Operations"
+      - "Chief Operating Officer"
+  - slug: racino-director
+    display: "Director of Casino Operations (Racinos)"
+    titles:
+      - "Director of Casino Operations"
+      - "Casino General Manager"
+      - "VP of Casino Operations"
+      - "Director of Gaming Operations"
+  - slug: regional-vp-riverboat
+    display: "Regional VP of Operations (Riverboat / Multi-Property)"
+    titles:
+      - "Regional Vice President of Operations"
+      - "Regional VP"
+      - "Senior Vice President of Operations"
+      - "Vice President Regional Operations"
+      - "Regional General Manager"
+  - slug: fb-director
+    display: "Director of Food & Beverage"
+    titles:
+      - "Director of Food & Beverage"
+      - "VP of Food & Beverage"
+      - "Food & Beverage Director"
+      - "Director of F&B Operations"
+      - "Director of Restaurants"
+      - "Director of Hospitality"
+offers:
+  - slug: pilot-zone
+    display: "Pilot Zone"
+    status: draft
+    posture: pilot
+    target_personas: [regional-commercial-gm, tribal-casino-gm, racino-director, fb-director]
+  - slug: retention-infrastructure-subscription
+    display: "Retention Infrastructure Subscription"
+    status: draft
+    posture: risk-reversal
+    target_personas: [regional-commercial-gm, tribal-casino-gm, regional-vp-riverboat, fb-director]
+  - slug: production-finance
+    display: "Production Finance"
+    status: draft
+    posture: risk-reversal
+    target_personas: [tribal-casino-gm, regional-commercial-gm, regional-vp-riverboat]
+  - slug: comp-multiplier
+    display: "Comp-Multiplier (candidate — pending productization)"
+    status: draft
+    posture: risk-reversal
+    target_personas: [regional-commercial-gm, regional-vp-riverboat]

@@ -1,10 +1,74 @@
-# Canonical entry for the Ski Resorts vertical (skeleton).
-# Source: handbook@main:marketing/go-to-market/verticals/ski-resorts/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Canonical entry for the Ski Resorts vertical.
+# Source: plugins/marketing/references/vertical-playbooks/ski-resorts.md (BC-5922 R-8 research grounding).
+# Status: draft — no Active engagements yet.
+# History:
+#   2026-06-05 — personas+offers backfilled from references/vertical-playbooks/ski-resorts.md
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - director-of-mountain-operations / lift-operations / ski-patrol: explicitly excluded by
+#     playbook § Buyer personas ("Brite's zone is the village — not lift-line or on-mountain
+#     operations"); named as the fastest way to lose trust at a ski-resort prospect.
+#   - director-of-events-programming: present in handbook README but not a first-call
+#     list-building target per the playbook; retained as a downstream coalition contact.
 slug: ski-resorts
 display: "Ski Resorts"
 playbook_path: "marketing/go-to-market/verticals/ski-resorts/README.md"
-personas: []
-offers: []
+personas:
+  - slug: general-manager
+    display: "General Manager"
+    titles:
+      - "General Manager"
+      - "Resort Manager"
+      - "Resort General Manager"
+      - "President & General Manager"
+      - "VP of Operations"
+      - "Managing Director"
+  - slug: fb-director
+    display: "F&B Director"
+    titles:
+      - "Director of Food & Beverage"
+      - "F&B Director"
+      - "Director of Food and Beverage"
+      - "Vice President of Food & Beverage"
+      - "Food & Beverage Manager"
+  - slug: director-sales-marketing
+    display: "Director of Sales & Marketing"
+    titles:
+      - "Director of Sales & Marketing"
+      - "Director of Marketing"
+      - "Director of Sales & Guest Services"
+      - "VP of Marketing"
+      - "Brand Director"
+  - slug: owner-operator
+    display: "Owner-Operator"
+    titles:
+      - "Owner"
+      - "President"
+      - "CEO"
+      - "Managing Partner"
+      - "Principal"
+      - "Founder"
+  - slug: sr-director-village-ops
+    display: "Sr. Director of Village Operations"
+    titles:
+      - "Senior Director of Village Operations"
+      - "Director of Village Operations"
+      - "Senior Director of Base Area Operations"
+      - "Director of Base Area and Village Operations"
+      - "Director of Guest Experience"
+offers:
+  - slug: village-production-finance
+    display: "Village Production Finance"
+    status: draft
+    posture: pilot
+    target_personas: [general-manager, fb-director, owner-operator]
+  - slug: village-pilot-zone
+    display: "Village Pilot Zone"
+    status: draft
+    posture: risk-reversal
+    target_personas: [general-manager, fb-director]
+  - slug: village-backbone-seasonal-dress
+    display: "Village Backbone, Seasonal Dress"
+    status: draft
+    posture: pilot
+    target_personas: [sr-director-village-ops, owner-operator, general-manager]

@@ -1,10 +1,80 @@
-# Canonical entry for the Wineries / Vineyards / Breweries vertical (skeleton).
+# Canonical entry for the Wineries / Vineyards / Breweries vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/wineries-breweries/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+#         + offers/ subdirectory (six draft offer files verified).
+# Status (handbook taxonomy): Future — not ready for outreach; no Active offers yet.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - Tasting Room Manager: operational influencer, not a first-call list-building target.
+#   - Winemaker / Head Brewer: production-side influencer, not decision-maker.
+#   - Wine Club Director / Membership Manager: secondary buyer — promote to persona once the
+#     vertical moves to Active and the club-program offer is validated.
+# Thin-source flag: vertical is marked Future/[NEEDS RESEARCH]; firmographics, geo overlap,
+#   and budget ranges are hypotheses inferred from README + offer pages.
 slug: wineries-breweries
 display: "Wineries / Vineyards / Breweries"
 playbook_path: "marketing/go-to-market/verticals/wineries-breweries/README.md"
-personas: []
-offers: []
+personas:
+  - slug: owner-operator
+    display: "Owner / Operator"
+    titles:
+      - "Owner"
+      - "Proprietor"
+      - "Co-Owner"
+      - "Founder"
+      - "Owner-Operator"
+      - "Managing Owner"
+  - slug: general-manager
+    display: "General Manager"
+    titles:
+      - "General Manager"
+      - "Property Manager"
+      - "Operations Manager"
+      - "Managing Director"
+  - slug: director-of-events-hospitality
+    display: "Director of Events / Hospitality"
+    titles:
+      - "Director of Events"
+      - "Director of Hospitality"
+      - "Events Director"
+      - "Director of Private Events"
+      - "Director of Wedding & Events"
+      - "Hospitality Director"
+offers:
+  - slug: holiday-tasting-room-shoulder-season
+    display: "Holiday Tasting Room & Shoulder-Season Activation"
+    status: draft
+    posture: risk-reversal
+    target_personas: [owner-operator, general-manager, director-of-events-hospitality]
+    prose_path: "marketing/go-to-market/verticals/wineries-breweries/offers/holiday-tasting-room-shoulder-season.md"
+  - slug: tasting-room-holiday-package
+    display: "Tasting Room & Patio Holiday Package"
+    status: draft
+    posture: pilot
+    target_personas: [owner-operator, general-manager]
+    prose_path: "marketing/go-to-market/verticals/wineries-breweries/offers/tasting-room-holiday-package.md"
+  - slug: barrel-room-private-event-lighting
+    display: "Barrel Room Private-Event Lighting"
+    status: draft
+    posture: pilot
+    target_personas: [owner-operator, director-of-events-hospitality]
+    prose_path: "marketing/go-to-market/verticals/wineries-breweries/offers/barrel-room-private-event-lighting.md"
+  - slug: vineyard-arrival-string-lights
+    display: "Vineyard Arrival & Patio Permanent String Lighting"
+    status: draft
+    posture: free-asset
+    target_personas: [owner-operator]
+    prose_path: "marketing/go-to-market/verticals/wineries-breweries/offers/vineyard-arrival-string-lights.md"
+  - slug: harvest-festival-fall-activation
+    display: "Harvest Festival & Oktoberfest Activation"
+    status: draft
+    posture: pilot
+    target_personas: [owner-operator, director-of-events-hospitality]
+    prose_path: "marketing/go-to-market/verticals/wineries-breweries/offers/harvest-festival-fall-activation.md"
+  - slug: wine-club-shipment-launch-event
+    display: "Wine Club Shipment & Beer-Club Release Night Activation"
+    status: draft
+    posture: risk-reversal
+    target_personas: [owner-operator, director-of-events-hospitality]
+    prose_path: "marketing/go-to-market/verticals/wineries-breweries/offers/wine-club-shipment-launch-event.md"

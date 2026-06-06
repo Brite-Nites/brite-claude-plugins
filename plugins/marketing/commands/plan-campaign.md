@@ -99,6 +99,7 @@ Parse the invocation arguments. Required flags: `--vertical`, `--persona`, `--of
 | `--owner-email` | no | Resolve via the chain in Step 4. |
 | `--eb-workspace` | no | Resolve from entity per the map in Step 4. |
 | `--theme` | conditional | Required if `--entity=cross-entity`. Otherwise ignored. |
+| `--segment` | no | Discovery-ICP segment(s) from `data/canonicals/icp/{vertical}.json` (repeatable or comma-list). Resolution per Step 2.5: single segment in file → auto-pick; multiple → AskUserQuestion (multiSelect); stub file → skipped with a preview/handoff warning. |
 | `--situation-mining` | no | Enable optional sub-issue #9 (Labs-only — Step 10 enforces). |
 | `--creative-angles` | no | Enable optional sub-issue #10. |
 | `--dry-run` | no | Print the full preview at Step 5 and exit without writing anything. |
@@ -132,6 +133,7 @@ Before any downstream step, validate every operator-controlled flag value. These
 | `--owner-email` | If provided, matches `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` | `ERROR: --owner-email failed regex; got '<value>'` |
 | `--vertical` / `--persona` / `--offer` | Strict kebab-case `^[a-z0-9]+(-[a-z0-9]+)*$` (canonicality membership checked in Step 2; this is the SHAPE check) | `ERROR: --<flag> must be strict kebab-case; got '<value>'` |
 | `--eb-workspace` | If provided, must be one of `emailbison-personal` / `emailbison-b2b` | `ERROR: --eb-workspace must be emailbison-personal or emailbison-b2b; got '<value>'` |
+| `--segment` | Each value strict kebab-case `^[a-z0-9]+(-[a-z0-9]+)*$` (membership in the vertical's icp file checked in Step 2.5; this is the SHAPE check — segment names flow into the Step 7 copy path `tam/{slug}/{segment}/icp.json`) | `ERROR: --segment must be strict kebab-case; got '<value>'. Path-traversal guard.` |
 
 The validator runs unconditionally, regardless of interactive vs non-interactive mode. Interactive prompts in Step 1 use AskUserQuestion which constrains the operator's input to a closed set + Other; the regex on the Other free-text path is the only place where prompt output could otherwise leak into downstream interpolation.
 
@@ -199,6 +201,39 @@ offers[<--offer>].target_personas via PR.
 The schema's `additionalProperties:false` (enforced by `scripts/lint_canonicals.py`) guarantees the file shape is well-formed; this runtime check covers the SEMANTIC constraint that a campaign's persona-offer pairing match the canonical's targeting model.
 
 Empty or absent `target_personas` = "all personas in this vertical are valid for this offer" — skip the membership check.
+
+### 2.5 — ICP-source resolution (Discovery ICP, ADR-032)
+
+Resolve the campaign's Discovery ICP from the single canonical source:
+`plugins/marketing/data/canonicals/icp/{vertical}.json`. This is the
+discovery half of the ICP (industries + geo + size band + signals — "which
+companies"); the `{vertical}.yaml` consumed in 2.1–2.4 is the contact half
+(personas + titles — "who at them"). See
+[`references/campaign-file-dependencies.md`](../references/campaign-file-dependencies.md)
+for the full dependency map. Advisory — this step NEVER hard-fails.
+
+1. **Read the file.** It exists for every registered vertical
+   (`lint_canonicals.py` ERROR-enforces presence), so a missing file means a
+   stale checkout or an unregistered vertical — report and continue.
+2. **Classify**: `segments` non-empty → **ready**; `segments` empty →
+   **stub** (`clarifications_needed` says what an operator must author).
+3. **Resolve segments** (ready files only):
+   - `--segment` provided (repeatable / comma-list): each value must be a key
+     in `segments` — on miss, list the valid keys and re-prompt.
+   - One segment in the file → auto-pick silently.
+   - Multiple segments, no flag → `AskUserQuestion` (multiSelect) listing
+     `segments[*].display` + persona pairing. A campaign may target multiple
+     account universes — each picked segment produces its own criteria copy
+     (Step 7) and its own tam run downstream.
+4. **Stub path**: skip segment resolution and the Step 7 copy entirely.
+   Surface in the Step 5 preview and § 11.3 handoff:
+   `ICP source: STUB — author segments in data/canonicals/icp/{vertical}.json before list-build`.
+5. **`docs/marketing-context.md` check** (Input 1 of the dependency map):
+   if absent, print ONE advisory —
+   `WARN: docs/marketing-context.md missing — entity context degraded for tam-mapping/list-building. Run /marketing:product-marketing-context (once; benefits all campaigns).`
+   Do not block; `--entity` covers this scaffold.
+
+Record `{icp_status: ready|stub, segments: [chosen...]}` for Steps 5, 7, and 11.
 
 ---
 
@@ -348,6 +383,8 @@ Print the operator-readable plan. Use this format (or a close variant — readab
   Launch date:    <launch-date>        (default = first day of month if not provided)
   EB workspace:   <eb-workspace>       (entity-mapped)
   Owner email:    <owner-email>        (resolved via <method>: get_username | --owner-email | AskUserQuestion)
+  ICP source:     <ready (segments: <seg1>, <seg2>) | STUB — author segments in data/canonicals/icp/<vertical>.json before list-build>
+                  (Discovery ICP per Step 2.5 / ADR-032; per-segment criteria copies written at Step 7)
 
   Plugin manifest:
     Path:         docs/campaigns/<entity>/<slug>/manifest.json
@@ -437,13 +474,24 @@ Then `Write` `docs/campaigns/<entity>/<slug>/manifest.json` with the FULL schema
     "launched_at": null
   },
   "created_at": "<ISO 8601 UTC timestamp from `date -u +%Y-%m-%dT%H:%M:%SZ`>",
-  "scaffolded_by": "/marketing:plan-campaign"
+  "scaffolded_by": "/marketing:plan-campaign",
+  "segments": ["<segment-1>", "<segment-2>"]
 }
 ```
 
 Initial state: `linear.milestone_id` and `salesforce.campaign_id` are `null`. These get backfilled in Step 8a + Step 8b respectively via `Read` → mutate JSON → `Write`.
 
+`segments` (optional, ADR-032) records the Discovery-ICP segments chosen at Step 2.5 — omit the key entirely when the icp file was a stub (absent ≠ empty; downstream consumers distinguish "no segments chosen" from "scaffolded pre-ADR-032").
+
 For cross-entity campaigns, `vertical` / `persona` / `offer` are still recorded for the (vertical, persona, offer) triple if provided (cross-entity campaigns may still have them); otherwise set to `null` (NOT empty string — empty string would break downstream parsers that distinguish "absent" from "empty").
+
+**Per-segment Discovery-ICP criteria copies** (ADR-032). For each segment chosen at Step 2.5 (skip entirely when the icp file was a stub): flatten the segment block from `plugins/marketing/data/canonicals/icp/<vertical>.json` to the criteria-file root (the block's own keys become the file's top-level keys — `display`/`persona`/`seed_accounts` ride along harmlessly; the `tam-map/*_client.py` scripts read keys by name) and `Write`:
+
+```
+docs/campaigns/<entity>/tam/<slug>/<segment>/icp.json
+```
+
+Uniform per-segment subdirs even for single-segment campaigns — each subdir doubles as that segment's tam-mapping `--output-dir`, so tam-mapping's file-existence resume detection works per segment unchanged. Campaign-specific narrowing (pruning a seed mid-deal, tightening geo) is edited in the COPY, never upstream in the canonical icp file.
 
 ### 7.1 — Confirm filesystem state
 
@@ -451,6 +499,7 @@ Run `Bash`:
 
 ```bash
 ls -la "docs/campaigns/<entity>/<slug>/" && cat "docs/campaigns/<entity>/<slug>/manifest.json" | head -5
+ls "docs/campaigns/<entity>/tam/<slug>/"*/icp.json 2>/dev/null  # per-segment criteria copies (absent when ICP source was stub)
 ```
 
 To prove the write landed. Do NOT `git add` or `git commit` — that's `/workflows:ship`.
@@ -723,6 +772,114 @@ Rationale: gives the marketing operator a single "campaign" issue to track in th
 
 Explicit rollback guidance prevents the orchestrator from leaving an orphan milestone + manifest hanging in inconsistent state.
 
+### 9.1 — Sub-issue specs
+
+For each row below, the description ALWAYS includes: (a) the handbook citation, (b) the expected plugin command, (c) the sub-issue role (1-2 sentences).
+
+#### #1 — Brief approved (gate)
+
+- **Title**: `Brief approved`
+- **Description**:
+  > Marketing brief author finalizes the brief in this milestone's description. GTM lead reviewer approves. Closes when the brief is approved.
+  >
+  > **Handbook citation**: `handbook@main:marketing/go-to-market/templates/campaign-brief-template.md`
+  > **Sub-issue role**: gate — blocks all downstream work. Per [D5](../../docs/decisions/) the brief template is 8 sections; the marketing brief author owns sections 2-8 content.
+  > **Expected plugin command**: none directly; brief is edited in Linear milestone description.
+- **dueDate**: `<launch-date> - 21 days` (T-21d per README § 3.6.5).
+- **blocks**: #2, #3, #4, #5, #6, #7, #8 (and #9, #10 if created)
+
+#### #2 — Target list built
+
+- **Title**: `Target list built`
+- **Description**:
+  > Outbound operator builds the enriched lead CSV for this campaign — typically via `/marketing:list-building` (which assumes a dbt audience view exists for this canonical persona+offer combo) OR `/marketing:tam-mapping` (if the TAM doesn't exist yet — Phase 1 source discovery → Phase 7 enrichment hand-off).
+  >
+  > **Discovery ICP**: <per Step 2.5 — `ready`: one line per chosen segment: `criteria-file docs/campaigns/<entity>/tam/<slug>/<segment>/icp.json (persona: <segment.persona>)` — run tam-mapping once per segment with that `--criteria-file` + `--output-dir`. `stub`: `STUB — author segments in plugins/marketing/data/canonicals/icp/<vertical>.json before list-build (see clarifications_needed)`.>
+  >
+  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/list-building.md`
+  > **Sub-issue role**: produces the enriched lead CSV that feeds Phase 1 of `/marketing:launch-campaign` at sub-issue #6.
+  > **Expected plugin command**: `/marketing:list-building` or `/marketing:tam-mapping`.
+- **dueDate**: `<launch-date> - 14 days`
+- **blockedBy**: [#1]
+- **blocks**: [#3]
+
+#### #3 — Copy written + approved
+
+- **Title**: `Copy written + approved`
+- **Description**:
+  > Marketing brief author runs `/marketing:email-copywriting` to produce the BC-5825 JSON copy artifact (step_1 + step_2 + custom_variables). GTM lead reviewer approves the rendered copy before Phase 1 of launch-campaign.
+  >
+  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/email-copywriting.md`
+  > **Sub-issue role**: produces the copy artifact that feeds Phase 1 of `/marketing:launch-campaign` at sub-issue #6.
+  > **Expected plugin command**: `/marketing:email-copywriting`.
+- **dueDate**: `<launch-date> - 10 days`
+- **blockedBy**: [#1] (NOT #2 — copy and target list can parallel)
+- **blocks**: [#4]
+
+#### #4 — Salesforce setup
+
+- **Title**: `Salesforce setup`
+- **Description**:
+  > Verify the SF Campaign record created at scaffold time (σ3 / `/revops:create-sf-campaign`). Populate audience members (CampaignMember records linked from EB lead suppress export). Wire Opportunity links if the offer is a pilot/risk-reversal posture.
+  >
+  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/sf-campaign-setup.md`
+  > **Sub-issue role**: SF reconciliation post-σ3 auto-create. If auto-create soft-failed at scaffold, manual `/revops:create-sf-campaign` re-run lands here.
+  > **Expected plugin command**: `/revops:create-sf-campaign` (reconciliation) + manual SF UI work.
+- **dueDate**: `<launch-date> - 7 days`
+- **blockedBy**: [#3]
+- **blocks**: [#5]
+
+#### #5 — Pre-launch QA
+
+- **Title**: `Pre-launch QA`
+- **Description**:
+  > Run the launch-campaign pre-flight checklist: copy renders correctly with sample leads, custom variables resolve, sender warm-up status, EB workspace health, SF Campaign linkage.
+  >
+  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/pre-launch-qa.md`
+  > **Sub-issue role**: catches launch-blocking issues before sub-issue #6 fires sending.
+  > **Expected plugin command**: `/marketing:launch-campaign --preview` (dry-run mode) + manual review.
+- **dueDate**: `<launch-date> - 3 days`
+- **blockedBy**: [#4]
+- **blocks**: [#6]
+
+#### #6 — Launch executed
+
+- **Title**: `Launch executed`
+- **Description**:
+  > Outbound operator runs `/marketing:launch-campaign` (Phase 11 ACTIVATE) to create + activate the EB campaign. Single EB campaign per [D1] (no sender splits).
+  >
+  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/launch.md`
+  > **Sub-issue role**: the moment the campaign goes live. EB campaign_id flows back into manifest.email_bison.campaign_id at this point.
+  > **Expected plugin command**: `/marketing:launch-campaign --activate` (consumes copy artifact from #3 + enriched CSV from #2).
+- **dueDate**: `<launch-date>`
+- **blockedBy**: [#5]
+- **blocks**: [#7]
+
+#### #7 — Active management — weekly reviews
+
+- **Title**: `Active management — weekly reviews`
+- **Description**:
+  > Outbound operator runs `/marketing:campaign-analysis` weekly during the active sending window. GTM lead reviews. Adjustments (pause / unpause / sender swaps) per the analysis.
+  >
+  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/active-management.md`
+  > **Sub-issue role**: weekly cadence during the ~4-week active window. Pause/kill decisions land here via `/marketing:sync-campaign-status` (T2-FA / BC-8752).
+  > **Expected plugin command**: `/marketing:campaign-analysis` weekly; `/marketing:sync-campaign-status` on status transitions.
+- **dueDate**: `<launch-date> + 28 days` (T+28d)
+- **blockedBy**: [#6]
+- **blocks**: [#8]
+
+#### #8 — Campaign closed + debrief
+
+- **Title**: `Campaign closed + debrief`
+- **Description**:
+  > Run `/marketing:campaign-debrief` to produce the learnings.md artifact and update the MSPA results log. Linear status flips to `completed` (or `killed`) which triggers σ3 status-sync (BC-8752) to update SF Campaign.
+  >
+  > **Handbook citation**: `handbook@main:marketing/go-to-market/processes/debrief.md`
+  > **Sub-issue role**: terminal step. Closes the campaign loop into the compounding MSPA flywheel.
+  > **Expected plugin command**: `/marketing:campaign-debrief`.
+- **dueDate**: `<launch-date> + 40 days` (T+40d)
+- **blockedBy**: [#7]
+- **blocks**: none (terminal)
 ### 9.1 — Sub-issue specs (read + stamp from the reference file)
 
 The per-phase sub-issue specs live in **`plugins/marketing/references/campaign-sub-issue-templates.md`** — extracted in BC-12564 so they are maintained in one place and contract-tested as the source of truth, rather than inlined here. `Read` that file once and stamp each entry under its `## Standard sub-issues` heading, in `id` order. Each sub-issue section is one fenced `yaml` block (`id`, `title`, `dueDate_offset_days`, `blockedBy`, `optional`, `labs_gated`) followed by a **Description** blockquote.
@@ -820,6 +977,7 @@ Append:
 End with:
 
 > Next step: marketing brief author opens `<milestone-url>` and finalizes the brief (sub-issue #1).
+> Discovery ICP: <`ready` — list each chosen segment's criteria-file path `docs/campaigns/<entity>/tam/<slug>/<segment>/icp.json`; the list-build owner runs tam-mapping once per segment | `STUB — author segments in plugins/marketing/data/canonicals/icp/<vertical>.json before list-build starts`>.
 
 ---
 

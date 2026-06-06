@@ -1,10 +1,67 @@
-# Canonical entry for the Historic Sites / Landmarks vertical (skeleton).
+# Canonical entry for the Historic Sites / Landmarks vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/historic-sites/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Future — README flagged "[NEEDS RESEARCH]" throughout; no
+#   validated ICP firmographics, market-size data, or closed deals; offers are draft.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README and offers/
+#                subdirectory (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - Preservation Officer: influencer/gatekeeper, not a first-call outreach target; gates
+#     the deal but is not the champion or economic buyer.
+#   - Board of Trustees / Government Authority: approver tier, not reachable via cold outbound.
+# Thin-source flag: all ICP firmographic ranges (budget, visitor counts, geography) are
+#   marked [NEEDS RESEARCH] in the source — treat downstream targeting as hypothesis-grade.
 slug: historic-sites
 display: "Historic Sites / Landmarks"
 playbook_path: "marketing/go-to-market/verticals/historic-sites/README.md"
-personas: []
-offers: []
+personas:
+  - slug: executive-director
+    display: "Executive Director / Site Director"
+    titles:
+      - "Executive Director"
+      - "Site Director"
+      - "President and CEO"
+      - "Chief Executive Officer"
+      - "Director of Operations"
+  - slug: director-of-visitor-experience
+    display: "Director of Visitor Experience / Programs"
+    titles:
+      - "Director of Visitor Experience"
+      - "Director of Programs"
+      - "Director of Programming"
+      - "Director of Tourism"
+      - "Director of Education and Visitor Experience"
+      - "Vice President of Programs"
+  - slug: director-of-development
+    display: "Director of Development"
+    titles:
+      - "Director of Development"
+      - "Vice President of Development"
+      - "Chief Development Officer"
+      - "Director of Philanthropy"
+      - "Director of Advancement"
+offers:
+  - slug: after-dark-heritage-activation
+    display: "After-Dark Heritage Activation"
+    status: draft
+    posture: risk-reversal
+    target_personas: [executive-director, director-of-visitor-experience, director-of-development]
+    prose_path: "marketing/go-to-market/verticals/historic-sites/offers/after-dark-heritage-activation.md"
+  - slug: heritage-week-illumination
+    display: "Heritage Week Illumination"
+    status: draft
+    posture: pilot
+    target_personas: [executive-director, director-of-visitor-experience]
+    prose_path: "marketing/go-to-market/verticals/historic-sites/offers/heritage-week-illumination.md"
+  - slug: seasonal-tourism-driver
+    display: "Seasonal Tourism Driver"
+    status: draft
+    posture: pilot
+    target_personas: [executive-director, director-of-visitor-experience]
+    prose_path: "marketing/go-to-market/verticals/historic-sites/offers/seasonal-tourism-driver.md"
+  - slug: preservation-safe-permanent-architectural
+    display: "Preservation-Safe Permanent Architectural Lighting"
+    status: draft
+    posture: knowledge
+    target_personas: [executive-director]
+    prose_path: "marketing/go-to-market/verticals/historic-sites/offers/preservation-safe-permanent-architectural.md"

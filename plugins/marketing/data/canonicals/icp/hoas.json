@@ -1,0 +1,158 @@
+{
+  "vertical": "hoas",
+  "source": "marketing/go-to-market/verticals/hoas/README.md",
+  "clarifications_needed": [
+    "size_band uses employee count as a proxy for communities-under-management or HOA household count — no employee-count data exists in the source; operator redline with real thresholds (e.g., management-company portfolio ≥5 communities, HOA ≥150 homes)",
+    "geo.regions defaults to the 11-territory BN set drawn from the README (UT/SoCal/NorCal mapped to CA/UT, DMV to DC/VA/MD, plus AZ/PA/CT/NY/NJ/CO/FL) — confirm whether sub-state precision matters for list-building and whether WA/NC/TX belong",
+    "seed_accounts for the self-managed segment are name-only look-alike exemplars inferred from the README's named-client signals (La Gorce, Ventana HOA, Sea to Ski HOA) — domains intentionally omitted where unverifiable; operator to validate or replace with confirmed accounts before campaign launch",
+    "developing-communities segment is explicitly 'emergent ICP — thin coverage' per the source sub-playbook; gate this segment from active prospecting until at least one signed developer deal is documented"
+  ],
+  "segments": {
+    "affluent-managed-communities": {
+      "display": "Affluent Managed Communities",
+      "persona": "regional-property-manager",
+      "industries": [
+        "property management",
+        "community association management",
+        "real estate services",
+        "residential HOA management",
+        "facilities management"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "CA", "UT", "DC", "VA", "MD", "AZ", "PA", "CT", "NY", "NJ", "CO"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 50,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Management company lists residential communities on their website with average home values $500K+",
+        "Regional Director or VP Operations title visible on LinkedIn at a national/regional property management company",
+        "Company portfolio page shows 5+ HOA communities in a BN Tier-1 or Tier-2 territory",
+        "CAI (Community Associations Institute) chapter membership or event sponsorship listed on company site",
+        "Job postings for Community Manager or CAM roles in target territories (signals active portfolio growth)",
+        "Company website mentions gated, resort-style, or master-planned community management as a specialty",
+        "Preferred vendor list or vendor onboarding portal visible on company site"
+      ],
+      "exclusions": [
+        "Commercial property management companies (office, retail, industrial portfolios only)",
+        "Management companies with fewer than 5 communities in BN territories",
+        "Self-storage or single-family rental operators",
+        "Existing Brite Nites customers already on preferred-vendor list"
+      ],
+      "seed_accounts": [
+        {"name": "FirstService Residential", "domain": "fsresidential.com"},
+        {"name": "Associa", "domain": "associaonline.com"},
+        {"name": "KW Property Management & Consulting", "domain": "kwpmc.com"},
+        {"name": "Leland Management", "domain": "lelandmanagement.com"},
+        {"name": "Castle Group", "domain": "castlegroup.com"},
+        {"name": "Seabreeze Management Company", "domain": "seabreezemgmt.com"},
+        {"name": "Keystone Pacific Property Management", "domain": "keystonepacific.com"},
+        {"name": "RealManage", "domain": "realmanage.com"},
+        {"name": "Sentry Management", "domain": "sentrymgt.com"}
+      ]
+    },
+    "affluent-self-managed-communities": {
+      "display": "Affluent Self-Managed Communities",
+      "persona": "board-president",
+      "industries": [
+        "homeowner associations",
+        "residential community associations",
+        "planned unit developments",
+        "condominium associations",
+        "gated residential communities"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "CA", "UT", "DC", "VA", "MD", "AZ", "PA", "CT", "NY", "NJ", "CO"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "HOA website or community Facebook group shows self-managed or small local management company (no national PM brand)",
+        "Zillow or county records indicate neighborhood median home value $350K+ with active HOA dues $150+/month",
+        "Google Maps or street view shows 3+ distinct common-area lighting zones (entrances, clubhouse, secondary gates)",
+        "Neighborhood has active community events calendar or holiday decoration photos from prior years (signals aesthetics investment)",
+        "Board President or Board Secretary contact listed on HOA website or community portal",
+        "Community previously ran volunteer holiday light installation (DIY history = conversion opportunity)",
+        "Adjacent communities are existing Brite Nites clients (referral-flywheel proximity signal)",
+        "Board meeting agendas or minutes (where publicly visible) discuss landscaping or amenity improvement budget items"
+      ],
+      "exclusions": [
+        "Communities managed by a national or regional management company (route to affluent-managed-communities instead)",
+        "Communities with average home values below $350K",
+        "Communities with fewer than 3 distinct common-area lighting zones",
+        "Budget communities signaling dues below $150/month or active cost-cutting campaigns",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "La Gorce Community (Miami, FL)"},
+        {"name": "Ventana HOA (Utah)"},
+        {"name": "Sea to Ski HOA"},
+        {"name": "Belmont Alpine Ski Properties HOA"},
+        {"name": "Coto de Caza Community Association (CA)", "domain": "cotodecaza.com"},
+        {"name": "Promontory (Park City, UT)", "domain": "promontoryclub.com"},
+        {"name": "Cascades Community Association (Sterling, VA)"}
+      ]
+    },
+    "developing-communities": {
+      "display": "Developing Communities",
+      "persona": "developer-marketing-director",
+      "industries": [
+        "residential real estate development",
+        "master-planned community development",
+        "homebuilding",
+        "land development",
+        "mixed-use residential development"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "CA", "UT", "DC", "VA", "MD", "AZ", "CO"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 25,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Developer LinkedIn page or website lists active residential subdivision or master-planned community projects in BN Tier-1 territories",
+        "Marketing Director or VP Marketing title visible at a residential developer with active community launches",
+        "Developer is advertising new home sales (model home grand-opening, sales office launch) in target territories",
+        "Target home prices in the development are $500K+ (aligns with post-handover affluent-HOA filter)",
+        "Developer portfolio shows multiple active projects in the same Tier-1 territory (portfolio opportunity signal)",
+        "Job postings for Sales Office Manager or Community Marketing roles signal active grand-opening phase",
+        "Developer's amenity plan or marketing materials reference common-area curb appeal as a sales differentiator"
+      ],
+      "exclusions": [
+        "Affordable housing developers or projects with target home prices below $500K",
+        "Commercial or mixed-use developers with no residential HOA formation planned",
+        "Developers in Tier-2-only territories where BN cannot support multi-year post-handover continuity",
+        "Communities already past HOA handover (route to managed or self-managed segments instead)",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Toll Brothers", "domain": "tollbrothers.com"},
+        {"name": "Shea Homes", "domain": "sheahomes.com"},
+        {"name": "Taylor Morrison", "domain": "taylormorrison.com"},
+        {"name": "Landsea Homes", "domain": "landseahomes.com"},
+        {"name": "Forestar Group", "domain": "forestar.com"},
+        {"name": "Kolter Homes", "domain": "kolterhomes.com"},
+        {"name": "Brookfield Residential", "domain": "brookfieldresidential.com"}
+      ]
+    }
+  }
+}

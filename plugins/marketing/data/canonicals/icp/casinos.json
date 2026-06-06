@@ -1,0 +1,150 @@
+{
+  "vertical": "casinos",
+  "source": "plugins/marketing/references/vertical-playbooks/casinos.md",
+  "clarifications_needed": [
+    "LABS-vs-NITES MOTION DIVERGENCE: the handbook README describes a Brite Labs custom-fabrication / holiday-display motion where Marketing/Events Director is the PRIMARY first-call persona; the playbook describes a Brite Nites non-gaming-retention motion where that persona is explicitly EXCLUDED. Confirm which motion this canonical serves — persona slugs here follow the Nites playbook",
+    "TRIBAL CLASS III SCOPE vs TRIBES-RESERVATIONS VERTICAL: the playbook scopes tribal Class III casinos IN; a separate tribes-reservations canonical also exists. Confirm tribal casino prospects route to casinos (gaming-led) while non-gaming tribal facilities route to tribes-reservations; hotel-first hybrids route to hotels-resorts",
+    "OFFER F COMP-MULTIPLIER GATE: the playbook marks Offer F candidate-only pending measurement infrastructure, legal/accounting structure, and a reference property — included at status: draft for tracking only; confirm whether it should be deferred entirely",
+    "GEO SCOPE: the handbook README specifies a Brite Labs service territory (AZ, NorCal, CO, FL, East Coast, Seattle/WA; UT excluded — no tribal casinos); the Nites playbook is a national motion. Confirm which entity and geo scope this canonical targets — seed accounts span the full US per the playbook"
+  ],
+  "segments": {
+    "tribal-class-iii": {
+      "display": "Tribal Class III Casino Enterprises",
+      "persona": "tribal-casino-gm",
+      "industries": [
+        "Tribal Gaming",
+        "Indian Gaming — Class III",
+        "Native American Gaming Enterprises"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CT", "FL", "CA", "WA", "OK", "AZ", "NY", "MI", "MN", "CO", "MS", "NC", "WI"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 500,
+        "employee_max": null,
+        "revenue_min": 100000000,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Non-gaming expansion announcement or Tribal Council capital-plan approval",
+        "New Casino GM or Executive Officer Gaming & Hospitality appointment (months 3–9 window)",
+        "F&B concept launch or executive chef hire at multi-outlet property",
+        "Loyalty-tier-gated programming announcement",
+        "New hotel tower, pool complex, or resort phase opening in trailing 18 months",
+        "NABDI or EDA tribal-community grant award covering feasibility or capital study"
+      ],
+      "exclusions": [
+        "Strip and Boardwalk flagship properties (out-of-scope per BC-5930 directive; ceiling references only)",
+        "Properties generating under $100M annual GGR (below resort-tier threshold per NIGC segmentation)",
+        "Class II gaming-only operations (bingo hall / pull-tab profile, no hotel or F&B non-gaming zone)",
+        "Tribal enterprises where hotel branding leads over casino branding (route to hotels-resorts vertical)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Foxwoods Resort Casino (Mashantucket Pequot Tribal Nation)", "domain": "foxwoods.com"},
+        {"name": "Mohegan Sun (Mohegan Tribe of Connecticut)", "domain": "mohegansun.com"},
+        {"name": "Seminole Hard Rock Hotel & Casino Hollywood", "domain": "seminolehardrockhollywood.com"},
+        {"name": "Yaamava' Resort & Casino at San Manuel", "domain": "yaamava.com"},
+        {"name": "Choctaw Casinos & Resorts (Choctaw Nation of Oklahoma)", "domain": "choctawcasinos.com"},
+        {"name": "Pechanga Resort Casino", "domain": "pechanga.com"},
+        {"name": "Soaring Eagle Casino & Resort (Saginaw Chippewa Indian Tribe)", "domain": "soaringeaglecasino.com"},
+        {"name": "Turning Stone Resort Casino (Oneida Nation of New York)", "domain": "turningstone.com"},
+        {"name": "Tulalip Resort Casino (Tulalip Tribes)", "domain": "tulalipresortcasino.com"},
+        {"name": "Barona Resort & Casino", "domain": "barona.com"}
+      ]
+    },
+    "regional-commercial": {
+      "display": "Regional Commercial Casino Operators",
+      "persona": "regional-commercial-gm",
+      "industries": [
+        "Commercial Casinos",
+        "Regional Gaming",
+        "Integrated Resort — Casino-Led"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CO", "NJ", "PA", "MD", "VA", "NY", "IL", "MO", "IN", "LA", "MS", "WV", "OH", "NC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 200,
+        "employee_max": null,
+        "revenue_min": 50000000,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Non-gaming expansion or capital program announcement (new hotel tower, pool complex, F&B concept)",
+        "New General Manager or VP Casino Operations appointment (months 3–9 non-gaming audit window)",
+        "10-K or 10-Q non-gaming segment disclosure showing growing non-gaming revenue share",
+        "Loyalty-program launch or tier-restructuring announcement",
+        "New F&B outlet or entertainment venue opening at property",
+        "Post-opening window 6–18 months after major expansion completion"
+      ],
+      "exclusions": [
+        "Strip and Boardwalk flagship properties (Wynn, MGM Grand, Bellagio, Caesars Palace, Venetian — out-of-scope per BC-5930; ceiling references only)",
+        "Properties where centralized corporate procurement gates all vendor spend above property-GM authority",
+        "Gaming-floor-only properties with no dedicated F&B, hotel, or entertainment non-gaming footprint",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Monarch Casino Resort Spa Black Hawk", "domain": "monarchcasino.com"},
+        {"name": "Full House Resorts — Chamonix Casino Hotel (Cripple Creek, CO)", "domain": "chamonixco.com"},
+        {"name": "Full House Resorts — American Place (Waukegan, IL)", "domain": "americanplace.com"},
+        {"name": "Ameristar Casino Resort Spa St. Charles (Boyd Gaming)", "domain": "boydgaming.com"},
+        {"name": "Century Casinos", "domain": "cnty.com"},
+        {"name": "Golden Entertainment", "domain": "goldenentertainment.com"},
+        {"name": "MGM National Harbor", "domain": "mgmnationalharbor.com"},
+        {"name": "Hard Rock Hotel & Casino Atlantic City", "domain": "hardrockatlanticcity.com"},
+        {"name": "Rivers Casino Philadelphia", "domain": "riverscasinophiladelphia.com"}
+      ]
+    },
+    "racino-riverboat-multiproperty": {
+      "display": "Racinos and Riverboat / Multi-Property Regional Operators",
+      "persona": "racino-director",
+      "industries": [
+        "Racinos",
+        "Riverboat Casinos",
+        "Multi-Property Regional Gaming Operators"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["NY", "PA", "MD", "IL", "MO", "IN", "LA", "MS", "IA", "WV", "OH"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 100,
+        "employee_max": 1000,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Casino-side non-gaming expansion announcement (distinct from racing-side capital — racing-side is out-of-scope buyer)",
+        "New casino-side Director of Casino Operations appointment",
+        "F&B concept launch or lounge renovation at casino-side non-gaming zone",
+        "Multi-property portfolio-level non-gaming programming announcement from Regional VP",
+        "State gaming-commission approval for casino-side facility expansion"
+      ],
+      "exclusions": [
+        "Racing-side operations and racing-side buyers (Director of Racing / GM of Racing — out-of-scope per playbook)",
+        "Properties where casino-side non-gaming footprint is limited to gaming floor",
+        "Racino properties absorbed into enterprise flagship corporate procurement (e.g., Harrah's Philadelphia under Caesars)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Empire City Casino (Yonkers Raceway)", "domain": "empirecitycasino.com"},
+        {"name": "Parx Casino (Bensalem, PA)", "domain": "parxcasino.com"},
+        {"name": "Presque Isle Downs & Casino (Erie, PA)", "domain": "presqueisledowns.com"},
+        {"name": "Hollywood Casino at Penn National Race Course (Grantville, PA)", "domain": "pennentertainment.com"},
+        {"name": "Ameristar Casino Hotel East Chicago (Boyd Gaming)", "domain": "boydgaming.com"},
+        {"name": "Horseshoe Hammond (Caesars)", "domain": "caesars.com"},
+        {"name": "Boomtown Casino Hotel New Orleans (Boyd Gaming)", "domain": "boydgaming.com"},
+        {"name": "Argosy Casino Alton (Penn Entertainment)", "domain": "pennentertainment.com"}
+      ]
+    }
+  }
+}

@@ -79,6 +79,16 @@
 #   BN string-list item appearing in a locked dict-list (parser)     expect 1
 #   BO indented line outside any block (parser orphan)               expect 1
 #   BP manifest missing required key                                 expect 1
+#   BQ icp/{slug}.json missing for a manifest vertical (ADR-032)      expect 1
+#   BR icp stub-rule violation (empty segments + empty clarifs)       expect 1
+#   BS icp segment persona dangling cross-ref                         expect 1
+#   BT icp unknown top-level key                                      expect 1
+#   BU icp filename stem != inner vertical value                      expect 1
+#   BV icp file named after an alias (rename hint)                    expect 1
+#   BW icp invalid JSON                                               expect 1
+#   BX icp/ directory missing entirely                                expect 1
+#   BY orphan icp file (slug not canonical, not alias)                expect 1
+#   BZ icp segment name non-kebab                                     expect 1
 #
 # Usage:
 #   bash scripts/test_lint_canonicals.sh
@@ -171,6 +181,37 @@ display: "Bravo"
 personas: []
 offers: []
 YAML
+  # Discovery ICP files (ADR-032) — mandatory per vertical. alpha exercises
+  # the ready form (one segment, persona cross-ref); bravo the stub form.
+  mkdir -p "$dir/icp"
+  cat > "$dir/icp/alpha.json" <<'JSON'
+{
+  "vertical": "alpha",
+  "source": "marketing/go-to-market/verticals/alpha/README.md",
+  "clarifications_needed": [],
+  "segments": {
+    "core": {
+      "display": "Core",
+      "persona": "persona-one",
+      "industries": ["alpha industry"],
+      "geo": { "country": "US", "regions": ["TX"], "zip_bands": [] },
+      "size_band": { "employee_min": 5, "employee_max": 50, "revenue_min": null, "revenue_max": null },
+      "tech_signals": [],
+      "intent_signals": [],
+      "exclusions": ["franchises"],
+      "seed_accounts": [{ "name": "Seed One", "domain": "seedone.example" }]
+    }
+  }
+}
+JSON
+  cat > "$dir/icp/bravo.json" <<'JSON'
+{
+  "vertical": "bravo",
+  "source": "marketing/go-to-market/verticals/bravo/README.md",
+  "clarifications_needed": ["category/segment", "size band", "geography"],
+  "segments": {}
+}
+JSON
 }
 
 mkdir_scenario() {
@@ -1401,6 +1442,138 @@ verticals:
 YAML
   invoke_lint "$dir"
   assert_exit_and_substring "BP: manifest missing schema_version" 1 "_manifest.yaml: missing required key 'schema_version'"
+}
+
+# ── Scenario BQ: icp file missing for a manifest vertical (ADR-032) ─────
+run_bq() {
+  local dir
+  dir="$(mkdir_scenario BQ)"
+  rm "$dir/icp/alpha.json"
+  invoke_lint "$dir"
+  assert_exit_and_substring "BQ: missing icp file" 1 "missing icp/alpha.json — Discovery ICP is mandatory"
+}
+
+# ── Scenario BR: stub-rule violation (empty segments + empty clarifs) ───
+run_br() {
+  local dir
+  dir="$(mkdir_scenario BR)"
+  cat > "$dir/icp/bravo.json" <<'JSON'
+{
+  "vertical": "bravo",
+  "source": "marketing/go-to-market/verticals/bravo/README.md",
+  "clarifications_needed": [],
+  "segments": {}
+}
+JSON
+  invoke_lint "$dir"
+  assert_exit_and_substring "BR: stub rule violated" 1 "stub form requires non-empty clarifications_needed"
+}
+
+# ── Scenario BS: segment persona dangling cross-ref ──────────────────────
+run_bs() {
+  local dir
+  dir="$(mkdir_scenario BS)"
+  python3 - "$dir/icp/alpha.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d["segments"]["core"]["persona"] = "ghost-persona"
+json.dump(d, open(p, "w"))
+PY
+  invoke_lint "$dir"
+  assert_exit_and_substring "BS: dangling persona cross-ref" 1 "persona 'ghost-persona' not defined in the sibling"
+}
+
+# ── Scenario BT: icp unknown top-level key ───────────────────────────────
+run_bt() {
+  local dir
+  dir="$(mkdir_scenario BT)"
+  python3 - "$dir/icp/alpha.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d["surprise"] = True
+json.dump(d, open(p, "w"))
+PY
+  invoke_lint "$dir"
+  assert_exit_and_substring "BT: icp unknown key" 1 "icp/alpha.json: unknown key 'surprise'"
+}
+
+# ── Scenario BU: icp filename stem != inner vertical ─────────────────────
+run_bu() {
+  local dir
+  dir="$(mkdir_scenario BU)"
+  python3 - "$dir/icp/alpha.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d["vertical"] = "bravo"
+json.dump(d, open(p, "w"))
+PY
+  invoke_lint "$dir"
+  assert_exit_and_substring "BU: icp filename mismatch" 1 "filename stem 'alpha' does not match vertical 'bravo'"
+}
+
+# ── Scenario BV: icp file named after an alias gets a rename hint ────────
+run_bv() {
+  local dir
+  dir="$(mkdir_scenario BV)"
+  cat > "$dir/alpha.yaml" <<'YAML'
+slug: alpha
+display: "Alpha"
+aliases: [old-alpha]
+personas:
+  - slug: persona-one
+    display: "Persona One"
+    titles:
+      - "Title One"
+offers: []
+YAML
+  cp "$dir/icp/bravo.json" "$dir/icp/old-alpha.json"
+  invoke_lint "$dir"
+  assert_exit_and_substring "BV: alias-named icp file" 1 "'old-alpha' is an alias of 'alpha' — name the file alpha.json"
+}
+
+# ── Scenario BW: icp invalid JSON ────────────────────────────────────────
+run_bw() {
+  local dir
+  dir="$(mkdir_scenario BW)"
+  printf '{ not json' > "$dir/icp/alpha.json"
+  invoke_lint "$dir"
+  assert_exit_and_substring "BW: icp invalid JSON" 1 "icp/alpha.json: invalid JSON"
+}
+
+# ── Scenario BX: icp/ directory missing entirely ─────────────────────────
+run_bx() {
+  local dir
+  dir="$(mkdir_scenario BX)"
+  rm -rf "$dir/icp"
+  invoke_lint "$dir"
+  assert_exit_and_substring "BX: icp dir missing" 1 "icp/: directory missing"
+}
+
+# ── Scenario BY: orphan icp file (not canonical, not alias) ──────────────
+run_by() {
+  local dir
+  dir="$(mkdir_scenario BY)"
+  cp "$dir/icp/bravo.json" "$dir/icp/charlie.json"
+  invoke_lint "$dir"
+  assert_exit_and_substring "BY: orphan icp file" 1 "icp/charlie.json present but 'charlie' is not a canonical vertical"
+}
+
+# ── Scenario BZ: icp segment name non-kebab ──────────────────────────────
+run_bz() {
+  local dir
+  dir="$(mkdir_scenario BZ)"
+  python3 - "$dir/icp/alpha.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p))
+d["segments"]["Not_Kebab"] = d["segments"].pop("core")
+json.dump(d, open(p, "w"))
+PY
+  invoke_lint "$dir"
+  assert_exit_and_substring "BZ: segment name non-kebab" 1 "segment name 'Not_Kebab' is not kebab-case"
 }
 
 # ── Run all scenarios ────────────────────────────────────────────────────

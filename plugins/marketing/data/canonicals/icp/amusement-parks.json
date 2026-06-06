@@ -1,0 +1,95 @@
+{
+  "vertical": "amusement-parks",
+  "source": "marketing/go-to-market/verticals/amusement-parks/README.md",
+  "clarifications_needed": [
+    "Geo priority markets are partially specified in the README (Utah, NorCal, Tampa-area FL, Tri-State NY/NJ/CT, DMV, NC — SoCal explicitly excluded) but BN service territory boundaries are not documented there; confirm which states are serviceable",
+    "VP of Marketing (Corporate) persona for the chain segment is referenced in the README decision structure but has no persona section; confirm whether to add a fourth persona or exclude from first-call targeting",
+    "Seed accounts are grounded in README-named examples (Lagoon, Knoebels, Adventureland, Quassy) plus independently known independents; validate against current BN prospecting lists and exclude existing customers/active opportunities",
+    "Mid-size-chain segment budget and revenue bands ($50M–$250M chain revenue; $75K–$250K per-park program) are README-sourced estimates marked 'Untested'; operator redline if discovery invalidates"
+  ],
+  "segments": {
+    "family-owned-regional-parks": {
+      "display": "Family-Owned Regional Amusement Parks",
+      "persona": "owner-gm-family-park",
+      "industries": ["Amusement Parks & Arcades", "Spectator Sports & Entertainment"],
+      "geo": {
+        "country": "US",
+        "regions": ["UT", "CA", "FL", "NY", "NJ", "CT", "VA", "MD", "DC", "NC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 50,
+        "employee_max": 500,
+        "revenue_min": 5000000,
+        "revenue_max": 50000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "job posting for Events Manager or Director of Entertainment",
+        "press release announcing new Halloween haunt program or holiday light event",
+        "social media posts promoting shoulder-season attendance events",
+        "website references a fall or winter programming gap",
+        "park advertises Halloween haunt but no holiday overlay program exists",
+        "IAAPA Expo attendee / exhibitor presence"
+      ],
+      "exclusions": [
+        "destination theme parks (Disney, Universal, Six Flags flagships, Cedar Fair flagships, Busch Gardens, SeaWorld)",
+        "parks with annual attendance above 1M visitors",
+        "SoCal geography (outside BN service territory per README)",
+        "parks already running a multi-vendor holiday overlay program at scale",
+        "existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Lagoon", "domain": "lagoonpark.com"},
+        {"name": "Knoebels Amusement Resort", "domain": "knoebels.com"},
+        {"name": "Adventureland (Iowa)", "domain": "adventurelandresort.com"},
+        {"name": "Quassy Amusement & Waterpark", "domain": "quassy.com"},
+        {"name": "Playland (Rye, NY)", "domain": "playland.com"},
+        {"name": "Santa Cruz Beach Boardwalk", "domain": "beachboardwalk.com"},
+        {"name": "Morey's Piers", "domain": "moreyspiers.com"}
+      ]
+    },
+    "mid-size-chain-parks": {
+      "display": "Mid-Size Chain Amusement Parks",
+      "persona": "park-gm-chain",
+      "industries": ["Amusement Parks & Arcades", "Spectator Sports & Entertainment"],
+      "geo": {
+        "country": "US",
+        "regions": ["UT", "CA", "FL", "NY", "NJ", "CT", "VA", "MD", "DC", "NC", "TX", "CO", "WA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 200,
+        "employee_max": 5000,
+        "revenue_min": 50000000,
+        "revenue_max": 250000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "corporate marketing job posting for seasonal programming or events role",
+        "chain-level press release launching or expanding a haunt or holiday program",
+        "IAAPA Expo presence at the corporate level",
+        "RFP or approved-vendor inquiry for seasonal lighting",
+        "social media benchmarking posts comparing shoulder-season programs across sister parks"
+      ],
+      "exclusions": [
+        "Six Flags flagship properties (enterprise tier)",
+        "Cedar Fair flagship properties (enterprise tier)",
+        "Disney, Universal, SeaWorld corporate chains",
+        "parks with per-property annual attendance above 1M",
+        "chains with formal national décor vendor contracts in place",
+        "existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Palace Entertainment", "domain": "palaceentertainment.com"},
+        {"name": "Parques Reunidos (US properties)", "domain": "parquesreunidos.com"},
+        {"name": "Herschend Family Entertainment", "domain": "hfecorp.com"},
+        {"name": "Kennywood (Palace Entertainment)", "domain": "kennywood.com"},
+        {"name": "Lake Compounce (Palace Entertainment)", "domain": "lakecompounce.com"},
+        {"name": "Canobie Lake Park", "domain": "canobie.com"},
+        {"name": "Trimper's Rides", "domain": "trimpersrides.com"},
+        {"name": "Funtown Splashtown USA", "domain": "funtownsplashtownusa.com"}
+      ]
+    }
+  }
+}

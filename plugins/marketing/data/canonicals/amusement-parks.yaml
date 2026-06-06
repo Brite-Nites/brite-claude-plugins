@@ -1,10 +1,59 @@
-# Canonical entry for the Amusement Parks vertical (skeleton).
+# Canonical entry for the Amusement Parks vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/amusement-parks/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status: draft — personas and offers backfilled from handbook vertical README.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - "VP of Marketing (Corporate)" — named in the README's ICP-2 decision-structure table
+#     but no dedicated persona section; conservatively omitted pending handbook expansion.
+#   - "CFO / Owner (Chain)" — listed only as budget approver in ICP-2 decision structure.
 slug: amusement-parks
 display: "Amusement Parks"
 playbook_path: "marketing/go-to-market/verticals/amusement-parks/README.md"
-personas: []
-offers: []
+personas:
+  - slug: owner-gm-family-park
+    display: "Owner / General Manager (Family-Owned Park)"
+    titles:
+      - "Owner"
+      - "President"
+      - "General Manager"
+      - "Owner-Operator"
+      - "Co-Owner"
+      - "Park Director"
+  - slug: director-events-marketing
+    display: "Director of Events / Marketing"
+    titles:
+      - "Director of Events"
+      - "Director of Marketing"
+      - "Events Manager"
+      - "Marketing Manager"
+      - "Events & Marketing Director"
+      - "Director of Entertainment"
+  - slug: park-gm-chain
+    display: "Park GM (Chain)"
+    titles:
+      - "General Manager"
+      - "VP of Operations"
+      - "Regional General Manager"
+      - "Park President"
+      - "Operations Director"
+offers:
+  - slug: holiday-overlay-program
+    display: "Holiday Overlay Program"
+    status: draft
+    posture: pilot
+    target_personas: [owner-gm-family-park, director-events-marketing]
+    prose_path: "marketing/go-to-market/verticals/amusement-parks/offers/holiday-overlay-program.md"
+  - slug: halloween-haunt-lighting
+    display: "Halloween Haunt Lighting"
+    status: draft
+    posture: pilot
+    target_personas: [director-events-marketing, park-gm-chain]
+    prose_path: "marketing/go-to-market/verticals/amusement-parks/offers/halloween-haunt-lighting.md"
+  - slug: multi-year-park-partnership
+    display: "Multi-Year Park Partnership"
+    status: draft
+    posture: risk-reversal
+    target_personas: [owner-gm-family-park, park-gm-chain]
+    prose_path: "marketing/go-to-market/verticals/amusement-parks/offers/multi-year-park-partnership.md"

@@ -1,0 +1,106 @@
+{
+  "vertical": "botanical-gardens",
+  "source": "marketing/go-to-market/verticals/botanical-gardens/README.md",
+  "clarifications_needed": [
+    "Geography is named in the README as city/metro clusters (Phoenix, Philadelphia metro, NorCal, Salt Lake, Florida, Tri-State; SoCal excluded) rather than state codes — zip_bands unfilled pending a mapping pass against BN service-territory boundaries",
+    "size_band uses employee bands plus operating budget as revenue proxy (large: $5M–$50M operating budget / 200K+ visitors; mid-tier: $1M–$10M / 100K–200K visitors; events budgets $250K–$2M and $25K–$100K respectively) — visitor and events-budget thresholds are README ICP firmographics that don't map to schema keys; encode via list filters",
+    "Director of Development persona is inferred from the 501(c)(3) revenue framing, not explicitly named in the README — validate as a first-call target in early discovery calls",
+    "Contract-range estimate ($25K–$300K/year) is BN-internal hypothesis-grade; renewal-rate assumption (>80%) extrapolated from Lightscape's expansion pattern, not BN data"
+  ],
+  "segments": {
+    "large-public-gardens": {
+      "display": "Large Public Botanical Gardens (200K+ visitors)",
+      "persona": "executive-director-garden",
+      "industries": [
+        "Botanical Gardens",
+        "Arboretums",
+        "Conservatories",
+        "Nonprofit Cultural Institutions"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["AZ", "PA", "CA", "UT", "FL", "NY", "NJ", "CT"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 30,
+        "employee_max": null,
+        "revenue_min": 5000000,
+        "revenue_max": 50000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "APGA Annual Conference attendance or sponsorship",
+        "Job postings for Director of Events, Director of Programming, or Seasonal Events Manager",
+        "Press coverage of peer-garden Lightscape launches in adjacent markets",
+        "RFP issued for holiday event production or seasonal lighting vendor",
+        "LinkedIn posts referencing new evening programming or revenue-generating events",
+        "Board meeting agenda items on new program approval (where public)"
+      ],
+      "exclusions": [
+        "SoCal gardens (explicitly excluded per README — BN service-territory constraint)",
+        "Gardens already under Lightscape / Culture Creative contract",
+        "Private members-only gardens with no public ticketed-event history",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Desert Botanical Garden", "domain": "dbg.org"},
+        {"name": "Longwood Gardens", "domain": "longwoodgardens.org"},
+        {"name": "New York Botanical Garden", "domain": "nybg.org"},
+        {"name": "Naples Botanical Garden", "domain": "naplesgarden.org"},
+        {"name": "Red Butte Garden", "domain": "redbuttegarden.org"},
+        {"name": "Filoli", "domain": "filoli.org"},
+        {"name": "Morris Arboretum & Gardens", "domain": "morrisarboretum.org"},
+        {"name": "Marie Selby Botanical Gardens", "domain": "selby.org"},
+        {"name": "Wave Hill", "domain": "wavehill.org"},
+        {"name": "UC Botanical Garden at Berkeley", "domain": "botanicalgarden.berkeley.edu"}
+      ]
+    },
+    "mid-tier-emerging-gardens": {
+      "display": "Mid-Tier & Emerging Botanical Gardens (100K–200K visitors)",
+      "persona": "executive-director-garden",
+      "industries": [
+        "Botanical Gardens",
+        "Arboretums",
+        "Conservatories",
+        "Nonprofit Cultural Institutions"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["AZ", "FL", "CA", "UT", "NC", "VA", "MD", "DC", "NY", "NJ", "CT", "TX", "CO", "WA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 5,
+        "employee_max": 50,
+        "revenue_min": 1000000,
+        "revenue_max": 10000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Peer garden in same metro or region has launched a Lightscape or holiday light event in the past 24 months",
+        "Job postings for events staff or Director of Programming at a garden with no existing evening event program",
+        "Board or Executive Director quoted in local press on the need for new revenue programs",
+        "APGA conference registration or session attendance on revenue-generating programming",
+        "Social media posts expressing awareness of regional peer light events",
+        "Grant applications or donor appeals mentioning unrestricted revenue / new earned-income programs"
+      ],
+      "exclusions": [
+        "SoCal gardens (explicitly excluded per README — BN service-territory constraint)",
+        "Gardens already operating a major ticketed evening light event (graduated to the large-gardens segment)",
+        "Gardens under $1M annual operating budget (outside stated ICP floor)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Tucson Botanical Garden", "domain": "tucsonbotanical.org"},
+        {"name": "Mounts Botanical Garden", "domain": "mounts.org"},
+        {"name": "The North Carolina Arboretum", "domain": "ncarboretum.org"},
+        {"name": "Denver Botanic Gardens Chatfield Farms", "domain": "botanicgardens.org"},
+        {"name": "The Oregon Garden", "domain": "oregongarden.org"},
+        {"name": "Meadowlark Botanical Gardens", "domain": "novaparks.com"},
+        {"name": "Paul J. Ciener Botanical Garden", "domain": "cienerbotanicalgarden.org"},
+        {"name": "Buffalo and Erie County Botanical Gardens", "domain": "buffalogardens.com"}
+      ]
+    }
+  }
+}

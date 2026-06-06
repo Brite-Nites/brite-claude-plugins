@@ -1,0 +1,98 @@
+{
+  "vertical": "churches",
+  "source": "marketing/go-to-market/verticals/churches/README.md",
+  "clarifications_needed": [
+    "Geography is flagged [NEEDS RESEARCH] in the README — TX, GA, CA, FL, TN mentioned as megachurch-concentration hypothesis; region list below adds national coverage but is NOT validated against church-density data",
+    "size_band is null on all four schema keys — the README sizes by weekly attendance (megachurch: 2,000+; large community: 500–1,999), which has no employee/revenue mapping for nonprofits; encode attendance via list-building filters",
+    "Decision structure is hypothesized (Executive Pastor / Campus Director as entry point, Elder Board / Finance Committee as approver) but explicitly unconfirmed — first discovery calls should validate whether this persona or the Facilities Director is the correct cold-outreach target",
+    "Budget cycle timing (Q3 approvals for Christmas spend, Q4 for Easter) is a README hypothesis; fiscal year varies (Jan–Dec vs. Jul–Jun) and needs primary research before campaign scheduling"
+  ],
+  "segments": {
+    "megachurches": {
+      "display": "Megachurches with Campus Facilities",
+      "persona": "executive-pastor-campus-director",
+      "industries": [
+        "Religious Organizations",
+        "Nonprofit",
+        "Houses of Worship"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["TX", "GA", "FL", "CA", "TN", "NC", "VA", "AZ", "CO", "WA", "OH", "IL", "PA", "NY", "NJ"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Job posting for Facilities Director or Campus Director",
+        "Capital campaign announcement or building fund launch",
+        "New campus opening or expansion announcement",
+        "Job posting for Director of Development",
+        "Church-conference sponsorship or speaker listing (ARC, Orange Conference, Catalyst)"
+      ],
+      "exclusions": [
+        "Congregations with fewer than 2,000 weekly attendance (DIY/volunteer culture likely to dominate)",
+        "Churches that have explicitly adopted a volunteer-only facilities philosophy",
+        "Single-room storefront congregations without campus-scale outdoor space",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Lakewood Church", "domain": "lakewoodchurch.com"},
+        {"name": "Life.Church", "domain": "life.church"},
+        {"name": "North Point Community Church", "domain": "northpoint.org"},
+        {"name": "Gateway Church", "domain": "gatewaypeople.com"},
+        {"name": "Elevation Church", "domain": "elevationchurch.org"},
+        {"name": "Church of the Highlands", "domain": "churchofthehighlands.com"},
+        {"name": "Saddleback Church", "domain": "saddleback.com"},
+        {"name": "Willow Creek Community Church", "domain": "willowcreek.org"},
+        {"name": "Prestonwood Baptist Church", "domain": "prestonwood.org"},
+        {"name": "Crossroads Church Cincinnati", "domain": "crossroads.net"}
+      ]
+    },
+    "large-community-churches": {
+      "display": "Large Community Churches",
+      "persona": "executive-pastor-campus-director",
+      "industries": [
+        "Religious Organizations",
+        "Nonprofit",
+        "Houses of Worship"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["TX", "GA", "FL", "CA", "TN", "NC", "VA", "AZ", "CO", "WA", "OH", "IL", "PA", "NY", "NJ"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "New building project or renovation permit",
+        "Seasonal programming job posting (worship/arts pastor, event coordinator)",
+        "Denomination-level conference attendance or speaker listing",
+        "Capital campaign or building fund reference in public communications"
+      ],
+      "exclusions": [
+        "Congregations below 500 weekly attendance (insufficient facilities budget hypothesis)",
+        "Single-campus operations without dedicated outdoor gathering space",
+        "Churches with publicly stated volunteer-only facilities philosophy",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Christ Fellowship Church (FL)", "domain": "christfellowship.church"},
+        {"name": "Watermark Community Church", "domain": "watermark.org"},
+        {"name": "The Village Church", "domain": "thevillagechurch.net"},
+        {"name": "Cornerstone Church San Antonio", "domain": "sacornerstone.com"},
+        {"name": "Harvest Bible Chapel", "domain": "harvestbiblechapel.org"}
+      ]
+    }
+  }
+}

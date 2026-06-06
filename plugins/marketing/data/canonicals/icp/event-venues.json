@@ -1,0 +1,118 @@
+{
+  "vertical": "event-venues",
+  "source": "marketing/go-to-market/verticals/event-venues/README.md",
+  "clarifications_needed": [
+    "size_band is null on all schema keys — the README sizes venues by seat capacity (5K+ managed / 2K+ independent) and annual visitors (500K+/100K+), which have no employee/revenue mapping; encode via list-building filters",
+    "Per-venue holiday-display budget bands ($25K–$500K+ managed, $25K–$200K independent) are inferred — no closed BN deals anchor them; update after first two contracts",
+    "Legends Global and OVG preferred-vendor qualification channels are undocumented publicly (README open research gap) — treat the managed-venue segment as hypothesis until a vendor portal or inside contact is confirmed",
+    "Geography reflects BN service territory stated in the README (UT, CO, AZ, NorCal, Seattle, FL metro, East Coast Tri-State/Philadelphia/DMV/NC; SoCal excluded)",
+    "Municipal procurement timelines (4–8 months) make municipal venues a distinct motion not yet field-tested by BN"
+  ],
+  "segments": {
+    "managed-venue-portfolios": {
+      "display": "Managed Venue Portfolios (Legends / OVG)",
+      "persona": "director-of-operations",
+      "industries": [
+        "Sports Venues & Stadiums",
+        "Arena Management",
+        "Convention Center Management",
+        "Amphitheater Operations",
+        "Venue Management Companies"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "Ticketmaster venue listing",
+        "AXS ticketing integration",
+        "SeatGeek venue partner page",
+        "ASM Global or OVG360 management credit on venue website"
+      ],
+      "intent_signals": [
+        "Venue RFP published for seasonal or holiday programming vendor",
+        "Job posting for Director of Events or Programming at venue",
+        "Competitor venue in same metro announced a holiday light show or seasonal activation",
+        "Venue LinkedIn page promoting dark-calendar entertainment or family events",
+        "Venue recently transitioned to Legends or OVG management (transition trigger)",
+        "New venue opening announcement within BN service territory"
+      ],
+      "exclusions": [
+        "SoCal venues (outside BN service territory per README)",
+        "Venues under 5K seats without major annual visitor count",
+        "Venues with active multi-year holiday-display vendor contracts",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Ball Arena", "domain": "ballarena.com"},
+        {"name": "Footprint Center", "domain": "footprintcenter.com"},
+        {"name": "Delta Center", "domain": "deltacenter.com"},
+        {"name": "Kaseya Center", "domain": "kaseyacenter.com"},
+        {"name": "Spectrum Center", "domain": "spectrumcentercharlotte.com"},
+        {"name": "CFG Bank Arena", "domain": "cfgbankarena.com"},
+        {"name": "SAP Center", "domain": "sapcenter.com"},
+        {"name": "Climate Pledge Arena", "domain": "climatepledgearena.com"}
+      ]
+    },
+    "independent-municipal-venues": {
+      "display": "Independent & Municipal Venues",
+      "persona": "director-of-events-entertainment",
+      "industries": [
+        "Convention Centers",
+        "Performing Arts Centers",
+        "Amphitheaters",
+        "Municipal Event Venues",
+        "Community Event Centers"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["FL", "AZ", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "UT", "CO", "WA", "NC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "City or county government domain (.gov) for municipally owned venues",
+        "Independent venue website with ticketing integration (Eventbrite, Universe)",
+        "Public RFP posted on BidNet, DemandStar, or Onvia for seasonal or holiday services",
+        "Venue listed on CVB (Convention & Visitors Bureau) regional event-venue directory"
+      ],
+      "intent_signals": [
+        "Municipal holiday-lighting RFP published (Feb–Apr posting window per README)",
+        "Venue social media promoting upcoming holiday or seasonal event",
+        "New venue leadership hire (Director of Events, GM) — transition trigger",
+        "Competitor independent venue in same metro launched a holiday activation",
+        "Community feedback or local press on venue dark-date calendar",
+        "Venue website listing available rental dates suggesting significant dark-calendar inventory"
+      ],
+      "exclusions": [
+        "SoCal venues (outside BN service territory per README)",
+        "Venues under 2K seats without significant community visitor volume",
+        "Venues with active multi-year holiday-display vendor contracts",
+        "Venues requiring federal procurement compliance (military bases, federal buildings)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Orlando Amphitheater at Central Florida Fairgrounds", "domain": "centralfloridafair.com"},
+        {"name": "Colorado Convention Center", "domain": "coloradoconventioncenter.com"},
+        {"name": "Raleigh Convention Center", "domain": "raleighconventioncenter.com"},
+        {"name": "Meadowlands Exposition Center", "domain": "mecexpo.com"},
+        {"name": "Wolf Trap (Filene Center)", "domain": "wolftrap.org"},
+        {"name": "Pima County Fairgrounds", "domain": "pimacountyfair.com"},
+        {"name": "Durham Performing Arts Center", "domain": "dpacnc.com"},
+        {"name": "Tacoma Dome", "domain": "tacomadome.org"}
+      ]
+    }
+  }
+}

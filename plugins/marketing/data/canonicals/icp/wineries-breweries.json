@@ -1,0 +1,115 @@
+{
+  "vertical": "wineries-breweries",
+  "source": "marketing/go-to-market/verticals/wineries-breweries/README.md",
+  "clarifications_needed": [
+    "Geography is unvalidated: README flags NorCal (Napa/Sonoma), AZ (Verde Valley/Willcox), OR (Willamette Valley if in territory), FL (emerging) as hypotheses — confirm which BN service territories actually overlap before list-building",
+    "Visitor-volume threshold (50K+ annual visitors) is a hypothesis with no industry data cited — validate or replace with a proxy signal (event-calendar activity, The Knot listing, tasting-room reservation system)",
+    "size_band revenue ranges are inferred from offer-page pricing ($5K–$75K install scopes) and industry context — entirely hypothetical per README; flag all deal-size assumptions when qualifying",
+    "Craft brewery segment size and taproom-event-space penetration are marked [NEEDS RESEARCH] — the brewery segment is inferred from offer pages (Harvest Festival/Oktoberfest, Beer-Club Release Night) rather than dedicated ICP research",
+    "Segment personas default to owner-operator (README KDM for owner-operated properties); director-of-events-hospitality and general-manager pair as secondary cascades — confirm pairing before list-build"
+  ],
+  "segments": {
+    "destination-winery-vineyard": {
+      "display": "Destination Winery / Vineyard with Event Program",
+      "persona": "owner-operator",
+      "industries": [
+        "Wineries",
+        "Vineyards",
+        "Cideries"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CA", "AZ", "OR", "FL", "NY", "VA", "NC", "WA", "CO", "TX", "NJ", "CT", "MD", "UT"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 5,
+        "employee_max": 150,
+        "revenue_min": 500000,
+        "revenue_max": 20000000
+      },
+      "tech_signals": [
+        "WineDirect or Commerce7 (DTC wine club platform)",
+        "The Knot or WeddingWire wedding-venue listing",
+        "Tock or Resy tasting-room reservation system",
+        "Active Instagram or Pinterest account with property/event photography"
+      ],
+      "intent_signals": [
+        "Recently posted harvest festival, vintner's dinner, or club-pickup event on social",
+        "Listed on a regional wine trail association website",
+        "The Knot / WeddingWire wedding-venue listing created or updated in last 12 months",
+        "Job posting for Events Director, Hospitality Manager, or Tasting Room Manager",
+        "Advertising extended evening tasting hours or holiday programming"
+      ],
+      "exclusions": [
+        "Production-only wineries / vineyards without a public tasting room",
+        "Properties without outdoor event space or patio",
+        "Properties with fewer than an estimated 25K annual visitors (insufficient event volume)",
+        "National chain / franchise hospitality groups (not owner-operated — procurement more formal)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Jordan Vineyard & Winery", "domain": "jordanwinery.com"},
+        {"name": "Chateau Ste. Michelle", "domain": "chateaustemichelle.com"},
+        {"name": "King Estate Winery", "domain": "kingestate.com"},
+        {"name": "Hanzell Vineyards", "domain": "hanzell.com"},
+        {"name": "Callaghan Vineyards", "domain": "callaghanvineyards.com"},
+        {"name": "Pillsbury Wine Company", "domain": "pillsburywine.com"},
+        {"name": "Barboursville Vineyards", "domain": "barboursvillewinery.com"},
+        {"name": "Lakewood Vineyards (Finger Lakes)", "domain": "lakewoodvineyards.com"},
+        {"name": "Biltmore Estate Winery", "domain": "biltmore.com"}
+      ]
+    },
+    "regional-brewery-with-event-space": {
+      "display": "Regional Craft Brewery / Taproom with Event Space",
+      "persona": "owner-operator",
+      "industries": [
+        "Craft Breweries",
+        "Taprooms",
+        "Brewpubs"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CA", "CO", "WA", "OR", "TX", "NC", "FL", "NY", "VA", "AZ", "CT", "NJ", "MD", "UT"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": 10,
+        "employee_max": 100,
+        "revenue_min": 500000,
+        "revenue_max": 10000000
+      },
+      "tech_signals": [
+        "Eventbrite or Tock event listings for release nights or taproom events",
+        "Active Facebook Events or Instagram event stories for Oktoberfest / seasonal programming",
+        "Untappd brewery profile with taproom check-ins",
+        "Toast or Square POS (taproom indicator)"
+      ],
+      "intent_signals": [
+        "Recently posted Oktoberfest, harvest-release, or mug-club event on social",
+        "Eventbrite or ticketing page for a fall or holiday event in the last 12 months",
+        "Job posting for Taproom Manager or Events Coordinator",
+        "Listed as a private-event venue on local-venue directories",
+        "Advertising a mug club, beer club, or release-night membership program"
+      ],
+      "exclusions": [
+        "Production-only / distribution-focused breweries without a public taproom",
+        "Taprooms without dedicated outdoor space or event-capacity infrastructure",
+        "Brewpub chains / franchise groups (not owner-operated)",
+        "Nano-breweries / homebrew-scale operations (insufficient event volume to justify install)",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Deschutes Brewery", "domain": "deschutesbrewery.com"},
+        {"name": "Odell Brewing Co.", "domain": "odellbrewing.com"},
+        {"name": "Dogfish Head Craft Brewery", "domain": "dogfish.com"},
+        {"name": "Bell's Brewery", "domain": "bellsbeer.com"},
+        {"name": "New Belgium Brewing", "domain": "newbelgium.com"},
+        {"name": "Sierra Nevada Brewing Co.", "domain": "sierranevada.com"},
+        {"name": "Allagash Brewing Company", "domain": "allagash.com"},
+        {"name": "Founders Brewing Co.", "domain": "foundersbrewing.com"},
+        {"name": "Tröegs Independent Brewing", "domain": "troegs.com"}
+      ]
+    }
+  }
+}

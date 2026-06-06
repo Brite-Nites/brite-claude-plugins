@@ -1,0 +1,111 @@
+{
+  "vertical": "theaters",
+  "source": "marketing/go-to-market/verticals/theaters/README.md",
+  "clarifications_needed": [
+    "Geography is specified as 'Brite Tier 1 + Tier 2 territories' but tier definitions are not in the README — defaulting to major arts-scene metros across the standard Brite state list; confirm exact territory map",
+    "size_band uses operating budget ($10M+ per README) as revenue proxy; the README's other qualifiers — 1,000+ seats, $500K+ capital budget, year-round programming, owns/controls facade or plaza — don't map to schema keys and must be encoded via list-building filters",
+    "Offer postures are inferred from asset gaps and the vertical description; no formal offers exist yet — validate all offers before campaigns",
+    "KDM validation: README flags 'Director of Operations is KDM' as an untested assumption; discovery calls should probe whether Artistic Director or Executive Director holds budget authority",
+    "Segment boundary between nonprofit PACs (501(c)(3)) and commercial concert halls is noted in firmographics but not developed — messaging and qualification may diverge materially"
+  ],
+  "segments": {
+    "nonprofit-performing-arts-centers": {
+      "display": "Nonprofit Performing Arts Centers",
+      "persona": "dir-operations-facilities",
+      "industries": [
+        "Performing Arts",
+        "Non-profit Arts & Culture",
+        "Opera & Ballet Companies",
+        "Symphony Orchestras",
+        "Regional Theater Companies"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["NY", "DC", "CA", "FL", "IL", "TX", "WA", "MA", "PA", "CO", "NC", "VA", "MD", "NJ"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": 10000000,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Capital improvement project announcement",
+        "Season opener or anniversary season publicized",
+        "Renovation or building expansion news",
+        "New Executive Director or Director of Operations hire",
+        "Major donor campaign or capital campaign launch",
+        "Holiday programming (Nutcracker, holiday concert) publicized with facility mention"
+      ],
+      "exclusions": [
+        "Venues under 1,000 seats",
+        "University-affiliated venues without independent facility budget authority",
+        "Venues that lease (do not own or control) their exterior",
+        "Operating budget below $10M",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Lincoln Center for the Performing Arts", "domain": "lincolncenter.org"},
+        {"name": "Kennedy Center for the Performing Arts", "domain": "kennedy-center.org"},
+        {"name": "San Francisco War Memorial & Performing Arts Center", "domain": "sfwmpac.org"},
+        {"name": "The 5th Avenue Theatre (Seattle)", "domain": "5thavenue.org"},
+        {"name": "Straz Center for the Performing Arts", "domain": "strazcenter.org"},
+        {"name": "Adrienne Arsht Center for the Performing Arts", "domain": "arshtcenter.org"},
+        {"name": "Denver Center for the Performing Arts", "domain": "denvercenter.org"},
+        {"name": "Kimmel Center (Ensemble Arts Philly)", "domain": "ensembleartsphilly.org"},
+        {"name": "Blumenthal Arts (Charlotte)", "domain": "blumenthalarts.org"}
+      ]
+    },
+    "historic-independent-theaters": {
+      "display": "Historic & Independent Commercial Theaters",
+      "persona": "dir-operations-facilities",
+      "industries": [
+        "Live Entertainment Venues",
+        "Historic Theater Preservation",
+        "Commercial Concert Halls",
+        "Broadway Touring Houses"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["NY", "DC", "CA", "FL", "IL", "TX", "WA", "MA", "PA", "CO", "NC", "VA", "MD", "NJ"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": 10000000,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Historic preservation grant awarded",
+        "Marquee or facade renovation publicized",
+        "New General Manager or Director of Operations hire",
+        "Season opening or centennial/anniversary event announced",
+        "Capital campaign targeting facility improvements",
+        "Holiday programming or New Year's Eve event listed on calendar"
+      ],
+      "exclusions": [
+        "Venues under 1,000 seats",
+        "Venues that lease (do not own or control) their exterior",
+        "Drive-in or outdoor-only amphitheaters (different scope)",
+        "Operating budget below $10M",
+        "Existing customers"
+      ],
+      "seed_accounts": [
+        {"name": "Beacon Theatre (MSG Entertainment)", "domain": "msg.com"},
+        {"name": "Fox Theatre Atlanta", "domain": "foxtheatre.org"},
+        {"name": "Orpheum Theatre Memphis", "domain": "orpheum-memphis.com"},
+        {"name": "Hollywood Pantages Theatre", "domain": "hollywoodpantages.com"},
+        {"name": "Paramount Theatre Seattle (STG)", "domain": "stgpresents.org"},
+        {"name": "Ohio Theatre Columbus (CAPA)", "domain": "capa.com"},
+        {"name": "Detroit Opera House", "domain": "detroitopera.org"},
+        {"name": "Wang Theatre (Boch Center, Boston)", "domain": "bochcenter.org"},
+        {"name": "Capitol Theatre Salt Lake City (Arts SLC)", "domain": "artsaltlake.org"},
+        {"name": "Broward Center for the Performing Arts", "domain": "browardcenter.org"}
+      ]
+    }
+  }
+}

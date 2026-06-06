@@ -1,10 +1,51 @@
-# Canonical entry for the Shopping Centers / Malls vertical (skeleton).
+# Canonical entry for the Shopping Centers / Malls vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/shopping-centers/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Exploring → first offer being promoted.
+#
+# History:
+#   2026-05-13 — skeleton authored (BC-8718 backfill).
+#   2026-06-01 — "flagship retail" merged in as a SUBSET of this vertical
+#                (Head of GTM decision, NOT a standalone vertical). Added
+#                personas vp-marketing + center-owner-asset-manager and the
+#                Brite Labs offer custom-illuminated-artwork (BC-11163). Backs
+#                the flagship-retail-vp-marketing-custom-illuminated-artwork
+#                campaign (FY26 M07). Open: a broader `retail` umbrella vertical
+#                if the brand-flagship ICP outgrows shopping-centers.
+#   2026-06-04 — flagship-retail registered as an alias (ADR-032): the live
+#                FY26-M07 campaign keeps its lived slug across Linear/EB/SF;
+#                the alias makes the slug's vertical-prefix resolvable. The
+#                Discovery ICP (icp/shopping-centers.json) carries the
+#                flagship-brands + destination-centers segments.
 slug: shopping-centers
 display: "Shopping Centers / Malls"
+aliases: [flagship-retail]
 playbook_path: "marketing/go-to-market/verticals/shopping-centers/README.md"
-personas: []
-offers: []
+personas:
+  - slug: vp-marketing
+    display: "VP of Marketing"
+    titles:
+      - "VP of Marketing"
+      - "Vice President of Marketing"
+      - "Director of Marketing"
+      - "VP Brand"
+      - "VP Brand & Experiential"
+      - "Head of Retail Experience"
+  - slug: center-owner-asset-manager
+    display: "Center Owner / Asset Manager"
+    titles:
+      - "Asset Manager"
+      - "VP Asset Management"
+      - "VP Property Management"
+      - "SVP Property Management"
+      - "VP Leasing"
+      - "Director of Development"
+      - "Owner"
+      - "Principal"
+offers:
+  - slug: custom-illuminated-artwork
+    display: "Custom Permanent Illuminated Artwork"
+    status: draft
+    posture: free-asset
+    target_personas:
+      - vp-marketing
+      - center-owner-asset-manager

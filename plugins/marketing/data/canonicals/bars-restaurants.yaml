@@ -1,10 +1,41 @@
-# Canonical entry for the Bars & Restaurants vertical (skeleton).
+# Canonical entry for the Bars & Restaurants vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/bars-restaurants/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Draft — research-backed; ready for first campaigns.
+#   README note: "BN has not yet run real campaigns or closed real restaurant-group deals."
+#   Two acknowledged handbook gaps: (1) BN-owned multi-location restaurant case study;
+#   (2) per-metro count of high-end independents with displayable outdoor space.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - General Manager (location-level): influencer/coordinator only — README notes GMs
+#     "don't respond to cold outreach about seasonal displays"; internal referral from
+#     corporate marketing is the primary path.
 slug: bars-restaurants
 display: "Bars & Restaurants"
 playbook_path: "marketing/go-to-market/verticals/bars-restaurants/README.md"
-personas: []
-offers: []
+personas:
+  - slug: restaurant-owner-operator
+    display: "Owner / Operator (Independent)"
+    titles:
+      - "Owner"
+      - "Proprietor"
+      - "Founder"
+      - "Managing Partner"
+      - "Owner-Operator"
+      - "Principal"
+  - slug: restaurant-group-marketing-director
+    display: "Director of Marketing (Restaurant Group)"
+    titles:
+      - "Director of Marketing"
+      - "VP of Marketing"
+      - "Brand Director"
+      - "Head of Marketing"
+      - "Marketing Director"
+offers:
+  - slug: restaurants-holiday-lighting
+    display: "Restaurants & Restaurant Groups — Holiday Lighting"
+    status: draft
+    posture: knowledge
+    target_personas: [restaurant-owner-operator, restaurant-group-marketing-director]
+    prose_path: "marketing/go-to-market/verticals/bars-restaurants/offers/restaurants.md"

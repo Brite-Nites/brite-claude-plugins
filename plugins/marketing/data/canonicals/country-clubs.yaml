@@ -1,10 +1,63 @@
-# Canonical entry for the Country Clubs / Golf Courses vertical (skeleton).
+# Canonical entry for the Country Clubs / Golf Courses vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/country-clubs/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Research Complete — Ready for Pilot Outreach.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - Board President / Committee Chairs: private-clubs approval layer, not a first-call
+#     list-building target.
+#   - Grounds Superintendent: technical coordinator, not KDM.
+#   - Management Company Regional Director: semi-private chain only — scope to sub-playbook
+#     when promoted.
+# Thin-source flag: sub-playbook files (private-clubs/, semi-private-resort-clubs/) were not
+#   independently verified — persona titles and offer details sourced from the cross-ICP
+#   orientation README and the three offer files under offers/.
 slug: country-clubs
 display: "Country Clubs / Golf Courses"
 playbook_path: "marketing/go-to-market/verticals/country-clubs/README.md"
-personas: []
-offers: []
+personas:
+  - slug: general-manager
+    display: "General Manager"
+    titles:
+      - "General Manager"
+      - "Club Manager"
+      - "Chief Operating Officer"
+      - "Club COO"
+      - "Club Director"
+  - slug: director-of-events
+    display: "Director of Events / Social Director"
+    titles:
+      - "Director of Events"
+      - "Social Director"
+      - "Events Director"
+      - "Director of Food & Beverage and Events"
+      - "Catering & Events Manager"
+      - "Club Events Coordinator"
+  - slug: director-of-membership
+    display: "Director of Membership"
+    titles:
+      - "Director of Membership"
+      - "Membership Director"
+      - "Director of Member Relations"
+      - "Membership & Marketing Director"
+      - "Member Services Director"
+offers:
+  - slug: holiday-gala-experience
+    display: "Holiday Gala Experience"
+    status: draft
+    posture: pilot
+    target_personas: [director-of-events, general-manager]
+    prose_path: "marketing/go-to-market/verticals/country-clubs/offers/holiday-gala-experience.md"
+  - slug: member-experience-upgrade
+    display: "Member Experience Upgrade"
+    status: draft
+    posture: pilot
+    target_personas: [general-manager]
+    prose_path: "marketing/go-to-market/verticals/country-clubs/offers/member-experience-upgrade.md"
+  - slug: off-season-property-activation
+    display: "Off-Season Property Activation"
+    status: draft
+    posture: pilot
+    target_personas: [general-manager]
+    prose_path: "marketing/go-to-market/verticals/country-clubs/offers/off-season-property-activation.md"

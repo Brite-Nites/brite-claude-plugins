@@ -1,0 +1,72 @@
+{
+  "vertical": "landscape-lighting",
+  "source": "marketing/go-to-market/verticals/landscape-lighting/README.md",
+  "clarifications_needed": [
+    "B2C DISCOVERY PATH REQUIRED: this is a consumer (household) universe, not a firmographic B2B universe — standard tam-mapping against company/employee data will not surface luxury homeowners. Operator to confirm consumer data path (e.g., county assessor records, residential data broker filtered by home value)",
+    "HOME VALUE THRESHOLD: cold-prospect threshold is $2M+ property value per the Luxury Homeowner Direct offer; the broader ICP uses $1M+ (existing holiday-client cross-sell exempt from the $2M floor) — confirm which threshold applies to outbound list-builds",
+    "GEO: README names 5 markets (CA, UT, FL, MD, DMV) with named sub-markets (SoCal/Bay Area; Alpine/Highland/Draper/Park City; Miami/Naples/Tampa/Orlando; Bethesda/Annapolis; McLean/Great Falls/Potomac) — operator to supply priority zip codes per market or confirm the state list is sufficient for Phase 1",
+    "SMART-HOME QUALIFIER: Luxor smart-home integration is confirmed available in UT, CA, and Miami only (standard FX elsewhere) — confirm whether Luxor-availability should split this into two discovery pools or remain a single segment filtered at outreach"
+  ],
+  "segments": {
+    "luxury-residential-homeowner": {
+      "display": "Luxury Residential Homeowner",
+      "persona": "luxury-homeowner",
+      "industries": [
+        "luxury residential real estate",
+        "high-net-worth households",
+        "single-family residential $1M+ property value",
+        "properties with significant landscaping investment",
+        "outdoor living assets (pools, patios, gardens)",
+        "smart-home equipped residences (Control4, Crestron, Savant, Lutron)"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["CA", "UT", "FL", "MD", "DC", "VA"],
+        "zip_bands": [
+          "Utah: Alpine 84004, Highland 84003, Draper 84020, Park City 84060",
+          "Florida: Miami Beach 33139/33140/33141, Naples 34102/34103/34108, Windermere 34786",
+          "Maryland: Bethesda 20816/20817, Annapolis 21401/21403",
+          "DMV: McLean 22101/22102, Great Falls 22066, Potomac 20854",
+          "SoCal + Bay Area luxury corridors — operator to supply zip list"
+        ]
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": null,
+        "revenue_max": null
+      },
+      "tech_signals": [
+        "Control4 installation or dealer service area",
+        "Crestron or Savant home automation",
+        "Lutron smart lighting system",
+        "smart-home integration platform"
+      ],
+      "intent_signals": [
+        "recent landscaping permit pulled (county records)",
+        "pool installation permit pulled",
+        "home renovation or outdoor-living addition permit",
+        "neighbor's property recently received landscape lighting installation (referral proximity)",
+        "existing Brite Nites holiday lighting customer — cross-sell warm pool",
+        "landscape architect engagement visible on property (recent hardscape/garden work)",
+        "Summit County / Park City property with pre-2025 outdoor lighting requiring dark-sky-ordinance retrofit",
+        "smart-home integrator referral from Control4, Crestron, Savant, or Lutron dealer"
+      ],
+      "exclusions": [
+        "properties outside CA, UT, FL, MD, DC, VA year-round territories",
+        "properties below $1M estimated value (below $2M for cold outbound)",
+        "projects below $5,500 minimum engagement threshold",
+        "properties beyond 45-minute drive of a Brite year-round crew base (evaluate case-by-case for luxury exception)",
+        "seasonal-only Brite markets (non-year-round territories)",
+        "existing Brite landscape lighting customers (already installed)"
+      ],
+      "seed_accounts": [
+        {"name": "Alpine, UT (Highland/Alpine luxury residential corridor)"},
+        {"name": "Park City, UT (Summit County — dark-sky ordinance retrofit demand)"},
+        {"name": "McLean / Great Falls, VA luxury corridor"},
+        {"name": "Bethesda / Potomac, MD luxury corridor"},
+        {"name": "Naples, FL (Port Royal / Aqualane Shores gated communities)"}
+      ]
+    }
+  }
+}

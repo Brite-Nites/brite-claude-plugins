@@ -1,10 +1,120 @@
-# Canonical entry for the Corporate Campuses vertical (skeleton).
+# Canonical entry for the Corporate Campuses vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/corporate-campuses/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Exploring — secondary research complete, primary research
+#   pending; no Active offers yet (all 11 offers Draft).
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - "Tenant Experience / Amenity Manager" (ICP-2 champion) — listed in README decision
+#     structure but not developed as a named persona; sub-champion, not a first-call target.
+#   - "Asset Manager (REIT level)" — influencer only, not a list-building entry point.
+#   - "Regional VP of Property Management" — approver layer above primary DM.
+# Note: prose_path values are index-confirmed filenames from offers/README.md; individual
+#   offer files exist per the index.
 slug: corporate-campuses
 display: "Corporate Campuses"
 playbook_path: "marketing/go-to-market/verticals/corporate-campuses/README.md"
-personas: []
-offers: []
+personas:
+  - slug: director-of-facilities-workplace
+    display: "Director of Facilities / Workplace"
+    titles:
+      - "Director of Facilities"
+      - "Director of Workplace"
+      - "VP of Facilities Operations"
+      - "Head of Workplace Experience"
+      - "Director of Real Estate & Facilities"
+      - "Senior Director of Facilities"
+  - slug: vp-workplace-real-estate
+    display: "VP of Workplace / Real Estate"
+    titles:
+      - "VP of Workplace"
+      - "VP of Real Estate"
+      - "VP Corporate Real Estate"
+      - "VP Workplace Experience"
+      - "Head of Real Estate & Workplace"
+  - slug: hr-employee-experience-lead
+    display: "HR / Employee Experience Lead"
+    titles:
+      - "Director of Employee Experience"
+      - "VP of People"
+      - "Head of Workplace Culture"
+      - "Chief People Officer"
+      - "Director of Culture & Employee Experience"
+  - slug: property-management-director
+    display: "Property Management Director"
+    titles:
+      - "Property Manager"
+      - "Director of Property Management"
+      - "General Manager"
+      - "VP of Property Operations"
+      - "Senior Property Manager"
+offers:
+  # Commercial mid-tier
+  - slug: year-end-campus-warmth
+    display: "Year-End Campus Warmth"
+    status: draft
+    posture: pilot
+    target_personas: [director-of-facilities-workplace, hr-employee-experience-lead]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/year-end-campus-warmth.md"
+  - slug: campus-entrance-arrival-experience
+    display: "Campus Entrance & Arrival Experience"
+    status: draft
+    posture: pilot
+    target_personas: [vp-workplace-real-estate, director-of-facilities-workplace]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/campus-entrance-arrival-experience.md"
+  - slug: holiday-employee-event-activation
+    display: "Holiday Employee Event Activation"
+    status: draft
+    posture: pilot
+    target_personas: [hr-employee-experience-lead]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/holiday-employee-event-activation.md"
+  - slug: cafe-courtyard-string-light-permanent
+    display: "Cafe & Courtyard String-Light Permanent"
+    status: draft
+    posture: free-asset
+    target_personas: [director-of-facilities-workplace]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/cafe-courtyard-string-light-permanent.md"
+  - slug: flagship-campus-tree-program
+    display: "Flagship Campus Tree Program"
+    status: draft
+    posture: pilot
+    target_personas: [vp-workplace-real-estate]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/flagship-campus-tree-program.md"
+  - slug: tenant-relations-broker-tour-ready
+    display: "Tenant Relations & Broker-Tour Ready"
+    status: draft
+    posture: pilot
+    target_personas: [property-management-director]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/tenant-relations-broker-tour-ready.md"
+  # Enterprise F500 tier
+  - slug: flagship-headquarters-signature
+    display: "Flagship Headquarters Signature"
+    status: draft
+    posture: risk-reversal
+    target_personas: [vp-workplace-real-estate, director-of-facilities-workplace]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/flagship-headquarters-signature.md"
+  - slug: executive-event-buyout-production
+    display: "Executive Event Buyout Production"
+    status: draft
+    posture: risk-reversal
+    target_personas: [vp-workplace-real-estate]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/executive-event-buyout-production.md"
+  - slug: multi-campus-portfolio-agreement
+    display: "Multi-Campus Portfolio Agreement"
+    status: draft
+    posture: risk-reversal
+    target_personas: [vp-workplace-real-estate]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/multi-campus-portfolio-agreement.md"
+  - slug: employee-experience-holiday-program
+    display: "Employee Experience Holiday Program"
+    status: draft
+    posture: pilot
+    target_personas: [vp-workplace-real-estate, hr-employee-experience-lead]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/employee-experience-holiday-program.md"
+  - slug: brand-activation-press-event
+    display: "Brand Activation & Press-Event Production"
+    status: draft
+    posture: risk-reversal
+    target_personas: [vp-workplace-real-estate]
+    prose_path: "marketing/go-to-market/verticals/corporate-campuses/offers/brand-activation-press-event.md"

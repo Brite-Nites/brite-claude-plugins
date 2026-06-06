@@ -1,10 +1,42 @@
-# Canonical entry for the Event Venues vertical (skeleton).
+# Canonical entry for the Event Venues vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/event-venues/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Draft — research-backed, awaiting field validation.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - VP/General Manager: approver role; GMs don't respond to cold outreach per README —
+#     reachable via internal referral only.
+#   - VP of Procurement (management company): gatekeeper at Legends/OVG level; engage only
+#     after a venue-level champion sponsors vendor qualification.
+#   - City Manager / Municipal Authority: government approver; not a direct outreach target.
+# Thin-source flag: README + offers/venues-arenas.md list one Draft offer with no pricing
+#   and no closed deals; posture inferred from offer framing — validate when first deals close.
 slug: event-venues
 display: "Event Venues"
 playbook_path: "marketing/go-to-market/verticals/event-venues/README.md"
-personas: []
-offers: []
+personas:
+  - slug: director-of-operations
+    display: "Director of Operations"
+    titles:
+      - "Director of Operations"
+      - "VP of Operations"
+      - "Director of Venue Operations"
+      - "Operations Manager"
+      - "VP of Facilities & Operations"
+  - slug: director-of-events-entertainment
+    display: "Director of Events / Entertainment"
+    titles:
+      - "Director of Events"
+      - "Director of Entertainment"
+      - "Director of Programming"
+      - "Events Manager"
+      - "Director of Event Services"
+      - "VP of Events"
+offers:
+  - slug: venues-arenas
+    display: "Venues & Arenas"
+    status: draft
+    posture: knowledge
+    target_personas: [director-of-operations, director-of-events-entertainment]
+    prose_path: "marketing/go-to-market/verticals/event-venues/offers/venues-arenas.md"

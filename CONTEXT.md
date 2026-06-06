@@ -73,6 +73,61 @@ the action; the artifact is a normal Linear issue. There is no separate
 ticketing system.
 _Avoid_: implying "ticket" is a different object type than a Linear issue
 
+### GTM data model
+
+Terms for the GTM data layer spanning `plugins/marketing/data/canonicals/` and
+the campaign pipeline (plan-campaign → tam-mapping → list-building). Org-wide
+GTM vocabulary (posture enum, canonical slug rule) lives in the handbook's
+`vocabulary.md`; these are the repo-local concepts.
+
+**Discovery ICP**:
+The account-finding half of an ICP — industries, geography, size band,
+fit/intent signals, exclusions. Canonical home is per-vertical; answers "which
+companies are in this market?"
+_Avoid_: firmographic ICP, targeting criteria
+
+**Contact cascade**:
+The people-finding half of an ICP — personas and their title cascades in the
+vertical's canonical `{vertical}.yaml`. Answers "who at those companies?"
+Complementary to the Discovery ICP, never a substitute.
+_Avoid_: title list, persona titles
+
+**Vertical ICP file**:
+The canonical Discovery ICP for one vertical:
+`plugins/marketing/data/canonicals/icp/{vertical}.json`. Mandatory for every
+registered vertical (lint-enforced, ERROR level); schema-validated against
+`schema.json` like its sibling `{vertical}.yaml`. Segments-only — no base
+block; a single-audience vertical is the one-segment case. Stub form: empty
+`segments` + non-empty `clarifications_needed` (structurally distinguishable
+from ready, no honor-system flags).
+_Avoid_: vertical criteria, icp.json (ambiguous)
+
+**Criteria-file**:
+The per-campaign copy of a Discovery ICP that `tam-mapping` reads
+(`--criteria-file`, `docs/campaigns/{entity}/tam/{slug}/{segment}/icp.json`).
+Copied from the vertical's canonical Discovery ICP at scaffold time;
+campaign-specific narrowing happens in the copy, never upstream.
+_Avoid_: icp.json (ambiguous — names both the vertical canonical and the campaign copy)
+
+**Segment**:
+A named, self-contained Discovery ICP block inside a vertical's canonical ICP
+file (`"segments": { "<name>": { … } }`). A complete Discovery ICP in its own
+right — never a sparse override of the base; no merge semantics. Each segment
+names exactly one account universe and carries a `persona` cross-reference to
+the contact cascade that pairs with it. A campaign spanning two account
+universes uses two segments (two tam runs, two lists), never a unioned one.
+Org precedent: flagship-retail is a segment of shopping-centers (Head of GTM,
+2026-06-01).
+_Avoid_: sub-vertical, audience, override
+
+**Playbook vertical**:
+One of the 6 verticals with a pre-built playbook in
+`references/vertical-playbooks/` (aquariums, casinos, hotels-resorts,
+ski-resorts, sports-stadiums, zoos). Source material for authoring that
+vertical's ICP segments — NOT an alternate resolution path; tam-mapping's
+playbook auto-load is legacy for manual runs only.
+_Avoid_: pre-loaded vertical, plug-and-play vertical
+
 ### Agent tooling & evaluation
 
 > Terminology for how we build and test the plugins themselves (per [ADR-028](docs/decisions/028-skill-engineering-discipline.md)). These were conflated before, which produced false confidence ("tests pass" on a command that never ran).

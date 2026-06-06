@@ -1,10 +1,69 @@
-# Canonical entry for the Aquariums vertical (skeleton).
-# Source: handbook@main:marketing/go-to-market/verticals/aquariums/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Canonical entry for the Aquariums vertical.
+# Source: plugins/marketing/references/vertical-playbooks/aquariums.md
+#         (BC-5929 research grounding 2026-04-23; BC-5879 zoos-ledger aquarium snippets).
+# Status (handbook taxonomy): Future — consolidated into zoos handbook playbook 2026-05-06;
+#   aquariums-specific personas+offers backfilled from the in-repo playbook reference.
+# playbook_path updated 2026-06-05: handbook merged aquariums into
+#   marketing/go-to-market/verticals/zoos/README.md (Future-status adjacent segment);
+#   the original aquariums/README.md no longer exists at its old path.
+# History:
+#   2026-06-05 — personas+offers backfilled from references/vertical-playbooks/aquariums.md
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - vp-revenue: VP-titled Revenue roles are enterprise-flagship-only; do not exist at
+#     mid-market independent aquariums (BC-5929 R-5 research).
+#   - director-of-adult-programs: adult programming lives under Marketing/Events or Guest
+#     Experience as a portfolio at mid-market — standalone directorate did not surface.
+#   - director-of-development: fundraising-adjacent coalition partner for multi-year /
+#     capital-campaign scenarios only; not a first-call list-building target.
+#   - director-of-operations: secondary buyer for Offer 3 (Permanent Canvas), blocked
+#     pending R-19 / BC-5941; not a first-call target for V1 offers.
 slug: aquariums
 display: "Aquariums"
-playbook_path: "marketing/go-to-market/verticals/aquariums/README.md"
-personas: []
-offers: []
+playbook_path: "marketing/go-to-market/verticals/zoos/README.md"
+personas:
+  - slug: executive-director
+    display: "Executive Director / President & CEO"
+    titles:
+      - "Executive Director"
+      - "President & CEO"
+      - "President and CEO"
+      - "Chief Executive Officer"
+      - "VP & Executive Director"
+  - slug: director-of-marketing-admissions-revenue
+    display: "Director of Marketing & Admissions Revenue"
+    titles:
+      - "Director of Marketing & Admissions Revenue"
+      - "Director of Marketing"
+      - "Director of Marketing and Revenue"
+      - "VP of Marketing"
+      - "Director of Admissions & Marketing"
+      - "Director of Marketing & Communications"
+  - slug: director-of-corporate-partnerships
+    display: "Director of Corporate Partnerships"
+    titles:
+      - "Director of Corporate Partnerships"
+      - "Director of Partnerships"
+      - "VP of Corporate Partnerships"
+      - "Director of Sponsorship"
+      - "Director of Corporate Sponsorship"
+      - "Director of Development & Partnerships"
+  - slug: director-of-guest-experience
+    display: "Director of Guest Experience"
+    titles:
+      - "Director of Guest Experience"
+      - "VP of Guest Experience"
+      - "Director of Guest Services"
+      - "Director of Visitor Experience"
+      - "Director of Visitor Services"
+offers:
+  - slug: glow-native-21-plus-revenue-share
+    display: "Glow-Native 21+ Revenue-Share"
+    status: draft
+    posture: risk-reversal
+    target_personas: [executive-director, director-of-marketing-admissions-revenue]
+  - slug: production-finance-sponsor-stack
+    display: "Production Finance / Sponsor-Stack Program"
+    status: draft
+    posture: pilot
+    target_personas: [director-of-corporate-partnerships, executive-director]

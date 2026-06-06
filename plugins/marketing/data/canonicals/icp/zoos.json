@@ -1,0 +1,149 @@
+{
+  "vertical": "zoos",
+  "source": "plugins/marketing/references/vertical-playbooks/zoos.md",
+  "clarifications_needed": [
+    "Geography defaults to BN service territory priority markets named in handbook ICP 1 (Phoenix/AZ, Hogle/UT, Philadelphia, Tampa/FL, Central FL, NorCal, Tri-State NJ/NY, DMV) — SoCal explicitly excluded per handbook; confirm whether this territory list is current and whether look-alike states (OH, IL, TX) stay in scope",
+    "size_band uses operating budget as revenue proxy (ICP 1: $10M+ operating budget / 250K+ annual visitors; ICP 2: $2M–$20M / 100K–250K visitors) — these are attendance/budget figures, not employee counts; operator should supply employee-count bands if list-building tooling requires headcount",
+    "Offer E production-finance open risks flagged in playbook (sponsor-sales capability, city economic-dev funding timeline, ad-revenue unproven at zoos) should be reviewed before activating segments for outbound — the segments assume Offer E is live and ready to pitch"
+  ],
+  "segments": {
+    "aza-accredited-large": {
+      "display": "AZA-Accredited Large Zoos (250K+ visitors)",
+      "persona": "executive-director-ceo",
+      "industries": [
+        "Zoos & Botanical Gardens (NAICS 712130)",
+        "Amusement Parks & Arcades (NAICS 713110)",
+        "Museums (NAICS 712110)"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["AZ", "UT", "PA", "FL", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "CO", "TX", "OH", "IL", "NC", "WA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": 10000000,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Holiday light program announced or running (ZooLights, LumiNature, Wild Lights, Wildlights, or similar branded format)",
+        "AZA Annual Conference attendance or speaker listing",
+        "Director of Corporate Partnerships or Director of Development role change within 12 months",
+        "Economic-impact study published referencing tourism-bureau partnership",
+        "Capital-plan vote or bond-measure approval for zoo expansion",
+        "Sponsor-pipeline announcement or title-sponsor named in zoo annual report"
+      ],
+      "exclusions": [
+        "SoCal zoos (per BN service territory exclusion in handbook ICP 1)",
+        "Aquariums (separate playbook per BC-5879 split decision)",
+        "LED-retrofit / back-of-house habitat lighting projects (wrong motion, wrong buyer)",
+        "Hogle Zoo (confirmed existing Brite Labs delivery — existing client)",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Lincoln Park Zoo", "domain": "lpzoo.org"},
+        {"name": "Columbus Zoo and Aquarium", "domain": "columbuszoo.org"},
+        {"name": "Dallas Zoo", "domain": "dallaszoo.com"},
+        {"name": "Denver Zoo", "domain": "denverzoo.org"},
+        {"name": "Nashville Zoo", "domain": "nashvillezoo.org"},
+        {"name": "Philadelphia Zoo", "domain": "philadelphiazoo.org"},
+        {"name": "Phoenix Zoo", "domain": "phoenixzoo.org"},
+        {"name": "San Antonio Zoo", "domain": "sazoo.org"},
+        {"name": "Woodland Park Zoo", "domain": "zoo.org"},
+        {"name": "Smithsonian's National Zoo", "domain": "nationalzoo.si.edu"}
+      ]
+    },
+    "aza-accredited-mid-market": {
+      "display": "Mid-Market & Non-Accredited Zoos (100K–250K visitors)",
+      "persona": "director-of-events",
+      "industries": [
+        "Zoos & Botanical Gardens (NAICS 712130)",
+        "Amusement Parks & Arcades (NAICS 713110)"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["AZ", "UT", "PA", "FL", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "CO", "TX", "NC", "WA"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": 2000000,
+        "revenue_max": 20000000
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Peer zoo in same region recently launched or expanded a holiday light program",
+        "Board meeting agenda or press release referencing new revenue program planning",
+        "Executive Director role change within 9 months",
+        "Capital-budget approval for new programming initiative",
+        "AZA Annual Conference attendance",
+        "Ticket-on-sale announcement for first-season holiday event"
+      ],
+      "exclusions": [
+        "SoCal zoos (per BN service territory exclusion)",
+        "Aquariums (separate playbook)",
+        "Facilities with fewer than 15 guest-accessible outdoor acres (insufficient footprint for a holiday light trail)",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Tulsa Zoo", "domain": "tulsazoo.org"},
+        {"name": "Potawatomi Zoo", "domain": "potawatomizoo.org"},
+        {"name": "Cleveland Metroparks Zoo", "domain": "clevelandmetroparks.com"},
+        {"name": "Maryland Zoo", "domain": "marylandzoo.org"},
+        {"name": "Memphis Zoo", "domain": "memphiszoo.org"},
+        {"name": "Sacramento Zoo", "domain": "saczoo.org"},
+        {"name": "ZooTampa at Lowry Park", "domain": "zootampa.org"},
+        {"name": "Central Florida Zoo", "domain": "centralfloridazoo.org"},
+        {"name": "Oakland Zoo", "domain": "oaklandzoo.org"},
+        {"name": "Lincoln Children's Zoo", "domain": "lincolnchildrenszoo.org"}
+      ]
+    },
+    "sponsor-pipeline-targets": {
+      "display": "Zoos with Active Corporate Sponsor Programs (Offer E co-sell entry)",
+      "persona": "director-corporate-partnerships",
+      "industries": [
+        "Zoos & Botanical Gardens (NAICS 712130)"
+      ],
+      "geo": {
+        "country": "US",
+        "regions": ["AZ", "UT", "PA", "FL", "CA", "NY", "NJ", "CT", "VA", "MD", "DC", "IL", "TX", "CO", "OH", "NC"],
+        "zip_bands": []
+      },
+      "size_band": {
+        "employee_min": null,
+        "employee_max": null,
+        "revenue_min": 10000000,
+        "revenue_max": null
+      },
+      "tech_signals": [],
+      "intent_signals": [
+        "Named title-sponsor or presenting-sponsor listed in zoo annual report or sponsor page (Invesco QQQ, ComEd, CPS Energy, TXU Energy, Meijer precedents)",
+        "Director of Corporate Partnerships or Director of Development role change within 12 months",
+        "Destination-marketing bureau or tourism-office partnership announced",
+        "Economic-impact study published citing hotel-room-nights or net-new economic activity",
+        "Sponsor-pipeline announcement in corporate newsletter or press release"
+      ],
+      "exclusions": [
+        "Zoos with no existing corporate sponsorship program (Offer E sponsor-finance story requires an active sponsor pipeline to close)",
+        "SoCal zoos",
+        "Aquariums",
+        "Hogle Zoo (existing client)",
+        "Existing Brite Nites customers"
+      ],
+      "seed_accounts": [
+        {"name": "Lincoln Park Zoo", "domain": "lpzoo.org"},
+        {"name": "San Antonio Zoo", "domain": "sazoo.org"},
+        {"name": "Denver Zoo", "domain": "denverzoo.org"},
+        {"name": "Columbus Zoo and Aquarium", "domain": "columbuszoo.org"},
+        {"name": "Cleveland Metroparks Zoo", "domain": "clevelandmetroparks.com"},
+        {"name": "Dallas Zoo", "domain": "dallaszoo.com"},
+        {"name": "Nashville Zoo", "domain": "nashvillezoo.org"},
+        {"name": "Philadelphia Zoo", "domain": "philadelphiazoo.org"},
+        {"name": "Phoenix Zoo", "domain": "phoenixzoo.org"}
+      ]
+    }
+  }
+}

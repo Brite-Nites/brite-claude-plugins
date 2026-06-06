@@ -1,10 +1,39 @@
-# Canonical entry for the Tribes & Reservations (Non-Casino) vertical (skeleton).
+# Canonical entry for the Tribes & Reservations (Non-Casino) vertical.
 # Source: handbook@main:marketing/go-to-market/verticals/tribes-reservations/README.md
-# Status (handbook taxonomy): Exploring or Future — no Active offers yet.
-# Personas and offers will be promoted via /marketing:new-persona +
-# /marketing:new-offer (Path A bootstrap, ADR-016 § 4) as discovery progresses.
+# Status (handbook taxonomy): Pre-launch Research — single-ICP vertical playbook in early draft.
+# History:
+#   2026-06-05 — personas+offers backfilled from handbook vertical README
+#                (BC-11163 follow-up, PR #432).
+# Personas omitted:
+#   - Tribal Council / Tribal Chair: README identifies council as final budget authority for
+#     capital projects, but outreach is not directed at council cold; all first-call motion
+#     routes through Cultural Affairs / Tourism Office.
+# Casinos boundary: tribal casino properties are explicitly excluded from this vertical —
+#   gaming properties route to the casinos vertical.
+# Thin-source flag: the README offers table is fully TBD; offers below are inferred from the
+#   ICP + qualification section ($25K project minimum, 6–12 month sales cycle, warm-intro-first
+#   channel) and marked draft. No prose_path entries — no offer files exist to verify.
 slug: tribes-reservations
 display: "Tribes & Reservations (Non-Casino)"
 playbook_path: "marketing/go-to-market/verticals/tribes-reservations/README.md"
-personas: []
-offers: []
+personas:
+  - slug: cultural-affairs-director
+    display: "Director of Cultural Affairs / Tourism Office"
+    titles:
+      - "Director of Cultural Affairs"
+      - "Director of Tourism"
+      - "Cultural Resources Manager"
+      - "Special Events Coordinator"
+      - "Tourism Director"
+      - "Director of Cultural Programs"
+offers:
+  - slug: cultural-event-lighting-pilot
+    display: "Cultural Event Lighting Pilot"
+    status: draft
+    posture: pilot
+    target_personas: [cultural-affairs-director]
+  - slug: seasonal-holiday-community-program
+    display: "Seasonal / Holiday Community Program"
+    status: draft
+    posture: risk-reversal
+    target_personas: [cultural-affairs-director]
