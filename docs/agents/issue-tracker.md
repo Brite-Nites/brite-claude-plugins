@@ -33,3 +33,11 @@ Create a Linear issue with `save_issue` in the Brite Company team / Brite Skill 
   parent project — pass `project:` + `milestone:` together.
 - `save_comment` that mentions another `BC-NNNN` in plaintext bumps that issue's `updatedAt` via backlink
   (no state change). When verifying "issue X unchanged," check `status`/`completedAt`, not `updatedAt`.
+
+## See also
+
+**Which intake command do I use?** The full **intake & triage map** is canonical in the handbook
+(brain-queryable): handbook → [`revops-data-engineering/ai-tools/intake-triage-map.md`](https://github.com/Brite-Nites/handbook/blob/main/revops-data-engineering/ai-tools/intake-triage-map.md).
+It routes a product bug/idea **or** an agent-tooling issue to `/workflows:raise-a-ticket` (the single
+front door), a GTM offer/concept to `/marketing:capture-idea`, and processing an existing ticket to
+`/triage` — and notes the `bug-report` (deprecated, forwards) + `report-issue` (expert alias) status.
