@@ -1778,6 +1778,40 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12587 — plan-campaign deterministic builder harness (BC-12587)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_build_manifest.sh — the unit/contract
+# suite for build_manifest.py, the deterministic builder /marketing:plan-campaign
+# delegates to in both its normal and emit runs (ADR-028 D8 emit-mode seam). It
+# invokes the builder against the REAL canonicals + sub-issue-template files into
+# a temp out-dir and asserts the slug/dates/labels/issue-set/blockedBy structure,
+# the HARD-FAIL validation (canonicality/regex/labs-gate), determinism, and the
+# purity guard. RESULT contract line drives the count (matches 15a-bc-8731 etc.).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12587. plan-campaign builder regression harness (BC-12587)"
+
+bm_harness="$REPO_ROOT/plugins/marketing/scripts/test_build_manifest.sh"
+bm_helper="$REPO_ROOT/plugins/marketing/scripts/build_manifest.py"
+
+if [ ! -f "$bm_helper" ]; then
+  warn "plugins/marketing/scripts/build_manifest.py not found — builder harness skipped"
+elif [ ! -f "$bm_harness" ]; then
+  warn "plugins/marketing/scripts/test_build_manifest.sh not found — builder harness skipped"
+else
+  if bm_harness_out=$(bash "$bm_harness" "$bm_helper" 2>&1); then
+    bm_pass_count=$(printf '%s\n' "$bm_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$bm_pass_count" ]; then
+      pass "plan-campaign builder regression harness (${bm_pass_count} assertions)"
+    else
+      pass "plan-campaign builder regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "plan-campaign builder regression harness failed:"
+    printf '%s\n' "$bm_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-8728 — Shared utilities + offer-performance harnesses (BC-8728)
 # ──────────────────────────────────────────────────────────────────────
 # Runs plugins/marketing/scripts/test_shared_utilities.sh (canonicals_reader,
