@@ -407,7 +407,7 @@ Print the operator-readable plan. Use this format (or a close variant — readab
 
   Plugin manifest:
     Path:         docs/campaigns/<entity>/<slug>/manifest.json
-    Schema:       v1 (12 top-level keys per Step 7)
+    Schema:       v1 (top-level keys per Step 7)
 
   Linear milestone:
     Project:      "Brite GTM" (<gtm-project-id>)
@@ -478,6 +478,7 @@ The builder's `docs/campaigns/<entity>/<slug>/manifest.json` carries the FULL sc
   "vertical": "<vertical>",
   "persona": "<persona>",
   "offer": "<offer>",
+  "theme": "<theme or null>",
   "year": <year>,
   "month": <month>,
   "linear": {
@@ -502,7 +503,7 @@ The builder's `docs/campaigns/<entity>/<slug>/manifest.json` carries the FULL sc
 
 Initial state: `linear.milestone_id` and `salesforce.campaign_id` are `null`. These get backfilled in Step 8a + Step 8b respectively via `Read` → mutate JSON → `Write`.
 
-For cross-entity campaigns, `vertical` / `persona` / `offer` are still recorded for the (vertical, persona, offer) triple if provided (cross-entity campaigns may still have them); otherwise set to `null` (NOT empty string — empty string would break downstream parsers that distinguish "absent" from "empty").
+For cross-entity campaigns, `theme` carries the campaign identity (a first-class field, so the manifest is self-describing without slug-parsing), and `vertical` / `persona` / `offer` are recorded if provided, otherwise `null` (NOT empty string — empty string would break downstream parsers that distinguish "absent" from "empty"). For a full V/P/O campaign, `theme` is `null`. The builder (`build_manifest.py`) fills all of these.
 
 ### 7.1 — Confirm filesystem state
 

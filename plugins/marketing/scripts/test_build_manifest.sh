@@ -173,6 +173,7 @@ run_a() {  # standard happy path
   assert_json "A: manifest schema_version 1" "$out/manifest.json" "d['schema_version']==1"
   assert_json "A: manifest entity/vertical/persona/offer" "$out/manifest.json" \
     "d['entity']=='nites' and d['vertical']=='municipalities' and d['persona']=='parks-rec-director' and d['offer']=='parks-bond'"
+  assert_json "A: manifest theme null (full V/P/O campaign)" "$out/manifest.json" "d['theme'] is None"
   assert_json "A: manifest year/month" "$out/manifest.json" "d['year']==2026 and d['month']==5"
   assert_json "A: manifest linear/sf IDs null" "$out/manifest.json" \
     "d['linear']['milestone_id'] is None and d['salesforce']['campaign_id'] is None and d['email_bison']['campaign_id'] is None"
@@ -325,6 +326,8 @@ run_n() {  # cross-entity with theme
   assert_json "N: cross-entity slug" "$out/manifest.json" "d['slug']=='cross-entity-america-250-fy26-m05'"
   assert_json "N: V/P/O null in manifest" "$out/manifest.json" \
     "d['vertical'] is None and d['persona'] is None and d['offer'] is None"
+  assert_json "N: theme is first-class in manifest (self-describing)" "$out/manifest.json" \
+    "d['theme']=='america-250'"
   assert_json "N: 5 identity labels (no v/p/o labels)" "$out/issues.json" \
     "d['issues'][0]['labels']==['slug:cross-entity-america-250-fy26-m05','entity:cross-entity','year:2026','month:05','status:planning']"
 }
@@ -504,9 +507,25 @@ run_z() {  # --disambiguator < 2 guard (must be >= 2; v1 is the base slug)
   assert_substr "Z: disambiguator error" "disambiguator must be an integer >= 2"
 }
 
+run_aa() {  # bad --templates path → canonical ERROR (NOT a raw Python traceback)
+  local out; out="$(mk_out AA)"
+  invoke_builder --vertical municipalities --persona parks-rec-director --offer parks-bond \
+    --entity nites --month 5 --year 2026 --launch-date 2026-05-01 \
+    --eb-workspace emailbison-personal --owner-email marketingadmin@britenites.com \
+    --created-at 2026-05-01T00:00:00Z --canonicals-dir "$CANON_DIR" \
+    --templates "$tmproot/does-not-exist.md" --out-dir "$out"
+  assert_exit "AA: bad --templates path hard-fail" 2
+  assert_substr "AA: canonical I/O ERROR line" "ERROR: could not read a required input file"
+  if printf '%s' "$LAST_OUTPUT" | grep -q "Traceback (most recent call last)"; then
+    echo "  FAIL  AA: raw Python traceback leaked to stderr"; fail=$((fail + 1))
+  else
+    echo "  PASS  AA: no raw traceback (clean ERROR: contract held)"; pass=$((pass + 1))
+  fi
+}
+
 run_a; run_b; run_c; run_d; run_e; run_f; run_g; run_h; run_i; run_j
 run_k; run_l; run_m; run_n; run_o; run_p; run_q; run_r; run_s
-run_t; run_u; run_v; run_w; run_x; run_y; run_z
+run_t; run_u; run_v; run_w; run_x; run_y; run_z; run_aa
 
 echo ""
 echo "RESULT pass=$pass fail=$fail"

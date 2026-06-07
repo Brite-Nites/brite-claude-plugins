@@ -450,6 +450,7 @@ def build_manifest(a: argparse.Namespace, slug: str, created_at: str) -> dict:
         "vertical": a.vertical,
         "persona": a.persona,
         "offer": a.offer,
+        "theme": a.theme,
         "year": a.year,
         "month": a.month,
         "linear": {"milestone_id": None, "milestone_url": None, "project": "Brite GTM"},
@@ -547,6 +548,12 @@ def main(argv: list[str]) -> int:
         brief = build_brief(a, slug, canon_dir)
     except BuildError as exc:
         sys.stderr.write(str(exc) + "\n")
+        return 2
+    except OSError as exc:
+        # A bad --templates / --brief-template / --canonicals-dir path must surface
+        # as the canonical ERROR: line (the command relays builder stderr verbatim
+        # and the harness pattern-matches on it), not a raw Python traceback.
+        sys.stderr.write(f"ERROR: could not read a required input file: {exc}\n")
         return 2
 
     out_dir = Path(a.out_dir)
