@@ -23,7 +23,7 @@
       "name": "marketing",
       "source": "./plugins/marketing",
       "description": "Marketing domain plugin \u2014 brand-aware marketing skills ported from coreyhaines31/marketingskills",
-      "version": "0.13.0"
+      "version": "0.13.1"
     },
     {
       "name": "cadence",
@@ -35,7 +35,7 @@
       "name": "revops",
       "source": "./plugins/revops",
       "description": "Revenue operations plugin \u2014 Salesforce dev + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
-      "version": "0.5.6"
+      "version": "0.5.7"
     },
     {
       "name": "flow-architecture",

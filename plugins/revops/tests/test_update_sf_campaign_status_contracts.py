@@ -149,9 +149,10 @@ def test_invalid_status_has_flag_discriminator() -> None:
 def test_target_org_regex_documented() -> None:
     """Phase 0 must validate `--target-org` against the SF org alias character
     set BEFORE shell-interpolating it into Phase 0/6/7 `sf` CLI calls (the
-    guard is hoisted ahead of the Phase 0 sink per BC-12623; ordering is
-    locked by test_target_org_guard_precedes_phase_0_sink). Defense-in-depth
-    against shell injection.
+    guard is hoisted ahead of the Phase 0 sink per BC-12623; the guard-precedes-
+    sink ordering is now locked repo-wide by the consolidating lint
+    scripts/_lib/lint_target_org_guard.py per BC-12638, which subsumed the prior
+    per-file ordering test). Defense-in-depth against shell injection.
     """
     body = read_command()
     expected = r"^[a-zA-Z0-9._@-]+$"
@@ -381,64 +382,30 @@ def test_marketplace_json_version_mirrors_plugin_json() -> None:
 
 
 # ---------------------------------------------------------------------------
-# BC-12623 — `--target-org` guard-after-sink ordering. `--target-org`'s
-# EARLIEST sink is the Phase 0 `sf org display --target-org "<target-org>"`
-# shell-out, which ran BEFORE the Phase 1 regex guard validated it. The
-# `"<value>"` double-quoting blocks bare metacharacters but NOT `$(...)` /
-# backtick command substitution (the shell expands those inside double
-# quotes), so a value reached a shell before its guard. This command has a
-# SECOND `sf org display` in the Phase 7 fallback (post-guard, safe); the
-# guard must precede the FIRST (Phase 0). The fix is purely ORDERING — hoist
-# the existing `^[a-zA-Z0-9._@-]+$` guard ahead of the Phase 0 sink (no regex
-# change). Dual-applied with the create sibling per ADR-015 / BC-10511.
+# BC-12638 — guard-precedes-sink ordering is enforced repo-wide by the
+# consolidating lint scripts/_lib/lint_target_org_guard.py, which subsumed the
+# prior per-file `test_target_org_guard_precedes_phase_0_sink`. Invoke the lint
+# on this command file so the ordering check is also reachable from the pytest
+# suite in isolation, not only via validate.sh (Greptile PR #450 follow-up).
 # ---------------------------------------------------------------------------
 
 
-def test_target_org_guard_precedes_phase_0_sink() -> None:
-    """BC-12623: the `--target-org` shape guard must appear BEFORE its earliest
-    sink — the Phase 0 `sf org display --target-org "<target-org>"` shell-out.
+def test_target_org_guard_lint_passes() -> None:
+    """The `--target-org` guard-precedes-sink ordering for this command is
+    enforced by the consolidating lint (BC-12638). Run it here so a
+    guard-after-sink / orphaned-marker regression fails the pytest suite too,
+    not only validate.sh."""
+    import subprocess
+    import sys
 
-    Anchor on the UNIQUE guard emit-JSON, NOT the bare regex (which also
-    appears in the flag table BEFORE the sink, so it would be green on the
-    pre-fix buggy ordering — see test_target_org_regex_documented) and NOT the
-    bare `invalid_target_org` key (which recurs in the Error-path catalog row).
-    `str.find` returns the FIRST `sf org display` occurrence (Phase 0); the
-    Phase 7 fallback `sf org display` is a later, post-guard occurrence and is
-    irrelevant to this anchor. The guard's emit must precede the Phase 0 sink.
-
-    Mutation coverage (all three verified by hand):
-      (a) move the guard emit-JSON below the first `sf org display` -> the
-          `guard_pos < sink_pos` assertion fails.
-      (b) delete the guard emit-JSON -> the `count == 1` assertion fails
-          (drops to 0; this also blocks a `-1 < sink_pos` false-pass).
-          test_target_org_regex_documented is INDEPENDENT and still passes:
-          the bare regex also documents in the flag table, so the *guard* is
-          identified by its emit-JSON, not the bare regex.
-      (c) re-emit the JSON in the Phase-1 cross-reference -> the `count == 1`
-          assertion fails (rises to 2).
-    """
-    body = read_command()
-    guard_emit = '{"error":"invalid_target_org","value":"<value>"}'
-    sink = "sf org display"
-
-    # The emit-JSON must stay unique so the ordering anchor is unambiguous: a
-    # second copy (e.g. a Phase-1 cross-reference that re-emits it) would let
-    # the authoritative guard regress below the sink while str.find still
-    # pointed at the pre-sink copy. The Phase-1 cross-reference must be
-    # prose-only.
-    assert body.count(guard_emit) == 1, (
-        f"BC-12623: guard emit-JSON {guard_emit!r} must appear EXACTLY once "
-        f"so the ordering anchor is unambiguous; got {body.count(guard_emit)}."
+    lint = ROOT.parents[1] / "scripts" / "_lib" / "lint_target_org_guard.py"
+    assert lint.is_file(), f"consolidating lint not found at {lint}"
+    result = subprocess.run(
+        [sys.executable, str(lint), str(COMMAND_PATH)],
+        capture_output=True,
+        text=True,
     )
-
-    guard_pos = body.find(guard_emit)
-    sink_pos = body.find(sink)
-    assert sink_pos != -1, f"BC-12623: Phase 0 sink {sink!r} not found in body"
-    assert guard_pos < sink_pos, (
-        f"BC-12623: the --target-org guard (emit-JSON at index {guard_pos}) "
-        f"must precede its earliest sink `sf org display` (index {sink_pos}). "
-        f"The Phase 0 shell-out interpolates --target-org into a double-quoted "
-        f"string that does NOT block $(...) / backtick command substitution, "
-        f"so the `^[a-zA-Z0-9._@-]+$` guard MUST run first (hoist it above the "
-        f"Phase 0 shell-out, and above the skip-on-dry-run gate)."
+    assert result.returncode == 0, (
+        f"target-org guard-precedes-sink lint failed for {COMMAND_PATH.name} "
+        f"(rc={result.returncode}):\n{result.stdout}{result.stderr}"
     )

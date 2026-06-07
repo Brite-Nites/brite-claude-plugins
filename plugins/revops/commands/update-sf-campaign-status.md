@@ -37,6 +37,7 @@ If any required flag is missing, emit `{"error":"missing_required_flag","flag":"
 
 ## Phase 0 — Resolve target-org metadata (recommended optimization)
 
+<!-- guard:target-org -->
 **First, validate `--target-org` (always — even on `--dry-run`).** If `--target-org` was explicitly supplied, it MUST match regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Otherwise emit `{"error":"invalid_target_org","value":"<value>"}` exit 0 and stop **without running any shell-out**. This is the shell-injection guard, and it lives here because the metadata shell-out below is `--target-org`'s *earliest* sink: the value is interpolated into a double-quoted `sf` argument, which blocks bare metacharacters but NOT `$(...)` / backtick command substitution — so the regex (which excludes `$`, `(`, `)`, backticks, whitespace) MUST run before that interpolation. This validation runs on **every** path; it is NOT subject to the `--dry-run` skip below. Dual-applied with the `/revops:create-sf-campaign` sibling per ADR-015 amendment (BC-10511 + BC-12623).
 
 Then resolve metadata — run via the `Bash` tool ONCE per invocation (skip on `--dry-run`):
@@ -44,6 +45,8 @@ Then resolve metadata — run via the `Bash` tool ONCE per invocation (skip on `
 ```bash
 sf org display --target-org "<target-org>" --json
 ```
+
+> **Canonical reference (BC-12639, ADR-028 emit-mode seam):** the regex this guard applies mirrors, byte-identically, the deterministic side-effect-free validator [`plugins/revops/scripts/validate_target_org.py`](../scripts/validate_target_org.py) (`exit 0` accept / non-zero reject for the same `^[a-zA-Z0-9._@-]+$`). That validator is behaviorally eval'd (`test_validate_target_org.sh`, wired into `validate.sh`) against real injection payloads (`$(touch pwned)`, backtick, `x'; DROP`) asserting rejection **and** no side effect — so the regex is *proven to reject*, not assumed. The command applies the regex inline (in the guard above); keep it byte-identical to the validator. The consolidating lint (`scripts/_lib/lint_target_org_guard.py`) enforces the byte-identity and that the `<!-- guard:target-org -->` marker is bound to the guard prose before the Phase 0 sink.
 
 Cache from the response:
 

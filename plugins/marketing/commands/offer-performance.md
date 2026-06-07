@@ -25,7 +25,10 @@ Per-offer-version performance synthesis for GTM Campaign Orchestration v1.0.
 
 ### Phase 0 — Resolve SF target-org metadata
 
-Mirror the BC-8717/BC-8723/BC-8731 metadata cache pattern:
+<!-- guard:target-org -->
+**First, validate `--target-org` — before the metadata shell-out below (its earliest sink).** If `--target-org` was explicitly supplied, validate it against regex `^[a-zA-Z0-9._@-]+$`. On mismatch, **hard-fail (exit non-zero)** with: `ERROR: --target-org failed regex (^[a-zA-Z0-9._@-]+$); got '<value-truncated-to-80-chars-with-control-bytes-stripped>'.` (Truncate the echoed value to 80 chars and strip ASCII control bytes 0x00–0x1F + 0x7F.) The shell-out below interpolates `--target-org` into a double-quoted `sf` argument, which blocks bare metacharacters but **not** `$(...)` / backtick command substitution — so this regex (which excludes `$`, `(`, `)`, backticks, whitespace) MUST run **before** that interpolation (guard-precedes-sink; BC-12638). Keep the regex byte-identical to `/marketing:portfolio-snapshot` and the revops σ3 siblings — the consolidating lint (`scripts/_lib/lint_target_org_guard.py`) enforces both the byte-identity and that this `<!-- guard:target-org -->` marker precedes the sink.
+
+Then mirror the BC-8717/BC-8723/BC-8731 metadata cache pattern:
 
 ```bash
 sf org display --target-org "<target-org>" --json
@@ -39,7 +42,7 @@ If `sf org display` fails, set `sf_unavailable=true` and proceed. Phase 3 degrad
 
 1. Validate `--offer-slug` against canonicals using the shared `canonicals_reader.validate_canonical_ref`. On mismatch, hard-fail with a clear error.
 2. Auto-detect `--entity` if absent: look up from matching manifest.json or from canonicals.
-3. Validate `--target-org` regex if provided.
+3. `--target-org` is validated earlier, in **Phase 0** (its earliest sink) — see there; the `^[a-zA-Z0-9._@-]+$` shell-injection guard runs before the value reaches the `sf` CLI shell-out.
 
 ### Phase 2 — Read plugin filesystem
 

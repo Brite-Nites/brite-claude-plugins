@@ -103,7 +103,7 @@ The character class is deliberately tight: blocks shell metacharacters (`$`, bac
 3. `--target-org` regex appears verbatim in the command body
 4. `--target-org` regex is **byte-identical** to the sibling `/revops:update-sf-campaign-status` regex — sibling drift surfaces immediately on either side's test run
 5. `invalid_target_org` appears in the soft-fail error-key roster (7 keys total now: `missing_required_flag`, `invalid_slug_format`, `invalid_target_org`, `invalid_owner_email`, `duplicate_slug`, `missing_owner`, `sf_cli_error` — `invalid_owner_email` added by BC-12594)
-6. **(BC-12623)** the `--target-org` guard precedes its earliest sink — the guard's emit-JSON `{"error":"invalid_target_org","value":"<value>"}` appears *before* the first `sf org display` in the command body (anchored on the emit-JSON, not the bare regex, which also appears in the flag table before the sink). Locked in both `test_create_sf_campaign_contracts.py` and `test_update_sf_campaign_status_contracts.py` by `test_target_org_guard_precedes_phase_0_sink`.
+6. **(BC-12623 → BC-12638)** the `--target-org` guard precedes its earliest sink. Originally locked per-file by `test_target_org_guard_precedes_phase_0_sink` (emit-JSON anchored). **Superseded** by the repo-wide consolidating lint `scripts/_lib/lint_target_org_guard.py` (BC-12638), which subsumes those per-file tests: it requires a standalone `<!-- guard:target-org -->` marker before the earliest sink **with the canonical regex documented in the window between the marker and the sink** (binding the marker to the real guard prose — a flag-table mention before the marker or a cross-reference after the sink does not satisfy it). The per-file tests are now deleted; the lint catches the same relocate/delete regressions idiom-agnostically across both σ3 commands *and* the marketing siblings. See the 2026-06-07 amendment.
 
 The byte-identity test (#4) is the canonical lock: a unilateral edit to one sibling's regex fails the OTHER sibling's test — neither command can drift in isolation. Identical contract tests live in `test_update_sf_campaign_status_contracts.py`.
 
@@ -113,10 +113,36 @@ If a third σ3 SF-write command is added, it MUST:
 
 - Adopt Pattern 1 (Phase 0 metadata cache, single `sf org display` invocation).
 - Adopt Pattern 2 (`--target-org` regex with the same character class).
+- Adopt Pattern 3 (guard-precedes-sink ordering — `<!-- guard:target-org -->` marker before the earliest sink; see the 2026-06-07 amendment).
 - Add a byte-identity contract test against this canonical pair.
 - Be listed in this amendment's Linear refs.
 
 The ~5-tool threshold (per the 2026-05-19 amendment for when a Brite-owned MCP server earns its boilerplate) still bounds the slash-commands-vs-MCP-server decision — but inside the slash-commands choice, σ3 siblings MUST be uniform.
+
+## Amendment 2026-06-07 — guard-precedes-sink generalized repo-wide (BC-12637)
+
+**Linear:** [BC-12637](https://linear.app/brite-nites/issue/BC-12637) (epic), [BC-12638](https://linear.app/brite-nites/issue/BC-12638) (coverage + consolidating lint), [BC-12639](https://linear.app/brite-nites/issue/BC-12639) (ADR-028 behavioral eval). Spawned by [BC-12623](https://linear.app/brite-nites/issue/BC-12623) (PR #446).
+
+BC-12623 fixed the `--target-org` guard-after-sink window in the **two σ3 commands only**. A systematic repo-wide sweep (BC-12637) then found the premise of the "operator commands" worry was overstated **and** that the σ3 pair was not the whole surface:
+
+- **Operator-facing revops commands are NOT in scope.** `deploy-prod` / `deploy-sandbox` / `doctor` / `setup-sandbox` / `post-deploy-runbook` **hardcode** `--target-org brite-prod` / `brite-sandbox` as literal aliases — they accept no `--target-org` input flag, so there is no value to inject (guarding a string constant is dead code). `post-deploy-runbook`'s `sf apex run --target-org <alias>` is an operator copy-paste runbook snippet, not a command-driven sink.
+- **Two MARKETING commands were the real, previously-missed finding.** `/marketing:offer-performance` and `/marketing:portfolio-snapshot` interpolate a placeholder `--target-org "<target-org>"` from a `--target-org` flag **and both carried the identical guard-after-sink defect** (Phase 0 `sf org display` sink before the Phase 1 guard). Both are hoisted per Pattern 3. Their failure idiom is **hard-fail exit non-zero `ERROR:`** (truncate-80 + strip control bytes), *not* σ3's soft-fail JSON — idiom is per-command; only the guard *placement* and the regex are uniform.
+
+### Pattern 3 — guard-precedes-sink ordering (generalized)
+
+Any command (in **any** plugin) that interpolates a **non-literal** `--target-org` (a `<placeholder>` / `$var`, not a literal alias) into an executable `sf` shell-out MUST place its `^[a-zA-Z0-9._@-]+$` shape guard **before** the value's earliest sink — and above any skip-on-dry-run / cache-hit gate ("validate-then-resolve"). The guard is anchored by a standalone `<!-- guard:target-org -->` marker **bound to the guard prose**: the canonical regex must appear in the window *between the marker and the earliest sink* (idiom-agnostic — it generalizes across σ3's soft-fail-JSON and marketing's hard-fail-`ERROR:` contracts, where BC-12623's emit-JSON anchor could not, while staying positionally precise so a flag-table mention before the marker or a cross-reference after the sink cannot satisfy it). A command whose bash-fenced non-literal `--target-org` is *not* a real command-driven sink declares a non-silent, sink-scoped `<!-- guard:target-org:exempt <reason> -->`.
+
+### Enforcement — consolidating lint subsumes the per-file ordering tests
+
+`scripts/_lib/lint_target_org_guard.py` (wired into `validate.sh`) is the single repo-wide gate: for every `plugins/*/commands/*.md` with an executable non-literal `--target-org` sink (detected inside ` ```bash `/`sh`/`shell`/`~~~`/unlabeled fences, `=`- or whitespace-separated, quote-tolerant), it asserts a standalone `<!-- guard:target-org -->` marker precedes the earliest sink **and** the canonical regex is bound in the marker→sink window. Because the bind is positional, it catches the regressions the deleted per-file tests caught — relocating the guard prose below the sink, or deleting it while a regex mention survives elsewhere — **idiom-agnostically across both σ3 commands and the marketing siblings** (verified by re-running those exact mutations against the real σ3 file). It thus **subsumes** BC-12623's two bespoke per-file `test_target_org_guard_precedes_phase_0_sink` tests (now deleted) and fires on any *future* non-literal passthrough in either plugin — the systematic end to the BC-10511 → BC-12594 → BC-12623 whack-a-mole. The exemption is **sink-scoped** (an exempt marker governs only the earliest sink it precedes — it cannot mask a later real sink).
+
+### ADR-028 behavioral eval (depth)
+
+BC-12623's ordering test was a structural markdown-grep *proxy* — it proved placement, never that the guard *rejects* `$(...)`. `plugins/revops/scripts/validate_target_org.py` extracts the σ3 guard as a deterministic, side-effect-free validator; `test_validate_target_org.sh` (in `validate.sh`) executes it against real injection payloads asserting rejection **and** no side effect. First security worked example of [ADR-028](028-skill-engineering-discipline.md)'s behavioral-eval tier. (σ3-only — cross-plugin distribution blocks a marketing-shared validator file.)
+
+### Audit-invariant roster drift-guard
+
+Deferred to [BC-12640](https://linear.app/brite-nites/issue/BC-12640): a machine-check that the audit-invariant error-key roster above (7 keys) matches the actual command catalogs — would have auto-caught the "6 keys → 7" staleness BC-12623 fixed by hand.
 
 ## Cross-references
 
