@@ -90,7 +90,9 @@ If Phase 0's `sf org display` itself fails, no separate error is emitted — Pha
 
 ### Pattern 2 — `--target-org` regex shell-injection guard (BC-10511)
 
-Both commands validate `--target-org` (when explicitly supplied) against regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set) at Phase 1, before any shell-out. Mismatch emits `{"error":"invalid_target_org","value":"<value>"}` exit 0 — soft-fail per the σ3 contract.
+Both commands validate `--target-org` (when explicitly supplied) against regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set) in **Phase 0, before any shell-out**. Mismatch emits `{"error":"invalid_target_org","value":"<value>"}` exit 0 — soft-fail per the σ3 contract.
+
+> **BC-12623 ordering correction.** The guard originally landed in Phase 1 — *after* Phase 0's `sf org display --target-org "<target-org>"` metadata fetch, which is `--target-org`'s **earliest** sink. The `"<value>"` double-quoting blocks bare metacharacters but not `$(...)` / backtick command substitution, so the value reached a shell before its guard. BC-12623 hoists the (unchanged) regex guard ahead of the Phase 0 shell-out in **both** commands — purely an ordering fix, no regex change — making the "before any shell-out" claim above true. The guard sits *above* Phase 0's `skip on --dry-run` gate so validation still runs on the dry-run path.
 
 The character class is deliberately tight: blocks shell metacharacters (`$`, backticks, `;`, `&`, `|`, `>`, `<`, quotes, whitespace, parentheses) while accepting every character SF aliases and usernames legitimately use (alphanumerics, dot, underscore, at, hyphen). `--target-org` flows into `sf` CLI invocations in Phase 0 + Phase 5 + (pre-backport) Phase 6, so the guard is a defense-in-depth for shell-injection.
 
@@ -101,6 +103,7 @@ The character class is deliberately tight: blocks shell metacharacters (`$`, bac
 3. `--target-org` regex appears verbatim in the command body
 4. `--target-org` regex is **byte-identical** to the sibling `/revops:update-sf-campaign-status` regex — sibling drift surfaces immediately on either side's test run
 5. `invalid_target_org` appears in the soft-fail error-key roster (6 keys total now: `missing_required_flag`, `invalid_slug_format`, `invalid_target_org`, `duplicate_slug`, `missing_owner`, `sf_cli_error`)
+6. **(BC-12623)** the `--target-org` guard precedes its earliest sink — the guard's emit-JSON `{"error":"invalid_target_org","value":"<value>"}` appears *before* the first `sf org display` in the command body (anchored on the emit-JSON, not the bare regex, which also appears in the flag table before the sink). Locked in both `test_create_sf_campaign_contracts.py` and `test_update_sf_campaign_status_contracts.py` by `test_target_org_guard_precedes_phase_0_sink`.
 
 The byte-identity test (#4) is the canonical lock: a unilateral edit to one sibling's regex fails the OTHER sibling's test — neither command can drift in isolation. Identical contract tests live in `test_update_sf_campaign_status_contracts.py`.
 
