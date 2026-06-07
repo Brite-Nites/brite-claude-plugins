@@ -523,9 +523,19 @@ run_aa() {  # bad --templates path → canonical ERROR (NOT a raw Python traceba
   fi
 }
 
+run_bb() {  # --theme passed with a non-cross-entity entity → ignored (manifest theme null)
+  local out; out="$(mk_out BB)"
+  invoke_std "$out" --theme some-theme
+  assert_exit "BB: --theme on non-cross-entity exit 0 (ignored, not rejected)" 0
+  assert_json "BB: manifest theme null (theme ignored for full V/P/O)" "$out/manifest.json" \
+    "d['theme'] is None"
+  assert_json "BB: slug unchanged (theme not folded into a V/P/O slug)" "$out/manifest.json" \
+    "d['slug']=='municipalities-parks-rec-director-parks-bond-fy26-m05'"
+}
+
 run_a; run_b; run_c; run_d; run_e; run_f; run_g; run_h; run_i; run_j
 run_k; run_l; run_m; run_n; run_o; run_p; run_q; run_r; run_s
-run_t; run_u; run_v; run_w; run_x; run_y; run_z; run_aa
+run_t; run_u; run_v; run_w; run_x; run_y; run_z; run_aa; run_bb
 
 echo ""
 echo "RESULT pass=$pass fail=$fail"
