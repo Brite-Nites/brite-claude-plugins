@@ -354,3 +354,66 @@ def test_owner_email_regex_byte_identical_to_marketing() -> None:
         f"truth may have drifted; re-sync required so the marketing->revops "
         f"boundary stays consistent."
     )
+
+
+# ---------------------------------------------------------------------------
+# BC-12623 — `--target-org` guard-after-sink ordering. `--target-org`'s
+# EARLIEST sink is the Phase 0 `sf org display --target-org "<target-org>"`
+# shell-out, which ran BEFORE the Phase 1 regex guard validated it. The
+# `"<value>"` double-quoting blocks bare metacharacters but NOT `$(...)` /
+# backtick command substitution (the shell expands those inside double
+# quotes), so a value reached a shell before its guard. The fix is purely
+# ORDERING — hoist the existing `^[a-zA-Z0-9._@-]+$` guard ahead of the sink
+# (no regex change). This test locks that ordering.
+# ---------------------------------------------------------------------------
+
+
+def test_target_org_guard_precedes_phase_0_sink() -> None:
+    """BC-12623: the `--target-org` shape guard must appear BEFORE its earliest
+    sink — the Phase 0 `sf org display --target-org "<target-org>"` shell-out.
+
+    Anchor on the UNIQUE guard emit-JSON, NOT the bare regex (which also
+    appears in the flag table BEFORE the sink, so it would be green on the
+    pre-fix buggy ordering — see test_target_org_regex_present_verbatim) and
+    NOT the bare `invalid_target_org` key (which recurs in the Error-path
+    catalog row). `str.find` returns the FIRST `sf org display` occurrence
+    (Phase 0, the only one in this command per
+    test_exactly_one_sf_org_display_invocation); the guard's emit must precede
+    it.
+
+    Mutation coverage (all three verified by hand):
+      (a) move the guard emit-JSON below the first `sf org display` -> the
+          `guard_pos < sink_pos` assertion fails.
+      (b) delete the guard emit-JSON -> the `count == 1` assertion fails
+          (drops to 0; this also blocks a `-1 < sink_pos` false-pass).
+          test_target_org_regex_present_verbatim is INDEPENDENT and still
+          passes: the bare regex also documents in the flag table, so the
+          *guard* is identified by its emit-JSON, not the bare regex.
+      (c) re-emit the JSON in the Phase-1 cross-reference -> the `count == 1`
+          assertion fails (rises to 2).
+    """
+    body = read_command()
+    guard_emit = '{"error":"invalid_target_org","value":"<value>"}'
+    sink = "sf org display"
+
+    # The emit-JSON must stay unique so the ordering anchor is unambiguous: a
+    # second copy (e.g. a Phase-1 cross-reference that re-emits it) would let
+    # the authoritative guard regress below the sink while str.find still
+    # pointed at the pre-sink copy. The Phase-1 cross-reference must be
+    # prose-only.
+    assert body.count(guard_emit) == 1, (
+        f"BC-12623: guard emit-JSON {guard_emit!r} must appear EXACTLY once "
+        f"so the ordering anchor is unambiguous; got {body.count(guard_emit)}."
+    )
+
+    guard_pos = body.find(guard_emit)
+    sink_pos = body.find(sink)
+    assert sink_pos != -1, f"BC-12623: Phase 0 sink {sink!r} not found in body"
+    assert guard_pos < sink_pos, (
+        f"BC-12623: the --target-org guard (emit-JSON at index {guard_pos}) "
+        f"must precede its earliest sink `sf org display` (index {sink_pos}). "
+        f"The Phase 0 shell-out interpolates --target-org into a double-quoted "
+        f"string that does NOT block $(...) / backtick command substitution, "
+        f"so the `^[a-zA-Z0-9._@-]+$` guard MUST run first (hoist it above the "
+        f"Phase 0 shell-out, and above the skip-on-dry-run gate)."
+    )

@@ -26,14 +26,16 @@ Parse from the invocation (e.g. `/revops:create-sf-campaign --slug=... --entity=
 | `--month` | yes | Integer 1-12. |
 | `--owner-email` | yes | SF user email (literal username, NOT alias — per `gotcha_sf_mcp_username_not_alias.md`). |
 | `--launch-date` | yes | ISO `YYYY-MM-DD`. Maps to `Campaign.StartDate`. |
-| `--target-org` | no | Defaults to `brite-prod` (SF prod-org canonical alias). When supplied, validated against regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Used as a shell argument to `sf` CLI — Phase 1's regex blocks shell-injection metacharacters. NOTE: This default does NOT auto-read `~/.sf/config.json`'s `target-org`. If the caller wants the SF MCP's session default, they MUST resolve it via `mcp__plugin_revops_salesforce__get_username(defaultTargetOrg=true).value` and pass that as `--target-org` explicitly. BC-8727 friction-log F11. |
+| `--target-org` | no | Defaults to `brite-prod` (SF prod-org canonical alias). When supplied, validated against regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Used as a shell argument to `sf` CLI — the Phase 0 regex (validated before the metadata shell-out, `--target-org`'s earliest sink) blocks shell-injection metacharacters. NOTE: This default does NOT auto-read `~/.sf/config.json`'s `target-org`. If the caller wants the SF MCP's session default, they MUST resolve it via `mcp__plugin_revops_salesforce__get_username(defaultTargetOrg=true).value` and pass that as `--target-org` explicitly. BC-8727 friction-log F11. |
 | `--dry-run` | no | Boolean. If present, print preview JSON and exit without inserting. |
 
 If any required flag is missing, emit `{"error":"missing_required_flag","flag":"<name>"}` exit 0 and stop. Do NOT prompt the user — orchestrators expect non-interactive behavior.
 
 ## Phase 0 — Resolve target-org metadata (recommended optimization)
 
-Run via the `Bash` tool ONCE per invocation (skip on `--dry-run`):
+**First, validate `--target-org` (always — even on `--dry-run`).** If `--target-org` was explicitly supplied, it MUST match regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Otherwise emit `{"error":"invalid_target_org","value":"<value>"}` exit 0 and stop **without running any shell-out**. This is the shell-injection guard, and it lives here because the metadata shell-out below is `--target-org`'s *earliest* sink: the value is interpolated into a double-quoted `sf` argument, which blocks bare metacharacters but NOT `$(...)` / backtick command substitution — so the regex (which excludes `$`, `(`, `)`, backticks, whitespace) MUST run before that interpolation. This validation runs on **every** path; it is NOT subject to the `--dry-run` skip below. Mirrors `/revops:update-sf-campaign-status` Phase 0 for sibling parity per ADR-015 amendment (BC-10511 + BC-12623).
+
+Then resolve metadata — run via the `Bash` tool ONCE per invocation (skip on `--dry-run`):
 
 ```bash
 sf org display --target-org "<target-org>" --json
@@ -48,10 +50,9 @@ If the call fails, do NOT emit a separate error — fall through to Phase 2 and 
 
 ## Phase 1 — Validate input
 
-Check (in order; fail-fast on first mismatch):
+`--target-org` is validated earlier, in **Phase 0** (its earliest sink) — see there; its `^[a-zA-Z0-9._@-]+$` shell-injection guard runs before the value is interpolated into any `sf` CLI shell-out (Phase 0/5/6). The remaining inputs are checked here (in order; fail-fast on first mismatch):
 
 - `--slug` matches regex `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$`. Otherwise emit `{"error":"invalid_slug_format","slug":"<value>"}` exit 0. This is also a SOQL-injection guard — the slug flows into a SOQL string literal in Phase 2, and the regex character class disallows quotes / backslashes / whitespace.
-- `--target-org` (if explicitly supplied) matches regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Otherwise emit `{"error":"invalid_target_org","value":"<value>"}` exit 0. This is a shell-injection guard — the value is interpolated into `sf` CLI shell-outs in Phase 0/5/6. Mirrors `/revops:update-sf-campaign-status` Phase 1 (BC-8723) for sibling parity per ADR-015 amendment (BC-10511).
 - `--owner-email` matches regex `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` (the canonical EMAIL_REGEX, byte-identical to the marketing-side callers `/marketing:plan-campaign` Step 4.2 / `/marketing:import-campaign` Step 5). Otherwise emit `{"error":"invalid_owner_email","value":"<value>"}` exit 0. This is also a SOQL-injection guard — the email flows into a SOQL string literal in Phase 3 (`WHERE Email = '<owner-email>'`), and the regex character class disallows quotes / backslashes / whitespace. An empty or whitespace-only value also fails this regex (rejected as `invalid_owner_email` for a precise diagnostic; security-neutral, since `WHERE Email = ''` is a harmless 0-row lookup that would otherwise fall through to Phase 3's `missing_owner`).
 
 ## Phase 2 — Idempotency precheck
@@ -161,7 +162,7 @@ This is the canonical success shape. Orchestrators capture `campaign_id` into `m
 |---|---|---|
 | `missing_required_flag` | A required flag was omitted | Caller re-invokes with full flag set |
 | `invalid_slug_format` | `--slug` fails regex | Caller normalizes slug (per ADR-012 + canonicals lint) |
-| `invalid_target_org` | Phase 1 `--target-org` regex `^[a-zA-Z0-9._@-]+$` rejected the input | Caller normalizes alias / username to the SF org alias character set; defense against shell injection into Phase 0/5/6. Mirrors `/revops:update-sf-campaign-status` (BC-8723) for sibling parity per ADR-015 amendment (BC-10511). |
+| `invalid_target_org` | Phase 0 `--target-org` regex `^[a-zA-Z0-9._@-]+$` rejected the input (validated before the Phase 0 shell-out, its earliest sink) | Caller normalizes alias / username to the SF org alias character set; defense against shell injection into Phase 0/5/6. Mirrors `/revops:update-sf-campaign-status` (BC-8723) for sibling parity per ADR-015 amendment (BC-10511 + BC-12623). |
 | `invalid_owner_email` | Phase 1 `--owner-email` regex `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` rejected the input (incl. empty / whitespace-only) | Caller normalizes to a valid email address; defense against SOQL injection into Phase 3's `WHERE Email = '<owner-email>'` literal. Byte-identical to the marketing-side EMAIL_REGEX (`/marketing:plan-campaign` Step 4.2). |
 | `duplicate_slug` | Phase 2 SOQL found existing Campaign | Caller treats as idempotent success; the existing `Id` is in `existing_id` |
 | `missing_owner` | Phase 3 returned 0 rows | Caller verifies `--owner-email` is an active SF user, OR provisions the user |

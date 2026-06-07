@@ -20,7 +20,7 @@ Parse from the invocation (e.g. `/revops:update-sf-campaign-status --slug=... --
 | `--slug` | yes | Mirrors `Campaign.Name`. The slug uniquely identifies the SF Campaign created by `/revops:create-sf-campaign`. |
 | `--linear-status` | yes | One of `planning` / `active` / `completed` / `killed`. Mirrors the Linear label set per O1. |
 | `--linear-substatus` | no | Empty or `paused`. Only meaningful when `--linear-status=active`. Other combinations ignore this flag (mapping table treats it as `(any)`). |
-| `--target-org` | no | Defaults to `brite-prod`. When supplied, validated against regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Used as a shell argument to `sf` CLI — Phase 1's regex blocks shell-injection metacharacters. |
+| `--target-org` | no | Defaults to `brite-prod`. When supplied, validated against regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Used as a shell argument to `sf` CLI — the Phase 0 regex (validated before the metadata shell-out, `--target-org`'s earliest sink) blocks shell-injection metacharacters. |
 | `--dry-run` | no | Boolean. If present, print mapping + UPDATE preview JSON and exit without writing. |
 
 If any required flag is missing, emit `{"error":"missing_required_flag","flag":"<name>"}` exit 0 and stop. Do NOT prompt the user — orchestrators expect non-interactive behavior.
@@ -37,7 +37,9 @@ If any required flag is missing, emit `{"error":"missing_required_flag","flag":"
 
 ## Phase 0 — Resolve target-org metadata (recommended optimization)
 
-Run via the `Bash` tool ONCE per invocation (skip on `--dry-run`):
+**First, validate `--target-org` (always — even on `--dry-run`).** If `--target-org` was explicitly supplied, it MUST match regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Otherwise emit `{"error":"invalid_target_org","value":"<value>"}` exit 0 and stop **without running any shell-out**. This is the shell-injection guard, and it lives here because the metadata shell-out below is `--target-org`'s *earliest* sink: the value is interpolated into a double-quoted `sf` argument, which blocks bare metacharacters but NOT `$(...)` / backtick command substitution — so the regex (which excludes `$`, `(`, `)`, backticks, whitespace) MUST run before that interpolation. This validation runs on **every** path; it is NOT subject to the `--dry-run` skip below. Dual-applied with the `/revops:create-sf-campaign` sibling per ADR-015 amendment (BC-10511 + BC-12623).
+
+Then resolve metadata — run via the `Bash` tool ONCE per invocation (skip on `--dry-run`):
 
 ```bash
 sf org display --target-org "<target-org>" --json
@@ -52,10 +54,9 @@ If the call fails, do NOT emit a separate error — fall through to Phase 2 and 
 
 ## Phase 1 — Validate input
 
-Check (in order; fail-fast on first mismatch):
+`--target-org` is validated earlier, in **Phase 0** (its earliest sink) — see there; its `^[a-zA-Z0-9._@-]+$` shell-injection guard runs before the value is interpolated into any `sf` CLI shell-out (Phase 0/6/7). The remaining inputs are checked here (in order; fail-fast on first mismatch):
 
 - `--slug` matches regex `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$`. Otherwise emit `{"error":"invalid_slug_format","slug":"<value>"}` exit 0. This is also a SOQL-injection guard — the slug flows into a SOQL string literal in Phase 2, and the regex character class disallows quotes / backslashes / whitespace.
-- `--target-org` (if explicitly supplied) matches regex `^[a-zA-Z0-9._@-]+$` (SF org alias / username character set). Otherwise emit `{"error":"invalid_target_org","value":"<value>"}` exit 0. This is a shell-injection guard — the value is interpolated into `sf` CLI shell-outs in Phase 0/6/7.
 - `--linear-status` ∈ `{planning, active, completed, killed}`. Otherwise emit `{"error":"invalid_status","flag":"--linear-status","value":"<value>"}` exit 0.
 - `--linear-substatus` ∈ `{empty, paused}` (or omitted). Otherwise emit `{"error":"invalid_status","flag":"--linear-substatus","value":"<value>"}` exit 0.
 
@@ -98,7 +99,7 @@ If `--dry-run` is present, emit the preview JSON and exit (NO UPDATE attempted) 
 {"dry_run":true,"mapping":{"linear_status":"<linear-status>","linear_substatus":"<linear-substatus-or-empty>","sf_status":"<mapped-status>","sf_substatus":"<mapped-substatus-or-empty>"},"command":"sf data update record --sobject Campaign --record-id <campaign-id> --values \"Status='<mapped-status>' Substatus__c='<mapped-substatus-or-empty>'\" --target-org \"<target-org>\" --json","payload":{"Status":"<mapped-status>","Substatus__c":"<mapped-substatus-or-empty>"},"target_org":"<target-org>"}
 ```
 
-The embedded `command` string quotes `--target-org "<target-org>"` defensively (defense-in-depth against operator copy-paste even though Phase 1's regex guard already rejects shell metacharacters in `--target-org`). All interpolated values in the `command` string — `<slug>` (gated by `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$`), `<mapped-status>` / `<mapped-substatus>` (closed-set lookup from the mapping table), `<campaign-id>` (SF record ID, matches `[a-zA-Z0-9]{15,18}`), `<target-org>` (gated by `^[a-zA-Z0-9._@-]+$`) — are regex-gated or closed-set upstream. The `command` field is documentation, not executable, but an operator copy-pasting it gets a safe template.
+The embedded `command` string quotes `--target-org "<target-org>"` defensively (defense-in-depth against operator copy-paste even though Phase 0's regex guard already rejects shell metacharacters in `--target-org`). All interpolated values in the `command` string — `<slug>` (gated by `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$`), `<mapped-status>` / `<mapped-substatus>` (closed-set lookup from the mapping table), `<campaign-id>` (SF record ID, matches `[a-zA-Z0-9]{15,18}`), `<target-org>` (gated by `^[a-zA-Z0-9._@-]+$`) — are regex-gated or closed-set upstream. The `command` field is documentation, not executable, but an operator copy-pasting it gets a safe template.
 
 The preview proves the mapping + UPDATE assembly without mutating SF.
 
@@ -127,7 +128,7 @@ sf data update record \
   --json
 ```
 
-`--target-org` is double-quoted defensively even though Phase 1's regex guard already rejects shell metacharacters — defense-in-depth against future relaxation of the regex.
+`--target-org` is double-quoted defensively even though Phase 0's regex guard already rejects shell metacharacters — defense-in-depth against future relaxation of the regex.
 
 When `<mapped-substatus>` is null, pass `Substatus__c=''` (empty string) — SF CLI v2.x interprets empty as clear-the-field. The shell-out must always include the `Substatus__c` segment so a `(active, paused) → (active, null)` transition correctly clears the overlay. **Verify in dry-run + throwaway-slug evidence**: if `Substatus__c=''` does NOT clear (post-UPDATE re-read still shows the old overlay), fall back to issuing the UPDATE via the SObject Composite REST API (`PATCH /services/data/vXX.X/sobjects/Campaign/<id>` with `{"Substatus__c": null}` body) — the SOQL re-read is the source of truth for this transition.
 
@@ -183,7 +184,7 @@ Orchestrators capture `status` + `substatus` for the portfolio rollup confirmati
 |---|---|---|
 | `error: missing_required_flag` | A required flag was omitted | Caller re-invokes with full flag set |
 | `error: invalid_slug_format` | Phase 1 slug regex rejected the input | Caller normalizes slug (per ADR-012 + canonicals lint) — same regex as `/revops:create-sf-campaign` |
-| `error: invalid_target_org` | Phase 1 `--target-org` regex rejected the input | Caller normalizes alias / username to the SF org alias character set; defense against shell injection into Phase 0/6/7 |
+| `error: invalid_target_org` | Phase 0 `--target-org` regex rejected the input (validated before the Phase 0 shell-out, its earliest sink) | Caller normalizes alias / username to the SF org alias character set; defense against shell injection into Phase 0/6/7 |
 | `error: invalid_status` (with `flag` discriminator) | `--linear-status` ∉ {planning, active, completed, killed}, OR `--linear-substatus` ∉ {empty, paused}. Payload includes a `flag` field naming the offending flag | Caller normalizes to canonical value |
 | `warning: campaign_not_found` | Phase 2 SOQL returned 0 rows | Caller treats as soft-fail; logs reconciliation reminder (operator manually runs `/revops:create-sf-campaign`); continues |
 | `error: sf_cli_error` | Phase 6 returned non-zero status | Caller inspects `detail`; common causes: missing `Substatus__c` field deploy (BC-8713), permset gap, FLS on custom field, record-locked |
