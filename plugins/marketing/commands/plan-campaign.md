@@ -1,7 +1,8 @@
 ---
 description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 8 standard sub-issues (with up to 2 optional) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
-argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--situation-mining] [--creative-angles] [--dry-run]
+argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--situation-mining] [--creative-angles] [--dry-run] | --emit <fixture.json> <sandbox-dir>
 allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_workflows_linear-server__create_issue_label, mcp__plugin_revops_salesforce__get_username, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__list_pages
+disable-model-invocation: true
 gbrain:
   schema: 1
   context_queries:
@@ -24,7 +25,7 @@ gbrain:
 
 # /marketing:plan-campaign
 
-> **How this command runs**: When invoked, the model reads this spec and executes each Step (1, 1b, 2, 3, ...) in order using its tool palette (Read, Write, Bash, Skill, the Linear MCP, etc.). There is no separate "runner" or background process — the spec IS the program. To debug a partial run, re-invoke from the failure point with corrected flags or apply hot-patches inline; expect a procedural, multi-turn execution. (Dogfood-surfaced 2026-05-19 BC-8727 / friction-log F2.)
+> **How this command runs**: When invoked, the model reads this spec and executes each Step (1, 1b, 2, 3, ...) in order using its tool palette (Read, Write, Bash, Skill, the Linear MCP, etc.). The deterministic, input-determined work (validation, slug, dates, labels, the issue set, `manifest.json`, the brief skeleton) is **NOT** done in-context — it is delegated to a separate program, `build_manifest.py`, which the model **executes via `Bash`** and whose output it consumes (see § Deterministic builder below). The model orchestrates the IO around that program (prompts, Linear/SF/EB writes, the confirm gate). To debug a partial run, re-invoke from the failure point with corrected flags or apply hot-patches inline; expect a procedural, multi-turn execution. (Dogfood-surfaced 2026-05-19 BC-8727 / friction-log F2.)
 
 The campaign-scaffolding orchestrator. One invocation creates one campaign across all four layers of Brite's GTM stack:
 
@@ -34,6 +35,50 @@ The campaign-scaffolding orchestrator. One invocation creates one campaign acros
 | Linear | 1 project-milestone in "Brite GTM" + 8 standard sub-issues + up to 2 optional sub-issues (blocked-by chained) | Orchestration + work-tracking surface |
 | Salesforce | 1 Campaign record (Status=Planned, custom fields populated) | Portfolio reporting surface (rollups, pipeline attribution) |
 | Email Bison | Workspace assignment recorded in manifest (NO EB campaign created here) | Sending-execution surface — actual EB campaign is created later by `/marketing:launch-campaign` at sub-issue #6 |
+
+## Deterministic builder — the source of truth (BC-12587)
+
+`/marketing:plan-campaign` is **command-as-orchestrator + a deterministic builder as composer** (the BC-8731 / BC-8728 pattern). Every mechanical, input-determined computation is owned by **`plugins/marketing/scripts/build_manifest.py`** — a pure, stdlib-only, hermetic helper — and this command **delegates to it in BOTH its normal and emit runs** (ADR-028 § 5 / D8). The builder owns:
+
+- **Validation** — Step 1b shape invariants, Step 2 canonicality (V/P/O membership + persona↔offer `target_personas`), Step 3.2 slug regex, Step 10.1 labs-gate. It exits non-zero with the canonical `ERROR:` message; the command surfaces that message verbatim and HALTs.
+- **Computation** — Step 3.1 slug (incl. the cross-entity variant + `--disambiguator` fold), the Step-7 `manifest.json`, the Step-9/10 per-issue payloads (title, verbatim-stamped description, absolute `dueDate`, the 8-label set, the `blockedBy`-by-INDEX graph), and the Step-8a brief-skeleton slot substitution.
+
+It writes three artifacts into a build dir: `manifest.json`, `issues.json` (shape `{container, issues[]}`, cross-referenced **by INDEX** — there are no real Linear IDs yet), and `brief.md`.
+
+**The command owns the IO boundary** — what the builder structurally cannot do: the Linear collision read (Step 3.3, re-invoking the builder with `--disambiguator` on a hit), all MCP writes (milestone / sub-issues / SF / EB — Steps 8–10), backfilling the real Linear/SF IDs into the live records + the manifest, the two-call confirm gate (Step 6), soft-fail SF (Step 8b), the handbook brief-template `gh api` fetch (Step 8a.2, handed to the builder via `--brief-template`), the interactive prompts (Step 1), and EB workspace assignment.
+
+**The crux (do not skip):** the command MUST literally **execute** the builder via `Bash` and consume its output files. It MUST NOT re-derive the slug / dates / labels / issue set inline from the prose below. Re-implementing that math in-context silently recreates the drift this design exists to kill — the per-PR behavioral eval (BC-12589) runs the builder, so an inline re-derivation would be an untested shadow path. The step prose below documents the **shape of what the builder produces** and the IO the command layers on top; it is a contract to read, not a computation to perform by hand. (A nightly LLM smoke, BC-12606, guards that the command actually drove the builder.)
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_manifest.py" \
+  --vertical <v> --persona <p> --offer <o> --entity <e> \
+  --month <M> --year <Y> --launch-date <YYYY-MM-DD> \
+  [--theme <t>] [--disambiguator <N>] [--situation-mining] [--creative-angles] \
+  --eb-workspace <ws> [--owner-email <email>] --created-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --canonicals-dir "${CLAUDE_PLUGIN_ROOT}/data/canonicals" \
+  --templates "${CLAUDE_PLUGIN_ROOT}/references/campaign-sub-issue-templates.md" \
+  [--brief-template <handbook-template-tmpfile>] \
+  --out-dir <build-dir>
+```
+
+`<build-dir>` for a normal run is a fresh `mktemp -d` temp dir; for an `--emit` run it is the operator-provided `<sandbox>`. On non-zero exit, surface the builder's stderr verbatim and HALT — that IS the Step 1b / 2 / 3.2 / 10.1 hard-fail surface. On success, read `<build-dir>/manifest.json` for the resolved `slug` and `<build-dir>/issues.json` for the sub-issue payloads.
+
+**When to invoke it (its inputs become available at different steps).** The builder needs `--eb-workspace` (it lands in `manifest.json`) plus the slug-determining inputs; `--owner-email` and `--brief-template` feed ONLY `brief.md`. `<eb-workspace>` (the Step 4.1 entity→EB map, or the cross-entity prompt) is **slug-independent**, so resolve it *before* the first builder run even though it's documented under Step 4. So:
+
+1. **First invocation — Step 3** (for the collision check + the Step-5 preview): slug-args + `--eb-workspace` + `--created-at`. **Generate `--created-at` ONCE here** (`date -u +%Y-%m-%dT%H:%M:%SZ`) and reuse that exact value in every later invocation so `manifest.json` stays byte-identical. **Omit** `--owner-email` / `--brief-template`. This yields the resolved `slug`, `manifest.json`, and `issues.json`; the `brief.md` it also writes is a *draft* (inline template, empty owner) — ignore it for now.
+2. **Second invocation — Step 8a.3** (after `<owner-email>` is resolved at Step 4.2 and the handbook template is fetched at Step 8a.2): re-run with the **same** slug-args + the **same** `--eb-workspace` + the **same** `--created-at` + `--owner-email <owner-email>` + `--brief-template <tmpfile>`. This produces the **authoritative** `brief.md` (used as the milestone description at Step 8a.5); `manifest.json` / `issues.json` are byte-identical to the first run, so re-writing them into `<build-dir>` is a harmless no-op.
+
+(`--emit` is single-invocation: the fixture supplies `eb_workspace` + optional `owner_email` up front and there is no handbook fetch, so the one run's inline-fallback `brief.md` is the artifact the eval asserts on.)
+
+## Emit mode (`--emit <fixture> <sandbox>`)
+
+`/marketing:plan-campaign --emit <fixture> <sandbox>` is the **side-effect-free** run that the behavioral eval (BC-12589) exercises and that humans can dogfood (ADR-028 § 0 / § 5). `<fixture>` is a JSON file of campaign-defining inputs; `<sandbox>` is the output dir. Emit mode:
+
+1. Reads `<fixture>` — keys: `vertical, persona, offer, entity, month, year, launch_date, theme?, eb_workspace, owner_email?, situation_mining?, creative_angles?, disambiguator?, created_at?`.
+2. Runs `build_manifest.py` with those values + `--out-dir <sandbox>` (and `--canonicals-dir` / `--templates` from `${CLAUDE_PLUGIN_ROOT}`; **no** `--brief-template`, so the deterministic inline fallback is used).
+3. **Stops.** It makes NO MCP writes (no Linear / SF / EB), does NO Linear collision read, and skips the Step-6 confirm gate. The sandbox holds the same `manifest.json` + `issues.json` the normal run computes via the same builder, plus the deterministic inline-fallback `brief.md` (emit omits the handbook fetch) — which is why asserting on them proves the real deterministic path.
+
+Emit mode does **not** make the command non-side-effecting: its DEFAULT (non-emit) run still creates real records, which is why `disable-model-invocation: true` is set (ADR-028 § 0 — the model must not fire the real, mutating run unprompted). Distinguish from the legacy `--dry-run` (Step 5), which previews and exits *before* any artifacts are written — `--dry-run` is the human preview; `--emit` is the testable seam. The eval's fixture + harness land in BC-12589; the per-PR eval invokes `build_manifest.py` **directly** (no `claude -p`, no API key — D9), so this `--emit` LLM entrypoint is for the BC-12606 nightly smoke + manual dogfood.
 
 ## Context-load phase
 
@@ -122,6 +167,8 @@ If all required flags are provided, skip prompts and proceed directly to Step 1b
 
 Before any downstream step, validate every operator-controlled flag value. These are mechanical safety invariants — non-interactive invocations skip the Step 1 prompts entirely, so these checks are the only barrier between operator input and shell/MCP/path interpolation. HARD-FAIL on any violation; do NOT auto-sanitize.
 
+> **Delegated to `build_manifest.py`** (§ Deterministic builder). These shape invariants are enforced inside the builder, which the command executes once after Step 1 resolves the inputs; on a violation the builder exits non-zero and the command surfaces its canonical `ERROR:` message and HALTs. The table below documents the contract — the command does NOT re-implement these regexes in-context. (The command still parses flags + runs the Step-1 interactive prompts; the builder is the validation backstop on whatever values those produce.)
+
 | Flag | Validator | HARD-FAIL message on miss |
 |---|---|---|
 | `--entity` | Must be one of `nites` / `supply` / `labs` / `cross-entity` (closed set; case-sensitive) | `ERROR: --entity must be one of [nites, supply, labs, cross-entity]; got '<value>'. Path-traversal guard.` |
@@ -140,6 +187,8 @@ The validator runs unconditionally, regardless of interactive vs non-interactive
 ## Step 2 — Canonicality validation
 
 Read the canonicals data layer in order; HARD-FAIL on the first miss with a pointer to the appropriate `/marketing:new-*` command.
+
+> **Delegated to `build_manifest.py`** (§ Deterministic builder). The builder reads the canonicals data layer (via `--canonicals-dir`) and enforces vertical/persona/offer membership + the persona↔offer `target_personas` compatibility check; on a miss it exits non-zero with the canonical `ERROR:` message (the same text as below) and the command HALTs. The 2.1–2.4 prose below is the contract the builder implements — the command does NOT re-read canonicals to re-validate in-context.
 
 ### 2.1 — Vertical existence
 
@@ -204,6 +253,8 @@ Empty or absent `target_personas` = "all personas in this vertical are valid for
 
 ## Step 3 — Slug compute + collision check
 
+> **3.1 (compute) + 3.2 (regex) are owned by `build_manifest.py`**; **3.3 (collision) stays in the command** (it needs a live Linear read). Run the builder once (§ Deterministic builder); read the resolved `slug` from the build dir's `manifest.json`. The 3.1/3.2 prose below is the builder's formula contract — do NOT recompute the slug in-context. For 3.3, the command checks Linear for a collision and, on a hit, **re-invokes the builder with `--disambiguator <attempt>`** (the builder folds `-v<N>` into the slug deterministically) and re-reads the new resolved slug — it does NOT mutate the slug string by hand.
+
 ### 3.1 — Compute slug
 
 **Standard slug**:
@@ -266,13 +317,18 @@ If any returned milestone's `name === <slug>`, enter the collision-resolution lo
 
 ```
 loop attempt = 2, 3, 4, ..., 9:
-  candidate = <base-slug>-v<attempt>
+  candidate = <base-slug>-v<attempt>   # collision LOOKUP key only; the authoritative
+                                       # disambiguated slug comes from the builder re-run below
   re-call list_milestones(project=<gtm-project-id>)  # same shape as above — no query filter; re-grep the response (or temp file) for "name":"<candidate>"
   if no collision:
     prompt operator with AskUserQuestion:
       Question: "Slug collision detected. Use candidate '<candidate>' instead?"
       Options: ["Use <candidate>", "Cancel scaffold"]
-    if operator picks "Use <candidate>": <slug> := <candidate>; exit loop
+    if operator picks "Use <candidate>":
+      re-invoke build_manifest.py with the same first-invocation args (slug-args + --eb-workspace
+        + the shared --created-at; still no --owner-email/--brief-template) + `--disambiguator <attempt>` (§ Deterministic builder)
+      <slug> := the resolved slug from the rebuilt <build-dir>/manifest.json   # builder folds -v<attempt>; do NOT set <slug> by hand
+      exit loop
     if operator picks "Cancel scaffold": halt with exit 0 and no writes
   if collision: continue to next attempt
 end loop
@@ -351,7 +407,7 @@ Print the operator-readable plan. Use this format (or a close variant — readab
 
   Plugin manifest:
     Path:         docs/campaigns/<entity>/<slug>/manifest.json
-    Schema:       v1 (12 top-level keys per Step 7)
+    Schema:       v1 (top-level keys per Step 7)
 
   Linear milestone:
     Project:      "Brite GTM" (<gtm-project-id>)
@@ -403,13 +459,16 @@ On `Cancel`, halt cleanly with no writes and re-print the Step 5 dry-run preview
 
 ## Step 7 — Write plugin dir + manifest.json
 
-After confirm, create the campaign directory:
+> **`manifest.json` is produced by `build_manifest.py`** (§ Deterministic builder) — it already wrote it to `<build-dir>` (with `linear.milestone_id` / `salesforce.campaign_id` / `email_bison.campaign_id` = `null`). Step 7 is the IO move: after confirm, create the real campaign dir and **copy the builder's `manifest.json` into it** (real IDs get backfilled in 8a/8b). Do NOT hand-author the JSON — the schema below is the builder's output contract, shown for reference.
+
+After confirm, create the campaign directory and place the builder's manifest:
 
 ```bash
 mkdir -p "docs/campaigns/<entity>/<slug>"
+cp "<build-dir>/manifest.json" "docs/campaigns/<entity>/<slug>/manifest.json"
 ```
 
-Then `Write` `docs/campaigns/<entity>/<slug>/manifest.json` with the FULL schema:
+The builder's `docs/campaigns/<entity>/<slug>/manifest.json` carries the FULL schema:
 
 ```json
 {
@@ -419,6 +478,7 @@ Then `Write` `docs/campaigns/<entity>/<slug>/manifest.json` with the FULL schema
   "vertical": "<vertical>",
   "persona": "<persona>",
   "offer": "<offer>",
+  "theme": "<theme or null>",
   "year": <year>,
   "month": <month>,
   "linear": {
@@ -443,7 +503,7 @@ Then `Write` `docs/campaigns/<entity>/<slug>/manifest.json` with the FULL schema
 
 Initial state: `linear.milestone_id` and `salesforce.campaign_id` are `null`. These get backfilled in Step 8a + Step 8b respectively via `Read` → mutate JSON → `Write`.
 
-For cross-entity campaigns, `vertical` / `persona` / `offer` are still recorded for the (vertical, persona, offer) triple if provided (cross-entity campaigns may still have them); otherwise set to `null` (NOT empty string — empty string would break downstream parsers that distinguish "absent" from "empty").
+For cross-entity campaigns, `theme` carries the campaign identity (a first-class field, so the manifest is self-describing without slug-parsing), and `vertical` / `persona` / `offer` are recorded if provided, otherwise `null` (NOT empty string — empty string would break downstream parsers that distinguish "absent" from "empty"). For a full V/P/O campaign, `theme` is `null`. The builder (`build_manifest.py`) fills all of these.
 
 ### 7.1 — Confirm filesystem state
 
@@ -482,11 +542,13 @@ If `gh api` fails (missing auth, file not found, network error), fall back to th
 
 Detection: `grep -c '{{slug}}' <(echo "$brief_template")` returns 0 → use inline fallback at Step 8a.4. ≥1 → use handbook template + substitution map at Step 8a.3.
 
-Capture the template body as `<brief-template>`.
+Capture the fetched template to a tempfile and pass it to the builder via `--brief-template <tmpfile>` (§ Deterministic builder), so the builder performs the slot substitution. If `gh api` fails (or the slot-availability probe finds 0 slots), omit `--brief-template` — the builder then uses its bundled inline fallback (the same 8-section skeleton as § 8a.4). Either way the substituted body lands at `<build-dir>/brief.md`.
 
 #### 8a.3 — Slot-substitute the template
 
-In `<brief-template>`, replace these slots (literal string-replace, in order):
+> **Substitution is performed by `build_manifest.py`** (it produces `<build-dir>/brief.md`). This is the **second builder invocation** (§ Deterministic builder → "When to invoke"): re-run the builder with the same slug-args + the same `--created-at` + `--eb-workspace`, now adding `--owner-email <owner-email>` + `--brief-template <tmpfile>` (the § 8a.2 handbook fetch, or omit it to fall back to the inline skeleton). That run regenerates `brief.md` authoritatively (and re-writes byte-identical `manifest.json`/`issues.json`). The slot table below is the builder's substitution contract; the command does NOT string-replace the brief in-context.
+
+The builder replaces these slots in the template (literal string-replace), in order:
 
 | Slot | Value |
 |---|---|
@@ -585,7 +647,7 @@ Call:
 mcp__plugin_workflows_linear-server__save_milestone(
   projectId=<gtm-project-id>,
   name=<slug>,
-  description=<substituted-brief-body>
+  description=<contents of <build-dir>/brief.md, produced by the builder at § 8a.3>
 )
 ```
 
@@ -608,28 +670,30 @@ via `Read` → JSON-mutate → `Write` (atomic per-file rewrite — Edit's not a
 
 Linear's project-milestone API does NOT accept labels (verified BC-8718 era + observed in `mcp__plugin_workflows_linear-server__save_milestone` shape). The 8-label set (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`) gets applied to each child sub-issue in Step 9 (sub-issues DO take labels via `save_issue`).
 
-**The same 8-label set is the canonical CONSTANT for this orchestrator.** Whenever you see "the 8 labels", "the label set", or label-applying logic referenced from Step 9 / Step 10 / dry-run preview, the membership IS exactly these 8: `slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`. Drift between this enumeration and Step 9's `labels:` field is a defect — the contract test at `plugins/marketing/tests/test_plan_campaign_contracts.py` verifies the two stay in lockstep.
+**`build_manifest.py` (`build_labels`) is the source of truth for the label set.** For a full V/P/O campaign the membership is exactly these 8: `slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`. A **cross-entity** campaign with no V/P/O triple omits the `vertical:` / `persona:` / `offer:` labels (the theme is the identity) → the **5 universal labels**. The labels the builder stamped on every `issues.json` entry (identical across entries, mirrored on `container.labels`) are authoritative; drift between this enumeration and Step 9's `labels:` field is a defect — the contract test at `plugins/marketing/tests/test_plan_campaign_contracts.py` verifies the two stay in lockstep.
 
-Before Step 9, ensure all 8 label values exist as `IssueLabel` records in the Brite Company team.
+Before Step 9, ensure each label value the builder stamped exists as an `IssueLabel` record in the Brite Company team.
 
 **Filtered lookup (BC-8727 dogfood-verified, 2026-05-19, friction-log F10)**: the Linear MCP `list_issue_labels` accepts a `name:` filter param. Use it per-label to cap each call's response size. Use the `<brite-company-team-id>` captured at Step 3.3 from the project's `teams[]` array:
 
 ```
-for label_name in [slug:<slug>, entity:<entity>, vertical:<vertical>, persona:<persona>,
-                    offer:<offer>, year:<year>, month:<month:02d>, status:planning]:
+# Drive the loop from the labels the builder actually stamped (read once from
+# <build-dir>/issues.json container.labels) — NOT a hardcoded 8-name list, so a
+# cross-entity campaign never pre-creates vertical:/persona:/offer: labels it won't use.
+for label_name in <build-dir>/issues.json → container.labels:   # 8 for full V/P/O; 5 for cross-entity
   result = mcp__plugin_workflows_linear-server__list_issue_labels(team="Brite Company", name=label_name)
   if result.labels is empty:
     mcp__plugin_workflows_linear-server__create_issue_label(name=label_name,
                                                              teamId=<brite-company-team-id>)
 ```
 
-This issues at most 8 list calls + up to 8 create calls = 16 MCP round-trips worst-case (every label missing — i.e. first-ever campaign). Subsequent campaigns hit fewer create branches as the workspace's fixed-prefix label set accumulates.
+This issues at most one list call + up to one create call per stamped label = up to 16 MCP round-trips worst-case for a full V/P/O campaign (every label missing — i.e. first-ever campaign); fewer for cross-entity (10) and on subsequent campaigns as the workspace's fixed-prefix label set accumulates.
 
 **Tradeoff note** (per perf-reviewer 2026-05-19): although call count rises vs an unfiltered dump (16 vs 9 worst-case), each filtered call returns O(1) payload — the unfiltered alternative grows O(workspace_labels) and at ~1,600 labels hits the tool-response token cap, triggering the temp-file fallback path. Filtered lookup wins on both context budget + tail latency.
 
 **Pre-filtered alternative** (deferred): when most labels are static across campaigns (`entity:`, `vertical:`, `persona:`, `offer:`, `year:`, `month:`, `status:`), a cached canonical-label set per Brite Company team — refreshed weekly — could collapse 8 list calls to 0. Out of v1 scope; track if profiling shows label pre-check is a measurable hot spot.
 
-Both `list_issue_labels` and `create_issue_label` are in `allowed-tools` per the frontmatter; no operator prompt is required. The step is idempotent (no-op if all 8 already exist).
+Both `list_issue_labels` and `create_issue_label` are in `allowed-tools` per the frontmatter; no operator prompt is required. The step is idempotent (no-op if every stamped label already exists).
 
 ---
 
@@ -685,17 +749,19 @@ Same `Read` → JSON-mutate → `Write` pattern as Step 8a.5.
 
 ## Step 9 — Create 8 standard sub-issues with blockedBy chain
 
-For each of the 8 sub-issues, call `save_issue` with:
+> **The sub-issue payloads are produced by `build_manifest.py`** in `<build-dir>/issues.json` (shape `{container, issues[]}`). Each entry already carries its `title`, verbatim-stamped `description`, **absolute** `dueDate` (the builder did `<launch-date>` + `dueDate_offset_days`), the 8-label set, `blockedBy` **by INDEX**, `optional`, and `labs_gated`. Step 9 is pure IO: `Read` `issues.json` and `save_issue` each entry, then wire `blockedBy` in a second pass by **resolving each INDEX → the real Linear `id`** captured in pass 1. The command does NOT recompute dates, labels, descriptions, or the dependency graph — it consumes them. (The field mapping below names where each `save_issue` arg comes from in `issues.json`.)
+
+For each issue object in `issues.json` (and the `container`), call `save_issue` with:
 
 - `team`: "Brite Company"
-- `title`: the matching sub-issue's `title` from the reference file (§ 9.1)
-- `description`: the matching sub-issue's **Description** blockquote from the reference file, stamped verbatim as the issue body (§ 9.1)
+- `title`: the issue object's `title` (from `issues.json`)
+- `description`: the issue object's `description` (from `issues.json`), stamped verbatim as the issue body (the builder already extracted it from the reference file's **Description** blockquote)
 - `parentId`: see § 9.0 below (resolved at impl time)
 - `projectId`: `<gtm-project-id>`
 - `projectMilestoneId`: `<milestone-id>` from Step 8a
-- `labels`: the 8-label set from § Step 8a.6 (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`) — applied to EVERY sub-issue (this milestone-level label set lives in the command, NOT in the reference file)
+- `labels`: the issue object's `labels` — the 8-label set the builder stamped on every entry (`slug:<slug>`, `entity:<entity>`, `vertical:<vertical>`, `persona:<persona>`, `offer:<offer>`, `year:<year>`, `month:<month:02d>`, `status:planning`; § 8a.6)
 - `assignee`: omit (sub-issues are assigned at sub-issue start time, not scaffold time)
-- `dueDate`: `<launch-date>` + the sub-issue's `dueDate_offset_days` from the reference file (§ 9.1)
+- `dueDate`: the issue object's `dueDate` — already absolute (the builder added `dueDate_offset_days` to `<launch-date>`); do NOT recompute
 
 After all 8 creates succeed, do a second pass to wire `blockedBy` relations. The Linear MCP `save_issue` shape for the second pass is **MINIMAL** — `save_issue(id=<sub-issue-id>, blockedBy=[<id>])` ONLY. The field is `blockedBy` (plural, array of issue IDs/identifiers; append-only per MCP schema), NOT `blockedById`.
 
@@ -723,23 +789,23 @@ Rationale: gives the marketing operator a single "campaign" issue to track in th
 
 Explicit rollback guidance prevents the orchestrator from leaving an orphan milestone + manifest hanging in inconsistent state.
 
-### 9.1 — Sub-issue specs (read + stamp from the reference file)
+### 9.1 — Sub-issue specs (consume from `issues.json`)
 
-The per-phase sub-issue specs live in **`plugins/marketing/references/campaign-sub-issue-templates.md`** — extracted in BC-12564 so they are maintained in one place and contract-tested as the source of truth, rather than inlined here. `Read` that file once and stamp each entry under its `## Standard sub-issues` heading, in `id` order. Each sub-issue section is one fenced `yaml` block (`id`, `title`, `dueDate_offset_days`, `blockedBy`, `optional`, `labs_gated`) followed by a **Description** blockquote.
+The per-phase sub-issue specs live in **`plugins/marketing/references/campaign-sub-issue-templates.md`** (extracted in BC-12564, contract-tested as the source of truth). **The builder reads + parses that file** (the `yaml` block + **Description** blockquote of each entry) and emits the ready-to-stamp payloads into `<build-dir>/issues.json` — so the command does NOT re-parse the reference file. `Read` `issues.json` once and iterate `issues[]` in `index` order.
 
-For each standard sub-issue (`optional: false`):
+For each issue object:
 
-1. Parse the `yaml` block.
-2. Call `save_issue` with the field mapping from Step 9 above:
-   - `title` ← the block's `title`.
-   - `description` ← the **Description** blockquote, stamped verbatim as the issue body.
-   - `dueDate` ← `<launch-date>` + `dueDate_offset_days` (e.g. `-21` → T-21d; `0` → launch day; `40` → T+40d). The reference file declares the offset integer; this command does the date arithmetic.
-   - `parentId` ← `<container-issue-id>` (§ 9.0); `projectId` ← `<gtm-project-id>`; `projectMilestoneId` ← `<milestone-id>`; `labels` ← the 8-label set (§ 8a.6, applied to every sub-issue).
-3. Capture the returned `id` + `identifier` (§ 9.2).
+1. Take its fields directly from `issues.json` (no parsing/computation):
+   - `title` ← the object's `title`.
+   - `description` ← the object's `description`, stamped verbatim as the issue body (the builder extracted it from the **Description** blockquote).
+   - `dueDate` ← the object's `dueDate` (already absolute — the builder added `dueDate_offset_days` to `<launch-date>`, e.g. `-21` → T-21d; `0` → launch day; `40` → T+40d).
+   - `parentId` ← `<container-issue-id>` (§ 9.0); `projectId` ← `<gtm-project-id>`; `projectMilestoneId` ← `<milestone-id>`; `labels` ← the object's `labels` (the 8-label set the builder stamped, § 8a.6).
+2. Call `save_issue` with that mapping.
+3. Capture the returned `id` + `identifier` (§ 9.2), keyed by the object's `index` (needed for the second-pass `blockedBy` resolution).
 
-The standard chain, by `id`: **#1 Brief approved** (gate) → **#2 Target list built** and **#3 Copy written + approved** (both gated only by #1 — copy and target list run in parallel) → **#4 Salesforce setup** → **#5 Pre-launch QA** → **#6 Launch executed** → **#7 Active management — weekly reviews** → **#8 Campaign closed + debrief** (terminal). The authoritative dependency graph is each entry's `blockedBy` field in the reference file — do NOT re-derive it here.
+The standard chain, by `index`: **#1 Brief approved** (gate) → **#2 Target list built** and **#3 Copy written + approved** (both gated only by #1 — copy and target list run in parallel) → **#4 Salesforce setup** → **#5 Pre-launch QA** → **#6 Launch executed** → **#7 Active management — weekly reviews** → **#8 Campaign closed + debrief** (terminal). The authoritative dependency graph is each object's `blockedBy` field in `issues.json` (the builder carried it forward from the reference file) — do NOT re-derive it here.
 
-**Second-pass `blockedBy` wiring** (per the two-pass note above): after all standard creates succeed, for each sub-issue call `save_issue(id=<sub-issue-id>, blockedBy=[<resolved-id(s)>])`, resolving each reference-file `blockedBy` index (e.g. `[1]`, `[3]`) to the Linear `id` captured for that index in pass 1. The reference file stores only `blockedBy` — the forward `blocks` edge is its exact inverse and is auto-rendered by Linear, so it is not stored (storing it previously caused a now-fixed inconsistency). The command writes only `blockedBy`.
+**Second-pass `blockedBy` wiring** (per the two-pass note above): after all standard creates succeed, for each sub-issue call `save_issue(id=<sub-issue-id>, blockedBy=[<resolved-id(s)>])`, resolving each `issues.json` `blockedBy` **index** (e.g. `[1]`, `[3]`) to the Linear `id` captured for that index in pass 1. `issues.json` stores only `blockedBy` (by index) — the forward `blocks` edge is its exact inverse and is auto-rendered by Linear, so it is not stored (storing it previously caused a now-fixed inconsistency). The command writes only `blockedBy`.
 
 ### 9.2 — Capture sub-issue IDs
 
@@ -749,24 +815,24 @@ For each `save_issue` response, capture the returned `id` + `identifier` (e.g., 
 
 ## Step 10 — Optional sub-issues
 
-The 2 optional sub-issues are defined under `## Optional sub-issues` in `plugins/marketing/references/campaign-sub-issue-templates.md` (`optional: true`): **#9 Situation Mining** (Labs-gated) and **#10 Creative Angles**. Create one ONLY when its flag is passed, stamping `title` / **Description** / `dueDate` (`<launch-date>` + `dueDate_offset_days`) and wiring `blockedBy` exactly as in § 9.1 — same 8-label set, same container parent, same second-pass wiring. When an optional sub-issue is created, also append its `id` to #1's downstream set so the gate blocks it too.
+The 2 optional sub-issues are **#9 Situation Mining** (Labs-gated) and **#10 Creative Angles**. The builder already included each in `issues.json` **iff** its flag (`--situation-mining` / `--creative-angles`) was passed — so Step 10 is the same IO as Step 9: `save_issue` whatever optional entries are present in `issues.json`, with the same container parent + second-pass `blockedBy` wiring. Each optional's `blockedBy: [1]` (in the builder's output) already encodes that #1 gates it; the inverse `blocks` edge Linear auto-renders, so there is nothing extra to "append to #1's downstream set."
 
 ### 10.1 — Situation Mining (Labs-gated)
 
-If `--situation-mining` was passed, enforce Labs entity. The reference file marks #9 `labs_gated: true`; this Step is where that gate is ENFORCED (the flag is data; the HARD-FAIL is orchestration).
+> **Enforced by `build_manifest.py`** (§ Deterministic builder). If `--situation-mining` is passed with `entity != labs`, the builder exits non-zero with the canonical labs-gate `ERROR:` (below) — the command never reaches sub-issue creation. So by the time Step 10 runs, the gate has already passed and #9 is present in `issues.json`; the command just creates it (Step 10 IO). The message below is the builder's contract.
 
-If `<entity> != "labs"`, HARD-FAIL (the operator clearly meant something else):
+The labs-gate the builder enforces (HARD-FAIL when `--situation-mining` is passed with a non-Labs entity):
 
 ```
 ERROR: --situation-mining is a Brite Labs framework (per docs/gtm-campaign-orchestration-README.md § 3.5).
 You passed --situation-mining with --entity=<entity>. Either drop the flag, OR re-run with --entity=labs.
 ```
 
-If `<entity> == "labs"`, create sub-issue #9 by stamping the reference file's `## Optional sub-issues` → #9 entry per § 9.1 (take its `blockedBy` and `dueDate_offset_days` from that entry — do not hardcode them here).
+When valid (`entity == labs`), sub-issue #9 is in `issues.json`; create it as in Step 9 (its `blockedBy` + absolute `dueDate` are already computed by the builder — do not hardcode them here).
 
 ### 10.2 — Creative Angles (no entity restriction)
 
-If `--creative-angles` was passed, create sub-issue #10 by stamping the reference file's `## Optional sub-issues` → #10 entry per § 9.1 (take its `blockedBy` and `dueDate_offset_days` from that entry — do not hardcode them here). No entity restriction.
+If `--creative-angles` was passed, the builder included sub-issue #10 in `issues.json`; create it as in Step 9 (its `blockedBy` + absolute `dueDate` are already computed by the builder). No entity restriction.
 
 ---
 

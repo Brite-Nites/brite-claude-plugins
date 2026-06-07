@@ -6,7 +6,7 @@
 **Related ADRs:** [ADR-003](003-plugin-distribution-architecture.md) (distribution), [ADR-013](013-gtm-three-layer-split.md) (HOW/standards layer)
 **Companion docs:** [`docs/guides/skill-command-design-standards.md`](../guides/skill-command-design-standards.md) (the canonical checklist), `CONTEXT.md` § Agent tooling & evaluation (terminology)
 
-> **ADR numbering:** This ADR is `025`. It was drafted as `024`, but `024` landed first as the merged `024-launch-campaign-verify-emails-swap-deferred.md` (#439), so it was renumbered to the next free integer at land time (precedent: #435 renumbered 022→023). Several open PRs still carry stale numbers (#432 claims `024`; #398/#401/#422 claim 021–023) and will renumber when they merge.
+> **ADR numbering:** This ADR is `028`. It was drafted as `024`, but landed behind a run of concurrently-merging ADRs — `024` was taken first by `024-launch-campaign-verify-emails-swap-deferred.md` (#439), then `025`–`027` by #422's three ADRs during the review window — so it was renumbered to the next free integer (`028`) at land time (precedent: #435 renumbered 022→023). The companion docs (CLAUDE.md index, standards guide, `CONTEXT.md`) reference it as 028; any remaining open PR carrying a stale number renumbers when it merges.
 
 ## Context
 
