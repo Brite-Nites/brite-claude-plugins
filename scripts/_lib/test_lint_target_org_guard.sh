@@ -229,5 +229,30 @@ sf org display --target-org "<target-org>" --json
 EOF
 expect_fail "$fo" "(o) unlabeled-fence sink" 'no .*marker preceding'
 
+# ── (p) RUN-LENGTH CLOSE — a shorter inner fence run must NOT close the block,
+# so a sink after it is still in-fence and detected. A 4-backtick block with an
+# inner 3-backtick line then an unguarded sink → FAIL (caught). Without the
+# run-length check the inner \`\`\` closes early, the sink falls outside any fence,
+# and the lint misses it. ────────────────────────────────────────────────────
+fp="$BOX/p/runlength.md"; write "$fp" <<EOF
+# run-length fence close
+\`\`\`\`bash
+echo in-fence
+\`\`\`
+sf org display --target-org "<target-org>" --json
+\`\`\`\`
+EOF
+expect_fail "$fp" "(p) run-length fence close" 'no .*marker preceding'
+
+# ── (q) ATTRIBUTE/BRACE LANG — a \`\`\`{.bash} (Pandoc attribute) fence must
+# normalize to bash and be treated as executable → unguarded sink FAILs. ──────
+fq="$BOX/q/brace_lang.md"; write "$fq" <<EOF
+# attribute-annotated fence lang
+\`\`\`{.bash}
+sf org display --target-org "<target-org>" --json
+\`\`\`
+EOF
+expect_fail "$fq" "(q) brace-attribute fence lang" 'no .*marker preceding'
+
 printf 'RESULT pass=%s fail=%s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

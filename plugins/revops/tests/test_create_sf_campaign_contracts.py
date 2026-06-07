@@ -354,3 +354,33 @@ def test_owner_email_regex_byte_identical_to_marketing() -> None:
         f"truth may have drifted; re-sync required so the marketing->revops "
         f"boundary stays consistent."
     )
+
+
+# ---------------------------------------------------------------------------
+# BC-12638 — guard-precedes-sink ordering is enforced repo-wide by the
+# consolidating lint scripts/_lib/lint_target_org_guard.py, which subsumed the
+# prior per-file `test_target_org_guard_precedes_phase_0_sink`. Invoke the lint
+# on this command file so the ordering check is also reachable from the pytest
+# suite in isolation, not only via validate.sh (Greptile PR #450 follow-up).
+# ---------------------------------------------------------------------------
+
+
+def test_target_org_guard_lint_passes() -> None:
+    """The `--target-org` guard-precedes-sink ordering for this command is
+    enforced by the consolidating lint (BC-12638). Run it here so a
+    guard-after-sink / orphaned-marker regression fails the pytest suite too,
+    not only validate.sh."""
+    import subprocess
+    import sys
+
+    lint = ROOT.parents[1] / "scripts" / "_lib" / "lint_target_org_guard.py"
+    assert lint.is_file(), f"consolidating lint not found at {lint}"
+    result = subprocess.run(
+        [sys.executable, str(lint), str(COMMAND_PATH)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"target-org guard-precedes-sink lint failed for {COMMAND_PATH.name} "
+        f"(rc={result.returncode}):\n{result.stdout}{result.stderr}"
+    )

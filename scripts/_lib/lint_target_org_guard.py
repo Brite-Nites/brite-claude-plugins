@@ -78,6 +78,7 @@ def _executable_nonliteral_sinks(lines: list[str]) -> list[int]:
     closes on `~~~` (CommonMark)."""
     sinks: list[int] = []
     fence_char: str | None = None  # "`" or "~" while inside a fence, else None
+    fence_len = 0  # opening run length (CommonMark: a closer must be >= this)
     fence_lang = ""
     for i, ln in enumerate(lines):
         m = _FENCE_RE.match(ln)
@@ -85,11 +86,16 @@ def _executable_nonliteral_sinks(lines: list[str]) -> list[int]:
             run, info = m.group(1), m.group(2)
             ch = run[0]
             if fence_char is None:
-                fence_char = ch
-                fence_lang = (info.strip().split() or [""])[0].lower()
-            elif ch == fence_char:  # same fence char closes the block
-                fence_char = None
-                fence_lang = ""
+                fence_char, fence_len = ch, len(run)
+                # lang = first info-string token, stripped of attribute syntax
+                # (`{.bash}` / `bash {.numberLines}` → `bash`) so annotated fences
+                # are still recognized as executable.
+                tok = (info.strip().split() or [""])[0]
+                fence_lang = tok.strip("{}.").lower()
+            elif ch == fence_char and len(run) >= fence_len and not info.strip():
+                # CommonMark close: same char, run >= opener, no info string. A
+                # shorter run (e.g. ``` inside a ```` block) does NOT close.
+                fence_char, fence_len, fence_lang = None, 0, ""
             continue
         if fence_char is not None and fence_lang in EXEC_FENCE_LANGS and "--target-org" in ln:
             tok = _TOKEN_RE.search(ln)
