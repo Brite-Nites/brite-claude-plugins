@@ -1921,6 +1921,84 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12639 — revops --target-org guard behavioral eval (BC-12639)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/revops/scripts/test_validate_target_org.sh — the BEHAVIORAL eval
+# for validate_target_org.py, the deterministic side-effect-free `--target-org`
+# shape validator the σ3 SF-write commands delegate their Phase 0 guard to
+# (ADR-028 emit-mode seam; first SECURITY worked example of the behavioral-eval
+# tier). Unlike BC-12623's structural markdown-grep ordering proxy, this harness
+# EXECUTES the validator against real injection payloads ($(touch pwned), backtick,
+# x'; DROP, metacharacters) in an isolated tmpdir and asserts both rejection AND
+# no side effect (the `pwned` sentinel is never created) — proving the guard
+# actually stops command substitution, not merely that it is positioned first.
+# RESULT contract line drives the count (matches 15a-bc-11849 etc.).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12639. revops --target-org guard behavioral eval (BC-12639)"
+
+vto_harness="$REPO_ROOT/plugins/revops/scripts/test_validate_target_org.sh"
+vto_helper="$REPO_ROOT/plugins/revops/scripts/validate_target_org.py"
+
+if [ ! -f "$vto_helper" ]; then
+  warn "plugins/revops/scripts/validate_target_org.py not found — target-org guard behavioral eval skipped"
+elif [ ! -f "$vto_harness" ]; then
+  warn "plugins/revops/scripts/test_validate_target_org.sh not found — target-org guard behavioral eval skipped"
+else
+  if vto_harness_out=$(bash "$vto_harness" "$vto_helper" 2>&1); then
+    vto_pass_count=$(printf '%s\n' "$vto_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$vto_pass_count" ]; then
+      pass "revops --target-org guard behavioral eval (${vto_pass_count} assertions)"
+    else
+      pass "revops --target-org guard behavioral eval — passed (count unparsed)"
+    fi
+  else
+    fail "revops --target-org guard behavioral eval failed:"
+    printf '%s\n' "$vto_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12638 — --target-org guard-precedes-sink consolidating lint (BC-12638)
+# ──────────────────────────────────────────────────────────────────────
+# Repo-wide CONSOLIDATING lint: every command interpolating a non-literal
+# `--target-org` into an executable `sf` shell-out (across BOTH plugins) must
+# carry a `<!-- guard:target-org -->` marker BEFORE its earliest sink + the
+# byte-identical canonical regex. SUBSUMES BC-12623's two bespoke per-file σ3
+# ordering tests and fires on any FUTURE non-literal passthrough — the systematic
+# answer to the guard-after-sink whack-a-mole. First the self-test (fixtures lock
+# the lint's own logic), then the lint run against the real command tree.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12638. --target-org guard-precedes-sink consolidating lint (BC-12638)"
+
+tog_lint="$REPO_ROOT/scripts/_lib/lint_target_org_guard.py"
+tog_selftest="$REPO_ROOT/scripts/_lib/test_lint_target_org_guard.sh"
+
+if [ ! -f "$tog_lint" ]; then
+  warn "scripts/_lib/lint_target_org_guard.py not found — target-org guard lint skipped"
+else
+  # (1) self-test — fixtures prove the lint's literal/marker/ordering/exempt/
+  #     byte-identity logic (mutation-locked).
+  if [ -f "$tog_selftest" ]; then
+    if tog_st_out=$(bash "$tog_selftest" "$tog_lint" 2>&1); then
+      tog_st_count=$(printf '%s\n' "$tog_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+      pass "target-org guard lint self-test (${tog_st_count:-?} assertions)"
+    else
+      fail "target-org guard lint self-test failed:"
+      printf '%s\n' "$tog_st_out" | tail -30 | sed 's/^/          /' >&2
+    fi
+  else
+    warn "scripts/_lib/test_lint_target_org_guard.sh not found — lint self-test skipped"
+  fi
+  # (2) the gate — run the lint against the real plugins/*/commands/*.md tree.
+  if tog_lint_out=$(python3 "$tog_lint" 2>&1); then
+    pass "target-org guard-precedes-sink lint (real tree clean)"
+  else
+    fail "target-org guard-precedes-sink lint found violations:"
+    printf '%s\n' "$tog_lint_out" | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"

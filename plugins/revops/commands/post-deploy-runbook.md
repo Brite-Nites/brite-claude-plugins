@@ -274,6 +274,8 @@ Replacement guidance:
 
 Execute via:
 
+<!-- guard:target-org:exempt operator copy-paste runbook snippet — the operator fills <alias> and runs it in their own terminal (or Developer Console); the command never interpolates-and-executes it, so there is no command-driven --target-org sink to guard (BC-12638) -->
+
 ```bash
 sf apex run --target-org <alias> --file scratch.apex
 ```

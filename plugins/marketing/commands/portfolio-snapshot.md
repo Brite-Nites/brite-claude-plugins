@@ -89,7 +89,10 @@ The output path is deterministic given today's date + the chosen flag. Re-runs a
 
 ### Phase 0 — Resolve SF target-org metadata (soft optimization)
 
-Run via the `Bash` tool ONCE per invocation (skip if `--target-org` was provided and matches the cached default `brite-prod` AND the cache has already been resolved earlier in this session):
+<!-- guard:target-org -->
+**First, validate `--target-org` — before anything else in this phase, including the skip-gate below (its earliest sink).** If `--target-org` was explicitly supplied, validate it against regex `^[a-zA-Z0-9._@-]+$`. On mismatch, **hard-fail (exit non-zero)** with: `ERROR: --target-org failed regex (^[a-zA-Z0-9._@-]+$); got '<value-truncated-to-80-chars-with-control-bytes-stripped>'.` (Truncate the echoed value to 80 chars and strip ASCII control bytes 0x00–0x1F + 0x7F.) The shell-out below interpolates `--target-org` into a double-quoted `sf` argument, which blocks bare metacharacters but **not** `$(...)` / backtick command substitution — so this regex (which excludes `$`, `(`, `)`, backticks, whitespace) MUST run **before** that interpolation, and **above** the skip-gate (validate-then-resolve, so a malformed value is rejected even on the cache-hit path; BC-12638/BC-12623). Keep the regex byte-identical to `/marketing:offer-performance` and the revops σ3 siblings — the consolidating lint (`scripts/_lib/lint_target_org_guard.py`) enforces both the byte-identity and that this `<!-- guard:target-org -->` marker precedes the sink.
+
+Then run via the `Bash` tool ONCE per invocation (skip if `--target-org` was provided and matches the cached default `brite-prod` AND the cache has already been resolved earlier in this session):
 
 ```bash
 sf org display --target-org "<target-org>" --json
@@ -107,7 +110,7 @@ Mirrors the Phase 0 metadata caching in [`/revops:create-sf-campaign`](../../rev
 After window resolution + Phase 0:
 
 1. Reject illegal flag combinations per the Input flags section above (`--monthly` + `--quarterly`; neither; explicitly-rejected `--weekly` / `--custom-window` / `--forecast` / `--charts`; unknown flags).
-2. Validate `--target-org` (if explicitly supplied) against regex `^[a-zA-Z0-9._@-]+$`. On mismatch, hard-fail (exit non-zero) with: `ERROR: --target-org failed regex (^[a-zA-Z0-9._@-]+$); got '<value-truncated-to-80-chars-with-control-bytes-stripped>'.` (Truncate echoed value to 80 chars and strip ASCII control bytes 0x00–0x1F + 0x7F.) Defense against shell injection into Phase 0's `sf` CLI shell-out.
+2. `--target-org` is validated earlier, in **Phase 0** (its earliest sink, above the skip-gate) — see there; the `^[a-zA-Z0-9._@-]+$` shell-injection guard runs before the value reaches the `sf` CLI shell-out.
 3. Compute the output path per Window resolution above. If the output file already exists, that's fine — the packet regenerates in place.
 
 ### Phase 2 — Read plugin filesystem (source of truth)
