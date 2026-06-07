@@ -1812,6 +1812,37 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12589 — Behavioral-eval harness + first plan-campaign eval (BC-12589)
+# ──────────────────────────────────────────────────────────────────────
+# Runs scripts/eval/test_eval_harness.sh — the reusable behavioral-eval spine
+# (M3 assert_lib + M2 run_eval) "test the tester" (ADR-028 § 5 / DP2-7). It runs
+# the M3 assertion-lib unit cases, the first plan-campaign behavioral eval GREEN
+# (build_manifest.py emit → schema + golden + key-field asserts, DP2-4/6), the M2
+# mutation self-test (mutated artifact → red + named diff), and a hermeticity
+# guard (no network module; runs with API keys unset). A red eval fails the build.
+# RESULT contract line drives the count (matches §15a-bc-12587 / §2e).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12589. behavioral-eval harness + plan-campaign eval (BC-12589)"
+
+eval_harness="$REPO_ROOT/scripts/eval/test_eval_harness.sh"
+
+if [ ! -f "$eval_harness" ]; then
+  warn "scripts/eval/test_eval_harness.sh not found — behavioral-eval harness skipped"
+else
+  if eval_harness_out=$(bash "$eval_harness" 2>&1); then
+    eval_pass_count=$(printf '%s\n' "$eval_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$eval_pass_count" ]; then
+      pass "behavioral-eval harness + plan-campaign eval (${eval_pass_count} assertions)"
+    else
+      pass "behavioral-eval harness — passed (count unparsed)"
+    fi
+  else
+    fail "behavioral-eval harness failed:"
+    printf '%s\n' "$eval_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-8728 — Shared utilities + offer-performance harnesses (BC-8728)
 # ──────────────────────────────────────────────────────────────────────
 # Runs plugins/marketing/scripts/test_shared_utilities.sh (canonicals_reader,

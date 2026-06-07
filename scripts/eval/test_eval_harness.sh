@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+# Behavioral-eval harness self-test — "test the tester" (BC-12589, ADR-028 § 5).
+#
+# This is the single validate.sh-wired entrypoint for the eval spine. It proves
+# the harness is trustworthy BOTH directions in one place (the originating-session
+# review's requirement + DP2-7's non-negotiable AC):
+#
+#   1. M3 assertion-lib unit cases — every assert_lib primitive, PASS and FAIL
+#      (schema / golden / key-field / contains / no_match), via _assert_cases.py.
+#   2. The first plan-campaign behavioral eval runs GREEN — known-good fixture →
+#      emit (build_manifest.py directly, DP2-4) → all assertions pass. This is the
+#      "plan-campaign eval green in CI" AC; validate.sh fails if it goes red.
+#   3. The M2 self-test — feed deliberately MUTATED emit artifacts (flip a
+#      blockedBy index / change a dueDate / drop a label / break the slug /
+#      un-null a manifest ID / drop a description contract line / reintroduce a
+#      brief {{slot}} / corrupt a field type) → the runner exits non-zero AND
+#      names the specific diff. Proves a red eval actually fails the build.
+#   4. Hermeticity — the eval imports no network module and runs to green with
+#      ANTHROPIC_API_KEY unset from an empty cwd, writing nothing outside its
+#      sandbox (build_manifest's purity-test idiom; DP2-4 no-API-key contract).
+#
+# RESULT contract line drives the count (matches §15a-bc-12587 / §2e).
+#
+# Usage:  bash scripts/eval/test_eval_harness.sh
+
+set -u  # NOT set -e — non-zero exits are EXPECTED for the mutation scenarios.
+
+# Defuse the caller's git env (stale-pre-push-hook GIT_DIR leak, per CLAUDE.md;
+# matches test_build_manifest.sh / test_portfolio_snapshot.sh discipline).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$script_dir/../.." && pwd)"
+RUN_EVAL="$script_dir/run_eval.py"
+CASES="$script_dir/_assert_cases.py"
+ASSERT_LIB="$script_dir/assert_lib.py"
+
+for required in "$RUN_EVAL" "$CASES" "$ASSERT_LIB"; do
+  if [ ! -f "$required" ]; then
+    echo "FATAL: required file not found: $required" >&2
+    exit 2
+  fi
+done
+
+tmproot="$(mktemp -d -t eval-harness-test.XXXXXX)" || {
+  echo "FATAL: mktemp -d failed" >&2
+  exit 2
+}
+cleanup() {
+  if [ -d "$tmproot" ]; then
+    find "$tmproot" -depth -type f -exec rm {} + 2>/dev/null || true
+    find "$tmproot" -depth -type d -exec rmdir {} + 2>/dev/null || true
+  fi
+}
+trap 'cleanup' EXIT
+
+pass=0
+fail=0
+mutid=0
+LAST_OUTPUT=""
+LAST_RC=0
+
+# ── helpers ────────────────────────────────────────────────────────────────
+
+invoke() {  # python3 <args...> → captures combined output + rc
+  LAST_OUTPUT="$(python3 "$@" 2>&1)"
+  LAST_RC=$?
+}
+
+assert_exit() {  # label expected_rc
+  local label="$1" expected="$2"
+  if [ "$expected" -eq "$LAST_RC" ]; then
+    echo "  PASS  $label (exit=$LAST_RC)"; pass=$((pass + 1))
+  else
+    echo "  FAIL  $label — exit expected=$expected actual=$LAST_RC"
+    printf '    output: %s\n' "$LAST_OUTPUT"; fail=$((fail + 1))
+  fi
+}
+
+assert_substr() {  # label regex (against LAST_OUTPUT)
+  local label="$1" rx="$2"
+  if printf '%s' "$LAST_OUTPUT" | grep -qF -- "$rx"; then
+    echo "  PASS  $label"; pass=$((pass + 1))
+  else
+    echo "  FAIL  $label — substring not in output: $rx"
+    printf '    output: %s\n' "$LAST_OUTPUT"; fail=$((fail + 1))
+  fi
+}
+
+# ── 1. M3 assertion-lib unit cases (pass + fail per primitive) ───────────────
+
+echo "── M3 assertion-lib unit cases ──"
+m3_cases="$(python3 "$CASES" --list)"
+m3_count="$(printf '%s\n' "$m3_cases" | grep -c .)"
+if [ "$m3_count" -lt 1 ]; then
+  echo "FATAL: _assert_cases.py --list returned no cases — the M3 layer would silently vanish" >&2
+  exit 2
+fi
+for c in $m3_cases; do
+  invoke "$CASES" "$c"
+  assert_exit "M3 case: $c" 0
+done
+
+# ── 2. first plan-campaign eval runs GREEN ───────────────────────────────────
+
+echo "── plan-campaign eval (known-good → GREEN) ──"
+GOOD="$tmproot/good"; mkdir -p "$GOOD"
+invoke "$RUN_EVAL" plan-campaign --sandbox "$GOOD"
+assert_exit "eval GREEN — known-good fixture builds + passes" 0
+assert_substr "eval prints PASS verdict" "PASS: plan-campaign eval"
+
+invoke "$RUN_EVAL" plan-campaign
+assert_exit "eval GREEN — default mktemp invocation (the CI form)" 0
+
+# Sanity: the three artifacts were produced.
+for art in manifest.json issues.json brief.md; do
+  if [ -f "$GOOD/$art" ]; then
+    echo "  PASS  artifact produced: $art"; pass=$((pass + 1))
+  else
+    echo "  FAIL  artifact missing: $art"; fail=$((fail + 1))
+  fi
+done
+
+# ── 3. M2 self-test — mutated artifacts must fail RED with a named diff ───────
+
+echo "── M2 self-test (mutated artifacts → RED) ──"
+mutate_and_assert() {  # label  expected_substr  python_mutation
+  local label="$1" rx="$2" code="$3"
+  local M="$tmproot/mut.$((mutid++))"; mkdir -p "$M"
+  cp "$GOOD/manifest.json" "$GOOD/issues.json" "$GOOD/brief.md" "$M/"
+  if ! MUT_DIR="$M" python3 -c "
+import json, os, pathlib
+M = pathlib.Path(os.environ['MUT_DIR'])
+$code
+"; then
+    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
+  fi
+  invoke "$RUN_EVAL" plan-campaign --artifact-dir "$M"
+  assert_exit "mutation '$label' → red (exit 1)" 1
+  assert_substr "mutation '$label' → named diff" "$rx"
+}
+
+mutate_and_assert "flip blockedBy index" "golden 1, got 6" \
+  'p=M/"issues.json"; d=json.load(open(p)); d["issues"][1]["blockedBy"]=[6]; json.dump(d,open(p,"w"))'
+mutate_and_assert "change a dueDate" "dueDate: golden '2026-04-10', got '2026-04-11'" \
+  'p=M/"issues.json"; d=json.load(open(p)); d["issues"][0]["dueDate"]="2026-04-11"; json.dump(d,open(p,"w"))'
+mutate_and_assert "drop a label" "array length mismatch" \
+  'p=M/"issues.json"; d=json.load(open(p)); d["issues"][2]["labels"].pop(); json.dump(d,open(p,"w"))'
+mutate_and_assert "break the slug" "container.title: golden" \
+  'p=M/"issues.json"; d=json.load(open(p)); d["container"]["title"]="WRONG-SLUG"; json.dump(d,open(p,"w"))'
+mutate_and_assert "un-null a manifest id" "milestone_id: expected None, got" \
+  'p=M/"manifest.json"; d=json.load(open(p)); d["linear"]["milestone_id"]="LIN-123"; json.dump(d,open(p,"w"))'
+mutate_and_assert "drop a description contract line" "missing required substring" \
+  'p=M/"issues.json"; d=json.load(open(p)); d["issues"][3]["description"]=d["issues"][3]["description"].replace("**Handbook citation**:","REMOVED:"); json.dump(d,open(p,"w"))'
+mutate_and_assert "reintroduce a brief slot token" "leftover template slot" \
+  'p=M/"brief.md"; p.write_text(p.read_text()+"\n{{slug}}\n")'
+mutate_and_assert "corrupt a field type" "expected type integer, got string" \
+  'p=M/"manifest.json"; d=json.load(open(p)); d["month"]="05"; json.dump(d,open(p,"w"))'
+# Structural breaks must surface as named SCHEMA diffs (exit 1), never a traceback.
+mutate_and_assert "drop an issue key" "required key missing" \
+  'p=M/"issues.json"; d=json.load(open(p)); del d["issues"][0]["blockedBy"]; json.dump(d,open(p,"w"))'
+mutate_and_assert "issues.json is not an object" "expected type object" \
+  'p=M/"issues.json"; json.dump([], open(p,"w"))'
+mutate_and_assert "leak an extra manifest key" "unexpected property" \
+  'p=M/"manifest.json"; d=json.load(open(p)); d["backdoor"]="x"; json.dump(d,open(p,"w"))'
+mutate_and_assert "leak an extra issue key" "unexpected property" \
+  'p=M/"issues.json"; d=json.load(open(p)); d["issues"][0]["extra"]="x"; json.dump(d,open(p,"w"))'
+# Deterministic value regressions that schema-type alone would miss.
+mutate_and_assert "non-deterministic created_at" "created_at: expected" \
+  'p=M/"manifest.json"; d=json.load(open(p)); d["created_at"]="2099-01-01T00:00:00Z"; json.dump(d,open(p,"w"))'
+mutate_and_assert "wrong linear project" "linear.project: expected 'Brite GTM'" \
+  'p=M/"manifest.json"; d=json.load(open(p)); d["linear"]["project"]="Wrong"; json.dump(d,open(p,"w"))'
+mutate_and_assert "wipe container description" "container.description" \
+  'p=M/"issues.json"; d=json.load(open(p)); d["container"]["description"]="WIPED"; json.dump(d,open(p,"w"))'
+
+# Infra errors (a failed/absent emit) surface as exit 2, distinct from a diff.
+echo "── infra-error exit codes ──"
+EMPTY="$tmproot/empty"; mkdir -p "$EMPTY"
+invoke "$RUN_EVAL" plan-campaign --artifact-dir "$EMPTY"
+assert_exit "missing artifacts → exit 2 (infra error, not a diff)" 2
+invoke "$RUN_EVAL" no-such-command
+assert_exit "unknown command-id → exit 2" 2
+
+# ── 4. hermeticity guard ─────────────────────────────────────────────────────
+
+echo "── hermeticity ──"
+# (a) no network-capable module is imported anywhere in the eval source.
+if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
+     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" >/dev/null 2>&1; then
+  echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
+else
+  echo "  PASS  hermeticity: no network module imported"; pass=$((pass + 1))
+fi
+# (b) the eval runs to GREEN with the API keys unset, from an empty cwd, writing
+#     nothing into that cwd (build_manifest purity idiom; DP2-4 no-API-key path).
+HCWD="$tmproot/hermetic-cwd"; mkdir -p "$HCWD"
+before="$(cd "$HCWD" && find . | sort)"
+herm_out="$(cd "$HCWD" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" plan-campaign 2>&1)"
+herm_rc=$?
+after="$(cd "$HCWD" && find . | sort)"
+if [ "$herm_rc" -eq 0 ]; then
+  echo "  PASS  hermeticity: eval GREEN with API keys unset, empty cwd"; pass=$((pass + 1))
+else
+  echo "  FAIL  hermeticity: eval failed without API keys (rc=$herm_rc)"
+  printf '    output: %s\n' "$herm_out"; fail=$((fail + 1))
+fi
+if [ "$before" = "$after" ]; then
+  echo "  PASS  hermeticity: eval wrote nothing into the working dir"; pass=$((pass + 1))
+else
+  echo "  FAIL  hermeticity: eval left stray files in the working dir"; fail=$((fail + 1))
+fi
+
+echo ""
+# Count floor — a vanished test block (broken --list, swallowed import, emptied
+# CASES) would otherwise drop the count yet still exit 0. Below the floor is a
+# silent-skip and must fail the build loudly (the eval's whole reason to exist).
+FLOOR=45
+if [ "$pass" -lt "$FLOOR" ]; then
+  echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
+  exit 2
+fi
+
+echo "RESULT pass=$pass fail=$fail"
+[ "$fail" -gt 0 ] && exit 1
+exit 0
