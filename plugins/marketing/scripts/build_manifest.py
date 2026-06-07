@@ -450,7 +450,10 @@ def build_manifest(a: argparse.Namespace, slug: str, created_at: str) -> dict:
         "vertical": a.vertical,
         "persona": a.persona,
         "offer": a.offer,
-        "theme": a.theme,
+        # theme is the cross-entity identity; for a full V/P/O campaign `--theme` is
+        # "otherwise ignored" (plan-campaign Step 1b) → null here, so the manifest
+        # never records a theme the slug didn't use (builder == its documented contract).
+        "theme": a.theme if a.entity == "cross-entity" else None,
         "year": a.year,
         "month": a.month,
         "linear": {"milestone_id": None, "milestone_url": None, "project": "Brite GTM"},
