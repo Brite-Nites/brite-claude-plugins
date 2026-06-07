@@ -1,0 +1,52 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_manifest.py's manifest.json (BC-12589 eval). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, items, enum, const. Asserts SHAPE; plan-campaign.golden + key_fields assert VALUES.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "slug", "entity", "vertical", "persona", "offer", "theme",
+    "year", "month", "linear", "salesforce", "email_bison", "created_at", "scaffolded_by"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "slug": { "type": "string" },
+    "entity": { "type": "string", "enum": ["nites", "supply", "labs", "cross-entity"] },
+    "vertical": { "type": ["string", "null"] },
+    "persona": { "type": ["string", "null"] },
+    "offer": { "type": ["string", "null"] },
+    "theme": { "type": ["string", "null"] },
+    "year": { "type": "integer" },
+    "month": { "type": "integer" },
+    "linear": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["milestone_id", "milestone_url", "project"],
+      "properties": {
+        "milestone_id": { "type": ["string", "null"] },
+        "milestone_url": { "type": ["string", "null"] },
+        "project": { "type": "string" }
+      }
+    },
+    "salesforce": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["campaign_id", "campaign_name"],
+      "properties": {
+        "campaign_id": { "type": ["string", "null"] },
+        "campaign_name": { "type": "string" }
+      }
+    },
+    "email_bison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace", "campaign_id", "campaign_name", "launched_at"],
+      "properties": {
+        "workspace": { "type": "string", "enum": ["emailbison-personal", "emailbison-b2b"] },
+        "campaign_id": { "type": ["string", "null"] },
+        "campaign_name": { "type": "string" },
+        "launched_at": { "type": ["string", "null"] }
+      }
+    },
+    "created_at": { "type": "string" },
+    "scaffolded_by": { "type": "string", "const": "/marketing:plan-campaign" }
+  }
+}

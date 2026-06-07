@@ -1,6 +1,6 @@
 # 028. Skill/command engineering discipline — behavioral evals + tiered forward gate
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-05
 **Linear:** [BC-12586](https://linear.app/brite-nites/issue/BC-12586) (ratify + land this ADR; originated in the PR #429 review session, 2026-06-04/05)
 **Related ADRs:** [ADR-003](003-plugin-distribution-architecture.md) (distribution), [ADR-013](013-gtm-three-layer-split.md) (HOW/standards layer)

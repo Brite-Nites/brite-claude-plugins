@@ -1,0 +1,36 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_manifest.py's issues.json (BC-12589 eval). Asserts the {container, issues[]} SHAPE + per-issue field types; the deterministic per-issue structure (values) is pinned by plan-campaign.golden + the description contract-line check. Validated by scripts/eval/assert_lib.py (subset keywords only).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["container", "issues"],
+  "properties": {
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "description", "labels"],
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "labels": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "title", "description", "dueDate", "labels", "blockedBy", "optional", "labs_gated"],
+        "properties": {
+          "index": { "type": "integer" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "dueDate": { "type": "string" },
+          "labels": { "type": "array", "items": { "type": "string" } },
+          "blockedBy": { "type": "array", "items": { "type": "integer" } },
+          "optional": { "type": "boolean" },
+          "labs_gated": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

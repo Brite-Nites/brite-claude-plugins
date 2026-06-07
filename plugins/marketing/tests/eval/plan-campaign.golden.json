@@ -1,0 +1,175 @@
+{
+  "container": {
+    "title": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+    "labels": [
+      "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "entity:nites",
+      "vertical:municipalities",
+      "persona:parks-rec-director",
+      "offer:parks-bond",
+      "year:2026",
+      "month:05",
+      "status:planning"
+    ]
+  },
+  "issues": [
+    {
+      "index": 1,
+      "title": "Brief approved",
+      "dueDate": "2026-04-10",
+      "labels": [
+        "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "entity:nites",
+        "vertical:municipalities",
+        "persona:parks-rec-director",
+        "offer:parks-bond",
+        "year:2026",
+        "month:05",
+        "status:planning"
+      ],
+      "blockedBy": [],
+      "optional": false,
+      "labs_gated": false
+    },
+    {
+      "index": 2,
+      "title": "Target list built",
+      "dueDate": "2026-04-17",
+      "labels": [
+        "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "entity:nites",
+        "vertical:municipalities",
+        "persona:parks-rec-director",
+        "offer:parks-bond",
+        "year:2026",
+        "month:05",
+        "status:planning"
+      ],
+      "blockedBy": [
+        1
+      ],
+      "optional": false,
+      "labs_gated": false
+    },
+    {
+      "index": 3,
+      "title": "Copy written + approved",
+      "dueDate": "2026-04-21",
+      "labels": [
+        "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "entity:nites",
+        "vertical:municipalities",
+        "persona:parks-rec-director",
+        "offer:parks-bond",
+        "year:2026",
+        "month:05",
+        "status:planning"
+      ],
+      "blockedBy": [
+        1
+      ],
+      "optional": false,
+      "labs_gated": false
+    },
+    {
+      "index": 4,
+      "title": "Salesforce setup",
+      "dueDate": "2026-04-24",
+      "labels": [
+        "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "entity:nites",
+        "vertical:municipalities",
+        "persona:parks-rec-director",
+        "offer:parks-bond",
+        "year:2026",
+        "month:05",
+        "status:planning"
+      ],
+      "blockedBy": [
+        3
+      ],
+      "optional": false,
+      "labs_gated": false
+    },
+    {
+      "index": 5,
+      "title": "Pre-launch QA",
+      "dueDate": "2026-04-28",
+      "labels": [
+        "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "entity:nites",
+        "vertical:municipalities",
+        "persona:parks-rec-director",
+        "offer:parks-bond",
+        "year:2026",
+        "month:05",
+        "status:planning"
+      ],
+      "blockedBy": [
+        4
+      ],
+      "optional": false,
+      "labs_gated": false
+    },
+    {
+      "index": 6,
+      "title": "Launch executed",
+      "dueDate": "2026-05-01",
+      "labels": [
+        "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "entity:nites",
+        "vertical:municipalities",
+        "persona:parks-rec-director",
+        "offer:parks-bond",
+        "year:2026",
+        "month:05",
+        "status:planning"
+      ],
+      "blockedBy": [
+        5
+      ],
+      "optional": false,
+      "labs_gated": false
+    },
+    {
+      "index": 7,
+      "title": "Active management — weekly reviews",
+      "dueDate": "2026-05-29",
+      "labels": [
+        "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "entity:nites",
+        "vertical:municipalities",
+        "persona:parks-rec-director",
+        "offer:parks-bond",
+        "year:2026",
+        "month:05",
+        "status:planning"
+      ],
+      "blockedBy": [
+        6
+      ],
+      "optional": false,
+      "labs_gated": false
+    },
+    {
+      "index": 8,
+      "title": "Campaign closed + debrief",
+      "dueDate": "2026-06-10",
+      "labels": [
+        "slug:municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "entity:nites",
+        "vertical:municipalities",
+        "persona:parks-rec-director",
+        "offer:parks-bond",
+        "year:2026",
+        "month:05",
+        "status:planning"
+      ],
+      "blockedBy": [
+        7
+      ],
+      "optional": false,
+      "labs_gated": false
+    }
+  ]
+}

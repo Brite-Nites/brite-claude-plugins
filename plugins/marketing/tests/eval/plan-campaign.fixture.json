@@ -1,0 +1,13 @@
+{
+  "_comment": "Behavioral-eval fixture for /marketing:plan-campaign (BC-12589). Emit-mode keys per plan-campaign.md § 'Emit mode'. A standard single-entity V/P/O campaign (the canonical municipalities/parks-rec-director/parks-bond triple proven in test_build_manifest.sh). 'created_at' is PINNED so the manifest is byte-stable for golden compare; the runner injects it as --created-at.",
+  "vertical": "municipalities",
+  "persona": "parks-rec-director",
+  "offer": "parks-bond",
+  "entity": "nites",
+  "month": 5,
+  "year": 2026,
+  "launch_date": "2026-05-01",
+  "eb_workspace": "emailbison-personal",
+  "owner_email": "marketingadmin@britenites.com",
+  "created_at": "2026-05-01T00:00:00Z"
+}
