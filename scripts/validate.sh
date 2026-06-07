@@ -1827,7 +1827,10 @@ section "15a-bc-12589. behavioral-eval harness + plan-campaign eval (BC-12589)"
 eval_harness="$REPO_ROOT/scripts/eval/test_eval_harness.sh"
 
 if [ ! -f "$eval_harness" ]; then
-  warn "scripts/eval/test_eval_harness.sh not found — behavioral-eval harness skipped"
+  # HARD fail, not warn: this is the mandatory ADR-028 behavioral-eval gate. A
+  # `warn` here would let a future accidental delete/rename of the harness pass CI
+  # green — silently removing the gate ("a check nobody is forced to run rots").
+  fail "scripts/eval/test_eval_harness.sh not found — the mandatory ADR-028 behavioral-eval gate is missing"
 else
   if eval_harness_out=$(bash "$eval_harness" 2>&1); then
     eval_pass_count=$(printf '%s\n' "$eval_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)

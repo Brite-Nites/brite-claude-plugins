@@ -273,7 +273,18 @@ class PlanCampaignAdapter:
     # ── golden regeneration ───────────────────────────────────────────────────
 
     def update_golden(self, artifacts: dict) -> str:
-        projection = self.project_issues(artifacts["issues.json"])
+        issues = artifacts["issues.json"]
+        # Schema-first, same as check(): never project a structurally-broken
+        # issues.json (project_issues indexes raw keys) — a malformed build must
+        # surface as a clean EvalError, not a KeyError, in the --update-golden flow.
+        issues_schema = json.loads(self.issues_schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(issues, issues_schema, artifact="issues.json")
+        if diffs:
+            raise EvalError(
+                "cannot regenerate golden — issues.json failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        projection = self.project_issues(issues)
         self.golden_path.write_text(
             json.dumps(projection, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
