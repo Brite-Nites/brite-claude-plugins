@@ -153,7 +153,11 @@ if [ "$?" -eq 2 ]; then ok; else bad 'seed dir without _manifest.yaml must exit 
 rm -rf "$emptyseed" "$outbox"; rm -f "$okfix"
 
 # ── count floor — a vanished test block must fail loudly, not pass on a thin count ──
-FLOOR=24
+# Calibrated tight (40 assertions actual, margin 5) to match the eval-harness discipline
+# (~95%); a loose floor is a wide wedge where coverage can silently erode before the guard
+# fires. Losing the verdict-branch block (~14), the injection block (~4), determinism (~2),
+# or any infra case drops the count below 35 and trips this.
+FLOOR=35
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2
