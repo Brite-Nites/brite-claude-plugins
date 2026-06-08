@@ -50,21 +50,17 @@ run_lint() {
 }
 
 # expect_pass <label> <lint-args...>  — lint must exit 0 (all numbers unique).
+# Used by the GREEN fixtures (1)/(8). There is deliberately NO expect_fail helper:
+# every FAIL fixture ((2)/(3)/(5)/(6)/(7)/(9)) needs fixture-specific assertions a
+# single-<msg-regex> helper can't express — naming ALL colliding files, the
+# no-traceback check, the rc=2-with-reason check — so they capture run_lint once
+# and assert inline. The load-bearing rc check is EXACT (rc==1 for a clean
+# duplicate, rc==2 for usage/IO): a TypeError/crash also exits non-zero, so
+# asserting only "non-zero" would false-green a broken parse path.
 expect_pass() {
   local label="$1"; shift
   local r; r="$(run_lint "$@")"
   if [ "${r%%|*}" -eq 0 ]; then ok; else bad "$label expected PASS, got rc=${r%%|*}: ${r#*|}"; fi
-}
-
-# expect_fail <label> <msg-regex> <lint-args...>  — lint must exit EXACTLY 1 (a
-# clean duplicate, NOT an rc=2 usage error or a crash) AND the message must match
-# <msg-regex>. The exact rc==1 check is load-bearing: a TypeError/crash also exits
-# non-zero, so asserting only "non-zero" would false-green a broken parse path.
-expect_fail() {
-  local label="$1" rx="$2"; shift 2
-  local r rc body; r="$(run_lint "$@")"; rc="${r%%|*}"; body="${r#*|}"
-  if [ "$rc" -eq 1 ]; then ok; else bad "$label expected FAIL rc=1, got rc=$rc: $body"; fi
-  if printf '%s' "$body" | grep -qiE "$rx"; then ok; else bad "$label message should match /$rx/: $body"; fi
 }
 
 # Populate a fixture dir with empty-bodied ADR (and non-ADR) files by NAME.
