@@ -2141,6 +2141,46 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12942 — update-sf-campaign-status builder unit suite (BC-12942)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/revops/scripts/test_build_status_update_payload.sh — the unit/contract
+# suite for build_status_update_payload.py, the deterministic decision core
+# /revops:update-sf-campaign-status delegates to in BOTH its normal and emit runs (the
+# single shared entrypoint — ADR-028 Phase-2 Batch A, the side-effecting σ3 sibling of
+# create-sf-campaign / BC-12701). It drives the builder across every verdict branch
+# (would_update incl. the (active,paused)→(active,null) overlay-clear / would_noop with
+# null≡empty Substatus__c / dry_run incl. both precedence edges / campaign_not_found /
+# invalid_*), proves the --target-org shell-injection guard REJECTS `$(touch pwned)` with
+# NO side effect (the builder only ever regex-matches the value — it never reaches a
+# shell), and locks the SLUG_RE byte-identity parity vs build_campaign_payload.py.
+# FAIL-if-missing (not warn): the builder is mandatory — both the command and the
+# behavioral eval depend on it, so a future delete must fail loudly (the §15a-bc-12589
+# lesson). RESULT line drives the count.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12942. update-sf-campaign-status builder unit suite (BC-12942)"
+
+usu_helper="$REPO_ROOT/plugins/revops/scripts/build_status_update_payload.py"
+usu_harness="$REPO_ROOT/plugins/revops/scripts/test_build_status_update_payload.sh"
+
+if [ ! -f "$usu_helper" ]; then
+  fail "plugins/revops/scripts/build_status_update_payload.py not found — the update-sf-campaign-status emit-mode builder is missing"
+elif [ ! -f "$usu_harness" ]; then
+  fail "plugins/revops/scripts/test_build_status_update_payload.sh not found — the update-sf-campaign-status builder suite is missing"
+else
+  if usu_harness_out=$(bash "$usu_harness" "$usu_helper" 2>&1); then
+    usu_pass_count=$(printf '%s\n' "$usu_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$usu_pass_count" ]; then
+      pass "update-sf-campaign-status builder unit suite (${usu_pass_count} assertions)"
+    else
+      pass "update-sf-campaign-status builder unit suite — passed (count unparsed)"
+    fi
+  else
+    fail "update-sf-campaign-status builder unit suite failed:"
+    printf '%s\n' "$usu_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12702 — canonicals-family emit builder unit suite (BC-12702 + BC-12915)
 # ──────────────────────────────────────────────────────────────────────
 # Runs plugins/marketing/scripts/test_canonical_emit.sh — the unit/contract suite for

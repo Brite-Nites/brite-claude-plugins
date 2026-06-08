@@ -235,6 +235,73 @@ mutate_csf "flip a verdict to an off-enum value" "is not one of enum" \
 mutate_csf "near-miss wrongly deduped" "scenarios[2].verdict: golden 'would_create'" \
   'p=M/"campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="near_miss_not_duplicate"][0]; s.update(verdict="would_skip_duplicate", payload=None, output={"error":"duplicate_slug","existing_id":"701X"}); json.dump(d,open(p,"w"))'
 
+# ── 3b2. update-sf-campaign-status eval (BC-12942 — the σ3 side-effecting sibling) ─
+# The σ3 sibling of create-sf-campaign: ALSO side-effecting (its default run MUTATES SF
+# via `sf data update record`). Its emit-mode builder (build_status_update_payload.py) is
+# driven over a SCENARIO MATRIX so the GREEN run exercises every verdict branch, then the
+# mutation cases prove a red diff — including the load-bearing IDEMPOTENCY regression (the
+# would_noop verdict flipped to would_update), the OVERLAY-CLEAR regression (its symmetric
+# twin), and BOTH precedence edges (dry_run>noop; campaign_not_found>dry_run). Same shape
+# as the create-sf-campaign block above; reuses invoke/assert_*.
+echo "── update-sf-campaign-status eval (BC-12942 — known-good → GREEN) ──"
+USU="$tmproot/usu"; mkdir -p "$USU"
+invoke "$RUN_EVAL" update-sf-campaign-status --sandbox "$USU"
+assert_exit "update-sf-campaign-status eval GREEN — known-good matrix builds + passes" 0
+assert_substr "update-sf-campaign-status eval prints PASS verdict" "PASS: update-sf-campaign-status eval"
+if [ -f "$USU/status-update-emit.json" ]; then
+  echo "  PASS  artifact produced: status-update-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: status-update-emit.json"; fail=$((fail + 1))
+fi
+
+echo "── update-sf-campaign-status self-test (mutated matrix → RED) ──"
+mutate_usu() {  # label  expected_substr  python_mutation (M = artifact dir)
+  local label="$1" rx="$2" code="$3"
+  local M="$tmproot/usumut.$((mutid++))"; mkdir -p "$M"
+  cp "$USU/status-update-emit.json" "$M/"
+  if ! MUT_DIR="$M" python3 -c "
+import json, os, pathlib
+M = pathlib.Path(os.environ['MUT_DIR'])
+$code
+"; then
+    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
+  fi
+  invoke "$RUN_EVAL" update-sf-campaign-status --artifact-dir "$M"
+  assert_exit "usu mutation '$label' → red (exit 1)" 1
+  assert_substr "usu mutation '$label' → named diff" "$rx"
+}
+
+# THE idempotency regression: a would_noop flipped to would_update (the command stops
+# short-circuiting an already-matching campaign) — the load-bearing behavior this eval
+# exists to catch (ADR-028: "green tests on a command that never ran").
+mutate_usu "idempotency regression (noop→update)" "golden 'would_noop', got 'would_update'" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="would_noop"][0]; s.update(verdict="would_update", payload={"Status":"Completed","Substatus__c":""}, output=None); json.dump(d,open(p,"w"))'
+# overlay-clear regression: the (active,paused)→(active,null) transition wrongly treated
+# as a noop (the overlay never clears) — the symmetric twin of the idempotency regression.
+mutate_usu "overlay-clear regression (update→noop)" "scenarios[1].verdict: golden 'would_update'" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="would_update_clears_overlay"][0]; s.update(verdict="would_noop", payload=None, output={"noop":True}); json.dump(d,open(p,"w"))'
+# precedence edge #1: dry_run>noop — a dry-run against a matching campaign wrongly noops.
+mutate_usu "precedence regression (dry_run→noop)" "golden 'dry_run', got 'would_noop'" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="dry_run_wins_over_noop"][0]; s.update(verdict="would_noop", output={"noop":True}); json.dump(d,open(p,"w"))'
+# precedence edge #2: campaign_not_found>dry_run — a dry-run against a missing campaign
+# wrongly emits a (degenerate) preview instead of the not-found warning.
+mutate_usu "precedence regression (not_found→dry_run)" "golden 'campaign_not_found', got 'dry_run'" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="dry_run_against_missing"][0]; s.update(verdict="dry_run", campaign_id="701ABCDEFGHIJKLMNO", output={"dry_run":True}); json.dump(d,open(p,"w"))'
+# no-write invariant: would_noop's Phase-7 campaign_url un-nulled (the URL is out of the
+# emit scope — a builder that filled it would be modeling the live read).
+mutate_usu "un-null a noop campaign_url (out-of-scope invariant)" "output.campaign_url must be null" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="would_noop"][0]; s["output"]["campaign_url"]="https://x.lightning.force.com/..."; json.dump(d,open(p,"w"))'
+# no-write invariant (symmetric twin): would_update's output un-nulled — the Phase-8
+# success envelope is IO-assembled post-write, so the hermetic emit row must keep it null.
+mutate_usu "un-null a would_update output (no-write invariant)" "would_update output must be null" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="would_update"][0]; s["output"]={"leaked":True}; json.dump(d,open(p,"w"))'
+mutate_usu "drop the idempotency scenario" "expected scenario id 'would_noop' is absent" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); d["scenarios"]=[s for s in d["scenarios"] if s["id"]!="would_noop"]; json.dump(d,open(p,"w"))'
+mutate_usu "leak an extra scenario key" "unexpected property" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+mutate_usu "flip a verdict to an off-enum value" "is not one of enum" \
+  'p=M/"status-update-emit.json"; d=json.load(open(p)); d["scenarios"][0]["verdict"]="ship_it"; json.dump(d,open(p,"w"))'
+
 # ── 3c. new-offer eval (BC-12702 — the structure-first / LLM-judged representative) ─
 # The THIRD registered command: it WRITES a GTM canonical where the operator/LLM chooses
 # the content. Its emit builder (build_offer_emit.py) drives the SAME runtime entrypoint
@@ -361,9 +428,10 @@ echo "── hermeticity ──"
 # (a) no network-capable module is imported anywhere in the eval source — incl. the
 #     create-sf-campaign builder AND the canonicals-family builder the adapters shell out to.
 CSF_BUILDER="$REPO_ROOT/plugins/revops/scripts/build_campaign_payload.py"
+USU_BUILDER="$REPO_ROOT/plugins/revops/scripts/build_status_update_payload.py"
 NO_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_canonical_emit.py"
 if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
-     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$NO_BUILDER" >/dev/null 2>&1; then
+     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$USU_BUILDER" "$NO_BUILDER" >/dev/null 2>&1; then
   echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
 else
   echo "  PASS  hermeticity: no network module imported"; pass=$((pass + 1))
@@ -404,6 +472,25 @@ if [ "$before2" = "$after2" ]; then
   echo "  PASS  hermeticity: create-sf-campaign eval wrote nothing into the working dir"; pass=$((pass + 1))
 else
   echo "  FAIL  hermeticity: create-sf-campaign eval left stray files in the working dir"; fail=$((fail + 1))
+fi
+# (c2) the update-sf-campaign-status eval (BC-12942) is hermetic too — GREEN with API keys
+#      unset from an empty cwd, no stray files (the builder makes NO SF write/SOQL; the
+#      load-bearing proof for the σ3 side-effecting sibling).
+HCWD_USU="$tmproot/hermetic-cwd-usu"; mkdir -p "$HCWD_USU"
+before_usu="$(cd "$HCWD_USU" && find . | sort)"
+herm_usu_out="$(cd "$HCWD_USU" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" update-sf-campaign-status 2>&1)"
+herm_usu_rc=$?
+after_usu="$(cd "$HCWD_USU" && find . | sort)"
+if [ "$herm_usu_rc" -eq 0 ]; then
+  echo "  PASS  hermeticity: update-sf-campaign-status eval GREEN with API keys unset, empty cwd"; pass=$((pass + 1))
+else
+  echo "  FAIL  hermeticity: update-sf-campaign-status eval failed without API keys (rc=$herm_usu_rc)"
+  printf '    output: %s\n' "$herm_usu_out"; fail=$((fail + 1))
+fi
+if [ "$before_usu" = "$after_usu" ]; then
+  echo "  PASS  hermeticity: update-sf-campaign-status eval wrote nothing into the working dir"; pass=$((pass + 1))
+else
+  echo "  FAIL  hermeticity: update-sf-campaign-status eval left stray files in the working dir"; fail=$((fail + 1))
 fi
 # (d) the new-offer eval (BC-12702) is hermetic too — GREEN with API keys unset from an
 #     empty cwd, no stray files. Its builder copies a frozen seed into a sandbox and shells
@@ -451,9 +538,11 @@ echo ""
 # yet still exit 0. Below the floor is a silent-skip and must fail the build loudly
 # (the eval's whole reason to exist). Bumped 45→80 (BC-12701 create-sf-campaign block),
 # 80→100 (BC-12702 new-offer block, +19), then 100→125 when the BC-12915 canonicals batch
-# landed (new-persona + new-vertical: +26 = 2×(3 GREEN + 4×2 mutations + 2 hermeticity),
-# total 131) — so losing any one command's eval block trips the floor rather than passing.
-FLOOR=125
+# landed (new-persona + new-vertical: +26, total 131), then 125→146 with the BC-12942
+# update-sf-campaign-status block (+23 = 3 GREEN + 9×2 mutations + 2 hermeticity, total
+# 154) — so losing any one command's eval block trips the floor rather than passing. Held
+# at ~95% of the live count to tolerate a single intentional assertion edit.
+FLOOR=146
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

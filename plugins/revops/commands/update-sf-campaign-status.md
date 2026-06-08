@@ -1,6 +1,7 @@
 ---
 description: Sync a Salesforce Campaign's Status (and Substatus__c overlay) to a Linear label transition. Soft-fail when the SF Campaign doesn't exist (auto-create earlier failed) — returns a structured `warning` and continues. Idempotent (no-ops when current state already matches target). Called by σ3 trigger automation (BC-8752) on Linear status transitions, and by `/marketing:sync-campaign-status` for manual paused/killed triggers. Triggers on "update sf campaign status", "sync sf campaign status", "σ3 status sync", or direct `/revops:update-sf-campaign-status` invocation.
 allowed-tools: Bash, mcp__plugin_revops_salesforce__run_soql_query
+disable-model-invocation: true
 ---
 
 # /revops:update-sf-campaign-status
@@ -10,6 +11,38 @@ Implements σ3 SF Campaign status sync per [ADR-015](../../docs/decisions/015-gt
 **Soft-fail contract** (load-bearing, per BC-8724 + BC-8752 designs): every error path exits 0 with a structured `{"error":"<kind>", ...}` or `{"warning":"<kind>", ...}` JSON object. Orchestrators detect failure by parsing the `error` / `warning` key, NOT by exit code. NEVER throw, NEVER exit non-zero, NEVER halt with prose.
 
 **Single-line JSON on stdout.** No narration, no banners, no markdown. The caller pipes the output to `jq`. If you need to log diagnostic context, write it to stderr — stdout is reserved for the one JSON line.
+
+## Deterministic builder
+
+`/revops:update-sf-campaign-status` is **command-as-orchestrator + a deterministic builder as composer** (the ADR-028 D2 emit-mode seam, the σ3 sibling of how `/revops:create-sf-campaign` delegates to `build_campaign_payload.py`). The status-mapping table lookup, the **idempotency noop pre-check** (null≡empty `Substatus__c` equivalence), the dry-run preview assembly, and the SF Campaign UPDATE **payload** assembly *given the one SOQL read* are owned by **[`plugins/revops/scripts/build_status_update_payload.py`](../scripts/build_status_update_payload.py)**, a pure, stdlib-only, hermetic helper the command **delegates to in BOTH its normal and emit runs** — that is the drift-prone logic the eval certifies in one place. The input-shape guards (slug / target-org) are the SAME byte-identical regexes living in two roles: applied **in-context** at Phase 0/1 as the ordering-critical shell-/SOQL-injection guards — they MUST run *before* their `sf` / SOQL sinks (Phase 0/2/6) — **and** re-applied inside the builder as the canonical, eval-tested copy (parity-locked by the BC-12638 lint + the builder's parity test, so the two roles cannot drift). The command owns the IO boundary: the Phase-0/2 live reads, the Phase-6 `sf data update record` write, the post-write `LastModifiedDate` re-read, the Phase-7 URL construction, and emitting the builder's decision on stdout.
+
+The builder's pure core is `decide(inputs, sf_state) -> {verdict, payload, output}`, where `sf_state` carries the result of the command's ONE live read (the Phase-2 campaign lookup + current-state read) — there is NO owner lookup here (the side it differs from `create-sf-campaign`, which injects two reads):
+
+```json
+{ "campaign": { "Id": "701…", "Status": "In Progress", "Substatus__c": null, "LastModifiedDate": "2026-…" } }
+```
+
+- `verdict` ∈ `would_update` | `would_noop` | `dry_run` | `campaign_not_found` | `error`.
+- `payload` is the SF Campaign UPDATE field-map `{Status, Substatus__c}` (present on `would_update` / `dry_run`, else `null`; `Substatus__c` is `""` when the mapped overlay is null — SF CLI v2.x clears the field on empty-string).
+- `output` is the exact soft-fail JSON envelope to emit on stdout (present on `would_noop` / `dry_run` / `campaign_not_found` / `error`, and `null` on `would_update` — the Phase-8 success envelope needs the post-write `LastModifiedDate` + URL the hermetic path can't compute).
+
+`sf_state.campaign` is `null` when the Phase-2 SOQL returns 0 rows → the builder yields `campaign_not_found` (a `warning`, not caller-correctable from this path). The verdict precedence mirrors the command's phase order EXACTLY — missing flags → Phase-0 target-org guard → Phase-1 slug/status guards → Phase-2 `campaign_not_found` → **Phase-4 `dry_run` (which WINS over the Phase-5 noop short-circuit)** → Phase-5 `would_noop` → Phase-6 `would_update`. Two precedence subtleties are load-bearing: `dry_run` wins over `would_noop` (a caller passing `--dry-run` always gets the `dry_run` shape, even when the state already matches), but `campaign_not_found` (Phase 2) is **upstream of** `dry_run` (Phase 4) — a `--dry-run` against a missing campaign is `campaign_not_found`, never a preview, because the preview embeds the record-id the Phase-2 read supplies.
+
+The `sf_cli_error` key, plus the `instance_url_unknown` / `updated_at_unavailable` warnings, have **no branch in `decide()`** — they are emitted by the command's IO layer on a live SF/CLI failure or a post-write degradation (Phase 6/7), which is not input-determined. The builder owns the five input-determined verdicts above; the live-IO outcomes stay with the IO boundary.
+
+At **runtime** the order is load-bearing: Phase 0/1 validate the inputs **in-context first** (the shell-/SOQL-injection guards, *before* any `sf` or SOQL sink) → Phase 2 performs the SOQL read → then pass the validated inputs + the SOQL row to the builder for the mapping/noop/dry_run verdict + payload:
+
+```bash
+echo '<scenario-json>' | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_status_update_payload.py" --decide -
+```
+
+`would_update` → run the Phase-6 `sf data update record` with the returned `payload`, then emit Phase-8 success; `would_noop` / `dry_run` / `campaign_not_found` / `error` → emit the builder's `output` verbatim (still exit 0 — soft-fail). Because the mapping + noop + payload are computed in ONE place, the behavioral eval that drives the builder (below) certifies the real decision logic, not a parallel copy. **The Phase prose below is the builder's contract: the command does NOT re-implement the mapping table, the noop comparison, or the payload assembly in-context — those are builder-only. The Phase 0/1 input-shape regexes DO run in-context (the injection-ordering guards), applying the same byte-identical patterns the builder re-checks.**
+
+## Emit mode (`--scenarios <fixture> --out-dir <sandbox>`)
+
+`build_status_update_payload.py --scenarios <fixture> --out-dir <sandbox>` is the **side-effect-free** run the behavioral eval (BC-12942) exercises (ADR-028 § 5). Because the noop/dry_run decisions depend on a LIVE SOQL read, the fixture **injects** that read as `sf_state.campaign` (the `/marketing:plan-campaign` idiom of injecting `created_at` to defeat `now()`) — so the builder is pure given its inputs. Emit runs `decide()` over a scenario matrix and writes `status-update-emit.json` (each row `{id, verdict, target_org, payload, campaign_id, output}`); it makes **NO** `run_soql_query` call, **NO** `sf` write, **NO** network call. Per-field nullness models the decision UP TO the write, never the write itself: `campaign_id` carries the injected *pre-write* read Id (it is real input, not a write result), but the genuinely *post-write* fields stay null — `would_update.output` is `null` and `would_noop.output.campaign_url` is `null` (the Phase-7 URL is out of the emit scope; `would_noop.output.updated_at` legitimately echoes the injected Phase-2 `LastModifiedDate`, no re-read). The eval golden-compares a structural projection of that matrix (`plugins/revops/tests/eval/update-sf-campaign-status.*`); the harness is `scripts/eval/test_eval_harness.sh` + the builder unit suite `plugins/revops/scripts/test_build_status_update_payload.sh`, both wired into `validate.sh`.
+
+Emit mode does **not** make the command non-side-effecting: its DEFAULT run still issues a real Campaign UPDATE, which is why **`disable-model-invocation: true`** is set (ADR-028 § 0 — the model must not fire the real, mutating run unprompted; the command stays invocable explicitly via `/revops:update-sf-campaign-status`, via `/marketing:sync-campaign-status`'s `Skill` delegation, and via the σ3 trigger automation's `Skill` calls in `/marketing:launch-campaign` + `/marketing:campaign-debrief`, BC-8752 — none of which are model-auto-fire, so the flag breaks no invocation path). Distinguish from the legacy `--dry-run` (Phase 4), which previews to stdout but still performs the live SOQL read — `--dry-run` is the human/orchestrator preview; emit mode is the hermetic, testable seam.
 
 ## Input flags
 

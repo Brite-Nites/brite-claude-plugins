@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "command": "/revops:update-sf-campaign-status",
+  "scenarios": [
+    {
+      "id": "would_update",
+      "verdict": "would_update",
+      "target_org": "brite-prod",
+      "payload": {
+        "Status": "Planned",
+        "Substatus__c": ""
+      },
+      "campaign_id": "701ABCDEFGHIJKLMNO",
+      "output": null
+    },
+    {
+      "id": "would_update_clears_overlay",
+      "verdict": "would_update",
+      "target_org": "brite-prod",
+      "payload": {
+        "Status": "In Progress",
+        "Substatus__c": ""
+      },
+      "campaign_id": "701ABCDEFGHIJKLMNO",
+      "output": null
+    },
+    {
+      "id": "would_noop",
+      "verdict": "would_noop",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": "701ABCDEFGHIJKLMNO",
+      "output": {
+        "campaign_id": "701ABCDEFGHIJKLMNO",
+        "campaign_url": null,
+        "campaign_name": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "status": "Completed",
+        "substatus": "",
+        "updated_at": "2026-05-01T12:00:00.000+0000",
+        "noop": true
+      }
+    },
+    {
+      "id": "would_noop_empty_substatus",
+      "verdict": "would_noop",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": "701ABCDEFGHIJKLMNO",
+      "output": {
+        "campaign_id": "701ABCDEFGHIJKLMNO",
+        "campaign_url": null,
+        "campaign_name": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "status": "In Progress",
+        "substatus": "",
+        "updated_at": "2026-05-01T12:00:00.000+0000",
+        "noop": true
+      }
+    },
+    {
+      "id": "dry_run",
+      "verdict": "dry_run",
+      "target_org": "brite-prod",
+      "payload": {
+        "Status": "Aborted",
+        "Substatus__c": ""
+      },
+      "campaign_id": "701ABCDEFGHIJKLMNO",
+      "output": {
+        "dry_run": true,
+        "mapping": {
+          "linear_status": "killed",
+          "linear_substatus": "",
+          "sf_status": "Aborted",
+          "sf_substatus": ""
+        },
+        "command": "sf data update record --sobject Campaign --record-id 701ABCDEFGHIJKLMNO --values \"Status='Aborted' Substatus__c=''\" --target-org \"brite-prod\" --json",
+        "payload": {
+          "Status": "Aborted",
+          "Substatus__c": ""
+        },
+        "target_org": "brite-prod"
+      }
+    },
+    {
+      "id": "dry_run_wins_over_noop",
+      "verdict": "dry_run",
+      "target_org": "brite-prod",
+      "payload": {
+        "Status": "Completed",
+        "Substatus__c": ""
+      },
+      "campaign_id": "701ABCDEFGHIJKLMNO",
+      "output": {
+        "dry_run": true,
+        "mapping": {
+          "linear_status": "completed",
+          "linear_substatus": "",
+          "sf_status": "Completed",
+          "sf_substatus": ""
+        },
+        "command": "sf data update record --sobject Campaign --record-id 701ABCDEFGHIJKLMNO --values \"Status='Completed' Substatus__c=''\" --target-org \"brite-prod\" --json",
+        "payload": {
+          "Status": "Completed",
+          "Substatus__c": ""
+        },
+        "target_org": "brite-prod"
+      }
+    },
+    {
+      "id": "dry_run_against_missing",
+      "verdict": "campaign_not_found",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "warning": "campaign_not_found",
+        "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05"
+      }
+    },
+    {
+      "id": "campaign_not_found",
+      "verdict": "campaign_not_found",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "warning": "campaign_not_found",
+        "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05"
+      }
+    },
+    {
+      "id": "invalid_slug_format",
+      "verdict": "error",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "invalid_slug_format",
+        "slug": "Not A Valid Slug!"
+      }
+    },
+    {
+      "id": "invalid_linear_status",
+      "verdict": "error",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "invalid_status",
+        "flag": "--linear-status",
+        "value": "bogus"
+      }
+    },
+    {
+      "id": "invalid_linear_substatus",
+      "verdict": "error",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "invalid_status",
+        "flag": "--linear-substatus",
+        "value": "snoozed"
+      }
+    },
+    {
+      "id": "invalid_target_org",
+      "verdict": "error",
+      "target_org": "$(touch pwned)",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "invalid_target_org",
+        "value": "$(touch pwned)"
+      }
+    },
+    {
+      "id": "missing_required_flag",
+      "verdict": "error",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "missing_required_flag",
+        "flag": "linear_status"
+      }
+    }
+  ]
+}
