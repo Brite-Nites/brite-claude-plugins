@@ -1,0 +1,26 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_offer_emit.py's offer-emit.json (BC-12702, ADR-028 eval #3). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, additionalProperties: false, items, enum, const. This asserts the matrix SHAPE (every row carries the same key set + types). It is DISTINCT from the canonical's structural validity, which lint_canonicals.py owns (its exit code is baked into each write row's lint.exit_code and asserted by the golden). appended_offer/lint are left type-only ([object,null]) so the golden + golden_compare lock their (per-branch, heterogeneous) values: a write row carries an appended_offer object + lint{exit_code}; a rejection row carries null for both + a non-null error string.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "command": { "type": "string", "const": "/marketing:new-offer" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "ok", "action", "appended_offer", "error", "lint"],
+        "properties": {
+          "id": { "type": "string" },
+          "ok": { "type": "boolean" },
+          "action": { "type": ["string", "null"] },
+          "appended_offer": { "type": ["object", "null"] },
+          "error": { "type": ["string", "null"] },
+          "lint": { "type": ["object", "null"] }
+        }
+      }
+    }
+  }
+}
