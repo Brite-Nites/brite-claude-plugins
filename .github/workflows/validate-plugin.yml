@@ -178,3 +178,33 @@ jobs:
         env:
           BASE_REF: origin/main
           HEAD_REF: HEAD
+
+  eval-gate:
+    # BC-12590 (M5 capstone) — the ADR-028 Phase-1 forward-only BLOCKING gate.
+    # For each command CHANGED vs origin/main, fails the PR unless the two §0
+    # non-negotiables hold (Split A′): structural R1 (disable-model-invocation)
+    # blocks any changed command; the behavioral-eval requirement is grandfathered
+    # by docs/skill-eval-debt.md (else needs a passing eval or a # eval-waiver).
+    #
+    # The LIVE diff-gate lives HERE — not in the `validate` job — because it needs
+    # origin/main as a diff base: the `validate` job is a shallow checkout where
+    # origin/main doesn't resolve, so a validate.sh-embedded diff-gate would
+    # silently no-op. validate.sh runs the diff-FREE half (the self-test harness +
+    # the --check debt-list integrity lint), which is shallow-safe. Same structure
+    # as the shift-left-clone-drift job above (pull_request-scoped, fetch-depth: 0),
+    # but BLOCKING — no continue-on-error: the Phase-1 discipline is real.
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read  # least-privilege — the gate only reads in-repo files + a git diff
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need origin/main as the diff base for the changed-command set
+
+      - name: Fetch origin/main for the diff base
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Run the M5 eval gate (changed commands vs origin/main)
+        run: python3 scripts/eval/eval_gate.py --base-ref origin/main --head-ref HEAD
