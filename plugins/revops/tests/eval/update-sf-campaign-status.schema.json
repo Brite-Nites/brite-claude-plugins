@@ -1,0 +1,26 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_status_update_payload.py's status-update-emit.json (BC-12942 eval). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, additionalProperties: false, items, enum, const. Asserts the matrix SHAPE; the golden + golden_compare assert the per-scenario verdict/payload/campaign_id/output VALUES. campaign_id is [string,null] — it carries the injected PRE-write read Id whenever the campaign exists (would_update / would_noop / dry_run) and null otherwise (campaign_not_found / error); unlike create-sf-campaign's always-null post-write id, this is a pre-write read and belongs in the emit. payload/output are left type-only ([object,null]) so the golden locks their (heterogeneous, per-branch) keys — incl. the post-write-null invariants (would_update.output==null; would_noop.output.campaign_url==null).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "command": { "type": "string", "const": "/revops:update-sf-campaign-status" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "verdict", "target_org", "payload", "campaign_id", "output"],
+        "properties": {
+          "id": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["would_update", "would_noop", "dry_run", "campaign_not_found", "error"] },
+          "target_org": { "type": "string" },
+          "payload": { "type": ["object", "null"] },
+          "campaign_id": { "type": ["string", "null"] },
+          "output": { "type": ["object", "null"] }
+        }
+      }
+    }
+  }
+}

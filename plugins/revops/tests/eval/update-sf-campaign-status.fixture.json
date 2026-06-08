@@ -1,0 +1,138 @@
+{
+  "_comment": "Behavioral-eval fixture for /revops:update-sf-campaign-status (BC-12942, ADR-028 Phase-2 Batch A — the side-effecting σ3 sibling of create-sf-campaign / BC-12701). A SCENARIO MATRIX: each row = status-transition inputs + the INJECTED result of the command's ONE live SOQL read (Phase-2 campaign lookup + current-state read `sf_state.campaign`, or null for 0 rows). Injecting that read is what makes the builder pure → the eval hermetic (the plan-campaign 'inject created_at to defeat now()' idiom, generalized to defeat the live SOQL). ONE injected read, NO owner lookup (the cheaper-than-create delta). The matrix exercises EVERY verdict branch — would_update (incl. the load-bearing (active,paused)→(active,null) overlay-CLEAR) + the behaviorally-load-bearing would_noop (idempotency, null≡empty Substatus__c) + dry_run + the two precedence edges (dry_run WINS over noop; campaign_not_found WINS over dry_run) + campaign_not_found + the input-shape guards — so a green eval certifies the whole decision function, not just the happy path. The canonical slug mirrors the create-sf-campaign fixture. SF Ids are synthetic 18-char shapes (never written anywhere — emit makes no SF write). One-fault-per-row: each rejection row keeps the OTHER inputs valid so the targeted phase is the one that trips.",
+  "scenarios": [
+    {
+      "id": "would_update",
+      "note": "state differs: a planning transition against an active campaign → emit the UPDATE payload (Planned, ''). output null — the success envelope is IO-assembled post-write.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "planning",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "would_update_clears_overlay",
+      "note": "THE load-bearing overlay-clear: (active,paused)→(active,null). Status already matches (In Progress) BUT substatus differs (Paused≠null) → would_update that CLEARS the overlay (Substatus__c=''), NOT a noop. The symmetric twin of the null≡empty noop equivalence.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "active",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": "Paused", "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "would_noop",
+      "note": "idempotency: current SF state already == mapped target (Completed, null) → would_noop, no UPDATE. output echoes the injected Phase-2 LastModifiedDate as updated_at (no re-read); campaign_url pinned null (Phase-7, out of scope); payload null (no write).",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "completed",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "Completed", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "would_noop_empty_substatus",
+      "note": "SOQL-side null≡empty (the load-bearing twin of would_noop): the CURRENT Substatus__c is the empty string \"\" (not null) — SF can return \"\" for a cleared overlay — and the active/no-substatus transition maps to null → would_noop. Proves _norm_sub reconciles SOQL-\"\" with mapped-null at the artifact level; a `return value` regression in _norm_sub (dropping the `or \"\"`) flips this row to would_update, which the null-overlay would_noop row above cannot catch (None==None passes raw ==).",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "active",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": "", "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "dry_run",
+      "note": "a --dry-run against a differing campaign → the preview envelope (mapping + the verbatim `command` shell-string + payload), NO UPDATE. The preview embeds --record-id from the injected Phase-2 read.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "killed",
+      "dry_run": true,
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "dry_run_wins_over_noop",
+      "note": "precedence edge #1: --dry-run against an ALREADY-MATCHING campaign → dry_run, NOT would_noop. 'Regardless of current SF state' = even if it'd be a noop. Re-ordering Phase 4/5 would silently break the orchestrator contract.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "completed",
+      "dry_run": true,
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "Completed", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "dry_run_against_missing",
+      "note": "precedence edge #2: --dry-run against a MISSING campaign → campaign_not_found, NOT a degenerate preview. campaign-existence (Phase 2) is UPSTREAM of and orthogonal to dry_run>noop — the preview needs the Phase-2 record-id, so Option-2 (dry_run-short-circuits-first) would force decide() to invent a null-id preview the real command never emits.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "active",
+      "dry_run": true,
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": null
+      }
+    },
+    {
+      "id": "campaign_not_found",
+      "note": "Phase-2 returned 0 rows (auto-create earlier may have failed) → soft-fail WARNING campaign_not_found (not error — not caller-correctable from the update path). campaign_id null.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "killed",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": null
+      }
+    },
+    {
+      "id": "invalid_slug_format",
+      "note": "Phase-1 slug guard (also the Phase-2 SOQL-literal guard): a slug failing the canonical regex → invalid_slug_format. target-org valid so Phase 0 passes first (one fault per row).",
+      "slug": "Not A Valid Slug!",
+      "linear_status": "active",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "invalid_linear_status",
+      "note": "Phase-1 --linear-status enum guard: a value outside {planning,active,completed,killed} → invalid_status with flag=--linear-status (the discriminator callers parse).",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "bogus",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "invalid_linear_substatus",
+      "note": "Phase-1 --linear-substatus enum guard: a value outside {empty,paused} → invalid_status with flag=--linear-substatus. linear-status is valid so the substatus check is the one that trips (fail-fast, status-before-substatus order).",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "active",
+      "linear_substatus": "snoozed",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "invalid_target_org",
+      "note": "Phase-0 shell-injection guard (reused BC-12639 validator): a command-substitution payload → invalid_target_org. The builder NEVER shells the value — test_build_status_update_payload.sh asserts no `pwned` sentinel.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "linear_status": "active",
+      "target_org": "$(touch pwned)",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    },
+    {
+      "id": "missing_required_flag",
+      "note": "presence check before any phase: --linear-status omitted → missing_required_flag flag=linear_status (flag-table order, after slug).",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "campaign": { "Id": "701ABCDEFGHIJKLMNO", "Status": "In Progress", "Substatus__c": null, "LastModifiedDate": "2026-05-01T12:00:00.000+0000" }
+      }
+    }
+  ]
+}
