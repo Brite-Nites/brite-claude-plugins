@@ -72,13 +72,33 @@ SIDE_EFFECTING_RE = re.compile(
     r"|git\s+(?:push|commit|branch)\b"
 )
 
-# `# lint:not-side-effecting <reason>` override marker (ADR-028: non-silent opt-out).
-# ANCHORED to a comment prefix (`#` / `<!--`) so a prose or inline-code MENTION of
-# the token — e.g. a command body that documents the override syntax — cannot
-# accidentally suppress a real R1 gate (the BC-12534 substring-lint gotcha: a grep
-# can't tell an instruction from a prohibition). ADR-028's form is `# lint:...`.
-# We capture the reason after the token and strip a trailing HTML-comment close.
-OVERRIDE_RE = re.compile(r"^\s*(?:#+|<!--)\s*lint:not-side-effecting[ \t]*(.*)$")
+# Comment-anchored opt-out / waiver marker parser — the ONE canonical copy (the
+# "single canonical copy" discipline this epic keeps teaching). BOTH the R1
+# `# lint:not-side-effecting <reason>` override (this module) and BC-12590's
+# `# eval-waiver: <reason>` (scripts/eval/eval_gate.py imports this function) route
+# through it so the two markers can never drift into subtly-different parsers.
+def parse_marker(text: str, token: str) -> str | None:
+    """First comment-anchored ``# <token><reason>`` marker in ``text``.
+
+    ANCHORED to a comment prefix (``#`` / ``<!--``) so a prose or inline-code MENTION
+    of the token — e.g. a body documenting the override syntax — cannot accidentally
+    suppress a real gate (the BC-12534 substring-lint gotcha: a grep can't tell an
+    instruction from a prohibition). ``token`` is the literal marker prefix INCLUDING
+    whatever separator the form uses: ``"lint:not-side-effecting"`` (space then
+    reason) vs ``"eval-waiver:"`` (colon then reason). Returns None when absent, ''
+    when present but with no reason (an empty marker — callers treat that as "does not
+    suppress"), else the reason string with a trailing HTML-comment close stripped.
+    """
+    rx = re.compile(rf"^\s*(?:#+|<!--)\s*{re.escape(token)}[ \t]*(.*)$")
+    for line in text.splitlines():
+        m = rx.search(line)
+        if m:
+            return re.sub(r"\s*-->\s*$", "", m.group(1)).strip()
+    return None
+
+
+# The R1 override token (ADR-028: non-silent opt-out; form `# lint:not-side-effecting <reason>`).
+LINT_OVERRIDE_TOKEN = "lint:not-side-effecting"
 
 # disable-model-invocation is read directly via fm_value(fm, "disable-model-invocation")
 # in rule_r1_side_effecting — there is intentionally no separate regex constant for it
@@ -159,13 +179,9 @@ def _side_effecting_hit(text: str) -> tuple[int, str] | None:
 
 def _override_reason(text: str) -> str | None:
     """`# lint:not-side-effecting <reason>` marker: None = absent, '' = present but
-    no reason (an empty marker), else the reason string."""
-    for line in text.splitlines():
-        m = OVERRIDE_RE.search(line)
-        if m:
-            reason = re.sub(r"\s*-->\s*$", "", m.group(1)).strip()
-            return reason
-    return None
+    no reason (an empty marker), else the reason string. Delegates to the canonical
+    parse_marker so the R1 override and eval_gate's `# eval-waiver` share one parser."""
+    return parse_marker(text, LINT_OVERRIDE_TOKEN)
 
 
 def rule_r1_side_effecting(path: Path, text: str) -> list[Finding]:

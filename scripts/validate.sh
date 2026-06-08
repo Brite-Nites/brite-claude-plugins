@@ -1901,6 +1901,62 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12590 — M5 forward-only eval gate (BC-12590, ADR-028 Phase-1)
+# ──────────────────────────────────────────────────────────────────────
+# The flip-to-blocking capstone. Two parts are wired HERE; the LIVE diff-gate is
+# deliberately NOT one of them — it runs in a dedicated pull_request CI job at
+# fetch-depth: 0 (.github/workflows/validate-plugin.yml § eval-gate). The
+# `validate` job is a shallow checkout where origin/main is not a resolvable diff
+# base, so a diff-gate embedded here would silently no-op (a gate that doesn't
+# gate). What runs here is diff-free and therefore meaningful in any checkout:
+#   1. The self-test harness (scripts/eval/test_eval_gate.sh) is a MANDATORY gate
+#      — FAIL if missing or red, so the gate can't silently vanish (the
+#      §15a-bc-12589 "a check nobody is forced to run rots" lesson).
+#   2. The debt-list integrity lint (`eval_gate.py --check`) is BLOCKING: it
+#      enforces debt ∩ ADAPTERS == ∅ and debt ∪ ADAPTERS == the full command
+#      surface (no net-new command merges un-recorded; no stale row for a deleted
+#      command). This is what makes grandfathering + `# eval-waiver` explicit,
+#      finite, and never silent.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12590. M5 forward-only eval gate (BC-12590, ADR-028)"
+
+eval_gate="$REPO_ROOT/scripts/eval/eval_gate.py"
+eval_gate_test="$REPO_ROOT/scripts/eval/test_eval_gate.sh"
+
+# Part 1 and Part 2 are gated INDEPENDENTLY (each on its own prerequisite) so a
+# missing/renamed self-test can't also silently disable the --check integrity lint
+# — the recursive form of the §15a-bc-12589 "a check nobody is forced to run rots"
+# lesson (Greptile review, PR #453). Both are mandatory; a missing file FAILs.
+
+# Part 1 — self-test harness (RESULT contract line drives the count).
+if [ ! -f "$eval_gate_test" ]; then
+  fail "scripts/eval/test_eval_gate.sh not found — the mandatory ADR-028 M5 eval-gate self-test is missing"
+elif [ ! -f "$eval_gate" ]; then
+  fail "scripts/eval/eval_gate.py not found — the ADR-028 M5 eval-gate self-test cannot run"
+else
+  if eg_test_out=$(bash "$eval_gate_test" 2>&1); then
+    eg_pass_count=$(printf '%s\n' "$eg_test_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    pass "eval-gate self-test (${eg_pass_count:-?} assertions)"
+  else
+    fail "eval-gate self-test failed — run scripts/eval/test_eval_gate.sh for details"
+    printf '%s\n' "$eg_test_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# Part 2 — debt-list integrity lint, BLOCKING (diff-free → shallow-checkout-safe).
+# Conditioned ONLY on eval_gate.py (not the self-test), so it keeps enforcing the
+# debt-list invariants even if the self-test file is ever removed/renamed.
+# exit 0 = invariants hold; 1 = a broken invariant; 2 = could-not-run — both FAIL.
+if [ ! -f "$eval_gate" ]; then
+  fail "scripts/eval/eval_gate.py not found — the ADR-028 M5 debt-list integrity lint cannot run"
+elif eg_check_out=$(python3 "$eval_gate" --check 2>&1); then
+  pass "debt-list integrity (eval_gate --check): debt ∩ ADAPTERS == ∅, debt ∪ ADAPTERS == surface"
+else
+  fail "debt-list integrity lint failed — docs/skill-eval-debt.md out of sync with the command surface / ADAPTERS (run: python3 scripts/eval/eval_gate.py --check)"
+  printf '%s\n' "$eg_check_out" | grep '^  PROBLEM' | sed 's/^/          /' >&2 || true
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-8728 — Shared utilities + offer-performance harnesses (BC-8728)
 # ──────────────────────────────────────────────────────────────────────
 # Runs plugins/marketing/scripts/test_shared_utilities.sh (canonicals_reader,
