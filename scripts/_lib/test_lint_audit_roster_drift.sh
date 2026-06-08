@@ -100,10 +100,12 @@ cmd_prefixed "$da/beta.md"  aaa bbb ddd
 expect_pass "(a) in-sync, both idioms" --adr "$da/adr.md" "$da/alpha.md" "$da/beta.md"
 
 # ── (b) command emits a key the ADR roster LACKS (≡ "add fake 8th key" / "remove
-#        a key from the ADR roster") → FAIL ────────────────────────────────────
+#        a key from the ADR roster") → ADR FAIL. cmd_bare tabulates the same key
+#        list it emits, so the table stays in sync — this isolates the ADR axis
+#        (the table axis is exercised by (d)/(e)). ──────────────────────────────
 db="$BOX/b"; mkdir -p "$db"
 cmd_bare "$db/alpha.md" aaa bbb ccc ddd   # emits ddd …
-adr_block alpha aaa bbb ccc > "$db/adr.md"  # … but ADR roster lacks it (and table will too → also table FAIL)
+adr_block alpha aaa bbb ccc > "$db/adr.md"  # … but ADR roster lacks it (table includes ddd too → table OK, only ADR FAIL)
 expect_fail "(b) emit key absent from ADR" 'STALE.*missing from ADR roster' --adr "$db/adr.md" "$db/alpha.md"
 
 # ── (c) ADR roster has a PHANTOM key the command never emits → FAIL ────────────
@@ -187,6 +189,12 @@ cmd_prefixed "$dk/beta.md"  aaa bbb fff        # fff = fake 6th on update-idiom
 { adr_block alpha aaa bbb ccc; adr_block beta aaa bbb; } > "$dk/adr.md"
 expect_fail "(k) fake extra key on both commands" 'eee|fff' --adr "$dk/adr.md" "$dk/alpha.md" "$dk/beta.md"
 
+# ── (l) clean rc — a missing ADR file is a usage/IO error (rc=2), NOT a drift ──
+dl="$BOX/l"; mkdir -p "$dl"
+cmd_bare "$dl/alpha.md" aaa
+rl="$(run_lint --adr "$dl/does-not-exist.md" "$dl/alpha.md")"
+if [ "${rl%%|*}" -eq 2 ]; then ok; else bad "(l) missing ADR should be rc=2, got ${rl%%|*}: ${rl#*|}"; fi
+
 # ── (m) STANDALONE-MARKER RULE — a marker mentioned inside backtick PROSE (the
 #        sibling-#3 `command=<name>` template) must NOT be parsed as a roster block
 #        (no phantom `ghost` dangling-roster). PASS proves fullmatch-on-standalone.
@@ -196,12 +204,6 @@ cmd_bare "$dm/alpha.md" aaa bbb
   printf 'A future sibling adds a `<!-- audit-invariant:error-roster command=ghost -->` block here.\n'
 } > "$dm/adr.md"
 expect_pass "(m) in-prose marker example is not a block" --adr "$dm/adr.md" "$dm/alpha.md"
-
-# ── (l) clean rc — a missing ADR file is a usage/IO error (rc=2), NOT a drift ──
-dl="$BOX/l"; mkdir -p "$dl"
-cmd_bare "$dl/alpha.md" aaa
-rl="$(run_lint --adr "$dl/does-not-exist.md" "$dl/alpha.md")"
-if [ "${rl%%|*}" -eq 2 ]; then ok; else bad "(l) missing ADR should be rc=2, got ${rl%%|*}: ${rl#*|}"; fi
 
 # ── (n) DIGIT-BEARING KEY IS VISIBLE — a key with a digit (e.g. `oauth2_err`) must
 #        be extracted from all three surfaces, so a drift in it is CAUGHT. Command
