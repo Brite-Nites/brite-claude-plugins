@@ -2129,6 +2129,49 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12617 — ADR-number duplicate guard (BC-12617)
+# ──────────────────────────────────────────────────────────────────────
+# ADRs live at docs/decisions/NNN-slug.md, numbered by reading "next free number"
+# off a stale `main`; concurrent branches grab the SAME NNN with DIFFERENT slugs,
+# so git never flags it (filenames differ) and the 2nd merge SILENTLY creates a
+# duplicate-numbered ADR (happened 4× in one week). This guard groups the files by
+# their NORMALIZED leading integer (so 021 == 21) and fails on any number used by
+# >1 file. DUPLICATE-detection only — gaps (004-006 absent, 001 Withdrawn) are
+# legitimate and never flagged. First the self-test (synthetic fixtures lock the
+# parse / int-normalize / file-selection / rc-discipline logic), then the lint
+# against the real docs/decisions/ tree. Missing files FAIL (not warn-skip): a
+# mandatory gate that silently passes when its harness is deleted is the BC-12589
+# trap — distinguish "check couldn't RUN" (fail) from "check found issues" (fail).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12617. ADR-number duplicate guard (BC-12617)"
+
+adr_num_lint="$REPO_ROOT/scripts/_lib/lint_adr_numbers.py"
+adr_num_selftest="$REPO_ROOT/scripts/_lib/test_lint_adr_numbers.sh"
+
+if [ ! -f "$adr_num_lint" ]; then
+  fail "scripts/_lib/lint_adr_numbers.py not found — ADR-number guard cannot run (BC-12617)"
+elif [ ! -f "$adr_num_selftest" ]; then
+  fail "scripts/_lib/test_lint_adr_numbers.sh not found — ADR-number guard self-test cannot run (BC-12617)"
+else
+  # (1) self-test — synthetic fixtures prove the parse / int-normalize / file-
+  #     selection / rc-discipline logic (mutation-locked).
+  if adr_num_st_out=$(bash "$adr_num_selftest" "$adr_num_lint" 2>&1); then
+    adr_num_st_count=$(printf '%s\n' "$adr_num_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    pass "ADR-number guard self-test (${adr_num_st_count:-?} assertions)"
+  else
+    fail "ADR-number guard self-test failed:"
+    printf '%s\n' "$adr_num_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  # (2) the gate — run the lint against the real docs/decisions/ tree.
+  if adr_num_lint_out=$(python3 "$adr_num_lint" 2>&1); then
+    pass "ADR-number duplicate guard (no duplicate ADR numbers)"
+  else
+    fail "ADR-number duplicate guard found duplicates:"
+    printf '%s\n' "$adr_num_lint_out" | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"
