@@ -208,3 +208,52 @@ jobs:
 
       - name: Run the M5 eval gate (changed commands vs origin/main)
         run: python3 scripts/eval/eval_gate.py --base-ref origin/main --head-ref HEAD
+
+  cross-pr-adr-guard:
+    # BC-12698 — surfaces a CROSS-PR ADR-number collision (two concurrently-open
+    # PRs each ADDING the same docs/decisions/NNN-*.md with DIFFERENT slugs) BEFORE
+    # either merges, as an advisory red naming the colliding PR so the author can
+    # renumber before the cascade.
+    #
+    # COMPLEMENTS — does not duplicate — the within-repo guard (lint_adr_numbers.py
+    # / validate.sh §15a-bc-12617): that one already catches a duplicate within one
+    # PR's tree, post-merge on main, AND vs-main at PR time (the pull_request
+    # merge-ref checkout = main ∪ this PR's added file, scanned as a tree). The one
+    # window it CAN'T see is two OPEN PRs colliding before either merges — this job
+    # closes that, and ONLY that (no vs-main check here; that would double-report).
+    #
+    # Thin adapter over the deterministic, unit-tested core
+    # (scripts/_lib/lint_cross_pr_adr_numbers.py, mutation-locked in
+    # validate.sh §15a-bc-12698). The adapter gathers the live open-PR set via gh —
+    # non-deterministic, hence in a pull_request job, NOT in validate.sh (whose
+    # shallow `validate` job can't see other PRs anyway; cf. BC-12590's
+    # shallow-checkout-diff-gate gotcha).
+    #
+    # ADVISORY — and stays advisory. The signal is inherently racy: each PR's run
+    # only sees what's open at that instant, BOTH colliding PRs may red on their own
+    # runs, and there's no reliable "only the later one fails" ordering. Promoting a
+    # non-deterministic signal to a required check would be a flaky gate — the real
+    # guards are the within-repo backstop (§15a-bc-12617) + the claim-first
+    # convention (CLAUDE.md ## Gotchas). This is the earlier-surface optimization,
+    # valuable mainly when the convention is skipped, so continue-on-error stays.
+    #
+    # The DEFAULT (shallow) checkout is deliberate: the adapter is gh-API-only (it
+    # reads each PR's added files via the GitHub API), so — unlike
+    # shift-left-clone-drift / eval-gate, which do local git diffs/blob lookups — it
+    # needs NO local git history; fetch-depth: 0 would be wasted work here.
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    continue-on-error: true
+    permissions:
+      contents: read        # read the in-repo guard scripts
+      pull-requests: read   # gh pr list + gh api pulls/*/files across the open PRs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Surface cross-PR ADR-number collisions (advisory)
+        run: bash scripts/ci/cross-pr-adr-guard.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}

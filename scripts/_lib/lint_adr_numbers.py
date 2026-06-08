@@ -31,7 +31,9 @@ and `21-bar.md` collide on the same number `21`, so a zero-pad variant cannot sn
 a duplicate past a naive string comparison. Anything that is not a
 `<digits>-<slug>.md` file is IGNORED — a `README.md`, a non-numeric-prefixed `.md`,
 a non-`.md` file, or a subdirectory cannot crash the guard or be mistaken for an
-ADR.
+ADR. The filename→number rule itself lives in `adr_numbers.adr_number` — the
+SINGLE canonical copy, shared with the cross-PR collision guard (BC-12698) so the
+two cannot drift; a parity test locks them together.
 
 Usage:
   lint_adr_numbers.py [DECISIONS_DIR]
@@ -41,34 +43,31 @@ Exit 0 = all ADR numbers unique, 1 = ≥1 duplicate number, 2 = usage / IO error
 from __future__ import annotations
 
 import sys
-import re
 from collections import defaultdict
 from pathlib import Path
 from typing import IO
+
+from adr_numbers import adr_number
 
 # scripts/_lib/ → repo root is two levels up (parents[2]).
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DIR = _REPO_ROOT / "docs" / "decisions"
 
-# An ADR filename: a leading run of digits, a hyphen, a non-empty slug, then `.md`.
-# The captured digits are the ADR NUMBER. A filename that does not match is not an
-# ADR and is ignored entirely (README.md, non-numeric .md, *.txt, etc.).
-_ADR_RE = re.compile(r"^(\d+)-.+\.md$")
-
 
 def group_by_number(decisions_dir: Path) -> dict[int, list[str]]:
     """Map each NORMALIZED ADR number (int) → sorted list of filenames using it.
 
-    Only regular files whose name matches `<digits>-<slug>.md` contribute; every
-    other directory entry is ignored. `int()` normalization means `021` and `21`
-    map to the same key, so a zero-pad variant is a collision, not a near-miss."""
+    Only regular files whose name matches `<digits>-<slug>.md` contribute (via the
+    shared `adr_number` rule); every other directory entry is ignored. `int()`
+    normalization means `021` and `21` map to the same key, so a zero-pad variant
+    is a collision, not a near-miss."""
     groups: dict[int, list[str]] = defaultdict(list)
     for entry in decisions_dir.iterdir():
         if not entry.is_file():
             continue
-        m = _ADR_RE.match(entry.name)
-        if m:
-            groups[int(m.group(1))].append(entry.name)
+        num = adr_number(entry.name)
+        if num is not None:
+            groups[num].append(entry.name)
     # Sort filenames within each group for deterministic, diff-stable output
     # (the only sort that matters — iterdir() order is otherwise irrelevant
     # since group keys are emitted via sorted() in main()).
