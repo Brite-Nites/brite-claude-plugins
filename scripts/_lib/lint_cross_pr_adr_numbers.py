@@ -92,10 +92,13 @@ def _oneline(s: str) -> str:
 
 
 def _md_cell(s: str) -> str:
-    """Escape a value for a markdown table cell: a literal `|` in an untrusted
-    filename would break the column layout, so backslash-escape it (and drop
-    CR/LF, which would break the row)."""
-    return _oneline(s).replace("|", "\\|")
+    """Escape a value for a markdown table cell. A literal `|` in an untrusted
+    filename would break the column layout, and a `[` would let it render as a
+    markdown hyperlink (`[text](url)` — open-redirect phishing in CI output that a
+    maintainer could mistake for a real ADR link). Backslash-escape both, and drop
+    CR/LF (which would break the row). Escaping `[` alone defuses the link (the
+    syntax needs the literal `[`), so `]`/`(`/`)` need no escaping."""
+    return _oneline(s).replace("|", "\\|").replace("[", "\\[")
 
 
 def _disp(pr) -> str:

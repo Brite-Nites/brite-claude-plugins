@@ -227,7 +227,7 @@ if [ "${ro%%|*}" -eq 2 ]; then ok; else bad "(10c) 'others' not a list should be
 if printf '%s' "$bo" | grep -qi 'others'; then ok; else bad "(10c) rc=2 must name the 'others' key: $bo"; fi
 if printf '%s' "$bo" | grep -qi 'traceback'; then bad "(10c) bad input must not dump a python traceback: $bo"; else ok; fi
 
-# ── (12) SELF-EXCLUSION across a pr TYPE skew — self.pr is int 460, the self-entry
+# ── (11) SELF-EXCLUSION across a pr TYPE skew — self.pr is int 460, the self-entry
 #         in `others` carries pr "460" (string, a shape gh JSON can yield). The
 #         core's str(opr)==str(self_pr) coercion must STILL exclude it, so the only
 #         real other (#455, different number) leaves it PASS. Pins the coercion: a
@@ -238,17 +238,17 @@ j12="$(mkjson selfstr.json '{
              {"pr": 455, "url": "u", "added": ["099-z.md"]}]
 }')"
 r12="$(run_core "$j12")"
-if [ "${r12%%|*}" -eq 0 ]; then ok; else bad "(12) string-vs-int self pr must still self-exclude (PASS), got rc=${r12%%|*}: ${r12#*|}"; fi
+if [ "${r12%%|*}" -eq 0 ]; then ok; else bad "(11) string-vs-int self pr must still self-exclude (PASS), got rc=${r12%%|*}: ${r12#*|}"; fi
 
-# ── (13) --github on a collision with GITHUB_STEP_SUMMARY UNSET (a CI step with no
+# ── (12) --github on a collision with GITHUB_STEP_SUMMARY UNSET (a CI step with no
 #         job summary) → still rc=1 + ::warning on stdout, no crash, summary just
 #         skipped. Pins the _summary_fh()-is-None branch on the COLLISION path. ───
 g13out="$(env -u GITHUB_STEP_SUMMARY python3 "$CORE" --github "$j2" 2>&1)"; g13rc=$?
-if [ "$g13rc" -eq 1 ]; then ok; else bad "(13) --github w/o GITHUB_STEP_SUMMARY expected rc=1, got $g13rc: $g13out"; fi
-if printf '%s' "$g13out" | grep -q '::warning'; then ok; else bad "(13) --github w/o summary must still annotate: $g13out"; fi
-if printf '%s' "$g13out" | grep -qi 'traceback'; then bad "(13) must not crash when GITHUB_STEP_SUMMARY unset: $g13out"; else ok; fi
+if [ "$g13rc" -eq 1 ]; then ok; else bad "(12) --github w/o GITHUB_STEP_SUMMARY expected rc=1, got $g13rc: $g13out"; fi
+if printf '%s' "$g13out" | grep -q '::warning'; then ok; else bad "(12) --github w/o summary must still annotate: $g13out"; fi
+if printf '%s' "$g13out" | grep -qi 'traceback'; then bad "(12) must not crash when GITHUB_STEP_SUMMARY unset: $g13out"; else ok; fi
 
-# ── (14) URL-LESS other PR on a collision (a gh race can drop a url) → no "(url)"
+# ── (13) URL-LESS other PR on a collision (a gh race can drop a url) → no "(url)"
 #         in the report, the table PR cell is plain #455 (no link), rc=1, no crash.
 j14="$(mkjson nourl.json '{
   "self":   {"pr": 460, "url": "u", "added": ["021-foo.md"]},
@@ -256,25 +256,29 @@ j14="$(mkjson nourl.json '{
 }')"
 sum14="$BOX/sum14.md"; : > "$sum14"
 g14out="$(GITHUB_STEP_SUMMARY="$sum14" python3 "$CORE" --github "$j14" 2>&1)"; g14rc=$?
-if [ "$g14rc" -eq 1 ]; then ok; else bad "(14) url-less other expected rc=1, got $g14rc: $g14out"; fi
-if printf '%s' "$g14out" | grep -q '455'; then ok; else bad "(14) should still name PR 455 without a url: $g14out"; fi
-if grep -qE '\| *#455 *\|' "$sum14"; then ok; else bad "(14) url-less PR cell should be plain #455 (no link): $(cat "$sum14")"; fi
+if [ "$g14rc" -eq 1 ]; then ok; else bad "(13) url-less other expected rc=1, got $g14rc: $g14out"; fi
+if printf '%s' "$g14out" | grep -q '455'; then ok; else bad "(13) should still name PR 455 without a url: $g14out"; fi
+if grep -qE '\| *#455 *\|' "$sum14"; then ok; else bad "(13) url-less PR cell should be plain #455 (no link): $(cat "$sum14")"; fi
 
-# ── (15) MARKDOWN-CELL ESCAPING (security hardening) — an attacker-controlled
-#         other-PR filename with a literal `|` must be backslash-escaped in the
-#         summary table so it cannot forge extra columns. (Newline/workflow-command
-#         injection is blocked upstream by the adapter's line filter; the core
-#         escapes defensively because it is independently invokable.) ─────────────
+# ── (14) MARKDOWN-CELL ESCAPING (security hardening) — an attacker-controlled
+#         other-PR filename with markdown metacharacters must be neutralised in the
+#         summary table: a literal `|` (would forge a column) AND a `[` (would
+#         render as a `[text](url)` hyperlink → open-redirect phishing in CI output
+#         a maintainer could mistake for a real ADR link) are BOTH backslash-
+#         escaped. (Newline/workflow-command injection is blocked upstream by the
+#         adapter's line filter; the core escapes defensively because it is
+#         independently invokable.) ─────────────────────────────────────────────
 j15="$(mkjson pipe.json '{
   "self":   {"pr": 460, "url": "u", "added": ["021-foo.md"]},
-  "others": [{"pr": 455, "url": "u", "added": ["021-ev|il.md"]}]
+  "others": [{"pr": 455, "url": "u", "added": ["021-ev|il[x](evil).md"]}]
 }')"
 sum15="$BOX/sum15.md"; : > "$sum15"
 g15out="$(GITHUB_STEP_SUMMARY="$sum15" python3 "$CORE" --github "$j15" 2>&1)"; g15rc=$?
-if [ "$g15rc" -eq 1 ]; then ok; else bad "(15) pipe-in-filename expected rc=1, got $g15rc: $g15out"; fi
-if grep -F '021-ev\|il.md' "$sum15" >/dev/null; then ok; else bad "(15) a '|' in an untrusted filename must be escaped (021-ev\\|il.md) in the table cell: $(cat "$sum15")"; fi
+if [ "$g15rc" -eq 1 ]; then ok; else bad "(14) metachar-in-filename expected rc=1, got $g15rc: $g15out"; fi
+if grep -F '021-ev\|il' "$sum15" >/dev/null; then ok; else bad "(14) a '|' in an untrusted filename must be escaped in the table cell: $(cat "$sum15")"; fi
+if grep -F '\[x]' "$sum15" >/dev/null; then ok; else bad "(14) a '[' in an untrusted filename must be escaped (no live markdown link) in the table cell: $(cat "$sum15")"; fi
 
-# ── (16) ORDER DETERMINISM — inputs in DESCENDING number order; the report must
+# ── (15) ORDER DETERMINISM — inputs in DESCENDING number order; the report must
 #         still be ASCENDING (sorted), so a dropped sorted(collisions) (dict-
 #         insertion order) is caught. Fixture (6)'s ascending input can't tell the
 #         two apart; this one feeds 22 before 21 and asserts 21 prints first. ─────
@@ -283,14 +287,14 @@ j16="$(mkjson order.json '{
   "others": [{"pr": 455, "url": "u", "added": ["022-x.md", "021-y.md"]}]
 }')"
 r16="$(run_core "$j16")"; b16="${r16#*|}"
-if [ "${r16%%|*}" -eq 1 ]; then ok; else bad "(16) descending-input collision expected rc=1, got ${r16%%|*}: $b16"; fi
+if [ "${r16%%|*}" -eq 1 ]; then ok; else bad "(15) descending-input collision expected rc=1, got ${r16%%|*}: $b16"; fi
 o16a="$(printf '%s\n' "$b16" | grep -n 'number 21:' | head -1 | cut -d: -f1)"
 o16b="$(printf '%s\n' "$b16" | grep -n 'number 22:' | head -1 | cut -d: -f1)"
-if [ -n "$o16a" ] && [ -n "$o16b" ] && [ "$o16a" -lt "$o16b" ]; then ok; else bad "(16) report must be ascending-sorted even when input is descending: $b16"; fi
+if [ -n "$o16a" ] && [ -n "$o16b" ] && [ "$o16a" -lt "$o16b" ]; then ok; else bad "(15) report must be ascending-sorted even when input is descending: $b16"; fi
 
-# ── (11) PARITY — both guards must REUSE the single shared filename→number rule
+# ── (16) PARITY — both guards must REUSE the single shared filename→number rule
 #         (adr_numbers.adr_number), never re-implement it (the BC-12594 byte-
-#         identical-reuse lesson). Three locks:
+#         identical-reuse lesson). Placed last as a meta/structural check. Three locks:
 #         (a) SOURCE (consumer): the core imports adr_number and declares no ADR
 #             regex of its own — necessary, but a NON-regex re-impl could evade the
 #             grep, hence (b).
@@ -302,28 +306,28 @@ if [ -n "$o16a" ] && [ -n "$o16b" ] && [ "$o16a" -lt "$o16b" ]; then ok; else ba
 #             output is compared to an INDEPENDENT oracle, not to itself.
 #         (c) SOURCE (producer): the within-repo lint also imports the shared rule,
 #             so producer and consumer are bound to the same module. ──────────────
-if grep -qE 'from adr_numbers import|import adr_numbers' "$CORE"; then ok; else bad "(11a) core must import the shared adr_number, not re-implement it"; fi
-if grep -qE 're\.compile\(.*\\d' "$CORE"; then bad "(11a) core must NOT declare its own ADR-number regex (drift risk) — import adr_number"; else ok; fi
+if grep -qE 'from adr_numbers import|import adr_numbers' "$CORE"; then ok; else bad "(16a) core must import the shared adr_number, not re-implement it"; fi
+if grep -qE 're\.compile\(.*\\d' "$CORE"; then bad "(16a) core must NOT declare its own ADR-number regex (drift risk) — import adr_number"; else ok; fi
 
 # (b) self.added == others[0].added == the battery, so the core collides on EXACTLY
 #     the distinct ADR numbers present. sort -u is LEXICAL, not numeric: a string-
 #     keyed drift emits "021" AND "21" as separate numbers, which a numeric -u would
 #     wrongly fold together — lexical keeps them distinct, so the mismatch is caught.
 battery='["021-foo.md","21-bar.md","000-a.md","00-b.md","0-c.md","7-d.md","0007-e.md","README.md","099.md","021-.md","1234-big.md","notes.md"]'
-j11="$(mkjson parity.json "{\"self\":{\"pr\":460,\"url\":\"u\",\"added\":$battery},\"others\":[{\"pr\":999,\"url\":\"u\",\"added\":$battery}]}")"
-r11="$(run_core "$j11")"; b11="${r11#*|}"
-if [ "${r11%%|*}" -eq 1 ]; then ok; else bad "(11b) battery should collide (rc=1), got ${r11%%|*}: $b11"; fi
-core_nums="$(printf '%s\n' "$b11" | grep -oE 'number [0-9]+:' | grep -oE '[0-9]+' | sort -u | xargs)"
+j17="$(mkjson parity.json "{\"self\":{\"pr\":460,\"url\":\"u\",\"added\":$battery},\"others\":[{\"pr\":999,\"url\":\"u\",\"added\":$battery}]}")"
+r17="$(run_core "$j17")"; b17="${r17#*|}"
+if [ "${r17%%|*}" -eq 1 ]; then ok; else bad "(16b) battery should collide (rc=1), got ${r17%%|*}: $b17"; fi
+core_nums="$(printf '%s\n' "$b17" | grep -oE 'number [0-9]+:' | grep -oE '[0-9]+' | sort -u | xargs)"
 oracle_nums="$(cd "$HERE" && python3 -c '
 import adr_numbers as a
 b=["021-foo.md","21-bar.md","000-a.md","00-b.md","0-c.md","7-d.md","0007-e.md","README.md","099.md","021-.md","1234-big.md","notes.md"]
 for n in {a.adr_number(f) for f in b if a.adr_number(f) is not None}:
     print(n)' | sort -u | xargs)"
-if [ "$core_nums" = "$oracle_nums" ]; then ok; else bad "(11b) core extraction diverges from the shared rule: core='[$core_nums]' oracle='[$oracle_nums]'"; fi
+if [ "$core_nums" = "$oracle_nums" ]; then ok; else bad "(16b) core extraction diverges from the shared rule: core='[$core_nums]' oracle='[$oracle_nums]'"; fi
 
 # (c) producer side bound to the same module.
-if grep -qE 'from adr_numbers import|import adr_numbers' "$WITHIN"; then ok; else bad "(11c) within-repo lint must import the shared adr_number too (producer↔consumer parity)"; fi
-if grep -qE 're\.compile\(.*\\d' "$WITHIN"; then bad "(11c) within-repo lint must NOT declare its own ADR-number regex — import adr_number"; else ok; fi
+if grep -qE 'from adr_numbers import|import adr_numbers' "$WITHIN"; then ok; else bad "(16c) within-repo lint must import the shared adr_number too (producer↔consumer parity)"; fi
+if grep -qE 're\.compile\(.*\\d' "$WITHIN"; then bad "(16c) within-repo lint must NOT declare its own ADR-number regex — import adr_number"; else ok; fi
 
 printf 'RESULT pass=%s fail=%s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
