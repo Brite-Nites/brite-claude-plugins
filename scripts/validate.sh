@@ -2228,6 +2228,55 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12698 — cross-PR ADR-number collision guard CORE (BC-12698)
+# ──────────────────────────────────────────────────────────────────────
+# The §15a-bc-12617 guard above catches a duplicate ADR number within ONE PR's
+# tree, post-merge on main, AND vs-main at PR time (the pull_request merge-ref
+# checkout = main ∪ this PR's added file, and the guard is a tree scan). It does
+# NOT catch two concurrently-open PRs that each ADD the same NNN with DIFFERENT
+# slugs before either merges. That cross-PR-pre-merge window is closed by the
+# BC-12698 guard, whose DETERMINISTIC CORE (lint_cross_pr_adr_numbers.py: {self,
+# others[]} JSON → collisions) is self-tested here. Only the self-test runs in
+# validate.sh — the LIVE check needs the open-PR set, which is non-deterministic
+# and unavailable in this checkout, so it lives in a dedicated pull_request job
+# (.github/workflows/validate-plugin.yml → cross-pr-adr-guard), per
+# gotcha_validate_shallow_checkout_diff_gate (BC-12590): a PR-set gate embedded in
+# validate.sh would silently no-op (the validate job is a shallow checkout that
+# can't resolve other PRs). That job is gh-API-only, so unlike the BC-12590
+# eval-gate it needs NO fetch-depth: 0 — it reads each PR's files via the API. The
+# shared extraction
+# module adr_numbers.py (imported by BOTH guards) is checked too — a parity test in
+# the self-test locks the two guards' number rule so they cannot drift (BC-12594).
+# Missing files FAIL (not warn-skip): a mandatory gate that silently passes when
+# its harness is deleted is the BC-12589 trap.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12698. cross-PR ADR-number collision guard core (BC-12698)"
+
+xpr_core="$REPO_ROOT/scripts/_lib/lint_cross_pr_adr_numbers.py"
+xpr_selftest="$REPO_ROOT/scripts/_lib/test_lint_cross_pr_adr_numbers.sh"
+xpr_shared="$REPO_ROOT/scripts/_lib/adr_numbers.py"
+
+if [ ! -f "$xpr_shared" ]; then
+  fail "scripts/_lib/adr_numbers.py not found — shared ADR-number rule missing (BC-12698)"
+elif [ ! -f "$xpr_core" ]; then
+  fail "scripts/_lib/lint_cross_pr_adr_numbers.py not found — cross-PR guard core cannot run (BC-12698)"
+elif [ ! -f "$xpr_selftest" ]; then
+  fail "scripts/_lib/test_lint_cross_pr_adr_numbers.sh not found — cross-PR guard self-test cannot run (BC-12698)"
+else
+  # Self-test only — synthetic fixtures lock the collision logic, self-exclusion,
+  # cross-PR int-normalize, --github visibility, rc-discipline, and the cross-module
+  # parity with the within-repo guard (mutation-locked). The live gh adapter is
+  # validated by reading the workflow + a manual `gh pr list` dry-run, not here.
+  if xpr_st_out=$(bash "$xpr_selftest" "$xpr_core" 2>&1); then
+    xpr_st_count=$(printf '%s\n' "$xpr_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    pass "cross-PR ADR-number guard core self-test (${xpr_st_count:-?} assertions)"
+  else
+    fail "cross-PR ADR-number guard core self-test failed:"
+    printf '%s\n' "$xpr_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"
