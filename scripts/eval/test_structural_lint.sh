@@ -105,6 +105,9 @@ run "$FIX/commands/r1-empty-override.md"
 assert_finding    "R1: empty override marker → still gate" R1-side-effecting-needs-flag gate
 assert_finding    "R1: empty override marker → advisory note" R1-override-missing-reason advisory
 
+run "$FIX/commands/r1-prose-mentions-override.md"
+assert_finding    "R1: prose/inline-code mention of the override token does NOT suppress (still gate)" R1-side-effecting-needs-flag gate
+
 # ── R2 — body too long (>= 500 lines, advisory) ────────────────────────────────
 echo "── R2 body-too-long ──"
 run "$FIX/commands/r2-long-body.md"
@@ -205,7 +208,7 @@ assert_rc "nonexistent/unreadable spec → exit 2 (internal error, not a finding
 
 echo ""
 # Count floor — a silently-skipped block must fail loudly, not drop the count.
-FLOOR=26
+FLOOR=27
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

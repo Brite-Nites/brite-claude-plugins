@@ -73,11 +73,16 @@ SIDE_EFFECTING_RE = re.compile(
 )
 
 # `# lint:not-side-effecting <reason>` override marker (ADR-028: non-silent opt-out).
-# The leading `#`/`<!--` is optional; we capture the reason after the token and
-# strip a trailing HTML-comment close.
-OVERRIDE_RE = re.compile(r"lint:not-side-effecting[ \t]*(.*)$")
+# ANCHORED to a comment prefix (`#` / `<!--`) so a prose or inline-code MENTION of
+# the token — e.g. a command body that documents the override syntax — cannot
+# accidentally suppress a real R1 gate (the BC-12534 substring-lint gotcha: a grep
+# can't tell an instruction from a prohibition). ADR-028's form is `# lint:...`.
+# We capture the reason after the token and strip a trailing HTML-comment close.
+OVERRIDE_RE = re.compile(r"^\s*(?:#+|<!--)\s*lint:not-side-effecting[ \t]*(.*)$")
 
-DISABLE_INVOCATION_RE = re.compile(r"^disable-model-invocation:[ \t]*true[ \t]*$", re.MULTILINE)
+# disable-model-invocation is read directly via fm_value(fm, "disable-model-invocation")
+# in rule_r1_side_effecting — there is intentionally no separate regex constant for it
+# (one code path, so M5 importers can't fork a second, subtly-different check).
 
 
 # ── Spec parsing helpers ──────────────────────────────────────────────────────
@@ -130,7 +135,14 @@ def spec_kind(path: Path) -> str:
 
 def _side_effecting_hit(text: str) -> tuple[int, str] | None:
     """First (line_no, matched_snippet) where the ADR-028 heuristic fires within
-    the spec's ``allowed-tools`` value OR its body. Returns None if no hit."""
+    the spec's ``allowed-tools`` value OR its body. Returns None if no hit.
+
+    Assumes a single-line ``allowed-tools:`` value — the repo's canonical
+    comma-separated form (enforced for skills by validate.sh § 8). A multi-line YAML
+    block/sequence value would leave its continuation lines unscanned: a known gap,
+    alongside the ``mcp__<ns>__*`` wildcard gap above. No spec on the current surface
+    uses the multi-line form.
+    """
     lines = text.splitlines()
     fm, body_start = split_frontmatter(text)
     has_fm = fm != ""
@@ -253,6 +265,9 @@ def rule_r3_description(path: Path, text: str) -> list[Finding]:
 # are legitimately un-prefixed. So R5 flags allowed-tools entries that are neither a
 # known built-in nor a well-formed mcp__ name (catches a bare `salesforce` /
 # `run_soql_query` and malformed `mcp__` entries). The allowlist is maintained.
+# Reads a single-line allowed-tools value (canonical comma-separated form, enforced
+# for skills by validate.sh § 8); a multi-line YAML value is a known unscanned gap
+# (no spec on the surface uses it) — same assumption as R1's _side_effecting_hit.
 BUILTIN_TOOLS = {
     "Read", "Write", "Edit", "MultiEdit", "NotebookEdit",
     "Bash", "BashOutput", "KillBash", "KillShell",
