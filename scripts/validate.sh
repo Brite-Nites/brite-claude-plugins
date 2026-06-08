@@ -1846,6 +1846,61 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12588 — Skill/command structural lint (BC-12588, ADR-028 Phase-1)
+# ──────────────────────────────────────────────────────────────────────
+# Two parts, mirroring the canonicals §15a (live lint + regression harness):
+#   1. The self-test harness (scripts/eval/test_structural_lint.sh) is a MANDATORY
+#      gate — FAIL if missing or red, so the lint can't silently vanish (the
+#      §15a-bc-12589 "a check nobody is forced to run rots" lesson).
+#   2. The live lint over the whole spec surface is ADVISORY this slice (DP2-10):
+#      every finding is surfaced WARN-only — NOTHING fails the build here. The
+#      `gate`-severity findings are a TIER LABEL ("[gate-tier · advisory this
+#      slice]"), destined to flip to build-failing in BC-12590/M5, which consumes
+#      this lint's findings[] (the M5 contract). A non-zero exit from the lint
+#      itself is "the check couldn't run" → FAIL (distinct from "found issues").
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12588. skill/command structural lint (BC-12588, ADR-028)"
+
+structural_lint="$REPO_ROOT/scripts/eval/structural_lint.py"
+structural_lint_test="$REPO_ROOT/scripts/eval/test_structural_lint.sh"
+
+if [ ! -f "$structural_lint_test" ]; then
+  # HARD fail, not warn: the mandatory ADR-028 structural-lint self-test. A `warn`
+  # would let an accidental delete/rename pass CI green — silently removing the gate.
+  fail "scripts/eval/test_structural_lint.sh not found — the mandatory ADR-028 structural-lint self-test is missing"
+elif [ ! -f "$structural_lint" ]; then
+  fail "scripts/eval/structural_lint.py not found — the ADR-028 structural lint is missing"
+else
+  # Part 1 — self-test harness (RESULT contract line drives the count).
+  if sl_test_out=$(bash "$structural_lint_test" 2>&1); then
+    sl_pass_count=$(printf '%s\n' "$sl_test_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    pass "structural-lint self-test (${sl_pass_count:-?} assertions)"
+  else
+    fail "structural-lint self-test failed — run scripts/eval/test_structural_lint.sh for details"
+    printf '%s\n' "$sl_test_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+
+  # Part 2 — live lint over the repo surface, WARN-only (findings never fail here).
+  if sl_out=$(python3 "$structural_lint" --scan-repo 2>&1); then
+    sl_summary=$(printf '%s\n' "$sl_out" | sed -n 's/^SUMMARY //p' | tail -1)
+    sl_total=$(printf '%s' "$sl_summary" | sed -n 's/.*findings=\([0-9][0-9]*\).*/\1/p')
+    if [ "${sl_total:-0}" -eq 0 ]; then
+      pass "structural lint: no findings across the spec surface"
+    else
+      warn "structural lint — advisory this slice (findings do NOT fail the build; gate-tier flips to blocking in BC-12590/M5): $sl_summary"
+      # Surface each finding as its own (indented) line under the banner; the
+      # warnings counter stays at +1 so the debt surface can't drown other sections.
+      # `|| true`: under `set -euo pipefail` a grep that filters everything exits 1
+      # — guard so this advisory section can never abort the build (it must not fail).
+      printf '%s\n' "$sl_out" | grep -v '^SUMMARY ' | sed 's/^/          /' || true
+    fi
+  else
+    fail "structural lint could not run (scan-repo exited non-zero) — run: python3 scripts/eval/structural_lint.py --scan-repo"
+    printf '%s\n' "$sl_out" | tail -20 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-8728 — Shared utilities + offer-performance harnesses (BC-8728)
 # ──────────────────────────────────────────────────────────────────────
 # Runs plugins/marketing/scripts/test_shared_utilities.sh (canonicals_reader,
