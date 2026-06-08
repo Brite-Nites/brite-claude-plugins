@@ -133,6 +133,12 @@ artifacts are written.
 A *blocking* CI check (fails the build). Distinct from an **advisory lint**
 (WARN only). Per ADR-028, a small set of checks are gates; the rest are advisory
 until promoted.
+_Avoid_: conflating a currently-blocking **Gate** with a lint **finding** whose
+`severity` is `gate`. The latter is a *tier label* — it means "destined to block
+in BC-12590/M5", NOT "blocks now". In the BC-12588 slice the structural lint
+(`scripts/eval/structural_lint.py`) computes both `gate`- and `advisory`-tier
+findings but surfaces them ALL WARN-only; the `gate`-tier findings flip to
+build-failing in M5. Output labels them `[gate-tier · advisory this slice]`.
 
 **Fixture / Golden file**:
 A fixture is a canned input for an eval; a golden file is the expected artifact

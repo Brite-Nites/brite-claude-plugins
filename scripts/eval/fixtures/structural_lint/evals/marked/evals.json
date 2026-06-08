@@ -1,0 +1,6 @@
+{
+  "_deprecated": "non-executing seed spec — deprecated per ADR-028 D3; do not author new evals.json",
+  "skill": "demo",
+  "version": "0.1.0",
+  "scenarios": []
+}
