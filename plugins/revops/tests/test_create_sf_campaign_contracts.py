@@ -384,3 +384,25 @@ def test_target_org_guard_lint_passes() -> None:
         f"target-org guard-precedes-sink lint failed for {COMMAND_PATH.name} "
         f"(rc={result.returncode}):\n{result.stdout}{result.stderr}"
     )
+
+
+def test_audit_roster_drift_lint_passes() -> None:
+    """ADR-015's per-command soft-fail error-key roster is kept in three-way
+    lock-step with each σ3 command's inline `{"error":"…"}` emits AND its
+    error-catalog table by the drift-guard (BC-12640). Run it here (default mode
+    = both σ3 commands vs the ADR) so a roster/catalog drift fails the pytest
+    suite too, not only validate.sh — the BC-12589 reachability lesson."""
+    import subprocess
+    import sys
+
+    lint = ROOT.parents[1] / "scripts" / "_lib" / "lint_audit_roster_drift.py"
+    assert lint.is_file(), f"roster drift-guard not found at {lint}"
+    result = subprocess.run(
+        [sys.executable, str(lint)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"audit-invariant roster drift-guard found drift "
+        f"(rc={result.returncode}):\n{result.stdout}{result.stderr}"
+    )

@@ -102,10 +102,34 @@ The character class is deliberately tight: blocks shell metacharacters (`$`, bac
 2. EXACTLY one `sf org display` invocation in the command body (count-based)
 3. `--target-org` regex appears verbatim in the command body
 4. `--target-org` regex is **byte-identical** to the sibling `/revops:update-sf-campaign-status` regex — sibling drift surfaces immediately on either side's test run
-5. `invalid_target_org` appears in the soft-fail error-key roster (7 keys total now: `missing_required_flag`, `invalid_slug_format`, `invalid_target_org`, `invalid_owner_email`, `duplicate_slug`, `missing_owner`, `sf_cli_error` — `invalid_owner_email` added by BC-12594)
+5. `invalid_target_org` appears in `/revops:create-sf-campaign`'s soft-fail error-key roster — enumerated per command in **Soft-fail error-key rosters** below and drift-guarded against the commands' inline `{"error":"…"}` emits + error-catalog tables by `scripts/_lib/lint_audit_roster_drift.py` (BC-12640). The roster is no longer a hand-typed count here — that count is what drifted (BC-12594 → BC-12623 "6 keys → 7").
 6. **(BC-12623 → BC-12638)** the `--target-org` guard precedes its earliest sink. Originally locked per-file by `test_target_org_guard_precedes_phase_0_sink` (emit-JSON anchored). **Superseded** by the repo-wide consolidating lint `scripts/_lib/lint_target_org_guard.py` (BC-12638), which subsumes those per-file tests: it requires a standalone `<!-- guard:target-org -->` marker before the earliest sink **with the canonical regex documented in the window between the marker and the sink** (binding the marker to the real guard prose — a flag-table mention before the marker or a cross-reference after the sink does not satisfy it). The per-file tests are now deleted; the lint catches the same relocate/delete regressions idiom-agnostically across both σ3 commands *and* the marketing siblings. See the 2026-06-07 amendment.
 
 The byte-identity test (#4) is the canonical lock: a unilateral edit to one sibling's regex fails the OTHER sibling's test — neither command can drift in isolation. Identical contract tests live in `test_update_sf_campaign_status_contracts.py`.
+
+### Soft-fail error-key rosters (machine-checked — BC-12640)
+
+The canonical enumeration of each σ3 command's soft-fail `error` keys. `scripts/_lib/lint_audit_roster_drift.py` (wired into `validate.sh` §15a-bc-12640) keeps each roster in three-way lock-step with that command's actual inline `{"error":"…"}` emits **and** its error-catalog table: any drift — a key added to a command but not here, a key removed, or a table that disagrees with the emits — fails CI, in both directions. The command **emits LEAD**; this roster **follows** (a failure means reconcile the roster to the command). `warning` keys are deliberately excluded — this is the error roster only. The key list is the source; the count is derived, never hand-maintained (the BC-12594 → BC-12623 "6 keys → 7" prose drift this guards).
+
+<!-- audit-invariant:error-roster command=create-sf-campaign -->
+- `missing_required_flag`
+- `invalid_slug_format`
+- `invalid_target_org`
+- `invalid_owner_email`
+- `duplicate_slug`
+- `missing_owner`
+- `sf_cli_error`
+<!-- /audit-invariant:error-roster -->
+
+`/revops:update-sf-campaign-status` has a divergent roster: it **adds** `invalid_status` (a flag-discriminated bad-enum guard) and **lacks** `invalid_owner_email` / `duplicate_slug` / `missing_owner` (it updates an existing Campaign, so there is no owner-lookup or slug-idempotency phase). Hence a per-command roster, not one shared list. (Its `warning` keys — `campaign_not_found`, `instance_url_unknown`, `updated_at_unavailable` — are out of scope: error roster only.)
+
+<!-- audit-invariant:error-roster command=update-sf-campaign-status -->
+- `missing_required_flag`
+- `invalid_slug_format`
+- `invalid_target_org`
+- `invalid_status`
+- `sf_cli_error`
+<!-- /audit-invariant:error-roster -->
 
 ### Future σ3 sibling #3
 
@@ -115,6 +139,7 @@ If a third σ3 SF-write command is added, it MUST:
 - Adopt Pattern 2 (`--target-org` regex with the same character class).
 - Adopt Pattern 3 (guard-precedes-sink ordering — `<!-- guard:target-org -->` marker before the earliest sink; see the 2026-06-07 amendment).
 - Add a byte-identity contract test against this canonical pair.
+- Add its soft-fail error roster to **Soft-fail error-key rosters** above (an `<!-- audit-invariant:error-roster command=<name> -->` block), kept in lock-step with the command's emits + table by `scripts/_lib/lint_audit_roster_drift.py` (BC-12640).
 - Be listed in this amendment's Linear refs.
 
 The ~5-tool threshold (per the 2026-05-19 amendment for when a Brite-owned MCP server earns its boilerplate) still bounds the slash-commands-vs-MCP-server decision — but inside the slash-commands choice, σ3 siblings MUST be uniform.
@@ -140,9 +165,9 @@ Any command (in **any** plugin) that interpolates a **non-literal** `--target-or
 
 BC-12623's ordering test was a structural markdown-grep *proxy* — it proved placement, never that the guard *rejects* `$(...)`. `plugins/revops/scripts/validate_target_org.py` extracts the σ3 guard as a deterministic, side-effect-free validator; `test_validate_target_org.sh` (in `validate.sh`) executes it against real injection payloads asserting rejection **and** no side effect. First security worked example of [ADR-028](028-skill-engineering-discipline.md)'s behavioral-eval tier. (σ3-only — cross-plugin distribution blocks a marketing-shared validator file.)
 
-### Audit-invariant roster drift-guard
+### Audit-invariant roster drift-guard (BC-12640 — delivered)
 
-Deferred to [BC-12640](https://linear.app/brite-nites/issue/BC-12640): a machine-check that the audit-invariant error-key roster above (7 keys) matches the actual command catalogs — would have auto-caught the "6 keys → 7" staleness BC-12623 fixed by hand.
+[BC-12640](https://linear.app/brite-nites/issue/BC-12640) — `scripts/_lib/lint_audit_roster_drift.py` (wired into `validate.sh` §15a-bc-12640) machine-checks that each σ3 command's **Soft-fail error-key roster** (above) stays in three-way lock-step with that command's actual inline `{"error":"…"}` emits **and** its error-catalog table — per command, bidirectional set-equality. This auto-catches the "6 keys → 7" prose drift BC-12623 fixed by hand (BC-12594 added `invalid_owner_email` to create's catalog without updating the roster). The subtlety it resolves: the two σ3 commands do **not** share one roster (update adds `invalid_status` and lacks the owner-lookup / slug-idempotency keys), so the ADR carries one roster per command rather than a single shared list. The sibling to BC-12638's guard-precedes-sink consolidating lint — the systematic answer to roster-vs-catalog drift.
 
 ## Cross-references
 

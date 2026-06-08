@@ -2033,6 +2033,47 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12640 — audit-invariant error-key roster drift-guard (BC-12640)
+# ──────────────────────────────────────────────────────────────────────
+# Machine-checks that each σ3 command's ADR-015 error-key roster stays in three-way
+# lock-step with that command's inline `{"error":"…"}` emits AND its error-catalog
+# table (per command, bidirectional set-equality). The sibling to §15a-bc-12638's
+# guard-precedes-sink lint — would have auto-caught the BC-12594 → BC-12623 "6 keys
+# → 7" prose drift. First the self-test (synthetic fixtures lock the lint's parse +
+# warning-exclusion + first-span + standalone-marker logic), then the lint against
+# the real ADR-015 + σ3 command tree. Missing files FAIL (not warn-skip): a
+# mandatory gate that silently passes when its harness is deleted is the BC-12589
+# trap — distinguish "check couldn't RUN" (fail) from "check found issues" (fail).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12640. audit-invariant roster drift-guard (BC-12640)"
+
+ard_lint="$REPO_ROOT/scripts/_lib/lint_audit_roster_drift.py"
+ard_selftest="$REPO_ROOT/scripts/_lib/test_lint_audit_roster_drift.sh"
+
+if [ ! -f "$ard_lint" ]; then
+  fail "scripts/_lib/lint_audit_roster_drift.py not found — roster drift-guard cannot run (BC-12640)"
+elif [ ! -f "$ard_selftest" ]; then
+  fail "scripts/_lib/test_lint_audit_roster_drift.sh not found — roster drift-guard self-test cannot run (BC-12640)"
+else
+  # (1) self-test — synthetic fixtures prove the lint's parse / equality / filter /
+  #     marker logic (mutation-locked).
+  if ard_st_out=$(bash "$ard_selftest" "$ard_lint" 2>&1); then
+    ard_st_count=$(printf '%s\n' "$ard_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    pass "roster drift-guard self-test (${ard_st_count:-?} assertions)"
+  else
+    fail "roster drift-guard self-test failed:"
+    printf '%s\n' "$ard_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  # (2) the gate — run the lint against the real ADR-015 + σ3 command tree.
+  if ard_lint_out=$(python3 "$ard_lint" 2>&1); then
+    pass "audit-invariant roster drift-guard (ADR ↔ emits ↔ table in sync)"
+  else
+    fail "audit-invariant roster drift-guard found drift:"
+    printf '%s\n' "$ard_lint_out" | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"
