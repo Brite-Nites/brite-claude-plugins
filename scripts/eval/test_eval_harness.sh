@@ -292,13 +292,76 @@ mutate_no "null out a rejection error" "non-empty builder error" \
 mutate_no "near-miss wrongly deduped" "scenarios[1].ok: golden True, got False" \
   'p=M/"offer-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="near_miss_not_duplicate"][0]; s.update(ok=False, action=None, appended_offer=None, lint=None, error="wrongly deduped"); json.dump(d,open(p,"w"))'
 
+# ── 3d/3e. new-persona + new-vertical evals (BC-12915 — the canonicals backfill batch) ─
+# The sibling structure-first commands: same generic CanonicalEmitAdapter + the SAME
+# build_canonical_emit.py builder + the SAME frozen seed, different subcommand. Each GREEN
+# run exercises its 5-row matrix; the mutation cases prove a red diff — incl. the load-
+# bearing structure-first regression (a written canonical that no longer passes
+# lint_canonicals) and a uniqueness regression (duplicate→write). `mutate_canon` is the
+# command/artifact-parameterized twin of `mutate_no`.
+mutate_canon() {  # cmd  good_dir  artifact  label  expected_substr  python_mutation (M)
+  local cmd="$1" good="$2" art="$3" label="$4" rx="$5" code="$6"
+  local M="$tmproot/cmut.$((mutid++))"; mkdir -p "$M"
+  cp "$good/$art" "$M/"
+  if ! MUT_DIR="$M" python3 -c "
+import json, os, pathlib
+M = pathlib.Path(os.environ['MUT_DIR'])
+$code
+"; then
+    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
+  fi
+  invoke "$RUN_EVAL" "$cmd" --artifact-dir "$M"
+  assert_exit "$cmd mutation '$label' → red (exit 1)" 1
+  assert_substr "$cmd mutation '$label' → named diff" "$rx"
+}
+
+echo "── new-persona eval (BC-12915 — known-good → GREEN) ──"
+NP="$tmproot/np"; mkdir -p "$NP"
+invoke "$RUN_EVAL" new-persona --sandbox "$NP"
+assert_exit "new-persona eval GREEN — known-good matrix builds + passes" 0
+assert_substr "new-persona eval prints PASS verdict" "PASS: new-persona eval"
+if [ -f "$NP/persona-emit.json" ]; then
+  echo "  PASS  artifact produced: persona-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: persona-emit.json"; fail=$((fail + 1))
+fi
+echo "── new-persona self-test (mutated matrix → RED) ──"
+mutate_canon new-persona "$NP" persona-emit.json "valid write fails lint (exit 1)" "lint.exit_code 0" \
+  'p=M/"persona-emit.json"; d=json.load(open(p)); d["scenarios"][0]["lint"]["exit_code"]=1; json.dump(d,open(p,"w"))'
+mutate_canon new-persona "$NP" persona-emit.json "uniqueness regression (dup→write)" "scenarios[2].ok: golden False, got True" \
+  'p=M/"persona-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="duplicate_slug"][0]; s.update(ok=True, action="created_persona", appended_persona={"slug":"ops-director","display":"Dup","titles":["t"]}, error=None, lint={"exit_code":0}); json.dump(d,open(p,"w"))'
+mutate_canon new-persona "$NP" persona-emit.json "drop the uniqueness scenario" "expected scenario id 'duplicate_slug' is absent" \
+  'p=M/"persona-emit.json"; d=json.load(open(p)); d["scenarios"]=[s for s in d["scenarios"] if s["id"]!="duplicate_slug"]; json.dump(d,open(p,"w"))'
+mutate_canon new-persona "$NP" persona-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"persona-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+echo "── new-vertical eval (BC-12915 — known-good → GREEN) ──"
+NV="$tmproot/nv"; mkdir -p "$NV"
+invoke "$RUN_EVAL" new-vertical --sandbox "$NV"
+assert_exit "new-vertical eval GREEN — known-good matrix builds + passes" 0
+assert_substr "new-vertical eval prints PASS verdict" "PASS: new-vertical eval"
+if [ -f "$NV/vertical-emit.json" ]; then
+  echo "  PASS  artifact produced: vertical-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: vertical-emit.json"; fail=$((fail + 1))
+fi
+echo "── new-vertical self-test (mutated matrix → RED) ──"
+mutate_canon new-vertical "$NV" vertical-emit.json "valid write fails lint (exit 1)" "lint.exit_code 0" \
+  'p=M/"vertical-emit.json"; d=json.load(open(p)); d["scenarios"][0]["lint"]["exit_code"]=1; json.dump(d,open(p,"w"))'
+mutate_canon new-vertical "$NV" vertical-emit.json "uniqueness regression (dup→write)" "scenarios[2].ok: golden False, got True" \
+  'p=M/"vertical-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="duplicate_slug"][0]; s.update(ok=True, action="created_vertical", appended_vertical={"slug":"sample-vertical","display":"Dup"}, error=None, lint={"exit_code":0}); json.dump(d,open(p,"w"))'
+mutate_canon new-vertical "$NV" vertical-emit.json "alias rejection error nulled" "non-empty builder error" \
+  'p=M/"vertical-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="invalid_alias"][0]; s["error"]=None; json.dump(d,open(p,"w"))'
+mutate_canon new-vertical "$NV" vertical-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"vertical-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
 # ── 4. hermeticity guard ─────────────────────────────────────────────────────
 
 echo "── hermeticity ──"
 # (a) no network-capable module is imported anywhere in the eval source — incl. the
-#     create-sf-campaign builder AND the new-offer builder the adapters shell out to.
+#     create-sf-campaign builder AND the canonicals-family builder the adapters shell out to.
 CSF_BUILDER="$REPO_ROOT/plugins/revops/scripts/build_campaign_payload.py"
-NO_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_offer_emit.py"
+NO_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_canonical_emit.py"
 if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
      "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$NO_BUILDER" >/dev/null 2>&1; then
   echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
@@ -362,16 +425,35 @@ if [ "$before3" = "$after3" ]; then
 else
   echo "  FAIL  hermeticity: new-offer eval left stray files in the working dir"; fail=$((fail + 1))
 fi
+# (e/f) the new-persona + new-vertical evals (BC-12915) are hermetic too — same builder,
+#       same frozen seed, different subcommand. Loop to avoid two near-identical blocks.
+for hc in new-persona new-vertical; do
+  HCWD="$tmproot/hermetic-cwd-$hc"; mkdir -p "$HCWD"
+  hb="$(cd "$HCWD" && find . | sort)"
+  ho="$(cd "$HCWD" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" "$hc" 2>&1)"; hrc=$?
+  ha="$(cd "$HCWD" && find . | sort)"
+  if [ "$hrc" -eq 0 ]; then
+    echo "  PASS  hermeticity: $hc eval GREEN with API keys unset, empty cwd"; pass=$((pass + 1))
+  else
+    echo "  FAIL  hermeticity: $hc eval failed without API keys (rc=$hrc)"
+    printf '    output: %s\n' "$ho"; fail=$((fail + 1))
+  fi
+  if [ "$hb" = "$ha" ]; then
+    echo "  PASS  hermeticity: $hc eval wrote nothing into the working dir"; pass=$((pass + 1))
+  else
+    echo "  FAIL  hermeticity: $hc eval left stray files in the working dir"; fail=$((fail + 1))
+  fi
+done
 
 echo ""
 # Count floor — a vanished test block (broken --list, swallowed import, emptied
 # CASES, or a whole command's eval block disappearing) would otherwise drop the count
 # yet still exit 0. Below the floor is a silent-skip and must fail the build loudly
 # (the eval's whole reason to exist). Bumped 45→80 (BC-12701 create-sf-campaign block),
-# then 80→100 when the BC-12702 new-offer block (+19 assertions: 3 GREEN + 7×2 mutations
-# + 2 hermeticity, total 105) landed — so losing either the create-sf-campaign or the
-# new-offer block (→86) trips the floor rather than passing green.
-FLOOR=100
+# 80→100 (BC-12702 new-offer block, +19), then 100→125 when the BC-12915 canonicals batch
+# landed (new-persona + new-vertical: +26 = 2×(3 GREEN + 4×2 mutations + 2 hermeticity),
+# total 131) — so losing any one command's eval block trips the floor rather than passing.
+FLOOR=125
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

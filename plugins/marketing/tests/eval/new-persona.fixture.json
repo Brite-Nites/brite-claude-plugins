@@ -1,0 +1,45 @@
+{
+  "_comment": "Behavioral-eval fixture for /marketing:new-persona (BC-12915, ADR-028 structure-first / LLM-judged). Driven through the REAL runtime entrypoint canonicals_bootstrap.py persona (which OWNS every input guard) against a copy of the SHARED frozen seed in new-offer-seed/ (vertical 'sample-vertical' with personas 'ops-director' + 'facilities-manager', so duplicate_slug has a deterministic collision). Structure-first proof: the WRITTEN canonical (seed + appended persona) passes lint_canonicals' full contract and the appended entry's slug/display match inputs (titles is a comma-string input -> parsed list, golden-locked). Each row isolates ONE builder-owned guard (slug -> vertical -> duplicate).",
+  "scenarios": [
+    {
+      "id": "valid_add",
+      "note": "clean append: a new, unique persona with a titles list into an existing vertical -> lints clean + fields match.",
+      "vertical": "sample-vertical",
+      "slug": "revenue-lead",
+      "display": "Revenue Lead",
+      "titles": "VP Revenue,Chief Revenue Officer"
+    },
+    {
+      "id": "near_miss_not_duplicate",
+      "note": "exact-match dedup: a slug SIMILAR to the seed's 'ops-director' but DIFFERENT must NOT collide -> still writes, still lints clean.",
+      "vertical": "sample-vertical",
+      "slug": "ops-director-emea",
+      "display": "Ops Director EMEA",
+      "titles": "Regional Operations Director"
+    },
+    {
+      "id": "duplicate_slug",
+      "note": "uniqueness guard (builder-owned): a slug equal to the seed's 'ops-director' -> ok:false, no write.",
+      "vertical": "sample-vertical",
+      "slug": "ops-director",
+      "display": "Duplicate Attempt",
+      "titles": "X"
+    },
+    {
+      "id": "unknown_vertical",
+      "note": "vertical-existence guard (builder-owned): a valid kebab slug into a vertical not in the manifest -> ok:false. Slug valid so the slug guard passes first.",
+      "vertical": "no-such-vertical",
+      "slug": "some-persona",
+      "display": "Some Persona",
+      "titles": "Y"
+    },
+    {
+      "id": "invalid_slug",
+      "note": "slug-shape guard (builder-owned, first in order): a non-kebab slug -> ok:false.",
+      "vertical": "sample-vertical",
+      "slug": "Not A Slug",
+      "display": "Bad Slug Persona",
+      "titles": "Z"
+    }
+  ]
+}

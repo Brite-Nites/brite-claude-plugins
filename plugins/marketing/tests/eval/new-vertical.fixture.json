@@ -1,0 +1,37 @@
+{
+  "_comment": "Behavioral-eval fixture for /marketing:new-vertical (BC-12915, ADR-028 structure-first / LLM-judged). Driven through the REAL runtime entrypoint canonicals_bootstrap.py vertical (which OWNS every input guard) against a copy of the SHARED frozen seed in new-offer-seed/ (manifest with 'sample-vertical', so duplicate_slug collides in the manifest). new-vertical CREATES a vertical: it inserts an alphabetized manifest entry + writes a skeleton {slug}.yaml, so the written canonical must still pass lint_canonicals (alphabetized + 1:1 manifest<->file + valid skeleton). Each row isolates ONE builder-owned guard (slug -> duplicate -> alias). aliases/playbook_path are not echoed in the result envelope, so the entry projects slug/display only; alias validity is covered by lint + the invalid_alias row.",
+  "scenarios": [
+    {
+      "id": "valid_add",
+      "note": "clean create: a new vertical (sorts before sample-vertical) with aliases -> manifest stays alphabetized, skeleton lints clean.",
+      "slug": "art-museums",
+      "display": "Art Museums",
+      "aliases": "galleries,museums"
+    },
+    {
+      "id": "near_miss_not_duplicate",
+      "note": "exact-match dedup: a slug SIMILAR to the seed's 'sample-vertical' but DIFFERENT must NOT collide -> still creates, still lints clean (sorts after sample-vertical).",
+      "slug": "sample-vertical-two",
+      "display": "Sample Vertical Two"
+    },
+    {
+      "id": "duplicate_slug",
+      "note": "uniqueness guard (builder-owned): a slug already in the seed manifest ('sample-vertical') -> ok:false, no write.",
+      "slug": "sample-vertical",
+      "display": "Duplicate Attempt"
+    },
+    {
+      "id": "invalid_slug",
+      "note": "slug-shape guard (builder-owned, first in order): a non-kebab slug -> ok:false.",
+      "slug": "Not A Slug",
+      "display": "Bad Slug Vertical"
+    },
+    {
+      "id": "invalid_alias",
+      "note": "alias-shape guard (builder-owned): a non-kebab alias -> ok:false. Slug valid so the slug guard passes first and the alias guard is the one under test.",
+      "slug": "valid-vertical",
+      "display": "Valid Vertical",
+      "aliases": "Bad Alias"
+    }
+  ]
+}

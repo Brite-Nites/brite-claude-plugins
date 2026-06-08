@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "command": "/marketing:new-vertical",
+  "scenarios": [
+    {
+      "id": "valid_add",
+      "ok": true,
+      "action": "created_vertical",
+      "appended_vertical": {
+        "slug": "art-museums",
+        "display": "Art Museums"
+      },
+      "error": null,
+      "lint": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "near_miss_not_duplicate",
+      "ok": true,
+      "action": "created_vertical",
+      "appended_vertical": {
+        "slug": "sample-vertical-two",
+        "display": "Sample Vertical Two"
+      },
+      "error": null,
+      "lint": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "duplicate_slug",
+      "ok": false,
+      "action": null,
+      "appended_vertical": null,
+      "error": "vertical 'sample-vertical' already exists in manifest",
+      "lint": null
+    },
+    {
+      "id": "invalid_slug",
+      "ok": false,
+      "action": null,
+      "appended_vertical": null,
+      "error": "slug 'Not A Slug' is not kebab-case (must match ^[a-z][a-z0-9]*(-[a-z0-9]+)*$)",
+      "lint": null
+    },
+    {
+      "id": "invalid_alias",
+      "ok": false,
+      "action": null,
+      "appended_vertical": null,
+      "error": "alias slug 'Bad Alias' is not kebab-case (must match ^[a-z][a-z0-9]*(-[a-z0-9]+)*$)",
+      "lint": null
+    }
+  ]
+}
