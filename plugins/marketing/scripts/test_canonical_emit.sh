@@ -7,11 +7,14 @@
 # drive. It does NOT re-implement any logic — it shells the SAME runtime entrypoints the
 # commands delegate to (canonicals_bootstrap.py `<subcommand>`, which OWNS every input
 # guard, + lint_canonicals.py, the 19-check ADR-016 contract) against a sandbox copy of a
-# SHARED frozen seed. This suite drives every verdict branch across all three subcommands,
+# SHARED frozen seed. This suite drives a REPRESENTATIVE set of verdict branches per
+# subcommand (a clean write + the load-bearing guards — NOT every branch; the FULL
+# per-command matrix is exercised by the behavioral eval's plugin-local fixtures/goldens),
 # proves a scenario value is NEVER shelled (a `$(touch pwned)` display reaches the entry as
 # inert data — no `pwned` sentinel), and locks determinism + infra exit codes. The
-# behavioral eval (scripts/eval/test_eval_harness.sh) asserts the emit-artifact STRUCTURE;
-# this asserts the builder's per-branch DECISIONS + injection-safety + determinism.
+# behavioral eval (scripts/eval/test_eval_harness.sh) asserts the emit-artifact STRUCTURE
+# over the full matrix; this asserts the builder's per-branch DECISIONS + injection-safety
+# + determinism.
 #
 # Usage:
 #   bash plugins/marketing/scripts/test_canonical_emit.sh
@@ -128,7 +131,7 @@ okfix="$(mktemp)"; outbox="$(mktemp -d)"
 printf '%s' '{"scenarios":[{"id":"v","vertical":"sample-vertical","slug":"x-offer","display":"X","posture":"knowledge"}]}' > "$okfix"
 ( python3 "$BUILDER" --subcommand widget --scenarios "$okfix" --out-dir "$outbox" --seed-dir "$SEED" ) >/dev/null 2>&1
 if [ "$?" -eq 2 ]; then ok; else bad 'unknown --subcommand must exit 2 (argparse choices)'; fi
-rm -rf "$outbox"
+rm -rf "$outbox"; rm -f "$okfix"
 
 badfix="$(mktemp)"; printf 'not json\n' > "$badfix"; outbox="$(mktemp -d)"
 ( python3 "$BUILDER" --subcommand offer --scenarios "$badfix" --out-dir "$outbox" --seed-dir "$SEED" ) >/dev/null 2>&1
@@ -146,11 +149,14 @@ missfix="$(mktemp)"; printf '%s' '{"scenarios":[{"id":"m","vertical":"sample-ver
 if [ "$?" -eq 2 ]; then ok; else bad 'scenario missing a required key must exit 2 (BuildError)'; fi
 rm -f "$missfix"; rm -rf "$outbox"
 
-# a seed dir without _manifest.yaml must exit 2 (BuildError), not a confusing crash.
-emptyseed="$(mktemp -d)"; outbox="$(mktemp -d)"
-( python3 "$BUILDER" --subcommand offer --scenarios "$okfix" --out-dir "$outbox" --seed-dir "$emptyseed" ) >/dev/null 2>&1
+# a seed dir without _manifest.yaml must exit 2 (BuildError), not a confusing crash. A
+# DEDICATED fixture (not a shared one) so this asserts the seed-dir path specifically — a
+# missing scenarios file would also exit 2, masking the seed-dir check (Greptile P2).
+seedfix="$(mktemp)"; emptyseed="$(mktemp -d)"; outbox="$(mktemp -d)"
+printf '%s' '{"scenarios":[{"id":"v","vertical":"sample-vertical","slug":"x-offer","display":"X","posture":"knowledge"}]}' > "$seedfix"
+( python3 "$BUILDER" --subcommand offer --scenarios "$seedfix" --out-dir "$outbox" --seed-dir "$emptyseed" ) >/dev/null 2>&1
 if [ "$?" -eq 2 ]; then ok; else bad 'seed dir without _manifest.yaml must exit 2 (BuildError)'; fi
-rm -rf "$emptyseed" "$outbox"; rm -f "$okfix"
+rm -rf "$emptyseed" "$outbox"; rm -f "$seedfix"
 
 # ── count floor — a vanished test block must fail loudly, not pass on a thin count ──
 # Calibrated tight (47 assertions actual, margin 5 ≈ 89%) to match the eval-harness
