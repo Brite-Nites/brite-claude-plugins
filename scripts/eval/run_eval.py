@@ -443,45 +443,55 @@ class CreateSfCampaignAdapter:
         return str(self.golden_path)
 
 
-# ── new-offer adapter ─────────────────────────────────────────────────────────
+# ── canonicals command family adapter (new-offer / new-persona / new-vertical) ──
 #
-# The third registered command (BC-12702) — the STRUCTURE-FIRST / LLM-judged
-# representative. /marketing:new-offer writes a GTM canonical where the operator/LLM
-# CHOOSES the content (which display/posture/status), but the file has a defined ADR-016
-# schema. Its emit builder (build_offer_emit.py) drives the SAME runtime entrypoint the
-# command delegates to (canonicals_bootstrap.py `offer`, which OWNS every input guard)
-# against a sandbox copy of a FROZEN seed, then runs lint_canonicals over the result.
-# The eval asserts the artifact's deterministic STRUCTURE — the written canonical passes
-# the full 19-check lint contract + the appended entry's fields == inputs — and NOT the
-# operator/LLM-chosen content (which offer, the handbook-draft prose). That is the
-# ADR-028 D2 structure-first cascade: a judgment-bearing command still passes
-# DETERMINISTICALLY on the per-PR gate.
+# The STRUCTURE-FIRST / LLM-judged representatives (BC-12702 new-offer + BC-12915
+# new-persona/new-vertical). Each writes a GTM canonical where the operator/LLM CHOOSES
+# the content, but the file has a defined ADR-016 schema. Their shared emit builder
+# (build_canonical_emit.py) drives the SAME runtime entrypoint each command delegates to
+# (canonicals_bootstrap.py `<subcommand>`, which OWNS every input guard) against a sandbox
+# copy of a FROZEN seed, then runs lint_canonicals over the result. The eval asserts the
+# artifact's deterministic STRUCTURE — the written canonical passes the full 19-check lint
+# contract + the new entry's fields == inputs — and NOT the operator/LLM-chosen content
+# (which entry, the handbook-draft prose). That is the ADR-028 D2 structure-first cascade.
+#
+# Generalized to ONE adapter (3 instances) at the Rule-of-Three point: the per-subcommand
+# differences are pure data (subcommand, artifact name, entry-key, projected/passthrough
+# fields, expected scenario ids). The `new-offer` instance produces a BYTE-IDENTICAL
+# artifact to BC-12702's, so its merged golden is untouched.
 
 
-class NewOfferAdapter:
-    """Emit adapter for /marketing:new-offer: drive build_offer_emit.py."""
+class CanonicalEmitAdapter:
+    """Generic emit adapter for the canonicals bootstrap command family."""
 
-    command_id = "new-offer"
-    artifact_names = ("offer-emit.json",)
-
-    fixture_path = REPO_ROOT / "plugins/marketing/tests/eval/new-offer.fixture.json"
-    golden_path = REPO_ROOT / "plugins/marketing/tests/eval/new-offer.golden.json"
-    schema_path = REPO_ROOT / "plugins/marketing/tests/eval/new-offer.schema.json"
-
-    builder = REPO_ROOT / "plugins/marketing/scripts/build_offer_emit.py"
-    # FROZEN fixture canonicals seeded into each scenario's sandbox. Deliberately NOT the
-    # live plugins/marketing/data/canonicals/ (a divergence from PlanCampaignAdapter,
-    # which reads the live dir): new-offer WRITES, and its guards need controlled
-    # pre-existing state — a live seed would drift the golden + risk hermeticity.
+    builder = REPO_ROOT / "plugins/marketing/scripts/build_canonical_emit.py"
+    # FROZEN fixture canonicals seeded into each scenario's sandbox, SHARED across the three
+    # subcommands. Deliberately NOT the live plugins/marketing/data/canonicals/ (a divergence
+    # from PlanCampaignAdapter, which reads the live dir): these commands WRITE, and their
+    # guards need controlled pre-existing state — a live seed would drift the golden + risk
+    # hermeticity.
     seed_dir = REPO_ROOT / "plugins/marketing/tests/eval/new-offer-seed"
+    _eval_dir = REPO_ROOT / "plugins/marketing/tests/eval"
 
-    # The scenario ids the matrix must carry, in order — a FLOOR-style guard so a fixture
-    # that silently drops a branch (e.g. the duplicate/uniqueness case) is caught by
-    # check() with a named diff rather than passing on a thinned matrix.
-    EXPECTED_SCENARIO_IDS = (
-        "valid_add", "near_miss_not_duplicate", "duplicate_slug", "unknown_vertical",
-        "invalid_posture", "invalid_status", "invalid_slug",
-    )
+    def __init__(self, subcommand: str, command_id: str, artifact_name: str,
+                 entry_key: str, passthrough_fields: tuple, expected_ids: tuple,
+                 *, defaults: dict | None = None, data_stem: str | None = None):
+        self.subcommand = subcommand
+        self.command_id = command_id
+        self.artifact_names = (artifact_name,)
+        self.entry_key = entry_key
+        # passthrough_fields = entry fields whose value is a DIRECT copy of the operator
+        # input (asserted == input via key_fields). A transformed field (e.g. persona's
+        # `titles`, a comma-string input → a parsed list) is excluded here and locked by
+        # golden_compare instead, which compares the exact value.
+        self.passthrough_fields = passthrough_fields
+        self.expected_ids = expected_ids
+        self.defaults = defaults or {}
+        self.action = f"created_{subcommand}"
+        stem = data_stem or command_id
+        self.fixture_path = self._eval_dir / f"{stem}.fixture.json"
+        self.golden_path = self._eval_dir / f"{stem}.golden.json"
+        self.schema_path = self._eval_dir / f"{stem}.schema.json"
 
     # ── build ───────────────────────────────────────────────────────────────
 
@@ -489,49 +499,47 @@ class NewOfferAdapter:
         """Run the batch builder over the fixture's scenarios into `sandbox`.
 
         The runner loads the fixture into a dict; we write it back to a sandbox file and
-        hand it to build_offer_emit.py's `--scenarios` mode, which copies the frozen seed
-        into a per-scenario sub-sandbox and shells the SAME canonicals_bootstrap.py +
+        hand it to build_canonical_emit.py's `--scenarios` mode, which copies the frozen
+        seed into a per-scenario sub-sandbox and shells the SAME canonicals_bootstrap.py +
         lint_canonicals.py the command runs. API keys are stripped to prove hermeticity
-        (DP2-4) — build_offer_emit strips them again for its own children."""
+        (DP2-4) — build_canonical_emit strips them again for its own children."""
         sandbox.mkdir(parents=True, exist_ok=True)
         fixture_file = sandbox / "_fixture.json"
         fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
         env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
         proc = subprocess.run(
-            [sys.executable, str(self.builder),
+            [sys.executable, str(self.builder), "--subcommand", self.subcommand,
              "--scenarios", str(fixture_file), "--out-dir", str(sandbox),
              "--seed-dir", str(self.seed_dir)],
             capture_output=True, text=True, env=env,
         )
         if proc.returncode != 0:
             raise EvalError(
-                f"emit failed (build_offer_emit.py exit {proc.returncode}):\n"
-                f"{proc.stderr.strip()}"
+                f"emit failed (build_canonical_emit.py {self.subcommand} exit "
+                f"{proc.returncode}):\n{proc.stderr.strip()}"
             )
 
     # ── collect ───────────────────────────────────────────────────────────────
 
     def collect(self, artifact_dir: Path) -> dict:
-        out: dict = {}
-        for name in self.artifact_names:
-            p = artifact_dir / name
-            if not p.exists():
-                raise EvalError(f"expected artifact missing: {p}")
-            try:
-                out[name] = json.loads(p.read_text(encoding="utf-8"))
-            except json.JSONDecodeError as exc:
-                raise EvalError(f"{name} is not valid JSON: {exc}") from exc
-        return out
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
 
     # ── projection (golden = a structural projection) ─────────────────────────
 
     @staticmethod
     def project(emit: dict) -> dict:
         """The structure the golden pins: the full matrix. Every field is deterministic
-        (the appended entry's slug/display/status/posture, the per-guard error string,
-        the baked lint exit code) — no prose, no sandbox path — so the projection is the
-        artifact itself, ordered, with no field dropped. (yaml_path + handbook_draft are
-        already dropped upstream by build_offer_emit, the structure-first seam.)"""
+        (the new entry's projected fields, the per-guard error string, the baked lint exit
+        code) — no prose, no sandbox path — so the projection is the artifact itself,
+        ordered, with no field dropped. (yaml_path + handbook_draft are already dropped
+        upstream by build_canonical_emit, the structure-first seam.)"""
         return {
             "schema_version": emit["schema_version"],
             "command": emit["command"],
@@ -541,16 +549,15 @@ class NewOfferAdapter:
     # ── check ─────────────────────────────────────────────────────────────────
 
     def check(self, artifacts: dict, fixture: dict) -> Result:
-        emit = artifacts["offer-emit.json"]
+        name = self.artifact_names[0]
+        emit = artifacts[name]
         golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
         schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
 
         # SHAPE FIRST — short-circuit so the value/invariant checks below only ever index
         # a structurally-valid matrix (a dropped/retyped key surfaces as a named schema
         # diff, never a KeyError).
-        schema_diffs = combine(
-            assert_lib.schema_validate(emit, schema, artifact="offer-emit.json")
-        )
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
         if not schema_diffs.ok:
             return schema_diffs
 
@@ -559,68 +566,64 @@ class NewOfferAdapter:
         # Branch coverage: every expected scenario id must be present (a thinned fixture
         # that drops the uniqueness/enum case is the failure this guards).
         got_ids = [s["id"] for s in emit["scenarios"]]
-        for sid in self.EXPECTED_SCENARIO_IDS:
+        for sid in self.expected_ids:
             if sid not in got_ids:
-                diffs.append(f"offer-emit.json: expected scenario id '{sid}' is absent from the matrix")
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
 
         fixture_by_id = {sc["id"]: sc for sc in fixture.get("scenarios", []) if isinstance(sc, dict)}
 
         # Per-verdict structural invariants (explicit + named, beyond the golden compare).
         for s in emit["scenarios"]:
-            tag = f"offer-emit.json $.scenarios[id={s['id']}]"
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            entry = s.get(self.entry_key)
             if s["ok"]:
-                # A clean write: the appended entry exists, no error, and the FULL
+                # A clean write: the new entry exists, no error, and the FULL
                 # lint_canonicals contract held over the written canonical (exit 0).
-                if s["action"] != "created_offer":
-                    diffs.append(f"{tag}: ok row must have action 'created_offer', got {s['action']!r}")
-                if not isinstance(s["appended_offer"], dict):
-                    diffs.append(f"{tag}: ok row must carry an appended_offer object, got {s['appended_offer']!r}")
+                if s["action"] != self.action:
+                    diffs.append(f"{tag}: ok row must have action '{self.action}', got {s['action']!r}")
+                if not isinstance(entry, dict):
+                    diffs.append(f"{tag}: ok row must carry a {self.entry_key} object, got {entry!r}")
                 if s["error"] is not None:
                     diffs.append(f"{tag}: ok row error must be null, got {s['error']!r}")
                 if not isinstance(s["lint"], dict) or s["lint"].get("exit_code") != 0:
                     diffs.append(f"{tag}: ok row must carry lint.exit_code 0 (the written canonical passes lint_canonicals), got {s['lint']!r}")
-                # Passthrough: the appended entry's deterministic fields == the inputs the
+                # Passthrough: the new entry's directly-copied fields == the inputs the
                 # operator supplied (the strongest structure-first assertion — proves no
-                # field is mangled). status defaults to 'draft' when the input omits it.
+                # field is mangled). A per-subcommand default fills an omitted optional
+                # (e.g. offer status → 'draft'). Transformed fields are golden-locked.
                 exp = fixture_by_id.get(s["id"], {})
-                if exp:
+                if exp and isinstance(entry, dict):
                     diffs += assert_lib.key_fields(
-                        s["appended_offer"],
-                        {
-                            "slug": exp.get("slug"),
-                            "display": exp.get("display"),
-                            "status": exp.get("status") or "draft",
-                            "posture": exp.get("posture"),
-                        },
-                        artifact=f"{tag}.appended_offer",
+                        entry,
+                        {f: exp.get(f, self.defaults.get(f)) for f in self.passthrough_fields},
+                        artifact=f"{tag}.{self.entry_key}",
                     )
             else:
                 # A rejection: no write, no structural claim, a builder-owned error string.
                 if s["action"] is not None:
                     diffs.append(f"{tag}: rejection row action must be null, got {s['action']!r}")
-                if s["appended_offer"] is not None:
-                    diffs.append(f"{tag}: rejection row must have a null appended_offer (no write), got {s['appended_offer']!r}")
+                if entry is not None:
+                    diffs.append(f"{tag}: rejection row must have a null {self.entry_key} (no write), got {entry!r}")
                 if s["lint"] is not None:
                     diffs.append(f"{tag}: rejection row lint must be null (nothing was written to lint), got {s['lint']!r}")
                 if not isinstance(s["error"], str) or not s["error"]:
                     diffs.append(f"{tag}: rejection row must carry a non-empty builder error string, got {s['error']!r}")
 
-        # VALUES — the exact matrix (per-scenario verdict + appended entry + error string
-        # + lint code) via golden compare.
-        golden_diffs = assert_lib.golden_compare(
-            self.project(emit), golden, artifact="offer-emit.json"
-        )
+        # VALUES — the exact matrix (per-scenario verdict + new entry + error string + lint
+        # code) via golden compare.
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
         return combine(diffs, golden_diffs)
 
     # ── golden regeneration ───────────────────────────────────────────────────
 
     def update_golden(self, artifacts: dict) -> str:
-        emit = artifacts["offer-emit.json"]
+        name = self.artifact_names[0]
+        emit = artifacts[name]
         schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
-        diffs = assert_lib.schema_validate(emit, schema, artifact="offer-emit.json")
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
         if diffs:
             raise EvalError(
-                "cannot regenerate golden — offer-emit.json failed schema validation:\n  - "
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
                 + "\n  - ".join(diffs)
             )
         self.golden_path.write_text(
@@ -629,10 +632,39 @@ class NewOfferAdapter:
         return str(self.golden_path)
 
 
+# One instance per canonicals subcommand. new-offer's params reproduce BC-12702's adapter
+# exactly (entry_key appended_offer, artifact offer-emit.json) → byte-identical artifact.
+_NEW_OFFER = CanonicalEmitAdapter(
+    "offer", "new-offer", "offer-emit.json", "appended_offer",
+    passthrough_fields=("slug", "display", "status", "posture"),
+    expected_ids=("valid_add", "near_miss_not_duplicate", "duplicate_slug",
+                  "unknown_vertical", "invalid_posture", "invalid_status", "invalid_slug"),
+    defaults={"status": "draft"},
+)
+_NEW_PERSONA = CanonicalEmitAdapter(
+    "persona", "new-persona", "persona-emit.json", "appended_persona",
+    # titles (comma-string input → parsed list) is transformed, so it's golden-locked, not
+    # a key_fields passthrough.
+    passthrough_fields=("slug", "display"),
+    expected_ids=("valid_add", "near_miss_not_duplicate", "duplicate_slug",
+                  "unknown_vertical", "invalid_slug"),
+)
+_NEW_VERTICAL = CanonicalEmitAdapter(
+    "vertical", "new-vertical", "vertical-emit.json", "appended_vertical",
+    # aliases/playbook_path are not echoed in the bootstrap result envelope, so the entry
+    # projects slug/display only; alias validity is covered by lint + the invalid_alias row.
+    passthrough_fields=("slug", "display"),
+    expected_ids=("valid_add", "near_miss_not_duplicate", "duplicate_slug",
+                  "invalid_slug", "invalid_alias"),
+)
+
+
 ADAPTERS = {
     PlanCampaignAdapter.command_id: PlanCampaignAdapter(),
     CreateSfCampaignAdapter.command_id: CreateSfCampaignAdapter(),
-    NewOfferAdapter.command_id: NewOfferAdapter(),
+    _NEW_OFFER.command_id: _NEW_OFFER,
+    _NEW_PERSONA.command_id: _NEW_PERSONA,
+    _NEW_VERTICAL.command_id: _NEW_VERTICAL,
 }
 
 

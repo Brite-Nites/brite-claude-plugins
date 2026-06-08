@@ -1,0 +1,26 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_canonical_emit.py's vertical-emit.json (BC-12915). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, additionalProperties: false, items, enum, const. Asserts the matrix SHAPE; DISTINCT from the canonical's validity (owned by lint_canonicals, baked into lint.exit_code). appended_vertical/lint are type-only ([object,null]) so golden_compare locks their per-branch values (a write row carries an appended_vertical object + lint{exit_code}; a rejection carries null for both + a non-null error string).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "command": { "type": "string", "const": "/marketing:new-vertical" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "ok", "action", "appended_vertical", "error", "lint"],
+        "properties": {
+          "id": { "type": "string" },
+          "ok": { "type": "boolean" },
+          "action": { "type": ["string", "null"] },
+          "appended_vertical": { "type": ["object", "null"] },
+          "error": { "type": ["string", "null"] },
+          "lint": { "type": ["object", "null"] }
+        }
+      }
+    }
+  }
+}

@@ -78,8 +78,6 @@ from becoming "forever-only."
 | `plugins/marketing/commands/icp-refinement-review.md` | marketing | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/marketing/commands/import-campaign.md` | marketing | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/marketing/commands/launch-campaign.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/marketing/commands/new-persona.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/marketing/commands/new-vertical.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/marketing/commands/offer-performance.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/marketing/commands/portfolio-snapshot.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/marketing/commands/setup-email-bison.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |

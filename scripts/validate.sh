@@ -2141,40 +2141,40 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 15a-bc-12702 — new-offer emit builder unit suite (BC-12702)
+# Section 15a-bc-12702 — canonicals-family emit builder unit suite (BC-12702 + BC-12915)
 # ──────────────────────────────────────────────────────────────────────
-# Runs plugins/marketing/scripts/test_build_offer_emit.sh — the unit/contract suite for
-# build_offer_emit.py, the hermetic emit harness /marketing:new-offer's behavioral eval
-# drives (ADR-028 eval #3, the STRUCTURE-FIRST / LLM-judged representative). The builder
-# does NOT re-implement offer logic — it shells the SAME runtime entrypoints the command
-# delegates to (canonicals_bootstrap.py `offer`, which OWNS every input guard, +
+# Runs plugins/marketing/scripts/test_canonical_emit.sh — the unit/contract suite for
+# build_canonical_emit.py, the hermetic emit harness the canonicals bootstrap command
+# family (/marketing:new-offer, new-persona, new-vertical) behavioral evals drive (ADR-028
+# STRUCTURE-FIRST / LLM-judged representatives). The builder does NOT re-implement any
+# logic — it shells the SAME runtime entrypoints the commands delegate to
+# (canonicals_bootstrap.py `<subcommand>`, which OWNS every input guard, +
 # lint_canonicals.py, the 19-check ADR-016 contract) against a sandbox copy of a FROZEN
-# seed. The suite drives every verdict branch (clean write / near-miss / duplicate /
-# unknown-vertical / invalid-posture / invalid-status / invalid-slug), proves a scenario
-# value is NEVER shelled (a `$(touch pwned)` display reaches the offer entry as inert data
-# — no `pwned` sentinel), and locks determinism + infra exit codes. FAIL-if-missing (not
-# warn): both the command's eval and the structure-first proof depend on it, so a future
-# delete must fail loudly (the §15a-bc-12589 lesson). RESULT line drives the count.
+# seed. The suite drives every verdict branch across all three subcommands, proves a
+# scenario value is NEVER shelled (a `$(touch pwned)` display reaches the entry as inert
+# data — no `pwned` sentinel), and locks determinism + infra exit codes. FAIL-if-missing
+# (not warn): both the commands' evals and the structure-first proof depend on it, so a
+# future delete must fail loudly (the §15a-bc-12589 lesson). RESULT line drives the count.
 # ══════════════════════════════════════════════════════════════════════
-section "15a-bc-12702. new-offer emit builder unit suite (BC-12702)"
+section "15a-bc-12702. canonicals-family emit builder unit suite (BC-12702 + BC-12915)"
 
-no_helper="$REPO_ROOT/plugins/marketing/scripts/build_offer_emit.py"
-no_harness="$REPO_ROOT/plugins/marketing/scripts/test_build_offer_emit.sh"
+no_helper="$REPO_ROOT/plugins/marketing/scripts/build_canonical_emit.py"
+no_harness="$REPO_ROOT/plugins/marketing/scripts/test_canonical_emit.sh"
 
 if [ ! -f "$no_helper" ]; then
-  fail "plugins/marketing/scripts/build_offer_emit.py not found — the new-offer emit-mode builder is missing"
+  fail "plugins/marketing/scripts/build_canonical_emit.py not found — the canonicals emit-mode builder is missing"
 elif [ ! -f "$no_harness" ]; then
-  fail "plugins/marketing/scripts/test_build_offer_emit.sh not found — the new-offer builder suite is missing"
+  fail "plugins/marketing/scripts/test_canonical_emit.sh not found — the canonicals builder suite is missing"
 else
   if no_harness_out=$(bash "$no_harness" "$no_helper" 2>&1); then
     no_pass_count=$(printf '%s\n' "$no_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
     if [ -n "$no_pass_count" ]; then
-      pass "new-offer emit builder unit suite (${no_pass_count} assertions)"
+      pass "canonicals-family emit builder unit suite (${no_pass_count} assertions)"
     else
-      pass "new-offer emit builder unit suite — passed (count unparsed)"
+      pass "canonicals-family emit builder unit suite — passed (count unparsed)"
     fi
   else
-    fail "new-offer emit builder unit suite failed:"
+    fail "canonicals-family emit builder unit suite failed:"
     printf '%s\n' "$no_harness_out" | tail -30 | sed 's/^/          /' >&2
   fi
 fi

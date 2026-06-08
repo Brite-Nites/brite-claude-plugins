@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "command": "/marketing:new-persona",
+  "scenarios": [
+    {
+      "id": "valid_add",
+      "ok": true,
+      "action": "created_persona",
+      "appended_persona": {
+        "slug": "revenue-lead",
+        "display": "Revenue Lead",
+        "titles": [
+          "VP Revenue",
+          "Chief Revenue Officer"
+        ]
+      },
+      "error": null,
+      "lint": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "near_miss_not_duplicate",
+      "ok": true,
+      "action": "created_persona",
+      "appended_persona": {
+        "slug": "ops-director-emea",
+        "display": "Ops Director EMEA",
+        "titles": [
+          "Regional Operations Director"
+        ]
+      },
+      "error": null,
+      "lint": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "duplicate_slug",
+      "ok": false,
+      "action": null,
+      "appended_persona": null,
+      "error": "persona 'ops-director' already exists in vertical 'sample-vertical'",
+      "lint": null
+    },
+    {
+      "id": "unknown_vertical",
+      "ok": false,
+      "action": null,
+      "appended_persona": null,
+      "error": "vertical 'no-such-vertical' not in canonicals manifest",
+      "lint": null
+    },
+    {
+      "id": "invalid_slug",
+      "ok": false,
+      "action": null,
+      "appended_persona": null,
+      "error": "slug 'Not A Slug' is not kebab-case (must match ^[a-z][a-z0-9]*(-[a-z0-9]+)*$)",
+      "lint": null
+    }
+  ]
+}

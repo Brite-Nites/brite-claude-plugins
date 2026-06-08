@@ -2,6 +2,7 @@
 description: Bootstrap a new GTM vertical in canonicals. Adds the slug to _manifest.yaml (alphabetized), creates a skeleton {slug}.yaml, and emits a handbook PR draft for operator review. Per ADR-016 (canonicals schema) + vocabulary.md Section 4 (canonical slug rule). Triggers on "new vertical", "add vertical", "bootstrap vertical", or direct /marketing:new-vertical invocation.
 argument-hint: --slug <kebab-slug> --display <Display Name> [--aliases a,b] [--playbook-path <handbook-path>]
 allowed-tools: Read, Write, AskUserQuestion, Bash
+disable-model-invocation: true
 ---
 
 # /marketing:new-vertical
@@ -9,6 +10,14 @@ allowed-tools: Read, Write, AskUserQuestion, Bash
 > **How this command runs**: model-interpreted spec delegating deterministic IO to `plugins/marketing/scripts/canonicals_bootstrap.py vertical`. Operator confirmation via `AskUserQuestion`.
 
 Bootstraps a new vertical in the GTM canonicals data layer. Creates the manifest entry + skeleton YAML file, then emits a handbook PR draft the operator pastes into a manual PR.
+
+> **`disable-model-invocation: true`** — this command WRITES to the version-controlled GTM canonicals (a source of truth other commands read), so per ADR-028 § 0 the model must not fire it unprompted from a vague request. It stays invocable explicitly (`/marketing:new-vertical …`) and via `Skill` delegation; the Phase-2 `AskUserQuestion` confirm gate is an additional guard before any write.
+
+## Emit mode (behavioral-eval seam)
+
+The behavioral eval (BC-12915, ADR-028 § 5 — the **structure-first / LLM-judged** representative, the canonicals backfill batch) drives the SAME deterministic builder this command delegates to (`canonicals_bootstrap.py vertical`) against a **sandbox copy of a frozen fixture seed** — `canonicals_bootstrap.py --canonicals-dir <sandbox> vertical …` — so the run is **side-effect-free**: no write to the real `data/canonicals/`, no Linear/EB/handbook write, no network. The eval-only harness `plugins/marketing/scripts/build_canonical_emit.py` (shared with new-offer/new-persona) orchestrates this (copy seed → run the builder → run `lint_canonicals.py --canonicals-dir <sandbox>`) and emits a structural matrix (`vertical-emit.json`).
+
+The eval asserts the artifact's deterministic **STRUCTURE** — that the written canonical (the new alphabetized manifest entry + the skeleton `{slug}.yaml`) passes the full 19-check `lint_canonicals` contract (manifest alphabetized + duplicate-free, 1:1 manifest↔file, kebab slug + aliases, valid skeleton) and the new entry's `slug`/`display` match the inputs — and explicitly **NOT** the operator/LLM-chosen content (which vertical/aliases/playbook, the handbook-draft prose). That is the ADR-028 D2 structure-first cascade: a judgment-bearing command still passes *deterministically* on the per-PR gate. Eval data lives under `plugins/marketing/tests/eval/new-vertical.*` + the shared `new-offer-seed/`; harnesses are `scripts/eval/test_eval_harness.sh` + the builder suite `plugins/marketing/scripts/test_canonical_emit.sh`, both wired into `validate.sh`.
 
 ## Input flags
 
