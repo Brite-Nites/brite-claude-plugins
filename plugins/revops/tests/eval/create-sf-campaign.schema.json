@@ -1,0 +1,26 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_campaign_payload.py's campaign-emit.json (BC-12701 eval). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, additionalProperties: false, items, enum, const. Asserts the matrix SHAPE + that campaign_id is ALWAYS null (refinement #4: emit makes no SF write); the golden + golden_compare assert the per-scenario verdict/payload/output VALUES. payload/output are left type-only ([object,null]) so the golden locks their (heterogeneous, per-branch) keys.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "command": { "type": "string", "const": "/revops:create-sf-campaign" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "verdict", "target_org", "payload", "campaign_id", "output"],
+        "properties": {
+          "id": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["would_create", "would_skip_duplicate", "error"] },
+          "target_org": { "type": "string" },
+          "payload": { "type": ["object", "null"] },
+          "campaign_id": { "type": "null" },
+          "output": { "type": ["object", "null"] }
+        }
+      }
+    }
+  }
+}

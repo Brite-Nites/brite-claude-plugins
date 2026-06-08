@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "command": "/revops:create-sf-campaign",
+  "scenarios": [
+    {
+      "id": "would_create",
+      "verdict": "would_create",
+      "target_org": "brite-prod",
+      "payload": {
+        "Name": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "Vertical__c": "municipalities",
+        "Persona__c": "parks-rec-director",
+        "Offer__c": "parks-bond",
+        "Entity__c": "nites",
+        "StartDate": "2026-05-01",
+        "OwnerId": "0051234567ABCDEFGH",
+        "Status": "Planned"
+      },
+      "campaign_id": null,
+      "output": null
+    },
+    {
+      "id": "duplicate_slug",
+      "verdict": "would_skip_duplicate",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "duplicate_slug",
+        "existing_id": "7011234567ABCDEFGH"
+      }
+    },
+    {
+      "id": "near_miss_not_duplicate",
+      "verdict": "would_create",
+      "target_org": "brite-prod",
+      "payload": {
+        "Name": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+        "Vertical__c": "municipalities",
+        "Persona__c": "parks-rec-director",
+        "Offer__c": "parks-bond",
+        "Entity__c": "nites",
+        "StartDate": "2026-05-01",
+        "OwnerId": "0051234567ABCDEFGH",
+        "Status": "Planned"
+      },
+      "campaign_id": null,
+      "output": null
+    },
+    {
+      "id": "missing_owner",
+      "verdict": "error",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "missing_owner",
+        "email": "nobody@britenites.com"
+      }
+    },
+    {
+      "id": "invalid_slug_format",
+      "verdict": "error",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "invalid_slug_format",
+        "slug": "Not A Valid Slug!"
+      }
+    },
+    {
+      "id": "invalid_target_org",
+      "verdict": "error",
+      "target_org": "$(touch pwned)",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "invalid_target_org",
+        "value": "$(touch pwned)"
+      }
+    },
+    {
+      "id": "invalid_owner_email",
+      "verdict": "error",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "invalid_owner_email",
+        "value": "not-an-email"
+      }
+    },
+    {
+      "id": "missing_required_flag",
+      "verdict": "error",
+      "target_org": "brite-prod",
+      "payload": null,
+      "campaign_id": null,
+      "output": {
+        "error": "missing_required_flag",
+        "flag": "offer"
+      }
+    }
+  ]
+}

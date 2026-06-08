@@ -87,7 +87,6 @@ from becoming "forever-only."
 | `plugins/marketing/commands/setup-tam-map.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/marketing/commands/sync-campaign-status.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/marketing/commands/tam-map.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/revops/commands/create-sf-campaign.md` | revops | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/revops/commands/deploy-prod.md` | revops | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/revops/commands/deploy-sandbox.md` | revops | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/revops/commands/doctor.md` | revops | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |

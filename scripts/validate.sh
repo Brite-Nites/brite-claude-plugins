@@ -2103,6 +2103,44 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12701 — create-sf-campaign builder unit suite (BC-12701)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/revops/scripts/test_build_campaign_payload.sh — the unit/contract
+# suite for build_campaign_payload.py, the deterministic decision core
+# /revops:create-sf-campaign delegates to in BOTH its normal and emit runs (the
+# single shared entrypoint — ADR-028 eval #2, the side-effecting representative).
+# It drives the builder across every verdict branch (would_create /
+# would_skip_duplicate / missing_owner / invalid_*), proves the --target-org
+# shell-injection guard REJECTS `$(touch pwned)` with NO side effect (the builder
+# only ever regex-matches the value — it never reaches a shell), and locks the
+# SLUG_RE/EMAIL_RE byte-identity parity. FAIL-if-missing (not warn): the builder is
+# mandatory — both the command and the behavioral eval depend on it, so a future
+# delete must fail loudly (the §15a-bc-12589 lesson). RESULT line drives the count.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12701. create-sf-campaign builder unit suite (BC-12701)"
+
+csf_helper="$REPO_ROOT/plugins/revops/scripts/build_campaign_payload.py"
+csf_harness="$REPO_ROOT/plugins/revops/scripts/test_build_campaign_payload.sh"
+
+if [ ! -f "$csf_helper" ]; then
+  fail "plugins/revops/scripts/build_campaign_payload.py not found — the create-sf-campaign emit-mode builder is missing"
+elif [ ! -f "$csf_harness" ]; then
+  fail "plugins/revops/scripts/test_build_campaign_payload.sh not found — the create-sf-campaign builder suite is missing"
+else
+  if csf_harness_out=$(bash "$csf_harness" "$csf_helper" 2>&1); then
+    csf_pass_count=$(printf '%s\n' "$csf_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$csf_pass_count" ]; then
+      pass "create-sf-campaign builder unit suite (${csf_pass_count} assertions)"
+    else
+      pass "create-sf-campaign builder unit suite — passed (count unparsed)"
+    fi
+  else
+    fail "create-sf-campaign builder unit suite failed:"
+    printf '%s\n' "$csf_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12638 — --target-org guard-precedes-sink consolidating lint (BC-12638)
 # ──────────────────────────────────────────────────────────────────────
 # Repo-wide CONSOLIDATING lint: every command interpolating a non-literal

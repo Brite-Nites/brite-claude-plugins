@@ -1,6 +1,7 @@
 ---
 description: Create a Salesforce Campaign record from canonical GTM slug + persona/offer/vertical/entity inputs. Idempotent (refuses duplicate slugs), soft-fail (all errors exit 0 with structured JSON), and orchestrator-friendly (single-line JSON on stdout). Called by `/marketing:plan-campaign` Step 8b (BC-8724) at scaffold time; can also be invoked manually for SF reconciliation when an earlier auto-create failed. Triggers on "create sf campaign", "scaffold sf campaign", "sigma3 auto-create", or direct `/revops:create-sf-campaign` invocation.
 allowed-tools: Bash, mcp__plugin_revops_salesforce__run_soql_query
+disable-model-invocation: true
 ---
 
 # /revops:create-sf-campaign
@@ -10,6 +11,36 @@ Implements σ3 SF Campaign auto-create per [ADR-015](../../docs/decisions/015-gt
 **Soft-fail contract** (load-bearing, per BC-8724 design): every error path exits 0 with a structured `{"error":"<kind>", ...}` JSON object. Orchestrators detect failure by parsing the `error` key, NOT by exit code. NEVER throw, NEVER exit non-zero, NEVER halt with prose.
 
 **Single-line JSON on stdout.** No narration, no banners, no markdown. The caller pipes the output to `jq`. If you need to log diagnostic context, write it to stderr — stdout is reserved for the one JSON line.
+
+## Deterministic builder
+
+`/revops:create-sf-campaign` is **command-as-orchestrator + a deterministic builder as composer** (the ADR-028 D2/D8 emit-mode seam, mirroring how `/marketing:plan-campaign` delegates to `build_manifest.py`). The SF Campaign **payload** assembly and the **dedup / owner verdict** *given the two SOQL reads* are owned by **[`plugins/revops/scripts/build_campaign_payload.py`](../scripts/build_campaign_payload.py)**, a pure, stdlib-only, hermetic helper the command **delegates to in BOTH its normal and emit runs** — that is the drift-prone logic the eval certifies in one place. The input-shape guards (slug / owner-email / target-org) are the SAME byte-identical regexes living in two roles: applied **in-context** at Phase 0/1 as the ordering-critical shell-/SOQL-injection guards — they MUST run *before* their `sf` / SOQL sinks (Phase 0/2/3) — **and** re-applied inside the builder as the canonical, eval-tested copy (parity-locked by the BC-12638 lint + the builder's parity test, so the two roles cannot drift). The command owns the IO boundary: the Phase-0/2/3 live SOQL reads, the Phase-5 `sf data create record` write, and emitting the builder's decision on stdout.
+
+The builder's pure core is `decide(inputs, sf_state) -> {verdict, payload, output}`, where `sf_state` carries the results of the command's two live reads (Phase-2 idempotency precheck + Phase-3 owner lookup):
+
+```json
+{ "existing_campaigns": [ {"Id": "701…", "Name": "<slug>"} ], "owner": {"email": "<owner-email>", "id": "005…"} }
+```
+
+- `verdict` ∈ `would_create` | `would_skip_duplicate` | `error`.
+- `payload` is the SF Campaign field-map (present on `would_create`, else `null`).
+- `output` is the exact soft-fail JSON envelope to emit on stdout (present on every non-`would_create` branch, else `null` — the Phase-7 success envelope needs the post-write `Id`).
+
+The 7th error-catalog key, **`sf_cli_error`**, has no branch in `decide()` — it is emitted by the command's IO layer on a live SOQL/CLI failure (Phase 2/3/5), which is not input-determined. The builder owns the six input-determined verdicts above; `sf_cli_error` stays with the IO boundary.
+
+At **runtime** the order is load-bearing: Phase 0/1 validate the inputs **in-context first** (the shell-/SOQL-injection guards, *before* any `sf` or SOQL sink) → Phase 2/3 perform the SOQL reads → then pass the validated inputs + the SOQL rows to the builder for the dedup/owner verdict + payload:
+
+```bash
+echo '<scenario-json>' | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_campaign_payload.py" --decide -
+```
+
+`would_create` → run the Phase-5 `sf data create record` with the returned `payload`, then emit Phase-7 success; any other verdict → emit the builder's `output` verbatim (still exit 0 — soft-fail). Because the payload + dedup/owner verdict are computed in ONE place, the behavioral eval that drives the builder (below) certifies the real decision logic, not a parallel copy. **The Phase prose below is the builder's contract: the command does NOT re-implement the payload assembly or the dedup/owner verdict in-context — those are builder-only. The Phase 0/1 input-shape regexes DO run in-context (the injection-ordering guards), applying the same byte-identical patterns the builder re-checks.**
+
+## Emit mode (`--scenarios <fixture> --out-dir <sandbox>`)
+
+`build_campaign_payload.py --scenarios <fixture> --out-dir <sandbox>` is the **side-effect-free** run the behavioral eval (BC-12701) exercises (ADR-028 § 5). Because the dedup + owner decisions depend on LIVE SOQL, the fixture **injects** those two reads as `sf_state` (the `/marketing:plan-campaign` idiom of injecting `created_at` to defeat `now()`) — so the builder is pure given its inputs. Emit runs `decide()` over a scenario matrix and writes `campaign-emit.json` (each row `{id, verdict, payload, campaign_id, output}`); it makes **NO** `run_soql_query` call, **NO** `sf` write, **NO** network call. `campaign_id` is always `null` — emit never writes. The eval golden-compares a structural projection of that matrix (`plugins/revops/tests/eval/create-sf-campaign.*`); the harness is `scripts/eval/test_eval_harness.sh` + the builder unit suite `plugins/revops/scripts/test_build_campaign_payload.sh`, both wired into `validate.sh`.
+
+Emit mode does **not** make the command non-side-effecting: its DEFAULT run still creates a real Campaign, which is why **`disable-model-invocation: true`** is set (ADR-028 § 0 — the model must not fire the real, mutating run unprompted; the command stays invocable explicitly via `/revops:create-sf-campaign` and via `/marketing:plan-campaign` Step 8b's `Skill` delegation). Distinguish from the legacy `--dry-run` (Phase 4), which previews to stdout but still performs the live SOQL reads — `--dry-run` is the human/orchestrator preview; emit mode is the hermetic, testable seam.
 
 ## Input flags
 
@@ -53,12 +84,16 @@ If the call fails, do NOT emit a separate error — fall through to Phase 2 and 
 
 ## Phase 1 — Validate input
 
+> **Shared with `build_campaign_payload.py`** (§ Deterministic builder): these are the SAME byte-identical regexes `decide()` applies (returning the `invalid_slug_format` / `invalid_owner_email` / Phase-0 `invalid_target_org` envelope as its `output`) — but they MUST also run **in-context, here, before Phase 2/3**, because the slug/email flow into SOQL string literals at Phase 2/3 and this is their injection guard. Validate in-context first (fail-fast, in order); the builder re-applies the identical patterns as the canonical, eval-tested copy (parity-locked), not as a substitute that would let the guard arrive *after* its SOQL sink.
+
 `--target-org` is validated earlier, in **Phase 0** (its earliest sink) — see there; its `^[a-zA-Z0-9._@-]+$` shell-injection guard runs before the value is interpolated into any `sf` CLI shell-out (Phase 0/5/6). The remaining inputs are checked here (in order; fail-fast on first mismatch):
 
 - `--slug` matches regex `^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$`. Otherwise emit `{"error":"invalid_slug_format","slug":"<value>"}` exit 0. This is also a SOQL-injection guard — the slug flows into a SOQL string literal in Phase 2, and the regex character class disallows quotes / backslashes / whitespace.
 - `--owner-email` matches regex `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` (the canonical EMAIL_REGEX, byte-identical to the marketing-side callers `/marketing:plan-campaign` Step 4.2 / `/marketing:import-campaign` Step 5). Otherwise emit `{"error":"invalid_owner_email","value":"<value>"}` exit 0. This is also a SOQL-injection guard — the email flows into a SOQL string literal in Phase 3 (`WHERE Email = '<owner-email>'`), and the regex character class disallows quotes / backslashes / whitespace. An empty or whitespace-only value also fails this regex (rejected as `invalid_owner_email` for a precise diagnostic; security-neutral, since `WHERE Email = ''` is a harmless 0-row lookup that would otherwise fall through to Phase 3's `missing_owner`).
 
 ## Phase 2 — Idempotency precheck
+
+> **The verdict is delegated to `build_campaign_payload.py`** (§ Deterministic builder): the command issues the SOQL read below, passes the returned rows in as `sf_state.existing_campaigns`, and the builder's exact `Name == <slug>` match yields the `would_skip_duplicate` verdict + the `duplicate_slug` `output`. The command performs the read; the builder owns the decision.
 
 Call `mcp__plugin_revops_salesforce__run_soql_query` with:
 
@@ -80,6 +115,8 @@ Otherwise, if the result contains any record, emit and exit:
 The idempotency check is the load-bearing safety property: `/marketing:plan-campaign` re-runs MUST be no-ops when the slug already exists.
 
 ## Phase 3 — Owner lookup
+
+> **Delegated to `build_campaign_payload.py`** (§ Deterministic builder): the command issues the SOQL read, passes the row in as `sf_state.owner` (`null` when 0 rows), and the builder yields `missing_owner` or carries the resolved `OwnerId` into the `would_create` payload.
 
 Call `mcp__plugin_revops_salesforce__run_soql_query` with:
 
@@ -111,6 +148,8 @@ If `--dry-run` is present, emit the preview JSON and exit (NO insert attempted):
 The preview proves the lookup + payload assembly without mutating SF. Useful for both human dry-run inspection and orchestrator-side integration tests.
 
 ## Phase 5 — Insert via SF CLI
+
+> **The `--values` payload is the builder's `payload`** (§ Deterministic builder) — do NOT re-assemble the field-map in-context; use the `would_create` `payload` returned by `--decide` (Name / Vertical__c / Persona__c / Offer__c / Entity__c / StartDate / OwnerId / Status='Planned').
 
 Run via the `Bash` tool:
 

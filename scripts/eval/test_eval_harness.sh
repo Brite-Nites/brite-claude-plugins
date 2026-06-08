@@ -181,12 +181,68 @@ assert_exit "missing artifacts → exit 2 (infra error, not a diff)" 2
 invoke "$RUN_EVAL" no-such-command
 assert_exit "unknown command-id → exit 2" 2
 
+# ── 3b. create-sf-campaign eval (BC-12701 — the side-effecting representative) ─
+# The SECOND registered command: its default run MUTATES external state (creates a
+# Salesforce Campaign). Its emit-mode builder (build_campaign_payload.py) is driven
+# over a SCENARIO MATRIX so the GREEN run exercises every verdict branch, then the
+# mutation cases prove a red diff — including an IDEMPOTENCY regression (the
+# duplicate verdict flipped to would_create), the load-bearing behavior this
+# command's eval exists to catch (ADR-028: "green tests on a command that never
+# ran"). Same shape as the plan-campaign block above; reuses invoke/assert_*.
+echo "── create-sf-campaign eval (BC-12701 — known-good → GREEN) ──"
+CSF="$tmproot/csf"; mkdir -p "$CSF"
+invoke "$RUN_EVAL" create-sf-campaign --sandbox "$CSF"
+assert_exit "create-sf-campaign eval GREEN — known-good matrix builds + passes" 0
+assert_substr "create-sf-campaign eval prints PASS verdict" "PASS: create-sf-campaign eval"
+if [ -f "$CSF/campaign-emit.json" ]; then
+  echo "  PASS  artifact produced: campaign-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: campaign-emit.json"; fail=$((fail + 1))
+fi
+
+echo "── create-sf-campaign self-test (mutated matrix → RED) ──"
+mutate_csf() {  # label  expected_substr  python_mutation (M = artifact dir)
+  local label="$1" rx="$2" code="$3"
+  local M="$tmproot/csfmut.$((mutid++))"; mkdir -p "$M"
+  cp "$CSF/campaign-emit.json" "$M/"
+  if ! MUT_DIR="$M" python3 -c "
+import json, os, pathlib
+M = pathlib.Path(os.environ['MUT_DIR'])
+$code
+"; then
+    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
+  fi
+  invoke "$RUN_EVAL" create-sf-campaign --artifact-dir "$M"
+  assert_exit "csf mutation '$label' → red (exit 1)" 1
+  assert_substr "csf mutation '$label' → named diff" "$rx"
+}
+
+mutate_csf "idempotency regression (dup→create)" "golden 'would_skip_duplicate', got 'would_create'" \
+  'p=M/"campaign-emit.json"; d=json.load(open(p)); [s.update(verdict="would_create", output=None) for s in d["scenarios"] if s["id"]=="duplicate_slug"]; json.dump(d,open(p,"w"))'
+mutate_csf "un-null a campaign_id (no-write invariant)" "expected type null, got string" \
+  'p=M/"campaign-emit.json"; d=json.load(open(p)); d["scenarios"][0]["campaign_id"]="701WROTE"; json.dump(d,open(p,"w"))'
+mutate_csf "corrupt a payload field" "payload.OwnerId: golden" \
+  'p=M/"campaign-emit.json"; d=json.load(open(p)); d["scenarios"][0]["payload"]["OwnerId"]="005WRONG"; json.dump(d,open(p,"w"))'
+mutate_csf "leak an extra scenario key" "unexpected property" \
+  'p=M/"campaign-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+mutate_csf "drop the idempotency scenario" "expected scenario id 'duplicate_slug' is absent" \
+  'p=M/"campaign-emit.json"; d=json.load(open(p)); d["scenarios"]=[s for s in d["scenarios"] if s["id"]!="duplicate_slug"]; json.dump(d,open(p,"w"))'
+mutate_csf "flip a verdict to an off-enum value" "is not one of enum" \
+  'p=M/"campaign-emit.json"; d=json.load(open(p)); d["scenarios"][0]["verdict"]="ship_it"; json.dump(d,open(p,"w"))'
+# dedup-EXACTNESS regression: a different-slug row wrongly classified as a duplicate
+# (the near_miss scenario flipped would_create→would_skip_duplicate) — the symmetric
+# twin of the idempotency regression above, proving the harness names that diff too.
+mutate_csf "near-miss wrongly deduped" "scenarios[2].verdict: golden 'would_create'" \
+  'p=M/"campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="near_miss_not_duplicate"][0]; s.update(verdict="would_skip_duplicate", payload=None, output={"error":"duplicate_slug","existing_id":"701X"}); json.dump(d,open(p,"w"))'
+
 # ── 4. hermeticity guard ─────────────────────────────────────────────────────
 
 echo "── hermeticity ──"
-# (a) no network-capable module is imported anywhere in the eval source.
+# (a) no network-capable module is imported anywhere in the eval source — incl.
+#     the create-sf-campaign builder the BC-12701 adapter shells out to.
+CSF_BUILDER="$REPO_ROOT/plugins/revops/scripts/build_campaign_payload.py"
 if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
-     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" >/dev/null 2>&1; then
+     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" >/dev/null 2>&1; then
   echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
 else
   echo "  PASS  hermeticity: no network module imported"; pass=$((pass + 1))
@@ -209,12 +265,34 @@ if [ "$before" = "$after" ]; then
 else
   echo "  FAIL  hermeticity: eval left stray files in the working dir"; fail=$((fail + 1))
 fi
+# (c) the create-sf-campaign eval (BC-12701) is hermetic too — GREEN with API keys
+#     unset from an empty cwd, no stray files (the builder makes NO SF write/SOQL;
+#     this is the load-bearing proof for the side-effecting representative).
+HCWD2="$tmproot/hermetic-cwd-csf"; mkdir -p "$HCWD2"
+before2="$(cd "$HCWD2" && find . | sort)"
+herm2_out="$(cd "$HCWD2" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" create-sf-campaign 2>&1)"
+herm2_rc=$?
+after2="$(cd "$HCWD2" && find . | sort)"
+if [ "$herm2_rc" -eq 0 ]; then
+  echo "  PASS  hermeticity: create-sf-campaign eval GREEN with API keys unset, empty cwd"; pass=$((pass + 1))
+else
+  echo "  FAIL  hermeticity: create-sf-campaign eval failed without API keys (rc=$herm2_rc)"
+  printf '    output: %s\n' "$herm2_out"; fail=$((fail + 1))
+fi
+if [ "$before2" = "$after2" ]; then
+  echo "  PASS  hermeticity: create-sf-campaign eval wrote nothing into the working dir"; pass=$((pass + 1))
+else
+  echo "  FAIL  hermeticity: create-sf-campaign eval left stray files in the working dir"; fail=$((fail + 1))
+fi
 
 echo ""
 # Count floor — a vanished test block (broken --list, swallowed import, emptied
-# CASES) would otherwise drop the count yet still exit 0. Below the floor is a
-# silent-skip and must fail the build loudly (the eval's whole reason to exist).
-FLOOR=45
+# CASES, or the whole create-sf-campaign block disappearing) would otherwise drop
+# the count yet still exit 0. Below the floor is a silent-skip and must fail the
+# build loudly (the eval's whole reason to exist). Bumped 45→80 when the BC-12701
+# create-sf-campaign block (+19 assertions: 3 GREEN + 7×2 mutations + 2 hermeticity,
+# total 86) landed, so losing that block (→67) trips the floor rather than passing green.
+FLOOR=80
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2
