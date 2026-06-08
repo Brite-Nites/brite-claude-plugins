@@ -1,0 +1,152 @@
+{
+  "_comment": "Behavioral-eval fixture for /revops:create-sf-campaign (BC-12701, ADR-028 eval #2 — the side-effecting representative). A SCENARIO MATRIX: each row = campaign-defining inputs + the INJECTED results of the command's two live SOQL reads (Phase-2 idempotency precheck `existing_campaigns`, Phase-3 owner lookup `owner`). Injecting both reads is what makes the builder pure → the eval hermetic (the plan-campaign 'inject created_at to defeat now()' idiom, generalized to defeat live SOQL). The matrix exercises EVERY verdict branch — would_create + the behaviorally-load-bearing would_skip_duplicate (idempotency, this command's headline feature) + missing_owner + the input-shape guards — so a green eval certifies the whole decision function, not just the happy path. The canonical V/P/O triple (municipalities/parks-rec-director/parks-bond) mirrors the plan-campaign fixture. SF Ids are synthetic 18-char shapes (never written anywhere — emit makes no SF write).",
+  "scenarios": [
+    {
+      "id": "would_create",
+      "note": "clean: no existing campaign for the slug + an active owner → write the Campaign.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "entity": "nites",
+      "vertical": "municipalities",
+      "persona": "parks-rec-director",
+      "offer": "parks-bond",
+      "year": 2026,
+      "month": 5,
+      "owner_email": "marketingadmin@britenites.com",
+      "launch_date": "2026-05-01",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "existing_campaigns": [],
+        "owner": { "email": "marketingadmin@britenites.com", "id": "0051234567ABCDEFGH" }
+      }
+    },
+    {
+      "id": "duplicate_slug",
+      "note": "idempotency: a Campaign with this exact Name already exists → would_skip (no-op).",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "entity": "nites",
+      "vertical": "municipalities",
+      "persona": "parks-rec-director",
+      "offer": "parks-bond",
+      "year": 2026,
+      "month": 5,
+      "owner_email": "marketingadmin@britenites.com",
+      "launch_date": "2026-05-01",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "existing_campaigns": [
+          { "Id": "7011234567ABCDEFGH", "Name": "municipalities-parks-rec-director-parks-bond-fy26-m05" }
+        ],
+        "owner": { "email": "marketingadmin@britenites.com", "id": "0051234567ABCDEFGH" }
+      }
+    },
+    {
+      "id": "near_miss_not_duplicate",
+      "note": "exact-match logic under test (refinement #2): a row with a DIFFERENT slug is NOT a duplicate → still would_create. Guards against a substring/case-insensitive dedup regression.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "entity": "nites",
+      "vertical": "municipalities",
+      "persona": "parks-rec-director",
+      "offer": "parks-bond",
+      "year": 2026,
+      "month": 5,
+      "owner_email": "marketingadmin@britenites.com",
+      "launch_date": "2026-05-01",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "existing_campaigns": [
+          { "Id": "701OTHER999XXXXXX", "Name": "municipalities-parks-rec-director-parks-bond-fy26-m06" }
+        ],
+        "owner": { "email": "marketingadmin@britenites.com", "id": "0051234567ABCDEFGH" }
+      }
+    },
+    {
+      "id": "missing_owner",
+      "note": "Phase-3 returned 0 rows (no active SF user for the email) → soft-fail missing_owner.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "entity": "nites",
+      "vertical": "municipalities",
+      "persona": "parks-rec-director",
+      "offer": "parks-bond",
+      "year": 2026,
+      "month": 5,
+      "owner_email": "nobody@britenites.com",
+      "launch_date": "2026-05-01",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "existing_campaigns": [],
+        "owner": null
+      }
+    },
+    {
+      "id": "invalid_slug_format",
+      "note": "Phase-1 slug guard (also the Phase-2 SOQL-literal guard): a slug that fails the canonical regex → invalid_slug_format.",
+      "slug": "Not A Valid Slug!",
+      "entity": "nites",
+      "vertical": "municipalities",
+      "persona": "parks-rec-director",
+      "offer": "parks-bond",
+      "year": 2026,
+      "month": 5,
+      "owner_email": "marketingadmin@britenites.com",
+      "launch_date": "2026-05-01",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "existing_campaigns": [],
+        "owner": { "email": "marketingadmin@britenites.com", "id": "0051234567ABCDEFGH" }
+      }
+    },
+    {
+      "id": "invalid_target_org",
+      "note": "Phase-0 shell-injection guard (reused BC-12639 validator): a command-substitution payload → invalid_target_org. The builder NEVER shells the value — test_build_campaign_payload.sh asserts no `pwned` sentinel.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "entity": "nites",
+      "vertical": "municipalities",
+      "persona": "parks-rec-director",
+      "offer": "parks-bond",
+      "year": 2026,
+      "month": 5,
+      "owner_email": "marketingadmin@britenites.com",
+      "launch_date": "2026-05-01",
+      "target_org": "$(touch pwned)",
+      "sf_state": {
+        "existing_campaigns": [],
+        "owner": { "email": "marketingadmin@britenites.com", "id": "0051234567ABCDEFGH" }
+      }
+    },
+    {
+      "id": "invalid_owner_email",
+      "note": "Phase-1 owner-email guard (also the Phase-3 SOQL-literal guard): a value failing EMAIL_RE → invalid_owner_email.",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "entity": "nites",
+      "vertical": "municipalities",
+      "persona": "parks-rec-director",
+      "offer": "parks-bond",
+      "year": 2026,
+      "month": 5,
+      "owner_email": "not-an-email",
+      "launch_date": "2026-05-01",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "existing_campaigns": [],
+        "owner": { "email": "not-an-email", "id": "0051234567ABCDEFGH" }
+      }
+    },
+    {
+      "id": "missing_required_flag",
+      "note": "presence check before any phase: --offer omitted → missing_required_flag flag=offer (flag-table order).",
+      "slug": "municipalities-parks-rec-director-parks-bond-fy26-m05",
+      "entity": "nites",
+      "vertical": "municipalities",
+      "persona": "parks-rec-director",
+      "year": 2026,
+      "month": 5,
+      "owner_email": "marketingadmin@britenites.com",
+      "launch_date": "2026-05-01",
+      "target_org": "brite-prod",
+      "sf_state": {
+        "existing_campaigns": [],
+        "owner": { "email": "marketingadmin@britenites.com", "id": "0051234567ABCDEFGH" }
+      }
+    }
+  ]
+}
