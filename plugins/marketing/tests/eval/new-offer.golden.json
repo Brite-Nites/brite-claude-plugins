@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "command": "/marketing:new-offer",
+  "scenarios": [
+    {
+      "id": "valid_add",
+      "ok": true,
+      "action": "created_offer",
+      "appended_offer": {
+        "slug": "holiday-anchor-audit",
+        "display": "Resort Holiday Anchor Audit",
+        "status": "draft",
+        "posture": "pilot"
+      },
+      "error": null,
+      "lint": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "near_miss_not_duplicate",
+      "ok": true,
+      "action": "created_offer",
+      "appended_offer": {
+        "slug": "existing-offer-v2",
+        "display": "Existing Offer V2",
+        "status": "active",
+        "posture": "knowledge"
+      },
+      "error": null,
+      "lint": {
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "duplicate_slug",
+      "ok": false,
+      "action": null,
+      "appended_offer": null,
+      "error": "offer 'existing-offer' already exists in vertical 'sample-vertical'",
+      "lint": null
+    },
+    {
+      "id": "unknown_vertical",
+      "ok": false,
+      "action": null,
+      "appended_offer": null,
+      "error": "vertical 'no-such-vertical' not in canonicals manifest",
+      "lint": null
+    },
+    {
+      "id": "invalid_posture",
+      "ok": false,
+      "action": null,
+      "appended_offer": null,
+      "error": "posture 'premium' invalid; must be one of: ['free-asset', 'knowledge', 'pilot', 'risk-reversal']",
+      "lint": null
+    },
+    {
+      "id": "invalid_status",
+      "ok": false,
+      "action": null,
+      "appended_offer": null,
+      "error": "status 'launched' invalid; must be one of: ['active', 'draft', 'retired']",
+      "lint": null
+    },
+    {
+      "id": "invalid_slug",
+      "ok": false,
+      "action": null,
+      "appended_offer": null,
+      "error": "slug 'Not A Slug' is not kebab-case (must match ^[a-z][a-z0-9]*(-[a-z0-9]+)*$)",
+      "lint": null
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "_comment": "Behavioral-eval fixture for /marketing:new-offer (BC-12702, ADR-028 eval #3 — the STRUCTURE-FIRST / LLM-judged representative). A SCENARIO MATRIX driven through the REAL runtime entrypoint canonicals_bootstrap.py (which OWNS every input guard) against a copy of the FROZEN seed canonicals in new-offer-seed/ (one vertical 'sample-vertical' + two personas + one pre-existing offer 'existing-offer' whose target_personas → 'ops-director', so duplicate_slug has a deterministic collision AND lint check #18 referential-integrity actually executes on the seed offer). The structure-first proof: the WRITTEN canonical (seed + appended) passes lint_canonicals' full 19-check contract and the appended entry's slug/display/status/posture match the inputs — NOT which offer/posture the operator chose, NOT the handbook-draft prose. Each row isolates ONE fault so the builder's first-guard-wins ordering (slug → vertical → posture → status → duplicate) yields a deterministic error string.",
+  "scenarios": [
+    {
+      "id": "valid_add",
+      "note": "clean append: a new, unique, kebab offer into an existing vertical → the canonical the builder writes passes the full lint contract (lint.exit_code 0) and the appended entry's fields == inputs. THE structure-first core.",
+      "vertical": "sample-vertical",
+      "slug": "holiday-anchor-audit",
+      "display": "Resort Holiday Anchor Audit",
+      "posture": "pilot",
+      "status": "draft"
+    },
+    {
+      "id": "near_miss_not_duplicate",
+      "note": "exact-match dedup under test (the cheap BC-12701 guard): a slug SIMILAR to the seed's 'existing-offer' but DIFFERENT must NOT collide → still writes, still lints clean. Guards against a future substring/case-insensitive dedup regression.",
+      "vertical": "sample-vertical",
+      "slug": "existing-offer-v2",
+      "display": "Existing Offer V2",
+      "posture": "knowledge",
+      "status": "active"
+    },
+    {
+      "id": "duplicate_slug",
+      "note": "uniqueness guard (builder-owned): a slug equal to the seed's pre-existing 'existing-offer' → ok:false, no write, no structural claim (lint:null).",
+      "vertical": "sample-vertical",
+      "slug": "existing-offer",
+      "display": "Duplicate Attempt",
+      "posture": "knowledge",
+      "status": "draft"
+    },
+    {
+      "id": "unknown_vertical",
+      "note": "vertical-existence guard (builder-owned): a valid kebab slug into a vertical not in the manifest → ok:false. Slug is valid so the earlier slug guard passes and the vertical guard is the one under test.",
+      "vertical": "no-such-vertical",
+      "slug": "some-offer",
+      "display": "Some Offer",
+      "posture": "pilot",
+      "status": "draft"
+    },
+    {
+      "id": "invalid_posture",
+      "note": "posture-enum guard (builder-owned, ADR-017): a posture outside {knowledge,free-asset,pilot,risk-reversal} → ok:false. Slug + vertical valid so the posture guard is the one under test.",
+      "vertical": "sample-vertical",
+      "slug": "premium-offer",
+      "display": "Premium Offer",
+      "posture": "premium",
+      "status": "draft"
+    },
+    {
+      "id": "invalid_status",
+      "note": "status-enum guard (builder-owned): a status outside {draft,active,retired} → ok:false. Slug + vertical + posture valid so the status guard is the one under test.",
+      "vertical": "sample-vertical",
+      "slug": "status-test-offer",
+      "display": "Status Test Offer",
+      "posture": "knowledge",
+      "status": "launched"
+    },
+    {
+      "id": "invalid_slug",
+      "note": "slug-shape guard (builder-owned): a non-kebab slug → ok:false. The slug guard is first in the builder's order, so this fault is reported even though the other flags are valid.",
+      "vertical": "sample-vertical",
+      "slug": "Not A Slug",
+      "display": "Bad Slug Offer",
+      "posture": "knowledge",
+      "status": "draft"
+    }
+  ]
+}

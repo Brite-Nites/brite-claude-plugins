@@ -235,14 +235,72 @@ mutate_csf "flip a verdict to an off-enum value" "is not one of enum" \
 mutate_csf "near-miss wrongly deduped" "scenarios[2].verdict: golden 'would_create'" \
   'p=M/"campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="near_miss_not_duplicate"][0]; s.update(verdict="would_skip_duplicate", payload=None, output={"error":"duplicate_slug","existing_id":"701X"}); json.dump(d,open(p,"w"))'
 
+# ── 3c. new-offer eval (BC-12702 — the structure-first / LLM-judged representative) ─
+# The THIRD registered command: it WRITES a GTM canonical where the operator/LLM chooses
+# the content. Its emit builder (build_offer_emit.py) drives the SAME runtime entrypoint
+# the command delegates to (canonicals_bootstrap.py `offer`) against a sandbox copy of a
+# FROZEN seed, then runs lint_canonicals over the result. The GREEN run exercises a 7-row
+# matrix (a clean write + a near-miss + every builder-owned guard); the mutation cases
+# prove a red diff — including the load-bearing structure-first regression (a written
+# canonical that no longer passes lint_canonicals) and a uniqueness regression
+# (duplicate→write). Same shape as the blocks above; reuses invoke/assert_*.
+echo "── new-offer eval (BC-12702 — known-good → GREEN) ──"
+NO="$tmproot/no"; mkdir -p "$NO"
+invoke "$RUN_EVAL" new-offer --sandbox "$NO"
+assert_exit "new-offer eval GREEN — known-good matrix builds + passes" 0
+assert_substr "new-offer eval prints PASS verdict" "PASS: new-offer eval"
+if [ -f "$NO/offer-emit.json" ]; then
+  echo "  PASS  artifact produced: offer-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: offer-emit.json"; fail=$((fail + 1))
+fi
+
+echo "── new-offer self-test (mutated matrix → RED) ──"
+mutate_no() {  # label  expected_substr  python_mutation (M = artifact dir)
+  local label="$1" rx="$2" code="$3"
+  local M="$tmproot/nomut.$((mutid++))"; mkdir -p "$M"
+  cp "$NO/offer-emit.json" "$M/"
+  if ! MUT_DIR="$M" python3 -c "
+import json, os, pathlib
+M = pathlib.Path(os.environ['MUT_DIR'])
+$code
+"; then
+    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
+  fi
+  invoke "$RUN_EVAL" new-offer --artifact-dir "$M"
+  assert_exit "no mutation '$label' → red (exit 1)" 1
+  assert_substr "no mutation '$label' → named diff" "$rx"
+}
+
+# THE structure-first regression: a valid write whose canonical no longer passes the full
+# lint_canonicals contract (exit 1) — the load-bearing proof for this representative.
+mutate_no "valid write fails lint (exit 1)" "lint.exit_code 0" \
+  'p=M/"offer-emit.json"; d=json.load(open(p)); d["scenarios"][0]["lint"]["exit_code"]=1; json.dump(d,open(p,"w"))'
+# uniqueness regression: the duplicate slug is wrongly WRITTEN instead of rejected.
+mutate_no "uniqueness regression (dup→write)" "scenarios[2].ok: golden False, got True" \
+  'p=M/"offer-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="duplicate_slug"][0]; s.update(ok=True, action="created_offer", appended_offer={"slug":"existing-offer","display":"Dup","status":"draft","posture":"knowledge"}, error=None, lint={"exit_code":0}); json.dump(d,open(p,"w"))'
+# passthrough regression: the appended entry's posture no longer matches the input.
+mutate_no "corrupt the appended posture" "posture" \
+  'p=M/"offer-emit.json"; d=json.load(open(p)); d["scenarios"][0]["appended_offer"]["posture"]="knowledge"; json.dump(d,open(p,"w"))'
+mutate_no "drop the uniqueness scenario" "expected scenario id 'duplicate_slug' is absent" \
+  'p=M/"offer-emit.json"; d=json.load(open(p)); d["scenarios"]=[s for s in d["scenarios"] if s["id"]!="duplicate_slug"]; json.dump(d,open(p,"w"))'
+mutate_no "leak an extra scenario key" "unexpected property" \
+  'p=M/"offer-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+mutate_no "null out a rejection error" "non-empty builder error" \
+  'p=M/"offer-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="invalid_slug"][0]; s["error"]=None; json.dump(d,open(p,"w"))'
+# dedup-EXACTNESS regression: a different-slug near-miss wrongly classified as a duplicate.
+mutate_no "near-miss wrongly deduped" "scenarios[1].ok: golden True, got False" \
+  'p=M/"offer-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="near_miss_not_duplicate"][0]; s.update(ok=False, action=None, appended_offer=None, lint=None, error="wrongly deduped"); json.dump(d,open(p,"w"))'
+
 # ── 4. hermeticity guard ─────────────────────────────────────────────────────
 
 echo "── hermeticity ──"
-# (a) no network-capable module is imported anywhere in the eval source — incl.
-#     the create-sf-campaign builder the BC-12701 adapter shells out to.
+# (a) no network-capable module is imported anywhere in the eval source — incl. the
+#     create-sf-campaign builder AND the new-offer builder the adapters shell out to.
 CSF_BUILDER="$REPO_ROOT/plugins/revops/scripts/build_campaign_payload.py"
+NO_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_offer_emit.py"
 if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
-     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" >/dev/null 2>&1; then
+     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$NO_BUILDER" >/dev/null 2>&1; then
   echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
 else
   echo "  PASS  hermeticity: no network module imported"; pass=$((pass + 1))
@@ -284,15 +342,36 @@ if [ "$before2" = "$after2" ]; then
 else
   echo "  FAIL  hermeticity: create-sf-campaign eval left stray files in the working dir"; fail=$((fail + 1))
 fi
+# (d) the new-offer eval (BC-12702) is hermetic too — GREEN with API keys unset from an
+#     empty cwd, no stray files. Its builder copies a frozen seed into a sandbox and shells
+#     canonicals_bootstrap + lint_canonicals (both stdlib, no network/MCP/real-file write);
+#     this is the load-bearing proof for the structure-first representative.
+HCWD3="$tmproot/hermetic-cwd-no"; mkdir -p "$HCWD3"
+before3="$(cd "$HCWD3" && find . | sort)"
+herm3_out="$(cd "$HCWD3" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" new-offer 2>&1)"
+herm3_rc=$?
+after3="$(cd "$HCWD3" && find . | sort)"
+if [ "$herm3_rc" -eq 0 ]; then
+  echo "  PASS  hermeticity: new-offer eval GREEN with API keys unset, empty cwd"; pass=$((pass + 1))
+else
+  echo "  FAIL  hermeticity: new-offer eval failed without API keys (rc=$herm3_rc)"
+  printf '    output: %s\n' "$herm3_out"; fail=$((fail + 1))
+fi
+if [ "$before3" = "$after3" ]; then
+  echo "  PASS  hermeticity: new-offer eval wrote nothing into the working dir"; pass=$((pass + 1))
+else
+  echo "  FAIL  hermeticity: new-offer eval left stray files in the working dir"; fail=$((fail + 1))
+fi
 
 echo ""
 # Count floor — a vanished test block (broken --list, swallowed import, emptied
-# CASES, or the whole create-sf-campaign block disappearing) would otherwise drop
-# the count yet still exit 0. Below the floor is a silent-skip and must fail the
-# build loudly (the eval's whole reason to exist). Bumped 45→80 when the BC-12701
-# create-sf-campaign block (+19 assertions: 3 GREEN + 7×2 mutations + 2 hermeticity,
-# total 86) landed, so losing that block (→67) trips the floor rather than passing green.
-FLOOR=80
+# CASES, or a whole command's eval block disappearing) would otherwise drop the count
+# yet still exit 0. Below the floor is a silent-skip and must fail the build loudly
+# (the eval's whole reason to exist). Bumped 45→80 (BC-12701 create-sf-campaign block),
+# then 80→100 when the BC-12702 new-offer block (+19 assertions: 3 GREEN + 7×2 mutations
+# + 2 hermeticity, total 105) landed — so losing either the create-sf-campaign or the
+# new-offer block (→86) trips the floor rather than passing green.
+FLOOR=100
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

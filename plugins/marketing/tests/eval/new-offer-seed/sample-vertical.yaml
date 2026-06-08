@@ -1,0 +1,18 @@
+slug: sample-vertical
+display: "Sample Vertical"
+personas:
+  - slug: ops-director
+    display: "Operations Director"
+    titles:
+      - "Director of Operations"
+  - slug: facilities-manager
+    display: "Facilities Manager"
+    titles:
+      - "Facilities Manager"
+offers:
+  - slug: existing-offer
+    display: "Existing Offer"
+    status: active
+    posture: knowledge
+    target_personas:
+      - ops-director

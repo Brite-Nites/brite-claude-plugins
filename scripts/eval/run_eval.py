@@ -443,9 +443,196 @@ class CreateSfCampaignAdapter:
         return str(self.golden_path)
 
 
+# ── new-offer adapter ─────────────────────────────────────────────────────────
+#
+# The third registered command (BC-12702) — the STRUCTURE-FIRST / LLM-judged
+# representative. /marketing:new-offer writes a GTM canonical where the operator/LLM
+# CHOOSES the content (which display/posture/status), but the file has a defined ADR-016
+# schema. Its emit builder (build_offer_emit.py) drives the SAME runtime entrypoint the
+# command delegates to (canonicals_bootstrap.py `offer`, which OWNS every input guard)
+# against a sandbox copy of a FROZEN seed, then runs lint_canonicals over the result.
+# The eval asserts the artifact's deterministic STRUCTURE — the written canonical passes
+# the full 19-check lint contract + the appended entry's fields == inputs — and NOT the
+# operator/LLM-chosen content (which offer, the handbook-draft prose). That is the
+# ADR-028 D2 structure-first cascade: a judgment-bearing command still passes
+# DETERMINISTICALLY on the per-PR gate.
+
+
+class NewOfferAdapter:
+    """Emit adapter for /marketing:new-offer: drive build_offer_emit.py."""
+
+    command_id = "new-offer"
+    artifact_names = ("offer-emit.json",)
+
+    fixture_path = REPO_ROOT / "plugins/marketing/tests/eval/new-offer.fixture.json"
+    golden_path = REPO_ROOT / "plugins/marketing/tests/eval/new-offer.golden.json"
+    schema_path = REPO_ROOT / "plugins/marketing/tests/eval/new-offer.schema.json"
+
+    builder = REPO_ROOT / "plugins/marketing/scripts/build_offer_emit.py"
+    # FROZEN fixture canonicals seeded into each scenario's sandbox. Deliberately NOT the
+    # live plugins/marketing/data/canonicals/ (a divergence from PlanCampaignAdapter,
+    # which reads the live dir): new-offer WRITES, and its guards need controlled
+    # pre-existing state — a live seed would drift the golden + risk hermeticity.
+    seed_dir = REPO_ROOT / "plugins/marketing/tests/eval/new-offer-seed"
+
+    # The scenario ids the matrix must carry, in order — a FLOOR-style guard so a fixture
+    # that silently drops a branch (e.g. the duplicate/uniqueness case) is caught by
+    # check() with a named diff rather than passing on a thinned matrix.
+    EXPECTED_SCENARIO_IDS = (
+        "valid_add", "near_miss_not_duplicate", "duplicate_slug", "unknown_vertical",
+        "invalid_posture", "invalid_status", "invalid_slug",
+    )
+
+    # ── build ───────────────────────────────────────────────────────────────
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        """Run the batch builder over the fixture's scenarios into `sandbox`.
+
+        The runner loads the fixture into a dict; we write it back to a sandbox file and
+        hand it to build_offer_emit.py's `--scenarios` mode, which copies the frozen seed
+        into a per-scenario sub-sandbox and shells the SAME canonicals_bootstrap.py +
+        lint_canonicals.py the command runs. API keys are stripped to prove hermeticity
+        (DP2-4) — build_offer_emit strips them again for its own children."""
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder),
+             "--scenarios", str(fixture_file), "--out-dir", str(sandbox),
+             "--seed-dir", str(self.seed_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_offer_emit.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    # ── collect ───────────────────────────────────────────────────────────────
+
+    def collect(self, artifact_dir: Path) -> dict:
+        out: dict = {}
+        for name in self.artifact_names:
+            p = artifact_dir / name
+            if not p.exists():
+                raise EvalError(f"expected artifact missing: {p}")
+            try:
+                out[name] = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+        return out
+
+    # ── projection (golden = a structural projection) ─────────────────────────
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        """The structure the golden pins: the full matrix. Every field is deterministic
+        (the appended entry's slug/display/status/posture, the per-guard error string,
+        the baked lint exit code) — no prose, no sandbox path — so the projection is the
+        artifact itself, ordered, with no field dropped. (yaml_path + handbook_draft are
+        already dropped upstream by build_offer_emit, the structure-first seam.)"""
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    # ── check ─────────────────────────────────────────────────────────────────
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        emit = artifacts["offer-emit.json"]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        # SHAPE FIRST — short-circuit so the value/invariant checks below only ever index
+        # a structurally-valid matrix (a dropped/retyped key surfaces as a named schema
+        # diff, never a KeyError).
+        schema_diffs = combine(
+            assert_lib.schema_validate(emit, schema, artifact="offer-emit.json")
+        )
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+
+        # Branch coverage: every expected scenario id must be present (a thinned fixture
+        # that drops the uniqueness/enum case is the failure this guards).
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"offer-emit.json: expected scenario id '{sid}' is absent from the matrix")
+
+        fixture_by_id = {sc["id"]: sc for sc in fixture.get("scenarios", []) if isinstance(sc, dict)}
+
+        # Per-verdict structural invariants (explicit + named, beyond the golden compare).
+        for s in emit["scenarios"]:
+            tag = f"offer-emit.json $.scenarios[id={s['id']}]"
+            if s["ok"]:
+                # A clean write: the appended entry exists, no error, and the FULL
+                # lint_canonicals contract held over the written canonical (exit 0).
+                if s["action"] != "created_offer":
+                    diffs.append(f"{tag}: ok row must have action 'created_offer', got {s['action']!r}")
+                if not isinstance(s["appended_offer"], dict):
+                    diffs.append(f"{tag}: ok row must carry an appended_offer object, got {s['appended_offer']!r}")
+                if s["error"] is not None:
+                    diffs.append(f"{tag}: ok row error must be null, got {s['error']!r}")
+                if not isinstance(s["lint"], dict) or s["lint"].get("exit_code") != 0:
+                    diffs.append(f"{tag}: ok row must carry lint.exit_code 0 (the written canonical passes lint_canonicals), got {s['lint']!r}")
+                # Passthrough: the appended entry's deterministic fields == the inputs the
+                # operator supplied (the strongest structure-first assertion — proves no
+                # field is mangled). status defaults to 'draft' when the input omits it.
+                exp = fixture_by_id.get(s["id"], {})
+                if exp:
+                    diffs += assert_lib.key_fields(
+                        s["appended_offer"],
+                        {
+                            "slug": exp.get("slug"),
+                            "display": exp.get("display"),
+                            "status": exp.get("status") or "draft",
+                            "posture": exp.get("posture"),
+                        },
+                        artifact=f"{tag}.appended_offer",
+                    )
+            else:
+                # A rejection: no write, no structural claim, a builder-owned error string.
+                if s["action"] is not None:
+                    diffs.append(f"{tag}: rejection row action must be null, got {s['action']!r}")
+                if s["appended_offer"] is not None:
+                    diffs.append(f"{tag}: rejection row must have a null appended_offer (no write), got {s['appended_offer']!r}")
+                if s["lint"] is not None:
+                    diffs.append(f"{tag}: rejection row lint must be null (nothing was written to lint), got {s['lint']!r}")
+                if not isinstance(s["error"], str) or not s["error"]:
+                    diffs.append(f"{tag}: rejection row must carry a non-empty builder error string, got {s['error']!r}")
+
+        # VALUES — the exact matrix (per-scenario verdict + appended entry + error string
+        # + lint code) via golden compare.
+        golden_diffs = assert_lib.golden_compare(
+            self.project(emit), golden, artifact="offer-emit.json"
+        )
+        return combine(diffs, golden_diffs)
+
+    # ── golden regeneration ───────────────────────────────────────────────────
+
+    def update_golden(self, artifacts: dict) -> str:
+        emit = artifacts["offer-emit.json"]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact="offer-emit.json")
+        if diffs:
+            raise EvalError(
+                "cannot regenerate golden — offer-emit.json failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
 ADAPTERS = {
     PlanCampaignAdapter.command_id: PlanCampaignAdapter(),
     CreateSfCampaignAdapter.command_id: CreateSfCampaignAdapter(),
+    NewOfferAdapter.command_id: NewOfferAdapter(),
 }
 
 
