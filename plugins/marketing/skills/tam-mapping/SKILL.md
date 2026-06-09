@@ -82,7 +82,7 @@ Read in priority order (per [ADR-008](../../../../docs/decisions/008-tam-mapping
 
 `brite_mcp` is **opt-in only** during the choice-now-default-later interim (BC-6170) — it is **not** auto-selected even when the brite-enrichment MCP is registered. Reach it via the `--enrichment-provider brite_mcp` flag or `${user_config.enrichment_provider}`. It is intentionally **not** in this skill's `allowed-tools` yet — an explicit opt-in that finds `bulk_enrich` absent in-session falls through to `blitz_waterfall`. **Two prerequisites must land together (a config-invariant pair): the BC-5316 redeploy of the published server with `bulk_enrich` AND this skill's `allowed-tools` grant — shipping one without the other leaves the opt-in silently inoperative.** When both land (plus an engine-maturity sign-off), ADR-008's Future Work flip moves `brite_mcp` to the front of this cascade as the default.
 
-The resolved provider is logged at skill invocation so the user sees which path ran (e.g., `[tam-mapping] enrichment_provider=blitz_waterfall (auto-detected; brite-enrichment MCP not registered, $BRITE_DATA_PLATFORM unset)`). See the canonical 4-row enum table in [§3 Phase 5](#phase-5--enrichment-hand-off-pluggable) for per-value implementation and fallback messages.
+The resolved provider is logged at skill invocation so the user sees which path ran (e.g., `[tam-mapping] enrichment_provider=blitz_waterfall (auto-detected; $BRITE_DATA_PLATFORM unset → brite_cli unavailable)`). See the canonical 4-row enum table in [§3 Phase 5](#phase-5--enrichment-hand-off-pluggable) for per-value implementation and fallback messages.
 
 ### Resume detection
 
