@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "command": "/marketing:portfolio-snapshot",
+  "scenarios": [
+    {
+      "id": "monthly_ok",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T15:00:00Z",
+        "window": {
+          "start": "2026-01-01",
+          "end": "2026-01-31",
+          "span": "monthly"
+        },
+        "command_version": "marketing@eval",
+        "sources": {
+          "sf": "ok",
+          "linear": "ok",
+          "filesystem": "ok"
+        }
+      },
+      "title_label": "2026-01",
+      "sections": [
+        "1. Portfolio shape",
+        "2. Pipeline summary",
+        "3. Verdict distribution",
+        "4. Transferable insights",
+        "5. Action items"
+      ],
+      "banners": {
+        "sf": false,
+        "linear": false
+      },
+      "verdicts": {
+        "SCALE": 2,
+        "ITERATE": 1,
+        "PAUSE": 0,
+        "KILL": 1
+      },
+      "campaigns_in_window": 1
+    },
+    {
+      "id": "quarterly_ok",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T15:00:00Z",
+        "window": {
+          "start": "2026-01-01",
+          "end": "2026-03-31",
+          "span": "quarterly"
+        },
+        "command_version": "marketing@eval",
+        "sources": {
+          "sf": "ok",
+          "linear": "ok",
+          "filesystem": "ok"
+        }
+      },
+      "title_label": "2026-Q1",
+      "sections": [
+        "1. Portfolio shape",
+        "2. Pipeline summary",
+        "3. Verdict distribution",
+        "4. Transferable insights",
+        "5. Action items",
+        "6. Cross-quarter MSPA transitions",
+        "7. Cumulative transferables",
+        "8. Per-offer-version aggregation",
+        "9. Coverage-gap callouts"
+      ],
+      "banners": {
+        "sf": false,
+        "linear": false
+      },
+      "verdicts": {
+        "SCALE": 2,
+        "ITERATE": 1,
+        "PAUSE": 0,
+        "KILL": 1
+      },
+      "campaigns_in_window": 2
+    },
+    {
+      "id": "sf_degraded_auth",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T15:00:00Z",
+        "window": {
+          "start": "2026-01-01",
+          "end": "2026-01-31",
+          "span": "monthly"
+        },
+        "command_version": "marketing@eval",
+        "sources": {
+          "sf": "degraded_auth",
+          "linear": "ok",
+          "filesystem": "ok"
+        }
+      },
+      "title_label": "2026-01",
+      "sections": [
+        "1. Portfolio shape",
+        "2. Pipeline summary",
+        "3. Verdict distribution",
+        "4. Transferable insights",
+        "5. Action items"
+      ],
+      "banners": {
+        "sf": true,
+        "linear": false
+      },
+      "verdicts": {
+        "SCALE": 2,
+        "ITERATE": 1,
+        "PAUSE": 0,
+        "KILL": 1
+      },
+      "campaigns_in_window": 1
+    },
+    {
+      "id": "linear_degraded",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T15:00:00Z",
+        "window": {
+          "start": "2026-01-01",
+          "end": "2026-01-31",
+          "span": "monthly"
+        },
+        "command_version": "marketing@eval",
+        "sources": {
+          "sf": "ok",
+          "linear": "degraded",
+          "filesystem": "ok"
+        }
+      },
+      "title_label": "2026-01",
+      "sections": [
+        "1. Portfolio shape",
+        "2. Pipeline summary",
+        "3. Verdict distribution",
+        "4. Transferable insights",
+        "5. Action items"
+      ],
+      "banners": {
+        "sf": false,
+        "linear": true
+      },
+      "verdicts": {
+        "SCALE": 2,
+        "ITERATE": 1,
+        "PAUSE": 0,
+        "KILL": 1
+      },
+      "campaigns_in_window": 1
+    },
+    {
+      "id": "out_of_window_excluded",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T15:00:00Z",
+        "window": {
+          "start": "2026-03-01",
+          "end": "2026-03-31",
+          "span": "monthly"
+        },
+        "command_version": "marketing@eval",
+        "sources": {
+          "sf": "ok",
+          "linear": "ok",
+          "filesystem": "ok"
+        }
+      },
+      "title_label": "2026-03",
+      "sections": [
+        "1. Portfolio shape",
+        "2. Pipeline summary",
+        "3. Verdict distribution",
+        "4. Transferable insights",
+        "5. Action items"
+      ],
+      "banners": {
+        "sf": false,
+        "linear": false
+      },
+      "verdicts": {
+        "SCALE": 0,
+        "ITERATE": 0,
+        "PAUSE": 0,
+        "KILL": 0
+      },
+      "campaigns_in_window": 0
+    },
+    {
+      "id": "out_anticreep_rejected",
+      "ok": false,
+      "frontmatter": null,
+      "title_label": null,
+      "sections": null,
+      "banners": null,
+      "verdicts": null,
+      "campaigns_in_window": null,
+      "error": "ERROR: --out must be a path under <sandbox>/docs/campaigns/_reviews (got <sandbox>/docs/campaigns/WRONG/x.md). V3 outcome item 6 anti-creep guard."
+    }
+  ]
+}

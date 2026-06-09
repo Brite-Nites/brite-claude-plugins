@@ -1,0 +1,28 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_offer_perf_emit.py's offer-perf-emit.json (BC-12943, ADR-028 Phase-2 Batch B). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, additionalProperties:false, items, enum, const. This asserts the matrix SHAPE (every row carries the same key set + types). frontmatter/sections/banners/retirement_signal/versions are left type-only ([object|array|boolean, null]) so the golden + golden_compare lock their (per-branch, heterogeneous) values: an OK row carries the projected report; a rejection row (an invalid offer slug → the canonicals guard, exit 1) carries null for every report field + a non-null error string.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "command": { "type": "string", "const": "/marketing:offer-performance" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "ok", "frontmatter", "sections", "banners", "retirement_signal", "versions", "error"],
+        "properties": {
+          "id": { "type": "string" },
+          "ok": { "type": "boolean" },
+          "frontmatter": { "type": ["object", "null"] },
+          "sections": { "type": ["array", "null"] },
+          "banners": { "type": ["object", "null"] },
+          "retirement_signal": { "type": ["boolean", "null"] },
+          "versions": { "type": ["array", "null"] },
+          "error": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

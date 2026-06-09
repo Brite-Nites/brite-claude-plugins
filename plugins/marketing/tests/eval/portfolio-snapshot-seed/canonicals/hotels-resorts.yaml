@@ -1,0 +1,8 @@
+slug: hotels-resorts
+display: hotels-resorts
+schema_version: 1
+personas: []
+offers:
+  - slug: test-offer
+    display: test-offer
+    posture: free-asset

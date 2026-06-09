@@ -1,0 +1,74 @@
+{
+  "_comment": "Behavioral-eval fixture for /marketing:offer-performance (BC-12943, ADR-028 Phase-2 Batch B — structure-first report-builder). A SCENARIO MATRIX driven through the REAL runtime entrypoint offer_performance.py against a sandbox copy of the FROZEN seed in offer-performance-seed/ (a 3-version offer 'holiday-anchor-audit' under entity 'labs', + canonicals declaring that offer as posture free-asset). The EB/SF stats are INJECTED per scenario via --eb-json/--sf-json (the same pre-fetched seam the command's MCP reads write to); --generated-at is pinned so the lone clock call is unreachable. The structure-first proof: the WRITTEN performance.md's frontmatter + ordered section headers + degraded banners + retirement signal + the fully-parsed per-version metrics table (every injected stat rendered through fmt_pct/fmt_money/fmt_int) — NOT prose. Each row isolates ONE load-bearing behavior so a regression yields a deterministic red diff.",
+  "scenarios": [
+    {
+      "id": "multi_version_ok",
+      "note": "all 3 versions, EB+SF healthy, non-monotone reply rates (6.0/5.5/7.0 → degradation count resets → NO retirement). Reads the multi-version ROLLUP: versions_analyzed 3, all 4 sections incl. the Cross-version comparison (len>=2), no banners, no retirement, 3 fully-rendered table rows.",
+      "offer_slug": "holiday-anchor-audit",
+      "entity": "labs",
+      "eb": [
+        {"slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02", "stats": {"reply_rate": 6.0, "meeting_rate": 1.5, "total_sent": 100, "total_replies": 10}},
+        {"slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m03-v2", "stats": {"reply_rate": 5.5, "meeting_rate": 1.2, "total_sent": 120, "total_replies": 12}},
+        {"slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m04-v3", "stats": {"reply_rate": 7.0, "meeting_rate": 2.0, "total_sent": 140, "total_replies": 14}}
+      ],
+      "sf": [
+        {"Name": "hotels-resorts-director-holiday-anchor-audit-fy26-m02", "AmountAllOpportunities": 30000, "AmountWonOpportunities": 10000, "NumberOfLeads": 10},
+        {"Name": "hotels-resorts-director-holiday-anchor-audit-fy26-m03-v2", "AmountAllOpportunities": 40000, "AmountWonOpportunities": 15000, "NumberOfLeads": 12},
+        {"Name": "hotels-resorts-director-holiday-anchor-audit-fy26-m04-v3", "AmountAllOpportunities": 60000, "AmountWonOpportunities": 25000, "NumberOfLeads": 20}
+      ]
+    },
+    {
+      "id": "single_version_ok",
+      "note": "--version 1 → only the v1 manifest → the per-version file (NOT a rollup): versions_analyzed 1, sections 1/3/4 with NO Cross-version comparison (len<2), no banners, no retirement (len<2), exactly 1 table row. Guards the single-version-omits-section-2 branch.",
+      "offer_slug": "holiday-anchor-audit",
+      "entity": "labs",
+      "version": 1,
+      "eb": [
+        {"slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02", "stats": {"reply_rate": 6.0, "meeting_rate": 1.5, "total_sent": 100, "total_replies": 10}}
+      ],
+      "sf": [
+        {"Name": "hotels-resorts-director-holiday-anchor-audit-fy26-m02", "AmountAllOpportunities": 30000, "AmountWonOpportunities": 10000, "NumberOfLeads": 10}
+      ]
+    },
+    {
+      "id": "eb_degraded",
+      "note": "EB upstream fetch failed (--eb-status degraded, NO --eb-json) but SF healthy → the EB-degraded banner renders, reply/meeting rates fall back to n/a, and SF pipeline ($50,000) still shows. Guards the EB-degraded soft-fail branch.",
+      "offer_slug": "holiday-anchor-audit",
+      "entity": "labs",
+      "version": 1,
+      "eb_status": "degraded",
+      "sf": [
+        {"Name": "hotels-resorts-director-holiday-anchor-audit-fy26-m02", "AmountAllOpportunities": 50000, "AmountWonOpportunities": 20000, "NumberOfLeads": 15}
+      ]
+    },
+    {
+      "id": "sf_degraded",
+      "note": "SF rollup failed (--sf-status degraded_auth, NO --sf-json) but EB healthy → the SF-degraded banner renders, AmountAll/Won/Leads fall back to n/a, and EB engagement (5.2%) still shows. Guards the SF-degraded soft-fail branch (the symmetric twin of eb_degraded).",
+      "offer_slug": "holiday-anchor-audit",
+      "entity": "labs",
+      "version": 1,
+      "sf_status": "degraded_auth",
+      "eb": [
+        {"slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02", "stats": {"reply_rate": 5.2, "meeting_rate": 1.1, "total_sent": 100, "total_replies": 10}}
+      ]
+    },
+    {
+      "id": "retirement_candidate",
+      "note": "all 3 versions with monotonically DECLINING reply rates (8.0/6.0/4.0) + --degradation-threshold 2 → 2 consecutive degrading → the rollup flags a RETIREMENT CANDIDATE. THE load-bearing decision this report computes. Reads the rollup.",
+      "offer_slug": "holiday-anchor-audit",
+      "entity": "labs",
+      "degradation_threshold": 2,
+      "eb": [
+        {"slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02", "stats": {"reply_rate": 8.0, "meeting_rate": 2.0, "total_sent": 100, "total_replies": 10}},
+        {"slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m03-v2", "stats": {"reply_rate": 6.0, "meeting_rate": 1.5, "total_sent": 100, "total_replies": 10}},
+        {"slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m04-v3", "stats": {"reply_rate": 4.0, "meeting_rate": 1.0, "total_sent": 100, "total_replies": 10}}
+      ]
+    },
+    {
+      "id": "invalid_slug",
+      "note": "an offer slug not in any canonicals vertical → the canonicals validation guard rejects (exit 1, stderr 'not found in any vertical'), no report written. ok:false + the builder's error string; the report fields are null. Guards the slug-validation rejection branch.",
+      "offer_slug": "totally-bogus-offer",
+      "entity": "labs"
+    }
+  ]
+}

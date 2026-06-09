@@ -4,6 +4,8 @@ argument-hint: --slug <slug> --status <planning|active|completed|killed> [--subs
 allowed-tools: Read, Skill
 ---
 
+<!-- eval-waiver: Read+Skill wrapper with no deterministic builder and no seam — its only logic (slug-regex, flag passthrough, the N-way response render) lives in prose. Its mutating substance (status to SF mapping, noop/dry-run verdict, payload assembly) is already behaviorally eval'd downstream by build_status_update_payload.py (BC-12942). Its one non-redundant control — the slug to Skill-args injection guard — is PROSE-ONLY (an instruction to the model, not a deterministic sink), so it is not hermetically eval-able on the per-PR path without a seam-extraction BUILD that Batch B's locked wrap-existing-builders scope excludes. Waive now (BC-12943); the residual injection-guard test gap is tracked as a filed follow-up, BC-12988. -->
+
 # /marketing:sync-campaign-status
 
 Thin operator-facing wrapper around `/revops:update-sf-campaign-status` (BC-8723). Two reasons this command exists:

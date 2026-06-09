@@ -75,14 +75,10 @@ from becoming "forever-only."
 | `plugins/flow-architecture/commands/ship.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/flow-architecture/commands/start-project.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/marketing/commands/capture-idea.md` | marketing | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
-| `plugins/marketing/commands/icp-refinement-review.md` | marketing | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
-| `plugins/marketing/commands/import-campaign.md` | marketing | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/marketing/commands/launch-campaign.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/marketing/commands/offer-performance.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/marketing/commands/portfolio-snapshot.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/marketing/commands/setup-email-bison.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/marketing/commands/setup-tam-map.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/marketing/commands/sync-campaign-status.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
+| `plugins/marketing/commands/sync-campaign-status.md` | marketing | waiver | Read+Skill wrapper, no builder/seam; mutating substance eval'd downstream by build_status_update_payload.py (BC-12942); only non-redundant logic = slug→Skill-args injection guard, prose-only → not hermetically eval-able without a seam-extraction BUILD (out of Batch B scope). Residual gap tracked: BC-12988 | 2026-06-08 |
 | `plugins/marketing/commands/tam-map.md` | marketing | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/revops/commands/deploy-prod.md` | revops | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/revops/commands/deploy-sandbox.md` | revops | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |

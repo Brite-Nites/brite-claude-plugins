@@ -853,6 +853,608 @@ _NEW_VERTICAL = CanonicalEmitAdapter(
 )
 
 
+# ── offer-performance adapter (BC-12943 — structure-first report-builder) ──────
+#
+# /marketing:offer-performance writes a per-offer-version performance.md report. Its
+# emit builder (build_offer_perf_emit.py) drives the SAME runtime entrypoint the
+# command shells (offer_performance.py) over a sandbox copy of a FROZEN campaigns +
+# canonicals seed, with EB/SF stats INJECTED per scenario (the --eb-json/--sf-json
+# seam the command's Phase-3/4 reads write to) and --generated-at pinned (the lone
+# clock call defeated). The eval asserts the WRITTEN report's deterministic STRUCTURE
+# — frontmatter, the ordered section headers, the degraded banners, the retirement
+# signal, and the fully-parsed per-version metrics table (every injected stat rendered
+# through the builder's formatters) — NOT prose (ADR-028 D2 structure-first).
+
+
+class OfferPerformanceAdapter:
+    """Emit adapter for /marketing:offer-performance (structure-first report)."""
+
+    command_id = "offer-performance"
+    artifact_names = ("offer-perf-emit.json",)
+    builder = REPO_ROOT / "plugins/marketing/scripts/build_offer_perf_emit.py"
+    seed_dir = REPO_ROOT / "plugins/marketing/tests/eval/offer-performance-seed"
+    _eval_dir = REPO_ROOT / "plugins/marketing/tests/eval"
+    fixture_path = _eval_dir / "offer-performance.fixture.json"
+    golden_path = _eval_dir / "offer-performance.golden.json"
+    schema_path = _eval_dir / "offer-performance.schema.json"
+
+    # Mirrors build_offer_perf_emit.GENERATED_AT — locking it in every OK row proves
+    # --generated-at is honored (the determinism control that defeats datetime.now()).
+    GENERATED_AT = "2026-05-26T12:00:00Z"
+    SECTION_1 = "1. Per-version metrics"
+    SECTION_CROSS = "2. Cross-version comparison"
+    EXPECTED_SCENARIO_IDS = (
+        "multi_version_ok", "single_version_ok", "eb_degraded",
+        "sf_degraded", "retirement_candidate", "invalid_slug",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox), "--seed-dir", str(self.seed_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_offer_perf_emit.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        """The structure the golden pins: the full matrix (every field deterministic —
+        the parsed frontmatter, ordered section headers, banner bools, retirement bool,
+        and the rendered metrics table; no prose, no sandbox path)."""
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        # SHAPE FIRST — short-circuit so value/invariant checks index a valid matrix.
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+
+        # Branch coverage: a thinned fixture that drops a load-bearing branch is caught.
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        fixture_by_id = {sc["id"]: sc for sc in fixture.get("scenarios", []) if isinstance(sc, dict)}
+
+        # Per-verdict structural invariants (explicit + named, beyond the golden compare).
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            if s["ok"]:
+                if not isinstance(s["frontmatter"], dict):
+                    diffs.append(f"{tag}: ok row must carry a frontmatter object, got {s['frontmatter']!r}")
+                    continue
+                if not isinstance(s["sections"], list) or not s["sections"]:
+                    diffs.append(f"{tag}: ok row must carry a non-empty sections list, got {s['sections']!r}")
+                if not isinstance(s["versions"], list):
+                    diffs.append(f"{tag}: ok row must carry a versions list, got {s['versions']!r}")
+                if s["error"] is not None:
+                    diffs.append(f"{tag}: ok row error must be null, got {s['error']!r}")
+                fm = s["frontmatter"]
+                # Determinism: the pinned --generated-at is honored (clock call defeated).
+                if fm.get("generated_at") != self.GENERATED_AT:
+                    diffs.append(f"{tag}: frontmatter.generated_at must be the pinned {self.GENERATED_AT!r}, got {fm.get('generated_at')!r}")
+                sections = s["sections"] if isinstance(s["sections"], list) else []
+                if not sections or sections[0] != self.SECTION_1:
+                    diffs.append(f"{tag}: sections[0] must be {self.SECTION_1!r}, got {(sections or [None])[0]!r}")
+                # The single-vs-multi branch: the metrics table has one row per analyzed
+                # version, and the Cross-version comparison renders IFF >= 2 versions.
+                n = fm.get("versions_analyzed")
+                versions = s["versions"] if isinstance(s["versions"], list) else []
+                if isinstance(n, int) and len(versions) != n:
+                    diffs.append(f"{tag}: versions_analyzed ({n}) != rendered table rows ({len(versions)})")
+                cross = self.SECTION_CROSS in sections
+                if isinstance(n, int):
+                    if n >= 2 and not cross:
+                        diffs.append(f"{tag}: {n} versions but the Cross-version comparison section is absent")
+                    if n < 2 and cross:
+                        diffs.append(f"{tag}: single version but a Cross-version comparison section is present")
+                # Passthrough: the report is for the offer/entity the scenario named.
+                exp = fixture_by_id.get(s["id"], {})
+                if exp:
+                    diffs += assert_lib.key_fields(
+                        fm,
+                        {"offer_slug": exp.get("offer_slug"), "entity": exp.get("entity")},
+                        artifact=f"{tag}.frontmatter",
+                    )
+            else:
+                # A rejection (invalid offer slug → the canonicals guard): no report.
+                for field in ("frontmatter", "sections", "banners", "retirement_signal", "versions"):
+                    if s[field] is not None:
+                        diffs.append(f"{tag}: rejection row must have null {field} (no report written), got {s[field]!r}")
+                if not isinstance(s["error"], str) or not s["error"]:
+                    diffs.append(f"{tag}: rejection row must carry a non-empty builder error string, got {s['error']!r}")
+
+        # VALUES — the exact matrix (frontmatter + sections + banners + retirement +
+        # rendered metrics table per scenario) via golden compare.
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+# ── portfolio-snapshot adapter (BC-12943 — structure-first report-builder) ─────
+#
+# /marketing:portfolio-snapshot writes a monthly/quarterly review packet. Its emit
+# builder (build_portfolio_emit.py) drives the SAME runtime entrypoint the command
+# shells (portfolio_snapshot.py) over a sandbox copy of a FROZEN campaigns+canonicals
+# seed with --generated-at pinned. The eval asserts the WRITTEN packet's deterministic
+# STRUCTURE — frontmatter (window + sources), the window label, the ordered section
+# headers (the monthly-5-vs-quarterly-9 branch), the degraded banners, the verdict
+# distribution, and the in-window campaign count — and the anti-creep --out guard
+# rejection (a load-bearing security branch) — NOT prose (ADR-028 D2 structure-first).
+
+
+class PortfolioSnapshotAdapter:
+    """Emit adapter for /marketing:portfolio-snapshot (structure-first report)."""
+
+    command_id = "portfolio-snapshot"
+    artifact_names = ("portfolio-emit.json",)
+    builder = REPO_ROOT / "plugins/marketing/scripts/build_portfolio_emit.py"
+    seed_dir = REPO_ROOT / "plugins/marketing/tests/eval/portfolio-snapshot-seed"
+    _eval_dir = REPO_ROOT / "plugins/marketing/tests/eval"
+    fixture_path = _eval_dir / "portfolio-snapshot.fixture.json"
+    golden_path = _eval_dir / "portfolio-snapshot.golden.json"
+    schema_path = _eval_dir / "portfolio-snapshot.schema.json"
+
+    GENERATED_AT = "2026-05-26T15:00:00Z"  # mirrors build_portfolio_emit.GENERATED_AT
+    SECTION_1 = "1. Portfolio shape"
+    SECTION_QUARTERLY = "6. Cross-quarter MSPA transitions"
+    MONTHLY_SECTIONS = 5
+    QUARTERLY_SECTIONS = 9
+    EXPECTED_SCENARIO_IDS = (
+        "monthly_ok", "quarterly_ok", "sf_degraded_auth",
+        "linear_degraded", "out_of_window_excluded", "out_anticreep_rejected",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox), "--seed-dir", str(self.seed_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_portfolio_emit.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        fixture_by_id = {sc["id"]: sc for sc in fixture.get("scenarios", []) if isinstance(sc, dict)}
+
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            exp = fixture_by_id.get(s["id"], {})
+            if s["ok"]:
+                if not isinstance(s["frontmatter"], dict):
+                    diffs.append(f"{tag}: ok row must carry a frontmatter object, got {s['frontmatter']!r}")
+                    continue
+                if not isinstance(s["sections"], list) or not s["sections"]:
+                    diffs.append(f"{tag}: ok row must carry a non-empty sections list, got {s['sections']!r}")
+                if not isinstance(s["banners"], dict):
+                    diffs.append(f"{tag}: ok row must carry a banners object, got {s['banners']!r}")
+                if not isinstance(s["campaigns_in_window"], int):
+                    diffs.append(f"{tag}: ok row must carry an integer campaigns_in_window, got {s['campaigns_in_window']!r}")
+                if s["error"] is not None:
+                    diffs.append(f"{tag}: ok row error must be null, got {s['error']!r}")
+                fm = s["frontmatter"]
+                if fm.get("generated_at") != self.GENERATED_AT:
+                    diffs.append(f"{tag}: frontmatter.generated_at must be the pinned {self.GENERATED_AT!r}, got {fm.get('generated_at')!r}")
+                sections = s["sections"] if isinstance(s["sections"], list) else []
+                if not sections or sections[0] != self.SECTION_1:
+                    diffs.append(f"{tag}: sections[0] must be {self.SECTION_1!r}, got {(sections or [None])[0]!r}")
+                # The monthly-vs-quarterly branch: quarterly adds sections 6-9.
+                span = exp.get("span")
+                quarterly_present = self.SECTION_QUARTERLY in sections
+                if span == "monthly":
+                    if len(sections) != self.MONTHLY_SECTIONS:
+                        diffs.append(f"{tag}: monthly span must render {self.MONTHLY_SECTIONS} sections, got {len(sections)}")
+                    if quarterly_present:
+                        diffs.append(f"{tag}: monthly span must NOT carry the quarterly section {self.SECTION_QUARTERLY!r}")
+                elif span == "quarterly":
+                    if len(sections) != self.QUARTERLY_SECTIONS:
+                        diffs.append(f"{tag}: quarterly span must render {self.QUARTERLY_SECTIONS} sections, got {len(sections)}")
+                    if not quarterly_present:
+                        diffs.append(f"{tag}: quarterly span must carry the quarterly section {self.SECTION_QUARTERLY!r}")
+                # Passthrough: the packet echoes the window + the upstream-source statuses.
+                if exp:
+                    diffs += assert_lib.key_fields(
+                        fm,
+                        {
+                            "window.span": exp.get("span"),
+                            "window.start": exp.get("window_start"),
+                            "window.end": exp.get("window_end"),
+                            "sources.sf": exp.get("sf_status", "ok"),
+                            "sources.linear": exp.get("linear_status", "ok"),
+                        },
+                        artifact=f"{tag}.frontmatter",
+                    )
+            else:
+                for field in ("frontmatter", "title_label", "sections", "banners", "verdicts", "campaigns_in_window"):
+                    if s[field] is not None:
+                        diffs.append(f"{tag}: rejection row must have null {field} (no packet written), got {s[field]!r}")
+                if not isinstance(s["error"], str) or not s["error"]:
+                    diffs.append(f"{tag}: rejection row must carry a non-empty builder error string, got {s['error']!r}")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+# ── import-campaign adapter (BC-12943 — structure-first manifest composer) ─────
+#
+# /marketing:import-campaign's `compose` step is a PURE stdin→stdout v2-manifest
+# composer (no clock — created_at is an input). Its emit builder (build_import_emit.py)
+# pipes each scenario's payload to the SAME `import_campaign.py compose` the command
+# shells, against a FROZEN copy of the canonicals audience-tier taxonomy. The eval
+# asserts the COMPOSED manifest's deterministic STRUCTURE — the 13-key top level,
+# schema_version 2, the scaffolded_by literal, the input passthroughs, and the
+# email_bison.campaigns[] records with their auto-classified audience_tier objects +
+# the derived pending_classification flag — and NOT prose (ADR-028 D2 structure-first).
+
+
+class ImportCampaignAdapter:
+    """Emit adapter for /marketing:import-campaign (structure-first manifest composer)."""
+
+    command_id = "import-campaign"
+    artifact_names = ("import-campaign-emit.json",)
+    builder = REPO_ROOT / "plugins/marketing/scripts/build_import_emit.py"
+    seed_manifest = REPO_ROOT / "plugins/marketing/tests/eval/import-campaign-seed/_manifest.yaml"
+    _eval_dir = REPO_ROOT / "plugins/marketing/tests/eval"
+    fixture_path = _eval_dir / "import-campaign.fixture.json"
+    golden_path = _eval_dir / "import-campaign.golden.json"
+    schema_path = _eval_dir / "import-campaign.schema.json"
+
+    # The v2 campaign_manifest top-level contract (data/canonicals/schema.json
+    # #/definitions/campaign_manifest `required`). The canonical schema is
+    # additionalProperties:true, so the 13-key set + the v1-anti-regression are
+    # asserted here as NAMED invariants rather than via schema_validate.
+    MANIFEST_KEYS = frozenset({
+        "schema_version", "slug", "entity", "vertical", "persona", "offer",
+        "year", "month", "linear", "salesforce", "email_bison", "created_at",
+        "scaffolded_by",
+    })
+    SCAFFOLDED_BY = "/marketing:import-campaign"
+    PASSTHROUGH = ("slug", "entity", "vertical", "persona", "offer", "year", "month")
+    EXPECTED_SCENARIO_IDS = (
+        "happy_empty_records", "single_launched_auto_classified",
+        "multi_workspace_multi_tier", "pending_classification_set",
+        "operator_tier_override", "reject_bad_slug",
+        "reject_bad_eb_record_workspace", "reject_non_dict_eb_record",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox), "--seed-manifest", str(self.seed_manifest)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_import_emit.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        fixture_by_id = {sc["id"]: sc for sc in fixture.get("scenarios", []) if isinstance(sc, dict)}
+
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            if s["ok"]:
+                m = s["manifest"]
+                if not isinstance(m, dict):
+                    diffs.append(f"{tag}: ok row must carry a manifest object, got {m!r}")
+                    continue
+                if s["error"] is not None:
+                    diffs.append(f"{tag}: ok row error must be null, got {s['error']!r}")
+                # v2 contract: exact 13-key top level + schema_version 2 + scaffolded_by.
+                if set(m) != self.MANIFEST_KEYS:
+                    extra = sorted(set(m) - self.MANIFEST_KEYS)
+                    missing = sorted(self.MANIFEST_KEYS - set(m))
+                    diffs.append(f"{tag}: manifest top-level keys != the v2 contract (extra={extra}, missing={missing})")
+                if m.get("schema_version") != 2:
+                    diffs.append(f"{tag}: manifest.schema_version must be 2, got {m.get('schema_version')!r}")
+                if m.get("scaffolded_by") != self.SCAFFOLDED_BY:
+                    diffs.append(f"{tag}: manifest.scaffolded_by must be {self.SCAFFOLDED_BY!r}, got {m.get('scaffolded_by')!r}")
+                # v1 anti-regression: the singular email_bison.campaign_id must NOT return
+                # (schema is additionalProperties:true, so only a named check catches it).
+                eb = m.get("email_bison")
+                if isinstance(eb, dict):
+                    if "campaign_id" in eb:
+                        diffs.append(f"{tag}: email_bison must NOT carry the v1 singular 'campaign_id' (v2 uses campaigns[])")
+                    if "campaigns" not in eb:
+                        diffs.append(f"{tag}: email_bison must carry the v2 'campaigns' array")
+                else:
+                    diffs.append(f"{tag}: manifest.email_bison must be an object, got {eb!r}")
+                # Passthrough: the deterministic input fields are copied verbatim.
+                exp = fixture_by_id.get(s["id"], {})
+                payload = exp.get("payload", {}) if isinstance(exp, dict) else {}
+                if payload:
+                    diffs += assert_lib.key_fields(
+                        m, {f: payload.get(f) for f in self.PASSTHROUGH},
+                        artifact=f"{tag}.manifest",
+                    )
+            else:
+                if s["manifest"] is not None:
+                    diffs.append(f"{tag}: rejection row must have a null manifest (no compose), got {s['manifest']!r}")
+                if not isinstance(s["error"], str) or not s["error"]:
+                    diffs.append(f"{tag}: rejection row must carry a non-empty builder error string, got {s['error']!r}")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+# ── icp-refinement-review adapter (BC-12943 — structure-first review loop) ─────
+#
+# /marketing:icp-refinement-review is a pure-disk review loop (scan → apply → emit-
+# handbook). Its emit builder (build_icp_review_emit.py) drives the SAME runtime
+# entrypoints the command shells over a sandbox copy of a FROZEN discoveries-tree seed,
+# then runs the SAME lint_discoveries.py the command's Validation § runs over the
+# MUTATED file. The eval asserts: the mutated discoveries.json STILL lints (lint_exit_code
+# 0 — the structure-first anchor), the apply count summary, the per-signal promotion_status
+# flips (incl. the defer-noop + one-way skip-terminal invariants), the scan filter count,
+# and the emit-handbook promoted-blob set — NOT prose (ADR-028 D2 structure-first).
+
+
+class IcpRefinementReviewAdapter:
+    """Emit adapter for /marketing:icp-refinement-review (structure-first review loop)."""
+
+    command_id = "icp-refinement-review"
+    artifact_names = ("icp-review-emit.json",)
+    builder = REPO_ROOT / "plugins/marketing/scripts/build_icp_review_emit.py"
+    seed_dir = REPO_ROOT / "plugins/marketing/tests/eval/icp-refinement-review-seed"
+    _eval_dir = REPO_ROOT / "plugins/marketing/tests/eval"
+    fixture_path = _eval_dir / "icp-refinement-review.fixture.json"
+    golden_path = _eval_dir / "icp-refinement-review.golden.json"
+    schema_path = _eval_dir / "icp-refinement-review.schema.json"
+
+    # The frozen seed has exactly two PENDING icp-refinement signals (hotels[0] +
+    # installers[0]); the terminal-promoted [1] + the title-discovery [2] are filtered
+    # out by scan. A constant across all rows → locks scan's category+pending filter.
+    SCAN_TOTAL_PENDING = 2
+    EXPECTED_SCENARIO_IDS = (
+        "apply_promote", "apply_mixed", "apply_defer_noop",
+        "apply_skip_terminal", "reject_bad_decision", "reject_out_of_range",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox), "--seed-dir", str(self.seed_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_icp_review_emit.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            # scan runs on EVERY row (before apply) → the filter count is invariant.
+            if s["scan_total_pending"] != self.SCAN_TOTAL_PENDING:
+                diffs.append(f"{tag}: scan_total_pending must be {self.SCAN_TOTAL_PENDING} (the seed's pending icp signals), got {s['scan_total_pending']!r}")
+            if s["ok"]:
+                if not isinstance(s["counts"], dict):
+                    diffs.append(f"{tag}: ok row must carry a counts object, got {s['counts']!r}")
+                if not isinstance(s["mutated_statuses"], dict):
+                    diffs.append(f"{tag}: ok row must carry a mutated_statuses object, got {s['mutated_statuses']!r}")
+                if not isinstance(s["emit_verticals"], list):
+                    diffs.append(f"{tag}: ok row must carry an emit_verticals list, got {s['emit_verticals']!r}")
+                if s["error"] is not None:
+                    diffs.append(f"{tag}: ok row error must be null, got {s['error']!r}")
+                # THE structure-first anchor: the MUTATED discoveries.json still lints.
+                if s["lint_exit_code"] != 0:
+                    diffs.append(f"{tag}: the mutated discoveries.json must still pass lint_discoveries (lint_exit_code 0), got {s['lint_exit_code']!r}")
+            else:
+                for field in ("counts", "mutated_statuses", "lint_exit_code", "emit_blob_count", "emit_verticals"):
+                    if s[field] is not None:
+                        diffs.append(f"{tag}: rejection row must have null {field} (no apply), got {s[field]!r}")
+                if not isinstance(s["error"], str) or not s["error"]:
+                    diffs.append(f"{tag}: rejection row must carry a non-empty builder error string, got {s['error']!r}")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
 ADAPTERS = {
     PlanCampaignAdapter.command_id: PlanCampaignAdapter(),
     CreateSfCampaignAdapter.command_id: CreateSfCampaignAdapter(),
@@ -860,6 +1462,10 @@ ADAPTERS = {
     _NEW_OFFER.command_id: _NEW_OFFER,
     _NEW_PERSONA.command_id: _NEW_PERSONA,
     _NEW_VERTICAL.command_id: _NEW_VERTICAL,
+    OfferPerformanceAdapter.command_id: OfferPerformanceAdapter(),
+    PortfolioSnapshotAdapter.command_id: PortfolioSnapshotAdapter(),
+    ImportCampaignAdapter.command_id: ImportCampaignAdapter(),
+    IcpRefinementReviewAdapter.command_id: IcpRefinementReviewAdapter(),
 }
 
 

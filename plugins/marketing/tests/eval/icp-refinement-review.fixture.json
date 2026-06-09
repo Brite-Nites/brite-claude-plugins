@@ -1,0 +1,48 @@
+{
+  "_comment": "Behavioral-eval fixture for /marketing:icp-refinement-review (BC-12943, ADR-028 Phase-2 Batch B — structure-first review loop). A SCENARIO MATRIX driven through the REAL runtime entrypoints (scan → apply → emit-handbook → lint_discoveries) against a sandbox copy of the FROZEN discoveries-tree seed in icp-refinement-review-seed/ (entity labs has hotels-resorts with [0] a pending icp-refinement signal, [1] an already-promoted terminal signal, [2] a title-discovery wrong-category signal; entity supply has installers with [0] a pending icp signal). The helper has NO clock — the frozen seed IS the input. The structure-first anchor: apply MUTATES discoveries.json in place and the mutated file STILL passes lint_discoveries (lint_exit_code 0), AND the apply count summary + the per-signal promotion_status flips + the emit-handbook promoted-blob set match. Each row isolates ONE behavior. Signal_id = <entity>/<slug>/discoveries.json::<index>.",
+  "scenarios": [
+    {
+      "id": "apply_promote",
+      "note": "promote a single pending icp signal → promoted:1; the file's promotion_status flips to 'promoted' AND the mutated file still lints (the structure-first anchor); emit-handbook emits exactly 1 blob for hotels-resorts.",
+      "decisions": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0": "promoted"
+      }
+    },
+    {
+      "id": "apply_mixed",
+      "note": "promote hotels[0] + reject installers[0] across two files → promoted:1 rejected:1; both files still lint; emit-handbook includes hotels-resorts and EXCLUDES installers (emit_blob_count 1, emit_verticals [hotels-resorts]) — the rejected signal must not surface in the handbook draft.",
+      "decisions": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0": "promoted",
+        "supply/installers-fy26-m03/discoveries.json::0": "rejected"
+      }
+    },
+    {
+      "id": "apply_defer_noop",
+      "note": "defer is a no-op → deferred:1; the signal's promotion_status stays 'pending' (NOT written — the defer invariant), the file still lints, and emit-handbook emits 0 blobs (no promoted decision).",
+      "decisions": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0": "deferred"
+      }
+    },
+    {
+      "id": "apply_skip_terminal",
+      "note": "a 'rejected' decision on an ALREADY-promoted (terminal) signal → skipped:1; promotion is one-way so the status stays 'promoted' and nothing is rewritten. The decision is DELIBERATELY different from the existing terminal status so mutated_statuses is a non-vacuous second guard: a regression that wrongly applied the decision would flip the readback 'promoted'→'rejected'. Guards the one-way / skip-terminal invariant (promoted:0, rejected:0, skipped:1 + the unchanged 'promoted' readback are the discriminators).",
+      "decisions": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::1": "rejected"
+      }
+    },
+    {
+      "id": "reject_bad_decision",
+      "note": "a decision string outside {promoted,rejected,deferred} → the enum guard rejects (exit 2, 'decision must be one of'), no mutation, no lint. ok:false + the error; scan still ran (scan_total_pending 2).",
+      "decisions": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0": "NOPE"
+      }
+    },
+    {
+      "id": "reject_out_of_range",
+      "note": "a signal index past the end of the array → the index guard rejects (exit 1, 'signal index out of range', a DATA error distinct from the bad-decision USAGE error exit 2), no mutation. ok:false. Locks BOTH the data-error and usage-error rejection codes across the matrix.",
+      "decisions": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::99": "promoted"
+      }
+    }
+  ]
+}

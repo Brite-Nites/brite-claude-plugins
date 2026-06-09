@@ -1,0 +1,50 @@
+{
+  "_comment": "Behavioral-eval fixture for /marketing:portfolio-snapshot (BC-12943, ADR-028 Phase-2 Batch B — structure-first report-builder). A SCENARIO MATRIX driven through the REAL runtime entrypoint portfolio_snapshot.py against a sandbox copy of the FROZEN seed in portfolio-snapshot-seed/ (entity 'labs' with two in-Q1 campaigns — Jan + Feb — under offer 'test-offer' posture free-asset, a second vertical 'ski-resorts' with 0 offers for the quarterly coverage-gap section, and an entity learnings.md whose Summary stats drive the verdict distribution SCALE=2/ITERATE=1/PAUSE=0/KILL=1). --generated-at is pinned so the lone clock call is unreachable. The structure-first proof: the WRITTEN packet's frontmatter (window + sources) + parenthesized window label + ordered section headers (the monthly-5-vs-quarterly-9 branch) + degraded banners + the verdict distribution + the in-window campaign count — NOT prose. Each row isolates ONE load-bearing behavior.",
+  "scenarios": [
+    {
+      "id": "monthly_ok",
+      "note": "monthly span over the Jan window → only the Jan campaign is in-window (campaigns_in_window 1); the 5 monthly sections render with NO quarterly sections 6-9; window label 2026-01; sources all ok (no banners); verdict distribution from learnings.md.",
+      "span": "monthly",
+      "window_start": "2026-01-01",
+      "window_end": "2026-01-31"
+    },
+    {
+      "id": "quarterly_ok",
+      "note": "quarterly span over Q1 → BOTH the Jan + Feb campaigns are in-window (campaigns_in_window 2); the 4 quarterly-only sections 6-9 render (9 total); window label 2026-Q1. Guards the monthly-vs-quarterly section branch.",
+      "span": "quarterly",
+      "window_start": "2026-01-01",
+      "window_end": "2026-03-31"
+    },
+    {
+      "id": "sf_degraded_auth",
+      "note": "--sf-status degraded_auth → the SF-rollup-degraded banner renders + frontmatter sources.sf is degraded_auth, while the filesystem/Linear sections still emit (5 sections intact). Guards the SF-degraded soft-fail branch.",
+      "span": "monthly",
+      "window_start": "2026-01-01",
+      "window_end": "2026-01-31",
+      "sf_status": "degraded_auth"
+    },
+    {
+      "id": "linear_degraded",
+      "note": "--linear-status degraded → the Linear-MCP-degraded banner renders in Section 1 + frontmatter sources.linear is degraded; the rest is unaffected. The symmetric twin of sf_degraded_auth.",
+      "span": "monthly",
+      "window_start": "2026-01-01",
+      "window_end": "2026-01-31",
+      "linear_status": "degraded"
+    },
+    {
+      "id": "out_of_window_excluded",
+      "note": "monthly span over a March window where NO seed campaign was created → the window filter excludes both the Jan + Feb manifests (which EXIST on disk) → campaigns_in_window 0. Proves filter_in_window actually drops out-of-window campaigns, not that the dir was empty.",
+      "span": "monthly",
+      "window_start": "2026-03-01",
+      "window_end": "2026-03-31"
+    },
+    {
+      "id": "out_anticreep_rejected",
+      "note": "--out outside docs/campaigns/_reviews/ → the anti-creep V3 guard refuses the write (exit 2, no file). ok:false + the builder's anti-creep error string; the report fields are null. The load-bearing security guard — a regression that drops it flips ok:true + writes the file outside _reviews/.",
+      "span": "monthly",
+      "window_start": "2026-01-01",
+      "window_end": "2026-01-31",
+      "out_override": "docs/campaigns/WRONG/x.md"
+    }
+  ]
+}

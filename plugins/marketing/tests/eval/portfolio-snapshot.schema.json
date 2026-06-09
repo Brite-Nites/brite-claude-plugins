@@ -1,0 +1,29 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_portfolio_emit.py's portfolio-emit.json (BC-12943, ADR-028 Phase-2 Batch B). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, additionalProperties:false, items, enum, const. Asserts the matrix SHAPE (every row carries the same key set + types). frontmatter/title_label/sections/banners/verdicts/campaigns_in_window are left type-only ([object|string|array|integer, null]) so the golden + golden_compare lock their per-branch values: an OK row carries the projected packet; a rejection row (the anti-creep guard, exit 2) carries null for every report field + a non-null error string.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "command": { "type": "string", "const": "/marketing:portfolio-snapshot" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "ok", "frontmatter", "title_label", "sections", "banners", "verdicts", "campaigns_in_window", "error"],
+        "properties": {
+          "id": { "type": "string" },
+          "ok": { "type": "boolean" },
+          "frontmatter": { "type": ["object", "null"] },
+          "title_label": { "type": ["string", "null"] },
+          "sections": { "type": ["array", "null"] },
+          "banners": { "type": ["object", "null"] },
+          "verdicts": { "type": ["object", "null"] },
+          "campaigns_in_window": { "type": ["integer", "null"] },
+          "error": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

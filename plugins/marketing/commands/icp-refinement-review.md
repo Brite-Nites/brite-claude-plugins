@@ -158,6 +158,7 @@ Suggested handbook PR title: BC-8726: icp-refinement-review YYYY-MM-DD batch
 ==============================================================
 ```
 
+<!-- lint:not-side-effecting this command is a pure-disk review loop — it writes ONLY local docs/campaigns/*/discoveries.json files (a non-external-state mutation, same class as the canonicals/manifest builders) and emits handbook markdown to stdout for operator-driven review. allowed-tools is Read/Write/Bash/AskUserQuestion with NO mcp__ or Skill grant. The R1 heuristic matched the shell tokens in the line below, but they appear inside a Do-NOT prohibition (the command explicitly refuses to auto-PR), not a real grant — so disable-model-invocation is NOT warranted; this override is the honest fix (BC-12943, ADR-028 R1 prose-mention FP). -->
 Do NOT `gh pr create` or `git push` to the handbook repo. Operator review of the prose IS the point — auto-PR'd handbook drafts erode the human-in-the-loop guarantee this command exists to provide.
 
 ## Step 4 — Print summary

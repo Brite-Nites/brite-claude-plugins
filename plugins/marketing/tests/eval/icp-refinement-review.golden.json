@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "command": "/marketing:icp-refinement-review",
+  "scenarios": [
+    {
+      "id": "apply_promote",
+      "ok": true,
+      "counts": {
+        "promoted": 1,
+        "rejected": 0,
+        "deferred": 0,
+        "skipped": 0
+      },
+      "scan_total_pending": 2,
+      "mutated_statuses": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0": "promoted"
+      },
+      "lint_exit_code": 0,
+      "emit_blob_count": 1,
+      "emit_verticals": [
+        "hotels-resorts"
+      ],
+      "error": null
+    },
+    {
+      "id": "apply_mixed",
+      "ok": true,
+      "counts": {
+        "promoted": 1,
+        "rejected": 1,
+        "deferred": 0,
+        "skipped": 0
+      },
+      "scan_total_pending": 2,
+      "mutated_statuses": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0": "promoted",
+        "supply/installers-fy26-m03/discoveries.json::0": "rejected"
+      },
+      "lint_exit_code": 0,
+      "emit_blob_count": 1,
+      "emit_verticals": [
+        "hotels-resorts"
+      ],
+      "error": null
+    },
+    {
+      "id": "apply_defer_noop",
+      "ok": true,
+      "counts": {
+        "promoted": 0,
+        "rejected": 0,
+        "deferred": 1,
+        "skipped": 0
+      },
+      "scan_total_pending": 2,
+      "mutated_statuses": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0": "pending"
+      },
+      "lint_exit_code": 0,
+      "emit_blob_count": 0,
+      "emit_verticals": [],
+      "error": null
+    },
+    {
+      "id": "apply_skip_terminal",
+      "ok": true,
+      "counts": {
+        "promoted": 0,
+        "rejected": 0,
+        "deferred": 0,
+        "skipped": 1
+      },
+      "scan_total_pending": 2,
+      "mutated_statuses": {
+        "labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::1": "promoted"
+      },
+      "lint_exit_code": 0,
+      "emit_blob_count": 0,
+      "emit_verticals": [],
+      "error": null
+    },
+    {
+      "id": "reject_bad_decision",
+      "ok": false,
+      "counts": null,
+      "scan_total_pending": 2,
+      "mutated_statuses": null,
+      "lint_exit_code": null,
+      "emit_blob_count": null,
+      "emit_verticals": null,
+      "error": "ERROR: --decision-map['labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0']: decision must be one of ['deferred', 'promoted', 'rejected']; got 'NOPE'"
+    },
+    {
+      "id": "reject_out_of_range",
+      "ok": false,
+      "counts": null,
+      "scan_total_pending": 2,
+      "mutated_statuses": null,
+      "lint_exit_code": null,
+      "emit_blob_count": null,
+      "emit_verticals": null,
+      "error": "ERROR: labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::99: signal index out of range"
+    }
+  ]
+}

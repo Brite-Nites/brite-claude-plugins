@@ -1,0 +1,164 @@
+{
+  "_comment": "Behavioral-eval fixture for /marketing:import-campaign (BC-12943, ADR-028 Phase-2 Batch B — structure-first manifest composer). A SCENARIO MATRIX driven through the REAL runtime entrypoint `import_campaign.py compose` (PURE stdin→stdout, no clock — created_at is an INPUT) against a FROZEN copy of the canonicals _manifest.yaml taxonomy in import-campaign-seed/. The structure-first proof: the COMPOSED v2 manifest's deterministic structure — the 13-key top level, schema_version 2, the scaffolded_by literal, the input passthroughs, and the email_bison.campaigns[] records WITH their auto-classified audience_tier objects (longest-token-wins over the taxonomy) + the derived pending_classification flag — and, for rejection rows, the builder-owned input-guard error. Each payload is the literal compose stdin; the success payloads come from the proven test_import_campaign.sh scenarios B/C/D/J/R; the rejections from E/G/Q1 (three distinct guard surfaces: slug validator, per-record workspace validator, non-dict shape guard).",
+  "scenarios": [
+    {
+      "id": "happy_empty_records",
+      "note": "cohort-1 shape: empty eb_records[] → schema_version 2, scaffolded_by literal, email_bison.campaigns []  (NOT the v1 singular campaign_id), salesforce.campaign_id null. Exercises the 13-key top level + the v1-anti-regression invariant.",
+      "payload": {
+        "slug": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {
+          "milestone_id": "17450de2-f8f2-4107-8625-c07594e06066",
+          "milestone_url": "https://linear.app/brite-nites/project/brite-gtm-fa8fc238ef28",
+          "project": "Brite GTM"
+        },
+        "salesforce_campaign_id": null,
+        "eb_workspace": "emailbison-b2b",
+        "eb_campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+        "eb_records": [],
+        "created_at": "2026-02-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "single_launched_auto_classified",
+      "note": "ONE launched record whose name carries 'Managers+ | Professional Emails' → the auto-classifier resolves tier=professional + seniority=managers-plus (longest-token-wins actually RUNS here), status + launched_at preserved, NO pending_classification. The classification assertion is load-bearing ONLY on a record-bearing row.",
+      "payload": {
+        "slug": "bars-restaurants-bar-owner-anchor-audit-fy25-m09",
+        "entity": "nites",
+        "vertical": "bars-restaurants",
+        "persona": "bar-owner",
+        "offer": "anchor-audit",
+        "year": 2025,
+        "month": 9,
+        "linear": {"milestone_id": "lin-abc", "milestone_url": "https://linear.app/brite-nites/project/brite-gtm-x", "project": "Brite GTM"},
+        "salesforce_campaign_id": null,
+        "eb_workspace": "emailbison-b2b",
+        "eb_campaign_name": "bars-restaurants-bar-owner-anchor-audit-fy25-m09",
+        "eb_records": [
+          {"workspace": "emailbison-b2b", "campaign_id": 10, "name": "FY25, M09 | Bars | Managers+ | Professional Emails | All ESPs", "status": "completed", "launched_at": "2025-09-20T08:00:00Z"}
+        ],
+        "created_at": "2025-09-20T08:00:00Z"
+      }
+    },
+    {
+      "id": "multi_workspace_multi_tier",
+      "note": "3 records across both workspaces + 3 distinct tiers (general / professional / personal) + the typo-tolerant 'Bars Owners, GMs' seniority match. Locks campaigns[] ORDER + per-record classification + pending_classification ABSENT on all 3.",
+      "payload": {
+        "slug": "bars-restaurants-bar-owner-anchor-audit-fy25-m09",
+        "entity": "nites",
+        "vertical": "bars-restaurants",
+        "persona": "bar-owner",
+        "offer": "anchor-audit",
+        "year": 2025,
+        "month": 9,
+        "linear": {"milestone_id": "lin-abc", "milestone_url": "https://linear.app/brite-nites/project/brite-gtm-x", "project": "Brite GTM"},
+        "salesforce_campaign_id": null,
+        "eb_workspace": "emailbison-b2b",
+        "eb_campaign_name": "bars-restaurants-bar-owner-anchor-audit-fy25-m09",
+        "eb_records": [
+          {"workspace": "emailbison-b2b", "campaign_id": 8, "name": "FY25, M09 | Bars | Bar Owners, GMs | General Emails", "status": "archived", "launched_at": "2025-09-15T10:00:00Z"},
+          {"workspace": "emailbison-b2b", "campaign_id": 10, "name": "FY25, M09 | Bars | Managers+ | Professional Emails | All ESPs", "status": "completed", "launched_at": "2025-09-20T08:00:00Z"},
+          {"workspace": "emailbison-personal", "campaign_id": 42, "name": "FY25, M09 | Bars | Bars Owners, GMs | Personal Emails", "status": "completed", "launched_at": "2025-09-22T09:00:00Z"}
+        ],
+        "created_at": "2025-09-15T10:00:00Z"
+      }
+    },
+    {
+      "id": "pending_classification_set",
+      "note": "a launched record EB returns with a blank/whitespace name → the classifier can't resolve it → the helper stamps a placeholder tier=professional (seniority null) AND sets pending_classification:true so it surfaces for operator review. THE derived-flag SET path (the twin of single_launched's absence assertion).",
+      "payload": {
+        "slug": "x-y-z-fy26-m02",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {"milestone_id": "m", "milestone_url": "https://x", "project": "Brite GTM"},
+        "eb_workspace": "emailbison-b2b",
+        "eb_campaign_name": "x",
+        "eb_records": [{"workspace": "emailbison-b2b", "campaign_id": 7, "name": "   "}],
+        "created_at": "2026-02-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "operator_tier_override",
+      "note": "a record carrying an explicit operator audience_tier {role, null, [reverified]} + a name the classifier would NOT match → the override is passed through verbatim (the classifier is bypassed). Guards the override branch + its shape-validation.",
+      "payload": {
+        "slug": "x-y-z-fy26-m02",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {"milestone_id": "m", "milestone_url": "https://x", "project": "Brite GTM"},
+        "eb_workspace": "emailbison-b2b",
+        "eb_campaign_name": "x",
+        "eb_records": [
+          {"workspace": "emailbison-b2b", "campaign_id": 99, "name": "Some Free-Form String The Classifier Won't Match", "audience_tier": {"tier": "role", "seniority": null, "modifiers": ["reverified"]}}
+        ],
+        "created_at": "2026-02-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "reject_bad_slug",
+      "note": "slug 'Bad_Slug_Underscore' fails the campaign-slug regex → rc 1, stderr names the slug validator. ok:false + the error string; manifest null. The slug guard is first in compose's order.",
+      "payload": {
+        "slug": "Bad_Slug_Underscore",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {"milestone_id": "m", "milestone_url": "https://x", "project": "Brite GTM"},
+        "eb_workspace": "emailbison-b2b",
+        "eb_campaign_name": "x",
+        "eb_records": [],
+        "created_at": "2026-02-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "reject_bad_eb_record_workspace",
+      "note": "valid top-level fields BUT a per-record workspace 'emailbison-broken' → rc 1, the per-record validator fires (distinct from the top-level eb_workspace path, which stays valid). Isolates the eb_record.workspace guard.",
+      "payload": {
+        "slug": "x-y-z-fy26-m02",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {"milestone_id": "m", "milestone_url": "https://x", "project": "Brite GTM"},
+        "eb_workspace": "emailbison-b2b",
+        "eb_campaign_name": "x",
+        "eb_records": [{"workspace": "emailbison-broken", "campaign_id": 1, "name": "x"}],
+        "created_at": "2026-02-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "reject_non_dict_eb_record",
+      "note": "a non-dict eb_records element (123) → rc 1 with a CLEAN 'eb_record must be an object' error, NOT a Python traceback (the BC-12xxx P1 regression lock). Isolates the shape guard / the (ValueError,KeyError,TypeError) backstop.",
+      "payload": {
+        "slug": "x-y-z-fy26-m02",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {"milestone_id": "m", "milestone_url": "https://x", "project": "Brite GTM"},
+        "eb_workspace": "emailbison-b2b",
+        "eb_campaign_name": "x",
+        "eb_records": [123],
+        "created_at": "2026-02-01T00:00:00Z"
+      }
+    }
+  ]
+}

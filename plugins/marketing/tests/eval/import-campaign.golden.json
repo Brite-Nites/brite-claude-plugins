@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "command": "/marketing:import-campaign",
+  "scenarios": [
+    {
+      "id": "happy_empty_records",
+      "ok": true,
+      "manifest": {
+        "schema_version": 2,
+        "slug": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {
+          "milestone_id": "17450de2-f8f2-4107-8625-c07594e06066",
+          "milestone_url": "https://linear.app/brite-nites/project/brite-gtm-fa8fc238ef28",
+          "project": "Brite GTM"
+        },
+        "salesforce": {
+          "campaign_id": null,
+          "campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02"
+        },
+        "email_bison": {
+          "workspace": "emailbison-b2b",
+          "campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+          "campaigns": []
+        },
+        "created_at": "2026-02-01T00:00:00Z",
+        "scaffolded_by": "/marketing:import-campaign"
+      },
+      "error": null
+    },
+    {
+      "id": "single_launched_auto_classified",
+      "ok": true,
+      "manifest": {
+        "schema_version": 2,
+        "slug": "bars-restaurants-bar-owner-anchor-audit-fy25-m09",
+        "entity": "nites",
+        "vertical": "bars-restaurants",
+        "persona": "bar-owner",
+        "offer": "anchor-audit",
+        "year": 2025,
+        "month": 9,
+        "linear": {
+          "milestone_id": "lin-abc",
+          "milestone_url": "https://linear.app/brite-nites/project/brite-gtm-x",
+          "project": "Brite GTM"
+        },
+        "salesforce": {
+          "campaign_id": null,
+          "campaign_name": "bars-restaurants-bar-owner-anchor-audit-fy25-m09"
+        },
+        "email_bison": {
+          "workspace": "emailbison-b2b",
+          "campaign_name": "bars-restaurants-bar-owner-anchor-audit-fy25-m09",
+          "campaigns": [
+            {
+              "workspace": "emailbison-b2b",
+              "campaign_id": 10,
+              "audience_tier": {
+                "tier": "professional",
+                "seniority": "managers-plus",
+                "modifiers": []
+              },
+              "name": "FY25, M09 | Bars | Managers+ | Professional Emails | All ESPs",
+              "launched_at": "2025-09-20T08:00:00Z",
+              "status": "completed"
+            }
+          ]
+        },
+        "created_at": "2025-09-20T08:00:00Z",
+        "scaffolded_by": "/marketing:import-campaign"
+      },
+      "error": null
+    },
+    {
+      "id": "multi_workspace_multi_tier",
+      "ok": true,
+      "manifest": {
+        "schema_version": 2,
+        "slug": "bars-restaurants-bar-owner-anchor-audit-fy25-m09",
+        "entity": "nites",
+        "vertical": "bars-restaurants",
+        "persona": "bar-owner",
+        "offer": "anchor-audit",
+        "year": 2025,
+        "month": 9,
+        "linear": {
+          "milestone_id": "lin-abc",
+          "milestone_url": "https://linear.app/brite-nites/project/brite-gtm-x",
+          "project": "Brite GTM"
+        },
+        "salesforce": {
+          "campaign_id": null,
+          "campaign_name": "bars-restaurants-bar-owner-anchor-audit-fy25-m09"
+        },
+        "email_bison": {
+          "workspace": "emailbison-b2b",
+          "campaign_name": "bars-restaurants-bar-owner-anchor-audit-fy25-m09",
+          "campaigns": [
+            {
+              "workspace": "emailbison-b2b",
+              "campaign_id": 8,
+              "audience_tier": {
+                "tier": "general",
+                "seniority": "bar-owners-gms",
+                "modifiers": []
+              },
+              "name": "FY25, M09 | Bars | Bar Owners, GMs | General Emails",
+              "launched_at": "2025-09-15T10:00:00Z",
+              "status": "archived"
+            },
+            {
+              "workspace": "emailbison-b2b",
+              "campaign_id": 10,
+              "audience_tier": {
+                "tier": "professional",
+                "seniority": "managers-plus",
+                "modifiers": []
+              },
+              "name": "FY25, M09 | Bars | Managers+ | Professional Emails | All ESPs",
+              "launched_at": "2025-09-20T08:00:00Z",
+              "status": "completed"
+            },
+            {
+              "workspace": "emailbison-personal",
+              "campaign_id": 42,
+              "audience_tier": {
+                "tier": "personal",
+                "seniority": "bar-owners-gms",
+                "modifiers": []
+              },
+              "name": "FY25, M09 | Bars | Bars Owners, GMs | Personal Emails",
+              "launched_at": "2025-09-22T09:00:00Z",
+              "status": "completed"
+            }
+          ]
+        },
+        "created_at": "2025-09-15T10:00:00Z",
+        "scaffolded_by": "/marketing:import-campaign"
+      },
+      "error": null
+    },
+    {
+      "id": "pending_classification_set",
+      "ok": true,
+      "manifest": {
+        "schema_version": 2,
+        "slug": "x-y-z-fy26-m02",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {
+          "milestone_id": "m",
+          "milestone_url": "https://x",
+          "project": "Brite GTM"
+        },
+        "salesforce": {
+          "campaign_id": null,
+          "campaign_name": "x-y-z-fy26-m02"
+        },
+        "email_bison": {
+          "workspace": "emailbison-b2b",
+          "campaign_name": "x",
+          "campaigns": [
+            {
+              "workspace": "emailbison-b2b",
+              "campaign_id": 7,
+              "audience_tier": {
+                "tier": "professional",
+                "seniority": null,
+                "modifiers": []
+              },
+              "pending_classification": true,
+              "name": "   "
+            }
+          ]
+        },
+        "created_at": "2026-02-01T00:00:00Z",
+        "scaffolded_by": "/marketing:import-campaign"
+      },
+      "error": null
+    },
+    {
+      "id": "operator_tier_override",
+      "ok": true,
+      "manifest": {
+        "schema_version": 2,
+        "slug": "x-y-z-fy26-m02",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "offer": "holiday-anchor-audit",
+        "year": 2026,
+        "month": 2,
+        "linear": {
+          "milestone_id": "m",
+          "milestone_url": "https://x",
+          "project": "Brite GTM"
+        },
+        "salesforce": {
+          "campaign_id": null,
+          "campaign_name": "x-y-z-fy26-m02"
+        },
+        "email_bison": {
+          "workspace": "emailbison-b2b",
+          "campaign_name": "x",
+          "campaigns": [
+            {
+              "workspace": "emailbison-b2b",
+              "campaign_id": 99,
+              "audience_tier": {
+                "tier": "role",
+                "seniority": null,
+                "modifiers": [
+                  "reverified"
+                ]
+              },
+              "name": "Some Free-Form String The Classifier Won't Match"
+            }
+          ]
+        },
+        "created_at": "2026-02-01T00:00:00Z",
+        "scaffolded_by": "/marketing:import-campaign"
+      },
+      "error": null
+    },
+    {
+      "id": "reject_bad_slug",
+      "ok": false,
+      "manifest": null,
+      "error": "ERROR: slug failed campaign-slug kebab-case + -fy<YY>-m<MM>[-v<N>] regex: 'Bad_Slug_Underscore'"
+    },
+    {
+      "id": "reject_bad_eb_record_workspace",
+      "ok": false,
+      "manifest": null,
+      "error": "ERROR: eb_record.workspace must be one of ('emailbison-b2b', 'emailbison-personal'); got 'emailbison-broken'"
+    },
+    {
+      "id": "reject_non_dict_eb_record",
+      "ok": false,
+      "manifest": null,
+      "error": "ERROR: eb_record must be an object; got int"
+    }
+  ]
+}
