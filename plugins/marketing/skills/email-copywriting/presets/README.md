@@ -34,7 +34,7 @@ The original BC-5879 scope was "fan out 10 Active-tier Nites preset files" (HOAs
 
 ## Preset file shape
 
-Every preset file follows the canonical template documented in SKILL.md §3: frontmatter block with 5 required keys (`preset`, `vertical`, `entity`, `when`, `situation_mining_row`), then a Hook section (recency-waterfall-anchored), then a Step 1 skeleton (greeting-merged first sentence, 2-3 paragraphs separated by `<br><br>`, spintaxed subject of 1-3 words with NO merge variables, sign-off block), then a Step 2 bump (short `Re: {subject}` reinforcement), then a Vertical anti-slop block (vertical-specific "don'ts" layered on top of the skill-wide anti-slop guardrails; use hyphens not em-dashes per BC-5936 task-1 precedent). See SKILL.md §3 for the canonical template and the authoritative list of required frontmatter keys.
+Every preset file follows the canonical template documented in SKILL.md §3: frontmatter block with 5 required keys (`preset`, `vertical`, `entity`, `when`, `situation_mining_row`), then a Hook section (recency-waterfall-anchored), then a Step 1 skeleton (greeting-merged first sentence, 2-3 paragraphs separated by `<br><br>`, spintaxed subject of 2-6 words in photograph form with NO merge variables, sign-off block), then a Step 2 bump (short reinforcement using a § Follow-up angle — never a cliché opener; do NOT prefix the subject with `Re:`, EB auto-prepends it via `thread_reply`), then a Vertical anti-slop block (vertical-specific "don'ts" layered on top of the skill-wide anti-slop guardrails; use hyphens not em-dashes per BC-5936 task-1 precedent). See SKILL.md §3 for the canonical template and the authoritative list of required frontmatter keys.
 
 ## Seeding status
 
