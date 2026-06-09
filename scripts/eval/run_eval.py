@@ -1455,6 +1455,571 @@ class IcpRefinementReviewAdapter:
         return str(self.golden_path)
 
 
+# ── workflows intake adapters (BC-12944, ADR-028 Phase-2 Batch C) ─────────────
+#
+# The workflows plugin's FIRST behavioral evals. raise-a-ticket + report-issue are
+# the S2 intake pair: their builders are NEW seam extractions (no prior build_*),
+# pure decide(inputs, injected_state) cores delegating the conversational parts to
+# the LLM. Each emit asserts the deterministic label/priority/team projection (+
+# report-issue's registry-entry artifact) — NOT the title/body/classification/dup
+# search (those are LLM-narrated / out of the deterministic scope). Both mirror the
+# UpdateSfCampaignStatusAdapter shape: build → collect → project → check → golden.
+
+
+class RaiseTicketAdapter:
+    """Emit adapter for /workflows:raise-a-ticket: drive build_raise_ticket_payload.py."""
+
+    command_id = "raise-a-ticket"
+    artifact_names = ("raise-ticket-emit.json",)
+
+    fixture_path = REPO_ROOT / "plugins/workflows/tests/eval/raise-a-ticket.fixture.json"
+    golden_path = REPO_ROOT / "plugins/workflows/tests/eval/raise-a-ticket.golden.json"
+    schema_path = REPO_ROOT / "plugins/workflows/tests/eval/raise-a-ticket.schema.json"
+
+    builder = REPO_ROOT / "plugins/workflows/scripts/build_raise_ticket_payload.py"
+
+    # The scenario ids the eval expects, in order — a FLOOR-style guard so a fixture
+    # that silently drops a branch (a modal-team edge, the severity/triage fallback)
+    # is caught by check() with a named diff rather than passing on a thinned matrix.
+    EXPECTED_SCENARIO_IDS = (
+        "bug_full_labels", "idea_no_severity", "bug_severity_not_provisioned",
+        "needs_triage_absent", "multi_team_modal", "multi_team_tie",
+        "multi_team_no_team_field", "bug_with_domain", "error_invalid_kind",
+        "error_bug_missing_severity",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder),
+             "--scenarios", str(fixture_file), "--out-dir", str(sandbox)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_raise_ticket_payload.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        out: dict = {}
+        for name in self.artifact_names:
+            p = artifact_dir / name
+            if not p.exists():
+                raise EvalError(f"expected artifact missing: {p}")
+            try:
+                out[name] = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+        return out
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        """Every field is deterministic (no prose, no live IDs — emit makes no
+        write), so the projection is the artifact itself, ordered."""
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        emit = artifacts["raise-ticket-emit.json"]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(
+            assert_lib.schema_validate(emit, schema, artifact="raise-ticket-emit.json")
+        )
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"raise-ticket-emit.json: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"raise-ticket-emit.json $.scenarios[id={s['id']}]"
+            if s["error"] is not None:
+                # A reject row produces no payload projection.
+                for k in ("type_label", "severity_label", "priority", "team", "team_tiebreak", "footer"):
+                    if s[k] is not None:
+                        diffs.append(f"{tag}: {k} must be null on an error row, got {s[k]!r}")
+                if s["applied_labels"]:
+                    diffs.append(f"{tag}: applied_labels must be empty on an error row, got {s['applied_labels']!r}")
+                continue
+            # Success row invariants.
+            if s["team"] is None:
+                diffs.append(f"{tag}: a filed ticket must resolve a team, got null")
+            if s["footer"] is None:
+                diffs.append(f"{tag}: a filed ticket must carry a provenance footer, got null")
+            if s["kind"] == "idea":
+                if s["severity_label"] is not None:
+                    diffs.append(f"{tag}: an Idea/Feedback carries no severity_label, got {s['severity_label']!r}")
+                if s["priority"] is not None:
+                    diffs.append(f"{tag}: an Idea/Feedback carries no priority, got {s['priority']!r}")
+            if s["severity_carried_by_priority"]:
+                if s["severity_label"] not in s["missing_labels"]:
+                    diffs.append(f"{tag}: severity_carried_by_priority is true but {s['severity_label']!r} is not in missing_labels")
+                if s["severity_label"] in s["applied_labels"]:
+                    diffs.append(f"{tag}: severity_carried_by_priority is true but {s['severity_label']!r} is in applied_labels")
+            if s["triage_state_fallback"] == "Triage" and "needs-triage" not in s["missing_labels"]:
+                diffs.append(f"{tag}: triage_state_fallback is set but needs-triage is not in missing_labels")
+
+        golden_diffs = assert_lib.golden_compare(
+            self.project(emit), golden, artifact="raise-ticket-emit.json"
+        )
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        emit = artifacts["raise-ticket-emit.json"]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact="raise-ticket-emit.json")
+        if diffs:
+            raise EvalError(
+                "cannot regenerate golden — raise-ticket-emit.json failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+class ReportIssueAdapter:
+    """Emit adapter for /workflows:report-issue: drive build_report_issue_payload.py."""
+
+    command_id = "report-issue"
+    artifact_names = ("report-issue-emit.json",)
+
+    fixture_path = REPO_ROOT / "plugins/workflows/tests/eval/report-issue.fixture.json"
+    golden_path = REPO_ROOT / "plugins/workflows/tests/eval/report-issue.golden.json"
+    schema_path = REPO_ROOT / "plugins/workflows/tests/eval/report-issue.schema.json"
+
+    builder = REPO_ROOT / "plugins/workflows/scripts/build_report_issue_payload.py"
+
+    TRIGGER_CLASSES = ("wrong-skill", "skill-not-fired", "skill-over-fired")
+    LINEAR_ONLY_CLASSES = ("hook-issue", "subagent-issue", "command-flow")
+    RUBRIC_KEYS = ("clarity", "completeness", "actionability")
+
+    EXPECTED_SCENARIO_IDS = (
+        "wrong_skill", "skill_not_fired", "skill_over_fired", "bad_output_b11",
+        "bad_output_noncontiguous", "hook_issue_linear_only", "command_flow_linear_only",
+        "severity_provisioned", "needs_triage_absent", "error_invalid_classification",
+        "error_missing_severity",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder),
+             "--scenarios", str(fixture_file), "--out-dir", str(sandbox)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_report_issue_payload.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        out: dict = {}
+        for name in self.artifact_names:
+            p = artifact_dir / name
+            if not p.exists():
+                raise EvalError(f"expected artifact missing: {p}")
+            try:
+                out[name] = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+        return out
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        """The golden pins the full composite matrix, with ONE transform: a
+        behavioral entry's `judge_rubric` (a dev-tuned, under-specified judgment —
+        the command's "4/5 standard, 3/5 minimum" gives no severity→threshold rule)
+        is projected to its sorted KEY SET as `judge_rubric_keys`, so the golden
+        asserts the rubric is PRESENT + well-shaped without pinning the judgment
+        VALUES. check() validates the values' keys + 1-5 range on the raw emit (the
+        schema leaves the polymorphic registry `entry` an unconstrained object, so
+        check() is the sole enforcer — not a schema backstop). ADR-028 D2: assert the
+        shape the builder owns, not the LLM/dev judgment. Everything else is
+        deterministic and pinned verbatim."""
+        scenarios = []
+        for s in emit["scenarios"]:
+            row = json.loads(json.dumps(s))  # deep copy (stdlib, no `copy` import)
+            reg = row.get("registry")
+            if isinstance(reg, dict) and isinstance(reg.get("entry"), dict):
+                entry = reg["entry"]
+                jr = entry.get("judge_rubric")
+                if isinstance(jr, dict):
+                    entry.pop("judge_rubric")
+                    entry["judge_rubric_keys"] = sorted(jr.keys())
+            scenarios.append(row)
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": scenarios,
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        emit = artifacts["report-issue-emit.json"]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(
+            assert_lib.schema_validate(emit, schema, artifact="report-issue-emit.json")
+        )
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"report-issue-emit.json: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"report-issue-emit.json $.scenarios[id={s['id']}]"
+            err, ip, reg, cls = s["error"], s["issue_payload"], s["registry"], s["classification"]
+
+            if err is not None:
+                if ip is not None:
+                    diffs.append(f"{tag}: error row must have a null issue_payload, got {ip!r}")
+                if reg is not None:
+                    diffs.append(f"{tag}: error row must have a null registry, got {reg!r}")
+                continue
+
+            if not isinstance(ip, dict):
+                diffs.append(f"{tag}: a successful row must carry an issue_payload object, got {ip!r}")
+            else:
+                if ip.get("severity_carried_by_priority"):
+                    sev_missing = [l for l in ip.get("missing_labels", []) if l.startswith("severity:")]
+                    if not sev_missing:
+                        diffs.append(f"{tag}: severity_carried_by_priority is true but no severity:* label is in missing_labels")
+                if ip.get("triage_state_fallback") == "Triage" and "needs-triage" not in ip.get("missing_labels", []):
+                    diffs.append(f"{tag}: triage_state_fallback is set but needs-triage is not in missing_labels")
+
+            if not isinstance(reg, dict):
+                diffs.append(f"{tag}: a successful row must carry a registry object, got {reg!r}")
+                continue
+            target, entry = reg.get("target"), reg.get("entry")
+
+            if cls in self.TRIGGER_CLASSES:
+                if target != "trigger-registry.json":
+                    diffs.append(f"{tag}: {cls} must route to trigger-registry.json, got {target!r}")
+                if not isinstance(entry, dict):
+                    diffs.append(f"{tag}: {cls} must carry a trigger-registry entry, got {entry!r}")
+                else:
+                    for k in ("phrase", "expected", "not_expected", "description"):
+                        if k not in entry:
+                            diffs.append(f"{tag}: trigger entry missing key '{k}'")
+                    if cls == "skill-over-fired" and entry.get("expected") != []:
+                        diffs.append(f"{tag}: skill-over-fired expected must be [], got {entry.get('expected')!r}")
+            elif cls == "bad-output":
+                if target != "behavioral-registry.json":
+                    diffs.append(f"{tag}: bad-output must route to behavioral-registry.json, got {target!r}")
+                if not isinstance(entry, dict):
+                    diffs.append(f"{tag}: bad-output must carry a behavioral-registry entry, got {entry!r}")
+                else:
+                    rid = entry.get("id")
+                    if not (isinstance(rid, str) and rid[:1] == "B" and rid[1:].isdigit()):
+                        diffs.append(f"{tag}: behavioral id must match B##, got {rid!r}")
+                    if entry.get("tier") != 2:
+                        diffs.append(f"{tag}: behavioral entry tier must be 2, got {entry.get('tier')!r}")
+                    # judge_rubric SHAPE only (Option 1): keys present + integer 1-5.
+                    jr = entry.get("judge_rubric")
+                    if not isinstance(jr, dict):
+                        diffs.append(f"{tag}: behavioral entry judge_rubric must be an object, got {jr!r}")
+                    else:
+                        for rk in self.RUBRIC_KEYS:
+                            v = jr.get(rk)
+                            if rk not in jr:
+                                diffs.append(f"{tag}: judge_rubric missing key '{rk}'")
+                            elif not (isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= 5):
+                                diffs.append(f"{tag}: judge_rubric.{rk} must be an integer in 1-5, got {v!r}")
+            else:  # Linear-only classifications
+                if target is not None:
+                    diffs.append(f"{tag}: {cls} must route Linear-only (target null), got {target!r}")
+                if entry is not None:
+                    diffs.append(f"{tag}: {cls} must have a null registry entry, got {entry!r}")
+
+        golden_diffs = assert_lib.golden_compare(
+            self.project(emit), golden, artifact="report-issue-emit.json"
+        )
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        emit = artifacts["report-issue-emit.json"]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact="report-issue-emit.json")
+        if diffs:
+            raise EvalError(
+                "cannot regenerate golden — report-issue-emit.json failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+# ── workflows cycle-metrics adapters (BC-12944, ADR-028 Phase-2 Batch C) ──────
+#
+# retrospective + sprint-planning are the S3 pair: their builders share cycle_metrics.py
+# (cycle_snapshot has 2 consumers; velocity is sprint-only). Each emit asserts the
+# deterministic snapshot / velocity / backlog projection over INJECTED list_issues +
+# list_cycles + as_of — NOT the LLM retro synthesis / suggestion rationale, nor the
+# mutating save_status_update / save_issue (out of the deterministic scope).
+
+
+class RetrospectiveAdapter:
+    """Emit adapter for /workflows:retrospective: drive build_retro_snapshot.py."""
+
+    command_id = "retrospective"
+    artifact_names = ("retro-snapshot-emit.json",)
+
+    fixture_path = REPO_ROOT / "plugins/workflows/tests/eval/retrospective.fixture.json"
+    golden_path = REPO_ROOT / "plugins/workflows/tests/eval/retrospective.golden.json"
+    schema_path = REPO_ROOT / "plugins/workflows/tests/eval/retrospective.schema.json"
+
+    builder = REPO_ROOT / "plugins/workflows/scripts/build_retro_snapshot.py"
+
+    EXPECTED_SCENARIO_IDS = (
+        "onTrack_80_boundary", "atRisk_75", "atRisk_50_boundary",
+        "offTrack_40_with_canceled", "empty_cycle", "error_no_cycle",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder),
+             "--scenarios", str(fixture_file), "--out-dir", str(sandbox)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_retro_snapshot.py exit {proc.returncode}):\n{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        out: dict = {}
+        for name in self.artifact_names:
+            p = artifact_dir / name
+            if not p.exists():
+                raise EvalError(f"expected artifact missing: {p}")
+            try:
+                out[name] = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+        return out
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        emit = artifacts["retro-snapshot-emit.json"]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(
+            assert_lib.schema_validate(emit, schema, artifact="retro-snapshot-emit.json")
+        )
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"retro-snapshot-emit.json: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"retro-snapshot-emit.json $.scenarios[id={s['id']}]"
+            if s["error"] is not None:
+                for k in ("cycle_number", "total", "completed", "carried_over", "canceled", "completion_rate", "health"):
+                    if s[k] is not None:
+                        diffs.append(f"{tag}: {k} must be null on an error row, got {s[k]!r}")
+                continue
+            # Partition invariant: every issue is delivered, carried, or canceled.
+            if s["total"] != s["completed"] + s["carried_over"] + s["canceled"]:
+                diffs.append(f"{tag}: total ({s['total']}) != completed+carried_over+canceled ({s['completed']}+{s['carried_over']}+{s['canceled']})")
+            # Count↔id-list consistency.
+            if s["completed"] != len(s["delivered_ids"]):
+                diffs.append(f"{tag}: completed ({s['completed']}) != len(delivered_ids) ({len(s['delivered_ids'])})")
+            if s["carried_over"] != len(s["carried_ids"]):
+                diffs.append(f"{tag}: carried_over ({s['carried_over']}) != len(carried_ids) ({len(s['carried_ids'])})")
+            if s["canceled"] != len(s["canceled_ids"]):
+                diffs.append(f"{tag}: canceled ({s['canceled']}) != len(canceled_ids) ({len(s['canceled_ids'])})")
+            # Health↔rate band consistency (binds the health() thresholds to the rate).
+            rate, h = s["completion_rate"], s["health"]
+            expected_health = "onTrack" if rate >= 80 else "atRisk" if rate >= 50 else "offTrack"
+            if h != expected_health:
+                diffs.append(f"{tag}: health '{h}' inconsistent with completion_rate {rate}% (expected '{expected_health}')")
+
+        golden_diffs = assert_lib.golden_compare(
+            self.project(emit), golden, artifact="retro-snapshot-emit.json"
+        )
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        emit = artifacts["retro-snapshot-emit.json"]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact="retro-snapshot-emit.json")
+        if diffs:
+            raise EvalError(
+                "cannot regenerate golden — retro-snapshot-emit.json failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+class SprintPlanningAdapter:
+    """Emit adapter for /workflows:sprint-planning: drive build_sprint_plan.py."""
+
+    command_id = "sprint-planning"
+    artifact_names = ("sprint-plan-emit.json",)
+
+    fixture_path = REPO_ROOT / "plugins/workflows/tests/eval/sprint-planning.fixture.json"
+    golden_path = REPO_ROOT / "plugins/workflows/tests/eval/sprint-planning.golden.json"
+    schema_path = REPO_ROOT / "plugins/workflows/tests/eval/sprint-planning.schema.json"
+
+    builder = REPO_ROOT / "plugins/workflows/scripts/build_sprint_plan.py"
+    BACKLOG_CAP = 20
+
+    EXPECTED_SCENARIO_IDS = (
+        "plan_partial_velocity", "velocity_three_full", "prioritization_only",
+        "large_backlog_truncated",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder),
+             "--scenarios", str(fixture_file), "--out-dir", str(sandbox)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_sprint_plan.py exit {proc.returncode}):\n{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        out: dict = {}
+        for name in self.artifact_names:
+            p = artifact_dir / name
+            if not p.exists():
+                raise EvalError(f"expected artifact missing: {p}")
+            try:
+                out[name] = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+        return out
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        emit = artifacts["sprint-plan-emit.json"]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(
+            assert_lib.schema_validate(emit, schema, artifact="sprint-plan-emit.json")
+        )
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"sprint-plan-emit.json: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"sprint-plan-emit.json $.scenarios[id={s['id']}]"
+            mode = s["mode"]
+            if mode == "prioritization-only":
+                if s["current_snapshot"] is not None:
+                    diffs.append(f"{tag}: prioritization-only must have a null current_snapshot")
+                if s["days_elapsed"] is not None:
+                    diffs.append(f"{tag}: prioritization-only must have a null days_elapsed")
+            elif mode == "plan":
+                if not isinstance(s["current_snapshot"], dict):
+                    diffs.append(f"{tag}: plan mode must carry a current_snapshot object, got {s['current_snapshot']!r}")
+                if s["current_cycle_number"] is None:
+                    diffs.append(f"{tag}: plan mode must carry a current_cycle_number")
+            else:
+                diffs.append(f"{tag}: unexpected mode {mode!r}")
+
+            vel = s["velocity"]
+            # contributing must equal the number of velocity rows (skips excluded).
+            if vel["contributing"] != len(vel["rows"]):
+                diffs.append(f"{tag}: velocity.contributing ({vel['contributing']}) != len(rows) ({len(vel['rows'])})")
+            # The limited-data note is present IFF fewer than 3 cycles contributed
+            # (binds the note rule — the non-vacuous twin of the 3-cycle row).
+            note_present = vel["note"] is not None
+            if note_present != (vel["contributing"] < 3):
+                diffs.append(f"{tag}: velocity.note presence ({note_present}) inconsistent with contributing {vel['contributing']} (note iff <3)")
+
+            bk = s["backlog"]
+            if bk["shown"] != len(bk["ordered_ids"]):
+                diffs.append(f"{tag}: backlog.shown ({bk['shown']}) != len(ordered_ids) ({len(bk['ordered_ids'])})")
+            if bk["truncated"] != (bk["total"] > self.BACKLOG_CAP):
+                diffs.append(f"{tag}: backlog.truncated ({bk['truncated']}) inconsistent with total {bk['total']} vs cap {self.BACKLOG_CAP}")
+            if bk["remaining"] != max(0, bk["total"] - self.BACKLOG_CAP):
+                diffs.append(f"{tag}: backlog.remaining ({bk['remaining']}) != max(0, total-{self.BACKLOG_CAP})")
+            if bk["large"] != (bk["total"] >= 50):
+                diffs.append(f"{tag}: backlog.large ({bk['large']}) inconsistent with total {bk['total']} (>=50)")
+
+        golden_diffs = assert_lib.golden_compare(
+            self.project(emit), golden, artifact="sprint-plan-emit.json"
+        )
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        emit = artifacts["sprint-plan-emit.json"]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact="sprint-plan-emit.json")
+        if diffs:
+            raise EvalError(
+                "cannot regenerate golden — sprint-plan-emit.json failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
 ADAPTERS = {
     PlanCampaignAdapter.command_id: PlanCampaignAdapter(),
     CreateSfCampaignAdapter.command_id: CreateSfCampaignAdapter(),
@@ -1466,6 +2031,10 @@ ADAPTERS = {
     PortfolioSnapshotAdapter.command_id: PortfolioSnapshotAdapter(),
     ImportCampaignAdapter.command_id: ImportCampaignAdapter(),
     IcpRefinementReviewAdapter.command_id: IcpRefinementReviewAdapter(),
+    RaiseTicketAdapter.command_id: RaiseTicketAdapter(),
+    ReportIssueAdapter.command_id: ReportIssueAdapter(),
+    RetrospectiveAdapter.command_id: RetrospectiveAdapter(),
+    SprintPlanningAdapter.command_id: SprintPlanningAdapter(),
 }
 
 

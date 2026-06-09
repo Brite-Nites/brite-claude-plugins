@@ -1,5 +1,6 @@
 ---
 description: Sprint retrospective — review completed cycle, facilitate retro discussion, post status update
+disable-model-invocation: true
 ---
 
 # Sprint Retrospective

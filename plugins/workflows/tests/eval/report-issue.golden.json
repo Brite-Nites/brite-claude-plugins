@@ -1,0 +1,330 @@
+{
+  "schema_version": 1,
+  "command": "/workflows:report-issue",
+  "scenarios": [
+    {
+      "id": "wrong_skill",
+      "error": null,
+      "classification": "wrong-skill",
+      "issue_payload": {
+        "title": "wrong-skill: brainstorming fired for a trivial rename",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 2,
+        "applied_labels": [
+          "type:bug",
+          "needs-triage",
+          "executor:hybrid"
+        ],
+        "missing_labels": [
+          "severity:sev1"
+        ],
+        "triage_state_fallback": null,
+        "severity_carried_by_priority": true,
+        "notes": [
+          "severity:* not provisioned in Brite Company; captured via priority"
+        ]
+      },
+      "registry": {
+        "target": "trigger-registry.json",
+        "entry": {
+          "phrase": "rename foo to bar",
+          "expected": [
+            "systematic-debugging"
+          ],
+          "not_expected": [
+            "brainstorming"
+          ],
+          "description": "Regression: a trivial rename must not trigger brainstorming"
+        }
+      }
+    },
+    {
+      "id": "skill_not_fired",
+      "error": null,
+      "classification": "skill-not-fired",
+      "issue_payload": {
+        "title": "skill-not-fired: tdd did not fire for a test-first request",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 3,
+        "applied_labels": [
+          "type:bug",
+          "needs-triage",
+          "executor:hybrid"
+        ],
+        "missing_labels": [
+          "severity:sev2"
+        ],
+        "triage_state_fallback": null,
+        "severity_carried_by_priority": true,
+        "notes": [
+          "severity:* not provisioned in Brite Company; captured via priority"
+        ]
+      },
+      "registry": {
+        "target": "trigger-registry.json",
+        "entry": {
+          "phrase": "build this feature test-first with red-green-refactor",
+          "expected": [
+            "tdd"
+          ],
+          "not_expected": [],
+          "description": "Regression: an explicit TDD request should fire tdd"
+        }
+      }
+    },
+    {
+      "id": "skill_over_fired",
+      "error": null,
+      "classification": "skill-over-fired",
+      "issue_payload": {
+        "title": "skill-over-fired: brainstorming fired on a one-line edit",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 4,
+        "applied_labels": [
+          "type:bug",
+          "needs-triage",
+          "executor:hybrid"
+        ],
+        "missing_labels": [
+          "severity:sev3"
+        ],
+        "triage_state_fallback": null,
+        "severity_carried_by_priority": true,
+        "notes": [
+          "severity:* not provisioned in Brite Company; captured via priority"
+        ]
+      },
+      "registry": {
+        "target": "trigger-registry.json",
+        "entry": {
+          "phrase": "fix the typo in the readme heading",
+          "expected": [],
+          "not_expected": [
+            "brainstorming"
+          ],
+          "description": "Regression: a one-line edit must fire no skill"
+        }
+      }
+    },
+    {
+      "id": "bad_output_b11",
+      "error": null,
+      "classification": "bad-output",
+      "issue_payload": {
+        "title": "bad-output: retrospective produced shallow action items",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 2,
+        "applied_labels": [
+          "type:bug",
+          "needs-triage",
+          "executor:hybrid"
+        ],
+        "missing_labels": [
+          "severity:sev1"
+        ],
+        "triage_state_fallback": null,
+        "severity_carried_by_priority": true,
+        "notes": [
+          "severity:* not provisioned in Brite Company; captured via priority"
+        ]
+      },
+      "registry": {
+        "target": "behavioral-registry.json",
+        "entry": {
+          "id": "B11",
+          "description": "retro output must carry concrete, owner-assigned action items",
+          "tier": 2,
+          "prompt": "Run a retrospective for cycle 6 and synthesize concrete action items.",
+          "expected_skill": "retrospective",
+          "expected_markers": [
+            "action items",
+            "completion rate"
+          ],
+          "not_expected_markers": [],
+          "not_expected_skills": [],
+          "estimated_cost": "$0.30",
+          "notes": "Regression from /workflows:report-issue — weak retro synthesis",
+          "judge_rubric_keys": [
+            "actionability",
+            "clarity",
+            "completeness"
+          ]
+        }
+      }
+    },
+    {
+      "id": "bad_output_noncontiguous",
+      "error": null,
+      "classification": "bad-output",
+      "issue_payload": {
+        "title": "bad-output: icp scoring output omitted rationale",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 3,
+        "applied_labels": [
+          "type:bug",
+          "needs-triage",
+          "executor:hybrid"
+        ],
+        "missing_labels": [
+          "severity:sev2"
+        ],
+        "triage_state_fallback": null,
+        "severity_carried_by_priority": true,
+        "notes": [
+          "severity:* not provisioned in Brite Company; captured via priority"
+        ]
+      },
+      "registry": {
+        "target": "behavioral-registry.json",
+        "entry": {
+          "id": "B08",
+          "description": "icp scoring must explain each score",
+          "tier": 2,
+          "prompt": "Score these ICP candidates and explain each score.",
+          "expected_skill": "icp-scoring",
+          "expected_markers": [
+            "rationale"
+          ],
+          "not_expected_markers": [],
+          "not_expected_skills": [],
+          "estimated_cost": "$0.30",
+          "notes": "Regression from /workflows:report-issue — missing rationale",
+          "judge_rubric_keys": [
+            "actionability",
+            "clarity",
+            "completeness"
+          ]
+        }
+      }
+    },
+    {
+      "id": "hook_issue_linear_only",
+      "error": null,
+      "classification": "hook-issue",
+      "issue_payload": {
+        "title": "hook-issue: security hook blocked a benign force-with-lease push",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 3,
+        "applied_labels": [
+          "type:bug",
+          "needs-triage",
+          "executor:hybrid"
+        ],
+        "missing_labels": [
+          "severity:sev2"
+        ],
+        "triage_state_fallback": null,
+        "severity_carried_by_priority": true,
+        "notes": [
+          "severity:* not provisioned in Brite Company; captured via priority"
+        ]
+      },
+      "registry": {
+        "target": null,
+        "entry": null
+      }
+    },
+    {
+      "id": "command_flow_linear_only",
+      "error": null,
+      "classification": "command-flow",
+      "issue_payload": {
+        "title": "command-flow: ship step ran review twice",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 4,
+        "applied_labels": [
+          "type:bug",
+          "needs-triage",
+          "executor:hybrid"
+        ],
+        "missing_labels": [
+          "severity:sev3"
+        ],
+        "triage_state_fallback": null,
+        "severity_carried_by_priority": true,
+        "notes": [
+          "severity:* not provisioned in Brite Company; captured via priority"
+        ]
+      },
+      "registry": {
+        "target": null,
+        "entry": null
+      }
+    },
+    {
+      "id": "severity_provisioned",
+      "error": null,
+      "classification": "command-flow",
+      "issue_payload": {
+        "title": "command-flow: deploy command skipped the dry-run gate",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 1,
+        "applied_labels": [
+          "type:bug",
+          "needs-triage",
+          "executor:hybrid",
+          "severity:sev0"
+        ],
+        "missing_labels": [],
+        "triage_state_fallback": null,
+        "severity_carried_by_priority": false,
+        "notes": []
+      },
+      "registry": {
+        "target": null,
+        "entry": null
+      }
+    },
+    {
+      "id": "needs_triage_absent",
+      "error": null,
+      "classification": "command-flow",
+      "issue_payload": {
+        "title": "command-flow: smoke-test mislabeled an MCP server as down",
+        "team": "Brite Company",
+        "project": "Brite Skill Packs",
+        "priority": 4,
+        "applied_labels": [
+          "type:bug",
+          "executor:hybrid"
+        ],
+        "missing_labels": [
+          "needs-triage",
+          "severity:sev3"
+        ],
+        "triage_state_fallback": "Triage",
+        "severity_carried_by_priority": true,
+        "notes": [
+          "needs-triage label not provisioned in Brite Company; set built-in Triage state",
+          "severity:* not provisioned in Brite Company; captured via priority"
+        ]
+      },
+      "registry": {
+        "target": null,
+        "entry": null
+      }
+    },
+    {
+      "id": "error_invalid_classification",
+      "error": "invalid_classification",
+      "classification": "frobnicate",
+      "issue_payload": null,
+      "registry": null
+    },
+    {
+      "id": "error_missing_severity",
+      "error": "missing_severity",
+      "classification": "bad-output",
+      "issue_payload": null,
+      "registry": null
+    }
+  ]
+}

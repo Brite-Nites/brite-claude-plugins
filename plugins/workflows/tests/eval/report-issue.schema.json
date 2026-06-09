@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "required": ["schema_version", "command", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "/workflows:report-issue" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "error", "classification", "issue_payload", "registry"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "error": { "type": ["string", "null"] },
+          "classification": { "type": ["string", "null"] },
+          "issue_payload": {
+            "type": ["object", "null"],
+            "required": [
+              "title", "team", "project", "priority", "applied_labels",
+              "missing_labels", "triage_state_fallback", "severity_carried_by_priority", "notes"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string" },
+              "team": { "type": "string" },
+              "project": { "type": "string" },
+              "priority": { "type": ["integer", "null"], "enum": [1, 2, 3, 4, null] },
+              "applied_labels": { "type": "array", "items": { "type": "string" } },
+              "missing_labels": { "type": "array", "items": { "type": "string" } },
+              "triage_state_fallback": { "type": ["string", "null"], "enum": ["Triage", null] },
+              "severity_carried_by_priority": { "type": "boolean" },
+              "notes": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "registry": {
+            "type": ["object", "null"],
+            "required": ["target", "entry"],
+            "additionalProperties": false,
+            "properties": {
+              "target": { "type": ["string", "null"], "enum": ["trigger-registry.json", "behavioral-registry.json", null] },
+              "entry": { "type": ["object", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

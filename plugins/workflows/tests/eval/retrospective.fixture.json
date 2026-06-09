@@ -1,0 +1,67 @@
+{
+  "scenarios": [
+    {
+      "id": "onTrack_80_boundary",
+      "note": "4 of 5 completed = 80% → onTrack (the >= 80 boundary).",
+      "cycle": { "number": 6, "startsAt": "2026-05-01", "endsAt": "2026-05-14" },
+      "linear_state": {
+        "issues": [
+          { "id": "BC-1", "state_type": "completed" },
+          { "id": "BC-2", "state_type": "completed" },
+          { "id": "BC-3", "state_type": "completed" },
+          { "id": "BC-4", "state_type": "completed" },
+          { "id": "BC-5", "state_type": "started" }
+        ]
+      }
+    },
+    {
+      "id": "atRisk_75",
+      "note": "3 of 4 completed = 75% → atRisk (in-band, just below 80 — 79 is not onTrack).",
+      "cycle": { "number": 7 },
+      "linear_state": {
+        "issues": [
+          { "id": "BC-6", "state_type": "completed" },
+          { "id": "BC-7", "state_type": "completed" },
+          { "id": "BC-8", "state_type": "completed" },
+          { "id": "BC-9", "state_type": "unstarted" }
+        ]
+      }
+    },
+    {
+      "id": "atRisk_50_boundary",
+      "note": "1 of 2 completed = 50% → atRisk (the >= 50 boundary).",
+      "cycle": { "number": 8 },
+      "linear_state": {
+        "issues": [
+          { "id": "BC-10", "state_type": "completed" },
+          { "id": "BC-11", "state_type": "backlog" }
+        ]
+      }
+    },
+    {
+      "id": "offTrack_40_with_canceled",
+      "note": "2 of 5 completed = 40% → offTrack; canceled categorized separately.",
+      "cycle": { "number": 9 },
+      "linear_state": {
+        "issues": [
+          { "id": "BC-12", "state_type": "completed" },
+          { "id": "BC-13", "state_type": "completed" },
+          { "id": "BC-14", "state_type": "started" },
+          { "id": "BC-15", "state_type": "canceled" },
+          { "id": "BC-16", "state_type": "unstarted" }
+        ]
+      }
+    },
+    {
+      "id": "empty_cycle",
+      "note": "An empty cycle → 0% (no divide-by-zero) → offTrack.",
+      "cycle": { "number": 10 },
+      "linear_state": { "issues": [] }
+    },
+    {
+      "id": "error_no_cycle",
+      "note": "No target cycle resolved → reject row (the command's 'No cycles found' stop).",
+      "linear_state": { "issues": [{ "id": "BC-99", "state_type": "completed" }] }
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "command": "/workflows:retrospective",
+  "scenarios": [
+    {
+      "id": "onTrack_80_boundary",
+      "error": null,
+      "cycle_number": 6,
+      "total": 5,
+      "completed": 4,
+      "carried_over": 1,
+      "canceled": 0,
+      "completion_rate": 80,
+      "delivered_ids": [
+        "BC-1",
+        "BC-2",
+        "BC-3",
+        "BC-4"
+      ],
+      "carried_ids": [
+        "BC-5"
+      ],
+      "canceled_ids": [],
+      "health": "onTrack"
+    },
+    {
+      "id": "atRisk_75",
+      "error": null,
+      "cycle_number": 7,
+      "total": 4,
+      "completed": 3,
+      "carried_over": 1,
+      "canceled": 0,
+      "completion_rate": 75,
+      "delivered_ids": [
+        "BC-6",
+        "BC-7",
+        "BC-8"
+      ],
+      "carried_ids": [
+        "BC-9"
+      ],
+      "canceled_ids": [],
+      "health": "atRisk"
+    },
+    {
+      "id": "atRisk_50_boundary",
+      "error": null,
+      "cycle_number": 8,
+      "total": 2,
+      "completed": 1,
+      "carried_over": 1,
+      "canceled": 0,
+      "completion_rate": 50,
+      "delivered_ids": [
+        "BC-10"
+      ],
+      "carried_ids": [
+        "BC-11"
+      ],
+      "canceled_ids": [],
+      "health": "atRisk"
+    },
+    {
+      "id": "offTrack_40_with_canceled",
+      "error": null,
+      "cycle_number": 9,
+      "total": 5,
+      "completed": 2,
+      "carried_over": 2,
+      "canceled": 1,
+      "completion_rate": 40,
+      "delivered_ids": [
+        "BC-12",
+        "BC-13"
+      ],
+      "carried_ids": [
+        "BC-14",
+        "BC-16"
+      ],
+      "canceled_ids": [
+        "BC-15"
+      ],
+      "health": "offTrack"
+    },
+    {
+      "id": "empty_cycle",
+      "error": null,
+      "cycle_number": 10,
+      "total": 0,
+      "completed": 0,
+      "carried_over": 0,
+      "canceled": 0,
+      "completion_rate": 0,
+      "delivered_ids": [],
+      "carried_ids": [],
+      "canceled_ids": [],
+      "health": "offTrack"
+    },
+    {
+      "id": "error_no_cycle",
+      "error": "no_target_cycle",
+      "cycle_number": null,
+      "total": null,
+      "completed": null,
+      "carried_over": null,
+      "canceled": null,
+      "completion_rate": null,
+      "delivered_ids": [],
+      "carried_ids": [],
+      "canceled_ids": [],
+      "health": null
+    }
+  ]
+}

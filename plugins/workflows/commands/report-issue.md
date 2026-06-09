@@ -1,5 +1,6 @@
 ---
 description: Report the agent tooling itself misbehaving — a skill, command, or hook that misfired (NOT a Brite product bug; for that use /workflows:raise-a-ticket). Classifies the failure, generates a regression test into the trigger/behavioral registry, and files a Linear issue. The direct expert alias into raise-a-ticket's agent-tooling branch.
+disable-model-invocation: true
 ---
 
 # Report Issue

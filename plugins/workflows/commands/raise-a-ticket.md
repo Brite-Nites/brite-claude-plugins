@@ -1,5 +1,6 @@
 ---
 description: The single front door for reporting into Linear — is it a Brite product, or the agent tooling itself? A bug or idea on a Brite product (Brite Base, Sites, Supply, a Labs site) routes to the right team + project as needs-triage for /triage; agent-tooling misbehavior (a skill/command/hook) hands off to /workflows:report-issue's regression-test flow. Cross-product, operator-friendly; supersedes bug-report.
+disable-model-invocation: true
 ---
 
 # Raise a Ticket
