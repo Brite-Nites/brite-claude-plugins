@@ -97,9 +97,6 @@ from becoming "forever-only."
 | `plugins/workflows/commands/onboarding-checklist.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/project-start.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/workflows/commands/promote-precedent.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
-| `plugins/workflows/commands/raise-a-ticket.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
-| `plugins/workflows/commands/report-issue.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
-| `plugins/workflows/commands/retrospective.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/workflows/commands/review.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/scope.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/workflows/commands/security-audit.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
@@ -107,6 +104,5 @@ from becoming "forever-only."
 | `plugins/workflows/commands/setup-claude-md.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/ship.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/workflows/commands/smoke-test.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/workflows/commands/sprint-planning.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/workflows/commands/tech-stack.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 

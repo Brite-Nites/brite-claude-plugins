@@ -1,5 +1,6 @@
 ---
 description: Report the agent tooling itself misbehaving — a skill, command, or hook that misfired (NOT a Brite product bug; for that use /workflows:raise-a-ticket). Classifies the failure, generates a regression test into the trigger/behavioral registry, and files a Linear issue. The direct expert alias into raise-a-ticket's agent-tooling branch.
+disable-model-invocation: true
 ---
 
 # Report Issue
@@ -163,7 +164,7 @@ Read `plugins/workflows/skills/_shared/trigger-registry.json` and locate the `te
 
 ### For bad-output → behavioral-registry.json
 
-Read `tests/fixtures/behavioral-registry.json`. Find the highest existing `B##` ID and compute the next one (e.g., if B10 exists, next is B11). Draft a new entry:
+Read `tests/fixtures/behavioral-registry.json`. Find the highest existing ID **numerically** (`max(int(id[1:]))`) and compute the next one (e.g., if B10 exists, next is B11). IDs are zero-padded to a **minimum** of 2 digits to match the existing `B01`..`B99` style; past 99 entries they widen (`B99 → B100`), staying unique and numerically monotonic — compare numerically, never lexically. Draft a new entry:
 
 ```json
 {

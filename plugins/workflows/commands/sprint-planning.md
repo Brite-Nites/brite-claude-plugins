@@ -1,5 +1,6 @@
 ---
 description: Sprint planning — pull backlog, review velocity, assign issues to cycles
+disable-model-invocation: true
 ---
 
 # Sprint Planning

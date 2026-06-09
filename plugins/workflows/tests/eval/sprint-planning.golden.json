@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "command": "/workflows:sprint-planning",
+  "scenarios": [
+    {
+      "id": "plan_partial_velocity",
+      "error": null,
+      "mode": "plan",
+      "current_cycle_number": 9,
+      "current_snapshot": {
+        "total": 2,
+        "completed": 1,
+        "carried_over": 1,
+        "canceled": 0,
+        "completion_rate": 50
+      },
+      "days_elapsed": 7,
+      "total_days": 14,
+      "velocity": {
+        "rows": [
+          {
+            "cycle": 6,
+            "completed": 8,
+            "total": 10,
+            "rate": 80
+          },
+          {
+            "cycle": 7,
+            "completed": 6,
+            "total": 8,
+            "rate": 75
+          }
+        ],
+        "skipped": [
+          {
+            "cycle": 8,
+            "reason": "Insufficient data for Cycle 8"
+          }
+        ],
+        "avg_completed": 7.0,
+        "avg_rate": 78,
+        "contributing": 2,
+        "note": "Limited data: fewer than 3 completed cycles contributed."
+      },
+      "backlog": {
+        "ordered_ids": [
+          "BC-61",
+          "BC-64",
+          "BC-60",
+          "BC-62"
+        ],
+        "total": 4,
+        "shown": 4,
+        "truncated": false,
+        "remaining": 0,
+        "large": false
+      }
+    },
+    {
+      "id": "velocity_three_full",
+      "error": null,
+      "mode": "plan",
+      "current_cycle_number": 12,
+      "current_snapshot": {
+        "total": 4,
+        "completed": 2,
+        "carried_over": 2,
+        "canceled": 0,
+        "completion_rate": 50
+      },
+      "days_elapsed": 3,
+      "total_days": 14,
+      "velocity": {
+        "rows": [
+          {
+            "cycle": 9,
+            "completed": 9,
+            "total": 10,
+            "rate": 90
+          },
+          {
+            "cycle": 10,
+            "completed": 8,
+            "total": 10,
+            "rate": 80
+          },
+          {
+            "cycle": 11,
+            "completed": 10,
+            "total": 10,
+            "rate": 100
+          }
+        ],
+        "skipped": [],
+        "avg_completed": 9.0,
+        "avg_rate": 90,
+        "contributing": 3,
+        "note": null
+      },
+      "backlog": {
+        "ordered_ids": [
+          "BC-80",
+          "BC-81"
+        ],
+        "total": 2,
+        "shown": 2,
+        "truncated": false,
+        "remaining": 0,
+        "large": false
+      }
+    },
+    {
+      "id": "prioritization_only",
+      "error": null,
+      "mode": "prioritization-only",
+      "current_cycle_number": null,
+      "current_snapshot": null,
+      "days_elapsed": null,
+      "total_days": null,
+      "velocity": {
+        "rows": [],
+        "skipped": [],
+        "avg_completed": null,
+        "avg_rate": null,
+        "contributing": 0,
+        "note": "Limited data: fewer than 3 completed cycles contributed."
+      },
+      "backlog": {
+        "ordered_ids": [
+          "BC-90",
+          "BC-91"
+        ],
+        "total": 2,
+        "shown": 2,
+        "truncated": false,
+        "remaining": 0,
+        "large": false
+      }
+    },
+    {
+      "id": "large_backlog_truncated",
+      "error": null,
+      "mode": "prioritization-only",
+      "current_cycle_number": null,
+      "current_snapshot": null,
+      "days_elapsed": null,
+      "total_days": null,
+      "velocity": {
+        "rows": [],
+        "skipped": [],
+        "avg_completed": null,
+        "avg_rate": null,
+        "contributing": 0,
+        "note": "Limited data: fewer than 3 completed cycles contributed."
+      },
+      "backlog": {
+        "ordered_ids": [
+          "L00",
+          "L01",
+          "L02",
+          "L03",
+          "L04",
+          "L05",
+          "L06",
+          "L07",
+          "L08",
+          "L09",
+          "L10",
+          "L11",
+          "L12",
+          "L13",
+          "L14",
+          "L15",
+          "L16",
+          "L17",
+          "L18",
+          "L19"
+        ],
+        "total": 55,
+        "shown": 20,
+        "truncated": true,
+        "remaining": 35,
+        "large": true
+      }
+    }
+  ]
+}

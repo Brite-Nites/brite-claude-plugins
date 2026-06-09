@@ -1,0 +1,95 @@
+{
+  "scenarios": [
+    {
+      "id": "bug_full_labels",
+      "note": "Bug + High in a single-team project with every canonical label provisioned.",
+      "kind": "bug",
+      "severity": "high",
+      "project_teams": ["Brite Company"],
+      "linear_state": {
+        "existing_labels": ["type:bug", "type:task", "needs-triage", "executor:hybrid", "severity:sev0", "severity:sev1", "severity:sev2", "severity:sev3"]
+      }
+    },
+    {
+      "id": "idea_no_severity",
+      "note": "Idea/Feedback → type:task, Step 4 skipped (no severity, no priority).",
+      "kind": "idea",
+      "project_teams": ["Brite Company"],
+      "linear_state": {
+        "existing_labels": ["type:bug", "type:task", "needs-triage", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "bug_severity_not_provisioned",
+      "note": "severity:* group absent → priority carries the severity signal.",
+      "kind": "bug",
+      "severity": "medium",
+      "project_teams": ["Brite Company"],
+      "linear_state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "needs_triage_absent",
+      "note": "needs-triage label not provisioned → set built-in Triage workflow state.",
+      "kind": "idea",
+      "project_teams": ["Brite Company"],
+      "linear_state": {
+        "existing_labels": ["type:task", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "multi_team_modal",
+      "note": "Brite Base spans [Brite Supply, Brite Company]; its issues predominantly live in Brite Company.",
+      "kind": "bug",
+      "severity": "low",
+      "project_teams": ["Brite Supply", "Brite Company"],
+      "linear_state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid", "severity:sev3"],
+        "project_issues": [{"team": "Brite Company"}, {"team": "Brite Company"}, {"team": "Brite Supply"}]
+      }
+    },
+    {
+      "id": "multi_team_tie",
+      "note": "A tie on the per-team tally → Brite Company tiebreaker.",
+      "kind": "idea",
+      "project_teams": ["Brite Supply", "Brite Labs"],
+      "linear_state": {
+        "existing_labels": ["type:task", "needs-triage", "executor:hybrid"],
+        "project_issues": [{"team": "Brite Supply"}, {"team": "Brite Labs"}]
+      }
+    },
+    {
+      "id": "multi_team_no_team_field",
+      "note": "The list_issues rows carry no team field → empty tally → Brite Company fallback.",
+      "kind": "idea",
+      "project_teams": ["Brite Supply", "Brite Labs"],
+      "linear_state": {
+        "existing_labels": ["type:task", "needs-triage", "executor:hybrid"],
+        "project_issues": [{"id": "X"}, {"id": "Y"}]
+      }
+    },
+    {
+      "id": "bug_with_domain",
+      "note": "An FDA domain:<slug> confirmed present (Step 5b) is applied.",
+      "kind": "bug",
+      "severity": "high",
+      "project_teams": ["Brite Company"],
+      "domain": "domain:quo",
+      "linear_state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid", "severity:sev1", "domain:quo"]
+      }
+    },
+    {
+      "id": "error_invalid_kind",
+      "note": "An unknown reporter-facing kind → reject row, no payload projection.",
+      "kind": "frobnicate"
+    },
+    {
+      "id": "error_bug_missing_severity",
+      "note": "A Bug with no severity → reject row (Step 4 requires it for bugs).",
+      "kind": "bug",
+      "project_teams": ["Brite Company"]
+    }
+  ]
+}

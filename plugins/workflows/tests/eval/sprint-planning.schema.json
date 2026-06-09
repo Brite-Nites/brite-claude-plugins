@@ -1,0 +1,90 @@
+{
+  "type": "object",
+  "required": ["schema_version", "command", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "/workflows:sprint-planning" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "error", "mode", "current_cycle_number", "current_snapshot",
+          "days_elapsed", "total_days", "velocity", "backlog"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "error": { "type": ["string", "null"] },
+          "mode": { "type": ["string", "null"], "enum": ["plan", "prioritization-only", null] },
+          "current_cycle_number": { "type": ["integer", "null"] },
+          "current_snapshot": {
+            "type": ["object", "null"],
+            "required": ["total", "completed", "carried_over", "canceled", "completion_rate"],
+            "additionalProperties": false,
+            "properties": {
+              "total": { "type": "integer" },
+              "completed": { "type": "integer" },
+              "carried_over": { "type": "integer" },
+              "canceled": { "type": "integer" },
+              "completion_rate": { "type": "integer" }
+            }
+          },
+          "days_elapsed": { "type": ["integer", "null"] },
+          "total_days": { "type": ["integer", "null"] },
+          "velocity": {
+            "type": "object",
+            "required": ["rows", "skipped", "avg_completed", "avg_rate", "contributing", "note"],
+            "additionalProperties": false,
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["cycle", "completed", "total", "rate"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "cycle": { "type": "integer" },
+                    "completed": { "type": "integer" },
+                    "total": { "type": "integer" },
+                    "rate": { "type": "integer" }
+                  }
+                }
+              },
+              "skipped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["cycle", "reason"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "cycle": { "type": ["integer", "null"] },
+                    "reason": { "type": "string" }
+                  }
+                }
+              },
+              "avg_completed": { "type": ["number", "null"] },
+              "avg_rate": { "type": ["integer", "null"] },
+              "contributing": { "type": "integer" },
+              "note": { "type": ["string", "null"] }
+            }
+          },
+          "backlog": {
+            "type": "object",
+            "required": ["ordered_ids", "total", "shown", "truncated", "remaining", "large"],
+            "additionalProperties": false,
+            "properties": {
+              "ordered_ids": { "type": "array", "items": { "type": "string" } },
+              "total": { "type": "integer" },
+              "shown": { "type": "integer" },
+              "truncated": { "type": "boolean" },
+              "remaining": { "type": "integer" },
+              "large": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

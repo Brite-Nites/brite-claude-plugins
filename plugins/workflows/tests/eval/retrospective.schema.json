@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "required": ["schema_version", "command", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "/workflows:retrospective" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "error", "cycle_number", "total", "completed", "carried_over",
+          "canceled", "completion_rate", "delivered_ids", "carried_ids",
+          "canceled_ids", "health"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "error": { "type": ["string", "null"] },
+          "cycle_number": { "type": ["integer", "null"] },
+          "total": { "type": ["integer", "null"] },
+          "completed": { "type": ["integer", "null"] },
+          "carried_over": { "type": ["integer", "null"] },
+          "canceled": { "type": ["integer", "null"] },
+          "completion_rate": { "type": ["integer", "null"] },
+          "delivered_ids": { "type": "array", "items": { "type": "string" } },
+          "carried_ids": { "type": "array", "items": { "type": "string" } },
+          "canceled_ids": { "type": "array", "items": { "type": "string" } },
+          "health": { "type": ["string", "null"], "enum": ["onTrack", "atRisk", "offTrack", null] }
+        }
+      }
+    }
+  }
+}

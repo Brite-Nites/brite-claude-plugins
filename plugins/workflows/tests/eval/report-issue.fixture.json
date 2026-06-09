@@ -1,0 +1,129 @@
+{
+  "scenarios": [
+    {
+      "id": "wrong_skill",
+      "note": "wrong-skill → trigger-registry; expected = correct skill, not_expected = the wrong skill that fired; phrase metachars stripped.",
+      "classification": "wrong-skill",
+      "severity": "high",
+      "short_desc": "brainstorming fired for a trivial rename",
+      "phrase": "rename $foo to `bar`",
+      "expected": ["systematic-debugging"],
+      "fired": "brainstorming",
+      "reg_description": "a trivial rename must not trigger brainstorming",
+      "state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "skill_not_fired",
+      "note": "skill-not-fired → trigger-registry; expected populated, not_expected empty.",
+      "classification": "skill-not-fired",
+      "severity": "medium",
+      "short_desc": "tdd did not fire for a test-first request",
+      "phrase": "build this feature test-first with red-green-refactor",
+      "expected": ["tdd"],
+      "reg_description": "an explicit TDD request should fire tdd",
+      "state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "skill_over_fired",
+      "note": "skill-over-fired → trigger-registry; expected empty, not_expected = the over-firing skill.",
+      "classification": "skill-over-fired",
+      "severity": "low",
+      "short_desc": "brainstorming fired on a one-line edit",
+      "phrase": "fix the typo in the readme heading",
+      "fired": "brainstorming",
+      "reg_description": "a one-line edit must fire no skill",
+      "state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "bad_output_b11",
+      "note": "bad-output → behavioral-registry; B10 highest → next B11; full entry shape.",
+      "classification": "bad-output",
+      "severity": "high",
+      "short_desc": "retrospective produced shallow action items",
+      "prompt": "Run a retrospective for cycle 6 and synthesize concrete action items.",
+      "expected_skill": "retrospective",
+      "expected_markers": ["action items", "completion rate"],
+      "reg_description": "retro output must carry concrete, owner-assigned action items",
+      "context": "weak retro synthesis",
+      "state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid"],
+        "behavioral_ids": ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B09", "B10"]
+      }
+    },
+    {
+      "id": "bad_output_noncontiguous",
+      "note": "B## allocation is max+1, NOT count+1: ids B03,B07 → B08.",
+      "classification": "bad-output",
+      "severity": "medium",
+      "short_desc": "icp scoring output omitted rationale",
+      "prompt": "Score these ICP candidates and explain each score.",
+      "expected_skill": "icp-scoring",
+      "expected_markers": ["rationale"],
+      "reg_description": "icp scoring must explain each score",
+      "context": "missing rationale",
+      "state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid"],
+        "behavioral_ids": ["B03", "B07"]
+      }
+    },
+    {
+      "id": "hook_issue_linear_only",
+      "note": "hook-issue → Linear-only; no appendable registry (entry null).",
+      "classification": "hook-issue",
+      "severity": "medium",
+      "short_desc": "security hook blocked a benign force-with-lease push",
+      "state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "command_flow_linear_only",
+      "note": "command-flow → Linear-only; no appendable registry (entry null).",
+      "classification": "command-flow",
+      "severity": "low",
+      "short_desc": "ship step ran review twice",
+      "state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "severity_provisioned",
+      "note": "When severity:* IS provisioned the label is applied (not carried by priority).",
+      "classification": "command-flow",
+      "severity": "critical",
+      "short_desc": "deploy command skipped the dry-run gate",
+      "state": {
+        "existing_labels": ["type:bug", "needs-triage", "executor:hybrid", "severity:sev0", "severity:sev1", "severity:sev2", "severity:sev3"]
+      }
+    },
+    {
+      "id": "needs_triage_absent",
+      "note": "needs-triage label not provisioned in the team → built-in Triage state fallback.",
+      "classification": "command-flow",
+      "severity": "low",
+      "short_desc": "smoke-test mislabeled an MCP server as down",
+      "state": {
+        "existing_labels": ["type:bug", "executor:hybrid"]
+      }
+    },
+    {
+      "id": "error_invalid_classification",
+      "note": "An unknown classification → reject row, no artifacts.",
+      "classification": "frobnicate",
+      "severity": "low",
+      "short_desc": "x"
+    },
+    {
+      "id": "error_missing_severity",
+      "note": "A report with no severity → reject row (Step 2b requires it).",
+      "classification": "bad-output",
+      "short_desc": "x"
+    }
+  ]
+}
