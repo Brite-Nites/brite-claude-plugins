@@ -22,11 +22,15 @@ from __future__ import annotations
 
 from datetime import date
 
-# Linear state-types (retrospective Step 2 categorization). "completed" → delivered;
-# "started" → in-progress (carried over); "unstarted"/"backlog" → not started
-# (carried over); "canceled" → canceled.
+# Linear state-types (retrospective Step 2 categorization). The two TERMINAL types
+# are explicit; everything else is unresolved work that carried over. Linear has six
+# state_type values — completed, canceled (terminal) + started, unstarted, backlog,
+# TRIAGE (non-terminal). Defining carried as the catch-all (NOT delivered AND NOT
+# canceled) keeps the partition `total == completed + carried + canceled` total over
+# ALL six (and any future) state_types — so a triage-state issue counts as carried
+# (correct: it's unresolved), never falling through the buckets and breaking the
+# RetrospectiveAdapter partition invariant on live data.
 _DELIVERED = ("completed",)
-_CARRIED = ("started", "unstarted", "backlog")
 _CANCELED = ("canceled",)
 
 # Native Linear priority (sprint-planning Step 3 backlog sort): 1=Urgent, 2=High,
@@ -59,8 +63,14 @@ def cycle_snapshot(issues) -> dict:
     """
     issues = [i for i in (issues or []) if isinstance(i, dict)]
     delivered = [i for i in issues if i.get("state_type") in _DELIVERED]
-    carried = [i for i in issues if i.get("state_type") in _CARRIED]
     canceled = [i for i in issues if i.get("state_type") in _CANCELED]
+    # Carried = the catch-all: any issue that is neither delivered nor canceled is
+    # unresolved work that carried over (started / unstarted / backlog / triage / any
+    # future non-terminal type). This makes the partition total by construction.
+    carried = [
+        i for i in issues
+        if i.get("state_type") not in _DELIVERED and i.get("state_type") not in _CANCELED
+    ]
 
     total = len(issues)
     completed = len(delivered)
@@ -177,8 +187,11 @@ def velocity(cycles, as_of: str) -> dict:
 def sort_backlog(issues, cap: int = 20) -> dict:
     """Sprint-planning Step 3 backlog projection. PURE given the merged backlog +
     unstarted `list_issues` rows. Excludes any issue already assigned to a cycle
-    (`cycle` non-null), sorts by native priority (Urgent>High>Medium>Low>None,
-    stable within a tier), and applies the display thresholds:
+    (`cycle` non-null), sorts by native priority (Urgent>High>Medium>Low>None) with
+    a SECONDARY id sort within a tier (the command's "sort by priority" leaves
+    intra-tier order unspecified; pinning it on id makes the projection total +
+    input-order-independent, robust like cycle_snapshot._sorted_ids), then applies
+    the display thresholds:
       - 50+ items → `large` (suggest /workflows:scope first);
       - more than `cap` (default 20) → show the top `cap`, `truncated`, remainder.
 
@@ -196,7 +209,7 @@ def sort_backlog(issues, cap: int = 20) -> dict:
         p = issue.get("priority")
         return p if isinstance(p, int) and 1 <= p <= 4 else _PRIORITY_NONE_RANK
 
-    ordered = sorted(rows, key=_rank)  # stable → ties keep input order
+    ordered = sorted(rows, key=lambda i: (_rank(i), str(i.get("id"))))  # priority, then id
     total = len(ordered)
     shown_rows = ordered[:cap]
     return {

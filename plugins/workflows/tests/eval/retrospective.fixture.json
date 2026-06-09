@@ -53,6 +53,18 @@
       }
     },
     {
+      "id": "triage_issue_carried",
+      "note": "A Linear triage-state issue is unresolved → counts as carried (NOT delivered/canceled). Locks the partition total over all six state_types: 2 of 3 = 67% atRisk, the triage issue in carried_ids.",
+      "cycle": { "number": 11 },
+      "linear_state": {
+        "issues": [
+          { "id": "BC-20", "state_type": "completed" },
+          { "id": "BC-21", "state_type": "completed" },
+          { "id": "BC-22", "state_type": "triage" }
+        ]
+      }
+    },
+    {
       "id": "empty_cycle",
       "note": "An empty cycle → 0% (no divide-by-zero) → offTrack.",
       "cycle": { "number": 10 },

@@ -66,6 +66,13 @@ want 'health 40 offTrack + canceled' '"canceled_ids": ["D"]'
 want 'health 40 offTrack + canceled' '"delivered_ids": ["A", "B"]'
 want 'health 40 offTrack + canceled' '"carried_ids": ["C", "E"]'
 
+# a Linear triage-state issue is unresolved → carried (NOT dropped); partition holds.
+decide 'triage issue carried' '{"cycle":{"number":11},"linear_state":{"issues":[{"id":"BC-20","state_type":"completed"},{"id":"BC-21","state_type":"completed"},{"id":"BC-22","state_type":"triage"}]}}'
+want 'triage issue carried' '"total": 3'
+want 'triage issue carried' '"carried_over": 1'
+want 'triage issue carried' '"carried_ids": ["BC-22"]'
+want 'triage issue carried' '"completion_rate": 67'
+
 # empty cycle → 0% offTrack (no divide-by-zero, "No issues completed").
 decide 'empty cycle 0pct' '{"cycle":{"number":9},"linear_state":{"issues":[]}}'
 want 'empty cycle 0pct' '"completion_rate": 0'

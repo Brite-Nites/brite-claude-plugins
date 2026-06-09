@@ -1796,7 +1796,8 @@ class RetrospectiveAdapter:
 
     EXPECTED_SCENARIO_IDS = (
         "onTrack_80_boundary", "atRisk_75", "atRisk_50_boundary",
-        "offTrack_40_with_canceled", "empty_cycle", "error_no_cycle",
+        "offTrack_40_with_canceled", "triage_issue_carried", "empty_cycle",
+        "error_no_cycle",
     )
 
     def build(self, fixture: dict, sandbox: Path) -> None:

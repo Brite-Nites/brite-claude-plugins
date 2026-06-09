@@ -84,6 +84,25 @@
       "health": "offTrack"
     },
     {
+      "id": "triage_issue_carried",
+      "error": null,
+      "cycle_number": 11,
+      "total": 3,
+      "completed": 2,
+      "carried_over": 1,
+      "canceled": 0,
+      "completion_rate": 67,
+      "delivered_ids": [
+        "BC-20",
+        "BC-21"
+      ],
+      "carried_ids": [
+        "BC-22"
+      ],
+      "canceled_ids": [],
+      "health": "atRisk"
+    },
+    {
       "id": "empty_cycle",
       "error": null,
       "cycle_number": 10,
