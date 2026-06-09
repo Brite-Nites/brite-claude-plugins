@@ -39,3 +39,8 @@ __pycache__/
 
 # Worktree mountpoints created by /workflows:session-start (per-session, never committed).
 .claude/worktrees/
+
+# Labs TAM raw discovery/crawl intermediates — large local scratch (10s of MB per run),
+# regenerable from the tam-map pipeline. Lightweight artifacts (icp.json, tam-config.json,
+# manifest.json, *.csv, README.md) stay tracked; the heavy raw .jsonl pulls do not.
+docs/campaigns/labs/tam/**/*.jsonl
