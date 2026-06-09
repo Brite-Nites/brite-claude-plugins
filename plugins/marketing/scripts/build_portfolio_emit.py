@@ -104,8 +104,10 @@ def _parse_frontmatter(text: str) -> dict:
         raise BuildError("packet has no frontmatter block")
     fm: dict = {}
     parent: str | None = None
+    closed = False
     for line in lines[1:]:
         if line.strip() == "---":
+            closed = True
             break
         if not line.strip():
             continue
@@ -121,6 +123,8 @@ def _parse_frontmatter(text: str) -> dict:
         else:
             fm[key] = value
             parent = None
+    if not closed:
+        raise BuildError("packet frontmatter block is unclosed (missing terminating '---')")
     if "schema_version" in fm:
         try:
             fm["schema_version"] = int(fm["schema_version"])

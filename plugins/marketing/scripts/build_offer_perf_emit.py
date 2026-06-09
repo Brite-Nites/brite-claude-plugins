@@ -104,13 +104,17 @@ def _parse_frontmatter(text: str) -> dict:
     if not lines or lines[0].strip() != "---":
         raise BuildError("performance.md has no frontmatter block")
     fm: dict = {}
+    closed = False
     for line in lines[1:]:
         if line.strip() == "---":
+            closed = True
             break
         if ":" not in line:
             continue
         key, _, value = line.partition(":")
         fm[key.strip()] = value.strip()
+    if not closed:
+        raise BuildError("performance.md frontmatter block is unclosed (missing terminating '---')")
     for k in ("schema_version", "versions_analyzed"):
         if k in fm:
             try:
