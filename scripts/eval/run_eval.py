@@ -2272,10 +2272,12 @@ class FlywheelMetricsAdapter:
             # avg_confidence range (assert_lib schema has no min/max — bind it here).
             if s["m2"]["avg_confidence"] is not None and not (0 <= s["m2"]["avg_confidence"] <= 10):
                 diffs.append(f"{tag}: m2.avg_confidence {s['m2']['avg_confidence']} out of range 0..10")
-            # monthly partition + ordering.
-            if sum(m["traces"] for m in s["monthly"]) != s["total_traces"]:
-                # (only dated traces are grouped — equal when the seed has no undated trace)
-                diffs.append(f"{tag}: sum(monthly.traces) != total_traces (an undated trace leaked?)")
+            # monthly partition + ordering. monthly is a SUBSET of total (an undated
+            # trace is legitimately excluded from grouping), so the bound is `>`, not `==`
+            # — the exact per-month counts are golden-locked. A monthly sum EXCEEDING the
+            # total is a phantom-trace inflation and is caught here.
+            if sum(m["traces"] for m in s["monthly"]) > s["total_traces"]:
+                diffs.append(f"{tag}: sum(monthly.traces) exceeds total_traces (a phantom monthly trace?)")
             if [m["month"] for m in s["monthly"]] != sorted(m["month"] for m in s["monthly"]):
                 diffs.append(f"{tag}: monthly not in ascending month order")
             if s["months"] != [m["month"] for m in s["monthly"]]:

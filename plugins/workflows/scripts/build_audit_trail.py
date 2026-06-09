@@ -46,7 +46,7 @@ import precedent_trace as pt  # noqa: E402  (BC-12945 shared precedent primitive
 SCHEMA_VERSION = 1
 COMMAND = "/workflows:audit-trail"
 
-ISSUE_ID_RE = re.compile(r"^[A-Z]+-[0-9]+$")
+ISSUE_ID_RE = re.compile(r"^[A-Z]+-[0-9]+\Z")  # \Z not $ — $ also matches before a trailing \n
 E_INVALID_ISSUE_ID = "invalid_issue_id"
 TOP_N = 5
 

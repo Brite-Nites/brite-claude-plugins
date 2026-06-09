@@ -51,7 +51,7 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 COMMAND = "/workflows:promote-precedent"
 
-ISSUE_ID_RE = re.compile(r"^[A-Z]+-[0-9]+$")
+ISSUE_ID_RE = re.compile(r"^[A-Z]+-[0-9]+\Z")  # \Z not $ — $ also matches before a trailing \n
 # Only these categories are gathered from the INDEX scan (Source B); the command's
 # Phase-1 filter. A row outside this set is never a candidate (silently ignored).
 ELIGIBLE_CATEGORIES = ("architecture", "library-selection", "trade-off")
@@ -155,8 +155,11 @@ def decide(inputs: dict) -> dict:
 
     # ── sort for review presentation: conf DESC, date DESC, id ASC (a TOTAL key) ──
     # Composed stable sorts, least-significant first (the sort_backlog tiebreak lesson).
+    # EVERY key is total: a non-string date or non-int confidence in an injected row
+    # must not raise (the exit-2-or-clean contract — a degenerate `date: 123` cell from
+    # a malformed INDEX/Linear read coerces to "" rather than crashing the whole emit).
     candidates.sort(key=lambda c: c["issue_id"])
-    candidates.sort(key=lambda c: c.get("date") or "", reverse=True)
+    candidates.sort(key=lambda c: c["date"] if isinstance(c.get("date"), str) else "", reverse=True)
     candidates.sort(key=lambda c: c["confidence"] if isinstance(c.get("confidence"), int) else -1,
                     reverse=True)
 

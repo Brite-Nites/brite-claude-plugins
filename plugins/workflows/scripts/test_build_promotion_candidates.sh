@@ -111,10 +111,21 @@ e = bp.decide({})
 eq("empty candidates", e["candidates"], [])
 eq("empty summary total", e["summary"]["total"], 0)
 
+# ── DEFENSIVE: a malformed injected `date` (non-string) must NOT crash the sort ──
+# (the BC-12944 P1 regression class — a non-total sort key over int<str). Two
+# eligible candidates force a comparison; the int-dated row coerces to "" (sorts last).
+md = bp.decide({"linear_candidates": [
+    {"issue_id": "BC-100", "decision": "good date", "confidence": 9, "date": "2026-04-01", "category": "architecture"},
+    {"issue_id": "BC-101", "decision": "int date", "confidence": 9, "date": 123, "category": "architecture"},
+    {"issue_id": "BC-102", "decision": "bool date", "confidence": 9, "date": True, "category": "architecture"},
+]})
+eq("malformed date does not crash; well-dated sorts first",
+   [c["issue_id"] for c in md["candidates"]], ["BC-100", "BC-101", "BC-102"])
+
 # ── SECURITY: injection / traversal ids reject with NO side effect ────────────
 box = tempfile.mkdtemp()
 try:
-    for evil in ['../../etc/passwd', '$(touch pwned)', 'BC-1; touch pwned', '`touch pwned`', 'bc-1']:
+    for evil in ['../../etc/passwd', '$(touch pwned)', 'BC-1; touch pwned', '`touch pwned`', 'bc-1', 'BC-1\n']:
         r = bp.decide({"linear_candidates": [
             {"issue_id": evil, "decision": "x", "confidence": 9, "date": "2026-04-01", "category": "architecture"}]})
         eq(f"guard rejects {evil!r}", verdict(r["candidates"], evil), "rejected_invalid_id")

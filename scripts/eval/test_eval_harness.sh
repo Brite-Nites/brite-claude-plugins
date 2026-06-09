@@ -882,6 +882,12 @@ mutate_canon analytics "$AN" analytics-emit.json "success pct arithmetic" "int(s
 # success>total invariant: a fraction with more successes than runs.
 mutate_canon analytics "$AN" analytics-emit.json "success exceeds total" "> total" \
   'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["success_rates"][0]["success"]=99; json.dump(d,open(p,"w"))'
+# success-rate denominator guard: a zero total (would be a div-by-zero in the % math).
+mutate_canon analytics "$AN" analytics-emit.json "success-rate total zero" "non-positive total" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["success_rates"][0]["total"]=0; json.dump(d,open(p,"w"))'
+# command frequency guard: a non-positive count.
+mutate_canon analytics "$AN" analytics-emit.json "command count non-positive" "non-positive count" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["commands"][-1]["count"]=0; json.dump(d,open(p,"w"))'
 # rendered-row completeness: a rendered dashboard loses its sessions count.
 mutate_canon analytics "$AN" analytics-emit.json "rendered row drops a detail" "must carry a non-null sessions" \
   'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["sessions"]=None; json.dump(d,open(p,"w"))'
@@ -914,8 +920,8 @@ else
   echo "  FAIL  artifact missing: flywheel-metrics-emit.json"; fail=$((fail + 1))
 fi
 echo "── flywheel-metrics self-test (mutated matrix → RED) ──"
-# M2 trend: the declining trend is flipped (golden-locked).
-mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "trend flipped" "trend" \
+# M2 trend: the declining trend is flipped (golden-locked — assert the specific field).
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "trend flipped" "m2.trend: golden 'declining'" \
   'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; s["m2"]["trend"]="improving"; json.dump(d,open(p,"w"))'
 # M3 coverage arithmetic: pct no longer matches covered/total.
 mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "cdr coverage arithmetic" "round(covered/total*100)" \
@@ -929,8 +935,9 @@ mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "denominator vs f
 # classification bind: a skip-band doc wrongly flagged in_denominator.
 mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "in_denominator vs band" "in_denominator" \
   'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; f=[x for x in s["freshness_detail"] if x["band"]=="on-change (skip)"][0]; f["in_denominator"]=True; json.dump(d,open(p,"w"))'
-# fresh↔band: an Aging doc wrongly flagged fresh.
-mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "fresh vs band" "fresh" \
+# fresh↔band: an Aging doc wrongly flagged fresh (assert the invariant-unique fragment,
+# not the bare "fresh" stem which the golden compare also emits).
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "fresh vs band" "inconsistent with band 'Aging'" \
   'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; f=[x for x in s["freshness_detail"] if x["band"]=="Aging"][0]; f["fresh"]=True; json.dump(d,open(p,"w"))'
 # M1/M5 closed set: M1 is no longer N/A (the schema `const` pins it).
 mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "m1 not N/A" "expected const 'N/A'" \
@@ -968,8 +975,9 @@ echo "── audit-trail self-test (mutated matrix → RED) ──"
 # error-row no-read: a rejected issue-id row wrongly carries a corpus read.
 mutate_canon audit-trail "$AT" audit-trail-emit.json "error row carries a read" "error row must not carry any corpus read" \
   'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="invalid_issue_id_traversal"][0]; s["trace_count"]=0; json.dump(d,open(p,"w"))'
-# trace_count mirrors the traces list length.
-mutate_canon audit-trail "$AT" audit-trail-emit.json "trace_count drift" "trace_count" \
+# trace_count mirrors the traces list length (assert the invariant-unique fragment,
+# not the bare "trace_count" which the golden compare also emits).
+mutate_canon audit-trail "$AT" audit-trail-emit.json "trace_count drift" "!= len(traces)" \
   'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_with_traces"][0]; s["trace_count"]=3; json.dump(d,open(p,"w"))'
 # frequency ordering: most_referenced no longer (count desc, path asc).
 mutate_canon audit-trail "$AT" audit-trail-emit.json "frequency ordering" "ordered by (count desc, path asc)" \
@@ -1188,8 +1196,8 @@ echo ""
 # workflows blocks (raise-a-ticket + report-issue + retrospective + sprint-planning: +92 =
 # 4 × (3 GREEN + 7-10×2 mutations + 2 hermeticity), live total 336), then 319→410 with the
 # BC-12945 Batch-D workflows precedent/telemetry blocks (analytics WRAP + flywheel-metrics +
-# audit-trail seed-read + promote-precedent inject-the-reads: +96 = 4 × (3 GREEN + 6-11×2
-# mutations + 2 hermeticity), live total 432) — so losing any one command's eval block trips
+# audit-trail seed-read + promote-precedent inject-the-reads: +100 = 4 × (3 GREEN + 6-11×2
+# mutations + 2 hermeticity), live total 436) — so losing any one command's eval block trips
 # the floor rather than passing. Held at ~95% of the live count to tolerate a single
 # intentional assertion edit.
 FLOOR=410

@@ -97,7 +97,7 @@ def decide_id(issue_id):
         shutil.rmtree(box, ignore_errors=True)
 
 for evil in ['../../etc/passwd', '$(touch pwned)', 'BC-1; touch pwned',
-             '`touch pwned`', 'bc-9101', 'BC9101', '', 'BC-1/../../x']:
+             '`touch pwned`', 'bc-9101', 'BC9101', '', 'BC-1/../../x', 'BC-9101\n']:
     row, side = decide_id(evil)
     eq(f"guard rejects {evil!r}", row["error"], "invalid_issue_id")
     eq(f"guard reads nothing for {evil!r}", row["trace_file_exists"], False)
