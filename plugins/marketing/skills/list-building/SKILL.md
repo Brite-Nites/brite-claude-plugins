@@ -51,12 +51,13 @@ Read in priority order (per [ADR-008](../../../../docs/decisions/008-tam-mapping
 1. `--enrichment-provider <id>` flag if passed.
 2. `${user_config.enrichment_provider}` from plugin.json `userConfig` if explicitly set.
 3. **Auto-detect** (when both above are unset):
-   1. Check for brite-enrichment MCP registration in the active session → use `brite_mcp`.
-   2. Else check for brite-enrichment CLI at `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` → use `brite_cli`.
-   3. Else fall through to `blitz_waterfall`.
+   1. Check for brite-enrichment CLI at `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` → use `brite_cli`.
+   2. Else fall through to `blitz_waterfall`.
 4. `skip` is never auto-selected; it must be passed explicitly.
 
-The resolved provider is logged at skill invocation so the user sees which path ran (e.g., `[list-building] enrichment_provider=blitz_waterfall (auto-detected; brite-enrichment MCP not registered, $BRITE_DATA_PLATFORM unset)`). The 4-row enum table is the canonical source — see [tam-mapping § 3 Phase 5](../tam-mapping/SKILL.md) for per-value implementation and fallback messages (single source of truth across both skills per ADR-008).
+`brite_mcp` is **opt-in only** during the choice-now-default-later interim (BC-6170) — it is **not** auto-selected even when the brite-enrichment MCP is registered. Reach it via the `--enrichment-provider brite_mcp` flag or `${user_config.enrichment_provider}`. It is intentionally **not** in this skill's `allowed-tools` yet — an explicit opt-in that finds `bulk_enrich` absent in-session falls through to `blitz_waterfall`. **Two prerequisites must land together (a config-invariant pair): the BC-5316 redeploy of the published server with `bulk_enrich` AND this skill's `allowed-tools` grant — shipping one without the other leaves the opt-in silently inoperative.** When both land (plus an engine-maturity sign-off), ADR-008's Future Work flip moves `brite_mcp` to the front of this cascade as the default.
+
+The resolved provider is logged at skill invocation so the user sees which path ran (e.g., `[list-building] enrichment_provider=blitz_waterfall (auto-detected; $BRITE_DATA_PLATFORM unset → brite_cli unavailable)`). The 4-row enum table is the canonical source — see [tam-mapping § 3 Phase 5](../tam-mapping/SKILL.md) for per-value implementation and fallback messages (single source of truth across both skills per ADR-008).
 
 ### Resume detection
 
@@ -137,7 +138,7 @@ Organized by phase + reason. Every row cites an ADR or a source file.
 | EB-exclusion availability check (Sources 2/3) | `mcp__emailbison-b2b__get_active_workspace_info` + `mcp__emailbison-personal__get_active_workspace_info` + `mcp__plugin_marketing_salesforce__run_soql_query` (`SELECT Id FROM User LIMIT 1`) | EB workspaces 55/13 + brite-salesforce prod | ADR 2a (Salesforce CRM SoR; EB sole sequencer); 3-probe parallel batch mirrors tam-mapping § 3 Phase 4.5 |
 | EB-exclusion bulk pagination (Sources 2/3) | `mcp__emailbison-b2b__list_leads` + `mcp__emailbison-personal__list_leads` | both EB workspaces | ADR 2a (two-workspace requirement) |
 | SF Lead suppression read (Sources 2/3) | `mcp__plugin_marketing_salesforce__run_soql_query` with `SELECT Id, Email, Status FROM Lead WHERE Email IN (:emails) LIMIT 2000` | brite-salesforce prod | `salesforce.md` § Common workflows → Lead suppression read |
-| Contact-discovery enrichment (provider-routed) | `Bash` → `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py` (default) OR `mcp__plugin_marketing_enrichment__*` (when GA via BC-5538 + BC-6170) | BlitzAPI + Prospeo (default) OR brite-enrichment (future) | [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pluggability.md) enrichment pluggability |
+| Contact-discovery enrichment (provider-routed) | `Bash` → `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py` (default) OR `mcp__plugin_marketing_enrichment__bulk_enrich` (opt-in `brite_mcp`; routes the list through the bulk door, pending BC-5316 redeploy) | BlitzAPI + Prospeo (default) OR brite-enrichment bulk door (opt-in) | [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pluggability.md) + ADR-017 enrichment pluggability |
 | SMTP verify | `Bash` → `plugins/marketing/scripts/bw-run.sh MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key -- python plugins/marketing/scripts/tam-map/verify_smtp.py` | MillionVerifier | Same script as tam-mapping § 3 Phase 6 (single source of truth) |
 | Contact-context augmentation (Step 1 fallback when enrichment provider returns no LinkedIn URL) | `mcp__plugin_marketing_spider__*` | Spider.cloud | Crawl homepage + `/about` + `/contact` for an inline LinkedIn link; only invoked when enrichment provider misses Step 1 |
 
@@ -168,7 +169,7 @@ Organized by phase + reason. Every row cites an ADR or a source file.
   - ABC tiering / ICP scoring → `icp-scoring` (BC-5831).
   - Sequence design + EB campaign activation → `campaign-orchestration` (BC-2718) + `launch-campaign` (BC-5826).
   - dbt model design + Snowflake materialization → `brite-data-platform`.
-  - Enrichment provider implementation → `services/enrichment/cli.py` in brite-data-platform (or BC-5538 future MCP).
+  - Enrichment provider implementation → `services/enrichment/cli.py` in brite-data-platform (or the brite-enrichment `bulk_enrich` door → REST `/enrich/batch`, pending BC-5316).
 
 ---
 
@@ -280,7 +281,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 3. Switch on `enrichment_provider` enum. The 4-row enum table is the canonical source — see [tam-mapping § 3 Phase 5](../tam-mapping/SKILL.md) for per-value invocation, fallback message, and status. Quick reference:
    - `blitz_waterfall` (default): `Bash` → `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input.jsonl> --out enriched.jsonl`. The script accepts only `--in` + `--out` (verify against the script's argparse before invocation). Title-tier filtering and `--max-contacts-per-company` are **skill-layer concerns**: pre-filter the input JSONL to drop non-target titles before invoking the script, and post-filter `enriched.jsonl` to dedup by `domain` keeping the top-N entries by tier rank (T1 > T2 > T3).
    - `brite_cli`: `Bash` → shell to `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` (subcommand and flags TBD per ADR-008 — verify against the actual `cli.py` argparse surface before invocation; falls through to `blitz_waterfall` if `$BRITE_DATA_PLATFORM` unset).
-   - `brite_mcp`: emit "pending BC-5537/5538 GA" message, fall through to `blitz_waterfall`. (Will flip when BC-6170 lands.)
+   - `brite_mcp` (opt-in): route the ENTIRE candidate list through the `bulk_enrich` bulk door (→ REST `/enrich/batch`, per [ADR-017](https://github.com/Brite-Nites/brite-data-platform/blob/main/docs/decisions/017-bulk-enrichment-door.md)) — **never** a per-company loop of single `enrich_contacts` calls. If `bulk_enrich` is unavailable in-session (distributed installs until BC-5316 redeploys the plugin server with it), log `brite_mcp selected but bulk_enrich unavailable — using blitz_waterfall (pending BC-5316)` and run `blitz_waterfall`.
    - `skip`: pass-through unenriched (testing only).
 4. **Step 1 conditionally** at the skill layer: skip per-record if `linkedin_url` already present in input row. When Step 1 is needed and the enrichment provider misses (returns no LinkedIn URL), fall back to Spider crawl of homepage + `/about` + `/contact` for an inline LinkedIn link.
 
@@ -443,7 +444,7 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 | 10 | Detects input source correctly (auto from flag or via `AskUserQuestion`). Runs/skips Workflow 2 per the source-routing table (skip Source 1, run Sources 2/3). Cost gate fires before Workflow 3 with the verbatim `estimated enrichment cost:` string. Workflow 4 uses the shared `verify_smtp.py` script. Free-email filter applied (rows routed to `personal-contacts.csv`, never in `enriched_leads.csv`). References ADR-008 for enrichment pluggability. Cross-links to BC-5832 / BC-5826 / BC-5831 / BC-2718 are present. SF MCP `directory` param handled (auto-detect or `--sfdx-project-dir`). Resume detection works without restarting from Workflow 1. |
 | 7-9 | Functional but skips one verification — e.g. forgets the cost-gate verbatim string, OR skips the free-email filter, OR runs Workflow 2 against only one EB workspace. Output is functional but missing one architectural rule. |
 | 4-6 | Runs the workflows but mixes free-email rows into `enriched_leads.csv` OR skips Workflow 2 when source is dbt-CSV/manual-CSV OR uses pattern-based email recovery (`info@`, `contact@`, `hello@`) on single-location businesses OR restarts from Workflow 1 on resume. Functional but violates a core rule. |
-| 1-3 | Hallucinates input-source detection. Calls unregistered MCP servers (e.g., `mcp__plugin_marketing_enrichment__*` before BC-5538 GA per BC-6170). Skips Workflow 2 cost protection — pulls enrichment credits blind. Outputs `gmail`/`yahoo` addresses in `enriched_leads.csv`. Hard-fails silently. |
+| 1-3 | Hallucinates input-source detection. Calls unregistered MCP tools (e.g., `mcp__plugin_marketing_enrichment__bulk_enrich` before it exists on the published server — pending BC-5316 — instead of falling through to `blitz_waterfall`). Skips Workflow 2 cost protection — pulls enrichment credits blind. Outputs `gmail`/`yahoo` addresses in `enriched_leads.csv`. Hard-fails silently. |
 
 ---
 
@@ -477,4 +478,4 @@ Typical exclusion rate: 20–40% (matches tam-mapping § 3 Phase 4.5 cited avera
 6. If `docs/marketing-context.md` exists, output must reference Brite entity from that file when applying the ICP title cascade.
 7. If `mcp__emailbison-b2b__get_active_workspace_info` returns auth failure with source ∈ {dbt-CSV, manual-CSV}, skill HARD-FAILS at Workflow 2 — does NOT proceed to Workflow 3.
 8. If source is tam-mapping output AND `mcp__emailbison-b2b__get_active_workspace_info` is auth-failed, skill PROCEEDS (Workflow 2 skipped per source routing — exclusion already ran upstream).
-9. If `${user_config.enrichment_provider}` is `brite_mcp` and the MCP is unavailable, output emits "pending BC-5537/5538 GA" message and falls through to `blitz_waterfall` (will flip when BC-6170 ships).
+9. If `${user_config.enrichment_provider}` is `brite_mcp` and `bulk_enrich` is unavailable in-session, output emits `brite_mcp selected but bulk_enrich unavailable — using blitz_waterfall (pending BC-5316)` and falls through to `blitz_waterfall`.
