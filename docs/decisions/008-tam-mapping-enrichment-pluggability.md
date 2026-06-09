@@ -58,7 +58,7 @@ Add to `plugins/marketing/plugin.json`:
 |-------|---------------|
 | `blitz_waterfall` | Upstream Revgrowth1/tam-map default. BlitzAPI → Prospeo via stdio MCP wrappers registered in `plugins/marketing/.mcp.json`. |
 | `brite_cli` | Shell out to `services/enrichment/cli.py` in `brite-data-platform`. Requires `BRITE_DATA_PLATFORM` env var pointing to the repo checkout. Works today. |
-| `brite_mcp` | Call brite-enrichment MCP. Requires BC-5538 shipped and MCP registered in `plugins/marketing/.mcp.json`. |
+| `brite_mcp` | Route the candidate list through the brite-enrichment MCP `bulk_enrich` bulk door (→ REST `/enrich/batch`, per ADR-017 in brite-data-platform) — never a per-company loop. Requires the published `plugin_marketing_enrichment` server redeployed with `bulk_enrich` (BC-5316) and registered in `plugins/marketing/.mcp.json`. |
 | `skip` | Pass candidate companies through unenriched. Downstream tools (BC-2717 list-building) handle enrichment separately. |
 
 **Unset resolution order** (when `enrichment_provider` not configured):
@@ -67,6 +67,8 @@ Add to `plugins/marketing/plugin.json`:
 2. Else check for brite-enrichment CLI at `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` → use `brite_cli`
 3. Else fall through to `blitz_waterfall`
 4. `skip` is never auto-selected; it must be explicit.
+
+> **Interim deviation (BC-6170, choice-now-default-later).** The order above is the **target** end-state. Until the published plugin server is redeployed with `bulk_enrich` (BC-5316) and the engine is judged production-solid, `brite_mcp` is **removed from auto-detect** and is reachable only by explicit flag / `userConfig`; auto-detect resolves to `brite_cli` (if present) else `blitz_waterfall`. The BC-5316 flip restores step 1 as written. See Future Work below.
 
 The resolved provider is logged at skill invocation so the user sees which path ran.
 
@@ -147,6 +149,6 @@ Smoke tests run in CI and on every `./scripts/validate.sh` invocation.
 - `confidence_score` numeric precision is lossy for providers that emit categorical confidence (mapping "medium" → 0.6 is arbitrary). Users who need provider-native confidence should inspect `provider_raw`.
 
 **Future work.**
-- When BC-5538 ships, flip the auto-detect order so `brite_mcp` is preferred and the CLI fallback is removed from auto-detect (but remains available as explicit config).
+- ~~When BC-5538 ships, flip the auto-detect order so `brite_mcp` is preferred and the CLI fallback is removed from auto-detect (but remains available as explicit config).~~ **Partially shipped in BC-6170:** `brite_mcp` is now a documented, **selectable opt-in** (via flag / `userConfig`; the `allowed-tools` grant is deferred to the BC-5316 redeploy so an opt-in resolves to `blitz_waterfall` until then) in both `list-building` and `tam-mapping` (routing through the `bulk_enrich` bulk door per ADR-017, never a single-call loop). The auto-detect **default-flip** is deferred — gated on the published `plugin_marketing_enrichment` server being redeployed with `bulk_enrich` (BC-5316, not BC-5538) plus an engine-maturity sign-off. At that flip, restore step 1 of the Unset resolution order and drop the interim-deviation note.
 - Schema amendment for intent signals (e.g., tech stack, funding round) can be added as optional output fields without breaking consumers.
 - Extending to B2C/residential enrichment (for Brite Nites verticals) may require a separate ADR since the record shape differs (person-first vs company-first).
