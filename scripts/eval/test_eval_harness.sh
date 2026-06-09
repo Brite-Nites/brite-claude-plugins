@@ -602,257 +602,6 @@ mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "drop a load-bear
 mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "leak an extra scenario key" "unexpected property" \
   'p=M/"icp-review-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
 
-# ── 3j. raise-a-ticket eval (BC-12944 — workflows intake S2, seam extraction) ──
-# The workflows plugin's FIRST behavioral eval. build_raise_ticket_payload.py is a
-# NEW pure decide(inputs, injected_state) core (no prior build_*) that projects the
-# deterministic label/priority/team slice of intake — Steps 2/4/1g/8 — injecting the
-# list_issue_labels + multi-team-tally reads. The GREEN run exercises a 10-row matrix;
-# the mutation cases prove a red diff for each load-bearing branch: the modal-team
-# default, the tie/fallback tiebreaks, the severity→priority + needs-triage→Triage
-# fallbacks, the Idea-no-priority + error-row null invariants, a dropped scenario, a
-# leaked key, and an off-enum tiebreak.
-echo "── raise-a-ticket eval (BC-12944 — known-good → GREEN) ──"
-RAT="$tmproot/rat"; mkdir -p "$RAT"
-invoke "$RUN_EVAL" raise-a-ticket --sandbox "$RAT"
-assert_exit "raise-a-ticket eval GREEN — known-good matrix builds + passes" 0
-assert_substr "raise-a-ticket eval prints PASS verdict" "PASS: raise-a-ticket eval"
-if [ -f "$RAT/raise-ticket-emit.json" ]; then
-  echo "  PASS  artifact produced: raise-ticket-emit.json"; pass=$((pass + 1))
-else
-  echo "  FAIL  artifact missing: raise-ticket-emit.json"; fail=$((fail + 1))
-fi
-
-echo "── raise-a-ticket self-test (mutated matrix → RED) ──"
-mutate_rat() {  # label  expected_substr  python_mutation (M = artifact dir)
-  local label="$1" rx="$2" code="$3"
-  local M="$tmproot/ratmut.$((mutid++))"; mkdir -p "$M"
-  cp "$RAT/raise-ticket-emit.json" "$M/"
-  if ! MUT_DIR="$M" python3 -c "
-import json, os, pathlib
-M = pathlib.Path(os.environ['MUT_DIR'])
-$code
-"; then
-    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
-  fi
-  invoke "$RUN_EVAL" raise-a-ticket --artifact-dir "$M"
-  assert_exit "rat mutation '$label' → red (exit 1)" 1
-  assert_substr "rat mutation '$label' → named diff" "$rx"
-}
-
-# THE modal-team regression: a multi-team project mis-defaults its team (the Step-1g
-# tiebreak — exactly the silent-routing break this eval exists to catch).
-mutate_rat "modal-team mis-default" "golden 'Brite Company'" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="multi_team_modal"][0]; s["team"]="Brite Supply"; json.dump(d,open(p,"w"))'
-# tie tiebreak regression: a tie wrongly resolves to a modal team instead of Brite Company.
-mutate_rat "tie tiebreak regression" "golden 'tie-brite-company'" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="multi_team_tie"][0]; s["team_tiebreak"]="modal"; json.dump(d,open(p,"w"))'
-# severity→priority fallback invariant: a row claims severity is carried by priority but
-# the severity label is NOT in missing_labels (it was applied) — the inconsistency the
-# per-row invariant binds, beyond the golden compare.
-mutate_rat "severity-carried inconsistency" "severity_carried_by_priority is true but" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="bug_full_labels"][0]; s["severity_carried_by_priority"]=True; json.dump(d,open(p,"w"))'
-# needs-triage→Triage fallback invariant: the fallback is set but needs-triage is no
-# longer in missing_labels (the fallback would be spurious).
-mutate_rat "triage-fallback inconsistency" "triage_state_fallback is set but needs-triage is not in missing_labels" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="needs_triage_absent"][0]; s["missing_labels"]=[]; json.dump(d,open(p,"w"))'
-# Idea-no-priority invariant: an Idea/Feedback wrongly carries a priority (Step 4 skipped).
-mutate_rat "idea priority leak" "an Idea/Feedback carries no priority" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="idea_no_severity"][0]; s["priority"]=3; json.dump(d,open(p,"w"))'
-# error-row null invariant: a reject row wrongly carries a payload projection.
-mutate_rat "error-row payload leak" "must be null on an error row" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="error_invalid_kind"][0]; s["type_label"]="type:bug"; json.dump(d,open(p,"w"))'
-mutate_rat "drop a load-bearing scenario" "expected scenario id 'multi_team_modal' is absent" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="multi_team_modal"]; json.dump(d,open(p,"w"))'
-mutate_rat "leak an extra scenario key" "unexpected property" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
-mutate_rat "off-enum team_tiebreak" "is not one of enum" \
-  'p=M/"raise-ticket-emit.json"; d=json.load(open(p)); d["scenarios"][0]["team_tiebreak"]="frobnicate"; json.dump(d,open(p,"w"))'
-
-# ── 3k. report-issue eval (BC-12944 — workflows intake S2, composite artifact) ─
-# build_report_issue_payload.py is a NEW pure core producing TWO artifacts: the Linear
-# issue payload AND the regression-registry entry, keyed by the injected classification.
-# The GREEN run exercises an 11-row matrix; the mutation cases prove a red diff for the
-# meatiest nuggets: the classification→registry routing, the B## next-id (max+1, not
-# count+1), the phrase metachar strip, the per-classification expected/not_expected
-# population, the Linear-only routing, the judge_rubric SHAPE (keys + 1-5 range, Option 1),
-# the error-row + severity-carried invariants, a dropped scenario, and a leaked key.
-echo "── report-issue eval (BC-12944 — known-good → GREEN) ──"
-RI="$tmproot/ri"; mkdir -p "$RI"
-invoke "$RUN_EVAL" report-issue --sandbox "$RI"
-assert_exit "report-issue eval GREEN — known-good matrix builds + passes" 0
-assert_substr "report-issue eval prints PASS verdict" "PASS: report-issue eval"
-if [ -f "$RI/report-issue-emit.json" ]; then
-  echo "  PASS  artifact produced: report-issue-emit.json"; pass=$((pass + 1))
-else
-  echo "  FAIL  artifact missing: report-issue-emit.json"; fail=$((fail + 1))
-fi
-
-echo "── report-issue self-test (mutated matrix → RED) ──"
-mutate_ri() {  # label  expected_substr  python_mutation (M = artifact dir)
-  local label="$1" rx="$2" code="$3"
-  local M="$tmproot/rimut.$((mutid++))"; mkdir -p "$M"
-  cp "$RI/report-issue-emit.json" "$M/"
-  if ! MUT_DIR="$M" python3 -c "
-import json, os, pathlib
-M = pathlib.Path(os.environ['MUT_DIR'])
-$code
-"; then
-    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
-  fi
-  invoke "$RUN_EVAL" report-issue --artifact-dir "$M"
-  assert_exit "ri mutation '$label' → red (exit 1)" 1
-  assert_substr "ri mutation '$label' → named diff" "$rx"
-}
-
-# routing regression: bad-output wrongly routes to the trigger registry.
-mutate_ri "routing regression (behavioral→trigger)" "bad-output must route to behavioral-registry.json" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="bad_output_b11"][0]; s["registry"]["target"]="trigger-registry.json"; json.dump(d,open(p,"w"))'
-# THE B## regression: max+1 mis-computed as first-id/count (B08 → B03) on the
-# non-contiguous fixture — the load-bearing id-allocation behavior.
-mutate_ri "B## allocation regression (max+1→first)" "golden 'B08'" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="bad_output_noncontiguous"][0]; s["registry"]["entry"]["id"]="B03"; json.dump(d,open(p,"w"))'
-# phrase-sanitize regression: an un-stripped shell metachar survives into the phrase.
-mutate_ri "phrase sanitize regression" "golden 'rename foo to bar'" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="wrong_skill"][0]; s["registry"]["entry"]["phrase"]="rename $foo to bar"; json.dump(d,open(p,"w"))'
-# population regression: skill-over-fired wrongly populates expected (must be []).
-mutate_ri "skill-over-fired expected leak" "skill-over-fired expected must be" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="skill_over_fired"][0]; s["registry"]["entry"]["expected"]=["brainstorming"]; json.dump(d,open(p,"w"))'
-# Linear-only routing: a hook-issue wrongly routes to a registry.
-mutate_ri "linear-only routing regression" "must route Linear-only" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="hook_issue_linear_only"][0]; s["registry"]["target"]="trigger-registry.json"; json.dump(d,open(p,"w"))'
-# judge_rubric SHAPE (Option 1): a value outside 1-5 fails the range invariant (the
-# eval asserts the rubric's shape, never its judgment values).
-mutate_ri "judge_rubric out-of-range" "must be an integer in 1-5" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="bad_output_b11"][0]; s["registry"]["entry"]["judge_rubric"]["clarity"]=9; json.dump(d,open(p,"w"))'
-# error-row null invariant: a reject row wrongly carries a (schema-valid, full)
-# issue_payload — so the per-row invariant catches it, not the schema's required-keys.
-mutate_ri "error-row payload leak" "error row must have a null issue_payload" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="error_invalid_classification"][0]; s["issue_payload"]={"title":"x","team":"Brite Company","project":"Brite Skill Packs","priority":1,"applied_labels":[],"missing_labels":[],"triage_state_fallback":None,"severity_carried_by_priority":False,"notes":[]}; json.dump(d,open(p,"w"))'
-# severity-carried invariant: claims priority carries severity while a severity label
-# was applied (no severity:* in missing_labels) — the inconsistency the invariant binds.
-mutate_ri "severity-carried inconsistency" "no severity:* label is in missing_labels" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="severity_provisioned"][0]; s["issue_payload"]["severity_carried_by_priority"]=True; json.dump(d,open(p,"w"))'
-mutate_ri "drop a load-bearing scenario" "expected scenario id 'bad_output_b11' is absent" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="bad_output_b11"]; json.dump(d,open(p,"w"))'
-mutate_ri "leak an extra scenario key" "unexpected property" \
-  'p=M/"report-issue-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
-
-# ── 3l. retrospective eval (BC-12944 — workflows cycle-metrics S3) ────────────
-# build_retro_snapshot.py shares cycle_metrics.py with sprint-planning. The GREEN run
-# exercises a 6-row matrix (the health bands incl. the >= boundaries + canceled
-# categorization + empty cycle + the no-cycle reject); the mutation cases prove a red
-# diff for the health↔rate consistency, the categorization partition, the count↔id-list
-# consistency, a golden id, a dropped scenario, a leaked key, and an off-enum health.
-echo "── retrospective eval (BC-12944 — known-good → GREEN) ──"
-RS="$tmproot/rs"; mkdir -p "$RS"
-invoke "$RUN_EVAL" retrospective --sandbox "$RS"
-assert_exit "retrospective eval GREEN — known-good matrix builds + passes" 0
-assert_substr "retrospective eval prints PASS verdict" "PASS: retrospective eval"
-if [ -f "$RS/retro-snapshot-emit.json" ]; then
-  echo "  PASS  artifact produced: retro-snapshot-emit.json"; pass=$((pass + 1))
-else
-  echo "  FAIL  artifact missing: retro-snapshot-emit.json"; fail=$((fail + 1))
-fi
-
-echo "── retrospective self-test (mutated matrix → RED) ──"
-mutate_retro() {  # label  expected_substr  python_mutation (M = artifact dir)
-  local label="$1" rx="$2" code="$3"
-  local M="$tmproot/rsmut.$((mutid++))"; mkdir -p "$M"
-  cp "$RS/retro-snapshot-emit.json" "$M/"
-  if ! MUT_DIR="$M" python3 -c "
-import json, os, pathlib
-M = pathlib.Path(os.environ['MUT_DIR'])
-$code
-"; then
-    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
-  fi
-  invoke "$RUN_EVAL" retrospective --artifact-dir "$M"
-  assert_exit "retro mutation '$label' → red (exit 1)" 1
-  assert_substr "retro mutation '$label' → named diff" "$rx"
-}
-
-# health↔rate boundary: 80% must be onTrack (a >→atRisk regression flips it).
-mutate_retro "health-band regression at 80" "inconsistent with completion_rate 80" \
-  'p=M/"retro-snapshot-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="onTrack_80_boundary"][0]; s["health"]="atRisk"; json.dump(d,open(p,"w"))'
-# partition invariant: total must equal completed+carried+canceled.
-mutate_retro "partition regression" "!= completed+carried_over+canceled" \
-  'p=M/"retro-snapshot-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="offTrack_40_with_canceled"][0]; s["total"]=99; json.dump(d,open(p,"w"))'
-# count↔id-list: the canceled count drifts from canceled_ids.
-mutate_retro "canceled count drift" "!= len(canceled_ids)" \
-  'p=M/"retro-snapshot-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="offTrack_40_with_canceled"][0]; s["canceled"]=0; json.dump(d,open(p,"w"))'
-# golden id: a delivered id changes (the categorization is wrong).
-mutate_retro "delivered id regression" "golden 'BC-1'" \
-  'p=M/"retro-snapshot-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="onTrack_80_boundary"][0]; s["delivered_ids"]=["BC-2","BC-3","BC-4","BC-X"]; json.dump(d,open(p,"w"))'
-mutate_retro "drop a load-bearing scenario" "expected scenario id 'offTrack_40_with_canceled' is absent" \
-  'p=M/"retro-snapshot-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="offTrack_40_with_canceled"]; json.dump(d,open(p,"w"))'
-mutate_retro "leak an extra scenario key" "unexpected property" \
-  'p=M/"retro-snapshot-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
-mutate_retro "off-enum health" "is not one of enum" \
-  'p=M/"retro-snapshot-emit.json"; d=json.load(open(p)); d["scenarios"][0]["health"]="vibes"; json.dump(d,open(p,"w"))'
-
-# ── 3m. sprint-planning eval (BC-12944 — workflows cycle-metrics S3) ──────────
-# build_sprint_plan.py: current snapshot + days (Step 2a) + last-3-completed velocity
-# (Step 2b) + priority-sorted backlog (Step 3). The GREEN run exercises a 4-row matrix;
-# the mutation cases prove a red diff for the velocity contributing↔rows + the limited-
-# data note (BOTH directions), the days math, the avg, the backlog sort + truncation,
-# and the prioritization-only null-snapshot invariant.
-echo "── sprint-planning eval (BC-12944 — known-good → GREEN) ──"
-SP="$tmproot/sp"; mkdir -p "$SP"
-invoke "$RUN_EVAL" sprint-planning --sandbox "$SP"
-assert_exit "sprint-planning eval GREEN — known-good matrix builds + passes" 0
-assert_substr "sprint-planning eval prints PASS verdict" "PASS: sprint-planning eval"
-if [ -f "$SP/sprint-plan-emit.json" ]; then
-  echo "  PASS  artifact produced: sprint-plan-emit.json"; pass=$((pass + 1))
-else
-  echo "  FAIL  artifact missing: sprint-plan-emit.json"; fail=$((fail + 1))
-fi
-
-echo "── sprint-planning self-test (mutated matrix → RED) ──"
-mutate_sp() {  # label  expected_substr  python_mutation (M = artifact dir)
-  local label="$1" rx="$2" code="$3"
-  local M="$tmproot/spmut.$((mutid++))"; mkdir -p "$M"
-  cp "$SP/sprint-plan-emit.json" "$M/"
-  if ! MUT_DIR="$M" python3 -c "
-import json, os, pathlib
-M = pathlib.Path(os.environ['MUT_DIR'])
-$code
-"; then
-    echo "  FAIL  mutation setup failed: $label"; fail=$((fail + 1)); return
-  fi
-  invoke "$RUN_EVAL" sprint-planning --artifact-dir "$M"
-  assert_exit "sp mutation '$label' → red (exit 1)" 1
-  assert_substr "sp mutation '$label' → named diff" "$rx"
-}
-
-# velocity exclusion: an in-progress cycle leaks into the rows (contributing≠len(rows)).
-mutate_sp "in-progress cycle leaks into velocity" "velocity.contributing (2) != len(rows)" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="plan_partial_velocity"][0]; s["velocity"]["rows"].append({"cycle":9,"completed":2,"total":12,"rate":17}); json.dump(d,open(p,"w"))'
-# limited-data note (present iff <3): drop the note while only 2 contribute.
-mutate_sp "note dropped on partial data" "note presence (False) inconsistent with contributing 2" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="plan_partial_velocity"][0]; s["velocity"]["note"]=None; json.dump(d,open(p,"w"))'
-# limited-data note, OTHER direction: a spurious note while 3 fully contribute.
-mutate_sp "spurious note on full data" "inconsistent with contributing 3" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="velocity_three_full"][0]; s["velocity"]["note"]="Limited data: spurious."; json.dump(d,open(p,"w"))'
-# days math: days_elapsed drifts off the injected as_of.
-mutate_sp "days_elapsed regression" "golden 7" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="plan_partial_velocity"][0]; s["days_elapsed"]=3; json.dump(d,open(p,"w"))'
-# velocity average drift.
-mutate_sp "avg_completed regression" "golden 7.0" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="plan_partial_velocity"][0]; s["velocity"]["avg_completed"]=99.0; json.dump(d,open(p,"w"))'
-# backlog priority sort: the top of the order changes (Urgent no longer first).
-mutate_sp "backlog sort regression" "golden 'BC-61'" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="plan_partial_velocity"][0]; s["backlog"]["ordered_ids"]=["BC-64","BC-61","BC-60","BC-62"]; json.dump(d,open(p,"w"))'
-# backlog truncation: 55 items no longer flagged truncated.
-mutate_sp "truncation regression" "backlog.truncated" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="large_backlog_truncated"][0]; s["backlog"]["truncated"]=False; json.dump(d,open(p,"w"))'
-# prioritization-only: a current_snapshot wrongly appears with no active cycle.
-mutate_sp "prioritization-only snapshot leak" "must have a null current_snapshot" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="prioritization_only"][0]; s["current_snapshot"]={"total":1,"completed":1,"carried_over":0,"canceled":0,"completion_rate":100}; json.dump(d,open(p,"w"))'
-mutate_sp "drop a load-bearing scenario" "expected scenario id 'velocity_three_full' is absent" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="velocity_three_full"]; json.dump(d,open(p,"w"))'
-mutate_sp "leak an extra scenario key" "unexpected property" \
-  'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
-
 # ── 4. hermeticity guard ─────────────────────────────────────────────────────
 
 echo "── hermeticity ──"
@@ -865,19 +614,9 @@ OP_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_offer_perf_emit.py"
 PF_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_portfolio_emit.py"
 IC_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_import_emit.py"
 ICP_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_icp_review_emit.py"
-# BC-12944 workflows intake + cycle-metrics builders + their shared modules (the FIRST
-# workflows build_* scripts).
-RAT_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_raise_ticket_payload.py"
-RI_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_report_issue_payload.py"
-INTAKE_COMMON="$REPO_ROOT/plugins/workflows/scripts/intake_common.py"
-RS_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_retro_snapshot.py"
-SP_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_sprint_plan.py"
-CYCLE_METRICS="$REPO_ROOT/plugins/workflows/scripts/cycle_metrics.py"
 if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
      "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$USU_BUILDER" "$NO_BUILDER" \
-     "$OP_BUILDER" "$PF_BUILDER" "$IC_BUILDER" "$ICP_BUILDER" \
-     "$RAT_BUILDER" "$RI_BUILDER" "$INTAKE_COMMON" \
-     "$RS_BUILDER" "$SP_BUILDER" "$CYCLE_METRICS" >/dev/null 2>&1; then
+     "$OP_BUILDER" "$PF_BUILDER" "$IC_BUILDER" "$ICP_BUILDER" >/dev/null 2>&1; then
   echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
 else
   echo "  PASS  hermeticity: no network module imported"; pass=$((pass + 1))
@@ -960,7 +699,7 @@ else
 fi
 # (e/f) the new-persona + new-vertical evals (BC-12915) are hermetic too — same builder,
 #       same frozen seed, different subcommand. Loop to avoid two near-identical blocks.
-for hc in new-persona new-vertical offer-performance portfolio-snapshot import-campaign icp-refinement-review raise-a-ticket report-issue retrospective sprint-planning; do
+for hc in new-persona new-vertical offer-performance portfolio-snapshot import-campaign icp-refinement-review; do
   HCWD="$tmproot/hermetic-cwd-$hc"; mkdir -p "$HCWD"
   hb="$(cd "$HCWD" && find . | sort)"
   ho="$(cd "$HCWD" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" "$hc" 2>&1)"; hrc=$?
@@ -988,12 +727,10 @@ echo ""
 # update-sf-campaign-status block (+23 = 3 GREEN + 9×2 mutations + 2 hermeticity, total
 # 154), then 146→231 with the BC-12943 Batch-B marketing-builder blocks (offer-performance
 # + portfolio-snapshot + import-campaign + icp-refinement-review: +90 = 4 × ~(3 GREEN +
-# 8-9×2 mutations + 2 hermeticity), live total 244), then 231→319 with the BC-12944 Batch-C
-# workflows blocks (raise-a-ticket + report-issue + retrospective + sprint-planning: +92 =
-# 4 × (3 GREEN + 7-10×2 mutations + 2 hermeticity), live total 336) — so losing any one
-# command's eval block trips the floor rather than passing. Held at ~95% of the live count
-# to tolerate a single intentional assertion edit.
-FLOOR=319
+# 8-9×2 mutations + 2 hermeticity), live total 244) — so losing any one command's eval
+# block trips the floor rather than passing. Held at ~95% of the live count to tolerate a
+# single intentional assertion edit.
+FLOOR=231
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

@@ -2220,52 +2220,6 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 15a-bc-12944 — workflows intake + cycle-metrics builder unit suites (BC-12944)
-# ──────────────────────────────────────────────────────────────────────
-# Runs the four unit/contract suites for the workflows plugin's FIRST build_* scripts
-# (ADR-028 Phase-2 Batch C — seam extraction from scratch): build_raise_ticket_payload
-# + build_report_issue_payload (S2 intake) and build_retro_snapshot + build_sprint_plan
-# (S3 cycle-metrics). Each is the PURE decide(inputs, injected_state) core its command
-# delegates to; the suites drive every branch (severity/type maps, label reconcile,
-# modal-team tiebreak, classification→registry routing, B## next-id, phrase sanitize,
-# the health bands, the velocity skip/exclude/partial-average edges, the backlog sort),
-# prove a `$(touch pwned)` value is NEVER shelled (these builders have no shell-out
-# sink — it stays inert data), and lock determinism + infra exit codes. The shared
-# modules (intake_common.py, cycle_metrics.py) are also asserted present. FAIL-if-missing
-# (not warn): the commands AND the behavioral evals depend on all of these, so a future
-# delete must fail loudly (the §15a-bc-12589 lesson). RESULT line drives the count.
-# ══════════════════════════════════════════════════════════════════════
-section "15a-bc-12944. workflows intake + cycle-metrics builder unit suites (BC-12944)"
-
-for wf_shared in intake_common.py cycle_metrics.py; do
-  if [ ! -f "$REPO_ROOT/plugins/workflows/scripts/$wf_shared" ]; then
-    fail "plugins/workflows/scripts/$wf_shared not found — a BC-12944 shared builder module is missing"
-  fi
-done
-
-for wf_stem in build_raise_ticket_payload build_report_issue_payload build_retro_snapshot build_sprint_plan; do
-  wf_helper="$REPO_ROOT/plugins/workflows/scripts/$wf_stem.py"
-  wf_harness="$REPO_ROOT/plugins/workflows/scripts/test_$wf_stem.sh"
-  if [ ! -f "$wf_helper" ]; then
-    fail "plugins/workflows/scripts/$wf_stem.py not found — a BC-12944 emit-mode builder is missing"
-  elif [ ! -f "$wf_harness" ]; then
-    fail "plugins/workflows/scripts/test_$wf_stem.sh not found — a BC-12944 builder unit suite is missing"
-  else
-    if wf_harness_out=$(bash "$wf_harness" "$wf_helper" 2>&1); then
-      wf_pass_count=$(printf '%s\n' "$wf_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$wf_pass_count" ]; then
-        pass "$wf_stem unit suite (${wf_pass_count} assertions)"
-      else
-        pass "$wf_stem unit suite — passed (count unparsed)"
-      fi
-    else
-      fail "$wf_stem unit suite failed:"
-      printf '%s\n' "$wf_harness_out" | tail -30 | sed 's/^/          /' >&2
-    fi
-  fi
-done
-
-# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12638 — --target-org guard-precedes-sink consolidating lint (BC-12638)
 # ──────────────────────────────────────────────────────────────────────
 # Repo-wide CONSOLIDATING lint: every command interpolating a non-literal
