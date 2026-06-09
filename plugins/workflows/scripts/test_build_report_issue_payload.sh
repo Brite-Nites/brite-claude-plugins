@@ -96,6 +96,13 @@ want   'non-contiguous → max+1' '"id": "B08"'
 # binds max() over the set, not a positional read of the last id.
 decide 'descending ids → max+1' "{\"classification\":\"bad-output\",\"severity\":\"low\",\"short_desc\":\"x\",\"prompt\":\"p\",\"reg_description\":\"d\",\"context\":\"c\",\"state\":{${BC_LABELS},\"behavioral_ids\":[\"B07\",\"B03\"]}}"
 want   'descending ids → max+1' '"id": "B08"'
+# OVERFLOW past 99 is INTENTIONAL (regression lock, Greptile P2): :02d is a min-width,
+# not a cap — B99 → B100 → B101, unique + numerically monotonic (truncating would
+# collide). Locks the documented widening behavior.
+decide 'overflow B99 → B100' "{\"classification\":\"bad-output\",\"severity\":\"low\",\"short_desc\":\"x\",\"prompt\":\"p\",\"reg_description\":\"d\",\"context\":\"c\",\"state\":{${BC_LABELS},\"behavioral_ids\":[\"B98\",\"B99\"]}}"
+want   'overflow B99 → B100' '"id": "B100"'
+decide 'overflow B100 → B101' "{\"classification\":\"bad-output\",\"severity\":\"low\",\"short_desc\":\"x\",\"prompt\":\"p\",\"reg_description\":\"d\",\"context\":\"c\",\"state\":{${BC_LABELS},\"behavioral_ids\":[\"B100\"]}}"
+want   'overflow B100 → B101' '"id": "B101"'
 
 # ── tier:2 constant + provenance prefixes (asserted with the bad-output row above) ─
 

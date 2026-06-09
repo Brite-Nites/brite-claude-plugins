@@ -106,15 +106,27 @@ def sanitize_phrase(phrase: str | None) -> str:
 
 
 def next_behavioral_id(existing_ids) -> str:
-    """The next B## id: max(int(id[1:]))+1 over the injected behavioral-registry ids
-    (B10 → B11). An empty/garbage set starts at B01. Zero-padded to 2 digits to
-    match the existing B01..B10 convention."""
+    """The next behavioral-registry id: `B` + (max(int(id[1:])) + 1) over the
+    injected ids (B10 → B11). An empty/garbage set starts at B01. Non-`B##` / non-str
+    ids are ignored.
+
+    The allocation guarantee — what this builder OWNS — is **unique + numerically
+    monotonic**: the next id is always greater (numerically) than every existing id,
+    so it can never collide. The `:02d` is a MINIMUM width matching the existing
+    B01..B99 zero-pad convention; it deliberately does NOT cap (truncating a 3-digit
+    value would re-introduce collisions — B100 → "B00" would clash with B00). So past
+    99 entries ids widen intentionally: B99 → B100 → B101, still unique + monotonic.
+    Downstream consumers must therefore compare ids NUMERICALLY (`int(id[1:])`), never
+    lexically — a string sort would order "B100" before "B99". This widening is
+    expected, not a silent migration; it's a far-future edge for a registry that holds
+    ~10 entries today, and is regression-locked in test_build_report_issue_payload.sh.
+    """
     nums = []
     for rid in existing_ids or []:
         if isinstance(rid, str) and rid[:1] == "B" and rid[1:].isdigit():
             nums.append(int(rid[1:]))
     nxt = (max(nums) + 1) if nums else 1
-    return f"B{nxt:02d}"
+    return f"B{nxt:02d}"  # min-width 2 (B01..B99); widens past 99 — see docstring
 
 
 def _expected_not_expected(classification: str, expected, fired) -> tuple[list, list]:
