@@ -1,0 +1,24 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_import_emit.py's import-campaign-emit.json (BC-12943, ADR-028 Phase-2 Batch B). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, additionalProperties:false, items, enum, const. Asserts the matrix SHAPE. manifest is left type-only ([object,null]) so the golden + golden_compare lock the composed manifest's per-branch values: an OK row carries the v2 manifest; a rejection row (a builder-owned input guard, rc 1) carries a null manifest + a non-null error string. The v2-schema validity + 13-key set + the v1-singular-campaign_id-absent anti-regression are asserted as NAMED invariants in the adapter (the campaign_manifest schema is additionalProperties:true, so it can't catch a leaked v1 key).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "command": { "type": "string", "const": "/marketing:import-campaign" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "ok", "manifest", "error"],
+        "properties": {
+          "id": { "type": "string" },
+          "ok": { "type": "boolean" },
+          "manifest": { "type": ["object", "null"] },
+          "error": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

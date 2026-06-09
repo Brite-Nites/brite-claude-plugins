@@ -2,6 +2,7 @@
 description: Backfill an existing GTM campaign into the plugin's manifest layer — read an existing Linear milestone + 1-N Email Bison campaign IDs (split by ESP × audience-tier per ADR-020) + canonical (vertical, persona, offer, month, year, entity) tuple → write a fully populated `docs/campaigns/{entity}/{slug}/manifest.json` (schema v2) + create σ3 Salesforce Campaign (soft-fail) + stub `learnings.md` + `analysis-{YYYY-MM}.md`. Sibling to `/marketing:plan-campaign` (scaffold-from-scratch); this command imports an already-launched campaign that pre-dates the plugin or was created out-of-band. Triggers on "import campaign", "backfill campaign", "import existing campaign", "reconcile campaign manifest", or direct `/marketing:import-campaign` invocation.
 argument-hint: --linear-milestone <id> --eb-records <id>:<workspace>[,<id>:<workspace>...] --vertical <slug> --persona <slug> --offer <slug> --entity <nites|supply|labs> --month <1-12> --year <YYYY> [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--dry-run]
 allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__get_project, mcp__plugin_workflows_linear-server__get_milestone, mcp__emailbison-b2b__list_campaigns, mcp__emailbison-personal__list_campaigns, mcp__plugin_revops_salesforce__get_username
+disable-model-invocation: true
 ---
 
 # /marketing:import-campaign

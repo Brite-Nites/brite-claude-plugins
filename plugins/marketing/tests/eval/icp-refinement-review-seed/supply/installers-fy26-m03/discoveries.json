@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "signals": [
+    {
+      "category": "icp-refinement",
+      "emitted_at": "2026-05-24T10:00:00Z",
+      "emitted_by_skill": "campaign-debrief",
+      "payload": {
+        "vertical": "installers",
+        "persona": "field-operations-manager",
+        "current_icp_summary": "Field ops manager at regional installers",
+        "observed_pattern": "Mid-market responders only",
+        "evidence_metric": "Reply Rate 3.2% on N=90 mid-market vs 0.4% on N=210 enterprise",
+        "refinement_proposal": "Narrow to mid-market field-ops"
+      }
+    }
+  ]
+}

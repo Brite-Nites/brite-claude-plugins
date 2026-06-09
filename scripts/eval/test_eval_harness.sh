@@ -422,6 +422,186 @@ mutate_canon new-vertical "$NV" vertical-emit.json "alias rejection error nulled
 mutate_canon new-vertical "$NV" vertical-emit.json "leak an extra scenario key" "unexpected property" \
   'p=M/"vertical-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
 
+# ── 3f. offer-performance eval (BC-12943 — structure-first report-builder, Batch B) ─
+# The FIRST marketing report-builder wrap: build_offer_perf_emit.py drives the REAL
+# offer_performance.py over a sandbox copy of a frozen campaigns+canonicals seed with
+# EB/SF stats INJECTED per scenario and --generated-at pinned, then projects the WRITTEN
+# performance.md (frontmatter + section headers + degraded banners + retirement signal +
+# the parsed per-version metrics table). The GREEN run exercises a 6-row matrix; the
+# mutation cases prove a red diff — incl. the retirement decision, the single-vs-multi
+# Cross-version branch, an injected-stat table cell, a degraded banner, and the
+# --generated-at determinism lock. Reuses the generic mutate_canon helper.
+echo "── offer-performance eval (BC-12943 — known-good → GREEN) ──"
+OP="$tmproot/op"; mkdir -p "$OP"
+invoke "$RUN_EVAL" offer-performance --sandbox "$OP"
+assert_exit "offer-performance eval GREEN — known-good matrix builds + passes" 0
+assert_substr "offer-performance eval prints PASS verdict" "PASS: offer-performance eval"
+if [ -f "$OP/offer-perf-emit.json" ]; then
+  echo "  PASS  artifact produced: offer-perf-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: offer-perf-emit.json"; fail=$((fail + 1))
+fi
+echo "── offer-performance self-test (mutated matrix → RED) ──"
+# THE retirement decision: a degrading-versions report that no longer flags the candidate.
+mutate_canon offer-performance "$OP" offer-perf-emit.json "retirement flipped off" "retirement_signal" \
+  'p=M/"offer-perf-emit.json"; d=json.load(open(p)); [s.update(retirement_signal=False) for s in d["scenarios"] if s["id"]=="retirement_candidate"]; json.dump(d,open(p,"w"))'
+# single-vs-multi branch: the multi-version rollup loses its Cross-version comparison.
+mutate_canon offer-performance "$OP" offer-perf-emit.json "cross-version section dropped" "Cross-version comparison section is absent" \
+  'p=M/"offer-perf-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="multi_version_ok"][0]; s["sections"]=[x for x in s["sections"] if x!="2. Cross-version comparison"]; json.dump(d,open(p,"w"))'
+# injected-stat flow: a rendered metrics-table cell no longer matches the injected EB stat.
+mutate_canon offer-performance "$OP" offer-perf-emit.json "corrupt a metrics-table cell" "reply_rate" \
+  'p=M/"offer-perf-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="multi_version_ok"][0]; s["versions"][0]["reply_rate"]="99.9%"; json.dump(d,open(p,"w"))'
+# degraded soft-fail: the EB-degraded banner stops rendering.
+mutate_canon offer-performance "$OP" offer-perf-emit.json "eb_degraded banner flipped off" "banners.eb_degraded" \
+  'p=M/"offer-perf-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eb_degraded"][0]; s["banners"]["eb_degraded"]=False; json.dump(d,open(p,"w"))'
+# determinism: the pinned --generated-at is ignored (a now()-leak regression).
+mutate_canon offer-performance "$OP" offer-perf-emit.json "generated_at drift" "generated_at must be the pinned" \
+  'p=M/"offer-perf-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="multi_version_ok"][0]; s["frontmatter"]["generated_at"]="2099-01-01T00:00:00Z"; json.dump(d,open(p,"w"))'
+# rejection invariant: an invalid-slug row wrongly carries a report instead of null + error.
+mutate_canon offer-performance "$OP" offer-perf-emit.json "un-null a rejection report" "rejection row must have null frontmatter" \
+  'p=M/"offer-perf-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="invalid_slug"][0]; s["frontmatter"]={"x":1}; json.dump(d,open(p,"w"))'
+mutate_canon offer-performance "$OP" offer-perf-emit.json "drop a load-bearing scenario" "expected scenario id 'retirement_candidate' is absent" \
+  'p=M/"offer-perf-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="retirement_candidate"]; json.dump(d,open(p,"w"))'
+mutate_canon offer-performance "$OP" offer-perf-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"offer-perf-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+# ── 3g. portfolio-snapshot eval (BC-12943 — structure-first report-builder, Batch B) ─
+# The σ-adjacent report wrap: build_portfolio_emit.py drives the REAL portfolio_snapshot.py
+# over a sandbox copy of a frozen campaigns+canonicals seed with --generated-at pinned,
+# then projects the WRITTEN packet (frontmatter window+sources + window label + ordered
+# section headers + degraded banners + verdict distribution + in-window campaign count).
+# The GREEN run exercises a 6-row matrix; the mutation cases prove a red diff — incl. the
+# monthly-vs-quarterly section branch (both directions), a degraded banner, the
+# window-filter campaign count, the anti-creep guard rejection, and the --generated-at
+# determinism lock. Reuses the generic mutate_canon helper.
+echo "── portfolio-snapshot eval (BC-12943 — known-good → GREEN) ──"
+PF="$tmproot/pf"; mkdir -p "$PF"
+invoke "$RUN_EVAL" portfolio-snapshot --sandbox "$PF"
+assert_exit "portfolio-snapshot eval GREEN — known-good matrix builds + passes" 0
+assert_substr "portfolio-snapshot eval prints PASS verdict" "PASS: portfolio-snapshot eval"
+if [ -f "$PF/portfolio-emit.json" ]; then
+  echo "  PASS  artifact produced: portfolio-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: portfolio-emit.json"; fail=$((fail + 1))
+fi
+echo "── portfolio-snapshot self-test (mutated matrix → RED) ──"
+# monthly-vs-quarterly branch (both directions): the section set must match the span.
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "quarterly loses sections 6-9" "quarterly span must render 9 sections" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="quarterly_ok"][0]; s["sections"]=s["sections"][:5]; json.dump(d,open(p,"w"))'
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "monthly gains a quarterly section" "monthly span must render 5 sections" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="monthly_ok"][0]; s["sections"].append("6. Cross-quarter MSPA transitions"); json.dump(d,open(p,"w"))'
+# degraded soft-fail: the SF-rollup-degraded banner stops rendering.
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "sf_degraded banner flipped off" "banners.sf" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="sf_degraded_auth"][0]; s["banners"]["sf"]=False; json.dump(d,open(p,"w"))'
+# window filter: the out-of-window row wrongly counts campaigns (a no-op filter).
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "window-filter no-op regression" "campaigns_in_window" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="out_of_window_excluded"][0]; s["campaigns_in_window"]=2; json.dump(d,open(p,"w"))'
+# anti-creep guard: the rejection row goes silent (no error string).
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "anti-creep rejection goes silent" "rejection row must carry a non-empty builder error" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="out_anticreep_rejected"][0]; s["error"]=None; json.dump(d,open(p,"w"))'
+# determinism: the pinned --generated-at is ignored.
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "generated_at drift" "generated_at must be the pinned" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="monthly_ok"][0]; s["frontmatter"]["generated_at"]="2099-01-01T00:00:00Z"; json.dump(d,open(p,"w"))'
+# passthrough: the frontmatter sources echo no longer matches the upstream status.
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "sources.sf passthrough drift" "sources.sf" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="sf_degraded_auth"][0]; s["frontmatter"]["sources"]["sf"]="ok"; json.dump(d,open(p,"w"))'
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "drop a load-bearing scenario" "expected scenario id 'quarterly_ok' is absent" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="quarterly_ok"]; json.dump(d,open(p,"w"))'
+mutate_canon portfolio-snapshot "$PF" portfolio-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"portfolio-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+# ── 3h. import-campaign eval (BC-12943 — structure-first manifest composer, Batch B) ─
+# The pure-composer wrap: build_import_emit.py pipes each scenario payload to the REAL
+# `import_campaign.py compose` (stdin→stdout, no clock) against a frozen audience-tier
+# taxonomy, then projects the COMPOSED v2 manifest. The GREEN run exercises an 8-row
+# matrix (5 compose + 3 rejection); the mutation cases prove a red diff — incl. the
+# v1-singular-campaign_id anti-regression, the schema_version-2 contract, the auto-
+# classification (audience_tier), the pending_classification derived flag, the 13-key
+# top-level contract, an input passthrough, and a silent rejection. Reuses mutate_canon.
+echo "── import-campaign eval (BC-12943 — known-good → GREEN) ──"
+IC="$tmproot/ic"; mkdir -p "$IC"
+invoke "$RUN_EVAL" import-campaign --sandbox "$IC"
+assert_exit "import-campaign eval GREEN — known-good matrix builds + passes" 0
+assert_substr "import-campaign eval prints PASS verdict" "PASS: import-campaign eval"
+if [ -f "$IC/import-campaign-emit.json" ]; then
+  echo "  PASS  artifact produced: import-campaign-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: import-campaign-emit.json"; fail=$((fail + 1))
+fi
+echo "── import-campaign self-test (mutated matrix → RED) ──"
+# v1 anti-regression: the deleted singular email_bison.campaign_id wrongly returns.
+mutate_canon import-campaign "$IC" import-campaign-emit.json "v1 singular campaign_id leak" "v1 singular 'campaign_id'" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="single_launched_auto_classified"][0]; s["manifest"]["email_bison"]["campaign_id"]=10; json.dump(d,open(p,"w"))'
+# v2 contract: schema_version drifts off 2.
+mutate_canon import-campaign "$IC" import-campaign-emit.json "schema_version downgrade" "schema_version must be 2" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="happy_empty_records"][0]; s["manifest"]["schema_version"]=1; json.dump(d,open(p,"w"))'
+# auto-classification: a record's classified seniority no longer matches the taxonomy.
+mutate_canon import-campaign "$IC" import-campaign-emit.json "audience_tier classification regression" "seniority" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="single_launched_auto_classified"][0]; s["manifest"]["email_bison"]["campaigns"][0]["audience_tier"]["seniority"]="employees"; json.dump(d,open(p,"w"))'
+# derived flag: the pending_classification:true on a blank-name record disappears.
+mutate_canon import-campaign "$IC" import-campaign-emit.json "pending_classification dropped" "pending_classification" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="pending_classification_set"][0]; s["manifest"]["email_bison"]["campaigns"][0].pop("pending_classification"); json.dump(d,open(p,"w"))'
+# 13-key contract: a leaked top-level key.
+mutate_canon import-campaign "$IC" import-campaign-emit.json "manifest top-level key leak" "top-level keys != the v2 contract" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="happy_empty_records"][0]; s["manifest"]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+# passthrough: a deterministic input field no longer copied verbatim.
+mutate_canon import-campaign "$IC" import-campaign-emit.json "input passthrough drift" "slug" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="happy_empty_records"][0]; s["manifest"]["slug"]="wrong-slug-fy26-m02"; json.dump(d,open(p,"w"))'
+# rejection invariant: a rejected payload goes silent (no error string).
+mutate_canon import-campaign "$IC" import-campaign-emit.json "rejection goes silent" "rejection row must carry a non-empty builder error" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="reject_bad_slug"][0]; s["error"]=None; json.dump(d,open(p,"w"))'
+mutate_canon import-campaign "$IC" import-campaign-emit.json "drop a load-bearing scenario" "expected scenario id 'pending_classification_set' is absent" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="pending_classification_set"]; json.dump(d,open(p,"w"))'
+mutate_canon import-campaign "$IC" import-campaign-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"import-campaign-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+# ── 3i. icp-refinement-review eval (BC-12943 — structure-first review loop, Batch B) ─
+# The pure-disk review-loop wrap: build_icp_review_emit.py drives the REAL scan → apply →
+# emit-handbook over a sandbox copy of a frozen discoveries-tree seed, then runs the REAL
+# lint_discoveries over the MUTATED tree. The GREEN run exercises a 6-row matrix; the
+# mutation cases prove a red diff — incl. the STRUCTURE-FIRST anchor (the mutated file no
+# longer lints), the one-way skip-terminal invariant, the defer-noop invariant, the emit
+# exclude-rejected behavior, the scan filter count, and both rejection codes. Reuses
+# mutate_canon.
+echo "── icp-refinement-review eval (BC-12943 — known-good → GREEN) ──"
+ICP="$tmproot/icp"; mkdir -p "$ICP"
+invoke "$RUN_EVAL" icp-refinement-review --sandbox "$ICP"
+assert_exit "icp-refinement-review eval GREEN — known-good matrix builds + passes" 0
+assert_substr "icp-refinement-review eval prints PASS verdict" "PASS: icp-refinement-review eval"
+if [ -f "$ICP/icp-review-emit.json" ]; then
+  echo "  PASS  artifact produced: icp-review-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: icp-review-emit.json"; fail=$((fail + 1))
+fi
+echo "── icp-refinement-review self-test (mutated matrix → RED) ──"
+# THE structure-first anchor: a mutated discoveries.json that no longer passes lint.
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "mutated file fails lint" "must still pass lint_discoveries" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="apply_promote"][0]; s["lint_exit_code"]=1; json.dump(d,open(p,"w"))'
+# one-way invariant: an already-promoted (terminal) signal wrongly OVERWRITTEN with the
+# decided value. The scenario decides 'rejected' on a 'promoted' terminal signal, so the
+# readback diverges under a regression — mutated_statuses is the non-vacuous guard here
+# (deciding the same value would make this field undetectable). golden_compare catches it.
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "one-way invariant broken (terminal overwritten)" "golden 'promoted'" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="apply_skip_terminal"][0]; s["mutated_statuses"]["labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::1"]="rejected"; json.dump(d,open(p,"w"))'
+# defer-noop invariant: a deferred signal wrongly written to a terminal status.
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "defer wrote a status" "golden 'pending'" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="apply_defer_noop"][0]; s["mutated_statuses"]["labs/hotels-resorts-holiday-anchor-fy26-m02/discoveries.json::0"]="promoted"; json.dump(d,open(p,"w"))'
+# emit exclude-rejected: a rejected signal's vertical wrongly surfaces in the handbook.
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "emit includes rejected vertical" "emit_verticals" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="apply_mixed"][0]; s["emit_verticals"]=["hotels-resorts","installers"]; s["emit_blob_count"]=2; json.dump(d,open(p,"w"))'
+# scan filter: the category+pending filter count drifts.
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "scan filter regression" "scan_total_pending must be 2" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); d["scenarios"][0]["scan_total_pending"]=3; json.dump(d,open(p,"w"))'
+# rejection invariants: a silent rejection, and a rejection that wrongly carries apply output.
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "rejection goes silent" "rejection row must carry a non-empty builder error" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="reject_bad_decision"][0]; s["error"]=None; json.dump(d,open(p,"w"))'
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "rejection un-nulls counts" "rejection row must have null counts" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="reject_out_of_range"][0]; s["counts"]={"promoted":0,"rejected":0,"deferred":0,"skipped":0}; json.dump(d,open(p,"w"))'
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "drop a load-bearing scenario" "expected scenario id 'apply_skip_terminal' is absent" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="apply_skip_terminal"]; json.dump(d,open(p,"w"))'
+mutate_canon icp-refinement-review "$ICP" icp-review-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"icp-review-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
 # ── 4. hermeticity guard ─────────────────────────────────────────────────────
 
 echo "── hermeticity ──"
@@ -430,8 +610,13 @@ echo "── hermeticity ──"
 CSF_BUILDER="$REPO_ROOT/plugins/revops/scripts/build_campaign_payload.py"
 USU_BUILDER="$REPO_ROOT/plugins/revops/scripts/build_status_update_payload.py"
 NO_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_canonical_emit.py"
+OP_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_offer_perf_emit.py"
+PF_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_portfolio_emit.py"
+IC_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_import_emit.py"
+ICP_BUILDER="$REPO_ROOT/plugins/marketing/scripts/build_icp_review_emit.py"
 if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
-     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$USU_BUILDER" "$NO_BUILDER" >/dev/null 2>&1; then
+     "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$USU_BUILDER" "$NO_BUILDER" \
+     "$OP_BUILDER" "$PF_BUILDER" "$IC_BUILDER" "$ICP_BUILDER" >/dev/null 2>&1; then
   echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
 else
   echo "  PASS  hermeticity: no network module imported"; pass=$((pass + 1))
@@ -514,7 +699,7 @@ else
 fi
 # (e/f) the new-persona + new-vertical evals (BC-12915) are hermetic too — same builder,
 #       same frozen seed, different subcommand. Loop to avoid two near-identical blocks.
-for hc in new-persona new-vertical; do
+for hc in new-persona new-vertical offer-performance portfolio-snapshot import-campaign icp-refinement-review; do
   HCWD="$tmproot/hermetic-cwd-$hc"; mkdir -p "$HCWD"
   hb="$(cd "$HCWD" && find . | sort)"
   ho="$(cd "$HCWD" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" "$hc" 2>&1)"; hrc=$?
@@ -540,9 +725,12 @@ echo ""
 # 80→100 (BC-12702 new-offer block, +19), then 100→125 when the BC-12915 canonicals batch
 # landed (new-persona + new-vertical: +26, total 131), then 125→146 with the BC-12942
 # update-sf-campaign-status block (+23 = 3 GREEN + 9×2 mutations + 2 hermeticity, total
-# 154) — so losing any one command's eval block trips the floor rather than passing. Held
-# at ~95% of the live count to tolerate a single intentional assertion edit.
-FLOOR=146
+# 154), then 146→231 with the BC-12943 Batch-B marketing-builder blocks (offer-performance
+# + portfolio-snapshot + import-campaign + icp-refinement-review: +90 = 4 × ~(3 GREEN +
+# 8-9×2 mutations + 2 hermeticity), live total 244) — so losing any one command's eval
+# block trips the floor rather than passing. Held at ~95% of the live count to tolerate a
+# single intentional assertion edit.
+FLOOR=231
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

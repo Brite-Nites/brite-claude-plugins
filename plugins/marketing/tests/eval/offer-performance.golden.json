@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "command": "/marketing:offer-performance",
+  "scenarios": [
+    {
+      "id": "multi_version_ok",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T12:00:00Z",
+        "command_version": "marketing@eval",
+        "offer_slug": "holiday-anchor-audit",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "posture": "free-asset",
+        "versions_analyzed": 3
+      },
+      "sections": [
+        "1. Per-version metrics",
+        "2. Cross-version comparison",
+        "3. Pipeline contribution",
+        "4. Retirement signal"
+      ],
+      "banners": {
+        "eb_degraded": false,
+        "sf_degraded": false
+      },
+      "retirement_signal": false,
+      "versions": [
+        {
+          "version": "v1",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02",
+          "reply_rate": "6.0%",
+          "meeting_rate": "1.5%",
+          "sent": "100",
+          "replies": "10",
+          "amount_all": "$30,000",
+          "amount_won": "$10,000",
+          "leads": "10",
+          "launched": "2026-02-15"
+        },
+        {
+          "version": "v2",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m03-v2",
+          "reply_rate": "5.5%",
+          "meeting_rate": "1.2%",
+          "sent": "120",
+          "replies": "12",
+          "amount_all": "$40,000",
+          "amount_won": "$15,000",
+          "leads": "12",
+          "launched": "2026-03-15"
+        },
+        {
+          "version": "v3",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m04-v3",
+          "reply_rate": "7.0%",
+          "meeting_rate": "2.0%",
+          "sent": "140",
+          "replies": "14",
+          "amount_all": "$60,000",
+          "amount_won": "$25,000",
+          "leads": "20",
+          "launched": "2026-04-15"
+        }
+      ]
+    },
+    {
+      "id": "single_version_ok",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T12:00:00Z",
+        "command_version": "marketing@eval",
+        "offer_slug": "holiday-anchor-audit",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "posture": "free-asset",
+        "versions_analyzed": 1
+      },
+      "sections": [
+        "1. Per-version metrics",
+        "3. Pipeline contribution",
+        "4. Retirement signal"
+      ],
+      "banners": {
+        "eb_degraded": false,
+        "sf_degraded": false
+      },
+      "retirement_signal": false,
+      "versions": [
+        {
+          "version": "v1",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02",
+          "reply_rate": "6.0%",
+          "meeting_rate": "1.5%",
+          "sent": "100",
+          "replies": "10",
+          "amount_all": "$30,000",
+          "amount_won": "$10,000",
+          "leads": "10",
+          "launched": "2026-02-15"
+        }
+      ]
+    },
+    {
+      "id": "eb_degraded",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T12:00:00Z",
+        "command_version": "marketing@eval",
+        "offer_slug": "holiday-anchor-audit",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "posture": "free-asset",
+        "versions_analyzed": 1
+      },
+      "sections": [
+        "1. Per-version metrics",
+        "3. Pipeline contribution",
+        "4. Retirement signal"
+      ],
+      "banners": {
+        "eb_degraded": true,
+        "sf_degraded": false
+      },
+      "retirement_signal": false,
+      "versions": [
+        {
+          "version": "v1",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02",
+          "reply_rate": "n/a",
+          "meeting_rate": "n/a",
+          "sent": "n/a",
+          "replies": "n/a",
+          "amount_all": "$50,000",
+          "amount_won": "$20,000",
+          "leads": "15",
+          "launched": "2026-02-15"
+        }
+      ]
+    },
+    {
+      "id": "sf_degraded",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T12:00:00Z",
+        "command_version": "marketing@eval",
+        "offer_slug": "holiday-anchor-audit",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "posture": "free-asset",
+        "versions_analyzed": 1
+      },
+      "sections": [
+        "1. Per-version metrics",
+        "3. Pipeline contribution",
+        "4. Retirement signal"
+      ],
+      "banners": {
+        "eb_degraded": false,
+        "sf_degraded": true
+      },
+      "retirement_signal": false,
+      "versions": [
+        {
+          "version": "v1",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02",
+          "reply_rate": "5.2%",
+          "meeting_rate": "1.1%",
+          "sent": "100",
+          "replies": "10",
+          "amount_all": "n/a",
+          "amount_won": "n/a",
+          "leads": "n/a",
+          "launched": "2026-02-15"
+        }
+      ]
+    },
+    {
+      "id": "retirement_candidate",
+      "ok": true,
+      "error": null,
+      "frontmatter": {
+        "schema_version": 1,
+        "generated_at": "2026-05-26T12:00:00Z",
+        "command_version": "marketing@eval",
+        "offer_slug": "holiday-anchor-audit",
+        "entity": "labs",
+        "vertical": "hotels-resorts",
+        "posture": "free-asset",
+        "versions_analyzed": 3
+      },
+      "sections": [
+        "1. Per-version metrics",
+        "2. Cross-version comparison",
+        "3. Pipeline contribution",
+        "4. Retirement signal"
+      ],
+      "banners": {
+        "eb_degraded": false,
+        "sf_degraded": false
+      },
+      "retirement_signal": true,
+      "versions": [
+        {
+          "version": "v1",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m02",
+          "reply_rate": "8.0%",
+          "meeting_rate": "2.0%",
+          "sent": "100",
+          "replies": "10",
+          "amount_all": "n/a",
+          "amount_won": "n/a",
+          "leads": "n/a",
+          "launched": "2026-02-15"
+        },
+        {
+          "version": "v2",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m03-v2",
+          "reply_rate": "6.0%",
+          "meeting_rate": "1.5%",
+          "sent": "100",
+          "replies": "10",
+          "amount_all": "n/a",
+          "amount_won": "n/a",
+          "leads": "n/a",
+          "launched": "2026-03-15"
+        },
+        {
+          "version": "v3",
+          "slug": "hotels-resorts-director-holiday-anchor-audit-fy26-m04-v3",
+          "reply_rate": "4.0%",
+          "meeting_rate": "1.0%",
+          "sent": "100",
+          "replies": "10",
+          "amount_all": "n/a",
+          "amount_won": "n/a",
+          "leads": "n/a",
+          "launched": "2026-04-15"
+        }
+      ]
+    },
+    {
+      "id": "invalid_slug",
+      "ok": false,
+      "frontmatter": null,
+      "sections": null,
+      "banners": null,
+      "retirement_signal": null,
+      "versions": null,
+      "error": "ERROR: offer 'totally-bogus-offer' not found in any vertical"
+    }
+  ]
+}

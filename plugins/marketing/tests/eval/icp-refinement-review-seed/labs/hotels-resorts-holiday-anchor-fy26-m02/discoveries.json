@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "signals": [
+    {
+      "category": "icp-refinement",
+      "emitted_at": "2026-05-26T10:00:00Z",
+      "emitted_by_skill": "campaign-debrief",
+      "payload": {
+        "vertical": "hotels-resorts",
+        "persona": "director-of-resort-experience",
+        "current_icp_summary": "Director of Resort Experience at 200+ room resorts",
+        "observed_pattern": "Responders skewed to family-resort sub-segment",
+        "evidence_metric": "Reply Rate 4.1% on N=120 family vs 0.6% on N=380 non-family",
+        "refinement_proposal": "Split persona into -family vs -luxury"
+      }
+    },
+    {
+      "category": "icp-refinement",
+      "emitted_at": "2026-05-25T09:00:00Z",
+      "emitted_by_skill": "campaign-debrief",
+      "payload": {
+        "vertical": "hotels-resorts",
+        "persona": "gm",
+        "current_icp_summary": "Old summary",
+        "observed_pattern": "Old pattern",
+        "evidence_metric": "Old evidence",
+        "refinement_proposal": "Already decided"
+      },
+      "promotion_status": "promoted"
+    },
+    {
+      "category": "title-discovery",
+      "emitted_at": "2026-05-26T10:00:00Z",
+      "emitted_by_skill": "list-building",
+      "payload": {
+        "vertical": "hotels-resorts",
+        "title": "Director of Resort Activations",
+        "occurrences": 3
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "slug": "hotels-resorts-pers-b-test-offer-fy26-m02",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "pers-b",
+  "offer": "test-offer",
+  "year": 2026,
+  "month": 2,
+  "created_at": "2026-02-15T10:00:00Z",
+  "salesforce": {"campaign_id": null},
+  "email_bison": {"workspace": "emailbison-b2b", "campaign_id": null, "launched_at": null}
+}

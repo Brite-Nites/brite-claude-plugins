@@ -1,0 +1,29 @@
+{
+  "_comment": "JSON-Schema-SUBSET for build_icp_review_emit.py's icp-review-emit.json (BC-12943, ADR-028 Phase-2 Batch B). Validated by scripts/eval/assert_lib.py — supported keywords ONLY: type (name or list; 'null' matches None), required, properties, additionalProperties:false, items, enum, const. Asserts the matrix SHAPE. counts/mutated_statuses/emit_verticals are left type-only so the golden + golden_compare lock per-branch values: an OK row carries the apply count summary + per-signal promotion_status flips + lint_exit_code 0 (the structure-first anchor: the mutated discoveries.json still lints) + the emit-handbook promoted-blob set; a rejection row (a decision-map guard, exit 1 data-error or exit 2 usage-error) carries nulls for the apply-side fields + a non-null error (scan_total_pending still ran).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "command": { "type": "string", "const": "/marketing:icp-refinement-review" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "ok", "counts", "scan_total_pending", "mutated_statuses", "lint_exit_code", "emit_blob_count", "emit_verticals", "error"],
+        "properties": {
+          "id": { "type": "string" },
+          "ok": { "type": "boolean" },
+          "counts": { "type": ["object", "null"] },
+          "scan_total_pending": { "type": "integer" },
+          "mutated_statuses": { "type": ["object", "null"] },
+          "lint_exit_code": { "type": ["integer", "null"] },
+          "emit_blob_count": { "type": ["integer", "null"] },
+          "emit_verticals": { "type": ["array", "null"] },
+          "error": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}
