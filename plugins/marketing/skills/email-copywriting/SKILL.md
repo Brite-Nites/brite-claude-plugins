@@ -4,7 +4,7 @@ description: Generate Email-Bison-formatted subject + body for step 1 + step 2 f
 user-invocable: true
 allowed-tools: mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   upstream: Revgrowth1/ai-gtm-workflows
   category: Outbound Lead Gen
 ---
@@ -38,7 +38,7 @@ Source these from `docs/marketing-context.md` first. If any are missing, intervi
 
 ## Methodology
 
-Four frameworks govern this skill: **Email Bison format rules**, **Hormozi value equation**, **offer postures + entity-aware selection matrix**, and the **recency waterfall**. A fifth governance subsection covers base template skeletons and the lazy-load pattern for per-vertical overrides. Every inference the skill surfaces inherits the hypothesis framing rule from situation-mining's §3 — body copy never states prospect worldview as fact; it tests a hypothesis.
+Four frameworks govern this skill: **Email Bison format rules**, **Hormozi value equation**, **offer postures + entity-aware selection matrix**, and the **recency waterfall**. Four copy-craft principles then govern *how* slots are filled — **copy principles** (active position, proximity spectrum, them-first, subject-as-photograph), the **CTA friction test**, **follow-up angles**, and the **ACV segmentation lens** (all folded in per BC-12966). Closing subsections cover base template skeletons and the lazy-load pattern for per-vertical overrides. Every inference the skill surfaces inherits the hypothesis framing rule from situation-mining's §3 — body copy never states prospect worldview as fact; it tests a hypothesis.
 
 ### Email Bison format rules (non-negotiable, hard failures in §8)
 
@@ -50,7 +50,7 @@ Every artifact the skill emits MUST satisfy all of these rules before Write. Ada
 - Zero em-dashes (`—`) in body copy. Em-dashes are a known EB spam trigger; replace with commas, periods, or hyphens. This is auto-replaced at draft time, not prompted per-occurrence.
 - Maximum sequence length is 2 steps (step 1 + step 2 bump). 3+ step sequences are a hard failure. Deeper sequences belong in `campaign-orchestration`'s multi-phase flow.
 - No `{FIRST_NAME}` (or any merge variable) in the subject line. Subjects are the highest-impact spam signal; merge personalization in subjects under-performs generic subjects across every deliverability benchmark.
-- Subject line length 1-3 words, with 3-option spintax. Example: `{Quick|Fast|30s} {question|check|idea}`.
+- Subject line length 2-6 words, with 3-option spintax. Example: `{Quick|Fast|30s} {question|check|idea}`. Treat the subject as a photograph (see § Copy principles): clarity > curiosity > clever. (Reconciled from 1-3 to 2-6 per BC-12966 — real campaigns run longer; 6 words is the hard ceiling.)
 - Spintax at the word level, not the sentence level: `{option1|option2|option3}`. Apply every 3-5 words where grammar permits — too little and EB sees identical sends; too much and the sentence loses meaning.
 - Step 2 subject does NOT include a `Re:` prefix. Email Bison auto-prepends `Re: ` at delivery whenever `thread_reply: true` (which step 2 always carries). Including `Re:` in the artifact produces a double-prefix (`"Re: Re: ..."`) in the recipient's inbox — verified BC-5906 round-2 Sx-14.
 - Step 2 body references step 1 without summarizing it. One paragraph typical. Reinforces the offer without repeating the pitch.
@@ -68,6 +68,62 @@ See [handbook/marketing/frameworks/offer-postures.md](https://github.com/Brite-N
 ### Recency waterfall (6-level hierarchy)
 
 See [handbook/marketing/frameworks/recency-waterfall.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/recency-waterfall.md) for the canonical 6-level hierarchy. Walk the waterfall top-to-bottom and use the highest-level signal available: (1) new job / role change, (2) LinkedIn post within 90 days, (3) company news within 90 days, (4) CEO podcast within 180 days, (5) company blog post, (6) fallback vertical-anchored trigger. Level 6 fires when the situation artifact yielded <2 recency-grade signals — flag the email as LOW-confidence.
+
+### Copy principles (proximity + them-first)
+
+Four principles govern *how* every slot is filled, layered on top of the format rules above. Folded in per BC-12966 from the Proximity Method (`github.com/termsheetinator/proximity-cold-email`) and the GTM-community Cold Email Copy Playbook. They sharpen hooks and tighten copy; none override the hypothesis-framing or no-fabricated-proof rules — they reinforce them.
+
+- **Active position.** Write from what is *already in motion*, not from what you would set up. The most load-bearing word is **already** — prefer "already working with / already running / already live / already seeing" over "we can build / set up / install / launch / create / implement." Setup language pushes the message away from the result the prospect wants; active-position language closes the distance. This is a sender-stance rule, independent of (and simultaneous with) the hypothesis-framing rule that governs how prospect worldview is stated. The ceiling is credibility: move as far toward "already" as a realistic prospect would believe, and no further. An active-position claim must stay truthful — no fabricated client or traction — which is the same ceiling the §2 value-equation proof-point rule enforces. Setup-verb usage in body copy is a §8 hard failure.
+- **The proximity spectrum.** Every line sits somewhere on: far-left (abstract, describes your process) → middle (credible but about you) → **middle-right (active, in motion, close to the result — the target zone)** → too-far-right (sounds fake, breaks trust). Aim every element (subject, opener, body, CTA) at middle-right.
+- **Them-first.** Name the prospect's company, signal, or situation before naming Brite. The first sentence is about *them*; if it opens with "I" / "we" / "my name is", rewrite. The base skeletons already open with `{RECENCY_ANCHOR}` at `{COMPANY}` — this rule makes the requirement explicit for preset authors and for Flow 2/3 scratch copy.
+- **Subject as photograph.** A subject line is a photograph, not an explanation — 2-6 words that create one mental picture the prospect already thinks about. Priority order: **clarity > curiosity > clever.** A 2-word relevant subject beats a clever one. Mechanical constraints (2-6 words, spintax, no merge variable) are in the Email Bison format rules above.
+
+### CTA design — the friction test
+
+One email, one CTA. Do not stack a free-resource offer, a case study, and a call request in the same email — multiple asks create decision fatigue and drop reply rates. Pick the single lowest-friction next step.
+
+**The friction test:** before emitting, ask "how hard is it to say yes to this?" The best cold CTA feels like permission, not pressure — one short question or soft offer, never a formal ask, never more than one line. Low-friction phrasings that pass:
+
+- "Want me to send it over?"
+- "Mind if I send the breakdown?"
+- "Worth a look?"
+- "Should I send the case study?"
+- "Cool if I share how they did it?"
+- "Would you hate me if I sent the 2-page version?"
+
+Phrasings that FAIL the test on a first touch (too much friction): "Do you have 30 minutes this week?", "Let's hop on a call", "Book a time here [link]." Asking for a 30-minute call in the first message is the marriage-on-the-first-date problem. The base skeletons' CTAs already follow this — keep new presets and scratch copy consistent.
+
+### Follow-up angles (step 2)
+
+The step-2 bump must *add* something, not just resurface the thread. Pick ONE angle; never open with a cliché. Angles, strongest first:
+
+- **Insight-add** — a specific number or lever the prospect would want: "ran the numbers on a similar push, the biggest lever was {SPECIFIC_LEVER}."
+- **Free-resource** — send the asset regardless of timing, no ask: "figured I'd send this regardless, here's the {FREE_ASSET_NOUN} {PROOF_POINT_COMPANY} used, no call needed."
+- **Social-proof** — one concrete peer result: "{PROOF_POINT_COMPANY} had the same thing and {PROOF_POINT_NUMBER}."
+- **Permission-close** — give them an easy out: "totally fine if now isn't the time, want me to close this out or revisit in a few months?"
+- **Humor / algorithm** — a light line that earns a smile while restating the offer. Use sparingly and only where entity tone permits (Nites warmer; Labs/Supply more reserved).
+
+These are authoring guidance — they do NOT add a JSON schema field. The `step_2.body` is still a single body string; the angle is a choice the author (or generator) makes, not a structured field.
+
+**What NOT to do — banned step-2 openers** (read as lazy and several are deliverability triggers; enforced in §8):
+
+- "Just bumping this up" / "Bumping this"
+- "Circling back" / "Circling back on my last email"
+- "Following up" / "Just following up"
+- "Just checking in" / "Touching base"
+- "Haven't heard from you"
+- "Per my last email" / "As I mentioned"
+- "I'm sure you're busy, but…"
+
+### Segmentation lens — ACV decision tree
+
+Before drafting, set the personalization depth from deal size. This is a copy-emphasis lens, not a list-building step — list segmentation lives upstream in `icp-scoring` and per-prospect research in `situation-mining`. It tells you *what to anchor the copy on*:
+
+- **ACV < $10k** → anchor on **ROLE** (who has the pain). Higher volume, lighter per-lead research, role-level pain in the hook.
+- **ACV $10k-$50k** → anchor on **COMPANY SIZE + ROLE**. Balance personalization and volume.
+- **ACV > $50k** → anchor on **INDUSTRY + SPECIFIC PAIN**. Lower volume, deeper research, named industry pain matched to a specific proof point.
+
+For any segment, the copy must answer four questions before a word is written: (1) the #1 pain right now, (2) what they actually care about (speed / scale / cost / compliance), (3) the language they use, (4) the proof that would resonate. These map directly onto the §2 value-equation inputs.
 
 ### Base template skeletons (2, entity-agnostic, inline)
 
@@ -91,8 +147,10 @@ Saw the {{ recency }} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked clo
 Subject: {subject}   (EB auto-prepends "Re: " at delivery — do NOT include "Re:" in the artifact)
 
 Body:
-{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. {Still happy|Glad still} to send the {FREE_ASSET_NOUN} whenever it's {useful|helpful|timely}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Figured|Thought} I'd {send|share} this {regardless|either way}, here's the {short|2-page|focused} {FREE_ASSET_NOUN} {PROOF_POINT_COMPANY} used, no {call|commitment} needed. {Use it|Keep it} and if it's {useful|relevant}, {I'm around|just say the word}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
 ```
+
+The step-2 bump uses the **free-resource follow-up angle** (see § Follow-up angles) — it adds the asset rather than resurfacing the thread, and opens with no cliché. Banned openers ("circling back", "bumping this", "just following up") are a §8 hard failure.
 
 #### Skeleton B — risk-reversal base
 
@@ -137,190 +195,67 @@ Body sections: Hook (vertical-specific recency waterfall line) → Step 1 skelet
 
 ### Liquid + spintax for graceful per-lead fallback
 
-Per-lead variables go missing. A 1000-row CSV will have rows with empty `RECENCY_ANCHOR`, missing `JOB_TITLE`, blank `CITY`. Email Bison's render engine substitutes empty strings silently — verified BC-6308 round-3 R-2b: a missing `{RECENCY_ANCHOR}` produced `"Saw the  at Acme Bob..."` with a visible double-space and orphan apostrophe-s. The fail-closed gate at `launch-campaign.md` Phase 1 step 5 prevents this by halting the launch when any variable lacks a non-empty default — safe but blunt. Liquid syntax provides per-lead graceful fallback inside the template body itself, so the launch proceeds and only the affected lead sees the fallback rendering. EB ships this capability natively. Authoritative reference: [EmailBison article 184](https://help.bisonsphere.com/en/articles/184-liquid-syntax-spintax-how-to-use-and-templates).
+Per-lead variables go missing (empty `RECENCY_ANCHOR`, blank `CITY`), and EB substitutes empty strings silently — producing visible glitches like `"Saw the  at Acme..."`. Liquid syntax provides per-lead graceful fallback inside the template body so the launch proceeds and only the affected lead sees the fallback. **The full pattern library — assign+filter-chain fallback (Pattern A), the naked-default anti-pattern, conditional/keyword branches (Patterns B/C), whitespace control, the inline-Liquid strip-hyphen rule (BC-7598), local-naming rules, and the available EB filters — lives in [`plugins/marketing/references/liquid-spintax-fallback.md`](../../references/liquid-spintax-fallback.md).** Read it before authoring any Liquid fallback in a skeleton or preset.
 
-#### Substitution order rule
+Two load-bearing rules to keep in mind even without opening the reference:
 
-Verbatim from EB docs: *"Bison replaces custom variables before parsing your liquid templates."*
+- **Substitution order:** EB substitutes `{TOKEN}` FIRST, Liquid runs SECOND. Bind a per-lead value to a local with `{%- assign name = '{FIRST_NAME}' | strip | default: 'there' -%}` (the single-quoted `'{TOKEN}'` is what makes it work) — never a naked `{{ var | default: ... }}`, which renders the fallback for every lead.
+- **Whitespace:** own-line Liquid tags use the strip form `{%- ... -%}` (else every line prints a blank line); inline mid-sentence tags do NOT use strip-hyphens (they collapse sentence spacing, BC-7598).
 
-Plain language: EB token substitution runs FIRST. Liquid runs SECOND. So Liquid sees the post-substitution result, not the raw `{TOKEN}`. A template like `{% assign x = '{FIRST_NAME}' %}` works because EB substitutes `{FIRST_NAME}` to the lead's name (or empty string) before Liquid evaluates the assign. Authors writing Liquid fallback patterns rely on this ordering — without it, the patterns wouldn't compose.
+Per-lead CSV values must be plain text, no Liquid metacharacters (`{{`, `}}`, `{%`, `%}`); `/marketing:launch-campaign` IV-10 rejects them fail-closed.
 
-#### Pattern A — assign + filter chain fallback
+Cross-reference: vendor-facts in `plugins/marketing/tools/integrations/email-bison.md` § Liquid + spintax + whitespace; gate-relax in `launch-campaign.md` Phase 1 step 5-6.
 
-Single-line fallback for one variable. Filter chain handles whitespace-only values + empty + case normalization in one expression.
+---
 
-```
-{%- assign name = '{FIRST_NAME}' | strip | default: 'there' | downcase | capitalize -%}
-```
+## Writer-Auditor Loop
 
-Then in body: `Hey {{ name }}, ...`
+Every draft passes through an internal two-role loop before the artifact is written. The **Writer** and **Auditor** are roles one model plays in sequence inside a single skill invocation — not separate subagents, and never surfaced to the operator as a back-and-forth. Adapted from the Proximity Method writer-auditor pattern, folded in per BC-12966. The loop runs after slot-fill and is the mechanism that **enforces** §8 — it does not replace §8, it executes it.
 
-Filter explanations:
+### Roles
 
-- `strip` — removes whitespace; whitespace-only values become empty strings
-- `default: 'there'` — empty/nil triggers the fallback string `'there'`
-- `downcase` — lowercases the result (case-insensitive matching downstream)
-- `capitalize` — uppercases the first character
+- **Writer** — produces the draft applying everything in §3: Email Bison format rules, the value equation, the copy principles (active position, proximity spectrum, them-first, subject-as-photograph), the CTA friction test, and the chosen follow-up angle for step 2.
+- **Auditor** — evaluates the Writer's draft against a single rubric: **the §8 Anti-Slop Guardrails are the rule source** (format hard-failures, fabrication, setup-verb ban, follow-up-cliché ban, curated spam triggers), plus the §3 copy-principle checks (per-element spectrum position, them-first, CTA friction test, subject 2-6 words). The Auditor returns PASS or FAIL with line-level **fix directions** — not rewrites. The Writer does the rewriting. There is no second rule list to drift: the Auditor reads §8 + §3, nothing else.
 
-The `{%- -%}` form strips whitespace per the Shopify whitespace rule (see "Whitespace control" below).
-
-#### Anti-pattern — naked default without `{% assign %}` wrapper
-
-The seductive shape that **does not work** for per-lead fallback:
+### Loop protocol
 
 ```
-{{ recency_anchor | default: 'recently' }}
+ROUND 1:
+  Writer drafts subject + body for step 1 + step 2 (applies all of §3)
+  -> Auditor runs §8 guardrails + §3 copy-principle checks on every element
+  -> PASS  -> go to Emit
+  -> FAIL  -> Auditor returns flagged lines + fix directions
+
+ROUND 2, 3:
+  Writer revises ONLY the flagged lines (no full rewrite)
+  -> Auditor re-runs the full rubric
+  -> PASS  -> go to Emit
+  -> FAIL  -> continue
+
+AFTER 3 ROUNDS still failing:
+  - Any UNRESOLVED §8 HARD failure (format / fabrication / setup-verb /
+    cliché / Supply trigger / >2 steps): ABORT — do NOT write the artifact.
+    Report the specific unresolved hard failure (this is the existing §8
+    emit-gate behavior; the loop just front-loads the fixing).
+  - Only SOFT issues remain (an element stuck below middle-right, a weak
+    recency anchor): EMIT the artifact and flag the soft issue in the
+    audit trail. Soft issues degrade gracefully; they never block the write.
 ```
 
-Every lead renders the fallback `'recently'` — the per-lead value never appears. Why: the lowercase identifier `recency_anchor` is a Liquid local that was never assigned via `{% assign %}`, so it is always `nil`, and `default:` always triggers. EB only substitutes the UPPERCASE `{TOKEN}` form (per the substitution-order rule above), and the naked shape above has no UPPERCASE token at all — only the lowercase Liquid local. Pattern A above is what binds a per-lead value to a Liquid local correctly: EB substitutes `{TOKEN}` inside the `'{TOKEN}'` single-quotes, the substituted value becomes a string literal, and `{% assign %}` binds it to the local.
+The hard/soft split is load-bearing: §8 hard failures are deliverability or trust defects and block the emit exactly as they do today; proximity spectrum position is a quality target and degrades to a flagged warning rather than a halt. This keeps the loop consistent with the §2 abort gates and the §8 emit gate — it never weakens a hard failure into a warning.
 
-The `launch-campaign.md` Phase 1 step 5 Path (5e)(a) gate hard-rejects copy containing this shape via the regex `\{%-?\s*assign\s+\w+\s*=\s*'\{[A-Z_]+\}'[^%]*default:\s*['"][^'"]+['"][^%]*-?%\}` — copy with the naked form halts pre-flight with a "Liquid fallback must use `{% assign %}` wrapper" error. Authors who hit this at gate-time should rewrite to Pattern A above before re-running. Origin: BC-6554 round-4 S-23 / BC-6782.
+### Audit trail (operator-facing)
 
-#### Pattern B — conditional + spintax fallback
-
-Whole-clause swap when the empty case warrants different sentence structure. Spintax composes inside the `{% else %}` clause for natural variation.
+After the loop resolves, print a compact summary alongside the artifact path. The internal Writer↔Auditor exchange is never shown. Format:
 
 ```
-{%- assign city = '{CITY}' -%}
-{%- if city -%}
-I'm helping several clients in {CITY} who need guidance with insurance.
-{%- else -%}
-I'm helping several clients in {your area|the region} who need guidance with insurance.
-{%- endif -%}
+Audit trail — copy-{campaign}-{date}.json
+Writer-auditor: {n} round(s), {n} issue(s) resolved
+Spectrum: subject {pos} / opener {pos} / body {pos} / CTA {pos}
+Guardrails: §8 hard-failures clear · {n} soft issue(s) flagged
 ```
 
-The truthy check `{% if city %}` evaluates the assigned local — when EB substituted an empty string into `{CITY}`, the local `city` is empty, the truthy check is false, the `{% else %}` clause renders. Spintax `{your area|the region}` rotates per-send.
-
-#### Pattern C — keyword-branched value-prop
-
-Branch a paragraph by job title or other keyword signal. Demonstrates the Hormozi value-equation paragraph 1 framing differently for executives vs. revenue ops vs. default.
-
-```
-{%- assign title = '{TITLE}' | downcase | strip -%}
-{%- if title contains "founder" or title contains "ceo" -%}
-I'll keep this brief given your schedule.
-{%- elsif title contains "sales" or title contains "revops" -%}
-Happy to share a quick pipeline impact summary.
-{%- else -%}
-I can tailor this to your team's priorities.
-{%- endif -%}
-```
-
-EB's documented gotcha verbatim: *"The downcase in the first line of code is used to make all text in the variable lower case as matching is case sensitive."* Without `downcase`, "Founder" won't match "founder" in `contains`. Always chain `| downcase | strip` before keyword comparison.
-
-#### Whitespace control
-
-Authoritative reference: [Shopify Liquid whitespace docs](https://shopify.github.io/liquid/basics/whitespace/).
-
-Verbatim rule: *"Any line of Liquid in your template will still print a blank line in your rendered HTML."*
-
-Without hyphens (broken — every Liquid line adds a blank line):
-
-```
-{% assign recency = '{RECENCY_ANCHOR}' | strip | default: 'a recent capital plan' %}
-Hey {FIRST_NAME}, saw {COMPANY}'s {{ recency }}...
-```
-
-Renders as:
-
-```
-
-Hey Bob, saw Acme's $3B village expansion...
-```
-
-(Note the leading blank line — the template's `{% assign %}` line printed an empty line in the output.)
-
-With hyphens (correct — Liquid lines emit nothing):
-
-```
-{%- assign recency = '{RECENCY_ANCHOR}' | strip | default: 'a recent capital plan' -%}
-Hey {FIRST_NAME}, saw {COMPANY}'s {{ recency }}...
-```
-
-Renders as:
-
-```
-Hey Bob, saw Acme's $3B village expansion...
-```
-
-Rule: every Liquid line in a body uses `{%- ... -%}` (or `{{- ... -}}` for output tags) unless the author explicitly wants a line break in the rendered output. This is non-negotiable — without it, every preset that adopts Liquid ships a render bug worse than the one Liquid is fixing.
-
-#### Inline Liquid: do NOT use strip-hyphens (BC-7598)
-
-The above rule applies to Liquid tags **on their own line** — the typical `{% assign %}` declarations at the top of a template, where the alternative is a printed blank line. For **inline** Liquid (mid-sentence `{% if %}` blocks embedded in prose), the opposite rule applies: do NOT use strip-hyphens. They consume the surrounding sentence whitespace and collapse the rendered text.
-
-Why: per Shopify Liquid spec, `{%- tag -%}` strips whitespace on **both sides** of the tag — before `{%-` and after `-%}`. For an inline block following a sentence period, this consumes (a) the space between the period and the opening tag, AND (b) the space between the closing tag and the next sentence. Result: `drop-offs. {%- if x -%} One that matters.{%- endif -%} More text.` renders as `drop-offs.One that matters.More text.` — both sentence boundaries collapse.
-
-The fix is mechanical: drop the strip-hyphens for inline tags.
-
-**Broken** (both strip-hyphens, sentence whitespace collapses):
-
-```
-We saw your drop-offs. {%- if company -%} One that matters: yours.{%- endif -%} More text.
-```
-
-Renders: `We saw your drop-offs.One that matters: yours.More text.`
-
-**Correct** (no strip-hyphens — surrounding sentence whitespace preserved):
-
-```
-We saw your drop-offs. {% if company %} One that matters: yours.{% endif %} More text.
-```
-
-Renders: `We saw your drop-offs. One that matters: yours. More text.`
-
-**Verified live, 2026-05-11**, via UI Preview Body (canonical Liquid-render verification surface per BC-6785 round-5). Four variants tested; only the no-strip-hyphens form rendered correctly. Inline tags do not produce blank lines in rendered output (the blank-line concern that motivates strip-hyphens applies only to tags occupying their own line).
-
-**Not a fix** — moving the space inside the block content (e.g., `drop-offs.{%- if x -%} One that...`) **does not work**. The right-strip on `{%- if x -%}` consumes the leading space inside the block content. The Shopify whitespace rule strips ALL whitespace adjacent to the tag, not just one character. Verified 2026-05-11 alongside the working form above.
-
-#### Liquid local variable naming rule
-
-Liquid local variables (the names introduced by `{% assign %}`) MUST be lowercase, snake_case acceptable. Examples:
-
-- Good: `{% assign name = ... %}`, `{% assign company_legal_name = ... %}`, `{% assign first_name = ... %}`
-- Forbidden: `{% assign NAME = ... %}`, `{% assign FirstName = ... %}`, `{% assign Company = ... %}`
-
-Why: the anti-slop rule (§ Anti-Slop Guardrails) detects EB-token typos like `{{FIRST_NAME}}` and `{{ FIRST_NAME }}` (uppercase identifier, with or without internal whitespace) via the regex `\{\{\s*[A-Z_]+\s*\}\}`. Lowercase Liquid locals (rendered as `{{ name }}`, lowercase identifier) are unambiguously distinct from typos. Uppercase Liquid locals (e.g., `{{ NAME }}`) ARE caught by the typo regex — that's intentional. They're forbidden by both convention AND regex enforcement, so the typo-detection rule is unambiguous and safe to apply mechanically regardless of authoring whitespace.
-
-#### Authoring guidance — fallbacks are for data sparsity, not lazy authoring
-
-Liquid fallbacks are a safety net for the 1-of-1000 lead with a missing per-lead value. They are not a substitute for per-lead research.
-
-Rule: if a campaign expects ≥10% of leads to use the fallback (i.e., ≥10% have empty per-lead values for the wrapped variable), the CSV needs better enrichment, not a smarter fallback. Generic fallbacks signal vendor-who-didn't-research at the prospect-side; per-lead values are the quality lever. The fallback exists to prevent visible glitches, not to make low-research email feel personalized.
-
-When choosing a fallback string, target "okay-ish if hit, signals nothing distinctive if not hit." A `RECENCY_ANCHOR` fallback like "a recent capital-plan announcement" reads as plausibly per-lead. A fallback like "your recent stuff" reads as obviously generic and is a quality drop. The former is acceptable for a rare-case safety net; the latter is not.
-
-#### Per-lead value safety — no Liquid metacharacters in CSV values
-
-EmailBison's substitution-order rule means lead values are inlined into the body BEFORE Liquid parses. A CSV row whose `RECENCY_ANCHOR` (or any per-lead variable) contains Liquid metacharacters — `{{`, `}}`, `{%`, `%}` — would inject Liquid that runs at EB render time. Worst case: a lead value like `{% for i in (1..1000000) %}{% endfor %}` triggers a Liquid render-loop DoS against the EB sender, or a quote-breakout like `'; some_filter; '` smuggles arbitrary Liquid filter invocation into the assign string.
-
-`/marketing:launch-campaign` enforces this at the input boundary via IV-10 (CSV row value Liquid-metacharacter rejection — see `plugins/marketing/commands/launch-campaign.md` § Input validation). Authors of campaign artifacts and per-lead enrichment pipelines should NOT manually defeat this check. Per-lead values should be plain text; if a campaign needs Liquid logic, it lives in the body template (authored by this skill), not in CSV cells. Threat model: enrichment-vendor data integrity boundary — Apollo, Clay, ZoomInfo, and similar paid sources have integrity guarantees, but the boundary is real and IV-10 is fail-closed.
-
-#### Available filters and conditionals
-
-Filters EB documents (verbatim list from article 184):
-
-- `strip` — removes whitespace
-- `downcase` — converts to lowercase
-- `capitalize` — capitalizes the first character
-- `default: '<value>'` — fallback when empty/nil
-- `date: '<format>'` — formats dates/times (e.g., `"now" | date: "%A"`)
-- `plus: <number>` — mathematical addition
-
-Conditional operators:
-
-- `==` (equality), `!=` (inequality)
-- `contains` (substring; case-sensitive — chain `| downcase` for case-insensitive)
-- `or`, `and` (logical composition)
-- `<`, `>`, `<=`, `>=` (numeric comparison)
-
-Comparing custom variables: EB docs verbatim: *"if you're using custom variables, and you're looking to make comparisons in 'if' statements, you must put them in quotes."* Pattern: `{% if '{FIRST_NAME}' == 'Cody' %}`. Comparing assigned locals: no quotes needed. Pattern: `{% if name == 'cody' %}` (after `{% assign name = '{FIRST_NAME}' | downcase %}`).
-
-#### Cross-reference
-
-Vendor-fact reference for Liquid + spintax + whitespace: `plugins/marketing/tools/integrations/email-bison.md` § Liquid + spintax + whitespace.
-
-Gate-relax accepting Liquid as a resolution path: `plugins/marketing/commands/launch-campaign.md` Phase 1 step 5 (5th resolution path) and Phase 1 step 6 (sanity checklist regex tightening).
+`{pos}` is one of far-left / middle / middle-right / too-far-right. A send-ready artifact shows every element at middle-right with zero soft issues. **This trail is operator-facing only — it is NOT written into the JSON artifact.** The schema is unchanged; `/marketing:launch-campaign` consumes exactly the same fields as before.
 
 ---
 
@@ -379,7 +314,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
   },
   "step_2": {
     "subject": "{Quick|Fast|30s} {question|check|idea}",
-    "body": "{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. ...",
+    "body": "{Figured|Thought} I'd {send|share} this {regardless|either way}, here's the {short|2-page|focused} {FREE_ASSET_NOUN} {PROOF_POINT_COMPANY} used, no {call|commitment} needed. ...",
     "wait_in_days": 4
   },
   "situation_mining_source": "docs/research/situations/denvergov.org-2026-04-20.md",
@@ -409,6 +344,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
 - **Offer posture is always recommend + confirm.** No auto-select code path. Even with HIGH signal density, surface the recommendation to the operator and wait for confirmation before drafting (D2).
 - **Preset files are lazy-loaded.** One preset file read per invocation, not the whole library. Use `Glob` + `Grep` to check existence before `Read`; on missing, fall back to base inline skeleton without halting (D3).
 - **Supply vertical triggers are out of scope.** The handbook 23-vertical taxonomy excludes professional installers + property management (see `Brite-Nites/handbook@main:marketing/go-to-market/verticals/README.md`). If an operator supplies a Supply-framed prospect, pause and clarify — do not produce a Supply-tone email. Inherited from BC-5824 precedent.
+- **Open-tracking stays OFF — owned downstream, not here.** This skill writes copy only and never touches campaign settings, but copywriters should know the rule: open-tracking pixels hurt sender reputation and are disabled by the no-opt-out `plain_text: true` deliverability invariant applied at `/marketing:launch-campaign` Phase 5 step 8 (see `plugins/marketing/commands/launch-campaign.md` and `plugins/marketing/tools/integrations/email-bison.md`). `tam-mapping` emits the verbatim `OPEN-TRACKING DISABLED` reminder. No action in this skill — cross-ref only (BC-12966 confirmed the rule is already canon).
 - **Hypothesis framing is non-negotiable.** Inherited from situation-mining §3 — body copy never states worldview as fact. When incorporating inferred signals from the situation artifact, the copy must read as "we noticed X and thought {HYPOTHESIS}" — never "you are X."
 - **Content-variable defaults must be non-empty (BC-6556 fail-closed gate).** Email Bison's render engine substitutes any unresolved `{TOKEN}` with empty string — silent, no error (verified BC-6308 round-3 R-2b: `{RECENCY_ANCHOR}` with null value rendered as `""`, producing `"Saw the  at Acme Bob..."` with double-space). To prevent this in production: every content variable referenced in `step_1` / `step_2` subject + body MUST have a non-empty `custom_variables[].default` in the artifact. Per-lead variables (`{COMPANY}`, `{FIRST_NAME}`) and sender variables (`{SENDER_*}`) are exceptions — they're resolved via per-lead CSV values and the §5 Workflow 1 priority chain respectively, not via campaign-level defaults. Enforced fail-closed by `launch-campaign.md` Phase 1 step 5. Defaults are a **safety net** for prospects with thin per-lead data, not a substitute for good per-lead values — for high-personalization campaigns, populate the per-lead value via the CSV. Graceful per-lead fallback (per-lead empty without campaign-level halt) is now handled via Liquid syntax in the template body — see § Liquid + spintax for graceful per-lead fallback (BC-6613, supersedes the canceled smart-merge formula approach).
 
@@ -432,7 +368,7 @@ All SF calls are read-only; no MCP confirmation gates apply. This skill has NO m
 
 ## Operational Runbook
 
-Six flows — the common paths operators actually run. Each flow states preconditions, steps (referencing §5 Workflow 1 where applicable), expected output, error handling, and cross-skill handoff.
+Six flows — the common paths operators actually run. Each flow states preconditions, steps (referencing §5 Workflow 1 where applicable), expected output, error handling, and cross-skill handoff. **Every drafting flow (1, 2, 3, 4, 6) runs the § Writer-Auditor Loop between slot-fill and `Write`, then prints the compact audit trail in its report step** — Flow 1 spells out the loop step explicitly; the others inherit it. Flow 5 is a precondition-pause path that writes no artifact, so the loop does not apply.
 
 ### Flow 1 — Happy path (situation artifact + offer posture + vertical → copy using preset)
 
@@ -447,12 +383,12 @@ Six flows — the common paths operators actually run. Each flow states precondi
 3. Run §2 value-equation gate — confirm the 4 inputs resolve from marketing-context.md + situation artifact. If any missing, interview the operator one input at a time.
 4. `Glob` check `presets/{template_preset}-{vertical}.md`. If it exists, `Read` it. If not, flag the fallback path (Flow 6).
 5. Fill slots: `{RECENCY_ANCHOR}` from the situation artifact's top waterfall signal, `{PROOF_POINT_*}` from marketing-context.md case studies, `{SENDER_*}` from marketing-context.md or §5 Workflow 1 fallback, `{FREE_ASSET_NOUN}` / `{INITIATIVE_NOUN}` / `{GUARANTEE_TERMS}` from value-equation inputs.
-6. Validate draft against §8 anti-slop guardrails — auto-replace em-dashes, check for `{{TOKEN}}` EB-token typos (regex `\{\{\s*[A-Z_]+\s*\}\}`; Liquid output `{{ var }}` is allowed), check for `<p>` tags, confirm subject has no `{FIRST_NAME}`, confirm step count is exactly 2.
+6. Run the **Writer-Auditor loop** (see § Writer-Auditor Loop): the Writer draft applies §3, the Auditor runs the §8 anti-slop guardrails + §3 copy-principle checks (auto-replace em-dashes, check for `{{TOKEN}}` EB-token typos per regex `\{\{\s*[A-Z_]+\s*\}\}` — Liquid output `{{ var }}` is allowed, check for `<p>` tags, setup-verb ban, follow-up-cliché ban, confirm subject is 2-6 words with no `{FIRST_NAME}`, confirm step count is exactly 2), looping ≤3 rounds. Unresolved hard failures abort; soft issues flag.
 7. Build the `custom_variables` array (every `{VARIABLE}` in body or subject must be declared).
 8. `Write` the JSON artifact to `docs/campaigns/{short_entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`.
-9. Report the artifact path + offer summary + tier + preset used to the operator.
+9. Report the artifact path + offer summary + posture + preset used, followed by the compact **audit trail** (rounds run, per-element spectrum position, guardrail status) per § Writer-Auditor Loop.
 
-**Expected output:** artifact written; one-line summary like "Wrote copy-denver-downtown-2026-04-20.json — free-asset posture, list-building Municipalities preset, 7 custom variables."
+**Expected output:** artifact written; one-line summary like "Wrote copy-denver-downtown-2026-04-20.json — free-asset posture, list-building Municipalities preset, 7 custom variables." plus the audit-trail block.
 
 **Error handling:** if §2 hard gate fails at step 3, abort with an operator-facing message naming the missing input. If §6 preset file missing, degrade to Flow 6 without halting.
 
@@ -567,10 +503,10 @@ Six flows — the common paths operators actually run. Each flow states precondi
 
 | Score | Criteria |
 |------:|----------|
-| 10 | Artifact is EB-format-compliant (no `{{TOKEN}}` EB-token typos per regex `\{\{\s*[A-Z_]+\s*\}\}`; Liquid output `{{ var }}` is allowed in body for fallback patterns; no `<p>`, no em-dashes in body, no `{FIRST_NAME}` in subject, exactly 2 steps, sign-off spintax correct); Hormozi value equation visible in body copy (all 4 inputs map to specific paragraphs); entity-aware tier from the §3 matrix is picked and confirmed by operator; recency-waterfall anchor appears in the hook and cites the waterfall level; every `{VARIABLE}` in body + subject is declared in `custom_variables`; base or per-vertical preset is cited in the artifact; `situation_mining_source` cited when applicable; all §8 anti-slop guardrails pass validation. |
+| 10 | Artifact is EB-format-compliant (no `{{TOKEN}}` EB-token typos per regex `\{\{\s*[A-Z_]+\s*\}\}`; Liquid output `{{ var }}` is allowed in body for fallback patterns; no `<p>`, no em-dashes in body, no `{FIRST_NAME}` in subject, exactly 2 steps, sign-off spintax correct); Hormozi value equation visible in body copy (all 4 inputs map to specific paragraphs); entity-aware posture from the §3 matrix is picked and confirmed by operator; recency-waterfall anchor appears in the hook and cites the waterfall level; every `{VARIABLE}` in body + subject is declared in `custom_variables`; base or per-vertical preset is cited in the artifact; `situation_mining_source` cited when applicable; all §8 anti-slop guardrails pass validation; every element (subject / opener / body / CTA) sits at middle-right on the proximity spectrum; subject is 2-6 words in photograph form; the single CTA passes the friction test; step 2 uses a § Follow-up angle with no cliché opener; the Writer-Auditor loop passed with zero soft issues and the audit trail was emitted. |
 | 7-9 | Mostly excellent with one gap — e.g. recency anchor cites a level but the signal is weak; one custom variable in the body is missing from the array; spintax is word-level but less dense than the 3-5 word guideline; sign-off is correct but not spintax-expanded. |
-| 4-6 | Functional but missing structural elements — e.g. value equation applied but proof point is generic (no numbers), or step 2 bump summarizes step 1 instead of referencing it, or tier was recommended but not confirmed with operator (D2 bypassed), or `vertical: null` without a valid fallback reason, or the preset file exists but wasn't read. |
-| 1-3 | Format violations (any one: `{{TOKEN}}` EB-token typo present per regex `\{\{\s*[A-Z_]+\s*\}\}` — note Liquid output `{{ var }}` is allowed and not a violation, `<p>` tag present, em-dash in body, `{FIRST_NAME}` in subject, >2 steps, Supply-vertical trigger like "installers" or "property mgmt" in body); OR `docs/marketing-context.md` was ignored (silent entity default); OR fact-claim framing ("you are X" instead of "we noticed X and thought Y"); OR fabricated proof point / statistic / case study not in marketing-context.md or operator input. |
+| 4-6 | Functional but missing structural elements — e.g. value equation applied but proof point is generic (no numbers), or step 2 bump summarizes step 1 instead of referencing it, or posture was recommended but not confirmed with operator (D2 bypassed), or `vertical: null` without a valid fallback reason, or the preset file exists but wasn't read. |
+| 1-3 | Format violations (any one: `{{TOKEN}}` EB-token typo present per regex `\{\{\s*[A-Z_]+\s*\}\}` — note Liquid output `{{ var }}` is allowed and not a violation, `<p>` tag present, em-dash in body, `{FIRST_NAME}` in subject, >2 steps, 7+ word subject, Supply-vertical trigger like "installers" or "property mgmt" in body, setup-verb in body like "we can build / set up / install / launch", step-2 cliché opener like "circling back / bumping this", ALL-CAPS or pressure-phrase spam trigger, RE/FWD subject spoof); OR `docs/marketing-context.md` was ignored (silent entity default); OR fact-claim framing ("you are X" instead of "we noticed X and thought Y"); OR fabricated proof point / statistic / case study not in marketing-context.md or operator input. |
 
 ---
 
@@ -597,12 +533,17 @@ Base guardrails (shared across marketing plugin) + skill-specific hard failures.
 - **Do not emit `{FIRST_NAME}` (or any merge variable) in the subject line.** Subjects are the highest-impact spam signal; merge variables under-perform generic subjects across every deliverability benchmark. Hard failure.
 - **Do not frame inferences as facts.** Inherited from situation-mining §3 — body copy MUST read as hypothesis when referencing a prospect worldview or inferred signal. Write "we noticed the {INITIATIVE} announcement and thought it might line up with how your team is scoping {VERTICAL_DESCRIPTOR}" — never "your team is scoping {VERTICAL_DESCRIPTOR}." Fact-claim framing is a hard failure; §7 1-3 band.
 - **Do not emit Supply-vertical triggers in body copy.** The handbook 23-vertical taxonomy excludes professional installers + property management. Body copy that keys to installer hiring, PM company onboarding, or other Supply signals is a hard failure per handbook canon + BC-5824 precedent. If an operator supplies a Supply-framed prospect, pause and clarify per §6 Flow 6 error handling.
+- **Do not emit setup-verb language in body copy.** Per § Copy principles (active position), the verbs *build / set up / install / launch / create / implement / develop* (and close synonyms) push copy to the far-left of the proximity spectrum. Rewrite from the active position ("already running / already live / already working with") instead. Detection is a phrase-level scan over body copy for these verbs in a sender-action context. Hard failure if present in the written artifact. Folded in per BC-12966.
+- **Do not open step 2 with a follow-up cliché.** The banned openers — *"just bumping this up" / "bumping this" / "circling back" / "following up" / "just following up" / "just checking in" / "touching base" / "haven't heard from you" / "per my last email" / "as I mentioned" / "I'm sure you're busy but"* — read as lazy and several are deliverability triggers. The step-2 bump must instead use one of the § Follow-up angles. Hard failure if a step-2 body opens with any banned phrase. Folded in per BC-12966.
+- **Do not emit high-signal universal spam triggers** (curated Brite subset, per BC-12966): ALL-CAPS words in subject or body, more than one `!` in the whole email, and pressure phrases (*"act now" / "limited time" / "buy now" / "order today" / "what are you waiting for" / "while supplies last"*). Em-dashes are already covered above. **This is deliberately a curated subset, NOT the Proximity Method's 350-word finance list** — that list bans words that are legitimate and load-bearing for Brite (`free`, `offer`, `rate`/`rates`, `performance`, `solution`, `new`, `cost`; e.g. "free architectural lighting preview", the `offer_posture` vocabulary, the `hotels-resorts-rate-premium` preset). Do NOT port the finance word-bans; they would break existing copy, presets, and the §4 schema vocabulary. Hard failure on the curated triggers only.
+- **Do not exceed a 6-word subject line.** Subjects are 2-6 words (§3 Email Bison format rules). A subject of 7+ words (counting spintax as one word per `{...}` group) is a hard failure.
+- **Do NOT adopt RE/FWD subject-spoofing.** The Proximity Method ships a `{{RANDOM|RE|Re|re|FWD|Fwd|fwd}}:` subject layer that fakes an ongoing thread to lift opens. **Brite explicitly rejects this** (BC-12966): it is a deliverability and trust risk on Brite sending domains, and step 2's real `Re:` is already auto-prepended by EB via `thread_reply` (see § Email Bison format rules). Emitting a spoofed RE/FWD prefix in a step-1 subject is a hard failure. This bullet exists so a future contributor reading the Proximity source does not "helpfully" add it.
 
 ---
 
 ## Behavioral Tests
 
-Eight scenarios covering the core paths. Structured assertions + expected-output details live in `evals/evals.json` alongside this file. Scenario IDs match the `evals.json` entries for 1:1 traceability.
+Thirteen scenarios are enumerated below — eight pre-existing (5 Tier 1 + 3 Tier 2) plus five new for BC-12966 (4 Tier 1 + 1 Tier 2). Those eight, plus a ninth seed (`legacy-offer-tier-input-accepted`, not re-listed here), have structured-assertion seeds in `evals/evals.json`, which is now a **frozen, non-executing seed spec** per [ADR-028 D3](../../../../docs/decisions/028-skill-engineering-discipline.md) — do NOT author new `evals.json` cases. The five BC-12966 scenarios below are SKILL.md-native behavioral specs with no `evals.json` counterpart; they are the living spec for the new copy-craft guardrails.
 
 ### Tier 1 — Free assertions (no tool calls needed)
 
@@ -617,5 +558,16 @@ Eight scenarios covering the core paths. Structured assertions + expected-output
 - **`happy-path-municipalities-seed`** — Given a situation artifact for Denver Parks & Rec at `docs/research/situations/denvergov.org-2026-04-20.md` + `vertical: municipalities` + `offer_posture: free-asset` + entity confirmed, the output JSON artifact (a) exists at the expected path, (b) has `template_preset == "list-building"`, (c) has `vertical == "municipalities"`, (d) has `situation_mining_source` populated, (e) body contains `<br><br>` paragraph breaks, (f) body contains zero `—` characters, (g) subject contains zero `{FIRST_NAME}` tokens. Preset file `list-building-municipalities.md` was `Read` during the flow.
 - **`entity-switching`** — Given the same situation artifact, run once with `entity: brite-nites` and once with `entity: brite-labs`. The two artifacts differ in (a) `offer_posture` (Nites → `free-asset` typical, Labs → `pilot` or `risk-reversal` typical per §3 matrix), (b) subject line word choices (Nites warmer / seasonal, Labs more capital / experiential), (c) CTA framing (Nites "free preview" vs Labs "scope a pilot"). Entity tone is sourced from `docs/marketing-context.md`.
 - **`missing-marketing-context-hard-gate`** — With `docs/marketing-context.md` absent from disk, the skill's first response does NOT contain any JSON artifact text and does NOT contain any "## Recommendations" section. It DOES contain the BC-5824 precedent warning message AND an entity prompt via AskUserQuestion. No Write tool call fires until the operator answers. (D1 hard gate.)
+
+### Tier 1 — BC-12966 copy-craft guardrails (SKILL.md-native, no `evals.json` seed)
+
+- **`followup-cliche-ban`** — Given any drafting flow that reaches a step-2 bump, the emitted `step_2.body` does NOT open with a banned cliché ("circling back", "bumping this", "just bumping this up", "following up", "just checking in", "touching base", "haven't heard from you", "per my last email", "as I mentioned", "I'm sure you're busy"). The opener instead matches one of the § Follow-up angles (insight-add / free-resource / social-proof / permission-close / humor). The shipped Skeleton A step-2 bump passes this (free-resource angle).
+- **`setup-verb-ban`** — Given an operator-supplied draft or generated body containing setup verbs in a sender-action context ("we can build", "we'll set up", "we install", "we launch", "we create"), the skill rewrites to active-position language ("already running / already live / already working with") before emit. The emitted body contains zero sender-action setup verbs.
+- **`friction-test-cta`** — Given any emitted artifact, each step body contains exactly ONE call-to-action, phrased as a single low-friction line (a soft question or offer), not a formal meeting ask. A draft whose step-1 body stacks two asks (e.g. a free resource AND a call request) fails; the skill reduces it to one before emit.
+- **`photograph-subject-2-6`** — Given any emitted artifact, `step_1.subject` (and `step_2.subject`) is 2 to 6 words inclusive (counting each `{...}` spintax group as one word), contains no merge variable, and carries no spoofed `RE:`/`FWD:` prefix. A 1-word or 7+-word subject fails.
+
+### Tier 2 — BC-12966 Writer-Auditor loop
+
+- **`writer-auditor-audit-trail`** — Given a complete drafting flow (e.g. happy-path municipalities), after the artifact is written the skill prints a compact audit trail containing (a) a Writer-auditor round count, (b) per-element spectrum positions for subject / opener / body / CTA, and (c) a guardrail-status line. The internal Writer↔Auditor exchange is NOT shown. The audit trail is operator-facing text only and does NOT appear inside the written JSON artifact (the schema is unchanged — no `audit_trail` key in the file).
 
 ---
