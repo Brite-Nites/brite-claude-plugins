@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "command": "/workflows:audit-trail",
+  "scenarios": [
+    {
+      "id": "issue_with_traces",
+      "error": null,
+      "issue_id": "BC-9101",
+      "corpus": "full",
+      "as_of": "2026-05-01",
+      "trace_file_exists": true,
+      "trace_count": 2,
+      "traces": [
+        {
+          "summary": "adopt the shared precedent_trace module at Rule-of-Three",
+          "category": "architecture",
+          "confidence": 9,
+          "precedent_referenced": "CDR-007",
+          "has_cdr": true,
+          "inputs": [
+            {
+              "path": "docs/refs/doc-fresh.md",
+              "band": "Fresh",
+              "exists": true
+            },
+            {
+              "path": "docs/refs/doc-stale.md",
+              "band": "Stale",
+              "exists": true
+            }
+          ]
+        },
+        {
+          "summary": "prefer the field form over heading-encoded category",
+          "category": "pattern-choice",
+          "confidence": 7,
+          "precedent_referenced": "ADR-003",
+          "has_cdr": false,
+          "inputs": [
+            {
+              "path": "docs/refs/doc-fresh.md",
+              "band": "Fresh",
+              "exists": true
+            },
+            {
+              "path": "docs/refs/doc-gone.md",
+              "band": "MISSING",
+              "exists": false
+            }
+          ]
+        }
+      ],
+      "session_context": [
+        {
+          "path": "docs/refs/doc-fresh.md",
+          "band": "Fresh",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-aging.md",
+          "band": "Aging",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-stale.md",
+          "band": "Stale",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-onchange.md",
+          "band": "on-change (skip)",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-nometa.md",
+          "band": "No freshness metadata",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-missing.md",
+          "band": "MISSING",
+          "exists": false
+        }
+      ],
+      "frequency": {
+        "most_referenced": [
+          {
+            "path": "docs/refs/doc-fresh.md",
+            "count": 2,
+            "band": "Fresh"
+          },
+          {
+            "path": "docs/refs/doc-gone.md",
+            "count": 1,
+            "band": "MISSING"
+          },
+          {
+            "path": "docs/refs/doc-stale.md",
+            "count": 1,
+            "band": "Stale"
+          }
+        ],
+        "session_only": [
+          "docs/refs/doc-aging.md",
+          "docs/refs/doc-missing.md",
+          "docs/refs/doc-nometa.md",
+          "docs/refs/doc-onchange.md"
+        ],
+        "single_use": [
+          "docs/refs/doc-gone.md",
+          "docs/refs/doc-stale.md"
+        ]
+      },
+      "warnings": {
+        "missing": [
+          "docs/refs/doc-gone.md",
+          "docs/refs/doc-missing.md"
+        ],
+        "stale": [
+          "docs/refs/doc-stale.md"
+        ],
+        "very_stale": [],
+        "total": 3
+      }
+    },
+    {
+      "id": "issue_no_traces",
+      "error": null,
+      "issue_id": "BC-9999",
+      "corpus": "full",
+      "as_of": "2026-05-01",
+      "trace_file_exists": false,
+      "trace_count": 0,
+      "traces": [],
+      "session_context": [
+        {
+          "path": "docs/refs/doc-fresh.md",
+          "band": "Fresh",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-aging.md",
+          "band": "Aging",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-stale.md",
+          "band": "Stale",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-onchange.md",
+          "band": "on-change (skip)",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-nometa.md",
+          "band": "No freshness metadata",
+          "exists": true
+        },
+        {
+          "path": "docs/refs/doc-missing.md",
+          "band": "MISSING",
+          "exists": false
+        }
+      ],
+      "frequency": {
+        "most_referenced": [],
+        "session_only": [
+          "docs/refs/doc-aging.md",
+          "docs/refs/doc-fresh.md",
+          "docs/refs/doc-missing.md",
+          "docs/refs/doc-nometa.md",
+          "docs/refs/doc-onchange.md",
+          "docs/refs/doc-stale.md"
+        ],
+        "single_use": []
+      },
+      "warnings": {
+        "missing": [
+          "docs/refs/doc-missing.md"
+        ],
+        "stale": [
+          "docs/refs/doc-stale.md"
+        ],
+        "very_stale": [],
+        "total": 2
+      }
+    },
+    {
+      "id": "invalid_issue_id_traversal",
+      "error": "invalid_issue_id",
+      "issue_id": "../../etc/passwd",
+      "corpus": "full",
+      "as_of": "2026-05-01",
+      "trace_file_exists": false,
+      "trace_count": null,
+      "traces": [],
+      "session_context": [],
+      "frequency": {
+        "most_referenced": [],
+        "session_only": [],
+        "single_use": []
+      },
+      "warnings": {
+        "missing": [],
+        "stale": [],
+        "very_stale": [],
+        "total": 0
+      }
+    },
+    {
+      "id": "invalid_issue_id_injection",
+      "error": "invalid_issue_id",
+      "issue_id": "BC-1; touch pwned",
+      "corpus": "full",
+      "as_of": "2026-05-01",
+      "trace_file_exists": false,
+      "trace_count": null,
+      "traces": [],
+      "session_context": [],
+      "frequency": {
+        "most_referenced": [],
+        "session_only": [],
+        "single_use": []
+      },
+      "warnings": {
+        "missing": [],
+        "stale": [],
+        "very_stale": [],
+        "total": 0
+      }
+    }
+  ]
+}

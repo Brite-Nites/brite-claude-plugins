@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -2021,8 +2022,574 @@ class SprintPlanningAdapter:
         return str(self.golden_path)
 
 
+class AnalyticsAdapter:
+    """Emit adapter for /workflows:analytics (BC-12945 — structure-first WRAP).
+
+    build_analytics_emit.py drives the SAME runtime entrypoint the command shells
+    (scripts/brite-analytics.sh) over a sandbox $HOME whose telemetry events.jsonl
+    is a frozen seed (HOME-override is the injection seam). The eval asserts the
+    rendered dashboard's deterministic STRUCTURE — the Period/sessions line, the
+    ordered section headers, the frequency-sorted command rows, the success-rate
+    triples, the average-duration rows, the recent-error rows — plus the two
+    no-output branches (no telemetry data; a filter window matching nothing). NOT
+    the ASCII bar widths or the sandbox-path footer (ADR-028 D2 structure-first)."""
+
+    command_id = "analytics"
+    artifact_names = ("analytics-emit.json",)
+    builder = REPO_ROOT / "plugins/workflows/scripts/build_analytics_emit.py"
+    seed_dir = REPO_ROOT / "plugins/workflows/tests/eval/analytics-seed"
+    _eval_dir = REPO_ROOT / "plugins/workflows/tests/eval"
+    fixture_path = _eval_dir / "analytics.fixture.json"
+    golden_path = _eval_dir / "analytics.golden.json"
+    schema_path = _eval_dir / "analytics.schema.json"
+
+    EXPECTED_SCENARIO_IDS = (
+        "all_time", "since_window", "until_window", "both_window",
+        "empty_window", "no_data",
+    )
+    _DETAIL_FIELDS = ("period", "sessions", "sections", "commands",
+                      "success_rates", "durations", "recent_errors")
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox), "--seed-dir", str(self.seed_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_analytics_emit.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        # SHAPE FIRST — short-circuit so the value/invariant checks index a valid matrix.
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+
+        # Branch coverage: a thinned fixture that drops a load-bearing branch is caught.
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            rendered = s["has_data"] and not s["no_match"]
+            if not rendered:
+                # The empty-file (has_data:false) + the matched-nothing (no_match:true)
+                # branches render no dashboard → every detail field must be null.
+                for f in self._DETAIL_FIELDS:
+                    if s[f] is not None:
+                        diffs.append(f"{tag}: non-rendered row must have null {f}, got {s[f]!r}")
+                continue
+            # A rendered row carries a full dashboard.
+            for f in self._DETAIL_FIELDS:
+                if s[f] is None:
+                    diffs.append(f"{tag}: rendered row must carry a non-null {f}")
+            if not isinstance(s["sessions"], int) or s["sessions"] < 0:
+                diffs.append(f"{tag}: sessions must be a non-negative int, got {s['sessions']!r}")
+            # Frequency sort: command counts are non-increasing (binds the script's sort).
+            counts = [c["count"] for c in (s["commands"] or [])]
+            if counts != sorted(counts, reverse=True):
+                diffs.append(f"{tag}: commands not in frequency-descending order: {counts}")
+            for c in (s["commands"] or []):
+                if c["count"] < 1:
+                    diffs.append(f"{tag}: command {c['command']!r} has a non-positive count {c['count']}")
+            # Success-rate arithmetic: pct == int(success/total*100), success<=total (binds
+            # the rendered % to its fraction — a flipped formula shows up here, not just golden).
+            for r in (s["success_rates"] or []):
+                if r["total"] <= 0:
+                    diffs.append(f"{tag}: success_rate for {r['command']!r} has non-positive total {r['total']}")
+                    continue
+                if r["success"] > r["total"]:
+                    diffs.append(f"{tag}: success ({r['success']}) > total ({r['total']}) for {r['command']!r}")
+                expected_pct = int(r["success"] * 100 / r["total"])
+                if r["pct"] != expected_pct:
+                    diffs.append(f"{tag}: pct {r['pct']} != int(success/total*100)={expected_pct} for {r['command']!r}")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+class FlywheelMetricsAdapter:
+    """Emit adapter for /workflows:flywheel-metrics (BC-12945 — S3 seed-read).
+
+    build_flywheel_metrics.py READS a frozen docs/precedents/ corpus (the markdown
+    parsing is the logic under test, ADR-028 D2) + the CLAUDE.md @imports, with
+    as_of injected, and computes M2 (confidence avg + monthly trend), M3 (CDR
+    coverage), M4 (context freshness); M1/M5 are documented N/A. The eval asserts
+    the metric VALUES + the per-doc freshness classification + the arithmetic
+    invariants (coverage = covered/total, freshness = fresh/denominator,
+    in_denominator/fresh ↔ band) — not the LLM 'Insights' prose."""
+
+    command_id = "flywheel-metrics"
+    artifact_names = ("flywheel-metrics-emit.json",)
+    builder = REPO_ROOT / "plugins/workflows/scripts/build_flywheel_metrics.py"
+    seed_dir = REPO_ROOT / "plugins/workflows/tests/eval/precedents-seed"
+    _eval_dir = REPO_ROOT / "plugins/workflows/tests/eval"
+    fixture_path = _eval_dir / "flywheel-metrics.fixture.json"
+    golden_path = _eval_dir / "flywheel-metrics.golden.json"
+    schema_path = _eval_dir / "flywheel-metrics.schema.json"
+
+    EXPECTED_SCENARIO_IDS = ("full_corpus", "insufficient_trend", "m4_na_no_freshness")
+    _DENOM_BANDS = ("Fresh", "Aging", "Stale", "Very Stale")
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox), "--seed-dir", str(self.seed_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_flywheel_metrics.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            # (M1/M5 are pinned to "N/A" by the schema `const` — no redundant check here.)
+            # M3 arithmetic: total mirrors total_traces; coverage = round(covered/total).
+            m3 = s["m3"]
+            if m3["total"] != s["total_traces"]:
+                diffs.append(f"{tag}: m3.total ({m3['total']}) != total_traces ({s['total_traces']})")
+            if m3["covered"] > m3["total"]:
+                diffs.append(f"{tag}: m3.covered ({m3['covered']}) > total ({m3['total']})")
+            if m3["total"] > 0:
+                exp = round(m3["covered"] * 100 / m3["total"])
+                if m3["cdr_coverage_pct"] != exp:
+                    diffs.append(f"{tag}: m3.cdr_coverage_pct {m3['cdr_coverage_pct']} != round(covered/total*100)={exp}")
+            elif m3["cdr_coverage_pct"] is not None:
+                diffs.append(f"{tag}: m3.cdr_coverage_pct must be null when total is 0")
+            # M4 arithmetic + the computed/N/A branch.
+            m4 = s["m4"]
+            denom_docs = [f for f in s["freshness_detail"] if f["in_denominator"]]
+            fresh_docs = [f for f in s["freshness_detail"] if f["fresh"]]
+            if m4["denominator"] != len(denom_docs):
+                diffs.append(f"{tag}: m4.denominator ({m4['denominator']}) != count(in_denominator) ({len(denom_docs)})")
+            if m4["fresh"] != len(fresh_docs):
+                diffs.append(f"{tag}: m4.fresh ({m4['fresh']}) != count(fresh) ({len(fresh_docs)})")
+            if m4["denominator"] > 0:
+                if m4["status"] != "computed":
+                    diffs.append(f"{tag}: m4.status must be 'computed' when denominator>0")
+                exp = round(m4["fresh"] * 100 / m4["denominator"])
+                if m4["freshness_pct"] != exp:
+                    diffs.append(f"{tag}: m4.freshness_pct {m4['freshness_pct']} != round(fresh/denominator*100)={exp}")
+            else:
+                if m4["status"] != "N/A" or m4["freshness_pct"] is not None:
+                    diffs.append(f"{tag}: m4 must be N/A with null freshness_pct when denominator is 0")
+            # The classification bind: in_denominator/fresh ↔ band (a flipped flag is caught).
+            for f in s["freshness_detail"]:
+                expect_denom = f["band"] in self._DENOM_BANDS
+                if f["in_denominator"] != expect_denom:
+                    diffs.append(f"{tag}: {f['path']} in_denominator ({f['in_denominator']}) inconsistent with band {f['band']!r}")
+                if f["fresh"] != (f["band"] == "Fresh"):
+                    diffs.append(f"{tag}: {f['path']} fresh ({f['fresh']}) inconsistent with band {f['band']!r}")
+            # avg_confidence range (assert_lib schema has no min/max — bind it here).
+            if s["m2"]["avg_confidence"] is not None and not (0 <= s["m2"]["avg_confidence"] <= 10):
+                diffs.append(f"{tag}: m2.avg_confidence {s['m2']['avg_confidence']} out of range 0..10")
+            # monthly partition + ordering.
+            if sum(m["traces"] for m in s["monthly"]) != s["total_traces"]:
+                # (only dated traces are grouped — equal when the seed has no undated trace)
+                diffs.append(f"{tag}: sum(monthly.traces) != total_traces (an undated trace leaked?)")
+            if [m["month"] for m in s["monthly"]] != sorted(m["month"] for m in s["monthly"]):
+                diffs.append(f"{tag}: monthly not in ascending month order")
+            if s["months"] != [m["month"] for m in s["monthly"]]:
+                diffs.append(f"{tag}: months list inconsistent with monthly breakdown")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+class AuditTrailAdapter:
+    """Emit adapter for /workflows:audit-trail (BC-12945 — S3 seed-read).
+
+    build_audit_trail.py READS a frozen docs/precedents/ corpus (parsing under test,
+    ADR-028 D2) + the CLAUDE.md @imports, with as_of injected, and reconstructs one
+    issue's per-trace inputs + staleness, the session-level context, and the
+    frequency analysis (most-referenced / session-only / single-use). The 2nd
+    consumer of precedent_trace.py. The eval asserts the audit VALUES + the
+    frequency/warning invariants (count↔membership, single_use↔count==1,
+    warnings↔band) + the issue-id guard (a `../`/`$()` value rejects, no file read)."""
+
+    command_id = "audit-trail"
+    artifact_names = ("audit-trail-emit.json",)
+    builder = REPO_ROOT / "plugins/workflows/scripts/build_audit_trail.py"
+    seed_dir = REPO_ROOT / "plugins/workflows/tests/eval/precedents-seed"
+    _eval_dir = REPO_ROOT / "plugins/workflows/tests/eval"
+    fixture_path = _eval_dir / "audit-trail.fixture.json"
+    golden_path = _eval_dir / "audit-trail.golden.json"
+    schema_path = _eval_dir / "audit-trail.schema.json"
+
+    TOP_N = 5
+    EXPECTED_SCENARIO_IDS = (
+        "issue_with_traces", "issue_no_traces",
+        "invalid_issue_id_traversal", "invalid_issue_id_injection",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox), "--seed-dir", str(self.seed_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_audit_trail.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            if s["error"] is not None:
+                # A rejected issue id (path-traversal/injection guard): no corpus read.
+                if s["trace_file_exists"] or s["trace_count"] is not None or s["traces"] or s["session_context"]:
+                    diffs.append(f"{tag}: an error row must not carry any corpus read")
+                continue
+            # trace_count mirrors the traces list length.
+            if s["trace_count"] != len(s["traces"]):
+                diffs.append(f"{tag}: trace_count ({s['trace_count']}) != len(traces) ({len(s['traces'])})")
+            # No trace file → no traces (the 'no traces found' branch still shows session context).
+            if not s["trace_file_exists"] and s["traces"]:
+                diffs.append(f"{tag}: trace_file_exists is false but traces is non-empty")
+
+            freq = s["frequency"]
+            # most_referenced: capped at TOP_N, frequency-desc then path-asc (a TOTAL key).
+            mr = freq["most_referenced"]
+            if len(mr) > self.TOP_N:
+                diffs.append(f"{tag}: most_referenced exceeds top-{self.TOP_N} ({len(mr)})")
+            order_key = [(-r["count"], r["path"]) for r in mr]
+            if order_key != sorted(order_key):
+                diffs.append(f"{tag}: most_referenced not ordered by (count desc, path asc): {[ (r['path'], r['count']) for r in mr ]}")
+            # single_use ⇔ a path referenced by exactly one trace.
+            from_traces: dict = {}
+            for t in s["traces"]:
+                for p in {i["path"] for i in t["inputs"]}:
+                    from_traces[p] = from_traces.get(p, 0) + 1
+            expected_single = sorted(p for p, c in from_traces.items() if c == 1)
+            if freq["single_use"] != expected_single:
+                diffs.append(f"{tag}: single_use {freq['single_use']} != paths referenced by exactly one trace {expected_single}")
+            # session_only ⇔ a session @import never cited in a trace input.
+            session_paths = [f["path"] for f in s["session_context"]]
+            expected_session_only = sorted(p for p in session_paths if p not in from_traces)
+            if freq["session_only"] != expected_session_only:
+                diffs.append(f"{tag}: session_only {freq['session_only']} != session imports not in any trace {expected_session_only}")
+
+            # warnings ⇔ the bands of every referenced file (trace inputs ∪ session).
+            band_by_path: dict = {}
+            for t in s["traces"]:
+                for i in t["inputs"]:
+                    band_by_path[i["path"]] = i["band"]
+            for f in s["session_context"]:
+                band_by_path.setdefault(f["path"], f["band"])
+            w = s["warnings"]
+            for key, band in (("missing", "MISSING"), ("stale", "Stale"), ("very_stale", "Very Stale")):
+                expected = sorted(p for p, b in band_by_path.items() if b == band)
+                if w[key] != expected:
+                    diffs.append(f"{tag}: warnings.{key} {w[key]} != files with band {band!r} {expected}")
+            if w["total"] != len(w["missing"]) + len(w["stale"]) + len(w["very_stale"]):
+                diffs.append(f"{tag}: warnings.total ({w['total']}) != missing+stale+very_stale")
+            # A MISSING file must report exists:false (binds the existence check).
+            for f in s["session_context"]:
+                if (f["band"] == "MISSING") != (not f["exists"]):
+                    diffs.append(f"{tag}: session file {f['path']} band/exists inconsistent (band={f['band']}, exists={f['exists']})")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+class PromotePrecedentAdapter:
+    """Emit adapter for /workflows:promote-precedent (BC-12945 — S2 side-effecting).
+
+    build_promotion_candidates.py is the PURE decide() the command delegates to for
+    the candidate pipeline BEFORE any human review / git / Linear mutation: it merges
+    the two injected sources, runs the ISSUE-ID guard + the Source-B confidence gate +
+    the dedup-vs-handbook, sorts (conf desc, date desc, id asc), and generalizes paths.
+    The parsing that produced the injected rows is covered by flywheel/audit, so the
+    DECISION pipeline is the unit here. The eval asserts the verdict ladder, the
+    summary tallies, the sort order, the guard (a `../`/`$()` id → rejected_invalid_id),
+    and the path generalization — not the LLM promote/skip decision or the mutations."""
+
+    command_id = "promote-precedent"
+    artifact_names = ("promotion-candidates-emit.json",)
+    builder = REPO_ROOT / "plugins/workflows/scripts/build_promotion_candidates.py"
+    _eval_dir = REPO_ROOT / "plugins/workflows/tests/eval"
+    fixture_path = _eval_dir / "promote-precedent.fixture.json"
+    golden_path = _eval_dir / "promote-precedent.golden.json"
+    schema_path = _eval_dir / "promote-precedent.schema.json"
+
+    ISSUE_ID_RE = re.compile(r"^[A-Z]+-[0-9]+$")
+    PROJECT_TOKEN = "<project>"
+    EXPECTED_SCENARIO_IDS = ("mixed_pipeline", "sort_order", "empty", "injection_guard")
+    _VERDICTS = ("promotable", "rejected_invalid_id", "rejected_low_confidence",
+                 "rejected_trace_missing", "skipped_already_in_handbook")
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_promotion_candidates.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            cands = s["candidates"]
+            summ = s["summary"]
+            # Summary tallies mirror the verdict counts (a miscount is caught).
+            if summ["total"] != len(cands):
+                diffs.append(f"{tag}: summary.total ({summ['total']}) != len(candidates) ({len(cands)})")
+            for v in self._VERDICTS:
+                actual = sum(1 for c in cands if c["verdict"] == v)
+                if summ[v] != actual:
+                    diffs.append(f"{tag}: summary.{v} ({summ[v]}) != actual count ({actual})")
+            for c in cands:
+                ctag = f"{tag}.{c['issue_id']!r}"
+                valid_id = bool(self.ISSUE_ID_RE.match(c["issue_id"]))
+                # The guard binds both ways: invalid_id ⟺ the id fails the pattern.
+                if (c["verdict"] == "rejected_invalid_id") != (not valid_id):
+                    diffs.append(f"{ctag}: verdict {c['verdict']!r} inconsistent with issue-id validity ({valid_id})")
+                # Only a promotable candidate carries generalized paths.
+                if c["verdict"] != "promotable" and c["generalized_paths"]:
+                    diffs.append(f"{ctag}: non-promotable verdict must have empty generalized_paths, got {c['generalized_paths']}")
+                # Generalization: no raw project-relative path survives (each is
+                # <project>/-prefixed or absolute).
+                for gp in c["generalized_paths"]:
+                    if not (gp.startswith(self.PROJECT_TOKEN + "/") or gp.startswith("/")):
+                        diffs.append(f"{ctag}: un-generalized path leaked: {gp!r}")
+                # Source A is trusted — never confidence/trace-gated.
+                if c["verdict"] in ("rejected_low_confidence", "rejected_trace_missing") and c["source"] != "index":
+                    diffs.append(f"{ctag}: verdict {c['verdict']!r} must be a Source-B (index) candidate, got source {c['source']!r}")
+            # Sort order: conf DESC, date DESC, id ASC (null confidence sorts as -1).
+            def sort_key(c):
+                return (-(c["confidence"] if isinstance(c["confidence"], int) else -1),
+                        c["date"] or "", c["issue_id"])
+            expected = sorted(cands, key=lambda c: c["issue_id"])
+            expected = sorted(expected, key=lambda c: c["date"] or "", reverse=True)
+            expected = sorted(expected, key=lambda c: c["confidence"] if isinstance(c["confidence"], int) else -1, reverse=True)
+            if [c["issue_id"] for c in cands] != [c["issue_id"] for c in expected]:
+                diffs.append(f"{tag}: candidates not ordered by (confidence desc, date desc, id asc): "
+                             f"{[c['issue_id'] for c in cands]}")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
 ADAPTERS = {
     PlanCampaignAdapter.command_id: PlanCampaignAdapter(),
+    AnalyticsAdapter.command_id: AnalyticsAdapter(),
+    FlywheelMetricsAdapter.command_id: FlywheelMetricsAdapter(),
+    AuditTrailAdapter.command_id: AuditTrailAdapter(),
+    PromotePrecedentAdapter.command_id: PromotePrecedentAdapter(),
     CreateSfCampaignAdapter.command_id: CreateSfCampaignAdapter(),
     UpdateSfCampaignStatusAdapter.command_id: UpdateSfCampaignStatusAdapter(),
     _NEW_OFFER.command_id: _NEW_OFFER,

@@ -1,0 +1,7 @@
+{
+  "scenarios": [
+    { "id": "full_corpus", "corpus": "full", "as_of": "2026-05-01" },
+    { "id": "insufficient_trend", "corpus": "one-month", "as_of": "2026-05-01" },
+    { "id": "m4_na_no_freshness", "corpus": "no-freshness", "as_of": "2026-05-01" }
+  ]
+}

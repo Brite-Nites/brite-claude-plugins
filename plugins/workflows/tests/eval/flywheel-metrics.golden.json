@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "command": "/workflows:flywheel-metrics",
+  "scenarios": [
+    {
+      "id": "full_corpus",
+      "corpus": "full",
+      "as_of": "2026-05-01",
+      "total_traces": 4,
+      "months": [
+        "2026-03",
+        "2026-04"
+      ],
+      "m1_status": "N/A",
+      "m2": {
+        "avg_confidence": 7.5,
+        "trend": "declining"
+      },
+      "m3": {
+        "cdr_coverage_pct": 50,
+        "covered": 2,
+        "total": 4
+      },
+      "m4": {
+        "status": "computed",
+        "freshness_pct": 33,
+        "fresh": 1,
+        "denominator": 3
+      },
+      "m5_status": "N/A",
+      "monthly": [
+        {
+          "month": "2026-03",
+          "traces": 2,
+          "avg_confidence": 8.0,
+          "cdr_coverage_pct": 50
+        },
+        {
+          "month": "2026-04",
+          "traces": 2,
+          "avg_confidence": 7.0,
+          "cdr_coverage_pct": 50
+        }
+      ],
+      "index_row_count": 3,
+      "freshness_detail": [
+        {
+          "path": "docs/refs/doc-fresh.md",
+          "band": "Fresh",
+          "in_denominator": true,
+          "fresh": true
+        },
+        {
+          "path": "docs/refs/doc-aging.md",
+          "band": "Aging",
+          "in_denominator": true,
+          "fresh": false
+        },
+        {
+          "path": "docs/refs/doc-stale.md",
+          "band": "Stale",
+          "in_denominator": true,
+          "fresh": false
+        },
+        {
+          "path": "docs/refs/doc-onchange.md",
+          "band": "on-change (skip)",
+          "in_denominator": false,
+          "fresh": false
+        },
+        {
+          "path": "docs/refs/doc-nometa.md",
+          "band": "No freshness metadata",
+          "in_denominator": false,
+          "fresh": false
+        },
+        {
+          "path": "docs/refs/doc-missing.md",
+          "band": "MISSING",
+          "in_denominator": false,
+          "fresh": false
+        }
+      ]
+    },
+    {
+      "id": "insufficient_trend",
+      "corpus": "one-month",
+      "as_of": "2026-05-01",
+      "total_traces": 1,
+      "months": [
+        "2026-04"
+      ],
+      "m1_status": "N/A",
+      "m2": {
+        "avg_confidence": 8.0,
+        "trend": "insufficient data for trend"
+      },
+      "m3": {
+        "cdr_coverage_pct": 100,
+        "covered": 1,
+        "total": 1
+      },
+      "m4": {
+        "status": "computed",
+        "freshness_pct": 100,
+        "fresh": 1,
+        "denominator": 1
+      },
+      "m5_status": "N/A",
+      "monthly": [
+        {
+          "month": "2026-04",
+          "traces": 1,
+          "avg_confidence": 8.0,
+          "cdr_coverage_pct": 100
+        }
+      ],
+      "index_row_count": 1,
+      "freshness_detail": [
+        {
+          "path": "docs/refs/doc-fresh.md",
+          "band": "Fresh",
+          "in_denominator": true,
+          "fresh": true
+        }
+      ]
+    },
+    {
+      "id": "m4_na_no_freshness",
+      "corpus": "no-freshness",
+      "as_of": "2026-05-01",
+      "total_traces": 1,
+      "months": [
+        "2026-04"
+      ],
+      "m1_status": "N/A",
+      "m2": {
+        "avg_confidence": 7.0,
+        "trend": "insufficient data for trend"
+      },
+      "m3": {
+        "cdr_coverage_pct": 0,
+        "covered": 0,
+        "total": 1
+      },
+      "m4": {
+        "status": "N/A",
+        "freshness_pct": null,
+        "fresh": 0,
+        "denominator": 0
+      },
+      "m5_status": "N/A",
+      "monthly": [
+        {
+          "month": "2026-04",
+          "traces": 1,
+          "avg_confidence": 7.0,
+          "cdr_coverage_pct": 0
+        }
+      ],
+      "index_row_count": 1,
+      "freshness_detail": [
+        {
+          "path": "docs/refs/doc-plain.md",
+          "band": "No freshness metadata",
+          "in_denominator": false,
+          "fresh": false
+        }
+      ]
+    }
+  ]
+}

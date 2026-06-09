@@ -853,6 +853,192 @@ mutate_sp "drop a load-bearing scenario" "expected scenario id 'velocity_three_f
 mutate_sp "leak an extra scenario key" "unexpected property" \
   'p=M/"sprint-plan-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
 
+# ── 3n. analytics eval (BC-12945 — workflows telemetry WRAP, Batch D) ──────────
+# The FIRST workflows report WRAP: build_analytics_emit.py drives the REAL
+# scripts/brite-analytics.sh over a sandbox $HOME whose telemetry events.jsonl is a
+# frozen seed (HOME-override seam), then projects the rendered dashboard's STRUCTURE
+# (Period/sessions, ordered section headers, frequency-sorted command rows, success-rate
+# triples, avg-duration rows, recent-error rows) + the two no-output branches. The GREEN
+# run exercises a 6-row matrix; the mutations prove a red diff — incl. the frequency-sort
+# order, the success-% arithmetic, a non-rendered row leaking data, the section closed-set,
+# and a rendered row losing a detail field. Reuses the generic mutate_canon helper.
+echo "── analytics eval (BC-12945 — known-good → GREEN) ──"
+AN="$tmproot/an"; mkdir -p "$AN"
+invoke "$RUN_EVAL" analytics --sandbox "$AN"
+assert_exit "analytics eval GREEN — known-good matrix builds + passes" 0
+assert_substr "analytics eval prints PASS verdict" "PASS: analytics eval"
+if [ -f "$AN/analytics-emit.json" ]; then
+  echo "  PASS  artifact produced: analytics-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: analytics-emit.json"; fail=$((fail + 1))
+fi
+echo "── analytics self-test (mutated matrix → RED) ──"
+# frequency sort: the command rows are no longer frequency-descending.
+mutate_canon analytics "$AN" analytics-emit.json "frequency sort regression" "frequency-descending order" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["commands"][0]["count"]=1; json.dump(d,open(p,"w"))'
+# success-% arithmetic: a rendered pct no longer matches its success/total fraction.
+mutate_canon analytics "$AN" analytics-emit.json "success pct arithmetic" "int(success/total*100)" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["success_rates"][0]["pct"]=99; json.dump(d,open(p,"w"))'
+# success>total invariant: a fraction with more successes than runs.
+mutate_canon analytics "$AN" analytics-emit.json "success exceeds total" "> total" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["success_rates"][0]["success"]=99; json.dump(d,open(p,"w"))'
+# rendered-row completeness: a rendered dashboard loses its sessions count.
+mutate_canon analytics "$AN" analytics-emit.json "rendered row drops a detail" "must carry a non-null sessions" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["sessions"]=None; json.dump(d,open(p,"w"))'
+# non-rendered invariant: the matched-nothing row wrongly carries a period.
+mutate_canon analytics "$AN" analytics-emit.json "non-rendered row leaks data" "non-rendered row must have null period" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="empty_window"][0]; s["period"]="2026-03-02"; json.dump(d,open(p,"w"))'
+# section closed-set: a section name outside the documented four (schema enum).
+mutate_canon analytics "$AN" analytics-emit.json "section closed-set" "is not one of enum" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="all_time"][0]; s["sections"].append("Bogus Section"); json.dump(d,open(p,"w"))'
+mutate_canon analytics "$AN" analytics-emit.json "drop a load-bearing scenario" "expected scenario id 'until_window' is absent" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="until_window"]; json.dump(d,open(p,"w"))'
+mutate_canon analytics "$AN" analytics-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"analytics-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+# ── 3o. flywheel-metrics eval (BC-12945 — workflows precedent metrics, Batch D) ─
+# The FIRST workflows seed-read builder: build_flywheel_metrics.py READS a frozen
+# docs/precedents/ corpus (the `## Trace —` + freshness parsing is the logic under
+# test) and computes M2/M3/M4 (+ M1/M5 N/A). The GREEN run exercises 3 corpora (full
+# / one-month insufficient-trend / no-freshness M4-N/A); the mutations prove a red
+# diff — incl. the CDR/freshness arithmetic, the in_denominator↔band classification,
+# the M1/M5 closed set, and the monthly partition. Reuses the generic mutate_canon.
+echo "── flywheel-metrics eval (BC-12945 — known-good → GREEN) ──"
+FW="$tmproot/fw"; mkdir -p "$FW"
+invoke "$RUN_EVAL" flywheel-metrics --sandbox "$FW"
+assert_exit "flywheel-metrics eval GREEN — known-good matrix builds + passes" 0
+assert_substr "flywheel-metrics eval prints PASS verdict" "PASS: flywheel-metrics eval"
+if [ -f "$FW/flywheel-metrics-emit.json" ]; then
+  echo "  PASS  artifact produced: flywheel-metrics-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: flywheel-metrics-emit.json"; fail=$((fail + 1))
+fi
+echo "── flywheel-metrics self-test (mutated matrix → RED) ──"
+# M2 trend: the declining trend is flipped (golden-locked).
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "trend flipped" "trend" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; s["m2"]["trend"]="improving"; json.dump(d,open(p,"w"))'
+# M3 coverage arithmetic: pct no longer matches covered/total.
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "cdr coverage arithmetic" "round(covered/total*100)" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; s["m3"]["cdr_coverage_pct"]=99; json.dump(d,open(p,"w"))'
+# M4 freshness arithmetic: pct no longer matches fresh/denominator.
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "freshness arithmetic" "round(fresh/denominator*100)" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; s["m4"]["freshness_pct"]=99; json.dump(d,open(p,"w"))'
+# M4 denominator vs the in_denominator flags.
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "denominator vs flags" "count(in_denominator)" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; s["m4"]["denominator"]=2; json.dump(d,open(p,"w"))'
+# classification bind: a skip-band doc wrongly flagged in_denominator.
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "in_denominator vs band" "in_denominator" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; f=[x for x in s["freshness_detail"] if x["band"]=="on-change (skip)"][0]; f["in_denominator"]=True; json.dump(d,open(p,"w"))'
+# fresh↔band: an Aging doc wrongly flagged fresh.
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "fresh vs band" "fresh" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; f=[x for x in s["freshness_detail"] if x["band"]=="Aging"][0]; f["fresh"]=True; json.dump(d,open(p,"w"))'
+# M1/M5 closed set: M1 is no longer N/A (the schema `const` pins it).
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "m1 not N/A" "expected const 'N/A'" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; s["m1_status"]="computed"; json.dump(d,open(p,"w"))'
+# monthly partition: a month's trace count drifts off the total.
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "monthly partition" "sum(monthly.traces)" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="full_corpus"][0]; s["monthly"][0]["traces"]=5; json.dump(d,open(p,"w"))'
+# M4 N/A branch: the no-freshness corpus wrongly reports a computed M4.
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "m4 N/A branch" "must be N/A with null freshness_pct" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="m4_na_no_freshness"][0]; s["m4"]["status"]="computed"; json.dump(d,open(p,"w"))'
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "drop a load-bearing scenario" "expected scenario id 'insufficient_trend' is absent" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="insufficient_trend"]; json.dump(d,open(p,"w"))'
+mutate_canon flywheel-metrics "$FW" flywheel-metrics-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"flywheel-metrics-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+# ── 3p. audit-trail eval (BC-12945 — workflows per-issue context audit, Batch D) ─
+# The 2nd workflows seed-read builder (shares precedent_trace.py with flywheel).
+# build_audit_trail.py READS one issue's trace file + the CLAUDE.md @imports and
+# reconstructs per-trace inputs + staleness + the frequency analysis. The GREEN run
+# exercises 4 scenarios (an issue with traces, a no-trace issue, 2 issue-id-guard
+# rejections); the mutations prove a red diff — incl. the frequency ordering, the
+# single_use/session_only definitions, warnings↔band, the no-trace branch, and the
+# error-row no-read invariant. Reuses the generic mutate_canon.
+echo "── audit-trail eval (BC-12945 — known-good → GREEN) ──"
+AT="$tmproot/at"; mkdir -p "$AT"
+invoke "$RUN_EVAL" audit-trail --sandbox "$AT"
+assert_exit "audit-trail eval GREEN — known-good matrix builds + passes" 0
+assert_substr "audit-trail eval prints PASS verdict" "PASS: audit-trail eval"
+if [ -f "$AT/audit-trail-emit.json" ]; then
+  echo "  PASS  artifact produced: audit-trail-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: audit-trail-emit.json"; fail=$((fail + 1))
+fi
+echo "── audit-trail self-test (mutated matrix → RED) ──"
+# error-row no-read: a rejected issue-id row wrongly carries a corpus read.
+mutate_canon audit-trail "$AT" audit-trail-emit.json "error row carries a read" "error row must not carry any corpus read" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="invalid_issue_id_traversal"][0]; s["trace_count"]=0; json.dump(d,open(p,"w"))'
+# trace_count mirrors the traces list length.
+mutate_canon audit-trail "$AT" audit-trail-emit.json "trace_count drift" "trace_count" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_with_traces"][0]; s["trace_count"]=3; json.dump(d,open(p,"w"))'
+# frequency ordering: most_referenced no longer (count desc, path asc).
+mutate_canon audit-trail "$AT" audit-trail-emit.json "frequency ordering" "ordered by (count desc, path asc)" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_with_traces"][0]; s["frequency"]["most_referenced"]=list(reversed(s["frequency"]["most_referenced"])); json.dump(d,open(p,"w"))'
+# single_use definition.
+mutate_canon audit-trail "$AT" audit-trail-emit.json "single_use definition" "referenced by exactly one trace" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_with_traces"][0]; s["frequency"]["single_use"]=["docs/refs/doc-fresh.md"]; json.dump(d,open(p,"w"))'
+# session_only definition.
+mutate_canon audit-trail "$AT" audit-trail-emit.json "session_only definition" "session imports not in any trace" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_with_traces"][0]; s["frequency"]["session_only"]=[]; json.dump(d,open(p,"w"))'
+# warnings ↔ band: a MISSING file dropped from warnings.missing.
+mutate_canon audit-trail "$AT" audit-trail-emit.json "warnings vs band" "files with band 'MISSING'" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_with_traces"][0]; s["warnings"]["missing"]=["docs/refs/doc-missing.md"]; json.dump(d,open(p,"w"))'
+# warnings.total arithmetic.
+mutate_canon audit-trail "$AT" audit-trail-emit.json "warnings total" "warnings.total" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_with_traces"][0]; s["warnings"]["total"]=99; json.dump(d,open(p,"w"))'
+# no-trace branch: a no-trace-file row wrongly carries traces.
+mutate_canon audit-trail "$AT" audit-trail-emit.json "no-trace branch" "trace_file_exists is false but traces is non-empty" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_no_traces"][0]; s["traces"]=[{"summary":"x","category":None,"confidence":None,"precedent_referenced":None,"has_cdr":False,"inputs":[]}]; s["trace_count"]=1; json.dump(d,open(p,"w"))'
+# band/exists consistency: a MISSING session file wrongly reports exists:true.
+mutate_canon audit-trail "$AT" audit-trail-emit.json "band vs exists" "band/exists inconsistent" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="issue_with_traces"][0]; f=[x for x in s["session_context"] if x["band"]=="MISSING"][0]; f["exists"]=True; json.dump(d,open(p,"w"))'
+mutate_canon audit-trail "$AT" audit-trail-emit.json "drop a load-bearing scenario" "expected scenario id 'invalid_issue_id_injection' is absent" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="invalid_issue_id_injection"]; json.dump(d,open(p,"w"))'
+mutate_canon audit-trail "$AT" audit-trail-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"audit-trail-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+# ── 3q. promote-precedent eval (BC-12945 — workflows S2 side-effecting, Batch D) ─
+# build_promotion_candidates.py is the PURE decide() the command delegates to for the
+# candidate merge/dedup/gate/sort/generalize projection (the slice before any human
+# review or git/Linear mutation; the parsed rows are injected — the parsing is covered
+# by flywheel/audit). The GREEN run exercises 4 scenarios (mixed verdict ladder, sort
+# tiebreak, empty, the issue-id injection guard); the mutations prove a red diff — incl.
+# the summary tallies, the guard↔id bind, the Source-A trust, the path generalization,
+# and the (conf desc, date desc, id asc) sort. Reuses the generic mutate_canon.
+echo "── promote-precedent eval (BC-12945 — known-good → GREEN) ──"
+PP="$tmproot/pp"; mkdir -p "$PP"
+invoke "$RUN_EVAL" promote-precedent --sandbox "$PP"
+assert_exit "promote-precedent eval GREEN — known-good matrix builds + passes" 0
+assert_substr "promote-precedent eval prints PASS verdict" "PASS: promote-precedent eval"
+if [ -f "$PP/promotion-candidates-emit.json" ]; then
+  echo "  PASS  artifact produced: promotion-candidates-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: promotion-candidates-emit.json"; fail=$((fail + 1))
+fi
+echo "── promote-precedent self-test (mutated matrix → RED) ──"
+# summary tallies mirror the verdict counts.
+mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "summary tally drift" "summary.promotable" \
+  'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="mixed_pipeline"][0]; s["summary"]["promotable"]=99; json.dump(d,open(p,"w"))'
+# the issue-id guard binds both ways: a valid id wrongly flagged rejected_invalid_id.
+mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "guard vs id validity" "inconsistent with issue-id validity" \
+  'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="mixed_pipeline"][0]; c=[x for x in s["candidates"] if x["issue_id"]=="BC-8001"][0]; c["verdict"]="rejected_invalid_id"; json.dump(d,open(p,"w"))'
+# only a promotable candidate carries generalized paths.
+mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "rejected carries paths" "non-promotable verdict must have empty generalized_paths" \
+  'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="mixed_pipeline"][0]; c=[x for x in s["candidates"] if x["issue_id"]=="BC-8004"][0]; c["generalized_paths"]=["<project>/x.ts"]; json.dump(d,open(p,"w"))'
+# path generalization: a raw project-relative path leaks unprefixed.
+mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "un-generalized path leak" "un-generalized path leaked" \
+  'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="mixed_pipeline"][0]; c=[x for x in s["candidates"] if x["issue_id"]=="BC-8001"][0]; c["generalized_paths"]=["src/raw.ts"]; json.dump(d,open(p,"w"))'
+# Source A is trusted — a low-confidence rejection must be a Source-B candidate.
+mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "source-A wrongly conf-gated" "must be a Source-B (index) candidate" \
+  'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="mixed_pipeline"][0]; c=[x for x in s["candidates"] if x["issue_id"]=="BC-8004"][0]; c["source"]="linear"; json.dump(d,open(p,"w"))'
+# sort tiebreak: the (conf desc, date desc, id asc) order is broken.
+mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "sort order broken" "not ordered by (confidence desc, date desc, id asc)" \
+  'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="sort_order"][0]; s["candidates"]=list(reversed(s["candidates"])); json.dump(d,open(p,"w"))'
+mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "drop a load-bearing scenario" "expected scenario id 'injection_guard' is absent" \
+  'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="injection_guard"]; json.dump(d,open(p,"w"))'
+mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
 # ── 4. hermeticity guard ─────────────────────────────────────────────────────
 
 echo "── hermeticity ──"
@@ -873,11 +1059,21 @@ INTAKE_COMMON="$REPO_ROOT/plugins/workflows/scripts/intake_common.py"
 RS_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_retro_snapshot.py"
 SP_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_sprint_plan.py"
 CYCLE_METRICS="$REPO_ROOT/plugins/workflows/scripts/cycle_metrics.py"
+# BC-12945 workflows precedent/telemetry builders + the shared precedent_trace module
+# (Batch D). build_analytics_emit.py WRAPS brite-analytics.sh; flywheel/audit read a
+# frozen docs/precedents/ seed; precedent_trace.py is the shared parser — all stdlib,
+# no network.
+AN_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_analytics_emit.py"
+FW_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_flywheel_metrics.py"
+AT_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_audit_trail.py"
+PP_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_promotion_candidates.py"
+PRECEDENT_TRACE="$REPO_ROOT/plugins/workflows/scripts/precedent_trace.py"
 if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
      "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$USU_BUILDER" "$NO_BUILDER" \
      "$OP_BUILDER" "$PF_BUILDER" "$IC_BUILDER" "$ICP_BUILDER" \
      "$RAT_BUILDER" "$RI_BUILDER" "$INTAKE_COMMON" \
-     "$RS_BUILDER" "$SP_BUILDER" "$CYCLE_METRICS" >/dev/null 2>&1; then
+     "$RS_BUILDER" "$SP_BUILDER" "$CYCLE_METRICS" \
+     "$AN_BUILDER" "$FW_BUILDER" "$AT_BUILDER" "$PP_BUILDER" "$PRECEDENT_TRACE" >/dev/null 2>&1; then
   echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
 else
   echo "  PASS  hermeticity: no network module imported"; pass=$((pass + 1))
@@ -960,7 +1156,7 @@ else
 fi
 # (e/f) the new-persona + new-vertical evals (BC-12915) are hermetic too — same builder,
 #       same frozen seed, different subcommand. Loop to avoid two near-identical blocks.
-for hc in new-persona new-vertical offer-performance portfolio-snapshot import-campaign icp-refinement-review raise-a-ticket report-issue retrospective sprint-planning; do
+for hc in new-persona new-vertical offer-performance portfolio-snapshot import-campaign icp-refinement-review raise-a-ticket report-issue retrospective sprint-planning analytics flywheel-metrics audit-trail promote-precedent; do
   HCWD="$tmproot/hermetic-cwd-$hc"; mkdir -p "$HCWD"
   hb="$(cd "$HCWD" && find . | sort)"
   ho="$(cd "$HCWD" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" "$hc" 2>&1)"; hrc=$?
@@ -990,10 +1186,13 @@ echo ""
 # + portfolio-snapshot + import-campaign + icp-refinement-review: +90 = 4 × ~(3 GREEN +
 # 8-9×2 mutations + 2 hermeticity), live total 244), then 231→319 with the BC-12944 Batch-C
 # workflows blocks (raise-a-ticket + report-issue + retrospective + sprint-planning: +92 =
-# 4 × (3 GREEN + 7-10×2 mutations + 2 hermeticity), live total 336) — so losing any one
-# command's eval block trips the floor rather than passing. Held at ~95% of the live count
-# to tolerate a single intentional assertion edit.
-FLOOR=319
+# 4 × (3 GREEN + 7-10×2 mutations + 2 hermeticity), live total 336), then 319→410 with the
+# BC-12945 Batch-D workflows precedent/telemetry blocks (analytics WRAP + flywheel-metrics +
+# audit-trail seed-read + promote-precedent inject-the-reads: +96 = 4 × (3 GREEN + 6-11×2
+# mutations + 2 hermeticity), live total 432) — so losing any one command's eval block trips
+# the floor rather than passing. Held at ~95% of the live count to tolerate a single
+# intentional assertion edit.
+FLOOR=410
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

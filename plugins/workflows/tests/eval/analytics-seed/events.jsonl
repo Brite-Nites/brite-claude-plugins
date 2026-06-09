@@ -1,0 +1,15 @@
+{"v":1,"ts":"2026-03-02T09:00:00Z","event_type":"session_start","command":null,"session_id":"s1","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}
+{"v":1,"ts":"2026-03-02T09:01:00Z","event_type":"command_start","command":"/workflows:ship","session_id":"s1","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}
+{"v":1,"ts":"2026-03-02T09:01:30Z","event_type":"command_end","command":"/workflows:ship","session_id":"s1","brite_version":"3.40.0","os":"darwin","duration_s":30,"outcome":"success","error_class":null}
+{"v":1,"ts":"2026-03-02T09:05:00Z","event_type":"command_start","command":"/workflows:review","session_id":"s1","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}
+{"v":1,"ts":"2026-03-02T09:07:00Z","event_type":"command_end","command":"/workflows:review","session_id":"s1","brite_version":"3.40.0","os":"darwin","duration_s":120,"outcome":"success","error_class":null}
+{"v":1,"ts":"2026-03-18T14:00:00Z","event_type":"session_start","command":null,"session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}
+{"v":1,"ts":"2026-03-18T14:00:10Z","event_type":"command_start","command":"/workflows:ship","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}
+{"v":1,"ts":"2026-03-18T14:01:40Z","event_type":"command_end","command":"/workflows:ship","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":90,"outcome":"error","error_class":"TimeoutError"}
+{"v":1,"ts":"2026-03-18T14:05:00Z","event_type":"command_start","command":"/workflows:ship","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}
+{"v":1,"ts":"2026-03-18T14:05:45Z","event_type":"command_end","command":"/workflows:ship","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":45,"outcome":"success","error_class":null}
+{"v":1,"ts":"2026-03-18T14:10:00Z","event_type":"command_start","command":"/workflows:review","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}
+{"v":1,"ts":"2026-03-18T14:11:00Z","event_type":"command_end","command":"/workflows:review","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":60,"outcome":"success","error_class":null}
+{"v":1,"ts":"2026-03-18T14:15:00Z","event_type":"command_start","command":"/marketing:plan-campaign","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}
+{"v":1,"ts":"2026-03-18T14:16:00Z","event_type":"command_end","command":"/marketing:plan-campaign","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":"unknown","error_class":null}
+{"v":1,"ts":"2026-03-18T14:20:00Z","event_type":"command_start","command":"/workflows:scope","session_id":"s2","brite_version":"3.40.0","os":"darwin","duration_s":null,"outcome":null,"error_class":null}

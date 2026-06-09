@@ -2266,6 +2266,53 @@ for wf_stem in build_raise_ticket_payload build_report_issue_payload build_retro
 done
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12945 — workflows precedent/telemetry builder unit suites (BC-12945)
+# ──────────────────────────────────────────────────────────────────────
+# ADR-028 Phase-2 Batch D. The shared precedent_trace.py parser + the three pure
+# builders (build_flywheel_metrics + build_audit_trail seed-read; build_promotion_
+# candidates inject-the-reads) get unit/contract suites that drive the PURE compute()/
+# decide() + the markdown parsing at finer granularity than the behavioral eval — the
+# trend bands, the M4 computed/N/A branch, the frequency top-N cap + tiebreak, the
+# warnings↔band map, the promote verdict ladder + (conf,date,id) sort, and the issue-id
+# injection guard (a `$(touch pwned)`/`../` value rejects with no read + no side effect).
+# build_analytics_emit.py is a WRAP of brite-analytics.sh with NO dedicated builder
+# logic (same as the marketing report wraps) → harness-covered, asserted present here,
+# no unit suite. The shared module + builders are FAIL-if-missing (the commands AND the
+# behavioral evals depend on them, so a future delete must fail loudly — the
+# §15a-bc-12589 lesson). RESULT line drives the count.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12945. workflows precedent/telemetry builder unit suites (BC-12945)"
+
+if [ ! -f "$REPO_ROOT/plugins/workflows/scripts/precedent_trace.py" ]; then
+  fail "plugins/workflows/scripts/precedent_trace.py not found — the BC-12945 shared parser module is missing"
+fi
+if [ ! -f "$REPO_ROOT/plugins/workflows/scripts/build_analytics_emit.py" ]; then
+  fail "plugins/workflows/scripts/build_analytics_emit.py not found — the BC-12945 analytics WRAP builder is missing"
+fi
+
+for d_stem in build_flywheel_metrics build_audit_trail build_promotion_candidates; do
+  d_helper="$REPO_ROOT/plugins/workflows/scripts/$d_stem.py"
+  d_harness="$REPO_ROOT/plugins/workflows/scripts/test_$d_stem.sh"
+  if [ ! -f "$d_helper" ]; then
+    fail "plugins/workflows/scripts/$d_stem.py not found — a BC-12945 seed-read builder is missing"
+  elif [ ! -f "$d_harness" ]; then
+    fail "plugins/workflows/scripts/test_$d_stem.sh not found — a BC-12945 builder unit suite is missing"
+  else
+    if d_harness_out=$(bash "$d_harness" "$d_helper" 2>&1); then
+      d_pass_count=$(printf '%s\n' "$d_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+      if [ -n "$d_pass_count" ]; then
+        pass "$d_stem unit suite (${d_pass_count} assertions)"
+      else
+        pass "$d_stem unit suite — passed (count unparsed)"
+      fi
+    else
+      fail "$d_stem unit suite failed:"
+      printf '%s\n' "$d_harness_out" | tail -30 | sed 's/^/          /' >&2
+    fi
+  fi
+done
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12638 — --target-org guard-precedes-sink consolidating lint (BC-12638)
 # ──────────────────────────────────────────────────────────────────────
 # Repo-wide CONSOLIDATING lint: every command interpolating a non-literal

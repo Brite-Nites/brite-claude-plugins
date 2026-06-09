@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "command": "/workflows:promote-precedent",
+  "scenarios": [
+    {
+      "id": "mixed_pipeline",
+      "candidates": [
+        {
+          "issue_id": "BC-8001",
+          "decision": "adopt the result type",
+          "category": "architecture",
+          "confidence": 9,
+          "date": "2026-04-10",
+          "source": "linear",
+          "verdict": "promotable",
+          "generalized_paths": [
+            "<project>/src/middleware/auth.ts",
+            "<project>/already.ts",
+            "/abs/path.ts"
+          ]
+        },
+        {
+          "issue_id": "BC-8002",
+          "decision": "use prisma over typeorm",
+          "category": "library-selection",
+          "confidence": 9,
+          "date": "2026-04-05",
+          "source": "linear",
+          "verdict": "skipped_already_in_handbook",
+          "generalized_paths": []
+        },
+        {
+          "issue_id": "BC-8003",
+          "decision": "choose stdlib json",
+          "category": "library-selection",
+          "confidence": 8,
+          "date": "2026-04-12",
+          "source": "index",
+          "verdict": "promotable",
+          "generalized_paths": [
+            "<project>/lib/json_io.py"
+          ]
+        },
+        {
+          "issue_id": "BC-8004",
+          "decision": "accept slower build for clarity",
+          "category": "trade-off",
+          "confidence": 6,
+          "date": "2026-04-01",
+          "source": "index",
+          "verdict": "rejected_low_confidence",
+          "generalized_paths": []
+        },
+        {
+          "issue_id": "BC-8005",
+          "decision": "split skeleton from skin",
+          "category": "architecture",
+          "confidence": null,
+          "date": "2026-03-20",
+          "source": "index",
+          "verdict": "rejected_trace_missing",
+          "generalized_paths": []
+        },
+        {
+          "issue_id": "not-an-id",
+          "decision": "malformed id row",
+          "category": "architecture",
+          "confidence": null,
+          "date": "2026-03-10",
+          "source": "index",
+          "verdict": "rejected_invalid_id",
+          "generalized_paths": []
+        }
+      ],
+      "summary": {
+        "total": 6,
+        "promotable": 2,
+        "rejected_invalid_id": 1,
+        "rejected_low_confidence": 1,
+        "rejected_trace_missing": 1,
+        "skipped_already_in_handbook": 1
+      }
+    },
+    {
+      "id": "sort_order",
+      "candidates": [
+        {
+          "issue_id": "BC-7003",
+          "decision": "d3",
+          "category": "architecture",
+          "confidence": 9,
+          "date": "2026-05-01",
+          "source": "linear",
+          "verdict": "promotable",
+          "generalized_paths": []
+        },
+        {
+          "issue_id": "BC-7001",
+          "decision": "d1",
+          "category": "architecture",
+          "confidence": 9,
+          "date": "2026-04-01",
+          "source": "linear",
+          "verdict": "promotable",
+          "generalized_paths": []
+        },
+        {
+          "issue_id": "BC-7002",
+          "decision": "d2",
+          "category": "architecture",
+          "confidence": 9,
+          "date": "2026-04-01",
+          "source": "linear",
+          "verdict": "promotable",
+          "generalized_paths": []
+        },
+        {
+          "issue_id": "BC-7004",
+          "decision": "d4",
+          "category": "architecture",
+          "confidence": 7,
+          "date": "2026-06-01",
+          "source": "linear",
+          "verdict": "promotable",
+          "generalized_paths": []
+        }
+      ],
+      "summary": {
+        "total": 4,
+        "promotable": 4,
+        "rejected_invalid_id": 0,
+        "rejected_low_confidence": 0,
+        "rejected_trace_missing": 0,
+        "skipped_already_in_handbook": 0
+      }
+    },
+    {
+      "id": "empty",
+      "candidates": [],
+      "summary": {
+        "total": 0,
+        "promotable": 0,
+        "rejected_invalid_id": 0,
+        "rejected_low_confidence": 0,
+        "rejected_trace_missing": 0,
+        "skipped_already_in_handbook": 0
+      }
+    },
+    {
+      "id": "injection_guard",
+      "candidates": [
+        {
+          "issue_id": "BC-1; touch pwned",
+          "decision": "injection",
+          "category": "architecture",
+          "confidence": 9,
+          "date": "2026-04-02",
+          "source": "linear",
+          "verdict": "rejected_invalid_id",
+          "generalized_paths": []
+        },
+        {
+          "issue_id": "../../etc/passwd",
+          "decision": "traversal",
+          "category": "architecture",
+          "confidence": 9,
+          "date": "2026-04-01",
+          "source": "linear",
+          "verdict": "rejected_invalid_id",
+          "generalized_paths": []
+        }
+      ],
+      "summary": {
+        "total": 2,
+        "promotable": 0,
+        "rejected_invalid_id": 2,
+        "rejected_low_confidence": 0,
+        "rejected_trace_missing": 0,
+        "skipped_already_in_handbook": 0
+      }
+    }
+  ]
+}

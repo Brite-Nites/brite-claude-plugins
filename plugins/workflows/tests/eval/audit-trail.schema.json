@@ -1,0 +1,100 @@
+{
+  "type": "object",
+  "required": ["schema_version", "command", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "/workflows:audit-trail" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "error", "issue_id", "corpus", "as_of", "trace_file_exists", "trace_count", "traces", "session_context", "frequency", "warnings"],
+        "properties": {
+          "id": { "type": "string" },
+          "error": { "type": ["string", "null"], "enum": ["invalid_issue_id", null] },
+          "issue_id": { "type": "string" },
+          "corpus": { "type": "string" },
+          "as_of": { "type": "string" },
+          "trace_file_exists": { "type": "boolean" },
+          "trace_count": { "type": ["integer", "null"] },
+          "traces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["summary", "category", "confidence", "precedent_referenced", "has_cdr", "inputs"],
+              "properties": {
+                "summary": { "type": ["string", "null"] },
+                "category": { "type": ["string", "null"] },
+                "confidence": { "type": ["integer", "null"] },
+                "precedent_referenced": { "type": ["string", "null"] },
+                "has_cdr": { "type": "boolean" },
+                "inputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["path", "band", "exists"],
+                    "properties": {
+                      "path": { "type": "string" },
+                      "band": { "type": "string", "enum": ["Fresh", "Aging", "Stale", "Very Stale", "on-change (skip)", "No freshness metadata", "Unknown cadence", "Unparseable last_refreshed", "MISSING"] },
+                      "exists": { "type": "boolean" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "session_context": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "band", "exists"],
+              "properties": {
+                "path": { "type": "string" },
+                "band": { "type": "string", "enum": ["Fresh", "Aging", "Stale", "Very Stale", "on-change (skip)", "No freshness metadata", "Unknown cadence", "Unparseable last_refreshed", "MISSING"] },
+                "exists": { "type": "boolean" }
+              }
+            }
+          },
+          "frequency": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["most_referenced", "session_only", "single_use"],
+            "properties": {
+              "most_referenced": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "count", "band"],
+                  "properties": {
+                    "path": { "type": "string" },
+                    "count": { "type": "integer" },
+                    "band": { "type": "string" }
+                  }
+                }
+              },
+              "session_only": { "type": "array", "items": { "type": "string" } },
+              "single_use": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "warnings": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["missing", "stale", "very_stale", "total"],
+            "properties": {
+              "missing": { "type": "array", "items": { "type": "string" } },
+              "stale": { "type": "array", "items": { "type": "string" } },
+              "very_stale": { "type": "array", "items": { "type": "string" } },
+              "total": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
