@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regression-lock for the WS-A reusable story-doc lint lib
 # (scripts/lib/flow_doc_lint.sh — A-1 grammar / A-2 persona / A-3 boilerplate /
-# FEW_SCENARIOS / D11 FRAME_MISMATCH).
+# FEW_SCENARIOS / D11 FRAME_MISMATCH / BC-13029 BAD_STATUS).
 #
 # Sources the lib and asserts `lint_story_doc` returns the right verdict on the
 # shared synthetic-story-quality fixtures (good + one-per-defect bad). The lib
@@ -87,7 +87,7 @@ assert_defect "bad-frame-mismatch → FRAME_MISMATCH" "$BAD_FRAME" "FRAME_MISMAT
 # trip ONLY FRAME_MISMATCH (proves the lint's defects are independent).
 frame_verdict="$(lint_story_doc "$BAD_FRAME" || true)"
 case " $frame_verdict " in
-  *" GRAMMAR "*|*" BOILERPLATE "*|*" FEW_SCENARIOS "*|*" GENERIC_PERSONA "*)
+  *" GRAMMAR "*|*" BOILERPLATE "*|*" FEW_SCENARIOS "*|*" GENERIC_PERSONA "*|*" BAD_STATUS "*)
     fail "bad-frame-mismatch leaks an unintended defect: $frame_verdict" ;;
   *) pass "bad-frame-mismatch trips ONLY the frame defect" ;;
 esac
@@ -100,7 +100,7 @@ section "4/4" "inline lib-branch coverage (OR-branches the one-per-defect fixtur
 mk_tmp_doc fp <<'DOC'
 ---
 flow_id: seo-fp
-status: built
+status: BUILT
 personas: SEO operator accountable for crawl budget
 ---
 # seo-fp
@@ -133,7 +133,7 @@ assert_defect "first-person infra roleplay → FRAME_MISMATCH (FIRST_PERSON_RE b
 mk_tmp_doc gram <<'DOC'
 ---
 flow_id: team-ga
-status: built
+status: BUILT
 personas: Workspace owner onboarding a new hire
 ---
 # team-ga
@@ -166,7 +166,7 @@ assert_defect "article after 'I want to' → GRAMMAR (a1 branch)" "$TMP_DOCS/gra
 mk_tmp_doc actor <<'DOC'
 ---
 flow_id: team-ac
-status: built
+status: BUILT
 ---
 # team-ac
 
@@ -202,7 +202,7 @@ assert_defect "generic '## Actor' lead ('Primary user', no personas: front-matte
 mk_tmp_doc outline <<'DOC'
 ---
 flow_id: team-so
-status: built
+status: BUILT
 personas: Workspace owner onboarding a new hire
 ---
 # team-so
@@ -229,6 +229,115 @@ Scenario Outline: invite errors
   Then <error>
 DOC
 assert_clean "3 'Scenario Outline:' blocks → no FEW_SCENARIOS (Outline counted)" "$TMP_DOCS/outline.md"
+
+# BC-13029 BAD_STATUS — front-matter `status:` off the canonical 6-value taxonomy.
+# Two off-taxonomy shapes: the exact #1 bug (lowercase `not-started`) and `draft`.
+# Each doc is otherwise well-formed, so it must trip ONLY BAD_STATUS.
+mk_tmp_doc badstatus_lc <<'DOC'
+---
+flow_id: team-bs
+status: not-started
+personas: Workspace owner onboarding a new hire
+---
+# team-bs
+
+## Job story
+
+> **When** a new hire joins, **I want to** invite them by email, **so I can** grant access fast.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_defect "lowercase 'not-started' status → BAD_STATUS (the #1 bug)" "$TMP_DOCS/badstatus_lc.md" "BAD_STATUS"
+lc_verdict="$(lint_story_doc "$TMP_DOCS/badstatus_lc.md" || true)"
+case " $lc_verdict " in
+  *" GRAMMAR "*|*" BOILERPLATE "*|*" FEW_SCENARIOS "*|*" GENERIC_PERSONA "*|*" FRAME_MISMATCH "*)
+    fail "badstatus_lc leaks an unintended defect: $lc_verdict" ;;
+  *) pass "badstatus_lc trips ONLY BAD_STATUS" ;;
+esac
+
+mk_tmp_doc badstatus_draft <<'DOC'
+---
+flow_id: team-bd
+status: draft
+personas: Workspace owner onboarding a new hire
+---
+# team-bd
+
+## Job story
+
+> **When** a new hire joins, **I want to** invite them by email, **so I can** grant access fast.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_defect "off-taxonomy 'draft' status → BAD_STATUS" "$TMP_DOCS/badstatus_draft.md" "BAD_STATUS"
+draft_verdict="$(lint_story_doc "$TMP_DOCS/badstatus_draft.md" || true)"
+case " $draft_verdict " in
+  *" GRAMMAR "*|*" BOILERPLATE "*|*" FEW_SCENARIOS "*|*" GENERIC_PERSONA "*|*" FRAME_MISMATCH "*)
+    fail "badstatus_draft leaks an unintended defect: $draft_verdict" ;;
+  *) pass "badstatus_draft trips ONLY BAD_STATUS" ;;
+esac
+
+# Accept path: a valid uppercase taxonomy value must NOT trip BAD_STATUS.
+mk_tmp_doc goodstatus <<'DOC'
+---
+flow_id: team-gs
+status: QA_SIGNED_OFF
+personas: Workspace owner onboarding a new hire
+---
+# team-gs
+
+## Job story
+
+> **When** a new hire joins, **I want to** invite them by email, **so I can** grant access fast.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_clean "valid 'QA_SIGNED_OFF' status → no BAD_STATUS (accept path)" "$TMP_DOCS/goodstatus.md"
 
 printf '\nflow-doc-lint v-slice summary: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"

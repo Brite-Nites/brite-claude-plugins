@@ -2,7 +2,7 @@
 flow_id: seo-09
 title: Crawl-budget sitemap fetch
 domain: seo
-status: built
+status: BUILT
 parent_issue: BC-9109
 personas: SEO operator accountable for crawl budget
 intent: ../../intent.md

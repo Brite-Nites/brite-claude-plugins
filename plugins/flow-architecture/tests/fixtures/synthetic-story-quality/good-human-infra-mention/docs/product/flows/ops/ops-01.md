@@ -2,7 +2,7 @@
 flow_id: ops-01
 title: Review crawl-coverage gaps
 domain: ops
-status: built
+status: BUILT
 parent_issue: BC-9201
 personas: SEO operator triaging which pages search crawlers failed to fetch
 intent: ../../intent.md

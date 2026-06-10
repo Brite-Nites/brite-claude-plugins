@@ -2,7 +2,7 @@
 flow_id: team-03
 title: Change teammate role
 domain: team
-status: built
+status: BUILT
 parent_issue: BC-9003
 personas: Workspace owner adjusting a teammate's permissions
 intent: ../../intent.md
