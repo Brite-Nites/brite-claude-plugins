@@ -18,7 +18,10 @@ cd "$REPO_ROOT"
 
 DRIFT="plugins/flow-architecture/scripts/check-clone-drift.sh"
 CLONE_FILE="plugins/flow-architecture/commands/session-start.md"
-TARGET_LINE='Upstream-SHA: 1e9be24abb85bda0514795ece360fb26252b316f'
+# Baseline re-synced in BC-12947 (Batch F added an eval-waiver marker to the
+# workflows session-start upstream, so the clone's recorded Upstream-SHA was
+# bumped to the new upstream blob in the same PR).
+TARGET_LINE='Upstream-SHA: 97cdc134d86405a0510b0128abb6f71256e1d3eb'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 
 # Drive the classifier from the branch's HEAD blob, not origin/main. The test
