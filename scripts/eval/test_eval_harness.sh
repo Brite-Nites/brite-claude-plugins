@@ -1095,10 +1095,14 @@ mutate_canon audit "$AU" audit-report-emit.json "leak an extra scenario key" "un
 # two-impl drift hazard noted in the AuditAdapter docstring.
 echo "── audit oracle cross-assert (run-audit-smoke.sh) ──"
 SMOKE="$REPO_ROOT/plugins/flow-architecture/tests/run-audit-smoke.sh"
-if [ -f "$SMOKE" ] && bash "$SMOKE" >/dev/null 2>&1; then
+if [ ! -f "$SMOKE" ]; then
+  echo "  FAIL  oracle: run-audit-smoke.sh missing"; fail=$((fail + 1))
+elif smoke_out="$(bash "$SMOKE" 2>&1)"; then
   echo "  PASS  oracle: run-audit-smoke.sh green (bash Phase-B impl pins the same fixtures)"; pass=$((pass + 1))
 else
-  echo "  FAIL  oracle: run-audit-smoke.sh missing or red — bash Phase-B impl drifted from the fixtures"; fail=$((fail + 1))
+  # Print the drift detail — this branch firing IS the whole point of the guard.
+  echo "  FAIL  oracle: run-audit-smoke.sh red — bash Phase-B impl drifted from the fixtures"; fail=$((fail + 1))
+  printf '%s\n' "$smoke_out" | tail -20 | sed 's/^/    | /'
 fi
 
 # ── 3r. plan-* evals (BC-12946 — ONE shared build_plan_section, 5 routes, Batch E) ─
@@ -1134,6 +1138,9 @@ mutate_canon plan-eng "$PE" plan-eng-emit.json "drops the Refinements heading" "
 # an error row must NOT carry rendered markdown.
 mutate_canon plan-eng "$PE" plan-eng-emit.json "error row leaks markdown" "error row must carry null" \
   'p=M/"plan-eng-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eng_degenerate"][0]; s["section_markdown"]="**Mode:** x"; json.dump(d,open(p,"w"))'
+# an error row must carry a non-empty error string (the named contract).
+mutate_canon plan-eng "$PE" plan-eng-emit.json "error row empties its error" "non-empty error string" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eng_degenerate"][0]; s["error"]=""; json.dump(d,open(p,"w"))'
 mutate_canon plan-eng "$PE" plan-eng-emit.json "drop a load-bearing scenario" "expected scenario id 'eng_scope_expansion' is absent" \
   'p=M/"plan-eng-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="eng_scope_expansion"]; json.dump(d,open(p,"w"))'
 mutate_canon plan-eng "$PE" plan-eng-emit.json "leak an extra scenario key" "unexpected property" \
@@ -1355,13 +1362,13 @@ echo ""
 # 4 × (3 GREEN + 7-10×2 mutations + 2 hermeticity), live total 336), then 319→410 with the
 # BC-12945 Batch-D workflows precedent/telemetry blocks (analytics WRAP + flywheel-metrics +
 # audit-trail seed-read + promote-precedent inject-the-reads: +100 = 4 × (3 GREEN + 6-11×2
-# mutations + 2 hermeticity), live total 436), then 410→487 with the BC-12946 Batch-E
+# mutations + 2 hermeticity), live total 436), then 410→489 with the BC-12946 Batch-E
 # flow-architecture blocks (audit Phase-B evaluator: 3 GREEN + 8×2 mutations + 1 oracle
 # cross-assert + 2 hermeticity; ONE shared build_plan_section behind 5 plan-* blocks:
-# 5 × 3 GREEN + 15×2 mutations + 5×2 hermeticity = +77, live total 513) — so losing any
+# 5 × 3 GREEN + 16×2 mutations + 5×2 hermeticity = +79, live total 515) — so losing any
 # one command's eval block trips the floor rather than passing. Held at ~95% of the live
 # count to tolerate a single intentional assertion edit.
-FLOOR=487
+FLOOR=489
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

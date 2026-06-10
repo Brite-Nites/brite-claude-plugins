@@ -2852,7 +2852,11 @@ class PlanSectionAdapter:
                     if "**Refinements:**" not in md:
                         diffs.append(f"{tag}: section_markdown is missing the Refinements heading")
             else:
-                # A degenerate review_output yields an error row with no rendered markdown.
+                # A degenerate review_output yields an error row: a non-empty error
+                # string + no rendered markdown (the named contract, mirroring the
+                # CanonicalEmitAdapter rejection branch).
+                if not (isinstance(s["error"], str) and s["error"]):
+                    diffs.append(f"{tag}: error row must carry a non-empty error string")
                 if s["section_markdown"] is not None:
                     diffs.append(f"{tag}: error row must carry null section_markdown, got {s['section_markdown']!r}")
 

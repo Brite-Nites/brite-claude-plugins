@@ -111,7 +111,10 @@ class BuildError(Exception):
 
 
 def _read(p: Path) -> str:
-    return p.read_text(encoding="utf-8")
+    # errors="replace" so a malformed-encoding on-disk artifact degrades to a FAILED
+    # gate (its predicates just don't match), never an uncaught UnicodeDecodeError that
+    # aborts the emit — honoring evaluate()'s gate-fail-not-crash contract.
+    return p.read_text(encoding="utf-8", errors="replace")
 
 
 def _config_story_frame_mode(repo: Path) -> str:
@@ -303,6 +306,10 @@ def evaluate(repo: Path) -> list:
              f"index={index_at} breadcrumb={brk_at}")
 
     # --- cross-cutting (Q29.3 filesystem halves) ---
+    # NOTE: fid/stat are re.escape()d here where the bash oracle interpolates them raw
+    # into `grep -qE`; on the fixtures both are regex-inert single tokens (TEAM-01 /
+    # shipped) so the two agree. A future fixture with a regex metachar in a flow_id/
+    # status would be malformed anyway — the escape is the safer port, intentionally.
     id_mismatch = False
     status_mismatch = False
     index_text = ""
@@ -370,7 +377,11 @@ def decide(scenario: dict, fixtures_dir: Path) -> dict:
     run). Otherwise evaluate Phase-B gates over the named fixture repo."""
     sid = scenario.get("id", "scenario")
     gate = scenario.get("gate")
-    if gate is not None and gate not in VALID_GATE_IDS:
+    # `isinstance(gate, str)` SHORT-CIRCUITS before the frozenset membership test — a
+    # non-string degenerate value (a list/dict is unhashable; an int won't match) routes
+    # to the same 64 arg-guard row instead of raising on the hash (the recurring
+    # malformed-injected-state P1 — VALID_GATE_IDS is a frozenset, not a tuple).
+    if gate is not None and (not isinstance(gate, str) or gate not in VALID_GATE_IDS):
         return {
             "id": sid, "gates": [],
             "summary": {"hard_pass": 0, "hard_fail": 0, "soft_warn": 0,

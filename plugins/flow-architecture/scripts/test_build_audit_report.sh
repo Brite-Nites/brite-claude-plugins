@@ -183,6 +183,11 @@ bad_gate = bar.decide({"id": "ig", "repo": "audit-clean-shape", "gate": "nope"},
 eq("invalid --gate → exit_code 64", bad_gate["summary"]["exit_code"], 64)
 truthy("invalid --gate → error message present", bad_gate["error"] is not None)
 eq("invalid --gate → no gates emitted", bad_gate["gates"], [])
+# crash-defense regression: a NON-HASHABLE (list/dict) injected gate must route to the
+# 64 arg-guard row, not raise on the frozenset hash (the recurring P1).
+for bad in (["a"], {"k": "v"}, 42, True):
+    row = bar.decide({"id": "x", "repo": "audit-clean-shape", "gate": bad}, bar.Path(FIXTURES))
+    eq(f"non-string gate {bad!r} → exit_code 64 (no crash)", row["summary"]["exit_code"], 64)
 # a VALID gate id is NOT a 64 (only unrecognized ids guard).
 valid_gate = bar.decide({"id": "vg", "repo": "audit-clean-shape", "gate": "intent-exists"}, bar.Path(FIXTURES))
 truthy("valid --gate id is not rejected as 64", valid_gate["summary"]["exit_code"] != 64)
