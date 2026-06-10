@@ -1,6 +1,6 @@
 ---
 name: flow-doc-author
-description: Per-domain story doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes N markdown files at `docs/product/flows/<domain>/<flow-id>.md`, one per sub-flow under a domain, conforming to the Q27 locked template + Q27 amendment 1 (mod 4: optional `## Cross-domain dependencies` section). Hybrid authoring — programmatic substitution for 17 deterministic top-level YAML keys + 2 deterministic body items (`children` is one top-level key with 5 nested fields); parallel background `Agent(general-purpose)` dispatch for up to 9 narrative sections (the 9th — `## Cross-domain dependencies` — is OPTIONAL per Q27 amendment 1 and authored only when the sub-flow has cross-domain build-order or gating relations). Runs AFTER `flow-linear-scaffold` so parent + children BC numbers + sibling `blockedBy` relations are available for 1:1 mirror. 2-layer fidelity-review (mechanical `verify-docs.sh` + per-doc narrative drift check). 0 synchronous gates in default mode (filesystem writes; git review is the implicit gate). Per-domain authoring wall ~60s greenfield, ~90s retrofit; the second-wave fidelity-review fan-out adds ~30-60s, which can be overlapped with downstream `flow-journey-author`.
+description: Per-domain story doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes N markdown files at `docs/product/flows/<domain>/<flow-id>.md`, one per sub-flow under a domain, conforming to the Q27 locked template + Q27 amendment 1 (mod 4: optional `## Cross-domain dependencies` section). Hybrid authoring — deterministic frontmatter stamping via the extracted `scripts/build_story_frontmatter.py` builder (scaffold-log children/parent + caller params + constants, fixture-locked); parallel background `Agent(story-doc-author)` body-only dispatch for up to 9 narrative sections (the 9th — `## Cross-domain dependencies` — is OPTIONAL per Q27 amendment 1 and authored only when the sub-flow has cross-domain build-order or gating relations). Runs AFTER `flow-linear-scaffold` so parent + children BC numbers + sibling `blockedBy` relations are available for 1:1 mirror. 2-layer fidelity-review (mechanical `verify-docs.sh` + per-doc narrative drift check). 0 synchronous gates in default mode (filesystem writes; git review is the implicit gate). Per-domain authoring wall ~60s greenfield, ~90s retrofit; the second-wave fidelity-review fan-out adds ~30-60s, which can be overlapped with downstream `flow-journey-author`.
 user-invocable: false
 disable-model-invocation: true
 allowed-tools: Agent, Bash, Read, Write, Edit, Glob, Grep
@@ -25,41 +25,37 @@ The full design rationale lives in `docs/design-rationale/fda-plugin-interview.m
 
 ## 1. Authoring strategy (Q15.1) --- hybrid
 
-### Programmatic substitution (17 deterministic top-level YAML keys + 2 body items)
+### Deterministic stamping --- the `build_story_frontmatter.py` builder (BC-13168)
 
-`children.*` is one top-level key with 5 nested fields — counted as 1 of 17 in the top-level tally; expanded into 5 rows in the table below for readability.
+The frontmatter is stamped by an **extracted deterministic builder**, not LLM prose, so it is fixture-lockable and cannot silently regress to the empty `children:` / `personas:` placeholders that shipped on every prior scaffold (BC-13028 #4; the BC-11996 hand-fix that recurred). The skill shells out to `scripts/build_story_frontmatter.py`, which reads **only** the per-domain scaffold-log (`.flow/scaffold-log/<domain>.md` --- canonical table shape per `templates/.flow/scaffold-log/SCHEMA.md`; join key `flow_id`/`DOMAIN-NN` per ADR-029) and assembles the frontmatter from the scaffold-log + caller-supplied params + constants:
 
-The skill substitutes the following without LLM dispatch:
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_story_frontmatter.py \
+  --scaffold-log <repo>/.flow/scaffold-log/<domain>.md --flow-id <DOMAIN-NN> --as-of <today> \
+  [--status <BUILT|IN_PROGRESS|…>] [--personas <role,role>] [--related-flows <ID,ID>]
+```
 
 | YAML key | Source |
 |---|---|
-| `flow_id` | inventory row |
-| `domain` | flow_id prefix |
-| `status` | inventory column OR Q15.7 code-evidence (capped at BUILT) |
-| `parent_issue` | scaffold output |
-| `children.story` | scaffold output |
-| `children.engineering` | scaffold output |
-| `children.design` | scaffold output |
-| `children.qa` | scaffold output |
-| `children.docs` | scaffold output |
-| `personas` | inventory row |
-| `related_flows` | inventory adjacency |
-| `figma` | `TBD` |
-| `sandbox_url` | Q15.7 code-evidence scan when status > NOT_STARTED, else `TBD` --- **NOT inventory Notes column**, which holds component names like `edit-role-dialog` |
-| `staging_url` | `TBD` |
-| `real_app_url` | `TBD` |
-| `e2e_test` | `TBD` |
-| `user_docs_url` | `TBD` |
-| `qa_status` | `not-tested` |
-| `qa_last_signed_off` | `null` |
-| `last_reviewed` | current ISO-8601 |
-| `intent` | `../../intent.md` (per Q27 mod 1) |
+| `flow_id` | `--flow-id` arg |
+| `domain` | `flow_id` prefix (builder-derived) |
+| `parent_issue` | **scaffold-log** parents table (builder) |
+| `children.{story,engineering,design,qa,docs}` | **scaffold-log** discipline-children table (builder); a missing/errored cell → `TBD` |
+| `status` | `--status` (the skill's Q15.7 code-evidence result, capped at BUILT) --- default `NOT_STARTED` |
+| `personas` | `--personas` (skill-derived; see note) --- honest `[]` when unknown |
+| `related_flows` | `--related-flows` (skill-derived adjacency) --- honest `[]` when unknown |
+| `qa_status` | constant `not-tested` |
+| `qa_last_signed_off` | constant `null` |
+| `eng_status` / `design_status` / `docs_status` | constant `not-started` (delivery mirrors → INDEX; updated post-build, not at scaffold) |
+| `figma` / `sandbox_url` / `staging_url` / `real_app_url` / `e2e_test` / `user_docs_url` | constant `TBD` (`sandbox_url` upgraded post-scaffold from Q15.7 code-evidence --- **NOT** the inventory Notes column, which holds component names like `edit-role-dialog`) |
+| `intent` | constant `../../intent.md` (per Q27 mod 1) |
+| `last_reviewed` | `--as-of` (current ISO-8601; injected so the builder stays golden-stable) |
 
-Body deterministic items: H1 title `<DOMAIN-NN>: <Inventory title>`; doc-type-warning blockquote from template boilerplate.
+**Why `personas`/`related_flows` are skill-derived params, not builder inventory reads.** The consumer `master-flow-inventory.md` schema is not standardized across repos and usually carries no personas/related_flows column, so the builder cannot source them deterministically --- it does **not** parse the inventory at all. The skill derives them (from the inventory row when a persona column is present, else the parent journey / `docs/product/personas/` / interview `partial_state`, per BC-13028's "pass personas via `partial_state`") and passes them through; absent → the builder stamps an honest empty `[]`, never a silent placeholder. The lock is `tests/run-story-frontmatter-vslice.sh` (ADR-028 D2-style golden + populated-key assertions).
 
-### Agent-authored (up to 9 narrative sections; the 9th is optional per Q27 amendment 1)
+### Agent-authored body (body-only contract)
 
-One `Agent(general-purpose, run_in_background: true)` per sub-flow. Each agent fills:
+One `Agent(story-doc-author, run_in_background: true)` per sub-flow authors the **body only** --- the H1 title `# <DOMAIN-NN>: <Inventory title>`, the doc-type-warning blockquote, and the narrative sections below --- and returns it as markdown. The skill prepends the builder-stamped frontmatter and writes the file. The agent **never emits frontmatter**: it is filesystem-only with no Linear/scaffold-log access, so it cannot know `children: [BC-…]` --- that contradiction was the proximate cause of the empties. Each agent fills:
 
 1. one-line summary blockquote
 2. optional `## Status notes` (Q27 mod 2 --- include only when status drift OR retrofit code-evidence flag)
@@ -75,13 +71,13 @@ One `Agent(general-purpose, run_in_background: true)` per sub-flow. Each agent f
 
 ## 2. Dispatch pattern (Q15.2) --- parallel background
 
-One `Agent(general-purpose, run_in_background: true)` per sub-flow. Skill collects all agents at sub-flow completion.
+Per sub-flow the skill (1) runs `build_story_frontmatter.py` to stamp the frontmatter block (Section 1), (2) dispatches one `Agent(story-doc-author, run_in_background: true)` to author the body, and (3) at collection prepends the stamped frontmatter to the returned body and writes `docs/product/flows/<domain>/<flow-id>.md`. Skill collects all agents at sub-flow completion. The deterministic stamp does not wait on the agent --- it is computed from the scaffold-log up front.
 
 **Wall time:** ~30-60s for any N (vs ~4-8 min serial for N=8). Each agent receives:
 
-- Skeleton with `TBD` markers for narrative fields.
+- The instruction to return the **body only** (`# <H1>` through `## QA history`); the skill owns the frontmatter via the builder and concatenates.
 - Q27 template path (incl. Q27 amendment 1 mod 4 `## Cross-domain dependencies` section).
-- Persona doc(s) for the personas that act in THIS sub-flow specifically — resolved from the sub-flow's inventory `personas` field (Section 1 substitution table), not the project-wide persona set. For each role named in that field, resolve `docs/product/personas/<role>.md`; if the standalone doc is absent, fall back to that role's persona block in the parent journey's per-phase persona lines (or the intent.md `## Target users` cross-link). Embed the resolved subset in `partial_state` so each agent gets the individuated persona(s) for its flow, never a single project-wide default.
+- Persona doc(s) for the personas that act in THIS sub-flow specifically — resolved from the skill-derived `personas` for this sub-flow (the same set the skill passes to the builder via `--personas`, Section 1), not the project-wide persona set. For each role named in that field, resolve `docs/product/personas/<role>.md`; if the standalone doc is absent, fall back to that role's persona block in the parent journey's per-phase persona lines (or the intent.md `## Target users` cross-link). Embed the resolved subset in `partial_state` so each agent gets the individuated persona(s) for its flow, never a single project-wide default.
 - Journey doc (if already authored --- in greenfield this skill runs before journey-author, so usually unavailable).
 - Inventory row.
 - Code-evidence summary (if status > NOT_STARTED --- Section 7).

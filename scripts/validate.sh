@@ -233,6 +233,33 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-stamp — flow-architecture story-frontmatter-stamp vslice (BC-13168)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-story-frontmatter-vslice.sh — the
+# ADR-028 D2-style deterministic lock for flow-doc-author's frontmatter stamping
+# (BC-13028 #4). Drives scripts/build_story_frontmatter.py over a fixture
+# scaffold-log (canonical table shape) and golden-compares the emitted
+# frontmatter + asserts the populated-key invariants (children/personas/parent
+# are real values, not TBD placeholders) that would have caught the
+# empty-frontmatter regression. Skill, outside COMMAND_GLOB — no command-eval
+# ceremony (the ADR-028 eval-gate enforces commands only).
+section "2b-stamp. flow-architecture story-frontmatter-stamp vslice (BC-13168)"
+
+fda_stamp_test="$REPO_ROOT/plugins/flow-architecture/tests/run-story-frontmatter-vslice.sh"
+
+if [ ! -f "$fda_stamp_test" ]; then
+  warn "plugins/flow-architecture/tests/run-story-frontmatter-vslice.sh not found — skipped"
+else
+  if fda_stamp_out=$(bash "$fda_stamp_test" 2>&1); then
+    fda_stamp_pass_count=$(printf '%s\n' "$fda_stamp_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture story-frontmatter-stamp vslice (${fda_stamp_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture story-frontmatter-stamp vslice failed — run plugins/flow-architecture/tests/run-story-frontmatter-vslice.sh for details"
+    printf '%s\n' "$fda_stamp_out" | tail -40 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b'''' — flow-architecture cross-domain-deps vslice (BC-10729)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-cross-domain-deps-vslice.sh —

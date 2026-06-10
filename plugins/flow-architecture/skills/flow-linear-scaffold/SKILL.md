@@ -63,19 +63,25 @@ parent
 
 ## 2. Idempotency (Q13.2) --- 3 layers
 
-### L1 --- `.flow/scaffold-log/<domain>.md` append-only log
+### L1 --- `.flow/scaffold-log/<domain>.md` log
 
-A cheap resume cache (no Linear reads required for the common-case re-run). One row per write:
+A cheap resume cache (no Linear reads required for the common-case re-run). The canonical shape is **7 frontmatter fields + three markdown tables** (milestone, parents, discipline children) per `templates/.flow/scaffold-log/SCHEMA.md`; the parents + discipline-children tables carry one `DOMAIN-NN` row each:
 
 ```
-2026-05-11T18:30:00Z  parent  AUTH-01  BC-XXXXX  result: executed
-2026-05-11T18:30:01Z  story   AUTH-01  BC-XXXXY  result: executed
-2026-05-11T18:30:01Z  design  AUTH-01  BC-XXXXZ  result: executed
-2026-05-11T18:30:02Z  eng     AUTH-01  BC-XXX10  result: executed
-...
+## Parents (N × executed)
+
+| # | Sub-flow | Linear identifier | Result |
+|---|---|---|---|
+| 2 | AUTH-01 — Log in | BC-XXXXX | executed |
+
+## Discipline children (5N × executed)
+
+| Sub-flow | Story | Engineering | Design | QA | Docs | Result |
+|---|---|---|---|---|---|---|
+| AUTH-01 | BC-XXXXY | BC-XXX10 | BC-XXXXZ | BC-XX120 | BC-XX130 | executed |
 ```
 
-Re-run: skill reads the log, identifies executed rows, skips them.
+Re-run: skill reads the log, identifies `executed` / `skipped-idempotent` rows, skips them. The discipline-children `Sub-flow` cell is the bare `DOMAIN-NN`; the parents `Sub-flow` cell is `DOMAIN-NN — <desc> [<annot>]`. `build_story_frontmatter.py` (BC-13168) consumes these same two tables to stamp story-doc `children:` / `parent_issue` deterministically.
 
 ### L2 --- per-sub-flow `list_issues` lookup
 

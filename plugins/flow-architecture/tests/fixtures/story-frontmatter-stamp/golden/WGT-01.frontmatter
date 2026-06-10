@@ -1,0 +1,27 @@
+---
+flow_id: WGT-01
+domain: WGT
+status: BUILT
+parent_issue: BC-20001
+children:
+  story: BC-20002
+  engineering: BC-20003
+  design: BC-20004
+  qa: BC-20005
+  docs: BC-20006
+personas: [operator, tm]
+related_flows: [WGT-02]
+figma: TBD
+sandbox_url: TBD
+staging_url: TBD
+real_app_url: TBD
+e2e_test: TBD
+user_docs_url: TBD
+qa_status: not-tested
+qa_last_signed_off: null
+eng_status: not-started
+design_status: not-started
+docs_status: not-started
+intent: ../../intent.md
+last_reviewed: 2026-06-10
+---
