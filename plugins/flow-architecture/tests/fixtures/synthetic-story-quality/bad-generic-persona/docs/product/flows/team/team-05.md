@@ -2,7 +2,7 @@
 flow_id: team-05
 title: Leave workspace
 domain: team
-status: built
+status: BUILT
 parent_issue: BC-9005
 personas: the user
 intent: ../../intent.md

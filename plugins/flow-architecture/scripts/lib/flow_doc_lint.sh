@@ -51,6 +51,16 @@
 #                  (the floor gate is authoritative — the 2-surface scope locked
 #                  with Q29 amendment 3); under `lenient` such a doc is also caught
 #                  by the LLM quality-reviewer via rubric D11.
+#   BAD_STATUS     (BC-13029) front-matter `status:` is not one of the canonical
+#                  6-value INDEX taxonomy (NOT_STARTED / IN_PROGRESS / BUILT /
+#                  QA_SIGNED_OFF / SHIPPED / BLOCKED). Catches the lowercase
+#                  `not-started` / `built` casing (reserved for the eng/design/
+#                  docs_status discipline-mirror fields) and off-taxonomy values
+#                  like `draft`. Feeds INDEX.md's Status column via
+#                  regenerate-flow-index.mts (which coerces an off-taxonomy value
+#                  to NOT_STARTED at render time — this lint is the upstream
+#                  deterministic guard). Only a PRESENT-but-invalid value trips;
+#                  absence is verify-docs's front-matter presence check.
 #
 # Bash 3.2 compatible (macOS default). Stdlib only. No literal backtick inside
 # any grep regex (apostrophes use the ['’] bracket class).
@@ -136,6 +146,23 @@ lint_story_doc() {
   [ -n "$scen" ] || scen=0
   if [ "$scen" -lt 3 ]; then
     defects="$defects FEW_SCENARIOS"
+  fi
+
+  # ── BAD_STATUS: front-matter `status:` ∈ canonical 6-value taxonomy ─
+  # Feeds INDEX.md's Status column (regenerate-flow-index.mts). MUST be uppercase
+  # NOT_STARTED|IN_PROGRESS|BUILT|QA_SIGNED_OFF|SHIPPED|BLOCKED — never a lowercase
+  # `not-started`/`built` (those casings are reserved for the eng/design/docs_status
+  # discipline-mirror fields) nor an off-taxonomy `draft`. Only a PRESENT-but-invalid
+  # value trips; absence is verify-docs's front-matter presence check. `^status:`
+  # anchors at line start, so it never matches `eng_status:`/`design_status:`/etc.
+  local status_fm
+  status_fm="$(grep -E '^status:' "$doc" 2>/dev/null | head -1 \
+    | sed -E 's/^status:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]+$//' || true)"
+  if [ -n "$status_fm" ]; then
+    case "$status_fm" in
+      NOT_STARTED|IN_PROGRESS|BUILT|QA_SIGNED_OFF|SHIPPED|BLOCKED) : ;;
+      *) defects="$defects BAD_STATUS" ;;
+    esac
   fi
 
   # ── A-2: generic project-wide default persona ──────────────────────

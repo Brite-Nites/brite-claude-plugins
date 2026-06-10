@@ -212,7 +212,18 @@ export function parseRow(filePath: string, repoRoot: string): Row | null {
     console.warn(`  ⚠ ${relative(repoRoot, filePath)}: missing flow_id or domain — skipping`);
     return null;
   }
-  const status = typeof fm.status === "string" ? fm.status : "NOT_STARTED";
+  // Status must be one of the 6-value INDEX taxonomy. An unknown value (a
+  // lowercase `not-started`, a `draft`, a typo) is coerced to NOT_STARTED with a
+  // warning rather than printed raw into the INDEX — unlike the discipline
+  // columns below, status had no validation. The deterministic guard upstream is
+  // the BC-13029 status A-lint; this is the render-time backstop. (BC-13028 #2.)
+  const STATUS_TAXONOMY = ["NOT_STARTED", "IN_PROGRESS", "BUILT", "QA_SIGNED_OFF", "SHIPPED", "BLOCKED"];
+  const rawStatus = typeof fm.status === "string" ? fm.status : "NOT_STARTED";
+  let status = rawStatus;
+  if (!STATUS_TAXONOMY.includes(status)) {
+    console.warn(`  ⚠ ${relative(repoRoot, filePath)}: status "${rawStatus}" not in taxonomy {${STATUS_TAXONOMY.join("|")}} — coercing to NOT_STARTED`);
+    status = "NOT_STARTED";
+  }
   const parentIssue = typeof fm.parent_issue === "string" ? fm.parent_issue : "TBD";
   const qaStatus = typeof fm.qa_status === "string" ? fm.qa_status : "not-tested";
   const engStatus = typeof fm.eng_status === "string" ? fm.eng_status : "not-started";

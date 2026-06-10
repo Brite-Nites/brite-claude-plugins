@@ -2,7 +2,7 @@
 flow_id: seo-01
 title: Per-domain sitemap and robots
 domain: seo
-status: built
+status: BUILT
 parent_issue: BC-9101
 personas: SEO operator accountable for every published page being crawl-discoverable
 intent: ../../intent.md

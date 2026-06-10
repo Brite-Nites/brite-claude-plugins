@@ -2,7 +2,7 @@
 flow_id: team-01
 title: Invite teammate
 domain: team
-status: built
+status: BUILT
 parent_issue: BC-9001
 personas: Workspace owner onboarding a new hire
 intent: ../../intent.md

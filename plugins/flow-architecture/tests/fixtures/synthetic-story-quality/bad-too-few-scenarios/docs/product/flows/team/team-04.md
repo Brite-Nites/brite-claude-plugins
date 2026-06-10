@@ -2,7 +2,7 @@
 flow_id: team-04
 title: Resend pending invite
 domain: team
-status: built
+status: BUILT
 parent_issue: BC-9004
 personas: Workspace owner chasing an unaccepted invite
 intent: ../../intent.md

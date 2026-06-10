@@ -2,7 +2,7 @@
 flow_id: team-02
 title: Remove teammate
 domain: team
-status: built
+status: BUILT
 parent_issue: BC-9002
 personas: Workspace owner offboarding a departing teammate
 intent: ../../intent.md
