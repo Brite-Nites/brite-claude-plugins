@@ -58,7 +58,8 @@ DEFAULT_FIXTURES_DIR = _HERE.parent / "tests" / "fixtures"
 # os.EX_USAGE arg-guard universe: the canonical `--gate=<id>` valid-ID set from
 # audit.md § Phase B `--gate=<id>` table (the full Q29 manifest). An unrecognized
 # --gate value exits 64. This is the SUPERSET; the Phase-B subset this builder
-# actually EMITS is `EMITTED_GATES` below (Phase A/C ids are valid-but-not-emitted).
+# actually EMITS is whatever evaluate() emits (the Phase A/C ids + env-ready +
+# scaffold-complete are valid-but-not-emitted here).
 VALID_GATE_IDS = frozenset({
     # phase-transition (Q29.1)
     "env-ready", "preflight-complete", "intent-exists", "inventory-complete",
@@ -85,6 +86,11 @@ VALID_GATE_IDS = frozenset({
 })
 
 # gate-id → type, for the `type` field of every emitted gate (Q29 categories).
+# This lists only the phase-transition gates this builder EMITS — the other two of
+# the 8 (env-ready, scaffold-complete) are intentionally absent because neither is
+# reachable from the filesystem alone in Phase B (env-ready needs Linear MCP/gh auth;
+# scaffold-complete needs the scaffold-log integration), mirroring run-audit-smoke.sh's
+# RECOGNIZED_GATES. _gate_type() only ever classifies an emitted gate id.
 _PHASE_TRANSITION = frozenset({
     "preflight-complete", "intent-exists", "inventory-complete",
     "story-docs-complete", "journey-complete", "index-complete",
