@@ -25,6 +25,11 @@ const INVENTORY_PATH = join(REPO_ROOT, "docs/product/master-flow-inventory.md");
 const INDEX_PATH = join(FLOWS_DIR, "INDEX.md");
 const LINEAR_ORG = "<LINEAR_ORG_SLUG>";
 
+// The 6-value canonical INDEX status taxonomy. parseRow coerces any off-taxonomy
+// front-matter `status` to NOT_STARTED with a warning (BC-13028 #2). Module-level
+// so it is allocated once, not per row.
+const STATUS_TAXONOMY = ["NOT_STARTED", "IN_PROGRESS", "BUILT", "QA_SIGNED_OFF", "SHIPPED", "BLOCKED"];
+
 export type Row = {
   flowId: string;
   domain: string;
@@ -217,7 +222,6 @@ export function parseRow(filePath: string, repoRoot: string): Row | null {
   // warning rather than printed raw into the INDEX — unlike the discipline
   // columns below, status had no validation. The deterministic guard upstream is
   // the BC-13029 status A-lint; this is the render-time backstop. (BC-13028 #2.)
-  const STATUS_TAXONOMY = ["NOT_STARTED", "IN_PROGRESS", "BUILT", "QA_SIGNED_OFF", "SHIPPED", "BLOCKED"];
   const rawStatus = typeof fm.status === "string" ? fm.status : "NOT_STARTED";
   let status = rawStatus;
   if (!STATUS_TAXONOMY.includes(status)) {

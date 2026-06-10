@@ -92,6 +92,13 @@ _fdl_frame_region() {
   awk '/^##[[:space:]]+Acceptance/{exit} {print}' "$1" 2>/dev/null
 }
 
+# Extract ONLY the YAML front-matter block (between the opening `---` on line 1
+# and the next `---`). Used to scope front-matter-key checks so a body line that
+# happens to start with `status:` (prose, a code block) can't false-positive.
+_fdl_frontmatter() {
+  awk 'NR==1 && /^---[[:space:]]*$/{f=1;next} f && /^---[[:space:]]*$/{exit} f' "$1" 2>/dev/null
+}
+
 lint_story_doc() {
   local doc="$1"
   local defects=""
@@ -155,8 +162,10 @@ lint_story_doc() {
   # discipline-mirror fields) nor an off-taxonomy `draft`. Only a PRESENT-but-invalid
   # value trips; absence is verify-docs's front-matter presence check. `^status:`
   # anchors at line start, so it never matches `eng_status:`/`design_status:`/etc.
+  # Scoped to the YAML front-matter block (not the whole file) so a body line that
+  # starts with `status:` can't false-positive.
   local status_fm
-  status_fm="$(grep -E '^status:' "$doc" 2>/dev/null | head -1 \
+  status_fm="$(_fdl_frontmatter "$doc" | grep -E '^status:' | head -1 \
     | sed -E 's/^status:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]+$//' || true)"
   if [ -n "$status_fm" ]; then
     case "$status_fm" in

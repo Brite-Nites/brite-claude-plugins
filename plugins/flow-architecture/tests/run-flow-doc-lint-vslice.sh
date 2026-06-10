@@ -300,6 +300,12 @@ Scenario: c
   Then z
 DOC
 assert_defect "off-taxonomy 'draft' status → BAD_STATUS" "$TMP_DOCS/badstatus_draft.md" "BAD_STATUS"
+draft_verdict="$(lint_story_doc "$TMP_DOCS/badstatus_draft.md" || true)"
+case " $draft_verdict " in
+  *" GRAMMAR "*|*" BOILERPLATE "*|*" FEW_SCENARIOS "*|*" GENERIC_PERSONA "*|*" FRAME_MISMATCH "*)
+    fail "badstatus_draft leaks an unintended defect: $draft_verdict" ;;
+  *) pass "badstatus_draft trips ONLY BAD_STATUS" ;;
+esac
 
 # Accept path: a valid uppercase taxonomy value must NOT trip BAD_STATUS.
 mk_tmp_doc goodstatus <<'DOC'
