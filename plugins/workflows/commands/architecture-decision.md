@@ -2,6 +2,8 @@
 description: Generate Architecture Decision Records (ADRs) for documenting technology choices
 ---
 
+<!-- eval-waiver: A multi-turn AskUserQuestion interview produces the ADR's Context/Options/Decision/Consequences prose plus a codebase fact-check; none of that has a fixed right-answer artifact a hermetic test could assert. A deterministic next-ADR-number plus kebab-slug helper exists (Glob NNN files then max+1; title to slug regex) but is deferred (BC-13163). -->
+
 # Architecture Decision Record
 
 You are generating an Architecture Decision Record (ADR) — a structured document that captures an architectural or technology choice, the alternatives considered, and the consequences. ADRs create institutional memory so future developers understand *why* a decision was made, not just *what* was chosen.

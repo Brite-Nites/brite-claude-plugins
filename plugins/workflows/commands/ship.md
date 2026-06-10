@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 description: Create PR, update Linear, compound learnings, best-practices audit, handbook drift check, suggest next issue
 gbrain:
   schema: 1
@@ -22,6 +23,8 @@ gbrain:
       limit: 3
       render_as: "## Changelog patterns"
 ---
+
+<!-- eval-waiver: The primary artifacts are an LLM-authored PR (title, summary, changes, test-plan body) and a Linear status comment, followed by dispatched compound-learnings, best-practices-audit, and handbook-drift skills; the PR and comment text are free-form narrative with no deterministic right-answer payload to fixture. -->
 
 # Ship & Compound
 

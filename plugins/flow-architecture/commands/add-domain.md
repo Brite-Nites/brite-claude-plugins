@@ -2,6 +2,8 @@
 description: Incremental-add Flow-Driven Architecture orchestrator (whole new domain with N sub-flows) — 6 phases / 2 gates / authors the new domain's journey doc per Q47 sub-decision 2
 ---
 
+<!-- eval-waiver: Six-phase incremental-add orchestrator that authors a new domain's milestone, N sub-flows, N story docs, and a journey doc by dispatching sub-skills (flow-inventory-add, flow-linear-scaffold, flow-journey-author, flow-index-regen) and AskUserQuestion gates; every artifact is AI-authored Linear and doc content with no fixed-right-answer, and there is no separable decide() core in the command body. -->
+
 # /flow:add-domain
 
 Heavier of the two incremental-add FDA orchestrators. Adds a whole new domain (1 milestone + N sub-flows + N story docs + 1 journey doc) under an existing FDA-shaped project. Runs **6 phases / 2 user-confirmation gates** per Q47 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:745`): Phase 3 is a per-domain inner loop with `N=1` domain but N sub-flows inside, mirroring the Q37 hybrid control flow degenerated to N=1 domain (memory:756); Phases 4-5 are globally batched with N=1 domain (degenerate but consistent with the start-project sibling). Wall ≈ 10-30 min depending on sub-flow count.

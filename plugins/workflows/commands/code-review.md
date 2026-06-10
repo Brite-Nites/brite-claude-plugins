@@ -2,6 +2,8 @@
 description: Standardized code review for Brite projects
 ---
 
+<!-- eval-waiver: The output is an LLM-authored P1/P2/P3 review narrative over an arbitrary diff (or a dispatch of parallel review agents in deep mode); the findings are free-text judgments with no fixed correct artifact, and the deep-mode agent-selection and dedup logic is borrowed from /workflows:review rather than owned here. -->
+
 # Code Review
 
 Perform a thorough code review following Brite standards. Reference the tech stack established in `/workflows:tech-stack` for technology-specific expectations.

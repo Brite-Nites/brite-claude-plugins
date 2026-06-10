@@ -2,6 +2,8 @@
 description: Run diagnostic checks on the plugin environment — CLI tools, MCP servers, hooks, agent dispatch
 ---
 
+<!-- eval-waiver: Every check probes live host and environment state (tool versions, MCP connectivity, hook firing, agent dispatch) and the PASS/FAIL/SKIP table is a direct function of that machine's installed tooling and auth, so there is no repeatable artifact independent of the live environment to fixture. -->
+
 # Smoke Test
 
 Run a comprehensive health check of the Brite plugin environment. This is a diagnostic tool for verifying everything is wired up correctly.

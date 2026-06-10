@@ -3,6 +3,8 @@ description: Guided, gated setup that gets a developer authenticated to the brit
 allowed-tools: Bash, Read, AskUserQuestion
 ---
 
+<!-- eval-waiver: Seven-phase one-time onboarding flow that detects local state then walks the developer through browser sf org login, sets the default target-org, and runs live connectivity and permission probes, each AskUserQuestion-gated; its mutations are local credential and config writes and its substance is the interactive, host-state-dependent setup walk, with no separable deterministic decide()-to-artifact. -->
+
 # /revops:setup-sandbox
 
 Get a developer from "no Salesforce auth" to "connected to `brite-sandbox`, default target-org set, and a trivial SOQL returns a row" — the laptop-side prerequisites every other revops command (`/revops:deploy-sandbox`, `/revops:deploy-prod`, `/revops:post-deploy-runbook`) silently assumes.

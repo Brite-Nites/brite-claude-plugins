@@ -2,6 +2,9 @@
 description: Pre-deployment validation checklist — run automated checks and confirm manual items before deploying
 ---
 
+<!-- eval-waiver: Every input to the READY/CAUTION/BLOCKED verdict is produced by talking to the live machine and repo (npm test, tsc, prisma migrate status, gh pr view, git state); the rollup is deterministic in principle but its check-statuses are non-repeatable host-state diagnostics with no fixturable artifact, and manual developer confirmations gate the verdict. -->
+<!-- lint:not-side-effecting R1 fired on the read `git branch --show-current`; the body has no mutating sink (git fetch updates remote-tracking refs only, gh pr view is read-only), so this is a false positive, not a side-effect. -->
+
 # Deployment Checklist
 
 You are running a pre-deployment validation checklist. Your job is to execute automated checks, prompt for manual confirmations, and produce a deployment confidence report. Every automated check must show real evidence (command output) — never claim a check passed without running it.

@@ -2,6 +2,8 @@
 description: Greenfield Flow-Driven Architecture orchestrator — 8 phases / 4 gates / hybrid control flow per Q37 lock
 ---
 
+<!-- eval-waiver: Eight-phase, four-gate greenfield orchestrator with hybrid control flow: preflight, office-hours, inventory interview, a per-domain flow-linear-scaffold inner loop, doc-author, journey-author, index-regen; every artifact is AI-authored and gated by AskUserQuestion, with no separable deterministic artifact in the command body to fixture (all Linear writes are dispatched to flow-linear-scaffold). -->
+
 # /flow:start-project
 
 Greenfield UI-bearing FDA build orchestrator. Runs **8 phases / 4 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:682`): Phase 4 is a per-domain inner loop preserving Q13.5 atomic recovery; Phases 5+6 are globally batched activating Q15.2 + Q16.2 internal parallelism. Wall ≈ 22–70 min on Brand Hub-shape projects depending on domain count.

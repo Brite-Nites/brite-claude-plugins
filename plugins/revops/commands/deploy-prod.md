@@ -1,8 +1,11 @@
 ---
+disable-model-invocation: true
 description: Production deploy orchestration for brite-salesforce — pre-flight (cwd + branch + clean tree + intent), prod dry-run, double-confirmation gate, actual deploy, coverage check, Tooling API post-deploy verification, runbook trigger. Use after `/revops:deploy-sandbox` has verified cleanly and the PR is merged to `main`. Closes the production-deploy discipline gap that `/workflows:ship` alone doesn't cover.
 argument-hint: [--reconcile]
 allowed-tools: Bash, AskUserQuestion
 ---
+
+<!-- eval-waiver: Seven-phase live-org deploy orchestrator: every phase shells sf project deploy start or sf data query against the real brite-prod org and gates on AskUserQuestion; the pr-diff source-dir resolver is a deterministic fragment but has no decide()-to-artifact boundary separable from the live deploy and double-confirmation gates it feeds, so the command's substance is the gated mutation sequence, not a pure verdict. -->
 
 # /revops:deploy-prod
 

@@ -4,6 +4,8 @@ argument-hint: <icp-string> [--entity <brite-nites|brite-supply|brite-labs>] [--
 allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__plugin_marketing_spider__*, mcp__plugin_marketing_aiark__*, mcp__plugin_marketing_discolike__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, WebSearch, WebFetch, Read, Write, Glob, Grep, Bash, AskUserQuestion
 ---
 
+<!-- eval-waiver: A pure orchestrator over the tam-mapping skill: it states it does not re-implement any skill phase and makes no direct mutating MCP calls; its own body only resolves entity, renders cost-estimate and summary prose, gates several times, and prints a handoff string, so the deterministic substance (dedup, EB cross-workspace exclusion, enrichment, tiering) all lives in the dispatched skill, not the command. -->
+
 # /marketing:tam-map
 
 Execute the 8 phases below sequentially. Use `AskUserQuestion` at every numbered user gate — the user must explicitly approve before you proceed. If they answer anything other than the "proceed" option, halt the phase and help resolve the blocker before re-asking. This command **orchestrates** the BC-5832 `tam-mapping` skill via per-phase invocation; it does not re-implement any skill phase. Each gate sits between two skill invocations scoped via `--stop-at-phase <N>`.

@@ -2,6 +2,8 @@
 description: Scaffold a new domain plugin from the template
 ---
 
+<!-- eval-waiver: Scaffolds a plugin by copying templates, sed-substituting placeholders, appending a marketplace.json entry, and running validate.sh; its output is a tree of local files whose correctness is checked by validate.sh, not a fixturable decide() artifact, and the name and description inputs are free-form interview values. -->
+
 # Create Plugin
 
 You are scaffolding a new domain plugin in this marketplace repository. Follow each step exactly.

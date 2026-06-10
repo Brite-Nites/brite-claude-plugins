@@ -1,6 +1,9 @@
 ---
+disable-model-invocation: true
 description: Start a new Brite project with a guided interview
 ---
+
+<!-- eval-waiver: Runs a multi-phase JTBD/Design-Thinking interview, classifies the project against 11 traits from free conversation, then scaffolds a repo, CLAUDE.md, trait docs, ADRs, and a Linear project; the trait classification is an LLM reading of unbounded interview text and the outputs are generated documents and live external resources, none of which is a fixturable decide() artifact. -->
 
 You are my dedicated software engineer. Before we build anything, conduct a thorough interview to understand me and my project, then classify it using the trait system below.
 

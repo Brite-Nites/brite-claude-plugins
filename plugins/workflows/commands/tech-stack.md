@@ -2,6 +2,8 @@
 description: Display Brite technology stack for tech decisions
 ---
 
+<!-- eval-waiver: The body is a static reference document (fixed tables of approved languages, frameworks, databases, tooling, plus decision-guideline and what-to-avoid lists); it parses nothing, reads nothing, and decides nothing, so there is no deterministic decide() to test. -->
+
 # Brite Technology Stack
 
 When making technology decisions, use the following established stack. Prefer these technologies over alternatives unless there's a compelling reason to deviate.

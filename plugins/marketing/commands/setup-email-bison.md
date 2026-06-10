@@ -3,6 +3,8 @@ description: Guided Email Bison MCP setup. Detects current registration state an
 allowed-tools: Bash, Read, AskUserQuestion
 ---
 
+<!-- eval-waiver: Seven-phase interactive onboarding wizard: it reads live claude mcp list state, walks the developer through copying Bitwarden tokens into their shell profile and hand-editing repo-root .mcp.json, then re-probes connectivity; every branch keys off host machine state and human acknowledgement gates, with no deterministic decide()-to-artifact, just diagnostics and copy-paste instructions. -->
+
 # /marketing:setup-email-bison
 
 Execute the phases below sequentially. Use `AskUserQuestion` at each numbered checkpoint so the user explicitly acknowledges each step before moving on. If they answer anything other than the "proceed" option, halt and help with their blocker before re-asking.

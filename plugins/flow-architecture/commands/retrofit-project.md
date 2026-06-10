@@ -1,6 +1,9 @@
 ---
+disable-model-invocation: true
 description: Retrofit Flow-Driven Architecture orchestrator — 9 phases / 5 gates / conditional office-hours per Q37 lock
 ---
+
+<!-- eval-waiver: Nine-phase, five-gate retrofit orchestrator: preflight, office-hours, two-pass legacy cross-reference (own-body get_milestone and save_milestone writes into legacy milestone descriptions), codebase-scan inventory, and per-domain flow-linear-scaffold; outputs are AI-authored docs plus Linear scaffold plus appended migration annotations gated by operator review, with no separable deterministic artifact to assert. -->
 
 # /flow:retrofit-project
 

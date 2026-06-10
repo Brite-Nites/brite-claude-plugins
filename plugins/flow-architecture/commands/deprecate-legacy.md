@@ -1,6 +1,9 @@
 ---
+disable-model-invocation: true
 description: Phase 5 legacy-milestone deprecation orchestrator — two-pass execution (review doc generation → pre-comms gate → serial per-milestone re-home / close / annotate / archive hand-off) with AskUserQuestion batch confirmation gates. Codifies the manual BC-6580 BriteBase precedent into a repeatable command.
 ---
+
+<!-- eval-waiver: Two-pass Phase-5 legacy-milestone deprecation orchestrator with a cooling gate and per-milestone batch confirmations; its disposition rules (re-home, close-as-obsolete, scoping-needed) are thin and inseparably interleaved with serial own-body Linear mutations and operator gates, so the per-milestone execution is a side-effecting orchestration, not a fixturable pure artifact. -->
 
 # /flow:deprecate-legacy
 

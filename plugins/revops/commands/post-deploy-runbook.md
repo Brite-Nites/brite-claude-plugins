@@ -1,7 +1,10 @@
 ---
+disable-model-invocation: true
 description: Post-deploy manual runbook for brite-salesforce — diff-driven walk through Screen Flow activation, Flow Draft cleanup, Scheduled Apex re-schedule, Named Credential URL updates, and Kanban Group By cache flush. Use after `/revops:deploy-sandbox` or `/revops:deploy-prod` lands, to walk the manual steps `sf project deploy start` can't automate.
 allowed-tools: Bash, AskUserQuestion
 ---
+
+<!-- eval-waiver: Seven-phase diff-driven manual runbook: it classifies a git diff against four detection regexes, walks AskUserQuestion-gated manual UI steps, and in Phase 3 queries and deletes live Flow Draft records via the Tooling API; the deterministic core is fused into the live-org runbook and human gates with no separable decide()-to-artifact boundary. A deterministic git-diff to four-flag classifier seam exists but is deferred (BC-13163). -->
 
 # /revops:post-deploy-runbook
 

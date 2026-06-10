@@ -3,6 +3,8 @@ description: Guided setup for the tam-map pipeline (Spider.cloud + AI Ark + Disc
 allowed-tools: Bash, Read, AskUserQuestion
 ---
 
+<!-- eval-waiver: Three-phase setup and health wizard for the tam-map pipeline (Bitwarden unlock, npm and pip bootstrap, MCP registration, then a per-provider GREEN/DEGRADED/RED verify board); its logic is live-state diagnosis (bw status, dual-path probes, authenticated curls to seven vendor APIs whose pass or fail depends on real keys, vendor uptime, and credit balances), with no hermetic artifact. -->
+
 # /marketing:setup-tam-map
 
 Execute the phases below sequentially. Use `AskUserQuestion` at each numbered checkpoint so the user explicitly acknowledges each step before moving on. If they answer anything other than the "proceed" option, halt and help with their blocker before re-asking.

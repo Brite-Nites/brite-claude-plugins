@@ -1,8 +1,11 @@
 ---
+disable-model-invocation: true
 description: Turn an enriched lead CSV + email-copywriting JSON artifact into an activated Email Bison campaign via an 11-phase flow with user confirmation gates at every mutating step. Consumes the BC-5825 copy artifact and the BC-2718 campaign-orchestration defaults. Default path creates campaigns in draft state; pass --activate to transition them to queued (starts real sending).
 argument-hint: --csv <path> --workspace <emailbison-b2b|emailbison-personal> --copy-artifact <path> --campaign-name <base> [--entity <brite-nites|brite-labs>] [--no-host-lookup] [--no-sequence] [--preview] [--activate] [--reference <campaign-id>] [--test-send <email>] [--test-send-sender <id>]
 allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep, Bash, AskUserQuestion, Skill
 ---
+
+<!-- eval-waiver: An eleven-phase Email Bison campaign launcher whose substance is LLM-driven: per-lead spintax and Liquid rendering checks, operator-gate narration, nine-cell segmentation prose, and live MX, SOQL, and EB round-trips; the deterministic fragments (input validators, the static role and free-mail classifier, ESP bucketing) are scattered helper checks woven into Bash and gate prose, not a single separable decide(inputs, injected_reads)-to-artifact core, and every consequential output depends on live EB workspace state and operator turns. -->
 
 # /marketing:launch-campaign
 
