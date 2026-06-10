@@ -213,8 +213,14 @@ gate --name-status "$(printf 'M\tplugins/marketing/commands/plan-campaign.md')"
 assert_rc_and_contains "C1 real plan-campaign (ADAPTERS eval runs + passes) → OK" 0 "behavioral eval registered and passing"
 gate --check
 assert_rc_and_contains "C2 real --check on the bootstrapped debt list → OK" 0 "debt ∩ ADAPTERS == ∅"
-gate --name-status "$(printf 'M\tplugins/workflows/commands/ship.md')"
-assert_rc_and_contains "C3 real grandfathered ship.md still BLOCKS on R1 (Split A′)" 1 "R1-side-effecting-needs-flag"
+# C3 fixture = capture-idea.md: after BC-12947 (Batch F) flagged/waived the rest,
+# it is the ONLY remaining grandfathered command, and it is R1-firing (save_issue)
+# and unflagged — the exact Split-A′ point (grandfathering exempts the EVAL, not R1).
+# ship.md no longer works here: Batch F added disable-model-invocation to it. When
+# BC-13161 evals capture-idea (it is eval-able, pulled from the waiver set), swap this
+# to whatever grandfathered+R1-firing command remains, or drop to the synthetic B2.
+gate --name-status "$(printf 'M\tplugins/marketing/commands/capture-idea.md')"
+assert_rc_and_contains "C3 real grandfathered capture-idea.md still BLOCKS on R1 (Split A′)" 1 "R1-side-effecting-needs-flag"
 
 # ════════════════════════════════════════════════════════════════════════════
 echo "── D. --check integrity failure modes (synthetic) ──"

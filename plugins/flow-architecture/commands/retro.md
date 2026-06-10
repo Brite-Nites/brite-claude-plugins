@@ -1,6 +1,9 @@
 ---
+disable-model-invocation: true
 description: Per-domain Flow-Driven Architecture retrospective utility — scope-bounded reflection on a completed domain milestone (Q44 lock; gstack-inspired, NOT time-windowed)
 ---
+
+<!-- eval-waiver: Per-domain retrospective: gathers a completed milestone's docs and Linear bodies, authors an 8-section reflective retro doc, and mirrors an executive summary to a Linear milestone comment; the substance is LLM-authored reflective prose, and the only deterministic bits (domain resolution, prior-retro glob and sort) are not a separable decide()-to-artifact core worth a hermetic eval. -->
 
 # /flow:retro
 

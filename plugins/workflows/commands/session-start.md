@@ -26,6 +26,8 @@ gbrain:
       render_as: "## Recent releases for this repo"
 ---
 
+<!-- eval-waiver: Inner-loop entry orchestrator: pulls latest, presents Linear issues, then hands off to the brainstorming, writing-plans, git-worktrees, and executing-plans skills in sequence; its own output is advisory orientation plus skill dispatches and the substantive artifacts are produced by the dispatched skills, so the command emits no fixed-right-answer artifact. -->
+
 # Session Start
 
 You are beginning a focused work session. Your job is to orient the developer, pick the next issue, and guide them through the inner loop: brainstorm → plan → worktree → execute.

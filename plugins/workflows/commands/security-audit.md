@@ -2,6 +2,8 @@
 description: Comprehensive security audit and vulnerability assessment for any project
 ---
 
+<!-- eval-waiver: The report is built from live host and project probes (npm/pip/go/bundle audit, secret-scan Grep, git ls-files, npm outdated) plus a security-reviewer agent's free-text findings; both halves are environment- and agent-dependent, so the audit report and A-F health grade have no repeatable artifact for a hermetic fixture. -->
+
 # Security Audit
 
 Perform a comprehensive security audit of the current project. This goes beyond diff-based code review — it assesses the project's overall security posture using automated tooling and agent-powered analysis.

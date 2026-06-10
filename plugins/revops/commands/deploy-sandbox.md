@@ -1,8 +1,11 @@
 ---
+disable-model-invocation: true
 description: Sandbox deploy orchestration for brite-salesforce — pre-flight, dry-run, deploy, Apex tests, manual browser verification. Use when you've completed SF metadata changes and want to validate in `brite-sandbox` before opening a PR. Fills the gap between `/workflows:review` and `/workflows:ship` that SF-specific ship discipline requires.
 argument-hint: [--reconcile]
 allowed-tools: Bash, AskUserQuestion
 ---
+
+<!-- eval-waiver: Six-phase sandbox deploy orchestrator that shells sf project deploy start and sf apex run test against the live brite-sandbox org and gates each mutating phase on AskUserQuestion; like deploy-prod the branch-diff resolver is deterministic but not a separable decide()-to-artifact core, and the value is the live deploy plus Apex-test plus manual-verification gating, which is host-state-dependent and not hermetically fixturable. -->
 
 # /revops:deploy-sandbox
 

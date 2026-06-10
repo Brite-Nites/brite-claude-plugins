@@ -3,6 +3,8 @@ description: Re-runnable, zero-mutation Salesforce environment health check for 
 allowed-tools: Bash
 ---
 
+<!-- eval-waiver: Zero-mutation SF environment health check: a single read-only probe block (sf --version, auth status, plugin list, mcp list, org list, config get, a trivial SOQL) whose entire output depends on live host, org, and auth state; there is no decide(inputs, injected_reads)-to-artifact, since every PASS/FAIL/WARN/SKIP line is computed inline against the real machine. -->
+
 # /revops:doctor
 
 A re-runnable, **zero-mutation** diagnostic that answers "is my Salesforce environment still good?" — the SF-specific analogue of `/workflows:smoke-test` (which only checks git/gh/node/npx + Linear generically and knows nothing about the `sf` CLI, sandbox auth, default target-org, or permsets). Run it when a `/revops:deploy-sandbox` mysteriously fails, after a laptop change, or to confirm a teammate is ready before a pairing session.

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 description: FDA-shaped Ship & Compound — pre-ship audit + FDA-shaped PR + Q46 ship-summary writeback + retro soft-notification. Cloned from workflows ship.md with FDA-swap at Steps 1, 2, 3, 8 (Q53 lock).
 gbrain:
   schema: 1
@@ -23,7 +24,9 @@ gbrain:
       render_as: "## Changelog patterns"
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 0187a4c764757ca1cc0ce2cdebd6a5cd77363be4. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. -->
+<!-- eval-waiver: Cloned Ship and Compound: pre-ship audit, push plus FDA-shaped PR, Q46 ship-summary writeback, Greptile gate, compound-learnings, best-practices audit, handbook-drift, and a retro notification; outputs are an LLM-authored PR body plus ship-summary comment plus session report, with no fixed-right-answer artifact separable from narration. -->
+
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 1fc40c430f83a81e0d8bf71410bf49a006b42b18. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). -->
 
 # Ship & Compound
 

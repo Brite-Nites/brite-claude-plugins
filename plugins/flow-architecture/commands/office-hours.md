@@ -2,6 +2,8 @@
 description: Flow-Driven Architecture project-intent interview — captures the 6 Q41 sections via sequential one-question-per-turn AskUserQuestion + fires 4-parallel L1 multi-perspective review, writes docs/product/intent.md once atomically per Q42 lock
 ---
 
+<!-- eval-waiver: Project-intent interview: sequential one-question-per-turn AskUserQuestion over six sections plus a four-parallel L1 reviewer dispatch, then a single atomic local write of docs/product/intent.md; the output is an LLM-authored intent doc plus reviewer headlines, with no deterministic fixed-answer artifact to fixture. -->
+
 # /flow:office-hours
 
 Utility command. Single-purpose runner for the Q42 project-intent interview (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:885`). Output target: `docs/product/intent.md` (Q41 template). Internal L1 multi-perspective review fires 4 reviewer agents in parallel after the interview's final-review approves; headlines populate `## L1 review summary`; concerns persist to `docs/plans/l1-concerns-<ISO-8601>.md` per Q42 sub-decision 4. Wall ≈ 8–20 min (interview-dominated) + ~30–60s for the 4 parallel L1 agents.

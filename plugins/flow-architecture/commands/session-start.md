@@ -26,7 +26,9 @@ gbrain:
       render_as: "## Recent releases for this repo"
 ---
 
-<!-- Cloned from workflows v3.32.0 (commands/session-start.md) on 2026-05-28. Upstream-SHA: 1e9be24abb85bda0514795ece360fb26252b316f. Drift-detection per parking lot #45. Re-synced for BC-11891 (context7 removal — both files dropped their Context7 prereq probes in tandem). Re-synced for BC-11754 (team-gbrain context-load phase — propagated verbatim from upstream). -->
+<!-- eval-waiver: Cloned session orchestrator: pull latest, preflight, query Linear for FDA discipline-child issues, then brainstorm, plan, worktree, and execute via dispatched skills plus an L4 plan-X dispatch; it is a sequencing and dispatch shell whose substantive artifacts (the plan-section writeback included) are produced by the dispatched skills, so it emits no fixed-right-answer artifact of its own. -->
+
+<!-- Cloned from workflows v3.32.0 (commands/session-start.md) on 2026-05-28. Upstream-SHA: 97cdc134d86405a0510b0128abb6f71256e1d3eb. Drift-detection per parking lot #45. Re-synced for BC-11891 (context7 removal — both files dropped their Context7 prereq probes in tandem). Re-synced for BC-11754 (team-gbrain context-load phase — propagated verbatim from upstream). Re-synced for BC-12947 (eval-waiver marker added to upstream). -->
 
 # Session Start
 

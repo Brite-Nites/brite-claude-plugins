@@ -2,6 +2,8 @@
 description: Incremental-add Flow-Driven Architecture orchestrator (sub-flow) — 5 phases / 2 gates / skips flow-journey-author per Q47 sub-decision 5.5 lock
 ---
 
+<!-- eval-waiver: Lightest FDA orchestrator: adds one sub-flow under an existing domain by dispatching flow-inventory-add plus flow-linear-scaffold and emitting a journey-staleness warning; output is AI-authored Linear scaffold plus a story doc, with no deterministic fixed-answer artifact separable from LLM narration. -->
+
 # /flow:add-sub-flow
 
 Lightest FDA orchestrator. Adds a single new sub-flow under an existing domain. Runs **5 phases / 2 user-confirmation gates** per Q47 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:743`): Phase 3 mirrors the sibling greenfield Phase-4 per-domain inner loop with N=1; Phases 4-5 are globally batched with N=1 (degenerate but consistent with the Q37 sibling shape). Wall ≈ 3-5 min on a typical sub-flow add. See § Architecture overview for the journey-author skip and journey-staleness warning that differentiate this command from `/flow:add-domain`.

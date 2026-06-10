@@ -2,6 +2,8 @@
 description: Guide for setting up a new Brite dev environment
 ---
 
+<!-- eval-waiver: Walks a developer's live machine through environment setup (tool-version probes, gh auth, clone, installs, migrations, dev-server start) and reports a per-step pass/fail checklist; every result depends on host state and interactive installs, with no repeatable artifact and no separable deterministic decision. -->
+
 # Brite Developer Onboarding
 
 Walk the user through setting up their development environment for Brite projects. Verify each step succeeds before moving to the next. If a step fails, help troubleshoot before continuing.

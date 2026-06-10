@@ -2,6 +2,8 @@
 description: DEPRECATED — use /workflows:raise-a-ticket instead. Forwards to the cross-product, Linear-routed intake command that files bugs and ideas/feedback as needs-triage for /triage.
 ---
 
+<!-- eval-waiver: Deprecated shim whose entire body is static prose redirecting to /workflows:raise-a-ticket; it parses nothing, decides nothing, and emits no artifact of its own, so there is nothing deterministic to fixture. -->
+
 # Bug Report — DEPRECATED
 
 > **This command is deprecated.** It has been superseded by

@@ -2,6 +2,8 @@
 description: Audit and refactor a project's CLAUDE.md against best practices
 ---
 
+<!-- eval-waiver: The artifact is a refactored or generated CLAUDE.md authored by the claude-md-generator agent from project structure and a best-practices reference, applied to local disk on approval; the generated prose has no single correct form to assert against. -->
+
 # Setup CLAUDE.md
 
 You are auditing and improving the project's CLAUDE.md file against Claude Code best practices. This command can be used at project setup or anytime to ensure the CLAUDE.md stays optimal.

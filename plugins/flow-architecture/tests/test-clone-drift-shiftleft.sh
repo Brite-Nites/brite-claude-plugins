@@ -32,13 +32,16 @@ WRAPPER="plugins/flow-architecture/scripts/check-clone-drift-shiftleft.sh"
 CORE="plugins/flow-architecture/scripts/check-clone-drift.sh"
 SS_CLONE="plugins/flow-architecture/commands/session-start.md"
 SS_UPSTREAM="plugins/workflows/commands/session-start.md"
-SS_TARGET='Upstream-SHA: 1e9be24abb85bda0514795ece360fb26252b316f'
+# Baselines re-synced in BC-12947 (Batch F added an eval-waiver marker — and, for
+# ship, disable-model-invocation — to the workflows upstreams, so each clone's
+# recorded Upstream-SHA was bumped to the new upstream blob in the same PR).
+SS_TARGET='Upstream-SHA: 97cdc134d86405a0510b0128abb6f71256e1d3eb'
 REV_CLONE="plugins/flow-architecture/commands/review.md"
 REV_UPSTREAM="plugins/workflows/commands/review.md"
-REV_TARGET='Upstream-SHA: 60b8c67f400a2d059e358f01b721d4687897bd0f'
+REV_TARGET='Upstream-SHA: 18a9894a5e4c4ac0756ea0b9f3296dbbd04fc4ad'
 SHIP_CLONE="plugins/flow-architecture/commands/ship.md"
 SHIP_UPSTREAM="plugins/workflows/commands/ship.md"
-SHIP_TARGET='Upstream-SHA: 0187a4c764757ca1cc0ce2cdebd6a5cd77363be4'
+SHIP_TARGET='Upstream-SHA: 1fc40c430f83a81e0d8bf71410bf49a006b42b18'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 # Unique per-invocation output file (portable mktemp template — trailing X's,
 # no suffix, works on both BSD/macOS and GNU/Linux). Avoids a fixed /tmp path

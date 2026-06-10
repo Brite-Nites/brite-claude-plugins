@@ -24,7 +24,9 @@ gbrain:
       render_as: "## Recurring issue patterns"
 ---
 
-<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: 60b8c67f400a2d059e358f01b721d4687897bd0f. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). -->
+<!-- eval-waiver: Cloned review loop: self-verify, diff-triage, simplify agents, dynamic reviewer selection, validation subagents, a P1 fix loop, and a final report; the artifact is an LLM-merged and severity-classified findings report from dispatched agents, and the agent-selection logic is config-driven branching, not a fixed-right-answer decide() separable from the agent narration. Read-only on Linear in v1 (review-summary writeback is a v1.1 parking-lot). -->
+
+<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: 18a9894a5e4c4ac0756ea0b9f3296dbbd04fc4ad. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12947 (eval-waiver marker added to upstream). -->
 
 # Review Loop (Phase 5)
 

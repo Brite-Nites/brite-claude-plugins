@@ -2,6 +2,8 @@
 description: Run the weekly planning loop — audit, scope, housekeep, narrate
 ---
 
+<!-- eval-waiver: A five-phase weekly-planning orchestrator shell: it reads Linear (list_projects, list_cycles, list_issues), manages a resume breadcrumb, and dispatches sub-skills (sprint-scoping, linear-housekeeping, narrative-writer) that own the actual scoping, mutation, and narration; the orchestrator body has no own deterministic decide()-to-artifact core, and its testable substance lives in the dispatched sub-skills, not the gate and breadcrumb shell. -->
+
 # /cadence:weekly
 
 Five-phase weekly planning loop. Replaces the manual W15/W16 checkpoint + narrative flow.

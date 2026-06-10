@@ -1,6 +1,9 @@
 ---
+disable-model-invocation: true
 description: Collaborative scoping session — discover what to build next, create Linear issues, prioritize
 ---
+
+<!-- eval-waiver: The output is a set of net-new Linear issues whose titles, descriptions, acceptance criteria, priorities, and dependency links are discovered live through an open-ended Socratic dialogue and gated on per-issue approval; unlike raise-a-ticket it has no parsed-input schema and no deterministic decision function, so there is nothing hermetic to fixture. -->
 
 # Scoping Session
 

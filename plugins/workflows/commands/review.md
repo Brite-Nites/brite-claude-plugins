@@ -24,6 +24,8 @@ gbrain:
       render_as: "## Recurring issue patterns"
 ---
 
+<!-- eval-waiver: The artifact is a merged P1/P2/P3 report authored by parallel LLM review agents and re-judged by per-finding verifier subagents; the orchestrator's deterministic logic (confidence filter, dedup order, severity sort) operates over non-deterministic agent findings, so there is no fixturable input-to-artifact pair without first freezing the agents' output. -->
+
 # Review Loop (Phase 5)
 
 You are reviewing work before it ships. Your job is to verify correctness, triage the diff, simplify code, run specialized review agents, validate findings, fix critical issues, and produce a clean report for the developer.
