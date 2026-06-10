@@ -106,7 +106,12 @@ def _inputs(section: str) -> list[str]:
         if collecting:
             s = ln.strip()
             if not s:
-                break
+                # A blank line does NOT end the list — markdown tolerates a blank
+                # line between `**Inputs:**` and the first bullet (and "loose" lists
+                # with blanks between bullets). Breaking here silently dropped every
+                # input for that layout; skip blanks and let a structural boundary
+                # (`###` / `**Field`) or non-bullet content end collection instead.
+                continue
             if s.startswith("###") or re.match(r"^\*\*\w", s):
                 break
             if s.startswith("-"):
@@ -245,7 +250,17 @@ def classify_context_file(base_dir, relpath: str, as_of: str) -> dict:
     drift. Returns {path, exists, band, ratio, in_denominator, fresh}. NEVER raises:
     a missing file → band MISSING (not in the denominator); an unreadable file is
     treated as no-metadata."""
-    p = Path(base_dir) / relpath
+    base = Path(base_dir).resolve()
+    p = (base / relpath).resolve()
+    # Confine the resolved path to the corpus root: an ABSOLUTE (`@/etc/shadow`) or
+    # TRAVERSAL (`@../../secret`) import — the @import/Input is project-derived content
+    # the runtime command reads off disk — must NOT be opened (it would leak an
+    # out-of-corpus file's existence + frontmatter). An escaping path is treated as
+    # MISSING (surfaces as a warning), never a read. The issue-id guard covers the id;
+    # this covers the context-file paths.
+    if not p.is_relative_to(base):
+        return {"path": relpath, "exists": False, "band": BAND_MISSING,
+                "ratio": None, "in_denominator": False, "fresh": False}
     if not p.is_file():
         return {"path": relpath, "exists": False, "band": BAND_MISSING,
                 "ratio": None, "in_denominator": False, "fresh": False}

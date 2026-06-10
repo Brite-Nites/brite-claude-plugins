@@ -2472,7 +2472,9 @@ class PromotePrecedentAdapter:
     golden_path = _eval_dir / "promote-precedent.golden.json"
     schema_path = _eval_dir / "promote-precedent.schema.json"
 
-    ISSUE_ID_RE = re.compile(r"^[A-Z]+-[0-9]+$")
+    # Mirrors build_promotion_candidates.ISSUE_ID_RE (keep in sync): `\Z` not `$`, so a
+    # newline-terminated id the builder rejects isn't counted "valid" by this checker.
+    ISSUE_ID_RE = re.compile(r"^[A-Z]+-[0-9]+\Z")
     PROJECT_TOKEN = "<project>"
     EXPECTED_SCENARIO_IDS = ("mixed_pipeline", "sort_order", "empty", "injection_guard")
     _VERDICTS = ("promotable", "rejected_invalid_id", "rejected_low_confidence",
@@ -2556,12 +2558,11 @@ class PromotePrecedentAdapter:
                 # Source A is trusted — never confidence/trace-gated.
                 if c["verdict"] in ("rejected_low_confidence", "rejected_trace_missing") and c["source"] != "index":
                     diffs.append(f"{ctag}: verdict {c['verdict']!r} must be a Source-B (index) candidate, got source {c['source']!r}")
-            # Sort order: conf DESC, date DESC, id ASC (null confidence sorts as -1).
-            def sort_key(c):
-                return (-(c["confidence"] if isinstance(c["confidence"], int) else -1),
-                        c["date"] or "", c["issue_id"])
+            # Sort order: conf DESC, date DESC, id ASC. Recomputed with the SAME total
+            # keys the builder uses (non-int confidence → -1, non-string date → "") so a
+            # degenerate injected date can't make the recomputed expected order diverge.
             expected = sorted(cands, key=lambda c: c["issue_id"])
-            expected = sorted(expected, key=lambda c: c["date"] or "", reverse=True)
+            expected = sorted(expected, key=lambda c: c["date"] if isinstance(c["date"], str) else "", reverse=True)
             expected = sorted(expected, key=lambda c: c["confidence"] if isinstance(c["confidence"], int) else -1, reverse=True)
             if [c["issue_id"] for c in cands] != [c["issue_id"] for c in expected]:
                 diffs.append(f"{tag}: candidates not ordered by (confidence desc, date desc, id asc): "

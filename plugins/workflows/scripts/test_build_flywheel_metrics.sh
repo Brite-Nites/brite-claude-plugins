@@ -121,6 +121,25 @@ bands = {d["path"].split("/")[-1]: d["band"] for d in row["freshness_detail"]}
 eq("doc-stale parsed Stale", bands["doc-stale.md"], "Stale")
 eq("doc-missing classified MISSING", bands["doc-missing.md"], "MISSING")
 
+# ── precedent_trace review-fix regressions (BC-12945 Greptile P2s) ────────────
+# (1) a blank line before the first Inputs bullet must NOT drop the inputs.
+blank_first = pt.parse_traces(
+    "# BC-X\n\n**Date:** 2026-04-01\n\n---\n\n## Trace — blank before bullets\n\n"
+    "**Category:** architecture\n**Confidence:** 8/10\n**Precedent Referenced:** CDR-1\n"
+    "**Inputs:**\n\n- `docs/refs/a.md`\n- `docs/refs/b.md`\n\n### Decision\nx\n")
+eq("blank-line-before-bullet keeps inputs", blank_first[0]["inputs"], ["docs/refs/a.md", "docs/refs/b.md"])
+
+# (2) classify_context_file confines to base_dir: an absolute / traversal @import is
+# NOT read (it must report MISSING without opening an out-of-corpus file).
+cbox = tempfile.mkdtemp()
+open(os.path.join(cbox, "in.md"), "w").write("---\nlast_refreshed: 2026-04-16\nrefresh_cadence: monthly\n---\n")
+eq("in-bounds file is read + classified", pt.classify_context_file(cbox, "in.md", "2026-05-01")["exists"], True)
+abs_res = pt.classify_context_file(cbox, "/etc/passwd", "2026-05-01")
+eq("absolute import refused (band MISSING)", abs_res["band"], "MISSING")
+eq("absolute import not read (exists False)", abs_res["exists"], False)
+eq("traversal import refused", pt.classify_context_file(cbox, "../../../../../etc/passwd", "2026-05-01")["band"], "MISSING")
+import shutil as _sh; _sh.rmtree(cbox, ignore_errors=True)
+
 # ── infra exit codes (exit-2-or-clean contract) ───────────────────────────────
 box = tempfile.mkdtemp()
 badfix = os.path.join(box, "bad.json"); open(badfix, "w").write("{not json")
