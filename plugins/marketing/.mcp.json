@@ -62,16 +62,18 @@
         "DATAGMA_API_KEY=enrichment-datagma-api-key",
         "BOUNCEBAN_API_KEY=enrichment-bounceban-api-key",
         "EMAILGUARD_API_KEY=enrichment-emailguard-api-key",
+        "ENRICHMENT_API_TOKEN=enrichment-api-token",
         "--",
         "uvx",
         "--from",
-        "git+https://github.com/Brite-Nites/brite-data-platform@685444636f65fc567dfc9a348c8e8035646fa794#subdirectory=tools/enrichment-mcp",
+        "git+https://github.com/Brite-Nites/brite-data-platform@0ac5389cc198a29a7f68c710f0814cf645c31666#subdirectory=tools/enrichment-mcp",
         "brite-enrichment-mcp"
       ],
       "env": {
         "USE_MOCK_PROVIDERS": "False",
         "MARTS_DATABASE": "ANALYTICS",
-        "MARTS_SCHEMA": "MARTS"
+        "MARTS_SCHEMA": "MARTS",
+        "ENRICHMENT_API_URL": "https://brite-data-platform-production.up.railway.app"
       }
     }
   }
