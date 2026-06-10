@@ -1,0 +1,1031 @@
+{
+  "schema_version": 1,
+  "command": "/flow:audit",
+  "scenarios": [
+    {
+      "id": "clean",
+      "gates": [
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "index-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "project",
+          "message": "index=2026-05-10T17:00:00Z breadcrumb=2026-05-10T12:00:00Z"
+        },
+        {
+          "id": "index-story-doc-status-match",
+          "type": "cross-cutting",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "intent-exists",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "inventory-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "inventory-story-doc-id-match",
+          "type": "cross-cutting",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "journey-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "domain:SHIP",
+          "message": ""
+        },
+        {
+          "id": "journey-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "domain:TEAM",
+          "message": ""
+        },
+        {
+          "id": "preflight-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": "count=3"
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "story-docs-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "domain:SHIP",
+          "message": "inventory=3 docs=3"
+        },
+        {
+          "id": "story-docs-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "domain:TEAM",
+          "message": "inventory=3 docs=3"
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-03",
+          "message": ""
+        }
+      ],
+      "summary": {
+        "hard_pass": 76,
+        "hard_fail": 0,
+        "soft_warn": 0,
+        "overrides": 0,
+        "exit_code": 0
+      },
+      "error": null
+    },
+    {
+      "id": "broken",
+      "gates": [
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "design-children-design-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "docs-children-docs-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "hard-fail",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "eng-children-engineering-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "index-complete",
+          "type": "phase-transition",
+          "status": "hard-fail",
+          "scope": "project",
+          "message": "index=2026-05-01T00:00:00Z breadcrumb=2026-05-10T12:00:00Z"
+        },
+        {
+          "id": "index-story-doc-status-match",
+          "type": "cross-cutting",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "intent-exists",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "inventory-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "inventory-story-doc-id-match",
+          "type": "cross-cutting",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "journey-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "domain:SHIP",
+          "message": ""
+        },
+        {
+          "id": "journey-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "domain:TEAM",
+          "message": ""
+        },
+        {
+          "id": "preflight-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "project",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "qa-children-qa-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "qa-history-row-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "qa-last-signed-off-iso8601",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "qa-status-signed-off",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": "count=3"
+        },
+        {
+          "id": "story-ac-gherkin-count",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": "count=3"
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "story-doc-exists",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "story-docs-complete",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "domain:SHIP",
+          "message": "inventory=3 docs=3"
+        },
+        {
+          "id": "story-docs-complete",
+          "type": "phase-transition",
+          "status": "hard-fail",
+          "scope": "domain:TEAM",
+          "message": "inventory=3 docs=2"
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "story-front-matter-populated",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-01",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-02",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:SHIP-03",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-01",
+          "message": ""
+        },
+        {
+          "id": "story-job-story-regex",
+          "type": "per-flow",
+          "status": "pass",
+          "scope": "flow:TEAM-02",
+          "message": ""
+        }
+      ],
+      "summary": {
+        "hard_pass": 62,
+        "hard_fail": 3,
+        "soft_warn": 0,
+        "overrides": 0,
+        "exit_code": 1
+      },
+      "error": null
+    },
+    {
+      "id": "invalid_gate",
+      "gates": [],
+      "summary": {
+        "hard_pass": 0,
+        "hard_fail": 0,
+        "soft_warn": 0,
+        "overrides": 0,
+        "exit_code": 64
+      },
+      "error": "invalid --gate 'bogus-gate-id': not a recognized gate id (os.EX_USAGE)"
+    }
+  ]
+}

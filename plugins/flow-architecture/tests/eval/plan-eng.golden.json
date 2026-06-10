@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "command": "/flow:plan-eng",
+  "scenarios": [
+    {
+      "id": "eng_scope_expansion",
+      "discipline": "eng",
+      "mode": "SCOPE_EXPANSION",
+      "marker_type": "plan-eng-section",
+      "section_markdown": "**Mode:** SCOPE_EXPANSION\n\nThe eng plan is under-ambitious for this sub-flow; the readiness panel should also surface the upstream gate graph, not just a single verdict.\n\n**Refinements:**\n- Render the dependency graph of blocking gates, not only the aggregate verdict.\n- Cache the per-gate results so a re-run is incremental.\n- Extract the verdict-rollup into a pure function for unit-testing.",
+      "error": null
+    },
+    {
+      "id": "eng_degenerate",
+      "discipline": "eng",
+      "mode": "NOT_A_REAL_MODE",
+      "marker_type": "plan-eng-section",
+      "section_markdown": null,
+      "error": "unknown or missing mode 'NOT_A_REAL_MODE'"
+    }
+  ]
+}

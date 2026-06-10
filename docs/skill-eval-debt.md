@@ -60,14 +60,8 @@ from becoming "forever-only."
 | `plugins/cadence/commands/weekly.md` | cadence | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/flow-architecture/commands/add-domain.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/flow-architecture/commands/add-sub-flow.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/flow-architecture/commands/audit.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/flow-architecture/commands/deprecate-legacy.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/flow-architecture/commands/office-hours.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/flow-architecture/commands/plan-design.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/flow-architecture/commands/plan-docs.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/flow-architecture/commands/plan-eng.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/flow-architecture/commands/plan-qa.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/flow-architecture/commands/plan-story.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/flow-architecture/commands/retro.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/flow-architecture/commands/retrofit-project.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/flow-architecture/commands/review.md` | flow-architecture | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |

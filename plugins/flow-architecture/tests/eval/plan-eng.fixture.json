@@ -1,0 +1,25 @@
+{
+  "scenarios": [
+    {
+      "id": "eng_scope_expansion",
+      "review_output": {
+        "mode": "SCOPE_EXPANSION",
+        "headline": "The eng plan is under-ambitious for this sub-flow; the readiness panel should also surface the upstream gate graph, not just a single verdict.",
+        "expansions": [
+          "Render the dependency graph of blocking gates, not only the aggregate verdict.",
+          "Cache the per-gate results so a re-run is incremental."
+        ],
+        "adjustments": [
+          "Extract the verdict-rollup into a pure function for unit-testing."
+        ]
+      }
+    },
+    {
+      "id": "eng_degenerate",
+      "review_output": {
+        "mode": "NOT_A_REAL_MODE",
+        "headline": "This row exercises crash-defense on a malformed injected review_output."
+      }
+    }
+  ]
+}

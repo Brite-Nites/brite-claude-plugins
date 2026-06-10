@@ -1,0 +1,16 @@
+{
+  "scenarios": [
+    {
+      "id": "qa_scope_reduction",
+      "review_output": {
+        "mode": "SCOPE_REDUCTION",
+        "headline": "The QA scope is over-ambitious for v1; strip the cross-browser matrix and the load test to keep the sign-off tractable.",
+        "reductions": [
+          "Drop the full cross-browser matrix; cover the two supported browsers only.",
+          "Defer the sustained-load test to a follow-up once the panel ships."
+        ],
+        "adjustments": []
+      }
+    }
+  ]
+}

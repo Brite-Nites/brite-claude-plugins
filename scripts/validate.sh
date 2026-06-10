@@ -2313,6 +2313,44 @@ for d_stem in build_flywheel_metrics build_audit_trail build_promotion_candidate
 done
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-12946 — flow-architecture audit + plan-section eval builders (BC-12946)
+# ──────────────────────────────────────────────────────────────────────
+# ADR-028 Phase-2 Batch E — flow-architecture's FIRST eval builders. build_audit_report.py
+# is an eval-only re-impl of the DOCUMENTED Phase-B gate semantics (driven over the on-disk
+# audit-{clean,broken}-shape fixtures, golden-locking {gates[], summary.exit_code}); the
+# ONE shared build_plan_section.py renders the Q43 Plan-section markdown + routes the Q46
+# marker for all 5 plan-* commands. Both are pure builders with sibling unit suites that
+# drive the gate predicates / the per-mode fold + the crash-defense matrix at finer
+# granularity than the behavioral eval. FAIL-if-missing (the commands' behavioral evals
+# depend on them, so a future delete must fail loudly — the §15a-bc-12589 lesson). RESULT
+# line drives the count. The behavioral evals themselves run in test_eval_harness.sh
+# (§15a-bc-12589), incl. the run-audit-smoke.sh ORACLE cross-assert.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12946. flow-architecture audit + plan-section eval builders (BC-12946)"
+
+for e_stem in build_audit_report build_plan_section; do
+  e_helper="$REPO_ROOT/plugins/flow-architecture/scripts/$e_stem.py"
+  e_harness="$REPO_ROOT/plugins/flow-architecture/scripts/test_$e_stem.sh"
+  if [ ! -f "$e_helper" ]; then
+    fail "plugins/flow-architecture/scripts/$e_stem.py not found — a BC-12946 eval builder is missing"
+  elif [ ! -f "$e_harness" ]; then
+    fail "plugins/flow-architecture/scripts/test_$e_stem.sh not found — a BC-12946 builder unit suite is missing"
+  else
+    if e_harness_out=$(bash "$e_harness" "$e_helper" 2>&1); then
+      e_pass_count=$(printf '%s\n' "$e_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+      if [ -n "$e_pass_count" ]; then
+        pass "$e_stem unit suite (${e_pass_count} assertions)"
+      else
+        pass "$e_stem unit suite — passed (count unparsed)"
+      fi
+    else
+      fail "$e_stem unit suite failed:"
+      printf '%s\n' "$e_harness_out" | tail -30 | sed 's/^/          /' >&2
+    fi
+  fi
+done
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12638 — --target-org guard-precedes-sink consolidating lint (BC-12638)
 # ──────────────────────────────────────────────────────────────────────
 # Repo-wide CONSOLIDATING lint: every command interpolating a non-literal

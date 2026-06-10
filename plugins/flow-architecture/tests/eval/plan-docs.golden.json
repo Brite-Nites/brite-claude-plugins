@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "command": "/flow:plan-docs",
+  "scenarios": [
+    {
+      "id": "docs_hold_scope_rationale",
+      "discipline": "docs",
+      "mode": "HOLD_SCOPE",
+      "marker_type": "plan-docs-section",
+      "section_markdown": "**Mode:** HOLD_SCOPE\n\nThe docs scope is right; the single how-to page covers the operator's job. The flow has one operator-facing surface, so one page is sufficient.\n\n**Refinements:**\n- Add a screenshot of the failing-gate state so the fix-link is discoverable.",
+      "error": null
+    }
+  ]
+}

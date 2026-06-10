@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "command": "/flow:plan-design",
+  "scenarios": [
+    {
+      "id": "design_hold_scope",
+      "discipline": "design",
+      "mode": "HOLD_SCOPE",
+      "marker_type": "plan-design-section",
+      "section_markdown": "**Mode:** HOLD_SCOPE\n\nThe design scope is right; focus execution rigor on the failure and loading states the happy-path mock skips.\n\n**Refinements:**\n- Specify the failing-gate state with a concrete fix-link affordance.\n- Specify the loading skeleton so the panel does not flash empty.\n- Align the verdict chip colors with the design-system tokens.",
+      "error": null
+    }
+  ]
+}

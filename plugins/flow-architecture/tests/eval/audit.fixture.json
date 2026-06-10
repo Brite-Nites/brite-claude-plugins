@@ -1,0 +1,7 @@
+{
+  "scenarios": [
+    { "id": "clean", "repo": "audit-clean-shape" },
+    { "id": "broken", "repo": "audit-broken-shape" },
+    { "id": "invalid_gate", "repo": "audit-clean-shape", "gate": "bogus-gate-id" }
+  ]
+}

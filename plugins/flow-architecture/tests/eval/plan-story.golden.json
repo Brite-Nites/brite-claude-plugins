@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "command": "/flow:plan-story",
+  "scenarios": [
+    {
+      "id": "story_selective_expansion",
+      "discipline": "story",
+      "mode": "SELECTIVE_EXPANSION",
+      "marker_type": "plan-story-section",
+      "section_markdown": "**Mode:** SELECTIVE_EXPANSION\n\nHold the core story scope, but cherry-pick the empty-state job story which the current draft omits.\n\n**Refinements:**\n- Add the 'no readiness data yet' empty-state job story.\n- Tighten the acceptance-criteria wording to name the actor explicitly.",
+      "error": null
+    }
+  ]
+}

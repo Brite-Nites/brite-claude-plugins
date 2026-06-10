@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "type": "string" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "discipline", "mode", "marker_type", "section_markdown", "error"],
+        "properties": {
+          "id": { "type": "string" },
+          "discipline": { "enum": ["eng", "story", "design", "qa", "docs"] },
+          "mode": { "type": ["string", "null"] },
+          "marker_type": {
+            "enum": [
+              "plan-eng-section", "plan-story-section", "plan-design-section",
+              "plan-qa-section", "plan-docs-section"
+            ]
+          },
+          "section_markdown": { "type": ["string", "null"] },
+          "error": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

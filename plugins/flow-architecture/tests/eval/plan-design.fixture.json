@@ -1,0 +1,18 @@
+{
+  "scenarios": [
+    {
+      "id": "design_hold_scope",
+      "review_output": {
+        "mode": "HOLD_SCOPE",
+        "headline": "The design scope is right; focus execution rigor on the failure and loading states the happy-path mock skips.",
+        "rigor_focus": [
+          "Specify the failing-gate state with a concrete fix-link affordance.",
+          "Specify the loading skeleton so the panel does not flash empty."
+        ],
+        "adjustments": [
+          "Align the verdict chip colors with the design-system tokens."
+        ]
+      }
+    }
+  ]
+}
