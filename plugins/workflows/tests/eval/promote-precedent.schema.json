@@ -1,0 +1,51 @@
+{
+  "type": "object",
+  "required": ["schema_version", "command", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "/workflows:promote-precedent" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "candidates", "summary"],
+        "properties": {
+          "id": { "type": "string" },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["issue_id", "decision", "category", "confidence", "date", "source", "verdict", "generalized_paths"],
+              "properties": {
+                "issue_id": { "type": "string" },
+                "decision": { "type": "string" },
+                "category": { "type": ["string", "null"] },
+                "confidence": { "type": ["integer", "null"] },
+                "date": { "type": ["string", "null"] },
+                "source": { "type": "string", "enum": ["linear", "index"] },
+                "verdict": { "type": "string", "enum": ["promotable", "rejected_invalid_id", "rejected_low_confidence", "rejected_trace_missing", "skipped_already_in_handbook"] },
+                "generalized_paths": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          },
+          "summary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["total", "promotable", "rejected_invalid_id", "rejected_low_confidence", "rejected_trace_missing", "skipped_already_in_handbook"],
+            "properties": {
+              "total": { "type": "integer" },
+              "promotable": { "type": "integer" },
+              "rejected_invalid_id": { "type": "integer" },
+              "rejected_low_confidence": { "type": "integer" },
+              "rejected_trace_missing": { "type": "integer" },
+              "skipped_already_in_handbook": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

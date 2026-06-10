@@ -1,0 +1,59 @@
+{
+  "scenarios": [
+    {
+      "id": "mixed_pipeline",
+      "linear_candidates": [
+        { "issue_id": "BC-8001", "decision": "adopt the result type", "confidence": 9, "date": "2026-04-10", "category": "architecture" },
+        { "issue_id": "BC-8002", "decision": "use prisma over typeorm", "confidence": 9, "date": "2026-04-05", "category": "library-selection" }
+      ],
+      "index_rows": [
+        { "issue": "BC-8001", "decision": "adopt the result type", "category": "architecture", "date": "2026-04-10" },
+        { "issue": "BC-8003", "decision": "choose stdlib json", "category": "library-selection", "date": "2026-04-12" },
+        { "issue": "BC-8004", "decision": "accept slower build for clarity", "category": "trade-off", "date": "2026-04-01" },
+        { "issue": "BC-8005", "decision": "split skeleton from skin", "category": "architecture", "date": "2026-03-20" },
+        { "issue": "BC-8006", "decision": "a pattern-choice not gathered", "category": "pattern-choice", "date": "2026-03-15" },
+        { "issue": "not-an-id", "decision": "malformed id row", "category": "architecture", "date": "2026-03-10" }
+      ],
+      "trace_confidence": { "BC-8003": 8, "BC-8004": 6 },
+      "handbook_rows": [
+        { "issue": "BC-8002", "decision": "Use Prisma Over Typeorm" }
+      ],
+      "paths": {
+        "BC-8001": ["src/middleware/auth.ts", "<project>/already.ts", "/abs/path.ts"],
+        "BC-8003": ["lib/json_io.py"]
+      }
+    },
+    {
+      "id": "sort_order",
+      "linear_candidates": [
+        { "issue_id": "BC-7001", "decision": "d1", "confidence": 9, "date": "2026-04-01", "category": "architecture" },
+        { "issue_id": "BC-7002", "decision": "d2", "confidence": 9, "date": "2026-04-01", "category": "architecture" },
+        { "issue_id": "BC-7003", "decision": "d3", "confidence": 9, "date": "2026-05-01", "category": "architecture" },
+        { "issue_id": "BC-7004", "decision": "d4", "confidence": 7, "date": "2026-06-01", "category": "architecture" }
+      ],
+      "index_rows": [],
+      "trace_confidence": {},
+      "handbook_rows": [],
+      "paths": {}
+    },
+    {
+      "id": "empty",
+      "linear_candidates": [],
+      "index_rows": [],
+      "trace_confidence": {},
+      "handbook_rows": [],
+      "paths": {}
+    },
+    {
+      "id": "injection_guard",
+      "linear_candidates": [
+        { "issue_id": "../../etc/passwd", "decision": "traversal", "confidence": 9, "date": "2026-04-01", "category": "architecture" },
+        { "issue_id": "BC-1; touch pwned", "decision": "injection", "confidence": 9, "date": "2026-04-02", "category": "architecture" }
+      ],
+      "index_rows": [],
+      "trace_confidence": {},
+      "handbook_rows": [],
+      "paths": {}
+    }
+  ]
+}

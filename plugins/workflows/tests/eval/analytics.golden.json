@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "command": "/workflows:analytics",
+  "scenarios": [
+    {
+      "id": "all_time",
+      "has_data": true,
+      "no_match": false,
+      "period": "2026-03-02 -- 2026-03-18",
+      "sessions": 2,
+      "sections": [
+        "Command Usage",
+        "Success Rate",
+        "Avg Duration",
+        "Recent Errors"
+      ],
+      "commands": [
+        {
+          "command": "/workflows:ship",
+          "count": 3
+        },
+        {
+          "command": "/workflows:review",
+          "count": 2
+        },
+        {
+          "command": "/marketing:plan-campaign",
+          "count": 1
+        },
+        {
+          "command": "/workflows:scope",
+          "count": 1
+        }
+      ],
+      "success_rates": [
+        {
+          "command": "/workflows:ship",
+          "pct": 66,
+          "success": 2,
+          "total": 3
+        },
+        {
+          "command": "/workflows:review",
+          "pct": 100,
+          "success": 2,
+          "total": 2
+        },
+        {
+          "command": "/marketing:plan-campaign",
+          "pct": 0,
+          "success": 0,
+          "total": 1
+        }
+      ],
+      "durations": [
+        {
+          "command": "/workflows:ship",
+          "avg": "55s"
+        },
+        {
+          "command": "/workflows:review",
+          "avg": "1m 30s"
+        }
+      ],
+      "recent_errors": [
+        {
+          "date": "2026-03-18",
+          "command": "/workflows:ship",
+          "detail": "TimeoutError"
+        },
+        {
+          "date": "2026-03-18",
+          "command": "/marketing:plan-campaign",
+          "detail": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "since_window",
+      "has_data": true,
+      "no_match": false,
+      "period": "2026-03-18",
+      "sessions": 1,
+      "sections": [
+        "Command Usage",
+        "Success Rate",
+        "Avg Duration",
+        "Recent Errors"
+      ],
+      "commands": [
+        {
+          "command": "/workflows:ship",
+          "count": 2
+        },
+        {
+          "command": "/workflows:review",
+          "count": 1
+        },
+        {
+          "command": "/marketing:plan-campaign",
+          "count": 1
+        },
+        {
+          "command": "/workflows:scope",
+          "count": 1
+        }
+      ],
+      "success_rates": [
+        {
+          "command": "/workflows:ship",
+          "pct": 50,
+          "success": 1,
+          "total": 2
+        },
+        {
+          "command": "/workflows:review",
+          "pct": 100,
+          "success": 1,
+          "total": 1
+        },
+        {
+          "command": "/marketing:plan-campaign",
+          "pct": 0,
+          "success": 0,
+          "total": 1
+        }
+      ],
+      "durations": [
+        {
+          "command": "/workflows:ship",
+          "avg": "1m 7s"
+        },
+        {
+          "command": "/workflows:review",
+          "avg": "1m 0s"
+        }
+      ],
+      "recent_errors": [
+        {
+          "date": "2026-03-18",
+          "command": "/workflows:ship",
+          "detail": "TimeoutError"
+        },
+        {
+          "date": "2026-03-18",
+          "command": "/marketing:plan-campaign",
+          "detail": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "until_window",
+      "has_data": true,
+      "no_match": false,
+      "period": "2026-03-02",
+      "sessions": 1,
+      "sections": [
+        "Command Usage",
+        "Success Rate",
+        "Avg Duration"
+      ],
+      "commands": [
+        {
+          "command": "/workflows:ship",
+          "count": 1
+        },
+        {
+          "command": "/workflows:review",
+          "count": 1
+        }
+      ],
+      "success_rates": [
+        {
+          "command": "/workflows:ship",
+          "pct": 100,
+          "success": 1,
+          "total": 1
+        },
+        {
+          "command": "/workflows:review",
+          "pct": 100,
+          "success": 1,
+          "total": 1
+        }
+      ],
+      "durations": [
+        {
+          "command": "/workflows:ship",
+          "avg": "30s"
+        },
+        {
+          "command": "/workflows:review",
+          "avg": "2m 0s"
+        }
+      ],
+      "recent_errors": []
+    },
+    {
+      "id": "both_window",
+      "has_data": true,
+      "no_match": false,
+      "period": "2026-03-18",
+      "sessions": 1,
+      "sections": [
+        "Command Usage",
+        "Success Rate",
+        "Avg Duration",
+        "Recent Errors"
+      ],
+      "commands": [
+        {
+          "command": "/workflows:ship",
+          "count": 2
+        },
+        {
+          "command": "/workflows:review",
+          "count": 1
+        },
+        {
+          "command": "/marketing:plan-campaign",
+          "count": 1
+        },
+        {
+          "command": "/workflows:scope",
+          "count": 1
+        }
+      ],
+      "success_rates": [
+        {
+          "command": "/workflows:ship",
+          "pct": 50,
+          "success": 1,
+          "total": 2
+        },
+        {
+          "command": "/workflows:review",
+          "pct": 100,
+          "success": 1,
+          "total": 1
+        },
+        {
+          "command": "/marketing:plan-campaign",
+          "pct": 0,
+          "success": 0,
+          "total": 1
+        }
+      ],
+      "durations": [
+        {
+          "command": "/workflows:ship",
+          "avg": "1m 7s"
+        },
+        {
+          "command": "/workflows:review",
+          "avg": "1m 0s"
+        }
+      ],
+      "recent_errors": [
+        {
+          "date": "2026-03-18",
+          "command": "/workflows:ship",
+          "detail": "TimeoutError"
+        },
+        {
+          "date": "2026-03-18",
+          "command": "/marketing:plan-campaign",
+          "detail": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "empty_window",
+      "has_data": true,
+      "no_match": true,
+      "period": null,
+      "sessions": null,
+      "sections": null,
+      "commands": null,
+      "success_rates": null,
+      "durations": null,
+      "recent_errors": null
+    },
+    {
+      "id": "no_data",
+      "has_data": false,
+      "no_match": false,
+      "period": null,
+      "sessions": null,
+      "sections": null,
+      "commands": null,
+      "success_rates": null,
+      "durations": null,
+      "recent_errors": null
+    }
+  ]
+}

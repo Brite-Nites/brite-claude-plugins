@@ -1,0 +1,79 @@
+{
+  "type": "object",
+  "required": ["schema_version", "command", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "/workflows:analytics" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "has_data", "no_match", "period", "sessions", "sections", "commands", "success_rates", "durations", "recent_errors"],
+        "properties": {
+          "id": { "type": "string" },
+          "has_data": { "type": "boolean" },
+          "no_match": { "type": "boolean" },
+          "period": { "type": ["string", "null"] },
+          "sessions": { "type": ["integer", "null"] },
+          "sections": {
+            "type": ["array", "null"],
+            "items": { "type": "string", "enum": ["Command Usage", "Success Rate", "Avg Duration", "Recent Errors"] }
+          },
+          "commands": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["command", "count"],
+              "properties": {
+                "command": { "type": "string" },
+                "count": { "type": "integer" }
+              }
+            }
+          },
+          "success_rates": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["command", "pct", "success", "total"],
+              "properties": {
+                "command": { "type": "string" },
+                "pct": { "type": "integer" },
+                "success": { "type": "integer" },
+                "total": { "type": "integer" }
+              }
+            }
+          },
+          "durations": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["command", "avg"],
+              "properties": {
+                "command": { "type": "string" },
+                "avg": { "type": "string" }
+              }
+            }
+          },
+          "recent_errors": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["date", "command", "detail"],
+              "properties": {
+                "date": { "type": "string" },
+                "command": { "type": "string" },
+                "detail": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

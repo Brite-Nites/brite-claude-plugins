@@ -1,0 +1,8 @@
+{
+  "scenarios": [
+    { "id": "issue_with_traces", "corpus": "full", "issue_id": "BC-9101", "as_of": "2026-05-01" },
+    { "id": "issue_no_traces", "corpus": "full", "issue_id": "BC-9999", "as_of": "2026-05-01" },
+    { "id": "invalid_issue_id_traversal", "corpus": "full", "issue_id": "../../etc/passwd", "as_of": "2026-05-01" },
+    { "id": "invalid_issue_id_injection", "corpus": "full", "issue_id": "BC-1; touch pwned", "as_of": "2026-05-01" }
+  ]
+}

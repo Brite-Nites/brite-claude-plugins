@@ -85,18 +85,14 @@ from becoming "forever-only."
 | `plugins/revops/commands/doctor.md` | revops | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/revops/commands/post-deploy-runbook.md` | revops | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/revops/commands/setup-sandbox.md` | revops | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/workflows/commands/analytics.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/architecture-decision.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/workflows/commands/audit-trail.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/bug-report.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/code-review.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/create-plugin.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/deployment-checklist.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/workflows/commands/fact-check.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
-| `plugins/workflows/commands/flywheel-metrics.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/onboarding-checklist.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/project-start.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
-| `plugins/workflows/commands/promote-precedent.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/workflows/commands/review.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |
 | `plugins/workflows/commands/scope.md` | workflows | grandfathered | no-eval (pre-ADR-028); R1 side-effecting (untouched) | 2026-06-08 |
 | `plugins/workflows/commands/security-audit.md` | workflows | grandfathered | no-eval (pre-ADR-028) | 2026-06-08 |

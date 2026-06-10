@@ -1,0 +1,85 @@
+{
+  "type": "object",
+  "required": ["schema_version", "command", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "/workflows:flywheel-metrics" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "corpus", "as_of", "total_traces", "months", "m1_status", "m2", "m3", "m4", "m5_status", "monthly", "index_row_count", "freshness_detail"],
+        "properties": {
+          "id": { "type": "string" },
+          "corpus": { "type": "string" },
+          "as_of": { "type": "string" },
+          "total_traces": { "type": "integer" },
+          "months": { "type": "array", "items": { "type": "string" } },
+          "m1_status": { "const": "N/A" },
+          "m5_status": { "const": "N/A" },
+          "m2": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["avg_confidence", "trend"],
+            "properties": {
+              "avg_confidence": { "type": ["number", "null"] },
+              "trend": { "type": "string", "enum": ["improving", "declining", "stable", "insufficient data for trend"] }
+            }
+          },
+          "m3": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["cdr_coverage_pct", "covered", "total"],
+            "properties": {
+              "cdr_coverage_pct": { "type": ["integer", "null"] },
+              "covered": { "type": "integer" },
+              "total": { "type": "integer" }
+            }
+          },
+          "m4": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "freshness_pct", "fresh", "denominator"],
+            "properties": {
+              "status": { "type": "string", "enum": ["computed", "N/A"] },
+              "freshness_pct": { "type": ["integer", "null"] },
+              "fresh": { "type": "integer" },
+              "denominator": { "type": "integer" }
+            }
+          },
+          "monthly": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["month", "traces", "avg_confidence", "cdr_coverage_pct"],
+              "properties": {
+                "month": { "type": "string" },
+                "traces": { "type": "integer" },
+                "avg_confidence": { "type": ["number", "null"] },
+                "cdr_coverage_pct": { "type": "integer" }
+              }
+            }
+          },
+          "index_row_count": { "type": "integer" },
+          "freshness_detail": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "band", "in_denominator", "fresh"],
+              "properties": {
+                "path": { "type": "string" },
+                "band": { "type": "string", "enum": ["Fresh", "Aging", "Stale", "Very Stale", "on-change (skip)", "No freshness metadata", "Unknown cadence", "Unparseable last_refreshed", "MISSING"] },
+                "in_denominator": { "type": "boolean" },
+                "fresh": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

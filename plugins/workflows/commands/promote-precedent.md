@@ -1,5 +1,6 @@
 ---
 description: Review and promote flagged decision traces from project precedents to the org-level handbook
+disable-model-invocation: true
 ---
 
 # Promote Precedent
