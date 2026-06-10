@@ -1047,6 +1047,165 @@ mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "drop a load
 mutate_canon promote-precedent "$PP" promotion-candidates-emit.json "leak an extra scenario key" "unexpected property" \
   'p=M/"promotion-candidates-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
 
+# ── 3q. audit eval (BC-12946 — flow-architecture Phase-B gate evaluator, Batch E) ─
+# flow-architecture's FIRST eval. build_audit_report.py is an eval-only re-impl of the
+# DOCUMENTED Phase-B gate semantics (audit.md § Phase B + the Q29 manifest), driven over
+# the two on-disk fixtures (audit-{clean,broken}-shape) — clean → exit 0, broken → exit 1
+# with EXACTLY the 3 documented hard-fails, an unrecognized --gate → 64. Phase A/C out.
+# The mutations are schema-VALID-but-invariant-VIOLATING (so they reach the check, not the
+# schema short-circuit) except the two boilerplate schema mutations (off-enum status, extra
+# key). The ORACLE cross-assert below runs run-audit-smoke.sh (the separate bash Phase-B
+# impl) green, so the two impls can't silently diverge on the fixtures.
+echo "── audit eval (BC-12946 — known-good → GREEN) ──"
+AU="$tmproot/au"; mkdir -p "$AU"
+invoke "$RUN_EVAL" audit --sandbox "$AU"
+assert_exit "audit eval GREEN — known-good matrix builds + passes" 0
+assert_substr "audit eval prints PASS verdict" "PASS: audit eval"
+if [ -f "$AU/audit-report-emit.json" ]; then
+  echo "  PASS  artifact produced: audit-report-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: audit-report-emit.json"; fail=$((fail + 1))
+fi
+echo "── audit self-test (mutated matrix → RED) ──"
+# the broken fixture's documented 3-fail oracle: flipping one to pass breaks it.
+mutate_canon audit "$AU" audit-report-emit.json "broken oracle drift" "documented oracle" \
+  'p=M/"audit-report-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="broken"][0]; [g for g in s["gates"] if g["id"]=="index-complete"][0]["status"]="pass"; json.dump(d,open(p,"w"))'
+# the clean fixture must be all-pass — a non-pass gate is a regression.
+mutate_canon audit "$AU" audit-report-emit.json "clean fixture not all-pass" "non-pass gate" \
+  'p=M/"audit-report-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="clean"][0]; s["gates"][0]["status"]="hard-fail"; json.dump(d,open(p,"w"))'
+# broken must exit 1 (it has hard-fails) — a 0 is the wrong verdict.
+mutate_canon audit "$AU" audit-report-emit.json "broken exit_code wrong" "broken fixture must exit 1" \
+  'p=M/"audit-report-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="broken"][0]; s["summary"]["exit_code"]=0; json.dump(d,open(p,"w"))'
+# summary ↔ gates binding: a hard_pass tally that no longer matches the counted gates.
+mutate_canon audit "$AU" audit-report-emit.json "summary tally drift" "!= counted" \
+  'p=M/"audit-report-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="clean"][0]; s["summary"]["hard_pass"]=99; json.dump(d,open(p,"w"))'
+# the arg-guard row must exit 64 — an unrecognized --gate is os.EX_USAGE.
+mutate_canon audit "$AU" audit-report-emit.json "invalid_gate not 64" "invalid_gate must yield exit 64" \
+  'p=M/"audit-report-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="invalid_gate"][0]; s["summary"]["exit_code"]=0; json.dump(d,open(p,"w"))'
+# status closed-set: a value outside the documented enum (schema).
+mutate_canon audit "$AU" audit-report-emit.json "status closed-set" "is not one of enum" \
+  'p=M/"audit-report-emit.json"; d=json.load(open(p)); d["scenarios"][0]["gates"][0]["status"]="bogus"; json.dump(d,open(p,"w"))'
+mutate_canon audit "$AU" audit-report-emit.json "drop a load-bearing scenario" "expected scenario id 'broken' is absent" \
+  'p=M/"audit-report-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="broken"]; json.dump(d,open(p,"w"))'
+mutate_canon audit "$AU" audit-report-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"audit-report-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+# ORACLE cross-assert: the separate bash Phase-B impl (run-audit-smoke.sh) agrees with the
+# fixtures (it internally asserts the SAME broken 3-fail set + clean all-pass). If either the
+# bash impl or the Python builder drifts on the fixtures, one side reds — bounding the
+# two-impl drift hazard noted in the AuditAdapter docstring.
+echo "── audit oracle cross-assert (run-audit-smoke.sh) ──"
+SMOKE="$REPO_ROOT/plugins/flow-architecture/tests/run-audit-smoke.sh"
+if [ ! -f "$SMOKE" ]; then
+  echo "  FAIL  oracle: run-audit-smoke.sh missing"; fail=$((fail + 1))
+elif smoke_out="$(bash "$SMOKE" 2>&1)"; then
+  echo "  PASS  oracle: run-audit-smoke.sh green (bash Phase-B impl pins the same fixtures)"; pass=$((pass + 1))
+else
+  # Print the drift detail — this branch firing IS the whole point of the guard.
+  echo "  FAIL  oracle: run-audit-smoke.sh red — bash Phase-B impl drifted from the fixtures"; fail=$((fail + 1))
+  printf '%s\n' "$smoke_out" | tail -20 | sed 's/^/    | /'
+fi
+
+# ── 3r. plan-* evals (BC-12946 — ONE shared build_plan_section, 5 routes, Batch E) ─
+# All 5 /flow:plan-{discipline} commands share ONE build_plan_section formatter; the
+# scenario matrix is the UNION across the 5 fixtures (rotating modes so every mode +
+# discipline + Q46 marker appears, + a degenerate crash-defense row in eng). Each block
+# proves GREEN + the two orthogonal invariants — DISCIPLINE→marker routing and MODE→fold
+# markdown (the mandatory **Mode:** tag + Refinements heading). All mutations are
+# schema-VALID-but-invariant-VIOLATING except the boilerplate schema ones (leak key).
+echo "── plan-eng eval (BC-12946 — known-good → GREEN) ──"
+PE="$tmproot/pe"; mkdir -p "$PE"
+invoke "$RUN_EVAL" plan-eng --sandbox "$PE"
+assert_exit "plan-eng eval GREEN — known-good matrix builds + passes" 0
+assert_substr "plan-eng eval prints PASS verdict" "PASS: plan-eng eval"
+if [ -f "$PE/plan-eng-emit.json" ]; then
+  echo "  PASS  artifact produced: plan-eng-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: plan-eng-emit.json"; fail=$((fail + 1))
+fi
+echo "── plan-eng self-test (mutated matrix → RED) ──"
+# DISCIPLINE→marker routing: a wrong-but-valid marker for an eng row.
+mutate_canon plan-eng "$PE" plan-eng-emit.json "marker mis-routes discipline" "discipline→marker routing" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eng_scope_expansion"][0]; s["marker_type"]="plan-story-section"; json.dump(d,open(p,"w"))'
+# MODE binding: a rendered row carries an off-enum mode.
+mutate_canon plan-eng "$PE" plan-eng-emit.json "mode off the four-mode enum" "not in the four-mode enum" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eng_scope_expansion"][0]; s["mode"]="BOGUS"; json.dump(d,open(p,"w"))'
+# the mandatory **Mode:** tag line (Q43) — drop it from the markdown.
+mutate_canon plan-eng "$PE" plan-eng-emit.json "drops the mandatory Mode tag" "must open with the mandatory" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eng_scope_expansion"][0]; s["section_markdown"]="\n".join(s["section_markdown"].split("\n")[1:]); json.dump(d,open(p,"w"))'
+# the Refinements heading — drop it.
+mutate_canon plan-eng "$PE" plan-eng-emit.json "drops the Refinements heading" "missing the Refinements heading" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eng_scope_expansion"][0]; s["section_markdown"]=s["section_markdown"].replace("**Refinements:**",""); json.dump(d,open(p,"w"))'
+# an error row must NOT carry rendered markdown.
+mutate_canon plan-eng "$PE" plan-eng-emit.json "error row leaks markdown" "error row must carry null" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eng_degenerate"][0]; s["section_markdown"]="**Mode:** x"; json.dump(d,open(p,"w"))'
+# an error row must carry a non-empty error string (the named contract).
+mutate_canon plan-eng "$PE" plan-eng-emit.json "error row empties its error" "non-empty error string" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); s=[x for x in d["scenarios"] if x["id"]=="eng_degenerate"][0]; s["error"]=""; json.dump(d,open(p,"w"))'
+mutate_canon plan-eng "$PE" plan-eng-emit.json "drop a load-bearing scenario" "expected scenario id 'eng_scope_expansion' is absent" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); d["scenarios"]=[x for x in d["scenarios"] if x["id"]!="eng_scope_expansion"]; json.dump(d,open(p,"w"))'
+mutate_canon plan-eng "$PE" plan-eng-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"plan-eng-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+echo "── plan-story eval (BC-12946 — known-good → GREEN) ──"
+PST="$tmproot/pst"; mkdir -p "$PST"
+invoke "$RUN_EVAL" plan-story --sandbox "$PST"
+assert_exit "plan-story eval GREEN — known-good matrix builds + passes" 0
+assert_substr "plan-story eval prints PASS verdict" "PASS: plan-story eval"
+if [ -f "$PST/plan-story-emit.json" ]; then
+  echo "  PASS  artifact produced: plan-story-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: plan-story-emit.json"; fail=$((fail + 1))
+fi
+mutate_canon plan-story "$PST" plan-story-emit.json "marker mis-routes discipline" "discipline→marker routing" \
+  'p=M/"plan-story-emit.json"; d=json.load(open(p)); d["scenarios"][0]["marker_type"]="plan-eng-section"; json.dump(d,open(p,"w"))'
+mutate_canon plan-story "$PST" plan-story-emit.json "drop a load-bearing scenario" "expected scenario id 'story_selective_expansion' is absent" \
+  'p=M/"plan-story-emit.json"; d=json.load(open(p)); d["scenarios"]=[]; json.dump(d,open(p,"w"))'
+
+echo "── plan-design eval (BC-12946 — known-good → GREEN) ──"
+PD="$tmproot/pd"; mkdir -p "$PD"
+invoke "$RUN_EVAL" plan-design --sandbox "$PD"
+assert_exit "plan-design eval GREEN — known-good matrix builds + passes" 0
+assert_substr "plan-design eval prints PASS verdict" "PASS: plan-design eval"
+if [ -f "$PD/plan-design-emit.json" ]; then
+  echo "  PASS  artifact produced: plan-design-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: plan-design-emit.json"; fail=$((fail + 1))
+fi
+mutate_canon plan-design "$PD" plan-design-emit.json "drops the Refinements heading" "missing the Refinements heading" \
+  'p=M/"plan-design-emit.json"; d=json.load(open(p)); s=d["scenarios"][0]; s["section_markdown"]=s["section_markdown"].replace("**Refinements:**",""); json.dump(d,open(p,"w"))'
+mutate_canon plan-design "$PD" plan-design-emit.json "leak an extra scenario key" "unexpected property" \
+  'p=M/"plan-design-emit.json"; d=json.load(open(p)); d["scenarios"][0]["backdoor"]="x"; json.dump(d,open(p,"w"))'
+
+echo "── plan-qa eval (BC-12946 — known-good → GREEN) ──"
+PQ="$tmproot/pq"; mkdir -p "$PQ"
+invoke "$RUN_EVAL" plan-qa --sandbox "$PQ"
+assert_exit "plan-qa eval GREEN — known-good matrix builds + passes" 0
+assert_substr "plan-qa eval prints PASS verdict" "PASS: plan-qa eval"
+if [ -f "$PQ/plan-qa-emit.json" ]; then
+  echo "  PASS  artifact produced: plan-qa-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: plan-qa-emit.json"; fail=$((fail + 1))
+fi
+mutate_canon plan-qa "$PQ" plan-qa-emit.json "drops the mandatory Mode tag" "must open with the mandatory" \
+  'p=M/"plan-qa-emit.json"; d=json.load(open(p)); s=d["scenarios"][0]; s["section_markdown"]="\n".join(s["section_markdown"].split("\n")[1:]); json.dump(d,open(p,"w"))'
+mutate_canon plan-qa "$PQ" plan-qa-emit.json "marker mis-routes discipline" "discipline→marker routing" \
+  'p=M/"plan-qa-emit.json"; d=json.load(open(p)); d["scenarios"][0]["marker_type"]="plan-docs-section"; json.dump(d,open(p,"w"))'
+
+echo "── plan-docs eval (BC-12946 — known-good → GREEN) ──"
+PDO="$tmproot/pdo"; mkdir -p "$PDO"
+invoke "$RUN_EVAL" plan-docs --sandbox "$PDO"
+assert_exit "plan-docs eval GREEN — known-good matrix builds + passes" 0
+assert_substr "plan-docs eval prints PASS verdict" "PASS: plan-docs eval"
+if [ -f "$PDO/plan-docs-emit.json" ]; then
+  echo "  PASS  artifact produced: plan-docs-emit.json"; pass=$((pass + 1))
+else
+  echo "  FAIL  artifact missing: plan-docs-emit.json"; fail=$((fail + 1))
+fi
+mutate_canon plan-docs "$PDO" plan-docs-emit.json "mode off the four-mode enum" "not in the four-mode enum" \
+  'p=M/"plan-docs-emit.json"; d=json.load(open(p)); d["scenarios"][0]["mode"]="BOGUS"; json.dump(d,open(p,"w"))'
+mutate_canon plan-docs "$PDO" plan-docs-emit.json "drop a load-bearing scenario" "expected scenario id 'docs_hold_scope_rationale' is absent" \
+  'p=M/"plan-docs-emit.json"; d=json.load(open(p)); d["scenarios"]=[]; json.dump(d,open(p,"w"))'
+
 # ── 4. hermeticity guard ─────────────────────────────────────────────────────
 
 echo "── hermeticity ──"
@@ -1076,12 +1235,18 @@ FW_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_flywheel_metrics.py"
 AT_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_audit_trail.py"
 PP_BUILDER="$REPO_ROOT/plugins/workflows/scripts/build_promotion_candidates.py"
 PRECEDENT_TRACE="$REPO_ROOT/plugins/workflows/scripts/precedent_trace.py"
+# BC-12946 flow-architecture Phase-B gate evaluator (Batch E) + the shared plan-section
+# formatter — both stdlib, no network (the audit builder only reads on-disk fixture repos;
+# build_plan_section is a pure transform of an injected review_output).
+ADT_BUILDER="$REPO_ROOT/plugins/flow-architecture/scripts/build_audit_report.py"
+PS_BUILDER="$REPO_ROOT/plugins/flow-architecture/scripts/build_plan_section.py"
 if grep -nE '^[[:space:]]*(import|from)[[:space:]]+(requests|urllib|http|socket|ftplib|smtplib|telnetlib)([.[:space:]]|$)' \
      "$RUN_EVAL" "$ASSERT_LIB" "$CASES" "$CSF_BUILDER" "$USU_BUILDER" "$NO_BUILDER" \
      "$OP_BUILDER" "$PF_BUILDER" "$IC_BUILDER" "$ICP_BUILDER" \
      "$RAT_BUILDER" "$RI_BUILDER" "$INTAKE_COMMON" \
      "$RS_BUILDER" "$SP_BUILDER" "$CYCLE_METRICS" \
-     "$AN_BUILDER" "$FW_BUILDER" "$AT_BUILDER" "$PP_BUILDER" "$PRECEDENT_TRACE" >/dev/null 2>&1; then
+     "$AN_BUILDER" "$FW_BUILDER" "$AT_BUILDER" "$PP_BUILDER" "$PRECEDENT_TRACE" \
+     "$ADT_BUILDER" "$PS_BUILDER" >/dev/null 2>&1; then
   echo "  FAIL  hermeticity: a network module is imported in the eval source"; fail=$((fail + 1))
 else
   echo "  PASS  hermeticity: no network module imported"; pass=$((pass + 1))
@@ -1164,7 +1329,7 @@ else
 fi
 # (e/f) the new-persona + new-vertical evals (BC-12915) are hermetic too — same builder,
 #       same frozen seed, different subcommand. Loop to avoid two near-identical blocks.
-for hc in new-persona new-vertical offer-performance portfolio-snapshot import-campaign icp-refinement-review raise-a-ticket report-issue retrospective sprint-planning analytics flywheel-metrics audit-trail promote-precedent; do
+for hc in new-persona new-vertical offer-performance portfolio-snapshot import-campaign icp-refinement-review raise-a-ticket report-issue retrospective sprint-planning analytics flywheel-metrics audit-trail promote-precedent audit plan-eng plan-story plan-design plan-qa plan-docs; do
   HCWD="$tmproot/hermetic-cwd-$hc"; mkdir -p "$HCWD"
   hb="$(cd "$HCWD" && find . | sort)"
   ho="$(cd "$HCWD" && env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY python3 "$RUN_EVAL" "$hc" 2>&1)"; hrc=$?
@@ -1197,10 +1362,13 @@ echo ""
 # 4 × (3 GREEN + 7-10×2 mutations + 2 hermeticity), live total 336), then 319→410 with the
 # BC-12945 Batch-D workflows precedent/telemetry blocks (analytics WRAP + flywheel-metrics +
 # audit-trail seed-read + promote-precedent inject-the-reads: +100 = 4 × (3 GREEN + 6-11×2
-# mutations + 2 hermeticity), live total 436) — so losing any one command's eval block trips
-# the floor rather than passing. Held at ~95% of the live count to tolerate a single
-# intentional assertion edit.
-FLOOR=410
+# mutations + 2 hermeticity), live total 436), then 410→489 with the BC-12946 Batch-E
+# flow-architecture blocks (audit Phase-B evaluator: 3 GREEN + 8×2 mutations + 1 oracle
+# cross-assert + 2 hermeticity; ONE shared build_plan_section behind 5 plan-* blocks:
+# 5 × 3 GREEN + 16×2 mutations + 5×2 hermeticity = +79, live total 515) — so losing any
+# one command's eval block trips the floor rather than passing. Held at ~95% of the live
+# count to tolerate a single intentional assertion edit.
+FLOOR=489
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

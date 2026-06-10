@@ -2587,7 +2587,315 @@ class PromotePrecedentAdapter:
         return str(self.golden_path)
 
 
+class AuditAdapter:
+    """Emit adapter for /flow:audit (BC-12946 — flow-architecture's first eval).
+
+    build_audit_report.py is an EVAL-ONLY re-impl of the DOCUMENTED Phase-B gate
+    semantics (audit.md § Phase B + the Q29 manifest); it drives those gates over
+    the two on-disk fixture repos (audit-{clean,broken}-shape) via an explicit
+    --fixtures-dir (it never runs against $CWD / the worktree). The eval asserts
+    {gates[], summary.exit_code} for the documented exit-code matrix: clean → 0,
+    broken → 1 with EXACTLY the three documented hard-fails, an unrecognized --gate
+    → 64. Phase A (verify-docs deep-parse) + Phase C (Linear-MCP) are OUT (the same
+    skip-with-reason scoping run-audit-smoke.sh uses); exit 2 is Phase-A-gated, out.
+
+    Drift between this Python impl and the bash run_phase_b_gates() is bounded by a
+    shared ORACLE: both evaluate the same two fixtures, the smoke pins the broken
+    fixture's 3 named fails (and the harness runs it green alongside this eval), and
+    ORACLE_BROKEN_FAILS below re-pins the same set inside this check — so a predicate
+    divergence on the fixtures reds one side or the other."""
+
+    command_id = "audit"
+    artifact_names = ("audit-report-emit.json",)
+    builder = REPO_ROOT / "plugins/flow-architecture/scripts/build_audit_report.py"
+    fixtures_dir = REPO_ROOT / "plugins/flow-architecture/tests/fixtures"
+    _eval_dir = REPO_ROOT / "plugins/flow-architecture/tests/eval"
+    fixture_path = _eval_dir / "audit.fixture.json"
+    golden_path = _eval_dir / "audit.golden.json"
+    schema_path = _eval_dir / "audit.schema.json"
+
+    EXPECTED_SCENARIO_IDS = ("clean", "broken", "invalid_gate")
+
+    # The broken fixture's THREE documented hard-fails (audit-broken-shape/README.md
+    # + run-audit-smoke.sh's assert_failed calls). Re-pinned here so the behavioral
+    # eval itself enforces the oracle, not just the golden.
+    ORACLE_BROKEN_FAILS = frozenset({
+        ("story-docs-complete", "domain:TEAM"),
+        ("index-complete", "project"),
+        ("eng-children-engineering-populated", "flow:SHIP-01"),
+    })
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--scenarios", str(fixture_file),
+             "--out-dir", str(sandbox), "--fixtures-dir", str(self.fixtures_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_audit_report.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        # Everything the builder emits is deterministic (gates + summary + error),
+        # so the projection is the whole artifact — the golden pins all of it.
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        # SHAPE FIRST — short-circuit so the value/invariant checks index a valid matrix.
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+
+        # Branch coverage: a thinned fixture dropping a load-bearing scenario is caught.
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+            gates = s["gates"]
+            summ = s["summary"]
+            hard_fail = sum(1 for g in gates if g["status"] == "hard-fail")
+            hard_pass = sum(1 for g in gates if g["status"] == "pass")
+
+            # summary ↔ gates binding (a miscount shows up here, not just the golden).
+            if summ["hard_fail"] != hard_fail:
+                diffs.append(f"{tag}: summary.hard_fail {summ['hard_fail']} != counted {hard_fail}")
+            if summ["hard_pass"] != hard_pass:
+                diffs.append(f"{tag}: summary.hard_pass {summ['hard_pass']} != counted {hard_pass}")
+
+            # exit_code ↔ error ↔ verdict coupling.
+            if s["error"] is not None:
+                if summ["exit_code"] != 64:
+                    diffs.append(f"{tag}: error row must carry exit_code 64, got {summ['exit_code']}")
+                if gates:
+                    diffs.append(f"{tag}: error (arg-guard) row must emit no gates, got {len(gates)}")
+            else:
+                want = 1 if hard_fail else 0
+                if summ["exit_code"] != want:
+                    diffs.append(f"{tag}: exit_code {summ['exit_code']} != {want} (1 iff any hard-fail)")
+
+            # Per-scenario documented expectations.
+            if s["id"] == "clean":
+                if summ["exit_code"] != 0 or hard_fail != 0:
+                    diffs.append(f"{tag}: clean fixture must be all-pass exit 0, got exit {summ['exit_code']} / {hard_fail} fails")
+                if not gates:
+                    diffs.append(f"{tag}: clean fixture must evaluate a non-empty gate set")
+                bad = [(g["id"], g["scope"]) for g in gates if g["status"] != "pass"]
+                if bad:
+                    diffs.append(f"{tag}: clean fixture has non-pass gate(s): {bad}")
+            elif s["id"] == "broken":
+                if summ["exit_code"] != 1:
+                    diffs.append(f"{tag}: broken fixture must exit 1, got {summ['exit_code']}")
+                got_fails = frozenset((g["id"], g["scope"]) for g in gates if g["status"] == "hard-fail")
+                if got_fails != self.ORACLE_BROKEN_FAILS:
+                    diffs.append(
+                        f"{tag}: broken hard-fail set {sorted(got_fails)} != documented oracle "
+                        f"{sorted(self.ORACLE_BROKEN_FAILS)} (audit-broken-shape README / smoke)"
+                    )
+            elif s["id"] == "invalid_gate":
+                if summ["exit_code"] != 64 or s["error"] is None:
+                    diffs.append(f"{tag}: invalid_gate must yield exit 64 + an error message")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+class PlanSectionAdapter:
+    """Generic emit adapter for the /flow:plan-{discipline} command family (BC-12946).
+
+    The ONE shared builder (build_plan_section.py) renders the Q43 Plan-section markdown
+    from an injected four-mode review_output; this adapter is parameterized by discipline
+    (the BC-12915 one-class-N-instances shape). MODE drives the fold (proven once per mode
+    across the union of the 5 fixtures); DISCIPLINE routes the Q46 marker (proven per
+    instance by the marker-type invariant). The eval drives Phase 3 ONLY — never the Phase-2
+    LLM reviewer nor the Phase-4 linear_writeback. The schema is SHARED across the 5
+    instances (one shape); the golden + fixture are per-discipline."""
+
+    builder = REPO_ROOT / "plugins/flow-architecture/scripts/build_plan_section.py"
+    _eval_dir = REPO_ROOT / "plugins/flow-architecture/tests/eval"
+    schema_path = _eval_dir / "plan-section.schema.json"
+    _MODES = ("SCOPE_EXPANSION", "SELECTIVE_EXPANSION", "HOLD_SCOPE", "SCOPE_REDUCTION")
+
+    def __init__(self, discipline: str, expected_ids: tuple):
+        self.discipline = discipline
+        self.command_id = f"plan-{discipline}"
+        self.artifact_names = (f"plan-{discipline}-emit.json",)
+        self.expected_ids = expected_ids
+        self.fixture_path = self._eval_dir / f"plan-{discipline}.fixture.json"
+        self.golden_path = self._eval_dir / f"plan-{discipline}.golden.json"
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder), "--discipline", self.discipline,
+             "--scenarios", str(fixture_file), "--out-dir", str(sandbox)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_plan_section.py {self.discipline} exit "
+                f"{proc.returncode}):\n{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        name = self.artifact_names[0]
+        p = artifact_dir / name
+        if not p.exists():
+            raise EvalError(f"expected artifact missing: {p}")
+        try:
+            return {name: json.loads(p.read_text(encoding="utf-8"))}
+        except json.JSONDecodeError as exc:
+            raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        # Every field is deterministic (the rendered markdown + the marker), so the
+        # projection is the whole matrix — the golden pins it.
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        # SHAPE FIRST — short-circuit so the value/invariant checks index a valid matrix.
+        schema_diffs = combine(assert_lib.schema_validate(emit, schema, artifact=name))
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list[str] = []
+
+        if emit["command"] != f"/flow:plan-{self.discipline}":
+            diffs.append(f"{name}: command {emit['command']!r} != /flow:plan-{self.discipline}")
+
+        # Branch coverage: a thinned fixture dropping a load-bearing scenario is caught.
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.expected_ids:
+            if sid not in got_ids:
+                diffs.append(f"{name}: expected scenario id '{sid}' is absent from the matrix")
+
+        want_marker = f"plan-{self.discipline}-section"
+        for s in emit["scenarios"]:
+            tag = f"{name} $.scenarios[id={s['id']}]"
+
+            # DISCIPLINE binding: the marker + discipline field route to THIS discipline.
+            if s["discipline"] != self.discipline:
+                diffs.append(f"{tag}: discipline {s['discipline']!r} != {self.discipline!r}")
+            if s["marker_type"] != want_marker:
+                diffs.append(f"{tag}: marker_type {s['marker_type']!r} != expected {want_marker!r} "
+                             "(discipline→marker routing)")
+
+            if s["error"] is None:
+                # MODE binding: a rendered row carries a known mode + the Q43 markdown shape.
+                if s["mode"] not in self._MODES:
+                    diffs.append(f"{tag}: rendered row mode {s['mode']!r} not in the four-mode enum")
+                md = s["section_markdown"]
+                if not isinstance(md, str) or not md:
+                    diffs.append(f"{tag}: rendered row must carry non-empty section_markdown")
+                else:
+                    # The mandatory **Mode:** tag line (Q43 sub-decision 5) + the Refinements heading.
+                    if not md.startswith(f"**Mode:** {s['mode']}"):
+                        diffs.append(f"{tag}: section_markdown must open with the mandatory '**Mode:** {s['mode']}' tag")
+                    if "**Refinements:**" not in md:
+                        diffs.append(f"{tag}: section_markdown is missing the Refinements heading")
+            else:
+                # A degenerate review_output yields an error row: a non-empty error
+                # string + no rendered markdown (the named contract, mirroring the
+                # CanonicalEmitAdapter rejection branch).
+                if not (isinstance(s["error"], str) and s["error"]):
+                    diffs.append(f"{tag}: error row must carry a non-empty error string")
+                if s["section_markdown"] is not None:
+                    diffs.append(f"{tag}: error row must carry null section_markdown, got {s['section_markdown']!r}")
+
+        golden_diffs = assert_lib.golden_compare(self.project(emit), golden, artifact=name)
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        name = self.artifact_names[0]
+        emit = artifacts[name]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact=name)
+        if diffs:
+            raise EvalError(
+                f"cannot regenerate golden — {name} failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
+# The 5 plan-* instances (one shared build_plan_section + 5 discipline routes). The
+# scenario matrix is the UNION across the 5 fixtures — rotating modes so every mode AND
+# every discipline AND every Q46 marker appears, + a degenerate crash-defense row (eng).
+_PLAN_ENG = PlanSectionAdapter("eng", ("eng_scope_expansion", "eng_degenerate"))
+_PLAN_STORY = PlanSectionAdapter("story", ("story_selective_expansion",))
+_PLAN_DESIGN = PlanSectionAdapter("design", ("design_hold_scope",))
+_PLAN_QA = PlanSectionAdapter("qa", ("qa_scope_reduction",))
+_PLAN_DOCS = PlanSectionAdapter("docs", ("docs_hold_scope_rationale",))
+
+
 ADAPTERS = {
+    AuditAdapter.command_id: AuditAdapter(),
+    _PLAN_ENG.command_id: _PLAN_ENG,
+    _PLAN_STORY.command_id: _PLAN_STORY,
+    _PLAN_DESIGN.command_id: _PLAN_DESIGN,
+    _PLAN_QA.command_id: _PLAN_QA,
+    _PLAN_DOCS.command_id: _PLAN_DOCS,
     PlanCampaignAdapter.command_id: PlanCampaignAdapter(),
     AnalyticsAdapter.command_id: AnalyticsAdapter(),
     FlywheelMetricsAdapter.command_id: FlywheelMetricsAdapter(),

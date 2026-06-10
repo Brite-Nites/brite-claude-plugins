@@ -1,5 +1,6 @@
 ---
 description: L4 Story-perspective plan generator for FDA discipline-child issues — dispatches plan-story-reviewer at L4 single-perspective scope and writes plan-story-section via Q46 markers
+disable-model-invocation: true
 ---
 
 # /flow:plan-story

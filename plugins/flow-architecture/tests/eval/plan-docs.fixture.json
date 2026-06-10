@@ -1,0 +1,17 @@
+{
+  "scenarios": [
+    {
+      "id": "docs_hold_scope_rationale",
+      "review_output": {
+        "mode": "HOLD_SCOPE",
+        "headline": "The docs scope is right; the single how-to page covers the operator's job.",
+        "rigor_focus": [
+          "Add a screenshot of the failing-gate state so the fix-link is discoverable."
+        ],
+        "rationale": [
+          "The flow has one operator-facing surface, so one page is sufficient."
+        ]
+      }
+    }
+  ]
+}

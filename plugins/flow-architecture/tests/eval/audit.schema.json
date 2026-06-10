@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "scenarios"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "/flow:audit" },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "gates", "summary", "error"],
+        "properties": {
+          "id": { "type": "string" },
+          "error": { "type": ["string", "null"] },
+          "gates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "type", "status", "scope", "message"],
+              "properties": {
+                "id": { "type": "string" },
+                "type": { "enum": ["phase-transition", "per-flow", "cross-cutting"] },
+                "status": { "enum": ["pass", "soft-warn", "hard-fail", "skipped", "overridden", "unknown"] },
+                "scope": { "type": "string" },
+                "message": { "type": "string" }
+              }
+            }
+          },
+          "summary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["hard_pass", "hard_fail", "soft_warn", "overrides", "exit_code"],
+            "properties": {
+              "hard_pass": { "type": "integer" },
+              "hard_fail": { "type": "integer" },
+              "soft_warn": { "type": "integer" },
+              "overrides": { "type": "integer" },
+              "exit_code": { "enum": [0, 1, 64] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

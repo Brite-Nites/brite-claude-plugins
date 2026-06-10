@@ -1,0 +1,17 @@
+{
+  "scenarios": [
+    {
+      "id": "story_selective_expansion",
+      "review_output": {
+        "mode": "SELECTIVE_EXPANSION",
+        "headline": "Hold the core story scope, but cherry-pick the empty-state job story which the current draft omits.",
+        "expansions": [
+          "Add the 'no readiness data yet' empty-state job story."
+        ],
+        "adjustments": [
+          "Tighten the acceptance-criteria wording to name the actor explicitly."
+        ]
+      }
+    }
+  ]
+}

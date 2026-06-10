@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "command": "/flow:plan-qa",
+  "scenarios": [
+    {
+      "id": "qa_scope_reduction",
+      "discipline": "qa",
+      "mode": "SCOPE_REDUCTION",
+      "marker_type": "plan-qa-section",
+      "section_markdown": "**Mode:** SCOPE_REDUCTION\n\nThe QA scope is over-ambitious for v1; strip the cross-browser matrix and the load test to keep the sign-off tractable.\n\n**Refinements:**\n- Drop the full cross-browser matrix; cover the two supported browsers only.\n- Defer the sustained-load test to a follow-up once the panel ships.",
+      "error": null
+    }
+  ]
+}
