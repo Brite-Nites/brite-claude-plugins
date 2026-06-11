@@ -152,6 +152,14 @@ if grep -qF 'display_name: "2024"' "$TMP/numeric.out" && grep -qF '  name: "2024
 else
   fail "numeric milestone name not safely quoted"; grep -E 'display_name|^  name' "$TMP/numeric.out" >&2 || true
 fi
+printf -- '---\ndomain: dated-widget\nlinear_milestone_id: 7f3c2a10-aaaa-4bbb-8ccc-0123456789ab\nlinear_milestone_name: 2026-01-01\n---\nbody\n' > "$TMP/dated-log.md"
+python3 "$BUILDER" --scaffold-log "$TMP/dated-log.md" --flows-dir "$FLOWS" --as-of "$AS_OF" \
+  > "$TMP/dated.out" 2>/dev/null || true
+if grep -qF 'display_name: "2026-01-01"' "$TMP/dated.out" && grep -qF '  name: "2026-01-01"' "$TMP/dated.out"; then
+  pass "date-shaped name emitted quoted (bare 2026-01-01 would YAML-coerce to date)"
+else
+  fail "date-shaped milestone name not safely quoted"; grep -E 'display_name|^  name' "$TMP/dated.out" >&2 || true
+fi
 
 # ── §4c: missing milestone name degrades to TBD ────────────────────────
 section "4c" "missing milestone name degrades to TBD"

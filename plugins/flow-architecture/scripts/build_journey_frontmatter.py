@@ -75,11 +75,13 @@ _FLOW_ID_RE = re.compile(r"^[A-Za-z]+-\d{1,9}\Z")
 # Anything else is emitted via json.dumps (a JSON string is a valid YAML
 # double-quoted scalar) so real names are preserved, never TBD'd, never raw.
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 &/().,'+_-]*\Z")
-# Whole-string forms YAML 1.1 coerces to non-string (bool/null/number) even when
-# charset-safe — "Off" → False, "2024" → int. These must be double-quoted or a
-# downstream YAML consumer silently loses the string type. Leading +/- can't
-# reach here (first char must be alnum in both charsets above).
-_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|on|off)\Z|^\d[\d_.,]*\Z")
+# Whole-string forms YAML 1.1 coerces to non-string (bool/null/number/timestamp)
+# even when charset-safe — "Off" → False, "2024" → int, "2024-01-01" → date.
+# These must be double-quoted or a downstream YAML consumer silently loses the
+# string type. The digit-led branch admits `-`/`:` so date/time shapes are
+# covered too. Leading +/- can't reach here (first char must be alnum in both
+# charsets above); mixed digit+alpha/space strings ("2024 Holiday") don't coerce.
+_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|on|off)\Z|^\d[\d_.,:-]*\Z")
 # Frontmatter line shapes (top-level `key: value` and block-list `- item`).
 _KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):(.*)$")
 _ITEM_RE = re.compile(r"^\s+-\s*(.+?)\s*$")
