@@ -2351,6 +2351,49 @@ for e_stem in build_audit_report build_plan_section; do
 done
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-13161 — capture-idea concept-payload builder unit suite (BC-13161)
+# ──────────────────────────────────────────────────────────────────────
+# ADR-028 Phase-2 — the eval for /marketing:capture-idea, the LAST grandfathered
+# command (grandfathered → 0 / BC-12700 DoD #1). build_concept_payload.py is the PURE
+# decide(parsed_fields, injected_reads) core the command delegates to: the
+# [Sketch]/[Maturing] status predicate, the missing-for-completeness list, the 3-state
+# canonical-match footer (classified over the FROZEN capture-idea-seed canonicals,
+# incl. the FULL→VERTICAL-ONLY downgrade), the status label name, and the save_issue
+# payload + rendered body. The suite drives every branch, proves a `$(touch pwned)`
+# value is treated as inert data (no shell-out sink), and that degenerate injected
+# state coerces (never a traceback). The frozen seed is FAIL-if-missing too (the footer
+# eval reads it). FAIL-if-missing (not warn): the command AND the behavioral eval
+# depend on these, so a future delete must fail loudly (the §15a-bc-12589 lesson).
+# RESULT line drives the count.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-13161. capture-idea concept-payload builder unit suite (BC-13161)"
+
+ci_helper="$REPO_ROOT/plugins/marketing/scripts/build_concept_payload.py"
+ci_harness="$REPO_ROOT/plugins/marketing/scripts/test_build_concept_payload.sh"
+ci_seed="$REPO_ROOT/plugins/marketing/tests/eval/capture-idea-seed/canonicals/_manifest.yaml"
+
+if [ ! -f "$ci_seed" ]; then
+  fail "plugins/marketing/tests/eval/capture-idea-seed/canonicals/_manifest.yaml not found — the BC-13161 frozen canonicals seed is missing"
+fi
+if [ ! -f "$ci_helper" ]; then
+  fail "plugins/marketing/scripts/build_concept_payload.py not found — the BC-13161 emit-mode builder is missing"
+elif [ ! -f "$ci_harness" ]; then
+  fail "plugins/marketing/scripts/test_build_concept_payload.sh not found — the BC-13161 builder unit suite is missing"
+else
+  if ci_harness_out=$(bash "$ci_harness" "$ci_helper" 2>&1); then
+    ci_pass_count=$(printf '%s\n' "$ci_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$ci_pass_count" ]; then
+      pass "capture-idea builder unit suite (${ci_pass_count} assertions)"
+    else
+      pass "capture-idea builder unit suite — passed (count unparsed)"
+    fi
+  else
+    fail "capture-idea builder unit suite failed:"
+    printf '%s\n' "$ci_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12638 — --target-org guard-precedes-sink consolidating lint (BC-12638)
 # ──────────────────────────────────────────────────────────────────────
 # Repo-wide CONSOLIDATING lint: every command interpolating a non-literal

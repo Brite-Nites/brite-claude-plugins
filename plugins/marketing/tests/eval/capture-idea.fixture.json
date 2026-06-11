@@ -1,0 +1,214 @@
+{
+  "scenarios": [
+    {
+      "id": "sketch_floor",
+      "parsed_fields": {
+        "concept_name": "National Park Gobo Series",
+        "offer": "Projected park-scene gobos for venue lighting"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "maturing_full",
+      "parsed_fields": {
+        "concept_name": "Botanical Gardens Ticketed Walkthrough",
+        "offer": "Lit after-dark walkthrough for botanical gardens, ticketed rev-share",
+        "brand": "labs",
+        "source": "Canyons Creative Concepts deck p12",
+        "icp": "Regional botanical gardens, 50k+ annual visitors",
+        "commercial_model": "rev-share"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "brand_unsure_suppressed",
+      "parsed_fields": {
+        "concept_name": "Botanical Gardens Ticketed Walkthrough",
+        "offer": "Lit after-dark walkthrough for botanical gardens, ticketed rev-share",
+        "brand": "unsure",
+        "source": "Canyons Creative Concepts deck p12",
+        "icp": "Regional botanical gardens, 50k+ annual visitors",
+        "commercial_model": "rev-share"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "brand_multi_passes",
+      "parsed_fields": {
+        "concept_name": "Cross-Brand Holiday Bundle",
+        "offer": "Joint Nites + Labs holiday lighting package for multi-venue operators",
+        "brand": "multi",
+        "source": "Q3 planning offsite",
+        "icp": "Multi-venue operators",
+        "commercial_model": "hybrid"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "source_blank_sketch",
+      "parsed_fields": {
+        "concept_name": "Botanical Gardens Ticketed Walkthrough",
+        "offer": "Lit after-dark walkthrough for botanical gardens, ticketed rev-share",
+        "brand": "labs",
+        "icp": "Regional botanical gardens, 50k+ annual visitors",
+        "commercial_model": "rev-share"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "maturing_icp_only",
+      "parsed_fields": {
+        "concept_name": "Zoo Holiday Walkthrough",
+        "offer": "After-dark lit zoo walkthrough, ticketed",
+        "brand": "labs",
+        "source": "zoo ops call",
+        "icp": "Regional zoos, 100k+ visitors"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "maturing_model_only",
+      "parsed_fields": {
+        "concept_name": "Zoo Holiday Walkthrough",
+        "offer": "After-dark lit zoo walkthrough, ticketed",
+        "brand": "labs",
+        "source": "zoo ops call",
+        "commercial_model": "ticketed"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "neither_icp_nor_model_sketch",
+      "parsed_fields": {
+        "concept_name": "Zoo Holiday Walkthrough",
+        "offer": "After-dark lit zoo walkthrough, ticketed",
+        "brand": "labs",
+        "source": "zoo ops call"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "footer_no_match",
+      "parsed_fields": {
+        "concept_name": "Underwater Basket Lighting",
+        "offer": "Submersible accent lighting for niche venues",
+        "candidate_vertical": "underwater-basket-weaving"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "footer_vertical_only",
+      "parsed_fields": {
+        "concept_name": "Zoo Lobby Lighting Pitch",
+        "offer": "Seasonal lit installs for zoo entrances",
+        "candidate_vertical": "zoos"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "footer_full",
+      "parsed_fields": {
+        "concept_name": "Hotel Lobby Holiday Lighting",
+        "offer": "Seasonal lit installs for hotel lobbies",
+        "brand": "labs",
+        "source": "hotel GM intro call",
+        "icp": "Boutique hotels",
+        "commercial_model": "install-fee",
+        "candidate_vertical": "hotels",
+        "candidate_persona": "gm",
+        "candidate_offer": "lobby-lighting"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "footer_downgrade",
+      "parsed_fields": {
+        "concept_name": "Hotel Rooftop Lighting",
+        "offer": "Rooftop bar lighting for hotels",
+        "candidate_vertical": "hotels",
+        "candidate_persona": "nonexistent-persona",
+        "candidate_offer": "lobby-lighting"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "with_lead",
+      "parsed_fields": {
+        "concept_name": "Aquarium Tunnel Lighting",
+        "offer": "Immersive tunnel lighting for aquariums",
+        "brand": "labs",
+        "source": "aquarium ops email",
+        "icp": "Mid-size aquariums",
+        "commercial_model": "co-invest",
+        "lead": "Sarah Chen"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "brand_model_normalized",
+      "parsed_fields": {
+        "concept_name": "Auto Dealership Lot Lighting",
+        "offer": "Year-round lot accent lighting for dealerships",
+        "brand": "supply",
+        "commercial_model": "install-fee"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "error_offer_missing",
+      "parsed_fields": {
+        "concept_name": "A Name But No Offer",
+        "brand": "labs"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "degenerate_canonical_state",
+      "parsed_fields": {
+        "concept_name": "Degenerate State Guard",
+        "offer": "Proves a malformed injected read coerces, not crashes",
+        "candidate_vertical": "hotels",
+        "candidate_persona": "gm",
+        "candidate_offer": "lobby-lighting"
+      },
+      "injected_reads": {
+        "milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "capture_date": "2026-06-10",
+        "canonical_state": {"in_manifest": true, "personas": null, "offers": null}
+      }
+    },
+    {
+      "id": "hostile_field_inert",
+      "parsed_fields": {
+        "concept_name": "Injection Guard",
+        "offer": "$(touch pwned) and @mention — rendered as inert body text"
+      },
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "nondict_parsed_fields",
+      "parsed_fields": ["malformed-not-an-object"],
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "nondict_injected_reads",
+      "parsed_fields": {"concept_name": "Degenerate Injected Reads", "offer": "Proves a non-dict injected_reads coerces, not crashes"},
+      "injected_reads": ["malformed-not-an-object"]
+    },
+    {
+      "id": "null_capture_date",
+      "parsed_fields": {"concept_name": "Missing Capture Date", "offer": "Proves a missing capture date renders an em-dash, not None"},
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8"}
+    },
+    {
+      "id": "nonhashable_brand",
+      "parsed_fields": {"concept_name": "Unhashable Brand Guard", "offer": "Proves a non-string brand value coerces to unsure, not a TypeError crash", "brand": ["nites"]},
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    },
+    {
+      "id": "name_blank_offer_present",
+      "parsed_fields": {"offer": "Files with a null title — the concept name is derived from the offer at runtime (offer-only required-to-file guard)"},
+      "injected_reads": {"milestone_id": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8", "capture_date": "2026-06-10"}
+    }
+  ]
+}

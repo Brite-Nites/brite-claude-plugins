@@ -213,14 +213,17 @@ gate --name-status "$(printf 'M\tplugins/marketing/commands/plan-campaign.md')"
 assert_rc_and_contains "C1 real plan-campaign (ADAPTERS eval runs + passes) → OK" 0 "behavioral eval registered and passing"
 gate --check
 assert_rc_and_contains "C2 real --check on the bootstrapped debt list → OK" 0 "debt ∩ ADAPTERS == ∅"
-# C3 fixture = capture-idea.md: after BC-12947 (Batch F) flagged/waived the rest,
-# it is the ONLY remaining grandfathered command, and it is R1-firing (save_issue)
-# and unflagged — the exact Split-A′ point (grandfathering exempts the EVAL, not R1).
-# ship.md no longer works here: Batch F added disable-model-invocation to it. When
-# BC-13161 evals capture-idea (it is eval-able, pulled from the waiver set), swap this
-# to whatever grandfathered+R1-firing command remains, or drop to the synthetic B2.
+# C3′ fixture = capture-idea.md, now EVAL'd (BC-13161): it is in ADAPTERS + flagged
+# (disable-model-invocation), so a MODIFIED capture-idea runs its registered behavioral
+# eval and PASSES (R1 satisfied by the flag) → exit 0. The C1 pattern on a second
+# command — the only PERMANENT end-to-end exercise of `run_eval.py capture-idea` through
+# the gate (the builder unit suite tests decide() directly; the diff-gate fires only on
+# .md changes). The Split-A′ "grandfathered + R1 still BLOCKS" point is covered
+# hermetically by the synthetic B2 above: capture-idea was the LAST grandfathered +
+# R1-firing command, so no real-repo fixture for that case remains (ship.md is flagged
+# + waived) — hence C3 moves from the Split-A′ proof to the eval-registered proof.
 gate --name-status "$(printf 'M\tplugins/marketing/commands/capture-idea.md')"
-assert_rc_and_contains "C3 real grandfathered capture-idea.md still BLOCKS on R1 (Split A′)" 1 "R1-side-effecting-needs-flag"
+assert_rc_and_contains "C3 real eval'd capture-idea.md runs its eval + passes (exit 0)" 0 "behavioral eval registered and passing"
 
 # ════════════════════════════════════════════════════════════════════════════
 echo "── D. --check integrity failure modes (synthetic) ──"
