@@ -289,6 +289,11 @@ def _gf(file: str, rule: str, sev: str = "gate") -> Finding:
     return Finding(rule, sev, "msg", file, 1)
 
 
+def _row(baseline: int | None = None) -> dict:
+    """A structural-debt row (fresh dict per call — no shared fixture across cases)."""
+    return {"reason": "r", "added": "d", "baseline": baseline}
+
+
 def sdebt_parse_rows() -> bool:
     rows, problems = G.parse_structural_debt(_SDEBT)
     return (
@@ -342,7 +347,7 @@ def sfilter_blocks_unlisted() -> bool:
 
 
 def sfilter_suppresses_listed() -> bool:
-    rows = {(SKL, "R4-nested-refs"): {"reason": "r", "added": "d", "baseline": None}}
+    rows = {(SKL, "R4-nested-refs"): _row()}
     blocking, suppressed, problems = G.filter_structural([_gf(SKL, "R4-nested-refs")], rows, {})
     return blocking == [] and len(suppressed) == 1 and problems == []
 
@@ -350,21 +355,21 @@ def sfilter_suppresses_listed() -> bool:
 def sfilter_rule_scoped_row() -> bool:
     # A row grandfathers ONE rule on ONE file: the same file's OTHER gate finding
     # still blocks (the (file, rule) key is the whole point vs a file-level mute).
-    rows = {(SKL, "R4-nested-refs"): {"reason": "r", "added": "d", "baseline": None}}
+    rows = {(SKL, "R4-nested-refs"): _row()}
     blocking, suppressed, _ = G.filter_structural(
         [_gf(SKL, "R4-nested-refs"), _gf(SKL, "R3-description-quality")], rows, {})
     return len(suppressed) == 1 and len(blocking) == 1 and blocking[0].rule_id == "R3-description-quality"
 
 
 def sfilter_baseline_at_limit_suppresses() -> bool:
-    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    rows = {(BIG, "R2-body-too-long"): _row(906)}
     blocking, suppressed, problems = G.filter_structural(
         [_gf(BIG, "R2-body-too-long")], rows, {BIG: 906})
     return blocking == [] and len(suppressed) == 1 and problems == []
 
 
 def sfilter_baseline_growth_blocks() -> bool:
-    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    rows = {(BIG, "R2-body-too-long"): _row(906)}
     blocking, suppressed, problems = G.filter_structural(
         [_gf(BIG, "R2-body-too-long")], rows, {BIG: 907})
     return len(blocking) == 1 and suppressed == [] and problems == []
@@ -373,14 +378,14 @@ def sfilter_baseline_growth_blocks() -> bool:
 def sfilter_baseline_missing_count_is_loud() -> bool:
     # No current body count available for a baseline row → problem + blocking,
     # never a silent exemption.
-    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    rows = {(BIG, "R2-body-too-long"): _row(906)}
     blocking, suppressed, problems = G.filter_structural(
         [_gf(BIG, "R2-body-too-long")], rows, {})
     return len(blocking) == 1 and suppressed == [] and any("no current body line count" in p for p in problems)
 
 
 def sfilter_stale_row_problem() -> bool:
-    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    rows = {(BIG, "R2-body-too-long"): _row(906)}
     blocking, suppressed, problems = G.filter_structural([], rows, {BIG: 100})
     return blocking == [] and suppressed == [] and any("stale" in p for p in problems)
 
@@ -388,7 +393,7 @@ def sfilter_stale_row_problem() -> bool:
 def sfilter_advisory_live_not_blocked() -> bool:
     # An advisory finding never blocks, but it DOES keep a pre-flip debt row live
     # (rows may land one PR before their rule's severity flips).
-    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    rows = {(BIG, "R2-body-too-long"): _row(906)}
     blocking, suppressed, problems = G.filter_structural(
         [_gf(BIG, "R2-body-too-long", sev="advisory")], rows, {BIG: 100})
     return blocking == [] and suppressed == [] and problems == []

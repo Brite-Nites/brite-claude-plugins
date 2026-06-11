@@ -54,6 +54,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SEV_GATE = "gate"
 SEV_ADVISORY = "advisory"
 
+# The lintable spec surface — the canonical copy (scan_surface consumes them;
+# eval_gate imports them for its changed-set filter and structural-debt row guard,
+# so the two modules can't drift). NOTE: consumers use these both as fnmatch
+# patterns (fnmatch's `*` crosses `/`) and as Path.glob patterns (glob's `*` does
+# not) — shared TEXT; each consumer's semantics happen to coincide at this depth.
+COMMAND_GLOB = "plugins/*/commands/*.md"
+SKILL_GLOB = "plugins/*/skills/*/SKILL.md"
+
 
 @dataclass
 class Finding:
@@ -540,8 +548,8 @@ def _rel(path: Path) -> str:
 def scan_surface(repo_root: Path) -> list[Path]:
     """The repo-wide lint surface: all command + SKILL.md specs + evals.json."""
     targets: list[Path] = []
-    targets += sorted(repo_root.glob("plugins/*/commands/*.md"))
-    for skill in sorted(repo_root.glob("plugins/*/skills/*/SKILL.md")):
+    targets += sorted(repo_root.glob(COMMAND_GLOB))
+    for skill in sorted(repo_root.glob(SKILL_GLOB)):
         if skill.parent.name == "_shared":
             continue
         targets.append(skill)
@@ -553,10 +561,15 @@ def lint_path(path: Path) -> list[Finding]:
     return lint_evals_json(path) if path.name == "evals.json" else lint_spec(path)
 
 
+def finding_loc(f: Finding) -> str:
+    """``file`` or ``file:line`` — the ONE rendering of a Finding's location
+    (eval_gate's --structural renderer imports it, so the two can't drift)."""
+    return f.file if f.line is None else f"{f.file}:{f.line}"
+
+
 def _human_line(f: Finding) -> str:
-    loc = f.file if f.line is None else f"{f.file}:{f.line}"
     tag = "[gate-tier · blocking via eval-gate]" if f.severity == SEV_GATE else "[advisory]"
-    return f"{tag} {f.rule_id} {loc} — {f.message}"
+    return f"{tag} {f.rule_id} {finding_loc(f)} — {f.message}"
 
 
 def main(argv: list[str]) -> int:

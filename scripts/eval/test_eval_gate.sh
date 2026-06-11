@@ -95,6 +95,12 @@ write_clean_cmd() {  # $1 = path
   printf -- '---\nname: %s\ndescription: third-person summary of what it does and when to use it\n---\nA short body with no side effects.\n' "$(basename "$1" .md)" > "$1"
 }
 
+# A spec whose description trips R3 (gate-tier since BC-13213) — section F's fixture.
+write_first_person_spec() {  # $1 = path, $2 = description
+  mkdir -p "$(dirname "$1")"
+  printf -- '---\nname: %s\ndescription: %s\n---\nbody\n' "$(basename "$1" .md)" "$2" > "$1"
+}
+
 # ════════════════════════════════════════════════════════════════════════════
 echo "── P. pure decision-core cases (scripts/eval/_eval_gate_cases.py, from spec) ──"
 # ════════════════════════════════════════════════════════════════════════════

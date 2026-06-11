@@ -102,8 +102,12 @@ _HERE = Path(__file__).resolve().parent
 REPO_ROOT = _HERE.parents[1]
 sys.path.insert(0, str(_HERE))
 from structural_lint import (  # noqa: E402
+    COMMAND_GLOB,
     SEV_GATE,
+    SKILL_GLOB,
+    Finding,
     body_lines,
+    finding_loc,
     lint_path,
     lint_spec,
     parse_marker,
@@ -111,15 +115,16 @@ from structural_lint import (  # noqa: E402
 )
 from run_eval import ADAPTERS  # noqa: E402
 
-COMMAND_GLOB = "plugins/*/commands/*.md"
 DEBT_LIST_REL = "docs/skill-eval-debt.md"
 RUN_EVAL = _HERE / "run_eval.py"
 
 # ── ADR-033 full-surface structural gate (BC-13213) ───────────────────────────
 STRUCTURAL_DEBT_REL = "docs/structural-lint-debt.md"
 # A structural-debt row's `file` cell must be a lintable spec — the glob-guard that
-# self-skips the table header/separator (same idiom as parse_debt_table).
-SPEC_ROW_GLOBS = (COMMAND_GLOB, "plugins/*/skills/*/SKILL.md")
+# self-skips the table header/separator (same idiom as parse_debt_table). The glob
+# text is imported from structural_lint (the canonical copy, next to scan_surface)
+# so a surface change can't silently strand debt rows.
+SPEC_ROW_GLOBS = (COMMAND_GLOB, SKILL_GLOB)
 # `baseline` is only meaningful for the body-size rule: it pins the grandfathered
 # body line count so the exemption can't silently absorb further growth.
 BASELINE_RULE = "R2-body-too-long"
@@ -386,10 +391,10 @@ def parse_structural_debt(text: str) -> tuple[dict[tuple[str, str], dict], list[
 
 
 def filter_structural(
-    findings,
+    findings: list[Finding],
     debt_rows: dict[tuple[str, str], dict],
     body_lines_by_file: dict[str, int],
-) -> tuple[list, list, list[str]]:
+) -> tuple[list[Finding], list[Finding], list[str]]:
     """``(blocking, suppressed, problems)`` for the full-surface gate. PURE.
 
     ``findings`` = the WHOLE surface's lint findings (all severities — advisory
@@ -407,8 +412,8 @@ def filter_structural(
       - row with no live (file, rule) finding of ANY severity → stale problem
         (the self-cleaning invariant: fix the file ⇒ remove the row, same PR)
     """
-    blocking: list = []
-    suppressed: list = []
+    blocking: list[Finding] = []
+    suppressed: list[Finding] = []
     problems: list[str] = []
     live_keys = {(f.file, f.rule_id) for f in findings}
 
@@ -680,7 +685,7 @@ def run_structural(repo_root: Path, as_json: bool) -> int:
     """
     try:
         targets = scan_surface(repo_root)
-        findings = []
+        findings: list[Finding] = []
         for t in targets:
             rel = t.relative_to(repo_root).as_posix()
             for f in lint_path(t):
@@ -691,16 +696,18 @@ def run_structural(repo_root: Path, as_json: bool) -> int:
 
     debt_rows, problems = parse_structural_debt(_read_text(repo_root / STRUCTURAL_DEBT_REL))
 
-    # Current body line counts — only for baseline (R2) rows, read once each.
+    # Current body line counts — only for baseline (R2) rows. At most one
+    # baseline row per file can exist (the parser rejects duplicates and
+    # non-R2 baselines), so no dedup is needed here.
     body_counts: dict[str, int] = {}
     for (fpath, _rule), row in debt_rows.items():
-        if row.get("baseline") is not None and fpath not in body_counts:
+        if row.get("baseline") is not None:
             text = _read_text(repo_root / fpath)
             if text:
                 body_counts[fpath] = len(body_lines(text))
 
     blocking, suppressed, fproblems = filter_structural(findings, debt_rows, body_counts)
-    problems = problems + fproblems
+    problems += fproblems
 
     if as_json:
         print(json.dumps({
@@ -717,15 +724,16 @@ def run_structural(repo_root: Path, as_json: bool) -> int:
         print(f"  surface={len(targets)} gate-findings={len(blocking) + len(suppressed)} "
               f"debt-rows={len(debt_rows)}")
         for f in blocking:
-            loc = f.file if f.line is None else f"{f.file}:{f.line}"
             note = ""
             row = debt_rows.get((f.file, f.rule_id))
-            if row is not None and row.get("baseline") is not None:
-                count = body_counts.get(f.file)
+            count = body_counts.get(f.file)
+            if row is not None and row.get("baseline") is not None and count is not None:
+                # count can be None on the missing-body-count path — the PROBLEM
+                # line is the sole explanation there; this note covers only growth.
                 note = f" (body grew to {count} lines, past the grandfathered baseline {row['baseline']})"
-            print(f"  BLOCK  [{f.rule_id}] {loc} — {f.message}{note}")
+            print(f"  BLOCK  [{f.rule_id}] {finding_loc(f)} — {f.message}{note}")
         for f in suppressed:
-            row = debt_rows.get((f.file, f.rule_id)) or {}
+            row = debt_rows[(f.file, f.rule_id)]  # suppressed ⇒ a row exists
             tail = f", baseline {row['baseline']}" if row.get("baseline") is not None else ""
             print(f"  SUPPRESSED  [{f.rule_id}] {f.file} (structural-debt row{tail})")
         for p in problems:
