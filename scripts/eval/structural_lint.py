@@ -17,7 +17,7 @@ with zero re-detection. M5 will layer additional fields (e.g. ``blocking``,
 THIS MODULE NEVER FAILS A BUILD ITSELF: the CLI exits 0 even with findings, and
 ``validate.sh`` §15a-bc-12588 surfaces them WARN-only. ``severity == "gate"`` is the
 TIER the eval-gate consumes as build-failing (see CONTEXT.md § "Gate"): the M5
-diff-gate blocks gate-tier findings on changed commands, and the ADR-033 full-surface
+diff-gate blocks gate-tier findings on changed commands, and the ADR-034 full-surface
 gate (``eval_gate.py --structural``, BC-13213) blocks them across the whole
 commands+skills surface unless covered by a ``docs/structural-lint-debt.md`` row.
 The CLI's human renderer labels gate-tier findings ``[gate-tier · blocking via
@@ -54,7 +54,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SEV_GATE = "gate"
 SEV_ADVISORY = "advisory"
 
-# ── Public consumer contract (imported by eval_gate.py, ADR-028/ADR-033) ──────
+# ── Public consumer contract (imported by eval_gate.py, ADR-028/ADR-034) ──────
 # COMMAND_GLOB, SKILL_GLOB, SEV_GATE, Finding, body_lines, finding_loc, lint_path,
 # lint_spec, parse_marker, scan_surface. Renaming any of these breaks the gate at
 # import time — treat them as API, not module-private helpers.
@@ -271,7 +271,7 @@ def rule_r2_body_too_long(path: Path, text: str) -> list[Finding]:
 # (no boundary / no following space). "Missing description" is already a hard FAIL
 # in validate.sh § 7/§ 8, so R3 covers the first-person case only. First advisory
 # rule promoted to gate (surface was clean: 0 findings at flip time) — enforced by
-# eval_gate's diff-gate (changed commands) + --structural (full surface, ADR-033).
+# eval_gate's diff-gate (changed commands) + --structural (full surface, ADR-034).
 FIRST_PERSON_RE = re.compile(r"^\s*(?:I|I'll|I'm|We|We'll|We're|My|Me|Our)\s+\S", re.IGNORECASE)
 
 

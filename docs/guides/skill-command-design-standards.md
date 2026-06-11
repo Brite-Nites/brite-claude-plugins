@@ -3,7 +3,7 @@
 Canonical checklist for building agent tooling in this repo. Derived from Anthropic's Agent Skills best-practices, "Building effective agents," and the Claude Code docs (skills / sub-agents / plugins), reconciled with this repo's hard-won gotchas. Enforcement model: **[ADR-028](../decisions/028-skill-engineering-discipline.md)** (phased ratchet). Terminology: `CONTEXT.md` § Agent tooling & evaluation.
 
 **Enforcement tags**:
-- **[GATE]** — blocking (fails CI): on a created/changed command via the eval-gate diff-gate, and — once a rule is promoted — across the whole commands+skills surface via the full-surface structural gate (`eval_gate.py --structural`, [ADR-033](../decisions/033-structural-ratchet-full-surface-gate.md); grandfathered exceptions live in `docs/structural-lint-debt.md`).
+- **[GATE]** — blocking (fails CI): on a created/changed command via the eval-gate diff-gate, and — once a rule is promoted — across the whole commands+skills surface via the full-surface structural gate (`eval_gate.py --structural`, [ADR-034](../decisions/034-structural-ratchet-full-surface-gate.md); grandfathered exceptions live in `docs/structural-lint-debt.md`).
 - **[GATE-existing]** — already-enforced blocking check that pre-dates ADR-028 (e.g. plugin-layout, version-bump); not new, listed here for completeness.
 - **[ADV]** — advisory WARN; promoted to [GATE] one rule at a time (the BC-12700 Phase-2 ratchet, flip order R3→R5→R6→R2→R4), each only after its surface is clean or grandfathered.
 - **[REF]** — reference principle; not linted, but reviewers should apply it.

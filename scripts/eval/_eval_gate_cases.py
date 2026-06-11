@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eval_gate as G  # noqa: E402
-from structural_lint import Finding  # noqa: E402  (synthetic findings for the ADR-033 filter)
+from structural_lint import Finding  # noqa: E402  (synthetic findings for the ADR-034 filter)
 
 
 def _reasons(d) -> str:
@@ -266,7 +266,7 @@ def check_waiver_coupled_ok() -> bool:
     return probs == []
 
 
-# ── parse_structural_debt() + filter_structural() — ADR-033 full-surface gate ──
+# ── parse_structural_debt() + filter_structural() — ADR-034 full-surface gate ──
 # Authored from the BC-13213 locked spec: rows keyed (file, rule); baseline only on
 # R2 and pins the grandfathered body line count (growth past it blocks; equality
 # suppresses); malformed rows are loud problems that never suppress; a row with no

@@ -137,12 +137,12 @@ _Avoid_: conflating a **Gate** (a check) with a lint **finding** whose `severity
 is `gate` (a tier). The structural lint (`scripts/eval/structural_lint.py`) never
 fails a build itself — it computes findings; `eval_gate.py` is what enforces the
 `gate`-tier ones: on changed commands (the diff-gate) and across the whole surface
-(the full-surface structural gate, ADR-033). Output labels gate-tier findings
+(the full-surface structural gate, ADR-034). Output labels gate-tier findings
 `[gate-tier · blocking via eval-gate]`.
 
 **Full-surface structural gate**:
 The diff-free enforcement surface for promoted structural rules
-(`eval_gate.py --structural`, ADR-033): lints every command + SKILL.md spec and
+(`eval_gate.py --structural`, ADR-034): lints every command + SKILL.md spec and
 fails on any gate-tier finding not covered by the structural-debt list. A second
 step in the REQUIRED eval-gate CI job. Full-surface because skills never appear
 in the diff-gate's changed-set and an R4 nested-refs regression can be introduced

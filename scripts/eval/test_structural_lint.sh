@@ -179,7 +179,7 @@ else
 fi
 
 # Human renderer labels gate-tier findings — the validate.sh-visible marker that
-# these warnings are the ones eval_gate enforces (diff-gate + --structural, ADR-033).
+# these warnings are the ones eval_gate enforces (diff-gate + --structural, ADR-034).
 run_human "$FIX/commands/r1-no-flag.md"
 if printf '%s' "$LAST" | grep -qF '[gate-tier · blocking via eval-gate]'; then
   echo "  PASS  human output labels gate-tier findings"; pass=$((pass + 1))

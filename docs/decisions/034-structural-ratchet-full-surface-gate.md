@@ -1,11 +1,11 @@
-# 033. Full-surface structural gate + per-rule structural-debt list (ADR-028 Phase-2 ratchet wiring)
+# 034. Full-surface structural gate + per-rule structural-debt list (ADR-028 Phase-2 ratchet wiring)
 
 **Status:** Accepted
 **Date:** 2026-06-10
 **Linear:** [BC-13213](https://linear.app/brite-nites/issue/BC-13213) (ratchet 1/5, the mechanism PR) under [BC-12700](https://linear.app/brite-nites/issue/BC-12700) bullet #2
 **Related ADRs:** [ADR-028](028-skill-engineering-discipline.md) (the discipline this enforces; D1 commits the advisory→blocking promotion), [ADR-007](007-revops-plugin-design.md) (augment-not-replace — why the revops subtree gets grandfathered rather than restructured)
 
-> **ADR numbering:** claimed as 033 per CDR-025 — at claim time 029 was taken on `main` (and again by open PR #401, which will renumber), 030+031 by open PR #398, 032 by open PR #432.
+> **ADR numbering:** claimed as 033 per CDR-025 (at claim time 029 was taken on `main` + open PR #401, 030+031 by open PR #398, 032 by open PR #432) — then **lost the 033 race to PR #475** (`033-fda-journey-frontmatter-canon.md`, opened inside the claim-to-PR window) and renumbered to **034** pre-merge. Caught by the `cross-pr-adr-guard` advisory CI job — its first live catch, working exactly as designed (BC-12698).
 
 ## Context
 

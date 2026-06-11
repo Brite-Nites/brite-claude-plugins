@@ -1,7 +1,7 @@
-# Structural-lint debt list (ADR-033, BC-13213 — the BC-12700 bullet-#2 ratchet)
+# Structural-lint debt list (ADR-034, BC-13213 — the BC-12700 bullet-#2 ratchet)
 
 <!--
-  MACHINE-READ by scripts/eval/eval_gate.py --structural (the ADR-033 full-surface
+  MACHINE-READ by scripts/eval/eval_gate.py --structural (the ADR-034 full-surface
   structural gate). Keep the table below as the single source of truth for which
   (file, rule) pairs are grandfathered against a PROMOTED (gate-tier) structural
   rule. Schema (positional columns; rows keyed on (file, rule) — a file can be
@@ -34,7 +34,7 @@
 -->
 
 This file is the **per-rule structural-debt grandfather record** for the ADR-028
-Phase-2 advisory→blocking ratchet (BC-12700 bullet #2, mechanism per ADR-033). The
+Phase-2 advisory→blocking ratchet (BC-12700 bullet #2, mechanism per ADR-034). The
 full-surface structural gate (`scripts/eval/eval_gate.py --structural` — a REQUIRED
 step in the eval-gate CI job, also run by `validate.sh` §15a-bc-12590 Part 3) fails
 on any gate-tier structural-lint finding **not** covered by a row below. The flip

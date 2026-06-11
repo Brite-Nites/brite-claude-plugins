@@ -303,7 +303,7 @@ gate --bootstrap   # missing --added
 assert_rc_and_contains "E2 --bootstrap without --added → exit 2 + reason" 2 "requires --added"
 
 # ════════════════════════════════════════════════════════════════════════════
-echo "── F. --structural full-surface gate (ADR-033, BC-13213) ──"
+echo "── F. --structural full-surface gate (ADR-034, BC-13213) ──"
 # ════════════════════════════════════════════════════════════════════════════
 # F1 real repo: a WIRING probe only — the mode dispatches, scans the live surface,
 # and emits the STRUCTURAL contract line with a policy verdict (exit 0 or 1, never
@@ -328,7 +328,7 @@ gate --repo-root "$st" --structural
 assert_rc_and_contains "F2 first-person command description → BLOCK (R3 gate)" 1 "R3-description-quality"
 
 # F3 a first-person SKILL description blocks too — the surface the commands-only
-# diff-gate can NOT see (the reason --structural is full-surface, ADR-033).
+# diff-gate can NOT see (the reason --structural is full-surface, ADR-034).
 write_first_person_spec "$st/plugins/foo/skills/badskill/SKILL.md" "I am a skill that helps"
 gate --repo-root "$st" --structural
 assert_rc_and_contains "F3 first-person SKILL description → BLOCK (skills covered)" 1 "plugins/foo/skills/badskill/SKILL.md"

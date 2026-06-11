@@ -31,7 +31,7 @@ Three enforcement surfaces, by design (they run in DIFFERENT CI checkouts):
     ``# eval-waiver: <reason>`` marker) so a waiver can never be silent in EITHER
     direction.
 
-  * **--structural** (full-surface structural gate — ADR-033, BC-13213, the
+  * **--structural** (full-surface structural gate — ADR-034, BC-13213, the
     BC-12700 bullet-#2 per-rule ratchet's enforcement surface) — diff-free: lints
     the WHOLE commands+skills surface and FAILS on any ``severity == "gate"``
     finding not covered by a ``docs/structural-lint-debt.md`` row. Full-surface
@@ -118,7 +118,7 @@ from run_eval import ADAPTERS  # noqa: E402
 DEBT_LIST_REL = "docs/skill-eval-debt.md"
 RUN_EVAL = _HERE / "run_eval.py"
 
-# ── ADR-033 full-surface structural gate (BC-13213) ───────────────────────────
+# ── ADR-034 full-surface structural gate (BC-13213) ───────────────────────────
 STRUCTURAL_DEBT_REL = "docs/structural-lint-debt.md"
 # A structural-debt row's `file` cell must be a lintable spec — the glob-guard that
 # self-skips the table header/separator (same idiom as parse_debt_table). The glob
@@ -719,7 +719,7 @@ def run_check(repo_root: Path, as_json: bool) -> int:
 
 
 def run_structural(repo_root: Path, as_json: bool) -> int:
-    """The ADR-033 full-surface structural gate (thin shell over the pure core).
+    """The ADR-034 full-surface structural gate (thin shell over the pure core).
 
     Diff-free: lints every spec ``scan_surface`` yields, normalizes finding paths to
     THIS repo_root (structural_lint's ``_rel`` resolves against its own module root,
@@ -759,7 +759,7 @@ def run_structural(repo_root: Path, as_json: bool) -> int:
             "ok": not blocking and not problems,
         }, indent=2))
     else:
-        print("=== eval-gate --structural (ADR-033 full-surface structural gate) ===")
+        print("=== eval-gate --structural (ADR-034 full-surface structural gate) ===")
         print(f"  surface={len(targets)} gate-findings={len(blocking) + len(suppressed)} "
               f"debt-rows={len(debt_rows)}")
         for f in blocking:
@@ -891,7 +891,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--repo-root", default=str(REPO_ROOT))
     ap.add_argument("--check", action="store_true", help="run the debt-list integrity lint (diff-free)")
     ap.add_argument("--structural", action="store_true",
-                    help="full-surface structural gate (ADR-033): fail on any gate-tier "
+                    help="full-surface structural gate (ADR-034): fail on any gate-tier "
                          "lint finding not covered by docs/structural-lint-debt.md")
     ap.add_argument("--bootstrap", action="store_true",
                     help="(re)generate docs/skill-eval-debt.md from the live surface")

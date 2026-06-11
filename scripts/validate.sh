@@ -1941,7 +1941,7 @@ else
     if [ "${sl_total:-0}" -eq 0 ]; then
       pass "structural lint: no findings across the spec surface"
     else
-      warn "structural lint — advisory findings never fail the build; gate-tier findings are BLOCKING via eval_gate (diff-gate + --structural, §15a-bc-12590 Part 3 / ADR-033): $sl_summary"
+      warn "structural lint — advisory findings never fail the build; gate-tier findings are BLOCKING via eval_gate (diff-gate + --structural, §15a-bc-12590 Part 3 / ADR-034): $sl_summary"
       # Surface each finding as its own (indented) line under the banner; the
       # warnings counter stays at +1 so the debt surface can't drown other sections.
       # `|| true`: under `set -euo pipefail` a grep that filters everything exits 1
@@ -1971,7 +1971,7 @@ fi
 #      surface (no net-new command merges un-recorded; no stale row for a deleted
 #      command). This is what makes grandfathering + `# eval-waiver` explicit,
 #      finite, and never silent.
-#   3. The full-surface structural gate (`eval_gate.py --structural`, ADR-033 /
+#   3. The full-surface structural gate (`eval_gate.py --structural`, ADR-034 /
 #      BC-13213) is BLOCKING: gate-tier lint findings anywhere on the
 #      commands+skills surface fail unless covered by docs/structural-lint-debt.md.
 # ══════════════════════════════════════════════════════════════════════
@@ -2013,7 +2013,7 @@ else
   printf '%s\n' "$eg_check_out" | grep '^  PROBLEM' | sed 's/^/          /' >&2 || true
 fi
 
-# Part 3 — full-surface structural gate (ADR-033, BC-13213), BLOCKING. Diff-free →
+# Part 3 — full-surface structural gate (ADR-034, BC-13213), BLOCKING. Diff-free →
 # shallow-checkout-safe, so unlike the diff-gate it CAN live here. Gate-tier lint
 # findings across the WHOLE commands+skills surface fail the build unless covered
 # by a docs/structural-lint-debt.md row ((file, rule)-keyed; R2 rows carry a
@@ -2024,7 +2024,7 @@ fi
 # REQUIRED eval-gate CI job (.github/workflows/validate-plugin.yml § eval-gate).
 # exit 0 = clean; 1 = blocking finding / list-integrity problem; 2 = could-not-run.
 if [ ! -f "$eval_gate" ]; then
-  fail "scripts/eval/eval_gate.py not found — the ADR-033 full-surface structural gate cannot run"
+  fail "scripts/eval/eval_gate.py not found — the ADR-034 full-surface structural gate cannot run"
 elif eg_structural_out=$(python3 "$eval_gate" --structural 2>&1); then
   eg_structural_line=$(printf '%s\n' "$eg_structural_out" | sed -n 's/^STRUCTURAL //p' | tail -1)
   pass "full-surface structural gate (eval_gate --structural): ${eg_structural_line:-clean}"
