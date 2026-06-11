@@ -2009,8 +2009,15 @@ if [ ! -f "$eval_gate" ]; then
 elif eg_check_out=$(python3 "$eval_gate" --check 2>&1); then
   pass "debt-list integrity (eval_gate --check): debt ∩ ADAPTERS == ∅, debt ∪ ADAPTERS == surface"
 else
-  fail "debt-list integrity lint failed — docs/skill-eval-debt.md out of sync with the command surface / ADAPTERS (run: python3 scripts/eval/eval_gate.py --check)"
-  printf '%s\n' "$eg_check_out" | grep '^  PROBLEM' | sed 's/^/          /' >&2 || true
+  fail "debt-list integrity lint failed — docs/skill-eval-debt.md out of sync with the command surface / ADAPTERS, or the check could not run (run: python3 scripts/eval/eval_gate.py --check)"
+  # PROBLEM lines (exit 1) AND the ERROR: line (exit 2) — same could-not-run
+  # surfacing as Part 3 below (Greptile, PR #476): show the cause, not just "failed".
+  eg_check_detail=$(printf '%s\n' "$eg_check_out" | grep -E '^  PROBLEM|^ERROR:' || true)
+  if [ -n "$eg_check_detail" ]; then
+    printf '%s\n' "$eg_check_detail" | sed 's/^/          /' >&2
+  else
+    printf '%s\n' "$eg_check_out" | tail -5 | sed 's/^/          /' >&2
+  fi
 fi
 
 # Part 3 — full-surface structural gate (ADR-034, BC-13213), BLOCKING. Diff-free →
@@ -2029,8 +2036,18 @@ elif eg_structural_out=$(python3 "$eval_gate" --structural 2>&1); then
   eg_structural_line=$(printf '%s\n' "$eg_structural_out" | sed -n 's/^STRUCTURAL //p' | tail -1)
   pass "full-surface structural gate (eval_gate --structural): ${eg_structural_line:-clean}"
 else
-  fail "full-surface structural gate failed — a gate-tier structural finding is not covered by docs/structural-lint-debt.md, or the list has a stale/malformed row (run: python3 scripts/eval/eval_gate.py --structural)"
-  printf '%s\n' "$eg_structural_out" | grep -E '^  (BLOCK|PROBLEM)' | sed 's/^/          /' >&2 || true
+  fail "full-surface structural gate failed — a gate-tier structural finding is not covered by docs/structural-lint-debt.md, the list has a stale/malformed row, or the scan could not run (run: python3 scripts/eval/eval_gate.py --structural)"
+  # Surface BLOCK/PROBLEM lines (exit 1) AND the ERROR: line (exit 2 — could not
+  # run); if neither matched (unexpected output shape), dump the tail — a broken
+  # environment must be distinguishable from a policy violation (Greptile, PR #476).
+  # Capture-first (not `grep | sed || fallback`): the fallback must not depend on
+  # pipefail to see grep's exit status. `|| true` guards set -e on the no-match case.
+  eg_structural_detail=$(printf '%s\n' "$eg_structural_out" | grep -E '^  (BLOCK|PROBLEM)|^ERROR:' || true)
+  if [ -n "$eg_structural_detail" ]; then
+    printf '%s\n' "$eg_structural_detail" | sed 's/^/          /' >&2
+  else
+    printf '%s\n' "$eg_structural_out" | tail -5 | sed 's/^/          /' >&2
+  fi
 fi
 
 # ══════════════════════════════════════════════════════════════════════
