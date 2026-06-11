@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Social media strategy skill stub
 - Content strategy skill stub
 
+## [0.13.8] - 2026-06-10
+
+BC-13165 — activate the `brite_mcp` bulk-enrichment door in the marketing skills (the deferred Task 1 of BC-6170). The published `enrichment` MCP server already carries `bulk_enrich` and points at the live Railway REST door (BC-5316 / BC-13016); this grants the skills permission to call it, so selecting `brite_mcp` finally routes through the bulk door instead of silently falling through to `blitz_waterfall`. Opt-in only — the auto-detect default stays `blitz_waterfall` (the default-flip remains deferred pending an engine-maturity sign-off; see ADR-008 Future Work).
+
+### Changed
+- `list-building` + `tam-mapping` `allowed-tools`: granted `mcp__plugin_marketing_enrichment__bulk_enrich` so the `brite_mcp` enrichment provider is operative (least-privilege — only the bulk-door tool, not the whole enrichment surface).
+- Removed now-stale "pending BC-5316" caveats throughout both skills; reworded the `bulk_enrich`-unavailable fall-through message to a runtime-reachability reason ("MCP server not reachable") while keeping the `blitz_waterfall` safety net.
+- ADR-008: marked the config-invariant pair (server-SHA pin + `allowed-tools` grant) satisfied; kept the auto-detect default-flip deferred behind an engine-maturity sign-off (bulk-path robustness BC-13096 + throughput BC-6322).
+
 ## [0.10.0] - 2026-05-29
 
 BC-5537 (plugins half) — register the Brite Enrichment MCP (3-tool scaffold) so marketing skills can reach the enrichment engine.

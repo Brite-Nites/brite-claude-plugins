@@ -2,7 +2,7 @@
 name: tam-mapping
 description: Build TAM databases from scratch using a 7-phase methodology (Source Discovery → Keyword Expansion → Config → Collection → Dedup → Exclusion → Enrichment hand-off). Triggers "tam map", "build tam", "total addressable market", "scrape industry", "map the market", "build a lead database", "venue partnerships tam", "labs tam", "residential tam", "installer tam". Entity-routed — Nites residential (Google Maps ZIP), Supply installer (SAM.gov + Houzz + state license dbs), Labs venue partnerships (Spider.cloud + AI Ark + Discolike + IcyPeas + BlitzAPI + Prospeo + MillionVerifier). Phase 4.5 cross-workspace EB exclusion is MANDATORY (HARD-FAIL on either workspace unreachable). Phase 5 enrichment is pluggable per ADR-008. Distinct from `list-building` (BC-2717 — assumes a TAM already exists via dbt audience views).
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__plugin_marketing_spider__*, mcp__plugin_marketing_aiark__*, mcp__plugin_marketing_discolike__*, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, WebSearch, WebFetch, Read, Write, Bash
+allowed-tools: mcp__plugin_marketing_salesforce__*, mcp__plugin_marketing_spider__*, mcp__plugin_marketing_aiark__*, mcp__plugin_marketing_discolike__*, mcp__plugin_marketing_enrichment__bulk_enrich, mcp__emailbison-b2b__*, mcp__emailbison-personal__*, WebSearch, WebFetch, Read, Write, Bash
 metadata:
   version: 0.1.0
   upstream: Revgrowth1/ai-gtm-workflows + Revgrowth1/tam-map@9f5c72e74b
@@ -80,7 +80,7 @@ Read in priority order (per [ADR-008](../../../../docs/decisions/008-tam-mapping
    2. Else fall through to `blitz_waterfall`.
 4. `skip` is never auto-selected; it must be passed explicitly.
 
-`brite_mcp` is **opt-in only** during the choice-now-default-later interim (BC-6170) — it is **not** auto-selected even when the brite-enrichment MCP is registered. Reach it via the `--enrichment-provider brite_mcp` flag or `${user_config.enrichment_provider}`. It is intentionally **not** in this skill's `allowed-tools` yet — an explicit opt-in that finds `bulk_enrich` absent in-session falls through to `blitz_waterfall`. **Two prerequisites must land together (a config-invariant pair): the BC-5316 redeploy of the published server with `bulk_enrich` AND this skill's `allowed-tools` grant — shipping one without the other leaves the opt-in silently inoperative.** When both land (plus an engine-maturity sign-off), ADR-008's Future Work flip moves `brite_mcp` to the front of this cascade as the default.
+`brite_mcp` is a **selectable opt-in** during the choice-now-default-later interim (BC-6170 → activated by BC-13165) — it is **not** auto-selected even when the brite-enrichment MCP is registered. Reach it via the `--enrichment-provider brite_mcp` flag or `${user_config.enrichment_provider}`; it **is** granted in this skill's `allowed-tools` (`mcp__plugin_marketing_enrichment__bulk_enrich`), so an explicit opt-in routes the candidate list through the bulk door. If the brite-enrichment MCP server is unreachable in-session, it falls through to `blitz_waterfall`. **The `allowed-tools` grant and the `.mcp.json` server-SHA pin are a config-invariant pair — keep them in lockstep: rolling the pin back to a SHA without `bulk_enrich` silently disables the opt-in (it degrades to the fall-through, not an error).** The auto-detect **default-flip** (moving `brite_mcp` to the front of this cascade) remains deferred pending an engine-maturity sign-off — see ADR-008 Future Work.
 
 The resolved provider is logged at skill invocation so the user sees which path ran (e.g., `[tam-mapping] enrichment_provider=blitz_waterfall (auto-detected; $BRITE_DATA_PLATFORM unset → brite_cli unavailable)`). See the canonical 4-row enum table in [§3 Phase 5](#phase-5--enrichment-hand-off-pluggable) for per-value implementation and fallback messages.
 
@@ -299,7 +299,7 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 |---|---|---|
 | `blitz_waterfall` | Shells to `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input> --out enriched.jsonl` (BlitzAPI 5 req/s serialized, Prospeo fallback max 20 workers) | **Default. Production-ready.** |
 | `brite_cli` | Shells to `services/enrichment/cli.py` in brite-data-platform | Pending repo wiring; falls through to `blitz_waterfall` if repo missing locally |
-| `brite_mcp` | Routes the whole candidate list through the `bulk_enrich` bulk door (`mcp__plugin_marketing_enrichment__bulk_enrich` → REST `/enrich/batch`, per [ADR-017](https://github.com/Brite-Nites/brite-data-platform/blob/main/docs/decisions/017-bulk-enrichment-door.md)) — **never** a per-company loop of single `enrich_contacts` calls. | **Selectable (opt-in).** The published plugin server lacks `bulk_enrich` until it is redeployed (BC-5316); until then, if `bulk_enrich` is unavailable in-session, `brite_mcp` logs `brite_mcp selected but bulk_enrich unavailable — using blitz_waterfall (pending BC-5316)` and falls through to `blitz_waterfall`. Intentionally **not** in `allowed-tools` until the BC-5316 redeploy; becomes the auto-detect default at that flip. |
+| `brite_mcp` | Routes the whole candidate list through the `bulk_enrich` bulk door (`mcp__plugin_marketing_enrichment__bulk_enrich` → REST `/enrich/batch`, per [ADR-017](https://github.com/Brite-Nites/brite-data-platform/blob/main/docs/decisions/017-bulk-enrichment-door.md)) — **never** a per-company loop of single `enrich_contacts` calls. | **Selectable (opt-in); granted in `allowed-tools` (BC-13165).** Selecting it routes the whole list through the bulk door. If `bulk_enrich` is unavailable in-session (the brite-enrichment MCP server failed to register/spawn), `brite_mcp` logs `brite_mcp selected but bulk_enrich unavailable in-session (MCP server not reachable) — using blitz_waterfall` and falls through to `blitz_waterfall`. Still **not** the auto-detect default — that default-flip is deferred pending an engine-maturity sign-off (ADR-008 Future Work). |
 | `skip` | No enrichment — pass through unenriched | Opt-in for testing or for handing off to BC-2717 list-building (which has its own enrichment pre-flight) |
 
 **Pre-flight (all providers):**
@@ -401,7 +401,7 @@ Organized by phase + reason:
 | Phase 4.5 — workspace 2 exclusion | `mcp__emailbison-personal__list_leads` | Email Bison personal workspace | ADR 2a — two-workspace requirement (per BC-5832 scope) |
 | Phase 4.5 — SF exclusion | `mcp__plugin_marketing_salesforce__run_soql_query` | brite-salesforce (production org) | ADR 2a (CRM SoR) |
 | Phase 5 — enrichment (default) | `Bash` → `enrich_waterfall.py` | BlitzAPI + Prospeo | ADR-008 default `blitz_waterfall` |
-| Phase 5 — enrichment (opt-in `brite_mcp`) | `mcp__plugin_marketing_enrichment__bulk_enrich` | brite-enrichment | ADR-008 + ADR-017 (bulk door; published-server redeploy pending BC-5316) |
+| Phase 5 — enrichment (opt-in `brite_mcp`) | `mcp__plugin_marketing_enrichment__bulk_enrich` | brite-enrichment | ADR-008 + ADR-017 (bulk door) |
 | Phase 6 — SMTP verify (Labs) | `Bash` → `verify_smtp.py` | MillionVerifier | tam-map upstream |
 | Phase 7 — tier delegation (Labs) | invoke `icp-scoring` skill | n/a (in-plugin delegation) | BC-5831 + tam-map-port-policy.md §4 |
 | Cross-repo handbook reads | `Bash` → `gh api repos/Brite-Nites/handbook/contents/...` | Brite-Nites/handbook (private repo) | `reference_handbook_access.md` |
@@ -597,7 +597,7 @@ docs/campaigns/labs/tam/{slug}/
 | 10 | Runs the entity-correct phase route end-to-end. Cites all 16 source categories in Phase 1 manifest. Phase 4.5 exclusion runs against BOTH EB workspaces + SF, HARD-FAILS on missing token. Cost gate fires before Phase 5. Open-tracking-OFF reminder emitted verbatim. Catch-all isolation enforced (Labs). Free-email filter applied (Labs). Resume detection works without restarting from Phase 1. References ADR-008 for enrichment pluggability. Cross-links to BC-2717 / BC-5826 / BC-5831 are present. |
 | 7-9 | Same as 10 but skips one verification — e.g. forgets the open-tracking reminder, OR skips the cost gate, OR runs Phase 4.5 against only one EB workspace. Output is functional but missing one architectural rule. |
 | 4-6 | Runs the phases but skips Phase 4.5 entirely OR mixes catch-all into tier CSVs OR uses pattern-based email recovery on single-location businesses OR restarts from Phase 1 on resume. Functional but violates a core rule. |
-| 1-3 | Hallucinates source taxonomy. Calls unregistered MCP tools (e.g., `mcp__plugin_marketing_enrichment__bulk_enrich` before it exists on the published server — pending BC-5316 — instead of falling through to `blitz_waterfall`). Skips IcyPeas free-count and pulls credits blind. Outputs `gmail`/`yahoo` addresses in tier CSVs. Hard-fails silently. |
+| 1-3 | Hallucinates source taxonomy. Calls MCP tools not registered in the current session (e.g., `mcp__plugin_marketing_enrichment__bulk_enrich` when the brite-enrichment server failed to spawn — instead of falling through to `blitz_waterfall`). Skips IcyPeas free-count and pulls credits blind. Outputs `gmail`/`yahoo` addresses in tier CSVs. Hard-fails silently. |
 
 ---
 
@@ -632,7 +632,7 @@ docs/campaigns/labs/tam/{slug}/
 6. If `docs/marketing-context.md` exists, output must reference Brite entity from that file in the Phase 1 manifest.
 7. If `mcp__emailbison-b2b__get_active_workspace_info` returns auth failure, skill HARD-FAILS at Phase 4.5 — does NOT proceed to Phase 5.
 8. If `mcp__emailbison-personal__get_active_workspace_info` returns auth failure (with b2b OK), skill STILL HARD-FAILS at Phase 4.5 — both must succeed.
-9. If `${user_config.enrichment_provider}` is `brite_mcp` and `bulk_enrich` is unavailable in-session, output emits `brite_mcp selected but bulk_enrich unavailable — using blitz_waterfall (pending BC-5316)` and falls through to `blitz_waterfall`.
+9. If `${user_config.enrichment_provider}` is `brite_mcp` and `bulk_enrich` is unavailable in-session, output emits `brite_mcp selected but bulk_enrich unavailable in-session (MCP server not reachable) — using blitz_waterfall` and falls through to `blitz_waterfall`.
 10. If `${user_config.enrichment_provider}` is `skip`, Phase 5 short-circuits; downstream Phases 6+7 still run for Labs.
 11. Open-tracking-OFF reminder appears as verbatim string `OPEN-TRACKING DISABLED` in Phase 1 output (grep test in evals).
 12. Cost-estimate string `estimated enrichment cost:` appears in output before any Phase 5 enrichment call (grep test in evals).

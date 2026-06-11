@@ -124,7 +124,7 @@
         "user_message": "Build a Labs ski-resorts TAM."
       },
       "assertions": [
-        { "type": "contains", "value": "pending BC-5537/5538 GA" },
+        { "type": "contains", "value": "unavailable in-session" },
         { "type": "falls_through_to_provider", "value": "blitz_waterfall" }
       ]
     },
