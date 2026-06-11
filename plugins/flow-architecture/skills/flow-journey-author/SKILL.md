@@ -1,6 +1,6 @@
 ---
 name: flow-journey-author
-description: Per-domain journey doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes ONE markdown file at `docs/product/journeys/<domain>.md` per domain, conforming to the Q26 locked template (variable phase count per Q26 mod 5; ~290-450+ lines based on TEAM precedent). Hybrid authoring — programmatic substitution for 8 deterministic top-level YAML keys + 2 body items; single `Agent(general-purpose)` call for 7-9 narrative sections (single-agent preserves cross-phase narrative continuity). Runs AFTER `flow-doc-author` so story docs are available as authoring context. 1 agent per domain; parallel across domains for multi-domain scaffolds with a concurrency cap of ~10 to avoid Claude Code background-agent queueing. 0 synchronous gates in default mode. Per-domain footprint ~90s; wall time scales as `ceil(N/10) * ~90s` — N≤10 domains finish in ~90s, N=27 finishes in ~270s (3 batches under the cap).
+description: Per-domain journey doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes ONE markdown file at `docs/product/journeys/<domain>.md` per domain, conforming to the Q26 locked template (variable phase count per Q26 mod 5; ~290-450+ lines based on TEAM precedent). Hybrid authoring — programmatic substitution for 8 deterministic top-level YAML keys + 2 body items; single `Agent(journey-doc-author)` call for 7-9 narrative sections (single-agent preserves cross-phase narrative continuity). Runs AFTER `flow-doc-author` so story docs are available as authoring context. 1 agent per domain; parallel across domains for multi-domain scaffolds with a concurrency cap of ~10 to avoid Claude Code background-agent queueing. 0 synchronous gates in default mode. Per-domain footprint ~90s; wall time scales as `ceil(N/10) * ~90s` — N≤10 domains finish in ~90s, N=27 finishes in ~270s (3 batches under the cap).
 user-invocable: false
 disable-model-invocation: true
 allowed-tools: Agent, Bash, Read, Write, Edit, Glob, Grep
@@ -13,7 +13,7 @@ metadata:
 
 # flow-journey-author
 
-Per-domain journey doc authoring sub-skill. Writes ONE markdown file per domain conforming to the Q26 locked journey-doc template. Single `Agent(general-purpose)` per domain --- multi-agent staged authoring is parked for v1.1 if domain content bloats past context limits.
+Per-domain journey doc authoring sub-skill. Writes ONE markdown file per domain conforming to the Q26 locked journey-doc template. Single `Agent(journey-doc-author)` per domain --- multi-agent staged authoring is parked for v1.1 if domain content bloats past context limits.
 
 This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
@@ -26,6 +26,8 @@ The full design rationale lives in `docs/design-rationale/fda-plugin-interview.m
 ## 1. Authoring strategy (Q16.1) --- hybrid
 
 ### Programmatic substitution (8 deterministic YAML keys + 2 body items)
+
+> **Deferred (BC-13028 residual):** unlike the story-doc side (which extracted `build_story_frontmatter.py` per BC-13168), this journey frontmatter is still stamped LLM-side — there is no extracted, fixture-locked builder yet. A journey stamper is blocked on pinning the journey frontmatter canon first (the `milestone` BC-vs-UUID semantic, the undeclared `linear_project_id` source, and reconciling this §1 ↔ the `domain-journey.md` template ↔ real produced docs). BC-13168 fixed only the dispatch identity (`Agent(general-purpose)` → `Agent(journey-doc-author)`); the deterministic stamp + schema canon are tracked on BC-13028.
 
 | YAML key | Source |
 |---|---|
@@ -42,7 +44,7 @@ Body deterministic items: H1 title `# <DOMAIN> --- <Display name>`; doc-type blo
 
 ### Agent-authored sections
 
-Single `Agent(general-purpose)` call writes 7-9 narrative sections:
+Single `Agent(journey-doc-author)` call writes 7-9 narrative sections:
 
 - **7 always-required:**
   1. `## Actor / Persona`
