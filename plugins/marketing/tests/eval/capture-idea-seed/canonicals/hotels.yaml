@@ -1,0 +1,15 @@
+slug: hotels
+display: "Hotels"
+personas:
+  - slug: gm
+    display: "General Manager"
+    titles:
+      - "General Manager"
+      - "GM"
+offers:
+  - slug: lobby-lighting
+    display: "Lobby Holiday Lighting"
+    status: live
+    posture: pilot
+    target_personas:
+      - gm

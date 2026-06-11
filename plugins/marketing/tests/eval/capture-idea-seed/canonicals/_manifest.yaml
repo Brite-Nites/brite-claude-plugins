@@ -1,0 +1,10 @@
+# FROZEN canonicals seed for the /marketing:capture-idea behavioral eval (BC-13161).
+# Self-contained — NOT a copy of plugins/marketing/data/canonicals. Two verticals:
+#   hotels — has a canonical persona + offer (drives FULL + the FULL→VERTICAL-ONLY
+#            downgrade when the LLM proposes a slug absent from this yaml)
+#   zoos   — in the manifest but skeleton (empty personas/offers) → VERTICAL-ONLY
+# A candidate_vertical absent from this list (e.g. underwater-basket-weaving) → NO match.
+schema_version: 2
+verticals:
+  - hotels
+  - zoos

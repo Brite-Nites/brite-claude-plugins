@@ -1,0 +1,488 @@
+{
+  "schema_version": 1,
+  "command": "/marketing:capture-idea",
+  "scenarios": [
+    {
+      "id": "sketch_floor",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "National Park Gobo Series",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Projected park-scene gobos for venue lighting\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "maturing_full",
+      "error": null,
+      "status": "Maturing",
+      "missing_for_completeness": [],
+      "match_state": "no",
+      "label_name": "status:maturing",
+      "save_issue_payload": {
+        "title": "Botanical Gardens Ticketed Walkthrough",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Maturing]\n\n## Concept\n**One-sentence offer:** Lit after-dark walkthrough for botanical gardens, ticketed rev-share\n**Brand fit:** Brite Labs\n**Source / inspiration:** Canyons Creative Concepts deck p12\n\n## Detail (encouraged)\n**Target ICP guess:** Regional botanical gardens, 50k+ annual visitors\n**Commercial model guess:** rev share\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:maturing"
+        ]
+      }
+    },
+    {
+      "id": "brand_unsure_suppressed",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Botanical Gardens Ticketed Walkthrough",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Lit after-dark walkthrough for botanical gardens, ticketed rev-share\n**Brand fit:** unsure\n**Source / inspiration:** Canyons Creative Concepts deck p12\n\n## Detail (encouraged)\n**Target ICP guess:** Regional botanical gardens, 50k+ annual visitors\n**Commercial model guess:** rev share\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "brand_multi_passes",
+      "error": null,
+      "status": "Maturing",
+      "missing_for_completeness": [],
+      "match_state": "no",
+      "label_name": "status:maturing",
+      "save_issue_payload": {
+        "title": "Cross-Brand Holiday Bundle",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Maturing]\n\n## Concept\n**One-sentence offer:** Joint Nites + Labs holiday lighting package for multi-venue operators\n**Brand fit:** multi\n**Source / inspiration:** Q3 planning offsite\n\n## Detail (encouraged)\n**Target ICP guess:** Multi-venue operators\n**Commercial model guess:** hybrid\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:maturing"
+        ]
+      }
+    },
+    {
+      "id": "source_blank_sketch",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "source"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Botanical Gardens Ticketed Walkthrough",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Lit after-dark walkthrough for botanical gardens, ticketed rev-share\n**Brand fit:** Brite Labs\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** Regional botanical gardens, 50k+ annual visitors\n**Commercial model guess:** rev share\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "maturing_icp_only",
+      "error": null,
+      "status": "Maturing",
+      "missing_for_completeness": [
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:maturing",
+      "save_issue_payload": {
+        "title": "Zoo Holiday Walkthrough",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Maturing]\n\n## Concept\n**One-sentence offer:** After-dark lit zoo walkthrough, ticketed\n**Brand fit:** Brite Labs\n**Source / inspiration:** zoo ops call\n\n## Detail (encouraged)\n**Target ICP guess:** Regional zoos, 100k+ visitors\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:maturing"
+        ]
+      }
+    },
+    {
+      "id": "maturing_model_only",
+      "error": null,
+      "status": "Maturing",
+      "missing_for_completeness": [
+        "ICP"
+      ],
+      "match_state": "no",
+      "label_name": "status:maturing",
+      "save_issue_payload": {
+        "title": "Zoo Holiday Walkthrough",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Maturing]\n\n## Concept\n**One-sentence offer:** After-dark lit zoo walkthrough, ticketed\n**Brand fit:** Brite Labs\n**Source / inspiration:** zoo ops call\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** ticketed\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:maturing"
+        ]
+      }
+    },
+    {
+      "id": "neither_icp_nor_model_sketch",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Zoo Holiday Walkthrough",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** After-dark lit zoo walkthrough, ticketed\n**Brand fit:** Brite Labs\n**Source / inspiration:** zoo ops call\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "footer_no_match",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Underwater Basket Lighting",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Submersible accent lighting for niche venues\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "footer_vertical_only",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "vertical-only",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Zoo Lobby Lighting Pitch",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Seasonal lit installs for zoo entrances\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nVertical `zoos` is canonical, but it has no canonical persona/offer yet. First `/marketing:new-persona --vertical zoos --slug <persona-slug> --display \"<Persona Name>\"` and `/marketing:new-offer --vertical zoos --slug <offer-slug> --display \"<Offer Name>\" --posture <knowledge|free-asset|pilot|risk-reversal>`, then `/marketing:plan-campaign --vertical zoos --persona <persona-slug> --offer <offer-slug>`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "footer_full",
+      "error": null,
+      "status": "Maturing",
+      "missing_for_completeness": [],
+      "match_state": "full",
+      "label_name": "status:maturing",
+      "save_issue_payload": {
+        "title": "Hotel Lobby Holiday Lighting",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Maturing]\n\n## Concept\n**One-sentence offer:** Seasonal lit installs for hotel lobbies\n**Brand fit:** Brite Labs\n**Source / inspiration:** hotel GM intro call\n\n## Detail (encouraged)\n**Target ICP guess:** Boutique hotels\n**Commercial model guess:** install fee\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nRun `/marketing:plan-campaign --vertical hotels --persona gm --offer lobby-lighting` to scaffold the full campaign.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:maturing"
+        ]
+      }
+    },
+    {
+      "id": "footer_downgrade",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "vertical-only",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Hotel Rooftop Lighting",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Rooftop bar lighting for hotels\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nVertical `hotels` is canonical and already has canonical entries, but this idea didn't map to an existing persona + offer pair. Reuse an existing canonical persona + offer for `hotels` (don't create duplicates), then `/marketing:plan-campaign --vertical hotels --persona <persona-slug> --offer <offer-slug>`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "with_lead",
+      "error": null,
+      "status": "Maturing",
+      "missing_for_completeness": [],
+      "match_state": "no",
+      "label_name": "status:maturing",
+      "save_issue_payload": {
+        "title": "Aquarium Tunnel Lighting",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Maturing]\n\n## Concept\n**One-sentence offer:** Immersive tunnel lighting for aquariums\n**Brand fit:** Brite Labs\n**Source / inspiration:** aquarium ops email\n\n## Detail (encouraged)\n**Target ICP guess:** Mid-size aquariums\n**Commercial model guess:** co invest\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [x] Named lead / champion identified — Sarah Chen\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:maturing"
+        ]
+      }
+    },
+    {
+      "id": "brand_model_normalized",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "source",
+        "ICP"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Auto Dealership Lot Lighting",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Year-round lot accent lighting for dealerships\n**Brand fit:** Brite Supply\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** install fee\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "error_offer_missing",
+      "error": "offer_missing",
+      "status": null,
+      "missing_for_completeness": null,
+      "match_state": null,
+      "label_name": null,
+      "save_issue_payload": null
+    },
+    {
+      "id": "degenerate_canonical_state",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "vertical-only",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Degenerate State Guard",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Proves a malformed injected read coerces, not crashes\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nVertical `hotels` is canonical, but it has no canonical persona/offer yet. First `/marketing:new-persona --vertical hotels --slug <persona-slug> --display \"<Persona Name>\"` and `/marketing:new-offer --vertical hotels --slug <offer-slug> --display \"<Offer Name>\" --posture <knowledge|free-asset|pilot|risk-reversal>`, then `/marketing:plan-campaign --vertical hotels --persona <persona-slug> --offer <offer-slug>`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "hostile_field_inert",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Injection Guard",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** $(touch pwned) and @mention — rendered as inert body text\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "nondict_parsed_fields",
+      "error": "offer_missing",
+      "status": null,
+      "missing_for_completeness": null,
+      "match_state": null,
+      "label_name": null,
+      "save_issue_payload": null
+    },
+    {
+      "id": "nondict_injected_reads",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Degenerate Injected Reads",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": null,
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Proves a non-dict injected_reads coerces, not crashes\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on —. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "null_capture_date",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Missing Capture Date",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Proves a missing capture date renders an em-dash, not None\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on —. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "nonhashable_brand",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": "Unhashable Brand Guard",
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Proves a non-string brand value coerces to unsure, not a TypeError crash\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    },
+    {
+      "id": "name_blank_offer_present",
+      "error": null,
+      "status": "Sketch",
+      "missing_for_completeness": [
+        "brand fit",
+        "source",
+        "ICP",
+        "commercial model"
+      ],
+      "match_state": "no",
+      "label_name": "status:sketch",
+      "save_issue_payload": {
+        "title": null,
+        "team": "Brite Company",
+        "project": "Brite GTM",
+        "milestone": "1714a6b6-64cb-4ddf-8e95-ab7eb844d3b8",
+        "description": "**Status:** [Sketch]\n\n## Concept\n**One-sentence offer:** Files with a null title — the concept name is derived from the offer at runtime (offer-only required-to-file guard)\n**Brand fit:** unsure\n**Source / inspiration:** —\n\n## Detail (encouraged)\n**Target ICP guess:** —\n**Commercial model guess:** —\n**Cross-references:** —\n**Next move to mature:** —\n\n## Promotion criteria — graduate to a campaign milestone when ALL are true\n- [ ] Named lead / champion identified\n- [ ] Target ICP defined (not just guessed)\n- [ ] Commercial model decided\n- [ ] At least one named reference account or prospect\n- [ ] Owner assigned for Phase 2+\n\n## When ready to promote\nNo canonical vertical yet. First `/marketing:new-vertical --slug <v> --display \"<Vertical Name>\"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.\n\n---\n_Captured via `/marketing:capture-idea` on 2026-06-10. Concept Library tier-1 intake; promotion is a separate, deliberate step._",
+        "state": "Backlog",
+        "priority": 0,
+        "labels": [
+          "status:sketch"
+        ]
+      }
+    }
+  ]
+}

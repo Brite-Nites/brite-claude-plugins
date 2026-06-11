@@ -2,6 +2,7 @@
 description: Capture a lightweight GTM campaign idea as a Concept Library issue in the "Brite GTM" Linear project — the tier-1 intake that sits upstream of /marketing:plan-campaign. Brain-dump-first (free text OR flags), parses the idea into the canonical 9-field concept template, auto-derives a [Sketch]/[Maturing] status, soft-warns on likely duplicates, and files into the [CONCEPT LIBRARY] milestone with a promotion-criteria checklist + a plan-campaign handoff. Does NOT write a full brief and does NOT promote — those stay with /marketing:plan-campaign. Triggers on "capture idea", "log a GTM idea", "jot down a campaign idea", "half-baked idea", "concept library", "add a concept", or direct /marketing:capture-idea invocation.
 argument-hint: "[<free-text idea>] [--name <title>] [--offer <one-sentence>] [--brand <nites|labs|supply|multi|unsure>] [--source <text>] [--icp <text>] [--commercial-model <install-fee|rev-share|ticketed|sponsor|co-invest|hybrid>] [--cross-refs <text>] [--next-move <text>] [--lead <name|email>] [--dry-run]"
 allowed-tools: Read, AskUserQuestion, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_workflows_linear-server__create_issue_label, mcp__plugin_workflows_linear-server__save_issue
+disable-model-invocation: true
 ---
 
 # /marketing:capture-idea
@@ -75,7 +76,7 @@ Never fabricate specifics the dump didn't contain — every field **except the o
 Read `plugins/marketing/data/canonicals/_manifest.yaml` (valid vertical slugs), then — for the **best-guess candidate vertical only** (at most 1–2, read by explicit path; never glob all 27) — its `plugins/marketing/data/canonicals/<vertical>.yaml` (`personas[]`, `offers[]`). Try to map the idea's audience/offer to a canonical `vertical` (+ `persona`/`offer` if obvious). Record the match as one of **three** states — most verticals are skeletons today (empty `personas[]`/`offers[]`), so the partial case is common, not rare:
 
 - **Full match** — vertical in the manifest AND a `persona` + `offer` confidently map to entries in that vertical's yaml. Record all three slugs.
-- **Vertical-only match** — vertical in the manifest, but its yaml has no matching (or no) `personas[]`/`offers[]`. Record the vertical slug only.
+- **Vertical-only match** — vertical in the manifest, but its yaml has no matching (or no) `personas[]`/`offers[]`. Record the vertical slug only. (Two sub-cases drive distinct Step-7 footers: the vertical has *no* canonical entries yet → guide toward creating them; the vertical *has* entries but this idea didn't map to a pair → guide toward reusing them, never toward a duplicate.)
 - **No match** — the audience doesn't map to any canonical vertical.
 
 This NEVER blocks, NEVER requires canonical input, and NEVER creates canonicals. Free text is the source of truth.
@@ -86,7 +87,7 @@ This NEVER blocks, NEVER requires canonical input, and NEVER creates canonicals.
 - `[Sketch]` — otherwise (the floor: name + offer).
 - `[Ready-to-promote]` — **never auto-set.** It's a deliberate human call against the promotion criteria; mention in Step 11 output how to get there.
 
-Compute the **missing-for-completeness** list (which required/encouraged fields are still blank) for the confirm + output.
+Compute the **missing-for-completeness** list for the confirm + output: the four maturity-relevant fields still blank, in this **fixed order** — **brand fit** (counted as missing when `unsure`), **source**, **ICP** (the Target ICP guess), **commercial model**. The one-sentence offer is never listed (it's required-to-file); **cross-references** and **next move** are encouraged extras that don't drive maturity and are excluded. The list is *not* the status predicate — a `[Maturing]` concept can still carry a non-empty list (e.g. it has an ICP guess but no commercial model). *(This deterministic core — the status predicate, the 3-state footer, the label, and the `save_issue` payload — is mirrored in `plugins/marketing/scripts/build_concept_payload.py` and locked by its behavioral eval; keep the two in parity.)*
 
 ## Step 6 — Duplicate soft-check
 
@@ -119,7 +120,9 @@ Render Markdown in this exact order (blank encouraged fields show `—`):
 
 ## When ready to promote
 <FULL match:> Run `/marketing:plan-campaign --vertical <v> --persona <p> --offer <o>` to scaffold the full campaign.
-<VERTICAL-ONLY match:> Vertical `<v>` is canonical, but it has no canonical persona/offer yet. First `/marketing:new-persona --vertical <v> --slug <persona-slug> --display "<Persona Name>"` and `/marketing:new-offer --vertical <v> --slug <offer-slug> --display "<Offer Name>" --posture <knowledge|free-asset|pilot|risk-reversal>`, then `/marketing:plan-campaign --vertical <v> --persona <persona-slug> --offer <offer-slug>`.
+<VERTICAL-ONLY match — vertical canonical but the persona/offer didn't both resolve. Two sub-cases:>
+  <(a) the vertical has NO canonical personas/offers yet:> Vertical `<v>` is canonical, but it has no canonical persona/offer yet. First `/marketing:new-persona --vertical <v> --slug <persona-slug> --display "<Persona Name>"` and `/marketing:new-offer --vertical <v> --slug <offer-slug> --display "<Offer Name>" --posture <knowledge|free-asset|pilot|risk-reversal>`, then `/marketing:plan-campaign --vertical <v> --persona <persona-slug> --offer <offer-slug>`.
+  <(b) the vertical ALREADY has canonical entries but this idea didn't map to an existing persona+offer pair:> Vertical `<v>` is canonical and already has canonical entries, but this idea didn't map to an existing persona + offer pair. Reuse an existing canonical persona + offer for `<v>` (don't create duplicates), then `/marketing:plan-campaign --vertical <v> --persona <persona-slug> --offer <offer-slug>`.
 <NO match:> No canonical vertical yet. First `/marketing:new-vertical --slug <v> --display "<Vertical Name>"`, then `/marketing:new-persona` + `/marketing:new-offer` (as above), then `/marketing:plan-campaign`.
 
 ---

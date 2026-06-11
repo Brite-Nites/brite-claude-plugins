@@ -2889,6 +2889,152 @@ _PLAN_QA = PlanSectionAdapter("qa", ("qa_scope_reduction",))
 _PLAN_DOCS = PlanSectionAdapter("docs", ("docs_hold_scope_rationale",))
 
 
+# ── marketing capture-idea adapter (BC-13161, ADR-028 Phase-2) ────────────────
+#
+# The eval for /marketing:capture-idea — the LAST grandfathered command (taking the
+# grandfathered count to 0 / closing BC-12700 DoD #1). Its builder is the pure
+# decide(parsed_fields, injected_reads) core the command delegates to for the
+# NON-conversational parts of the tier-1 idea intake: the [Sketch]/[Maturing] status
+# predicate, the missing-for-completeness list, the 3-state canonical-match footer
+# (classified over a FROZEN canonicals seed — incl. the FULL→VERTICAL-ONLY downgrade
+# when the LLM proposes a slug absent from the yaml), the status label name, and the
+# save_issue PAYLOAD (incl. the fully-rendered Step-7 body). The free-text brain-dump
+# parse, the idea→vertical/persona/offer mapping, and the duplicate noun-compare are
+# the LLM parts — held out / fixtured (ADR-028 D2). Same build→collect→project→check
+# →golden shape as RaiseTicketAdapter.
+
+
+class CaptureIdeaAdapter:
+    """Emit adapter for /marketing:capture-idea: drive build_concept_payload.py."""
+
+    command_id = "capture-idea"
+    artifact_names = ("concept-emit.json",)
+
+    _eval_dir = REPO_ROOT / "plugins/marketing/tests/eval"
+    fixture_path = _eval_dir / "capture-idea.fixture.json"
+    golden_path = _eval_dir / "capture-idea.golden.json"
+    schema_path = _eval_dir / "capture-idea.schema.json"
+
+    builder = REPO_ROOT / "plugins/marketing/scripts/build_concept_payload.py"
+    seed_dir = _eval_dir / "capture-idea-seed"
+
+    # The scenario ids the eval expects, in order — a FLOOR-style guard so a fixture
+    # that silently drops a branch (the brand suppressor, the footer downgrade, the
+    # offer-missing reject, a totality guard) is caught by check() with a named diff.
+    EXPECTED_SCENARIO_IDS = (
+        "sketch_floor", "maturing_full", "brand_unsure_suppressed", "brand_multi_passes",
+        "source_blank_sketch", "maturing_icp_only", "maturing_model_only",
+        "neither_icp_nor_model_sketch", "footer_no_match", "footer_vertical_only",
+        "footer_full", "footer_downgrade", "with_lead", "brand_model_normalized",
+        "error_offer_missing", "degenerate_canonical_state", "hostile_field_inert",
+        "nondict_parsed_fields", "nondict_injected_reads", "null_capture_date",
+        "nonhashable_brand", "name_blank_offer_present",
+    )
+
+    def build(self, fixture: dict, sandbox: Path) -> None:
+        sandbox.mkdir(parents=True, exist_ok=True)
+        fixture_file = sandbox / "_fixture.json"
+        fixture_file.write_text(json.dumps(fixture), encoding="utf-8")
+        env = {k: v for k, v in os.environ.items() if k not in HERMETIC_DENY}
+        proc = subprocess.run(
+            [sys.executable, str(self.builder),
+             "--scenarios", str(fixture_file), "--out-dir", str(sandbox),
+             "--seed-dir", str(self.seed_dir)],
+            capture_output=True, text=True, env=env,
+        )
+        if proc.returncode != 0:
+            raise EvalError(
+                f"emit failed (build_concept_payload.py exit {proc.returncode}):\n"
+                f"{proc.stderr.strip()}"
+            )
+
+    def collect(self, artifact_dir: Path) -> dict:
+        out: dict = {}
+        for name in self.artifact_names:
+            p = artifact_dir / name
+            if not p.exists():
+                raise EvalError(f"expected artifact missing: {p}")
+            try:
+                out[name] = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise EvalError(f"{name} is not valid JSON: {exc}") from exc
+        return out
+
+    @staticmethod
+    def project(emit: dict) -> dict:
+        """Every field is deterministic (the parse is held out / fixtured, the capture
+        date is injected, the body renders from those), so the projection is the
+        artifact itself — the golden full-pins the matrix incl. each rendered body."""
+        return {
+            "schema_version": emit["schema_version"],
+            "command": emit["command"],
+            "scenarios": emit["scenarios"],
+        }
+
+    def check(self, artifacts: dict, fixture: dict) -> Result:
+        emit = artifacts["concept-emit.json"]
+        golden = json.loads(self.golden_path.read_text(encoding="utf-8"))
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+
+        schema_diffs = combine(
+            assert_lib.schema_validate(emit, schema, artifact="concept-emit.json")
+        )
+        if not schema_diffs.ok:
+            return schema_diffs
+
+        diffs: list = []
+        got_ids = [s["id"] for s in emit["scenarios"]]
+        for sid in self.EXPECTED_SCENARIO_IDS:
+            if sid not in got_ids:
+                diffs.append(f"concept-emit.json: expected scenario id '{sid}' is absent from the matrix")
+
+        for s in emit["scenarios"]:
+            tag = f"concept-emit.json $.scenarios[id={s['id']}]"
+            if s["error"] is not None:
+                # A reject row produces no projection.
+                for k in ("status", "missing_for_completeness", "match_state",
+                          "label_name", "save_issue_payload"):
+                    if s[k] is not None:
+                        diffs.append(f"{tag}: {k} must be null on an error row, got {s[k]!r}")
+                continue
+            # Success-row invariants (hold regardless of the golden — they catch a
+            # builder change that also re-blessed the golden self-consistently).
+            if s["status"] not in ("Sketch", "Maturing"):
+                diffs.append(f"{tag}: a filed concept must derive Sketch|Maturing, got {s['status']!r}")
+            if s["match_state"] not in ("no", "vertical-only", "full"):
+                diffs.append(f"{tag}: match_state must be one of no|vertical-only|full, got {s['match_state']!r}")
+            exp_label = "status:maturing" if s["status"] == "Maturing" else "status:sketch"
+            if s["label_name"] != exp_label:
+                diffs.append(f"{tag}: label_name {s['label_name']!r} does not match status {s['status']!r}")
+            p = s["save_issue_payload"]
+            if not isinstance(p, dict):
+                diffs.append(f"{tag}: a filed concept must carry a save_issue_payload object, got {p!r}")
+            else:
+                if p.get("labels") != [exp_label]:
+                    diffs.append(f"{tag}: payload labels {p.get('labels')!r} must be [{exp_label!r}]")
+                if f"[{s['status']}]" not in (p.get("description") or ""):
+                    diffs.append(f"{tag}: rendered body must carry the [{s['status']}] status line")
+
+        golden_diffs = assert_lib.golden_compare(
+            self.project(emit), golden, artifact="concept-emit.json"
+        )
+        return combine(diffs, golden_diffs)
+
+    def update_golden(self, artifacts: dict) -> str:
+        emit = artifacts["concept-emit.json"]
+        schema = json.loads(self.schema_path.read_text(encoding="utf-8"))
+        diffs = assert_lib.schema_validate(emit, schema, artifact="concept-emit.json")
+        if diffs:
+            raise EvalError(
+                "cannot regenerate golden — concept-emit.json failed schema validation:\n  - "
+                + "\n  - ".join(diffs)
+            )
+        self.golden_path.write_text(
+            json.dumps(self.project(emit), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        return str(self.golden_path)
+
+
 ADAPTERS = {
     AuditAdapter.command_id: AuditAdapter(),
     _PLAN_ENG.command_id: _PLAN_ENG,
@@ -2910,6 +3056,7 @@ ADAPTERS = {
     PortfolioSnapshotAdapter.command_id: PortfolioSnapshotAdapter(),
     ImportCampaignAdapter.command_id: ImportCampaignAdapter(),
     IcpRefinementReviewAdapter.command_id: IcpRefinementReviewAdapter(),
+    CaptureIdeaAdapter.command_id: CaptureIdeaAdapter(),
     RaiseTicketAdapter.command_id: RaiseTicketAdapter(),
     ReportIssueAdapter.command_id: ReportIssueAdapter(),
     RetrospectiveAdapter.command_id: RetrospectiveAdapter(),
