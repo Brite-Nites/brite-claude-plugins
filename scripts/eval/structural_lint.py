@@ -54,6 +54,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SEV_GATE = "gate"
 SEV_ADVISORY = "advisory"
 
+# ── Public consumer contract (imported by eval_gate.py, ADR-028/ADR-033) ──────
+# COMMAND_GLOB, SKILL_GLOB, SEV_GATE, Finding, body_lines, finding_loc, lint_path,
+# lint_spec, parse_marker, scan_surface. Renaming any of these breaks the gate at
+# import time — treat them as API, not module-private helpers.
+
 # The lintable spec surface — the canonical copy (scan_surface consumes them;
 # eval_gate imports them for its changed-set filter and structural-debt row guard,
 # so the two modules can't drift). NOTE: consumers use these both as fnmatch

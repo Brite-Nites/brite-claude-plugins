@@ -27,7 +27,10 @@
   is command-level EVAL debt — different axis, different consumer). Rows are added
   only when a rule is promoted advisory→gate with violations that are deliberately
   grandfathered rather than cleaned (BC-12700 bullet #2: R2 keeps its 13 oversized
-  bodies with baselines; R4 keeps the 8 revops upstream-subtree skills).
+  bodies with baselines; R4 keeps the 8 revops upstream-subtree skills — the 9th
+  R4-affected file, marketing/email-copywriting, gets CLEANED in BC-13217, not
+  grandfathered. The authoritative set is whatever `--structural` reports at flip
+  time, not these counts).
 -->
 
 This file is the **per-rule structural-debt grandfather record** for the ADR-028

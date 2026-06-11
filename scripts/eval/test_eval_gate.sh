@@ -305,21 +305,31 @@ assert_rc_and_contains "E2 --bootstrap without --added → exit 2 + reason" 2 "r
 # ════════════════════════════════════════════════════════════════════════════
 echo "── F. --structural full-surface gate (ADR-033, BC-13213) ──"
 # ════════════════════════════════════════════════════════════════════════════
-# F1 real repo: the live surface is clean (R3 flipped with 0 findings; debt table empty).
+# F1 real repo: a WIRING probe only — the mode dispatches, scans the live surface,
+# and emits the STRUCTURAL contract line with a policy verdict (exit 0 or 1, never
+# 2). Deliberately NOT asserting blocking=0: live-surface cleanliness is the job of
+# validate.sh §15a-bc-12590 Part 3 + the REQUIRED CI step (which run this same
+# command), and a self-test that reds on an unrelated dirty working tree conflates
+# "gate broken" with "surface dirty" (review-verifier ruling, BC-13213).
 gate --structural
-assert_rc_and_contains "F1 real repo --structural → clean, exit 0" 0 "STRUCTURAL blocking=0"
+if { [ "$LAST_RC" -eq 0 ] || [ "$LAST_RC" -eq 1 ]; } && printf '%s' "$LAST" | grep -qE '^STRUCTURAL blocking=[0-9]+ suppressed=[0-9]+ problems=[0-9]+$'; then
+  echo "  PASS  F1 real repo --structural → runs + emits contract line (exit=$LAST_RC)"; pass=$((pass + 1))
+else
+  echo "  FAIL  F1 real repo --structural — expected exit 0|1 + STRUCTURAL contract line (got exit=$LAST_RC)"
+  printf '%s\n' "$LAST" | tail -8 | sed 's/^/        | /'
+  fail=$((fail + 1))
+fi
 
 # F2 a first-person COMMAND description blocks (R3 is gate-tier now).
 st="$tmproot/structural"; mkdir -p "$st/docs"
 write_clean_cmd "$st/plugins/foo/commands/ok.md"
-printf -- '---\nname: badcmd\ndescription: I will do things for you\n---\nbody\n' > "$st/plugins/foo/commands/badcmd.md"
+write_first_person_spec "$st/plugins/foo/commands/badcmd.md" "I will do things for you"
 gate --repo-root "$st" --structural
 assert_rc_and_contains "F2 first-person command description → BLOCK (R3 gate)" 1 "R3-description-quality"
 
 # F3 a first-person SKILL description blocks too — the surface the commands-only
 # diff-gate can NOT see (the reason --structural is full-surface, ADR-033).
-mkdir -p "$st/plugins/foo/skills/badskill"
-printf -- '---\nname: badskill\ndescription: I am a skill that helps\n---\nbody\n' > "$st/plugins/foo/skills/badskill/SKILL.md"
+write_first_person_spec "$st/plugins/foo/skills/badskill/SKILL.md" "I am a skill that helps"
 gate --repo-root "$st" --structural
 assert_rc_and_contains "F3 first-person SKILL description → BLOCK (skills covered)" 1 "plugins/foo/skills/badskill/SKILL.md"
 
@@ -341,8 +351,8 @@ gate --repo-root "$st" --structural
 assert_rc_and_contains "F5 stale debt row → PROBLEM, exit 1" 1 "stale structural-debt row"
 
 # F6 a malformed baseline is a loud problem AND the row does not suppress.
-st2="$tmproot/structural2"; mkdir -p "$st2/docs" "$st2/plugins/foo/commands"
-printf -- '---\nname: badcmd2\ndescription: I will do more things\n---\nbody\n' > "$st2/plugins/foo/commands/badcmd2.md"
+st2="$tmproot/structural2"; mkdir -p "$st2/docs"
+write_first_person_spec "$st2/plugins/foo/commands/badcmd2.md" "I will do more things"
 cat > "$st2/docs/structural-lint-debt.md" <<'EOF'
 | file | rule | reason | added | baseline |
 |---|---|---|---|---|

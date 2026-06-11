@@ -321,6 +321,27 @@ def sdebt_parse_malformed_baseline() -> bool:
     return rows == {} and any("malformed baseline" in p for p in problems)
 
 
+def sdebt_parse_unicode_digit_baseline() -> bool:
+    # '²'/'٩٠٦' pass bare isdigit()/int() respectively but are NOT valid baselines —
+    # each must take the malformed-problem path, never an uncaught ValueError (the
+    # isdigit/int unicode mismatch) and never a silently-parsed non-ASCII number.
+    for bad in ("²", "٩٠٦", "+5"):
+        rows, problems = G.parse_structural_debt(
+            f"| `{BIG}` | R2-body-too-long | r | d | {bad} |\n"
+        )
+        if rows != {} or not any("malformed baseline" in p for p in problems):
+            return False
+    return True
+
+
+def sdebt_parse_rejects_traversal() -> bool:
+    # fnmatch's `*` crosses `/`, so a `..` path can match the glob guard — it must
+    # be rejected loudly before anything derives a filesystem path from it.
+    text = "| `plugins/x/commands/../../../../outside.md` | R2-body-too-long | r | d | 5 |\n"
+    rows, problems = G.parse_structural_debt(text)
+    return rows == {} and any("`..` segment" in p for p in problems)
+
+
 def sdebt_parse_baseline_only_r2() -> bool:
     # A baseline on a non-R2 rule is a schema problem (it would be meaningless).
     text = f"| `{SKL}` | R4-nested-refs | r | d | 100 |\n"
@@ -390,6 +411,34 @@ def sfilter_stale_row_problem() -> bool:
     return blocking == [] and suppressed == [] and any("stale" in p for p in problems)
 
 
+def sfilter_noninteger_baseline_row_is_loud() -> bool:
+    # filter_structural is public: a degenerate injected row (baseline as a STRING)
+    # must be a loud problem + blocking, never a TypeError out of `count <= baseline`
+    # (mirror of the count guard; parse_structural_debt itself only emits int|None).
+    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": "906"}}
+    blocking, suppressed, problems = G.filter_structural(
+        [_gf(BIG, "R2-body-too-long")], rows, {BIG: 900})
+    return len(blocking) == 1 and suppressed == [] and any("non-integer baseline" in p for p in problems)
+
+
+def scounts_glue_reads_body_not_total() -> bool:
+    # The body-counts glue must count BODY lines via body_lines (frontmatter
+    # excluded) — what R2 itself measures. A splitlines() mutation reads 7 here.
+    spec = "---\nname: big\ndescription: d\n---\nb1\nb2\nb3"
+    counts = G.collect_body_counts(
+        {(BIG, "R2-body-too-long"): _row(906)}, lambda p: spec if p == BIG else "")
+    return counts == {BIG: 3}
+
+
+def scounts_glue_skips_nonbaseline_and_unreadable() -> bool:
+    # No baseline → no read; unreadable/empty text → no entry (the filter then
+    # raises the loud missing-count problem rather than silently exempting).
+    counts = G.collect_body_counts(
+        {(SKL, "R4-nested-refs"): _row(), (BIG, "R2-body-too-long"): _row(906)},
+        lambda p: "")
+    return counts == {}
+
+
 def sfilter_advisory_live_not_blocked() -> bool:
     # An advisory finding never blocks, but it DOES keep a pre-flip debt row live
     # (rows may land one PR before their rule's severity flips).
@@ -434,9 +483,14 @@ CASES = {
     "sdebt-parse-skips-header-separator": sdebt_parse_skips_header_separator,
     "sdebt-parse-empty": sdebt_parse_empty,
     "sdebt-parse-malformed-baseline": sdebt_parse_malformed_baseline,
+    "sdebt-parse-unicode-digit-baseline": sdebt_parse_unicode_digit_baseline,
+    "sdebt-parse-rejects-traversal": sdebt_parse_rejects_traversal,
     "sdebt-parse-baseline-only-r2": sdebt_parse_baseline_only_r2,
     "sdebt-parse-missing-rule-id": sdebt_parse_missing_rule_id,
     "sdebt-parse-duplicate-row": sdebt_parse_duplicate_row,
+    "sfilter-noninteger-baseline-row-is-loud": sfilter_noninteger_baseline_row_is_loud,
+    "scounts-glue-reads-body-not-total": scounts_glue_reads_body_not_total,
+    "scounts-glue-skips-nonbaseline-and-unreadable": scounts_glue_skips_nonbaseline_and_unreadable,
     "sfilter-blocks-unlisted": sfilter_blocks_unlisted,
     "sfilter-suppresses-listed": sfilter_suppresses_listed,
     "sfilter-rule-scoped-row": sfilter_rule_scoped_row,

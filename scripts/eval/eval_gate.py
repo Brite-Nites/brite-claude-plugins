@@ -353,6 +353,14 @@ def parse_structural_debt(text: str) -> tuple[dict[tuple[str, str], dict], list[
         fpath = cells[0]
         if not any(fnmatch.fnmatch(fpath, g) for g in SPEC_ROW_GLOBS):
             continue  # header / |---| separator / prose — not a data row
+        if ".." in fpath.split("/"):
+            # fnmatch's `*` crosses `/`, so a traversal path can match the glob —
+            # reject it loudly before anything derives a filesystem path from it.
+            problems.append(
+                f"structural-debt row file `{fpath}` contains a `..` segment "
+                "(must be a plain repo-relative spec path) — fix or remove the row"
+            )
+            continue
         rule = cells[1] if len(cells) > 1 else ""
         if not rule.startswith("R"):
             problems.append(
@@ -363,7 +371,11 @@ def parse_structural_debt(text: str) -> tuple[dict[tuple[str, str], dict], list[
         raw_baseline = cells[4] if len(cells) > 4 else ""
         baseline: int | None = None
         if raw_baseline not in ("", "-", "—"):
-            if raw_baseline.isdigit():
+            # ASCII digits ONLY: bare isdigit() also accepts '²'/'①' (which int()
+            # rejects → uncaught ValueError) and int() itself accepts signs and
+            # non-ASCII Nd digits like '٩٠٦' — both ends of that mismatch are
+            # malformed-row territory, never a crash or a silent parse.
+            if raw_baseline.isascii() and raw_baseline.isdigit():
                 baseline = int(raw_baseline)
             else:
                 problems.append(
@@ -428,6 +440,16 @@ def filter_structural(
         if baseline is None:
             suppressed.append(f)
             continue
+        if not isinstance(baseline, int):
+            # parse_structural_debt only emits int | None, but this is a public
+            # pure function — a degenerate injected row must be loud, not a
+            # TypeError out of `count <= baseline` (mirror of the count guard).
+            problems.append(
+                f"({f.file}, {f.rule_id}): debt row carries a non-integer baseline "
+                f"{baseline!r} — treating the finding as blocking"
+            )
+            blocking.append(f)
+            continue
         count = body_lines_by_file.get(f.file)
         if not isinstance(count, int):
             problems.append(
@@ -447,6 +469,25 @@ def filter_structural(
                 "this (file, rule) — the file was fixed or the rule renamed; remove the row"
             )
     return blocking, suppressed, problems
+
+
+def collect_body_counts(debt_rows: dict[tuple[str, str], dict], read_text) -> dict[str, int]:
+    """Current BODY line counts for every baseline-carrying debt row. PURE (the
+    file read is injected as ``read_text(fpath) -> str``, so the unit cases can
+    drive this glue hermetically — a real end-to-end baseline pair is impossible
+    until R2 itself flips to gate severity, BC-13216).
+
+    Counts BODY lines (``body_lines`` — frontmatter excluded), matching what R2
+    itself measures; an unreadable/empty file contributes no entry (the filter
+    then raises the loud missing-count problem rather than silently exempting).
+    """
+    counts: dict[str, int] = {}
+    for (fpath, _rule), row in debt_rows.items():
+        if row.get("baseline") is not None:
+            text = read_text(fpath)
+            if text:
+                counts[fpath] = len(body_lines(text))
+    return counts
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -698,13 +739,8 @@ def run_structural(repo_root: Path, as_json: bool) -> int:
 
     # Current body line counts — only for baseline (R2) rows. At most one
     # baseline row per file can exist (the parser rejects duplicates and
-    # non-R2 baselines), so no dedup is needed here.
-    body_counts: dict[str, int] = {}
-    for (fpath, _rule), row in debt_rows.items():
-        if row.get("baseline") is not None:
-            text = _read_text(repo_root / fpath)
-            if text:
-                body_counts[fpath] = len(body_lines(text))
+    # non-R2 baselines), so no dedup is needed.
+    body_counts = collect_body_counts(debt_rows, lambda p: _read_text(repo_root / p))
 
     blocking, suppressed, fproblems = filter_structural(findings, debt_rows, body_counts)
     problems += fproblems
