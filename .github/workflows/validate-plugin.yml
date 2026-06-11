@@ -209,6 +209,15 @@ jobs:
       - name: Run the M5 eval gate (changed commands vs origin/main)
         run: python3 scripts/eval/eval_gate.py --base-ref origin/main --head-ref HEAD
 
+      # ADR-033 (BC-13213) — the full-surface structural gate, second step of the
+      # SAME required job so "eval-gate is the gate of record" stays true. Diff-free:
+      # blocks any gate-tier structural-lint finding (promoted rules — R3 first) not
+      # covered by docs/structural-lint-debt.md, across commands AND skills. Full
+      # surface because the diff-gate's changed-set can't see SKILL.md files or an
+      # R4 nested-refs regression introduced via a bundled-reference edit.
+      - name: Run the full-surface structural gate (ADR-033)
+        run: python3 scripts/eval/eval_gate.py --structural
+
   cross-pr-adr-guard:
     # BC-12698 — surfaces a CROSS-PR ADR-number collision (two concurrently-open
     # PRs each ADDING the same docs/decisions/NNN-*.md with DIFFERENT slugs) BEFORE

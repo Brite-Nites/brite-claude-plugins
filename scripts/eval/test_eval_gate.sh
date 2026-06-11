@@ -296,13 +296,62 @@ assert_rc_and_contains "E1 unresolvable diff base → exit 2 + reason" 2 "could 
 gate --bootstrap   # missing --added
 assert_rc_and_contains "E2 --bootstrap without --added → exit 2 + reason" 2 "requires --added"
 
+# ════════════════════════════════════════════════════════════════════════════
+echo "── F. --structural full-surface gate (ADR-033, BC-13213) ──"
+# ════════════════════════════════════════════════════════════════════════════
+# F1 real repo: the live surface is clean (R3 flipped with 0 findings; debt table empty).
+gate --structural
+assert_rc_and_contains "F1 real repo --structural → clean, exit 0" 0 "STRUCTURAL blocking=0"
+
+# F2 a first-person COMMAND description blocks (R3 is gate-tier now).
+st="$tmproot/structural"; mkdir -p "$st/docs"
+write_clean_cmd "$st/plugins/foo/commands/ok.md"
+printf -- '---\nname: badcmd\ndescription: I will do things for you\n---\nbody\n' > "$st/plugins/foo/commands/badcmd.md"
+gate --repo-root "$st" --structural
+assert_rc_and_contains "F2 first-person command description → BLOCK (R3 gate)" 1 "R3-description-quality"
+
+# F3 a first-person SKILL description blocks too — the surface the commands-only
+# diff-gate can NOT see (the reason --structural is full-surface, ADR-033).
+mkdir -p "$st/plugins/foo/skills/badskill"
+printf -- '---\nname: badskill\ndescription: I am a skill that helps\n---\nbody\n' > "$st/plugins/foo/skills/badskill/SKILL.md"
+gate --repo-root "$st" --structural
+assert_rc_and_contains "F3 first-person SKILL description → BLOCK (skills covered)" 1 "plugins/foo/skills/badskill/SKILL.md"
+
+# F4 structural-debt rows suppress exactly their (file, rule) → exit 0.
+cat > "$st/docs/structural-lint-debt.md" <<'EOF'
+| file | rule | reason | added | baseline |
+|---|---|---|---|---|
+| `plugins/foo/commands/badcmd.md` | R3-description-quality | self-test grandfather | 2026-06-10 |  |
+| `plugins/foo/skills/badskill/SKILL.md` | R3-description-quality | self-test grandfather | 2026-06-10 |  |
+EOF
+gate --repo-root "$st" --structural
+assert_rc_and_contains "F4 debt rows suppress listed (file,rule) → exit 0" 0 "STRUCTURAL blocking=0 suppressed=2"
+
+# F5 a stale row (no live finding for that (file,rule)) → PROBLEM, exit 1.
+cat >> "$st/docs/structural-lint-debt.md" <<'EOF'
+| `plugins/foo/commands/ok.md` | R3-description-quality | not actually violating | 2026-06-10 |  |
+EOF
+gate --repo-root "$st" --structural
+assert_rc_and_contains "F5 stale debt row → PROBLEM, exit 1" 1 "stale structural-debt row"
+
+# F6 a malformed baseline is a loud problem AND the row does not suppress.
+st2="$tmproot/structural2"; mkdir -p "$st2/docs" "$st2/plugins/foo/commands"
+printf -- '---\nname: badcmd2\ndescription: I will do more things\n---\nbody\n' > "$st2/plugins/foo/commands/badcmd2.md"
+cat > "$st2/docs/structural-lint-debt.md" <<'EOF'
+| file | rule | reason | added | baseline |
+|---|---|---|---|---|
+| `plugins/foo/commands/badcmd2.md` | R3-description-quality | bad baseline | 2026-06-10 | lots |
+EOF
+gate --repo-root "$st2" --structural
+assert_rc_and_contains "F6 malformed baseline → PROBLEM (row does not suppress)" 1 "malformed baseline"
+
 # ── exact count — a silently-skipped (or silently-added) assertion fails loudly ─
 # Total = the (dynamic) pure-case count + the fixed integration-assertion count.
 # `set -u` (not -e): a mid-section setup failure changes WHAT later assertions test
 # without aborting, so assert the EXACT total — catches a 1-assertion skip AND forces
 # EXPECTED_INTEGRATION to move in lockstep when integration assertions are added.
 echo ""
-EXPECTED_INTEGRATION=27
+EXPECTED_INTEGRATION=33
 EXPECTED_TOTAL=$((npure_listed + EXPECTED_INTEGRATION))
 if [ "$((pass + fail))" -ne "$EXPECTED_TOTAL" ]; then
   echo "FATAL: $((pass + fail)) assertions ran, expected exactly $EXPECTED_TOTAL ($npure_listed pure + $EXPECTED_INTEGRATION integration) — a block was skipped or added without updating EXPECTED_INTEGRATION" >&2

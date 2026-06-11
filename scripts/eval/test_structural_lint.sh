@@ -115,10 +115,10 @@ assert_finding    "R2: body >= 500 lines → advisory" R2-body-too-long advisory
 run "$FIX/commands/r1-with-flag.md"
 assert_no_finding "R2: short body → no R2" R2-body-too-long
 
-# ── R3 — description first-person (advisory) ────────────────────────────────────
+# ── R3 — description first-person (GATE — flipped BC-13213, ratchet 1/5) ────────
 echo "── R3 description-quality ──"
 run "$FIX/commands/r3-first-person.md"
-assert_finding    "R3: first-person description → advisory" R3-description-quality advisory
+assert_finding    "R3: first-person description → gate (blocking via eval-gate)" R3-description-quality gate
 run "$FIX/commands/r1-with-flag.md"
 assert_no_finding "R3: third-person description → no R3" R3-description-quality
 
@@ -178,10 +178,10 @@ else
   echo "  FAIL  findings[] contract violated"; printf '    out: %s\n' "$LAST"; fail=$((fail + 1))
 fi
 
-# Human renderer labels gate-tier findings — the validate.sh-visible disambiguation
-# of severity:gate (tier label) vs a currently-blocking Gate.
+# Human renderer labels gate-tier findings — the validate.sh-visible marker that
+# these warnings are the ones eval_gate enforces (diff-gate + --structural, ADR-033).
 run_human "$FIX/commands/r1-no-flag.md"
-if printf '%s' "$LAST" | grep -qF '[gate-tier · advisory this slice]'; then
+if printf '%s' "$LAST" | grep -qF '[gate-tier · blocking via eval-gate]'; then
   echo "  PASS  human output labels gate-tier findings"; pass=$((pass + 1))
 else
   echo "  FAIL  human output missing the gate-tier label"; printf '    out: %s\n' "$LAST"; fail=$((fail + 1))

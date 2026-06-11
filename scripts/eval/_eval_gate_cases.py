@@ -19,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import eval_gate as G  # noqa: E402
+from structural_lint import Finding  # noqa: E402  (synthetic findings for the ADR-033 filter)
 
 
 def _reasons(d) -> str:
@@ -265,6 +266,134 @@ def check_waiver_coupled_ok() -> bool:
     return probs == []
 
 
+# ── parse_structural_debt() + filter_structural() — ADR-033 full-surface gate ──
+# Authored from the BC-13213 locked spec: rows keyed (file, rule); baseline only on
+# R2 and pins the grandfathered body line count (growth past it blocks; equality
+# suppresses); malformed rows are loud problems that never suppress; a row with no
+# live finding of ANY severity is stale.
+
+BIG = "plugins/a/commands/big.md"
+SKL = "plugins/b/skills/s/SKILL.md"
+
+_SDEBT = f"""\
+# header prose
+| file | rule | reason | added | baseline |
+|---|---|---|---|---|
+| `{BIG}` | R2-body-too-long | flagship, split later | 2026-06-10 | 906 |
+| `{SKL}` | R4-nested-refs | upstream subtree | 2026-06-10 |  |
+trailing prose
+"""
+
+
+def _gf(file: str, rule: str, sev: str = "gate") -> Finding:
+    return Finding(rule, sev, "msg", file, 1)
+
+
+def sdebt_parse_rows() -> bool:
+    rows, problems = G.parse_structural_debt(_SDEBT)
+    return (
+        problems == []
+        and set(rows) == {(BIG, "R2-body-too-long"), (SKL, "R4-nested-refs")}
+        and rows[(BIG, "R2-body-too-long")]["baseline"] == 906
+        and rows[(SKL, "R4-nested-refs")]["baseline"] is None
+    )
+
+
+def sdebt_parse_skips_header_separator() -> bool:
+    rows, _ = G.parse_structural_debt(_SDEBT)
+    return all(k[0].startswith("plugins/") for k in rows)
+
+
+def sdebt_parse_empty() -> bool:
+    return G.parse_structural_debt("") == ({}, []) and G.parse_structural_debt("no table") == ({}, [])
+
+
+def sdebt_parse_malformed_baseline() -> bool:
+    # A non-integer baseline must be a loud problem AND the row must not suppress
+    # (dropped) — never a silent exemption (the pure-builder-crash family lesson).
+    text = f"| `{BIG}` | R2-body-too-long | r | d | lots |\n"
+    rows, problems = G.parse_structural_debt(text)
+    return rows == {} and any("malformed baseline" in p for p in problems)
+
+
+def sdebt_parse_baseline_only_r2() -> bool:
+    # A baseline on a non-R2 rule is a schema problem (it would be meaningless).
+    text = f"| `{SKL}` | R4-nested-refs | r | d | 100 |\n"
+    rows, problems = G.parse_structural_debt(text)
+    return rows == {} and any("only valid" in p for p in problems)
+
+
+def sdebt_parse_missing_rule_id() -> bool:
+    text = f"| `{BIG}` |  | r | d |  |\n"
+    rows, problems = G.parse_structural_debt(text)
+    return rows == {} and any("no valid rule id" in p for p in problems)
+
+
+def sdebt_parse_duplicate_row() -> bool:
+    text = (f"| `{SKL}` | R4-nested-refs | r | d |  |\n"
+            f"| `{SKL}` | R4-nested-refs | r2 | d |  |\n")
+    rows, problems = G.parse_structural_debt(text)
+    return len(rows) == 1 and any("duplicate" in p for p in problems)
+
+
+def sfilter_blocks_unlisted() -> bool:
+    blocking, suppressed, problems = G.filter_structural([_gf(BIG, "R3-description-quality")], {}, {})
+    return len(blocking) == 1 and suppressed == [] and problems == []
+
+
+def sfilter_suppresses_listed() -> bool:
+    rows = {(SKL, "R4-nested-refs"): {"reason": "r", "added": "d", "baseline": None}}
+    blocking, suppressed, problems = G.filter_structural([_gf(SKL, "R4-nested-refs")], rows, {})
+    return blocking == [] and len(suppressed) == 1 and problems == []
+
+
+def sfilter_rule_scoped_row() -> bool:
+    # A row grandfathers ONE rule on ONE file: the same file's OTHER gate finding
+    # still blocks (the (file, rule) key is the whole point vs a file-level mute).
+    rows = {(SKL, "R4-nested-refs"): {"reason": "r", "added": "d", "baseline": None}}
+    blocking, suppressed, _ = G.filter_structural(
+        [_gf(SKL, "R4-nested-refs"), _gf(SKL, "R3-description-quality")], rows, {})
+    return len(suppressed) == 1 and len(blocking) == 1 and blocking[0].rule_id == "R3-description-quality"
+
+
+def sfilter_baseline_at_limit_suppresses() -> bool:
+    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    blocking, suppressed, problems = G.filter_structural(
+        [_gf(BIG, "R2-body-too-long")], rows, {BIG: 906})
+    return blocking == [] and len(suppressed) == 1 and problems == []
+
+
+def sfilter_baseline_growth_blocks() -> bool:
+    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    blocking, suppressed, problems = G.filter_structural(
+        [_gf(BIG, "R2-body-too-long")], rows, {BIG: 907})
+    return len(blocking) == 1 and suppressed == [] and problems == []
+
+
+def sfilter_baseline_missing_count_is_loud() -> bool:
+    # No current body count available for a baseline row → problem + blocking,
+    # never a silent exemption.
+    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    blocking, suppressed, problems = G.filter_structural(
+        [_gf(BIG, "R2-body-too-long")], rows, {})
+    return len(blocking) == 1 and suppressed == [] and any("no current body line count" in p for p in problems)
+
+
+def sfilter_stale_row_problem() -> bool:
+    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    blocking, suppressed, problems = G.filter_structural([], rows, {BIG: 100})
+    return blocking == [] and suppressed == [] and any("stale" in p for p in problems)
+
+
+def sfilter_advisory_live_not_blocked() -> bool:
+    # An advisory finding never blocks, but it DOES keep a pre-flip debt row live
+    # (rows may land one PR before their rule's severity flips).
+    rows = {(BIG, "R2-body-too-long"): {"reason": "r", "added": "d", "baseline": 906}}
+    blocking, suppressed, problems = G.filter_structural(
+        [_gf(BIG, "R2-body-too-long", sev="advisory")], rows, {BIG: 100})
+    return blocking == [] and suppressed == [] and problems == []
+
+
 CASES = {
     "decide-pass-clean": decide_pass_clean,
     "decide-pass-with-r1": decide_pass_with_r1,
@@ -296,6 +425,21 @@ CASES = {
     "check-marker-without-row": check_marker_without_row,
     "check-marker-wrong-status": check_marker_wrong_status,
     "check-waiver-coupled-ok": check_waiver_coupled_ok,
+    "sdebt-parse-rows": sdebt_parse_rows,
+    "sdebt-parse-skips-header-separator": sdebt_parse_skips_header_separator,
+    "sdebt-parse-empty": sdebt_parse_empty,
+    "sdebt-parse-malformed-baseline": sdebt_parse_malformed_baseline,
+    "sdebt-parse-baseline-only-r2": sdebt_parse_baseline_only_r2,
+    "sdebt-parse-missing-rule-id": sdebt_parse_missing_rule_id,
+    "sdebt-parse-duplicate-row": sdebt_parse_duplicate_row,
+    "sfilter-blocks-unlisted": sfilter_blocks_unlisted,
+    "sfilter-suppresses-listed": sfilter_suppresses_listed,
+    "sfilter-rule-scoped-row": sfilter_rule_scoped_row,
+    "sfilter-baseline-at-limit-suppresses": sfilter_baseline_at_limit_suppresses,
+    "sfilter-baseline-growth-blocks": sfilter_baseline_growth_blocks,
+    "sfilter-baseline-missing-count-is-loud": sfilter_baseline_missing_count_is_loud,
+    "sfilter-stale-row-problem": sfilter_stale_row_problem,
+    "sfilter-advisory-live-not-blocked": sfilter_advisory_live_not_blocked,
 }
 
 
