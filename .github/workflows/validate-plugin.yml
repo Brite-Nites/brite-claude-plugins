@@ -215,7 +215,11 @@ jobs:
       # covered by docs/structural-lint-debt.md, across commands AND skills. Full
       # surface because the diff-gate's changed-set can't see SKILL.md files or an
       # R4 nested-refs regression introduced via a bundled-reference edit.
+      # `!cancelled()`: run even when the diff-gate step fails, so a compound
+      # failure surfaces BOTH verdicts in one CI run instead of hiding this one
+      # behind the first (the job still fails either way).
       - name: Run the full-surface structural gate (ADR-034)
+        if: ${{ !cancelled() }}
         run: python3 scripts/eval/eval_gate.py --structural
 
   cross-pr-adr-guard:
