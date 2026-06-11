@@ -334,6 +334,16 @@ def sdebt_parse_unicode_digit_baseline() -> bool:
     return True
 
 
+def sdebt_parse_overlong_baseline() -> bool:
+    # CPython 3.11+ int() raises ValueError past sys.get_int_max_str_digits()
+    # (default 4300) even on pure ASCII digits — an overlong baseline must take
+    # the malformed-problem path, never a crash (round-2 finding, BC-13213).
+    rows, problems = G.parse_structural_debt(
+        f"| `{BIG}` | R2-body-too-long | r | d | {'9' * 4301} |\n"
+    )
+    return rows == {} and any("malformed baseline" in p for p in problems)
+
+
 def sdebt_parse_rejects_traversal() -> bool:
     # fnmatch's `*` crosses `/`, so a `..` path can match the glob guard — it must
     # be rejected loudly before anything derives a filesystem path from it.
@@ -484,6 +494,7 @@ CASES = {
     "sdebt-parse-empty": sdebt_parse_empty,
     "sdebt-parse-malformed-baseline": sdebt_parse_malformed_baseline,
     "sdebt-parse-unicode-digit-baseline": sdebt_parse_unicode_digit_baseline,
+    "sdebt-parse-overlong-baseline": sdebt_parse_overlong_baseline,
     "sdebt-parse-rejects-traversal": sdebt_parse_rejects_traversal,
     "sdebt-parse-baseline-only-r2": sdebt_parse_baseline_only_r2,
     "sdebt-parse-missing-rule-id": sdebt_parse_missing_rule_id,

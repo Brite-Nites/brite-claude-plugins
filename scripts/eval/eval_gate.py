@@ -371,11 +371,14 @@ def parse_structural_debt(text: str) -> tuple[dict[tuple[str, str], dict], list[
         raw_baseline = cells[4] if len(cells) > 4 else ""
         baseline: int | None = None
         if raw_baseline not in ("", "-", "—"):
-            # ASCII digits ONLY: bare isdigit() also accepts '²'/'①' (which int()
-            # rejects → uncaught ValueError) and int() itself accepts signs and
-            # non-ASCII Nd digits like '٩٠٦' — both ends of that mismatch are
-            # malformed-row territory, never a crash or a silent parse.
-            if raw_baseline.isascii() and raw_baseline.isdigit():
+            # ASCII digits ONLY, bounded length: bare isdigit() also accepts
+            # '²'/'①' (which int() rejects → uncaught ValueError) and int() itself
+            # accepts signs and non-ASCII Nd digits like '٩٠٦'; CPython 3.11+'s
+            # int() additionally raises past sys.get_int_max_str_digits() (4300)
+            # even on pure ASCII digits. All of it is malformed-row territory,
+            # never a crash or a silent parse — and no body line count needs more
+            # than 9 digits.
+            if raw_baseline.isascii() and raw_baseline.isdigit() and len(raw_baseline) <= 9:
                 baseline = int(raw_baseline)
             else:
                 problems.append(
