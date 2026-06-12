@@ -1,12 +1,14 @@
 ---
-domain: <DOMAIN>                   # e.g. QUO
-milestone: BC-XXXX                 # the Linear milestone this domain maps 1:1 to
-linear_project_id: <LINEAR_PROJECT_ID>  # FDA: the Linear project the milestone lives in (auto-substituted at scaffold)
-personas: [<role>, <role>]
-flow_ids_in_scope: [<DOMAIN-01>..<DOMAIN-NN>]
+domain: <domain-slug>              # kebab folder-slug, e.g. quote-building — matches the filename + scaffold-log (ADR-033; the uppercase code lives in the flow IDs + the H1)
+display_name: <Display name>       # human name, e.g. Quote Building (scaffold-log `linear_milestone_name`)
+linear_milestone:                  # the Linear milestone this domain maps 1:1 to (ADR-033: a milestone is a UUID — it has no BC number)
+  name: <Milestone display name>
+  id: <milestone-uuid>
+personas: [<role>, <role>]         # aggregated from the domain's story-doc front-matter (first-seen dedup in flow_id order, per ADR-033)
+flow_ids_in_scope: [<DOMAIN-01>..<DOMAIN-NN>]  # the domain's story-doc flow_ids, natural-sorted
 status: not-started | in-progress | shipped   # the doc's AUTHORING lifecycle, NOT the domain's delivery state (delivery is aggregated per-flow in INDEX.md)
 figma: <domain-hub-frame-url or TBD>
-intent: ../../intent.md            # FDA: project-intent cross-link (Q26 mod 1)
+intent: ../intent.md               # FDA: project-intent cross-link (Q26 mod 1; journeys sit ONE level under docs/product/)
 last_reviewed: YYYY-MM-DD
 ---
 # <DOMAIN>: <Display name — e.g. Quote Building>

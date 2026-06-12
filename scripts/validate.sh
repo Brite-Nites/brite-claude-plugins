@@ -260,6 +260,33 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-journey-stamp — flow-architecture journey-frontmatter-stamp vslice (BC-13028)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-journey-frontmatter-vslice.sh — the
+# ADR-028 D2-style deterministic lock for flow-journey-author's frontmatter
+# stamping (BC-13028 #4 journey half; schema canon per ADR-033). Drives
+# scripts/build_journey_frontmatter.py over a fixture scaffold-log frontmatter
+# + a fixture story-doc dir and golden-compares the emitted frontmatter +
+# asserts the populated-key invariants (milestone UUID / personas / flow_ids
+# are real values, not TBD/[] placeholders). Skill, outside COMMAND_GLOB — no
+# command-eval ceremony (the ADR-028 eval-gate enforces commands only).
+section "2b-journey-stamp. flow-architecture journey-frontmatter-stamp vslice (BC-13028)"
+
+fda_journey_stamp_test="$REPO_ROOT/plugins/flow-architecture/tests/run-journey-frontmatter-vslice.sh"
+
+if [ ! -f "$fda_journey_stamp_test" ]; then
+  warn "plugins/flow-architecture/tests/run-journey-frontmatter-vslice.sh not found — skipped"
+else
+  if fda_journey_stamp_out=$(bash "$fda_journey_stamp_test" 2>&1); then
+    fda_journey_stamp_pass_count=$(printf '%s\n' "$fda_journey_stamp_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture journey-frontmatter-stamp vslice (${fda_journey_stamp_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture journey-frontmatter-stamp vslice failed — run plugins/flow-architecture/tests/run-journey-frontmatter-vslice.sh for details"
+    printf '%s\n' "$fda_journey_stamp_out" | tail -40 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b'''' — flow-architecture cross-domain-deps vslice (BC-10729)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-cross-domain-deps-vslice.sh —

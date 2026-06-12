@@ -1,0 +1,13 @@
+---
+domain: TBD
+display_name: "Broken & Widget: <v2>"
+linear_milestone:
+  name: "Broken & Widget: <v2>"
+  id: TBD
+personas: [operator, tm, finance-auditor, "off", intake-clerk]
+flow_ids_in_scope: [WGT-1, WGT-2, WGT-3, WGT-10]
+status: in-progress
+figma: TBD
+intent: ../intent.md
+last_reviewed: 2026-06-11
+---

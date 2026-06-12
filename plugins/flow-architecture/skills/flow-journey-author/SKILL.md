@@ -1,6 +1,6 @@
 ---
 name: flow-journey-author
-description: Per-domain journey doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes ONE markdown file at `docs/product/journeys/<domain>.md` per domain, conforming to the Q26 locked template (variable phase count per Q26 mod 5; ~290-450+ lines based on TEAM precedent). Hybrid authoring — programmatic substitution for 8 deterministic top-level YAML keys + 2 body items; single `Agent(journey-doc-author)` call for 7-9 narrative sections (single-agent preserves cross-phase narrative continuity). Runs AFTER `flow-doc-author` so story docs are available as authoring context. 1 agent per domain; parallel across domains for multi-domain scaffolds with a concurrency cap of ~10 to avoid Claude Code background-agent queueing. 0 synchronous gates in default mode. Per-domain footprint ~90s; wall time scales as `ceil(N/10) * ~90s` — N≤10 domains finish in ~90s, N=27 finishes in ~270s (3 batches under the cap).
+description: Per-domain journey doc authoring sub-skill for the flow-architecture plugin (implements CDR-023). Writes ONE markdown file at `docs/product/journeys/<domain>.md` per domain, conforming to the Q26 locked template (variable phase count per Q26 mod 5; ~290-450+ lines based on TEAM precedent). Hybrid authoring — deterministic frontmatter stamping via the extracted `scripts/build_journey_frontmatter.py` builder (scaffold-log frontmatter + story-doc aggregation per ADR-033, fixture-locked); single body-only `Agent(journey-doc-author)` call for 7-9 narrative sections (single-agent preserves cross-phase narrative continuity). Runs AFTER `flow-doc-author` so story docs are available as authoring context AND as the personas/flow_ids aggregation source. 1 agent per domain; parallel across domains for multi-domain scaffolds with a concurrency cap of ~10 to avoid Claude Code background-agent queueing. 0 synchronous gates in default mode. Per-domain footprint ~90s; wall time scales as `ceil(N/10) * ~90s` — N≤10 domains finish in ~90s, N=27 finishes in ~270s (3 batches under the cap).
 user-invocable: false
 disable-model-invocation: true
 allowed-tools: Agent, Bash, Read, Write, Edit, Glob, Grep
@@ -25,26 +25,35 @@ The full design rationale lives in `docs/design-rationale/fda-plugin-interview.m
 
 ## 1. Authoring strategy (Q16.1) --- hybrid
 
-### Programmatic substitution (8 deterministic YAML keys + 2 body items)
+### Deterministic stamping --- the `build_journey_frontmatter.py` builder (BC-13028, ADR-033)
 
-> **Deferred (BC-13028 residual):** unlike the story-doc side (which extracted `build_story_frontmatter.py` per BC-13168), this journey frontmatter is still stamped LLM-side — there is no extracted, fixture-locked builder yet. A journey stamper is blocked on pinning the journey frontmatter canon first (the `milestone` BC-vs-UUID semantic, the undeclared `linear_project_id` source, and reconciling this §1 ↔ the `domain-journey.md` template ↔ real produced docs). BC-13168 fixed only the dispatch identity (`Agent(general-purpose)` → `Agent(journey-doc-author)`); the deterministic stamp + schema canon are tracked on BC-13028.
+The frontmatter is stamped by an **extracted deterministic builder**, not LLM prose, so it is fixture-lockable and cannot silently regress to empty placeholders (the journey half of BC-13028 #4; the story half is `build_story_frontmatter.py` per BC-13168 — a deliberately SEPARATE script, since the two share no parsing core). The skill shells out to `scripts/build_journey_frontmatter.py`, which reads exactly two standardized inputs — the per-domain scaffold-log's **frontmatter** (`templates/.flow/scaffold-log/SCHEMA.md`; the body tables are never parsed) and the domain's **story-doc frontmatter** (deterministically stamped since BC-13168) — and emits the ADR-033 canonical 9-key block:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_journey_frontmatter.py \
+  --scaffold-log <repo>/.flow/scaffold-log/<domain>.md \
+  --flows-dir <repo>/docs/product/flows/<domain> --as-of <today>
+```
 
 | YAML key | Source |
 |---|---|
-| `domain` | inventory section |
-| `milestone` | scaffold output (`BC-XXXX`) |
-| `personas` | deduplicated from inventory rows OR `personas/INDEX.md` |
-| `flow_ids_in_scope` | inventory domain section row IDs |
-| `status` | `in-progress` initial (describes doc-authoring lifecycle, NOT delivery state) |
-| `figma` | `TBD` |
-| `last_reviewed` | current ISO-8601 |
-| `intent` | `../intent.md` (per Q26 mod 1) |
+| `domain` | scaffold-log frontmatter `domain` (kebab folder-slug per ADR-033) |
+| `display_name` | scaffold-log frontmatter `linear_milestone_name` |
+| `linear_milestone.{name,id}` | scaffold-log frontmatter `linear_milestone_name` + `linear_milestone_id` (UUID — a milestone has no BC number) |
+| `personas` | story-doc frontmatter aggregation: first-seen dedup walking flow_id order (builder-derived; the unstandardized inventory is NOT read) |
+| `flow_ids_in_scope` | story-doc frontmatter `flow_id` values, natural-sorted by numeric suffix |
+| `status` | constant `in-progress` initial (describes doc-authoring lifecycle, NOT delivery state) |
+| `figma` | constant `TBD` |
+| `intent` | constant `../intent.md` (per Q26 mod 1) |
+| `last_reviewed` | `--as-of` (current ISO-8601; injected so the builder stays golden-stable) |
 
-Body deterministic items: H1 title `# <DOMAIN> --- <Display name>`; doc-type blockquote (~3 lines from template `:12-14`).
+Degrade contract: junk/missing scaffold-log values → `TBD` (never malformed YAML); a YAML-unsafe milestone name is emitted double-quoted; story docs without a valid `flow_id` are skipped whole; **zero valid story docs → exit 2** (the Q16.8 ordering contract was violated — fail loud, never stamp honest-empties). The lock is `tests/run-journey-frontmatter-vslice.sh` (golden + populated-key assertions). Schema canon: `docs/decisions/033-fda-journey-frontmatter-canon.md`.
 
-### Agent-authored sections
+The H1 title (`# <DOMAIN>: <Display name>`) and doc-type blockquote are **body** items authored by the agent (body-only contract below).
 
-Single `Agent(journey-doc-author)` call writes 7-9 narrative sections:
+### Agent-authored sections (body-only contract)
+
+Single `Agent(journey-doc-author)` call authors the **body only** --- the H1 title `# <DOMAIN>: <Display name>`, the doc-type blockquote, and 7-9 narrative sections --- and returns it as markdown. The skill prepends the builder-stamped frontmatter and writes the file. The agent **never emits frontmatter**: it is filesystem-only, so it cannot know the milestone UUID --- that contradiction was the proximate cause of the placeholder frontmatter (BC-13028 #4). Sections:
 
 - **7 always-required:**
   1. `## Actor / Persona`
@@ -164,9 +173,9 @@ Even greenfield `NOT_STARTED` stubs confirm flow IDs + personas + related_flows 
 
 `/flow:start-project` greenfield, 5 domains:
 
-1. Skill reads `state.scaffold_log` for all 5 domains -> 5 milestone BCs + N parent BCs + 5N children BCs.
+1. Skill reads `state.scaffold_log` for all 5 domains -> 5 milestone UUIDs + N parent BCs + 5N children BCs.
 2. Skill reads `docs/product/flows/<domain>/*.md` for all 5 domains -> ~31 story docs total (authored by Q15).
-3. Skill fans out 5 background agents in parallel (all 5 fit in 1 batch under the ~10 concurrency cap per Section 2).
+3. Skill stamps 5 frontmatter blocks via `build_journey_frontmatter.py` (scaffold-log frontmatter + story-doc aggregation, Section 1), then fans out 5 background body-only agents in parallel (all 5 fit in 1 batch under the ~10 concurrency cap per Section 2) and prepends each stamped block to its returned body at collection.
 4. ~60-90s wall time (5 domains in a single batch; matches the per-domain footprint anchor — `ceil(5/10) * ~90s = ~90s`).
 5. Mechanical layer: `bash scripts/verify-docs.sh` logs 0 errors.
 6. Narrative layer: 5 fidelity-review agents; 4 PASS, 1 flagged for missing `## Open questions` section.
@@ -180,5 +189,6 @@ Even greenfield `NOT_STARTED` stubs confirm flow IDs + personas + related_flows 
 - `docs/design-rationale/fda-plugin-interview.md` Q26 --- journey-doc template.
 - `docs/design-rationale/fda-plugin-interview.md` Q15 --- upstream story-doc author.
 - `skills/flow-doc-author/SKILL.md` --- preceding sub-skill (provides story docs as authoring context).
-- `skills/flow-linear-scaffold/SKILL.md` --- preceding sub-skill (provides milestone BC for the `milestone` front-matter field).
-- `skills/flow-regen-index/SKILL.md` --- downstream sub-skill (consumes the journey doc's `milestone:` field for INDEX header).
+- `skills/flow-linear-scaffold/SKILL.md` --- preceding sub-skill (writes the scaffold-log whose frontmatter sources the `linear_milestone` field).
+- `skills/flow-regen-index/SKILL.md` --- downstream sub-skill (consumes the journey doc's `linear_milestone.id` for the INDEX header milestone link, per ADR-033).
+- `docs/decisions/033-fda-journey-frontmatter-canon.md` (repo root) --- the journey frontmatter schema canon this skill stamps.

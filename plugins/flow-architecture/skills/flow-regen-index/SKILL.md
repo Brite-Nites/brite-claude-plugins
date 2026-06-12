@@ -31,7 +31,7 @@ Inputs, in priority order:
 |---|---|---|
 | Story docs | `docs/product/flows/<domain>/*.md` (front-matter) | `status`, `parent_issue`, `children.*`, `figma`, `sandbox_url`, `staging_url`, `real_app_url`, `qa_status`, `user_docs_url`, `flow_id` |
 | Master inventory | `docs/product/master-flow-inventory.md` | Canonical section order + canonical flow titles (foreign-key registry — never trust story-doc title) |
-| Domain journeys | `docs/product/journeys/<domain>.md` (front-matter) | `milestone:` field → section-header link |
+| Domain journeys | `docs/product/journeys/<domain>.md` (front-matter) | `linear_milestone.id` (UUID, per ADR-033) → section-header milestone link (URL built with `.flow/config.json` `linear_project_id`). Documented contract — the consumer-repo regen scripts do not yet parse journey front-matter; wiring tracked under BC-11983 (note: a nested-YAML read, not a scalar grep) |
 | Linear | batched `list_issues({labels: ["domain:<slug>"]})` per domain | Eng + Design state (state.type) |
 | Plugin config | `.flow/config.json` | `<PROJECT_NAME>` placeholder; `linear_project_id` for milestone URL construction |
 

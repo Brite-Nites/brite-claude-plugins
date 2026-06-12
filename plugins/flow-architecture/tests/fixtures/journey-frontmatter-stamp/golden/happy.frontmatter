@@ -1,0 +1,13 @@
+---
+domain: widget-intake
+display_name: Widget Intake
+linear_milestone:
+  name: Widget Intake
+  id: 7f3c2a10-aaaa-4bbb-8ccc-0123456789ab
+personas: [operator, tm, finance-auditor, "off", intake-clerk]
+flow_ids_in_scope: [WGT-1, WGT-2, WGT-3, WGT-10]
+status: in-progress
+figma: TBD
+intent: ../intent.md
+last_reviewed: 2026-06-11
+---
