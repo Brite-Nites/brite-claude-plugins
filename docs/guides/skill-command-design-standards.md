@@ -26,7 +26,7 @@ Canonical checklist for building agent tooling in this repo. Derived from Anthro
 - **[ADV] File references one level deep; TOC on any reference file > 100 lines.** Chained refs get partially read.
 - **[REF] Match degrees of freedom to fragility.** Exact scripts/steps for fragile/consistency-critical ops; prose for open-ended judgment.
 - **[REF] Deterministic work → code, not tokens.** Sorting/validation/fixed transforms belong in a helper script, not model generation. Make execution-vs-reference intent explicit.
-- **[ADV] Fully-qualified MCP tool names** (`mcp__plugin_<plugin>_<server>__*`); **[ADV] `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` paths** (never hardcoded/absolute/backslash).
+- **[GATE] Fully-qualified MCP tool names** (`mcp__plugin_<plugin>_<server>__*`) — *promoted R5, BC-13214 (ratchet 2/5)*; **[ADV] `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` paths** (never hardcoded/absolute/backslash).
 - **[REF] One word per concept; single default + escape hatch; no magic constants** (document every number).
 - **Anti-patterns:** vague/first-person descriptions; deeply nested refs; verbose explanation of things the model knows; too many options with no default; non-descriptive filenames.
 

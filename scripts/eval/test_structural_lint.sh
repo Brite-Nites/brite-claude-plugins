@@ -122,10 +122,10 @@ assert_finding    "R3: first-person description → gate (blocking via eval-gate
 run "$FIX/commands/r1-with-flag.md"
 assert_no_finding "R3: third-person description → no R3" R3-description-quality
 
-# ── R5 — MCP tool names must be fully-qualified (advisory) ──────────────────────
+# ── R5 — MCP tool names must be fully-qualified (GATE — flipped BC-13214, 2/5) ──
 echo "── R5 mcp-not-fully-qualified ──"
 run "$FIX/commands/r5-bare-mcp.md"
-assert_finding    "R5: bare/unqualified allowed-tools entry → advisory" R5-mcp-not-fully-qualified advisory
+assert_finding    "R5: bare/unqualified allowed-tools entry → gate (blocking via eval-gate)" R5-mcp-not-fully-qualified gate
 run "$FIX/commands/r1-with-flag.md"
 assert_no_finding "R5: fully-qualified mcp + built-in → no R5" R5-mcp-not-fully-qualified
 

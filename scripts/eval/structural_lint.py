@@ -296,7 +296,11 @@ def rule_r3_description(path: Path, text: str) -> list[Finding]:
     return []
 
 
-# ── R5 — MCP tool names must be fully-qualified (advisory) ──────────────────────
+# ── R5 — MCP tool names must be fully-qualified (GATE — flipped BC-13214, 2/5) ──
+# Second advisory rule promoted to gate (surface cleaned in the same PR: the one
+# live finding was sf-connected-apps' space-separated allowed-tools line) —
+# enforced by eval_gate's diff-gate (changed commands) + --structural (full
+# surface, ADR-034).
 # A fully-qualified MCP name is `mcp__<ns>__<tool|*>`. We can't require the
 # `plugin_<plugin>_` segment — user-level servers (e.g. `mcp__emailbison-b2b__*`)
 # are legitimately un-prefixed. So R5 flags allowed-tools entries that are neither a
@@ -335,7 +339,7 @@ def rule_r5_mcp_qualified(path: Path, text: str) -> list[Finding]:
             continue
         out.append(
             Finding(
-                "R5-mcp-not-fully-qualified", SEV_ADVISORY,
+                "R5-mcp-not-fully-qualified", SEV_GATE,
                 f"allowed-tools entry '{entry}' is neither a known built-in nor a "
                 "fully-qualified mcp__<ns>__<tool|*> name",
                 rel, line,
