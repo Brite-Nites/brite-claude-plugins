@@ -2,10 +2,10 @@
 
 Canonical checklist for building agent tooling in this repo. Derived from Anthropic's Agent Skills best-practices, "Building effective agents," and the Claude Code docs (skills / sub-agents / plugins), reconciled with this repo's hard-won gotchas. Enforcement model: **[ADR-028](../decisions/028-skill-engineering-discipline.md)** (phased ratchet). Terminology: `CONTEXT.md` § Agent tooling & evaluation.
 
-**Enforcement tags** (Phase 1):
-- **[GATE]** — blocking on a created/changed skill-command (fails CI).
+**Enforcement tags**:
+- **[GATE]** — blocking (fails CI): on a created/changed command via the eval-gate diff-gate, and — once a rule is promoted — across the whole commands+skills surface via the full-surface structural gate (`eval_gate.py --structural`, [ADR-034](../decisions/034-structural-ratchet-full-surface-gate.md); grandfathered exceptions live in `docs/structural-lint-debt.md`).
 - **[GATE-existing]** — already-enforced blocking check that pre-dates ADR-028 (e.g. plugin-layout, version-bump); not new, listed here for completeness.
-- **[ADV]** — advisory WARN now; promotable to [GATE] in Phase 2.
+- **[ADV]** — advisory WARN; promoted to [GATE] one rule at a time (the BC-12700 Phase-2 ratchet, flip order R3→R5→R6→R2→R4), each only after its surface is clean or grandfathered.
 - **[REF]** — reference principle; not linted, but reviewers should apply it.
 
 ---
@@ -22,7 +22,7 @@ Canonical checklist for building agent tooling in this repo. Derived from Anthro
 - **[ADV] Progressive disclosure.** Layer: `description` (always loaded) → `SKILL.md` body (on trigger) → bundled reference files (only when read). Unused content costs zero tokens.
 - **[ADV] Body < ~500 lines.** Once loaded, every line is a recurring per-session token cost. Split into reference files when it grows.
 - **[REF] Context is a public good.** Only add what the model doesn't already know. Challenge each line's token cost.
-- **[ADV] Description: third person, states what it does AND when to use it, with trigger terms, key use case first.** It's the routing signal; vague/first-person descriptions break discovery. (Listing budget truncates ~1.5k chars — front-load.)
+- **[GATE] Description: third person, states what it does AND when to use it, with trigger terms, key use case first.** It's the routing signal; vague/first-person descriptions break discovery. (Listing budget truncates ~1.5k chars — front-load.) *Promoted R3, BC-13213 (ratchet 1/5): the lint gates the enforceable core — a first-person description blocks; the rest of this bullet stays reviewer guidance.*
 - **[ADV] File references one level deep; TOC on any reference file > 100 lines.** Chained refs get partially read.
 - **[REF] Match degrees of freedom to fragility.** Exact scripts/steps for fragile/consistency-critical ops; prose for open-ended judgment.
 - **[REF] Deterministic work → code, not tokens.** Sorting/validation/fixed transforms belong in a helper script, not model generation. Make execution-vs-reference intent explicit.

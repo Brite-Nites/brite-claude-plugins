@@ -14,15 +14,21 @@ git-diff "changed" set, filters via the grandfather/debt list, and flips the
 with zero re-detection. M5 will layer additional fields (e.g. ``blocking``,
 ``grandfathered``) ON TOP of this shape; do NOT add them here.
 
-ADVISORY THIS SLICE: nothing in this module fails a build. ``validate.sh`` surfaces
-every finding WARN-only. ``severity == "gate"`` is a TIER LABEL ("destined to block
-in M5"), NOT a currently-blocking CI Gate (see CONTEXT.md § "Gate"). The CLI's human
-renderer labels gate-tier findings ``[gate-tier · advisory this slice]`` so a human
-reading ``validate.sh`` output can't conflate the two; the durable ``message`` stays
-a plain violation description that M5 can reuse verbatim as a real blocking error.
+THIS MODULE NEVER FAILS A BUILD ITSELF: the CLI exits 0 even with findings, and
+``validate.sh`` §15a-bc-12588 surfaces them WARN-only. ``severity == "gate"`` is the
+TIER the eval-gate consumes as build-failing (see CONTEXT.md § "Gate"): the M5
+diff-gate blocks gate-tier findings on changed commands, and the ADR-034 full-surface
+gate (``eval_gate.py --structural``, BC-13213) blocks them across the whole
+commands+skills surface unless covered by a ``docs/structural-lint-debt.md`` row.
+The CLI's human renderer labels gate-tier findings ``[gate-tier · blocking via
+eval-gate]`` so a human reading ``validate.sh`` output knows which warnings are
+enforced; the durable ``message`` stays a plain violation description the gate
+reuses verbatim as the blocking error.
 
 Severities follow the ``[GATE]``/``[ADV]`` tags in
-``docs/guides/skill-command-design-standards.md``.
+``docs/guides/skill-command-design-standards.md``. Advisory rules are promoted to
+gate one at a time, each only after its surface is clean or grandfathered — the
+BC-12700 bullet-#2 per-rule ratchet (R3 flipped first, BC-13213).
 
 The R1 side-effecting heuristic below is the FIRST executable encoding of ADR-028's
 prose ("Detecting side-effecting", Consequences). It is intentionally DISTINCT from
@@ -47,6 +53,19 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 SEV_GATE = "gate"
 SEV_ADVISORY = "advisory"
+
+# ── Public consumer contract (imported by eval_gate.py, ADR-028/ADR-034) ──────
+# COMMAND_GLOB, SKILL_GLOB, SEV_GATE, Finding, body_lines, finding_loc, lint_path,
+# lint_spec, parse_marker, scan_surface. Renaming any of these breaks the gate at
+# import time — treat them as API, not module-private helpers.
+
+# The lintable spec surface — the canonical copy (scan_surface consumes them;
+# eval_gate imports them for its changed-set filter and structural-debt row guard,
+# so the two modules can't drift). NOTE: consumers use these both as fnmatch
+# patterns (fnmatch's `*` crosses `/`) and as Path.glob patterns (glob's `*` does
+# not) — shared TEXT; each consumer's semantics happen to coincide at this depth.
+COMMAND_GLOB = "plugins/*/commands/*.md"
+SKILL_GLOB = "plugins/*/skills/*/SKILL.md"
 
 
 @dataclass
@@ -246,11 +265,13 @@ def rule_r2_body_too_long(path: Path, text: str) -> list[Finding]:
     return []
 
 
-# ── R3 — description quality: first-person (advisory) ───────────────────────────
+# ── R3 — description quality: first-person (GATE — flipped BC-13213, ratchet 1/5) ──
 # Leading first-person framing only (highest-signal, lowest false-positive). The
 # `\s+\S` tail (pronoun then whitespace then non-space) excludes "I/O", "AI", "CI"
 # (no boundary / no following space). "Missing description" is already a hard FAIL
-# in validate.sh § 7/§ 8, so R3 covers the first-person case only.
+# in validate.sh § 7/§ 8, so R3 covers the first-person case only. First advisory
+# rule promoted to gate (surface was clean: 0 findings at flip time) — enforced by
+# eval_gate's diff-gate (changed commands) + --structural (full surface, ADR-034).
 FIRST_PERSON_RE = re.compile(r"^\s*(?:I|I'll|I'm|We|We'll|We're|My|Me|Our)\s+\S", re.IGNORECASE)
 
 
@@ -267,7 +288,7 @@ def rule_r3_description(path: Path, text: str) -> list[Finding]:
     if desc and FIRST_PERSON_RE.match(desc):
         return [
             Finding(
-                "R3-description-quality", SEV_ADVISORY,
+                "R3-description-quality", SEV_GATE,
                 "description is first-person; use a third-person form stating what it does AND when to use it",
                 _rel(path), _fm_keyline(text, "description"),
             )
@@ -532,8 +553,8 @@ def _rel(path: Path) -> str:
 def scan_surface(repo_root: Path) -> list[Path]:
     """The repo-wide lint surface: all command + SKILL.md specs + evals.json."""
     targets: list[Path] = []
-    targets += sorted(repo_root.glob("plugins/*/commands/*.md"))
-    for skill in sorted(repo_root.glob("plugins/*/skills/*/SKILL.md")):
+    targets += sorted(repo_root.glob(COMMAND_GLOB))
+    for skill in sorted(repo_root.glob(SKILL_GLOB)):
         if skill.parent.name == "_shared":
             continue
         targets.append(skill)
@@ -545,10 +566,15 @@ def lint_path(path: Path) -> list[Finding]:
     return lint_evals_json(path) if path.name == "evals.json" else lint_spec(path)
 
 
+def finding_loc(f: Finding) -> str:
+    """``file`` or ``file:line`` — the ONE rendering of a Finding's location
+    (eval_gate's --structural renderer imports it, so the two can't drift)."""
+    return f.file if f.line is None else f"{f.file}:{f.line}"
+
+
 def _human_line(f: Finding) -> str:
-    loc = f.file if f.line is None else f"{f.file}:{f.line}"
-    tag = "[gate-tier · advisory this slice]" if f.severity == SEV_GATE else "[advisory]"
-    return f"{tag} {f.rule_id} {loc} — {f.message}"
+    tag = "[gate-tier · blocking via eval-gate]" if f.severity == SEV_GATE else "[advisory]"
+    return f"{tag} {f.rule_id} {finding_loc(f)} — {f.message}"
 
 
 def main(argv: list[str]) -> int:

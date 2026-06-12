@@ -11,7 +11,7 @@ Architecture: a PURE decision core (``decide`` / ``classify_changes`` /
 unit-tested in ``_eval_gate_cases.py`` from the locked spec — wrapped by a thin I/O
 shell (git diff, ``run_eval`` subprocess, debt-file + spec reads).
 
-Two enforcement surfaces, by design (they run in DIFFERENT CI checkouts):
+Three enforcement surfaces, by design (they run in DIFFERENT CI checkouts):
 
   * **diff-gate** (default mode) — ``(base_ref, head_ref)`` → the changed
     ``plugins/*/commands/*.md`` set → a per-command BLOCK/OK verdict. Runs in a
@@ -30,6 +30,20 @@ Two enforcement surfaces, by design (they run in DIFFERENT CI checkouts):
     waiver↔row coupling (every ``status: waiver`` row ⇔ an in-file
     ``# eval-waiver: <reason>`` marker) so a waiver can never be silent in EITHER
     direction.
+
+  * **--structural** (full-surface structural gate — ADR-034, BC-13213, the
+    BC-12700 bullet-#2 per-rule ratchet's enforcement surface) — diff-free: lints
+    the WHOLE commands+skills surface and FAILS on any ``severity == "gate"``
+    finding not covered by a ``docs/structural-lint-debt.md`` row. Full-surface
+    (not changed-set) because the ratchet's later flips need it: every R4/R5/R6
+    violation at flip time lives in a SKILL.md the commands-only diff-gate never
+    sees, and an R4 (nested-refs) regression can be introduced by editing a bundled
+    REFERENCE file — invisible to any spec-file changed-set. Runs as a second step
+    in the REQUIRED eval-gate CI job and (diff-free → shallow-safe) in
+    ``validate.sh`` §15a-bc-12590 Part 3. Debt rows are keyed ``(file, rule)``; an
+    R2 row carries a line-count BASELINE (suppresses only while the body hasn't
+    grown past it); a row whose ``(file, rule)`` has no live finding is STALE and
+    fails the gate (self-cleaning list).
 
 Split A′ (locked in the BC-12590 grill, 2026-06-07) — the two §0 non-negotiables
 are gated DIFFERENTLY, by cost:
@@ -79,7 +93,7 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 # scripts/eval/eval_gate.py → repo root is two parents up. Import the merged
@@ -87,12 +101,33 @@ from pathlib import Path
 _HERE = Path(__file__).resolve().parent
 REPO_ROOT = _HERE.parents[1]
 sys.path.insert(0, str(_HERE))
-from structural_lint import lint_spec, parse_marker, SEV_GATE  # noqa: E402
+from structural_lint import (  # noqa: E402
+    COMMAND_GLOB,
+    SEV_GATE,
+    SKILL_GLOB,
+    Finding,
+    body_lines,
+    finding_loc,
+    lint_path,
+    lint_spec,
+    parse_marker,
+    scan_surface,
+)
 from run_eval import ADAPTERS  # noqa: E402
 
-COMMAND_GLOB = "plugins/*/commands/*.md"
 DEBT_LIST_REL = "docs/skill-eval-debt.md"
 RUN_EVAL = _HERE / "run_eval.py"
+
+# ── ADR-034 full-surface structural gate (BC-13213) ───────────────────────────
+STRUCTURAL_DEBT_REL = "docs/structural-lint-debt.md"
+# A structural-debt row's `file` cell must be a lintable spec — the glob-guard that
+# self-skips the table header/separator (same idiom as parse_debt_table). The glob
+# text is imported from structural_lint (the canonical copy, next to scan_surface)
+# so a surface change can't silently strand debt rows.
+SPEC_ROW_GLOBS = (COMMAND_GLOB, SKILL_GLOB)
+# `baseline` is only meaningful for the body-size rule: it pins the grandfathered
+# body line count so the exemption can't silently absorb further growth.
+BASELINE_RULE = "R2-body-too-long"
 
 # `# eval-waiver: <reason>` — the net-new escape hatch (ADR-028 D1). Parsed by the
 # ONE canonical comment-anchored-marker parser in structural_lint (note #3), so it
@@ -293,6 +328,169 @@ def check_invariants(
                 f"{c}: carries a `# eval-waiver:` marker but its debt row is status={st} (should be status=waiver)"
             )
     return problems
+
+
+def parse_structural_debt(text: str) -> tuple[dict[tuple[str, str], dict], list[str]]:
+    """Parse docs/structural-lint-debt.md → ``({(file, rule): row}, problems)``. PURE.
+
+    Same glob-guarded positional idiom as ``parse_debt_table``, but keyed
+    ``(file, rule)`` — a file can be grandfathered for ONE rule while still gated on
+    every other. Columns: ``| file | rule | reason | added | baseline |``.
+
+    A malformed row is a loud PROBLEM and never suppresses (the recurring
+    pure-builder lesson: degenerate input must not silently become an exemption):
+    a non-integer baseline, a baseline on a non-R2 rule, a missing rule id, and a
+    duplicate ``(file, rule)`` each drop the row and record a problem.
+    """
+    rows: dict[tuple[str, str], dict] = {}
+    problems: list[str] = []
+    for line in text.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [c.strip().strip("`").strip() for c in line.strip().strip("|").split("|")]
+        if not cells:
+            continue
+        fpath = cells[0]
+        if not any(fnmatch.fnmatch(fpath, g) for g in SPEC_ROW_GLOBS):
+            continue  # header / |---| separator / prose — not a data row
+        if ".." in fpath.split("/"):
+            # fnmatch's `*` crosses `/`, so a traversal path can match the glob —
+            # reject it loudly before anything derives a filesystem path from it.
+            problems.append(
+                f"structural-debt row file `{fpath}` contains a `..` segment "
+                "(must be a plain repo-relative spec path) — fix or remove the row"
+            )
+            continue
+        rule = cells[1] if len(cells) > 1 else ""
+        if not rule.startswith("R"):
+            problems.append(
+                f"structural-debt row for `{fpath}` has no valid rule id in column 2 "
+                f"(got '{rule}') — fix or remove the row"
+            )
+            continue
+        raw_baseline = cells[4] if len(cells) > 4 else ""
+        baseline: int | None = None
+        if raw_baseline not in ("", "-", "—"):
+            # ASCII digits ONLY, bounded length: bare isdigit() also accepts
+            # '²'/'①' (which int() rejects → uncaught ValueError) and int() itself
+            # accepts signs and non-ASCII Nd digits like '٩٠٦'; CPython 3.11+'s
+            # int() additionally raises past sys.get_int_max_str_digits() (4300)
+            # even on pure ASCII digits. All of it is malformed-row territory,
+            # never a crash or a silent parse — and no body line count needs more
+            # than 9 digits.
+            if raw_baseline.isascii() and raw_baseline.isdigit() and len(raw_baseline) <= 9:
+                baseline = int(raw_baseline)
+            else:
+                problems.append(
+                    f"structural-debt row ({fpath}, {rule}) has a malformed baseline "
+                    f"'{raw_baseline}' (must be a body line count) — the row does NOT suppress"
+                )
+                continue
+        if baseline is not None and rule != BASELINE_RULE:
+            problems.append(
+                f"structural-debt row ({fpath}, {rule}): a baseline is only valid for "
+                f"{BASELINE_RULE} rows — remove it or fix the rule id"
+            )
+            continue
+        if (fpath, rule) in rows:
+            problems.append(
+                f"duplicate structural-debt row ({fpath}, {rule}) — keep exactly one"
+            )
+            continue
+        rows[(fpath, rule)] = {
+            "reason": cells[2] if len(cells) > 2 else "",
+            "added": cells[3] if len(cells) > 3 else "",
+            "baseline": baseline,
+        }
+    return rows, problems
+
+
+def filter_structural(
+    findings: list[Finding],
+    debt_rows: dict[tuple[str, str], dict],
+    body_lines_by_file: dict[str, int],
+) -> tuple[list[Finding], list[Finding], list[str]]:
+    """``(blocking, suppressed, problems)`` for the full-surface gate. PURE.
+
+    ``findings`` = the WHOLE surface's lint findings (all severities — advisory
+    findings keep a pre-flip debt row "live" for the staleness check, but only
+    ``severity == "gate"`` findings can block or be suppressed). ``debt_rows`` =
+    ``parse_structural_debt`` rows. ``body_lines_by_file`` = current body line
+    counts, consulted only for rows carrying a baseline.
+
+      - gate finding, no row            → blocking
+      - gate finding, row w/o baseline  → suppressed
+      - gate finding, row w/ baseline   → suppressed iff count <= baseline,
+                                          blocking once the body GROWS past it;
+                                          a missing count is a loud problem +
+                                          blocking (never a silent exemption)
+      - row with no live (file, rule) finding of ANY severity → stale problem
+        (the self-cleaning invariant: fix the file ⇒ remove the row, same PR)
+    """
+    blocking: list[Finding] = []
+    suppressed: list[Finding] = []
+    problems: list[str] = []
+    live_keys = {(f.file, f.rule_id) for f in findings}
+
+    for f in findings:
+        if f.severity != SEV_GATE:
+            continue
+        row = debt_rows.get((f.file, f.rule_id))
+        if row is None:
+            blocking.append(f)
+            continue
+        baseline = row.get("baseline")
+        if baseline is None:
+            suppressed.append(f)
+            continue
+        if not isinstance(baseline, int):
+            # parse_structural_debt only emits int | None, but this is a public
+            # pure function — a degenerate injected row must be loud, not a
+            # TypeError out of `count <= baseline` (mirror of the count guard).
+            problems.append(
+                f"({f.file}, {f.rule_id}): debt row carries a non-integer baseline "
+                f"{baseline!r} — treating the finding as blocking"
+            )
+            blocking.append(f)
+            continue
+        count = body_lines_by_file.get(f.file)
+        if not isinstance(count, int):
+            problems.append(
+                f"({f.file}, {f.rule_id}): baseline row but no current body line count "
+                "is available — treating the finding as blocking"
+            )
+            blocking.append(f)
+        elif count <= baseline:
+            suppressed.append(f)
+        else:
+            blocking.append(f)  # grew past the grandfathered baseline
+
+    for key in sorted(debt_rows):
+        if key not in live_keys:
+            problems.append(
+                f"stale structural-debt row ({key[0]}, {key[1]}): no live finding for "
+                "this (file, rule) — the file was fixed or the rule renamed; remove the row"
+            )
+    return blocking, suppressed, problems
+
+
+def collect_body_counts(debt_rows: dict[tuple[str, str], dict], read_text) -> dict[str, int]:
+    """Current BODY line counts for every baseline-carrying debt row. PURE (the
+    file read is injected as ``read_text(fpath) -> str``, so the unit cases can
+    drive this glue hermetically — a real end-to-end baseline pair is impossible
+    until R2 itself flips to gate severity, BC-13216).
+
+    Counts BODY lines (``body_lines`` — frontmatter excluded), matching what R2
+    itself measures; an unreadable/empty file contributes no entry (the filter
+    then raises the loud missing-count problem rather than silently exempting).
+    """
+    counts: dict[str, int] = {}
+    for (fpath, _rule), row in debt_rows.items():
+        if row.get("baseline") is not None:
+            text = read_text(fpath)
+            if text:
+                counts[fpath] = len(body_lines(text))
+    return counts
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -520,6 +718,72 @@ def run_check(repo_root: Path, as_json: bool) -> int:
     return 1 if problems else 0
 
 
+def run_structural(repo_root: Path, as_json: bool) -> int:
+    """The ADR-034 full-surface structural gate (thin shell over the pure core).
+
+    Diff-free: lints every spec ``scan_surface`` yields, normalizes finding paths to
+    THIS repo_root (structural_lint's ``_rel`` resolves against its own module root,
+    which differs under ``--repo-root`` — e.g. the self-test's synthetic repos), then
+    filters through the structural-debt rows. Exit 0 = clean; 1 = a blocking finding
+    or a list-integrity problem; 2 = the scan itself could not run.
+    """
+    try:
+        targets = scan_surface(repo_root)
+        findings: list[Finding] = []
+        for t in targets:
+            rel = t.relative_to(repo_root).as_posix()
+            for f in lint_path(t):
+                f.file = rel  # normalize: every rule stamps the linted spec's path
+                findings.append(f)
+    except Exception as e:
+        raise GateError(f"could not scan the structural surface: {e}") from e
+
+    debt_rows, problems = parse_structural_debt(_read_text(repo_root / STRUCTURAL_DEBT_REL))
+
+    # Current body line counts — only for baseline (R2) rows. At most one
+    # baseline row per file can exist (the parser rejects duplicates and
+    # non-R2 baselines), so no dedup is needed.
+    body_counts = collect_body_counts(debt_rows, lambda p: _read_text(repo_root / p))
+
+    blocking, suppressed, fproblems = filter_structural(findings, debt_rows, body_counts)
+    problems += fproblems
+
+    if as_json:
+        print(json.dumps({
+            "surface": len(targets),
+            "gate_findings": len(blocking) + len(suppressed),
+            "blocking": [asdict(f) for f in blocking],
+            "suppressed": [asdict(f) for f in suppressed],
+            "debt_rows": len(debt_rows),
+            "problems": problems,
+            "ok": not blocking and not problems,
+        }, indent=2))
+    else:
+        print("=== eval-gate --structural (ADR-034 full-surface structural gate) ===")
+        print(f"  surface={len(targets)} gate-findings={len(blocking) + len(suppressed)} "
+              f"debt-rows={len(debt_rows)}")
+        for f in blocking:
+            note = ""
+            row = debt_rows.get((f.file, f.rule_id))
+            count = body_counts.get(f.file)
+            if row is not None and row.get("baseline") is not None and count is not None:
+                # count can be None on the missing-body-count path — the PROBLEM
+                # line is the sole explanation there; this note covers only growth.
+                note = f" (body grew to {count} lines, past the grandfathered baseline {row['baseline']})"
+            print(f"  BLOCK  [{f.rule_id}] {finding_loc(f)} — {f.message}{note}")
+        for f in suppressed:
+            row = debt_rows[(f.file, f.rule_id)]  # suppressed ⇒ a row exists
+            tail = f", baseline {row['baseline']}" if row.get("baseline") is not None else ""
+            print(f"  SUPPRESSED  [{f.rule_id}] {f.file} (structural-debt row{tail})")
+        for p in problems:
+            print(f"  PROBLEM  {p}")
+        if not blocking and not problems:
+            print("  OK — no unfiltered gate-tier findings on the structural surface")
+        print(f"STRUCTURAL blocking={len(blocking)} suppressed={len(suppressed)} "
+              f"problems={len(problems)}")
+    return 1 if blocking or problems else 0
+
+
 # ── bootstrap (one-time / regen, like run_eval --update-golden) ────────────────
 
 _DEBT_HEADER = """\
@@ -626,6 +890,9 @@ def main(argv: list[str]) -> int:
                     help="raw `git diff --name-status` text (hermetic test hook; skips git)")
     ap.add_argument("--repo-root", default=str(REPO_ROOT))
     ap.add_argument("--check", action="store_true", help="run the debt-list integrity lint (diff-free)")
+    ap.add_argument("--structural", action="store_true",
+                    help="full-surface structural gate (ADR-034): fail on any gate-tier "
+                         "lint finding not covered by docs/structural-lint-debt.md")
     ap.add_argument("--bootstrap", action="store_true",
                     help="(re)generate docs/skill-eval-debt.md from the live surface")
     ap.add_argument("--added", default="", help="the 'added' date written by --bootstrap (YYYY-MM-DD)")
@@ -642,6 +909,8 @@ def main(argv: list[str]) -> int:
             return run_bootstrap(repo_root, args.added)
         if args.check:
             return run_check(repo_root, args.json)
+        if args.structural:
+            return run_structural(repo_root, args.json)
         return run_diff_gate(repo_root, args.base_ref, args.head_ref, args.name_status, args.json)
     except GateError as e:
         sys.stderr.write(f"ERROR: {e}\n")

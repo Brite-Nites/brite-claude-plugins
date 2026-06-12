@@ -132,13 +132,31 @@ artifacts are written.
 **Gate**:
 A *blocking* CI check (fails the build). Distinct from an **advisory lint**
 (WARN only). Per ADR-028, a small set of checks are gates; the rest are advisory
-until promoted.
-_Avoid_: conflating a currently-blocking **Gate** with a lint **finding** whose
-`severity` is `gate`. The latter is a *tier label* — it means "destined to block
-in BC-12590/M5", NOT "blocks now". In the BC-12588 slice the structural lint
-(`scripts/eval/structural_lint.py`) computes both `gate`- and `advisory`-tier
-findings but surfaces them ALL WARN-only; the `gate`-tier findings flip to
-build-failing in M5. Output labels them `[gate-tier · advisory this slice]`.
+until promoted — one rule at a time, via the BC-12700 ratchet.
+_Avoid_: conflating a **Gate** (a check) with a lint **finding** whose `severity`
+is `gate` (a tier). The structural lint (`scripts/eval/structural_lint.py`) never
+fails a build itself — it computes findings; `eval_gate.py` is what enforces the
+`gate`-tier ones: on changed commands (the diff-gate) and across the whole surface
+(the full-surface structural gate, ADR-034). Output labels gate-tier findings
+`[gate-tier · blocking via eval-gate]`.
+
+**Full-surface structural gate**:
+The diff-free enforcement surface for promoted structural rules
+(`eval_gate.py --structural`, ADR-034): lints every command + SKILL.md spec and
+fails on any gate-tier finding not covered by the structural-debt list. A second
+step in the REQUIRED eval-gate CI job. Full-surface because skills never appear
+in the diff-gate's changed-set and an R4 nested-refs regression can be introduced
+by editing a bundled reference file no spec-file diff would show.
+_Avoid_: calling it "the diff-gate" — that is the per-changed-command mode; the
+two coexist in one CI job.
+
+**Structural-debt list**:
+`docs/structural-lint-debt.md` — the per-rule grandfather record for promoted
+structural rules, rows keyed `(file, rule)` (a file can be grandfathered for one
+rule and gated on the rest). R2 rows pin a body line-count **baseline** (growth
+past it blocks); a row with no live finding is stale and fails the gate.
+_Avoid_: conflating it with `docs/skill-eval-debt.md`, which is command-level
+*eval* debt — a different axis with different invariants.
 
 **Fixture / Golden file**:
 A fixture is a canned input for an eval; a golden file is the expected artifact
