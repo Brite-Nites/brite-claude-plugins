@@ -1,10 +1,10 @@
 {
   "name": "revops",
-  "description": "Revenue operations plugin — Salesforce development + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
+  "description": "Revenue operations plugin \u2014 Salesforce development + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
   "author": {
     "name": "Brite"
   },
-  "version": "0.5.10",
+  "version": "0.5.11",
   "homepage": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "repository": "https://github.com/Brite-Nites/britenites-claude-plugins",
   "license": "MIT",
