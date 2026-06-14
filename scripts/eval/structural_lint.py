@@ -348,7 +348,11 @@ def rule_r5_mcp_qualified(path: Path, text: str) -> list[Finding]:
     return out
 
 
-# ── R6 — hardcoded absolute / backslash paths (advisory) ────────────────────────
+# ── R6 — hardcoded absolute / backslash paths (GATE — flipped BC-13215, ratchet 3/5) ──
+# Third advisory rule promoted to gate (surface cleaned in the same PR by refining
+# the detector — the 4 live findings were all placeholder-prose false positives, now
+# exempted below) — enforced by eval_gate's diff-gate (changed commands) +
+# --structural (full surface, ADR-034).
 # Conservative + high-precision: developer-home absolute prefixes + drive-letter
 # Windows paths only. The lookbehind skips prefixes embedded in a longer path or a
 # URL (e.g. github.com/Users/...). Relative `plugins/<p>/` paths are NOT flagged —
@@ -357,6 +361,31 @@ def rule_r5_mcp_qualified(path: Path, text: str) -> list[Finding]:
 ABS_PATH_RE = re.compile(r"(?<![\w./:-])(?:/Users/|/home/|/root/)")
 WIN_PATH_RE = re.compile(r"(?<![\w])[A-Za-z]:\\")
 
+# A real macOS/Linux/Windows username cannot BEGIN with any of these, so when the
+# text immediately after a matched path prefix starts with one, the "path" is a
+# placeholder — prohibition prose like `/Users/...` (the BC-12534 substring class),
+# not a hardcoded path. Exempt by structural FORM only: never by formatting (a real
+# path in a code span is exactly what R6 must still catch) and never by literal
+# placeholder WORDS like `user`/`yourname` (those can be real account names).
+PLACEHOLDER_STARTS = ("...", "…", "<", "$")
+
+
+def _is_placeholder_username(line: str, m: re.Match) -> bool:
+    return line[m.end():].startswith(PLACEHOLDER_STARTS)
+
+
+def _first_hardcoded_path(line: str) -> re.Match | None:
+    """First NON-placeholder absolute/Windows path match on ``line``, ABS prefixes
+    before WIN. Rescanning past exempted placeholders stops a placeholder from giving
+    the rest of its line a free pass (`/Users/...` then a real `/Users/<name>/`); the
+    first real match per line is reported, preserving R6's one-finding-per-line shape.
+    """
+    for rx in (ABS_PATH_RE, WIN_PATH_RE):
+        m = next((c for c in rx.finditer(line) if not _is_placeholder_username(line, c)), None)
+        if m:
+            return m
+    return None
+
 
 def rule_r6_hardcoded_paths(path: Path, text: str) -> list[Finding]:
     lines = text.splitlines()
@@ -364,12 +393,11 @@ def rule_r6_hardcoded_paths(path: Path, text: str) -> list[Finding]:
     rel = _rel(path)
     out: list[Finding] = []
     for idx in range(body_start, len(lines) + 1):
-        line = lines[idx - 1]
-        m = ABS_PATH_RE.search(line) or WIN_PATH_RE.search(line)
+        m = _first_hardcoded_path(lines[idx - 1])
         if m:
             out.append(
                 Finding(
-                    "R6-hardcoded-paths", SEV_ADVISORY,
+                    "R6-hardcoded-paths", SEV_GATE,
                     f"hardcoded absolute/backslash path near '{m.group(0)}'; "
                     "use ${CLAUDE_PLUGIN_ROOT} / ${CLAUDE_SKILL_DIR}",
                     rel, idx,
