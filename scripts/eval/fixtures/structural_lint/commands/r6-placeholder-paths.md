@@ -13,5 +13,6 @@ username is structurally impossible as a real account name, so R6 must stay sile
 - angle placeholder: `/Users/<username>/config.json`
 - shell var: `/Users/$USER/config.json`
 - prefix generality: `/home/...`
+- root prefix: `/root/...`
 - windows placeholder: `C:\...`
 - the live false-positive shape, verbatim: must be relative (no `/Users/...`, no `~/...`, no `..` segments)
