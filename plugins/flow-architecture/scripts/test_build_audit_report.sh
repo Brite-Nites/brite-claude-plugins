@@ -99,6 +99,22 @@ eq("config frontmatter_schema:strict → strict", fmcfgmode("strict"), "strict")
 eq("config frontmatter_schema:STRICT (uppercase) → strict", fmcfgmode("STRICT"), "strict")
 eq("config frontmatter_schema:banana (unrecognized) → lenient", fmcfgmode("banana"), "lenient")
 eq("config frontmatter_schema field absent → lenient", fmcfgmode(None), "lenient")
+# valid-but-non-dict config.json (a top-level JSON list/scalar) must fail-safe to
+# lenient, NOT raise AttributeError on .get — the malformed-injected-state class.
+def rawcfg(text, fn):
+    box = tempfile.mkdtemp()
+    try:
+        os.makedirs(os.path.join(box, ".flow"))
+        open(os.path.join(box, ".flow", "config.json"), "w").write(text)
+        return fn(bar.Path(box))
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+eq("non-dict config (JSON list) → frontmatter_schema lenient (no crash)",
+   rawcfg('["a","b"]', bar._config_frontmatter_schema_mode), "lenient")
+eq("non-dict config (JSON scalar) → frontmatter_schema lenient (no crash)",
+   rawcfg('42', bar._config_frontmatter_schema_mode), "lenient")
+eq("non-dict config (JSON list) → story_frame lenient (twin hardened too)",
+   rawcfg('["a","b"]', bar._config_story_frame_mode), "lenient")
 
 # ── 3c. story-front-matter-populated predicate: lenient floor vs strict canon ──
 # Directly exercises the NEW Python strict branch (lint_text delegation), the twin of

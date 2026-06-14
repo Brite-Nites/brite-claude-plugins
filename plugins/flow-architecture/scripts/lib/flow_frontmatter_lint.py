@@ -67,26 +67,29 @@ JOURNEY_CANON = (
 )
 JOURNEY_MILESTONE_SUBKEYS = ("name", "id")
 
-# ── Drift maps (wrong-name key → the canonical key it impersonates) ───────────
+# ── Drift maps (wrong-name key → its remediation hint) ────────────────────────
 # Grounded in the live census of all 7 WS-E consumer repos, not invented:
 # brand-hub (sub_flow_id/linear_parent/linear_children), brite-roster + brite-labs
 # (singular persona, linear_parent), brite-supply-react (sub_flow_id /
-# linear_parent_issue), brite-pim (linear_parent). The value is the remediation hint.
+# linear_parent_issue), brite-pim (linear_parent). The value is the full remediation
+# hint INCLUDING the verb (`use <canon>` for a rename, `drop …` for a removed key),
+# emitted verbatim after `<key> → ` — so a drop-only key (`linear_project_id`, which
+# ADR-033 deleted with no replacement) doesn't read as the nonsensical "use (dropped)".
 STORY_DRIFT = {
-    "sub_flow_id": "flow_id",
-    "linear_parent": "parent_issue",
-    "linear_parent_issue": "parent_issue",
-    "linear_children": "children",
-    "persona": "personas",
+    "sub_flow_id": "use flow_id",
+    "linear_parent": "use parent_issue",
+    "linear_parent_issue": "use parent_issue",
+    "linear_children": "use children",
+    "persona": "use personas",
 }
 # Journey drift: `milestone:`/`milestone_name:`/`linear_milestone_name:` predate the
 # ADR-033 nested `linear_milestone: {name, id}`; `linear_project_id` was DROPPED by
 # ADR-033 (zero consumers) — brand-hub's 10 journeys still carry it.
 JOURNEY_DRIFT = {
-    "milestone": "linear_milestone",
-    "milestone_name": "linear_milestone.name",
-    "linear_milestone_name": "linear_milestone.name",
-    "linear_project_id": "(dropped — remove per ADR-033)",
+    "milestone": "use linear_milestone",
+    "milestone_name": "use linear_milestone.name",
+    "linear_milestone_name": "use linear_milestone.name",
+    "linear_project_id": "drop (removed per ADR-033, no replacement)",
 }
 # ADR-033 § "real-doc extras tolerated, not canon" — silently allowed on journeys.
 JOURNEY_TOLERATED = frozenset(
@@ -156,7 +159,8 @@ def _lint(present, nested, canon, drift_map, nested_spec, tolerated, doc_type):
     for key in present:
         if key in drift_map and key not in seen_drift:
             seen_drift.add(key)
-            drift.append("{k} → use {c}".format(k=key, c=drift_map[key]))
+            # drift_map value already carries the verb (`use <canon>` / `drop …`).
+            drift.append("{k} → {hint}".format(k=key, hint=drift_map[key]))
 
     # MISSING — a canonical top-level key absent; if present-but-nested, descend.
     for key in canon:

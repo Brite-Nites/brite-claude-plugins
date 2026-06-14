@@ -197,9 +197,11 @@ assert_clean "journey honest-empty personas: [] → clean (presence floor)" "$TM
 # milestone: drift (also makes linear_milestone missing)
 sed 's/^linear_milestone:/milestone:/' "$GOOD_JOURNEY" > "$TMP/j-drift-milestone.md"
 assert_has "journey milestone flagged DRIFT → linear_milestone" "$TMP/j-drift-milestone.md" journey drift "milestone → use linear_milestone"
-# linear_project_id (ADR-033-dropped) alongside good → drift
+# linear_project_id (ADR-033-dropped) alongside good → drift, with a DROP-not-USE hint
 awk '/^---$/{c++} c==2 && !done {print "linear_project_id: abc-123"; done=1} {print}' "$GOOD_JOURNEY" > "$TMP/j-drift-projid.md"
 assert_has "journey linear_project_id flagged DRIFT (dropped per ADR-033)" "$TMP/j-drift-projid.md" journey drift "linear_project_id"
+# the drop-only entry reads naturally ('→ drop …', not the nonsensical '→ use (dropped)')
+assert_has "drop-only drift hint reads as 'drop', not 'use'" "$TMP/j-drift-projid.md" journey drift "linear_project_id → drop"
 # nested linear_milestone.id missing
 sed '/^  id: 7f3c2a10/d' "$GOOD_JOURNEY" > "$TMP/j-miss-id.md"
 assert_has "journey nested linear_milestone.id absent flagged MISSING" "$TMP/j-miss-id.md" journey missing "linear_milestone.id (nested canonical key absent)"

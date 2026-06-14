@@ -138,7 +138,10 @@ def _config_story_frame_mode(repo: Path) -> str:
         return "lenient"
     try:
         v = json.loads(_read(cfg)).get("story_frame")
-    except (ValueError, OSError):
+    except (ValueError, OSError, AttributeError):
+        # AttributeError: valid-but-non-dict JSON (e.g. a top-level list) → .get fails.
+        # Fail-safe to lenient on ANY unusable config, matching the smoke twin's broad
+        # catch — the gate can only ever STAY permissive, never accidentally narrow.
         return "lenient"
     return "strict" if isinstance(v, str) and v.lower() == "strict" else "lenient"
 
@@ -154,7 +157,10 @@ def _config_frontmatter_schema_mode(repo: Path) -> str:
         return "lenient"
     try:
         v = json.loads(_read(cfg)).get("frontmatter_schema")
-    except (ValueError, OSError):
+    except (ValueError, OSError, AttributeError):
+        # AttributeError: valid-but-non-dict JSON (e.g. a top-level list) → .get fails.
+        # Fail-safe to lenient on ANY unusable config (parity with the smoke twin's
+        # broad catch + _config_story_frame_mode above).
         return "lenient"
     return "strict" if isinstance(v, str) and v.lower() == "strict" else "lenient"
 
