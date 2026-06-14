@@ -180,6 +180,59 @@ PY
   printf '%s' "$mode"
 }
 
+# frontmatter_schema_mode <fixture> — resolve a consumer repo's frontmatter-schema
+# strictness from .flow/config.json `frontmatter_schema` (BC-12572). Returns
+# `strict` ONLY for an explicit string `frontmatter_schema: "strict"`
+# (case-insensitive); every other state — file absent, field absent, unrecognized
+# value, parse error — resolves to `lenient`. Same fail-safe construction as
+# story_frame_mode (the gate can only ever STAY permissive, never accidentally
+# narrow). Per-repo strangler-fig: repos flip to `strict` as their story docs are
+# migrated to full canon; once all WS-E repos converge, `strict` becomes the
+# hardcoded default + this flag is deleted (tracked on a BC-11983 child).
+frontmatter_schema_mode() {
+  local fixture="$1" mode="lenient"
+  [ -f "$fixture/.flow/config.json" ] || { printf 'lenient'; return 0; }
+  mode="$(python3 - "$fixture/.flow/config.json" <<'PY'
+import json, sys
+try:
+    v = json.load(open(sys.argv[1])).get('frontmatter_schema')
+    print('strict' if isinstance(v, str) and v.lower() == 'strict' else 'lenient')
+except Exception:
+    print('lenient')
+PY
+)"
+  printf '%s' "$mode"
+}
+
+# story_frontmatter_populated <doc> [<mode>] — the story-front-matter-populated gate
+# (BC-12572 config-gated widening). LENIENT (default): the 4-key presence floor
+# (flow_id/status/figma/user_docs_url) — today's behavior, byte-unchanged. STRICT:
+# the FULL 20-key story canon must be present (presence, NEVER non-emptiness —
+# honest-empty `personas: []` passes), delegated to the WS-A frontmatter lint
+# (scripts/lib/flow_frontmatter_lint.py) so the canon is single-sourced, not
+# re-listed a third time. PASS iff zero MISSING_KEY. A drift key (sub_flow_id …)
+# fails here only via the canonical key it displaces going MISSING — naming the
+# drift is the standalone lint's job, not this completeness gate. <mode> defaults
+# to lenient so every existing caller is unchanged.
+story_frontmatter_populated() {
+  local doc="$1" mode
+  mode="$(printf '%s' "${2:-lenient}" | tr '[:upper:]' '[:lower:]')"
+  if [ "$mode" = "strict" ]; then
+    local missing
+    missing="$(python3 - "$SCRIPT_DIR/../scripts/lib" "$doc" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import flow_frontmatter_lint as m
+print(len(m.lint_doc(sys.argv[2], "story")["missing"]))
+PY
+)"
+    [ "$missing" = "0" ]
+    return
+  fi
+  grep -q '^flow_id:' "$doc" && grep -q '^status:' "$doc" \
+    && grep -q '^figma:' "$doc" && grep -q '^user_docs_url:' "$doc"
+}
+
 # === Phase B-equivalent gate runner (filesystem-only checks) =================
 # Mirrors `commands/audit.md` § Phase B for the gates that don't require Linear
 # MCP. Per-flow + per-domain + cross-cutting filesystem checks only.
@@ -192,6 +245,11 @@ run_phase_b_gates() {
   # story-job-story-regex gate below.
   local frame_mode
   frame_mode="$(story_frame_mode "$fixture")"
+  # Per-repo frontmatter-schema strictness (BC-12572): lenient unless the consumer
+  # repo's .flow/config.json sets `frontmatter_schema: strict`. Threaded into the
+  # story-front-matter-populated gate below.
+  local fm_schema_mode
+  fm_schema_mode="$(frontmatter_schema_mode "$fixture")"
 
   # --- preflight-complete (Q29.1) ---
   if [ -f "$fixture/.flow/config.json" ] && python3 - "$fixture" <<'PY' >/dev/null 2>&1
@@ -266,8 +324,7 @@ PY
 
         emit_gate PASS story-doc-exists "$scope"
 
-        if grep -q '^flow_id:' "$doc" && grep -q '^status:' "$doc" && \
-           grep -q '^figma:' "$doc" && grep -q '^user_docs_url:' "$doc"; then
+        if story_frontmatter_populated "$doc" "$fm_schema_mode"; then
           emit_gate PASS story-front-matter-populated "$scope"
         else
           emit_gate FAIL story-front-matter-populated "$scope"
@@ -630,6 +687,95 @@ printf '%s' '{"version":"1","story_frame":"lenient"}' > "$MODE_TMP/.flow/config.
 printf '%s' '{"version":"1","story_frame":"banana"}' > "$MODE_TMP/.flow/config.json"
 [ "$(story_frame_mode "$MODE_TMP")" = "lenient" ] \
   && pass "unrecognized story_frame value → lenient (fail-safe: never accidentally narrow)" || fail "unrecognized value did not resolve lenient"
+
+# ── Section 4e: frontmatter_schema:strict widens story-front-matter-populated ─
+# BC-12572: .flow/config.json `frontmatter_schema: strict` widens the
+# story-front-matter-populated gate from the 4-key floor to the full 20-key story
+# canon (presence, not non-emptiness). Default/absent = the 4-key floor (Sections
+# 2/3 above already pin lenient). Mirrors Section 4c's copy-and-mutate wiring: the
+# clean fixture's docs carry only the 4 floor keys (+ children/qa), so under strict
+# they FAIL until upgraded to full canon. Proves (1) a full-canon doc PASSes strict,
+# (2) a still-lean doc FAILs strict, (3) BOTH PASS lenient (the flag GATES it).
+section "4e/5" "frontmatter_schema:strict widens story-front-matter-populated to full canon"
+SCHEMA_FIX="$(mktemp -d)"
+trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$STRICT_FIX" "$MODE_TMP" "$SCHEMA_FIX"' EXIT
+cp -R "$CLEAN_FIXTURE/." "$SCHEMA_FIX/"
+# Upgrade TEAM-01 to the FULL 20-key canon by inserting the keys the lean fixture
+# lacks before the closing front-matter `---`.
+SCHEMA_DOC="$SCHEMA_FIX/docs/product/flows/TEAM/TEAM-01.md"
+python3 - "$SCHEMA_DOC" <<'PY'
+import sys
+p = sys.argv[1]
+lines = open(p).read().splitlines(keepends=True)
+add = ("domain: TEAM\nparent_issue: BC-1\npersonas: []\nrelated_flows: []\n"
+       "sandbox_url: TBD\nstaging_url: TBD\nreal_app_url: TBD\ne2e_test: TBD\n"
+       "eng_status: not-started\ndesign_status: not-started\ndocs_status: not-started\n"
+       "intent: ../../intent.md\n")
+idx = [i for i, l in enumerate(lines) if l.strip() == "---"]
+lines.insert(idx[1], add)  # before the front-matter close
+open(p, "w").write("".join(lines))
+PY
+# Guard: confirm the upgraded doc now satisfies the full canon (zero MISSING_KEY)
+# while a sibling lean doc does not — defeats a vacuous pass if the insert no-ops.
+if story_frontmatter_populated "$SCHEMA_DOC" strict \
+   && ! story_frontmatter_populated "$SCHEMA_FIX/docs/product/flows/TEAM/TEAM-02.md" strict; then
+  pass "e2e setup: TEAM-01 upgraded to full canon; TEAM-02 still lean (strict-separable)"
+else
+  fail "e2e setup: upgrade no-op or TEAM-02 already full — e2e assertions invalid"
+fi
+
+python3 - "$SCHEMA_FIX/.flow/config.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p)); d['frontmatter_schema'] = 'strict'
+json.dump(d, open(p, 'w'))
+PY
+run_phase_b_gates "$SCHEMA_FIX"
+if awk -F'\t' '$1=="FAIL" && $2=="story-front-matter-populated" && $3=="flow:TEAM-02"{f=1} END{exit !f}' "$GATE_REPORT"; then
+  pass "strict: lean TEAM-02 FAILs story-front-matter-populated (4-key floor insufficient)"
+else
+  fail "strict: lean TEAM-02 did not FAIL — widening not enforced"
+fi
+if awk -F'\t' '$1=="PASS" && $2=="story-front-matter-populated" && $3=="flow:TEAM-01"{f=1} END{exit !f}' "$GATE_REPORT"; then
+  pass "strict: full-canon TEAM-01 PASSes story-front-matter-populated"
+else
+  fail "strict: full-canon TEAM-01 did not PASS — widening rejects a complete doc"
+fi
+
+# lenient control (field removed) → the lean TEAM-02 PASSes the 4-key floor again
+# (proves the flag, not the doc, drives the verdict).
+python3 - "$SCHEMA_FIX/.flow/config.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p)); d.pop('frontmatter_schema', None)
+json.dump(d, open(p, 'w'))
+PY
+run_phase_b_gates "$SCHEMA_FIX"
+if awk -F'\t' '$1=="PASS" && $2=="story-front-matter-populated" && $3=="flow:TEAM-02"{f=1} END{exit !f}' "$GATE_REPORT"; then
+  pass "lenient (control): lean TEAM-02 still PASSes the 4-key floor"
+else
+  fail "lenient (control): lean TEAM-02 FAILed the floor — lenient floor broken end-to-end"
+fi
+
+# ── Section 4f: frontmatter_schema_mode config reader (fail-safe lenient) ─────
+section "4f/5" "frontmatter_schema_mode resolves .flow/config.json (fail-safe lenient)"
+SCHEMA_MODE_TMP="$(mktemp -d)"
+trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$STRICT_FIX" "$MODE_TMP" "$SCHEMA_FIX" "$SCHEMA_MODE_TMP"' EXIT
+mkdir -p "$SCHEMA_MODE_TMP/.flow"
+[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP/absent")" = "lenient" ] \
+  && pass "absent .flow/config.json → lenient" || fail "absent config did not resolve lenient"
+printf '%s' '{"version":"1"}' > "$SCHEMA_MODE_TMP/.flow/config.json"
+[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP")" = "lenient" ] \
+  && pass "field absent → lenient" || fail "field-absent did not resolve lenient"
+printf '%s' '{"version":"1","frontmatter_schema":"strict"}' > "$SCHEMA_MODE_TMP/.flow/config.json"
+[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP")" = "strict" ] \
+  && pass "frontmatter_schema:strict → strict" || fail "strict did not resolve strict"
+printf '%s' '{"version":"1","frontmatter_schema":"STRICT"}' > "$SCHEMA_MODE_TMP/.flow/config.json"
+[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP")" = "strict" ] \
+  && pass "frontmatter_schema:STRICT (uppercase) → strict" || fail "uppercase STRICT did not resolve strict"
+printf '%s' '{"version":"1","frontmatter_schema":"banana"}' > "$SCHEMA_MODE_TMP/.flow/config.json"
+[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP")" = "lenient" ] \
+  && pass "unrecognized value → lenient (fail-safe)" || fail "unrecognized value did not resolve lenient"
 
 # ── Section 5: skip-with-reason for Phase A / C / LLM-runner ────────────────
 section "5/5" "Phase A / C / LLM-runner gates (skipped per vslice-greenfield precedent)"

@@ -84,6 +84,43 @@ eq("config story_frame:lenient → lenient", cfgmode("lenient"), "lenient")
 eq("config story_frame:banana (unrecognized) → lenient", cfgmode("banana"), "lenient")
 eq("config story_frame field absent → lenient", cfgmode(None), "lenient")
 
+# ── 3b. config frontmatter_schema mode reader (BC-12572; fail-safe lenient) ────
+def fmcfgmode(val):
+    box = tempfile.mkdtemp()
+    try:
+        os.makedirs(os.path.join(box, ".flow"))
+        if val is not None:
+            open(os.path.join(box, ".flow", "config.json"), "w").write(
+                json.dumps({"frontmatter_schema": val}))
+        return bar._config_frontmatter_schema_mode(bar.Path(box))
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+eq("config frontmatter_schema:strict → strict", fmcfgmode("strict"), "strict")
+eq("config frontmatter_schema:STRICT (uppercase) → strict", fmcfgmode("STRICT"), "strict")
+eq("config frontmatter_schema:banana (unrecognized) → lenient", fmcfgmode("banana"), "lenient")
+eq("config frontmatter_schema field absent → lenient", fmcfgmode(None), "lenient")
+
+# ── 3c. story-front-matter-populated predicate: lenient floor vs strict canon ──
+# Directly exercises the NEW Python strict branch (lint_text delegation), the twin of
+# run-audit-smoke.sh §4e — so the bash↔Python ORACLE covers BOTH impls of the widening.
+FM_LEAN = "---\nflow_id: X-01\nstatus: BUILT\nfigma: TBD\nuser_docs_url: TBD\n---\n# b\n"
+FM_FULL = ("---\nflow_id: X-01\ndomain: X\nstatus: BUILT\nparent_issue: BC-1\n"
+           "children:\n  story: BC-2\n  engineering: BC-3\n  design: BC-4\n  qa: BC-5\n  docs: BC-6\n"
+           "personas: []\nrelated_flows: []\nfigma: TBD\nsandbox_url: TBD\nstaging_url: TBD\n"
+           "real_app_url: TBD\ne2e_test: TBD\nuser_docs_url: TBD\nqa_status: not-tested\n"
+           "qa_last_signed_off: null\neng_status: not-started\ndesign_status: not-started\n"
+           "docs_status: not-started\nintent: ../../intent.md\nlast_reviewed: 2026-06-14\n---\n# b\n")
+truthy("lenient: the 4-key floor doc PASSes populated", bar._story_frontmatter_populated(FM_LEAN, "lenient"))
+truthy("strict: the 4-key floor doc FAILs populated (needs full canon)",
+       not bar._story_frontmatter_populated(FM_LEAN, "strict"))
+truthy("strict: the full-canon doc PASSes populated", bar._story_frontmatter_populated(FM_FULL, "strict"))
+truthy("strict: honest-empty personas:[]/null still PASS (presence not non-emptiness)",
+       bar._story_frontmatter_populated(FM_FULL, "strict"))
+# control: the clean fixture's lean docs do NOT fail story-front-matter-populated under
+# the default (lenient) — the e2e strict flip is asserted in Section 5 via with_mutation.
+truthy("lenient default: lean clean-fixture doc PASSes story-front-matter-populated",
+       ("story-front-matter-populated", "flow:TEAM-01") not in fails(CLEAN))
+
 # ── 4. children-block parser ──────────────────────────────────────────────────
 DOC_CHILDREN = ("---\nflow_id: X-01\nchildren:\n  story: BC-1\n  engineering: BC-2\n"
                 "  qa: BC-3\n---\n# body\n")
@@ -162,6 +199,16 @@ def lenient_constraint(r):
     open(d, "w").write(t)
 truthy("control: constraint-spec doc under lenient does NOT fail (flag, not doc, drives it)",
        ("story-job-story-regex", "flow:TEAM-01") not in with_mutation(lenient_constraint))
+
+# frontmatter_schema:strict (BC-12572) e2e: the clean fixture's docs carry only the
+# 4-key floor, so flipping the repo to strict flips story-front-matter-populated to a
+# hard-fail — exercising the NEW Python strict branch (lint_text) through evaluate(),
+# the twin of run-audit-smoke.sh §4e (bash↔Python ORACLE now covers both impls).
+def strict_frontmatter(r):
+    cfgp = os.path.join(r, ".flow", "config.json")
+    c = json.load(open(cfgp)); c["frontmatter_schema"] = "strict"; json.dump(c, open(cfgp, "w"))
+truthy("frontmatter_schema:strict + lean clean-fixture doc → story-front-matter-populated fails (e2e)",
+       ("story-front-matter-populated", "flow:TEAM-01") in with_mutation(strict_frontmatter))
 
 # ── 6. determinism: gates sorted by total (id, scope); no absolute-path leak ───
 # NOTE: evaluate() returns UNSORTED; decide()/CLI sort. Assert the sort key is total
