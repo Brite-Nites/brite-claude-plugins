@@ -129,12 +129,22 @@ assert_finding    "R5: bare/unqualified allowed-tools entry → gate (blocking v
 run "$FIX/commands/r1-with-flag.md"
 assert_no_finding "R5: fully-qualified mcp + built-in → no R5" R5-mcp-not-fully-qualified
 
-# ── R6 — hardcoded absolute / backslash paths (advisory) ────────────────────────
+# ── R6 — hardcoded absolute / backslash paths (GATE — flipped BC-13215, ratchet 3/5) ──
 echo "── R6 hardcoded-paths ──"
 run "$FIX/commands/r6-absolute-path.md"
-assert_finding    "R6: absolute /Users path → advisory" R6-hardcoded-paths advisory
+assert_finding    "R6: absolute /Users path → gate (blocking via eval-gate)" R6-hardcoded-paths gate
 run "$FIX/commands/clean.md"
 assert_no_finding "R6: URL + relative plugins/ + \${CLAUDE_PLUGIN_ROOT} → no R6" R6-hardcoded-paths
+run "$FIX/commands/r6-placeholder-paths.md"
+assert_no_finding "R6: placeholder usernames (.../…/<>/\$VAR) → no R6" R6-hardcoded-paths
+run "$FIX/commands/r6-placeholder-then-real.md"
+assert_finding    "R6: placeholder then real path on one line → still flags (no dodge)" R6-hardcoded-paths gate
+run "$FIX/commands/r6-win-path.md"
+assert_finding    "R6: real Windows drive-letter path → gate" R6-hardcoded-paths gate
+run "$FIX/commands/r6-placeholder-glued.md"
+assert_finding    "R6: real username glued behind an ellipsis lead → still flags" R6-hardcoded-paths gate
+run "$FIX/commands/r6-cross-regex.md"
+assert_finding    "R6: exempted ABS placeholder falls through to a real WIN path (ABS-before-WIN)" R6-hardcoded-paths gate
 
 # ── R4 — reference chain > 1 level deep (advisory) ──────────────────────────────
 echo "── R4 nested-refs ──"
@@ -208,7 +218,7 @@ assert_rc "nonexistent/unreadable spec → exit 2 (internal error, not a finding
 
 echo ""
 # Count floor — a silently-skipped block must fail loudly, not drop the count.
-FLOOR=27
+FLOOR=32
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2
