@@ -477,8 +477,8 @@ def filter_structural(
 def collect_body_counts(debt_rows: dict[tuple[str, str], dict], read_text) -> dict[str, int]:
     """Current BODY line counts for every baseline-carrying debt row. PURE (the
     file read is injected as ``read_text(fpath) -> str``, so the unit cases can
-    drive this glue hermetically — a real end-to-end baseline pair is impossible
-    until R2 itself flips to gate severity, BC-13216).
+    drive this glue hermetically; the real end-to-end baseline pair landed with
+    R2's flip to gate severity in BC-13216 — see test_eval_gate.sh F7-F9).
 
     Counts BODY lines (``body_lines`` — frontmatter excluded), matching what R2
     itself measures; an unreadable/empty file contributes no entry (the filter

@@ -236,14 +236,22 @@ EOF
 gate --repo-root "$synth" --name-status "$(printf 'M\tplugins/foo/commands/longgrand.md')"
 assert_rc_and_contains "B9 grandfathered >=500-line command MODIFIED → EXEMPT (R2 not diff-gated)" 0 "EXEMPT plugins/foo/commands/longgrand.md"
 assert_not_contains "B9b R2 is NOT a diff-gate block reason post-flip" "R2-body-too-long"
-# B10 surgical proof: dropping R2 from the diff-gate must NOT drop the other gate-tier
-# structural rules — a first-person description (R3) on a changed command still BLOCKS.
-write_first_person_spec "$synth/plugins/foo/commands/fpgrand.md" "I will do things for you"
+# B10 surgical proof, CO-LOCATED on one file: a >=500-line body (R2 gate) AND a
+# first-person description (R3 gate) on the SAME changed command. The diff-gate must
+# drop ONLY R2 — so it still BLOCKS on R3 (retained) and never names R2 as a reason.
+# Co-locating both rules on one file proves the exclusion is per-rule, not "drop all
+# structural" (B10b is RED on the pre-filter code where R2 is also a block reason).
+mkdir -p "$synth/plugins/foo/commands"
+{
+  printf -- '---\nname: fpgrand\ndescription: I will do things for you\n---\n'
+  i=1; while [ "$i" -le 500 ]; do printf 'body line %d\n' "$i"; i=$((i + 1)); done
+} > "$synth/plugins/foo/commands/fpgrand.md"
 cat >> "$synth/docs/skill-eval-debt.md" <<'EOF'
 | `plugins/foo/commands/fpgrand.md` | foo | grandfathered | no-eval | 2026-06-14 |
 EOF
 gate --repo-root "$synth" --name-status "$(printf 'M\tplugins/foo/commands/fpgrand.md')"
-assert_rc_and_contains "B10 first-person desc still BLOCKS via diff-gate (R3 retained, filter is surgical)" 1 "R3-description-quality"
+assert_rc_and_contains "B10 same-file R2+R3 → still BLOCKS on R3 (retained, filter is surgical)" 1 "R3-description-quality"
+assert_not_contains "B10b same-file R2+R3 → R2 dropped, not a diff-gate block reason" "R2-body-too-long"
 
 # ════════════════════════════════════════════════════════════════════════════
 echo "── C. integration against the real repo ──"
@@ -434,7 +442,7 @@ assert_rc_and_contains "F9 fresh >=500-line spec, no debt row → BLOCK, exit 1"
 # without aborting, so assert the EXACT total — catches a 1-assertion skip AND forces
 # EXPECTED_INTEGRATION to move in lockstep when integration assertions are added.
 echo ""
-EXPECTED_INTEGRATION=39
+EXPECTED_INTEGRATION=40
 EXPECTED_TOTAL=$((npure_listed + EXPECTED_INTEGRATION))
 if [ "$((pass + fail))" -ne "$EXPECTED_TOTAL" ]; then
   echo "FATAL: $((pass + fail)) assertions ran, expected exactly $EXPECTED_TOTAL ($npure_listed pure + $EXPECTED_INTEGRATION integration) — a block was skipped or added without updating EXPECTED_INTEGRATION" >&2
