@@ -55,6 +55,12 @@ _HERE = Path(__file__).resolve().parent
 REPO_ROOT = _HERE.parent.parent.parent
 DEFAULT_FIXTURES_DIR = _HERE.parent / "tests" / "fixtures"
 
+# Single-source the canonical story key set: the strict `story-front-matter-populated`
+# widening (BC-12572) delegates to the WS-A frontmatter lint rather than re-listing
+# the 20-key canon a third time. lib/ is a sibling of this file.
+sys.path.insert(0, str(_HERE / "lib"))
+import flow_frontmatter_lint as _ffl  # noqa: E402
+
 # os.EX_USAGE arg-guard universe: the canonical `--gate=<id>` valid-ID set from
 # audit.md § Phase B `--gate=<id>` table (the full Q29 manifest). An unrecognized
 # --gate value exits 64. This is the SUPERSET; the Phase-B subset this builder
@@ -132,9 +138,47 @@ def _config_story_frame_mode(repo: Path) -> str:
         return "lenient"
     try:
         v = json.loads(_read(cfg)).get("story_frame")
-    except (ValueError, OSError):
+    except (ValueError, OSError, AttributeError):
+        # AttributeError: valid-but-non-dict JSON (e.g. a top-level list) → .get fails.
+        # Fail-safe to lenient on ANY unusable config, matching the smoke twin's broad
+        # catch — the gate can only ever STAY permissive, never accidentally narrow.
         return "lenient"
     return "strict" if isinstance(v, str) and v.lower() == "strict" else "lenient"
+
+
+def _config_frontmatter_schema_mode(repo: Path) -> str:
+    """`.flow/config.json` frontmatter_schema → 'strict' iff the string 'strict'
+    (case-insensitive); every other state (absent file/field, bad value, parse
+    error) resolves fail-safe to 'lenient'. Mirrors _config_story_frame_mode and
+    the smoke's frontmatter_schema_mode() — same per-repo strangler-fig as
+    story_frame (BC-12572 / mirrors Q29 amendment 3)."""
+    cfg = repo / ".flow" / "config.json"
+    if not cfg.is_file():
+        return "lenient"
+    try:
+        v = json.loads(_read(cfg)).get("frontmatter_schema")
+    except (ValueError, OSError, AttributeError):
+        # AttributeError: valid-but-non-dict JSON (e.g. a top-level list) → .get fails.
+        # Fail-safe to lenient on ANY unusable config (parity with the smoke twin's
+        # broad catch + _config_story_frame_mode above).
+        return "lenient"
+    return "strict" if isinstance(v, str) and v.lower() == "strict" else "lenient"
+
+
+def _story_frontmatter_populated(doc_text: str, mode: str) -> bool:
+    """The story-front-matter-populated predicate (BC-12572 config-gated widening).
+
+    LENIENT (default): the 4-key presence floor (flow_id/status/figma/user_docs_url)
+    — today's behavior, unchanged. STRICT: the FULL 20-key story canon must be
+    present (presence, never non-emptiness — honest-empty `personas: []` passes),
+    delegated to the WS-A lint (over the already-read doc_text, no re-read) so the
+    canon is single-sourced. Drift keys fail here only via the canonical key they
+    displace going MISSING — naming the drift itself is the standalone lint's job,
+    not this completeness gate."""
+    if mode == "strict":
+        return not _ffl.lint_text(doc_text, "story")["missing"]
+    return all(re.search(rf"^{k}:", doc_text, re.MULTILINE) for k in
+               ("flow_id", "status", "figma", "user_docs_url"))
 
 
 def _story_frame_present(doc_text: str, mode: str) -> bool:
@@ -212,6 +256,7 @@ def evaluate(repo: Path) -> list:
         })
 
     frame_mode = _config_story_frame_mode(repo)
+    fm_schema_mode = _config_frontmatter_schema_mode(repo)
 
     # --- preflight-complete (Q29.1) ---
     cfg = repo / ".flow" / "config.json"
@@ -271,9 +316,8 @@ def evaluate(repo: Path) -> list:
 
             emit("pass", "story-doc-exists", scope)
 
-            fm_ok = all(re.search(rf"^{k}:", t, re.MULTILINE) for k in
-                        ("flow_id", "status", "figma", "user_docs_url"))
-            emit("pass" if fm_ok else "hard-fail", "story-front-matter-populated", scope)
+            emit("pass" if _story_frontmatter_populated(t, fm_schema_mode)
+                 else "hard-fail", "story-front-matter-populated", scope)
 
             emit("pass" if _story_frame_present(t, frame_mode) else "hard-fail",
                  "story-job-story-regex", scope)

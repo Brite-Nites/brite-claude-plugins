@@ -473,6 +473,33 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-frontmatter-schema — flow-architecture WS-A frontmatter-schema lint (BC-12572)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-flow-frontmatter-lint-vslice.sh — the
+# regression lock for the frontmatter-schema lint (scripts/lib/flow_frontmatter_lint.py):
+# A-10 story-doc (20-key canon, ADR-029) + A-11 journey-doc (9-key canon, ADR-033)
+# schema enforcement with three severity classes (DRIFT_KEY / MISSING_KEY loud;
+# UNKNOWN_KEY quiet). The lib's hardcoded canon is asserted against the fixture-locked
+# builder goldens (story-/journey-frontmatter-stamp) so lint↔builder drift reds CI.
+# The retention half of the frontmatter work (BC-13168/BC-13028 built the generators).
+# Pass count auto-derived from the harness RESULT line.
+section "2b-frontmatter-schema. flow-architecture WS-A frontmatter-schema lint (BC-12572)"
+
+fda_fmlint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-frontmatter-lint-vslice.sh"
+
+if [ ! -f "$fda_fmlint_test" ]; then
+  warn "plugins/flow-architecture/tests/run-flow-frontmatter-lint-vslice.sh not found — skipped"
+else
+  if fda_fmlint_out=$(bash "$fda_fmlint_test" 2>&1); then
+    fda_fmlint_pass_count=$(printf '%s\n' "$fda_fmlint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture WS-A frontmatter-schema lint vslice (${fda_fmlint_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture WS-A frontmatter-schema lint vslice failed — run plugins/flow-architecture/tests/run-flow-frontmatter-lint-vslice.sh for details"
+    printf '%s\n' "$fda_fmlint_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b''''''''''' — flow-architecture journey/story template alignment (BC-11983 WS-E precursor)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-template-alignment-vslice.sh — the
