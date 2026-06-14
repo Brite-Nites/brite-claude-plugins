@@ -108,10 +108,10 @@ assert_finding    "R1: empty override marker → advisory note" R1-override-miss
 run "$FIX/commands/r1-prose-mentions-override.md"
 assert_finding    "R1: prose/inline-code mention of the override token does NOT suppress (still gate)" R1-side-effecting-needs-flag gate
 
-# ── R2 — body too long (>= 500 lines, advisory) ────────────────────────────────
+# ── R2 — body too long (>= 500 lines; GATE — flipped BC-13216, ratchet 4/5) ─────
 echo "── R2 body-too-long ──"
 run "$FIX/commands/r2-long-body.md"
-assert_finding    "R2: body >= 500 lines → advisory" R2-body-too-long advisory
+assert_finding    "R2: body >= 500 lines → gate (blocking via eval-gate)" R2-body-too-long gate
 run "$FIX/commands/r1-with-flag.md"
 assert_no_finding "R2: short body → no R2" R2-body-too-long
 

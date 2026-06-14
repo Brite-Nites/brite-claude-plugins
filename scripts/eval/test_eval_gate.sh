@@ -101,6 +101,18 @@ write_first_person_spec() {  # $1 = path, $2 = description
   printf -- '---\nname: %s\ndescription: %s\n---\nbody\n' "$(basename "$1" .md)" "$2" > "$1"
 }
 
+# A clean spec with EXACTLY $2 body lines (frontmatter excluded — what body_lines /
+# R2 measure). Used to drive the R2 (gate-tier since BC-13216) baseline pair: the
+# named file must really exist with real body content or collect_body_counts finds
+# no count and the baseline row blocks (the missing-count guard), not suppresses.
+write_long_body_cmd() {  # $1 = path, $2 = body line count
+  mkdir -p "$(dirname "$1")"
+  {
+    printf -- '---\nname: %s\ndescription: third-person summary of what it does and when to use it\n---\n' "$(basename "$1" .md)"
+    i=1; while [ "$i" -le "$2" ]; do printf 'body line %d\n' "$i"; i=$((i + 1)); done
+  } > "$1"
+}
+
 # ════════════════════════════════════════════════════════════════════════════
 echo "── P. pure decision-core cases (scripts/eval/_eval_gate_cases.py, from spec) ──"
 # ════════════════════════════════════════════════════════════════════════════
@@ -211,6 +223,27 @@ assert_rc_and_contains "B7 side-effecting + flag + grandfathered → EXEMPT" 0 "
 # B8 mixed diff — count arithmetic + per-command independence (grand M exempt + netnew A block)
 gate --repo-root "$synth" --name-status "$(printf 'M\tplugins/foo/commands/grand.md\nA\tplugins/foo/commands/netnew.md')"
 assert_rc_and_contains "B8 mixed (grandfathered M + net-new A) → changed=2 blocked=1" 1 "GATE changed=2 blocked=1"
+
+# B9 fork-① (BC-13216): R2 is gate-tier, but the diff-gate can't read the structural
+# debt baselines (only --structural can), so editing a grandfathered >=500-line
+# COMMAND must NOT be blocked on R2 here — else every typo-fix to one of the 13
+# grandfathered commands is wedged with no escape. The flip drops R2 from
+# structural_gate_reasons; --structural (full-surface, every PR) stays R2's authority.
+write_long_body_cmd "$synth/plugins/foo/commands/longgrand.md" 520
+cat >> "$synth/docs/skill-eval-debt.md" <<'EOF'
+| `plugins/foo/commands/longgrand.md` | foo | grandfathered | no-eval | 2026-06-14 |
+EOF
+gate --repo-root "$synth" --name-status "$(printf 'M\tplugins/foo/commands/longgrand.md')"
+assert_rc_and_contains "B9 grandfathered >=500-line command MODIFIED → EXEMPT (R2 not diff-gated)" 0 "EXEMPT plugins/foo/commands/longgrand.md"
+assert_not_contains "B9b R2 is NOT a diff-gate block reason post-flip" "R2-body-too-long"
+# B10 surgical proof: dropping R2 from the diff-gate must NOT drop the other gate-tier
+# structural rules — a first-person description (R3) on a changed command still BLOCKS.
+write_first_person_spec "$synth/plugins/foo/commands/fpgrand.md" "I will do things for you"
+cat >> "$synth/docs/skill-eval-debt.md" <<'EOF'
+| `plugins/foo/commands/fpgrand.md` | foo | grandfathered | no-eval | 2026-06-14 |
+EOF
+gate --repo-root "$synth" --name-status "$(printf 'M\tplugins/foo/commands/fpgrand.md')"
+assert_rc_and_contains "B10 first-person desc still BLOCKS via diff-gate (R3 retained, filter is surgical)" 1 "R3-description-quality"
 
 # ════════════════════════════════════════════════════════════════════════════
 echo "── C. integration against the real repo ──"
@@ -361,13 +394,47 @@ EOF
 gate --repo-root "$st2" --structural
 assert_rc_and_contains "F6 malformed baseline → PROBLEM (row does not suppress)" 1 "malformed baseline"
 
+# ── R2 baseline end-to-end pair (BC-13216) — the integration BC-13213 deferred ──
+# R2 is gate-tier now, so the full-surface gate finally sees a real R2 gate finding
+# to suppress-by-baseline / block-on-growth. Each of F7-F9 is non-vacuous: on the
+# pre-flip (advisory) lint, filter_structural skips the finding (severity != gate)
+# so F8/F9 would exit 0 and F7 would report suppressed=0 — all RED before the flip.
+# F7 baseline suppression: body == baseline (the <= boundary) → SUPPRESSED, exit 0.
+st3="$tmproot/structural3"; mkdir -p "$st3/docs"
+write_long_body_cmd "$st3/plugins/foo/commands/big.md" 500
+cat > "$st3/docs/structural-lint-debt.md" <<'EOF'
+| file | rule | reason | added | baseline |
+|---|---|---|---|---|
+| `plugins/foo/commands/big.md` | R2-body-too-long | self-test grandfather | 2026-06-14 | 500 |
+EOF
+gate --repo-root "$st3" --structural
+assert_rc_and_contains "F7 R2 body == baseline (500) → SUPPRESSED, exit 0" 0 "STRUCTURAL blocking=0 suppressed=1"
+
+# F8 growth-block: body == baseline + 1 (the +1 boundary) → BLOCK, exit 1.
+st4="$tmproot/structural4"; mkdir -p "$st4/docs"
+write_long_body_cmd "$st4/plugins/foo/commands/grew.md" 501
+cat > "$st4/docs/structural-lint-debt.md" <<'EOF'
+| file | rule | reason | added | baseline |
+|---|---|---|---|---|
+| `plugins/foo/commands/grew.md` | R2-body-too-long | self-test grandfather | 2026-06-14 | 500 |
+EOF
+gate --repo-root "$st4" --structural
+assert_rc_and_contains "F8 R2 body grew past baseline (501 > 500) → BLOCK, exit 1" 1 "past the grandfathered baseline"
+
+# F9 fresh-bloat: a fresh >=500-line spec with NO debt row → BLOCK, exit 1.
+st5="$tmproot/structural5"; mkdir -p "$st5/docs"
+write_long_body_cmd "$st5/plugins/foo/commands/fresh.md" 500
+printf -- '| file | rule | reason | added | baseline |\n|---|---|---|---|---|\n' > "$st5/docs/structural-lint-debt.md"
+gate --repo-root "$st5" --structural
+assert_rc_and_contains "F9 fresh >=500-line spec, no debt row → BLOCK, exit 1" 1 "R2-body-too-long"
+
 # ── exact count — a silently-skipped (or silently-added) assertion fails loudly ─
 # Total = the (dynamic) pure-case count + the fixed integration-assertion count.
 # `set -u` (not -e): a mid-section setup failure changes WHAT later assertions test
 # without aborting, so assert the EXACT total — catches a 1-assertion skip AND forces
 # EXPECTED_INTEGRATION to move in lockstep when integration assertions are added.
 echo ""
-EXPECTED_INTEGRATION=33
+EXPECTED_INTEGRATION=39
 EXPECTED_TOTAL=$((npure_listed + EXPECTED_INTEGRATION))
 if [ "$((pass + fail))" -ne "$EXPECTED_TOTAL" ]; then
   echo "FATAL: $((pass + fail)) assertions ran, expected exactly $EXPECTED_TOTAL ($npure_listed pure + $EXPECTED_INTEGRATION integration) — a block was skipped or added without updating EXPECTED_INTEGRATION" >&2
