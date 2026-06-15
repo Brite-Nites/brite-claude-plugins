@@ -43,4 +43,7 @@ __pycache__/
 # Labs TAM raw discovery/crawl intermediates — large local scratch (10s of MB per run),
 # regenerable from the tam-map pipeline. Lightweight artifacts (icp.json, tam-config.json,
 # manifest.json, *.csv, README.md) stay tracked; the heavy raw .jsonl pulls do not.
+# Same policy applies to the brite-labs/ tree, plus its _raw/ run scratch.
 docs/campaigns/labs/tam/**/*.jsonl
+docs/campaigns/brite-labs/tam/**/*.jsonl
+docs/campaigns/brite-labs/tam/**/_raw/
