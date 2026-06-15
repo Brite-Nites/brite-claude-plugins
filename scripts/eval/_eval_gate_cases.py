@@ -406,6 +406,24 @@ def sfilter_baseline_growth_blocks() -> bool:
     return len(blocking) == 1 and suppressed == [] and problems == []
 
 
+def sfilter_baseline_inflated_is_loud() -> bool:
+    # An INFLATED baseline (baseline EXCEEDS the live body count) must be a loud
+    # problem, never a silent suppression: it would otherwise grant growth headroom
+    # up to the inflated value — the exact unbounded-growth hole R2 closes, reached
+    # via a too-high baseline rather than a missing one (BC-13287). Suppression now
+    # requires count == baseline; a shrink below the baseline is the SAME condition
+    # (baseline > count) and must also re-baseline down. PROBLEMS-ONLY routing —
+    # the finding is in neither blocking nor suppressed (mirrors the stale-row path,
+    # not the missing-count path, so the BLOCK-render "grew past" note can't mis-fire).
+    rows = {(BIG, "R2-body-too-long"): _row(600)}
+    blocking, suppressed, problems = G.filter_structural(
+        [_gf(BIG, "R2-body-too-long")], rows, {BIG: 500})
+    return (
+        blocking == [] and suppressed == []
+        and any("exceeds the current body line count" in p for p in problems)
+    )
+
+
 def sfilter_baseline_missing_count_is_loud() -> bool:
     # No current body count available for a baseline row → problem + blocking,
     # never a silent exemption.
@@ -507,6 +525,7 @@ CASES = {
     "sfilter-rule-scoped-row": sfilter_rule_scoped_row,
     "sfilter-baseline-at-limit-suppresses": sfilter_baseline_at_limit_suppresses,
     "sfilter-baseline-growth-blocks": sfilter_baseline_growth_blocks,
+    "sfilter-baseline-inflated-is-loud": sfilter_baseline_inflated_is_loud,
     "sfilter-baseline-missing-count-is-loud": sfilter_baseline_missing_count_is_loud,
     "sfilter-stale-row-problem": sfilter_stale_row_problem,
     "sfilter-advisory-live-not-blocked": sfilter_advisory_live_not_blocked,

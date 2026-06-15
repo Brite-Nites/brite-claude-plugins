@@ -436,6 +436,25 @@ printf -- '| file | rule | reason | added | baseline |\n|---|---|---|---|---|\n'
 gate --repo-root "$st5" --structural
 assert_rc_and_contains "F9 fresh >=500-line spec, no debt row → BLOCK, exit 1" 1 "R2-body-too-long"
 
+# F12 inflated-baseline integrity (BC-13287): a debt baseline ABOVE the live body
+# count must be a loud PROBLEM (exit 1), never a silent suppression — it would
+# otherwise grant growth headroom up to the inflated value (the unbounded-growth
+# hole R2 closes, reached via a too-high baseline rather than a missing one). The
+# finding is PROBLEMS-ONLY (not blocking, not suppressed), so the contract line is
+# blocking=0 suppressed=0 problems=1 — which also locks that it is NOT dual-routed
+# to blocking (no false "grew past" render line). Non-vacuous / RED before the fix:
+# on the pre-fix code count(500) <= baseline(600) → SUPPRESSED, exit 0, problems=0.
+st6="$tmproot/structural-inflated"; mkdir -p "$st6/docs"
+write_long_body_cmd "$st6/plugins/foo/commands/inflated.md" 500
+cat > "$st6/docs/structural-lint-debt.md" <<'EOF'
+| file | rule | reason | added | baseline |
+|---|---|---|---|---|
+| `plugins/foo/commands/inflated.md` | R2-body-too-long | self-test inflated baseline | 2026-06-15 | 600 |
+EOF
+gate --repo-root "$st6" --structural
+assert_rc_and_contains "F12 inflated baseline (600 > body 500) → PROBLEM, exit 1" 1 "exceeds the current body line count"
+assert_rc_and_contains "F12b inflated baseline → problems-only (blocking=0 suppressed=0 problems=1)" 1 "STRUCTURAL blocking=0 suppressed=0 problems=1"
+
 # ── R4 reference-edit fresh-violation (graph-shaped, BC-13217 ratchet 5/5) ──────
 # R4 is GRAPH-shaped (ADR-034's raison d'être): a chain regression can be introduced
 # by editing a bundled REFERENCE file, with NO spec (SKILL.md) in the diff at all —
@@ -464,7 +483,7 @@ assert_rc_and_contains "F11 refA→refB added (no SKILL.md change) → BLOCK on 
 # without aborting, so assert the EXACT total — catches a 1-assertion skip AND forces
 # EXPECTED_INTEGRATION to move in lockstep when integration assertions are added.
 echo ""
-EXPECTED_INTEGRATION=42
+EXPECTED_INTEGRATION=44
 EXPECTED_TOTAL=$((npure_listed + EXPECTED_INTEGRATION))
 if [ "$((pass + fail))" -ne "$EXPECTED_TOTAL" ]; then
   echo "FATAL: $((pass + fail)) assertions ran, expected exactly $EXPECTED_TOTAL ($npure_listed pure + $EXPECTED_INTEGRATION integration) — a block was skipped or added without updating EXPECTED_INTEGRATION" >&2
