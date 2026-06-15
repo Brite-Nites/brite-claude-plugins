@@ -20,7 +20,7 @@ Canonical checklist for building agent tooling in this repo. Derived from Anthro
 ## 1. Agent Skills (recipe cards)
 
 - **[ADV] Progressive disclosure.** Layer: `description` (always loaded) → `SKILL.md` body (on trigger) → bundled reference files (only when read). Unused content costs zero tokens.
-- **[ADV] Body < ~500 lines.** Once loaded, every line is a recurring per-session token cost. Split into reference files when it grows.
+- **[GATE] Body < ~500 lines.** Once loaded, every line is a recurring per-session token cost. Split into reference files when it grows. *Promoted R2, BC-13216 (ratchet 4/5): the 13 already-oversized bodies are grandfathered with a line-count baseline in `docs/structural-lint-debt.md` (growth past baseline blocks); enforced by `eval_gate.py --structural` full-surface, not the changed-set diff-gate.*
 - **[REF] Context is a public good.** Only add what the model doesn't already know. Challenge each line's token cost.
 - **[GATE] Description: third person, states what it does AND when to use it, with trigger terms, key use case first.** It's the routing signal; vague/first-person descriptions break discovery. (Listing budget truncates ~1.5k chars — front-load.) *Promoted R3, BC-13213 (ratchet 1/5): the lint gates the enforceable core — a first-person description blocks; the rest of this bullet stays reviewer guidance.*
 - **[ADV] File references one level deep; TOC on any reference file > 100 lines.** Chained refs get partially read.

@@ -247,7 +247,14 @@ def rule_r1_side_effecting(path: Path, text: str) -> list[Finding]:
     ]
 
 
-# ── R2 — body too long (advisory) ──────────────────────────────────────────────
+# ── R2 — body too long (GATE — flipped BC-13216, ratchet 4/5) ───────────────────
+# Fourth advisory rule promoted to gate. Its 13 oversized command/skill bodies are
+# NOT split (weeks of refactor risk); each is grandfathered with a line-count
+# BASELINE in docs/structural-lint-debt.md (suppresses while the body stays <=
+# baseline, blocks once it GROWS past) — enforced by eval_gate's --structural full
+# surface, ADR-034. R2 is deliberately NOT enforced by the changed-set diff-gate
+# (see structural_gate_reasons): the diff-gate can't read the structural-debt
+# baselines, so it would block every edit to a grandfathered command.
 BODY_LINE_LIMIT = 500  # standards guide § 1: body < ~500 lines
 
 
@@ -256,7 +263,7 @@ def rule_r2_body_too_long(path: Path, text: str) -> list[Finding]:
     if n >= BODY_LINE_LIMIT:
         return [
             Finding(
-                "R2-body-too-long", SEV_ADVISORY,
+                "R2-body-too-long", SEV_GATE,
                 f"body is {n} lines (>= {BODY_LINE_LIMIT}); split into reference files "
                 "(every loaded line is a recurring per-session token cost)",
                 _rel(path), None,

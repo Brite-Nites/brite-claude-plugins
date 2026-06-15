@@ -477,8 +477,8 @@ def filter_structural(
 def collect_body_counts(debt_rows: dict[tuple[str, str], dict], read_text) -> dict[str, int]:
     """Current BODY line counts for every baseline-carrying debt row. PURE (the
     file read is injected as ``read_text(fpath) -> str``, so the unit cases can
-    drive this glue hermetically — a real end-to-end baseline pair is impossible
-    until R2 itself flips to gate severity, BC-13216).
+    drive this glue hermetically; the real end-to-end baseline pair landed with
+    R2's flip to gate severity in BC-13216 — see test_eval_gate.sh F7-F9).
 
     Counts BODY lines (``body_lines`` — frontmatter excluded), matching what R2
     itself measures; an unreadable/empty file contributes no entry (the filter
@@ -595,13 +595,26 @@ def waiver_reason_of(cmd_path: str, repo_root: Path) -> str | None:
 
 
 def structural_gate_reasons(cmd_path: str, repo_root: Path) -> list[str]:
-    """The R1 (gate-tier) findings on a command, as block-reason strings — what flips
-    to blocking. Advisory findings are dropped (they stay WARN, surfaced by
-    validate.sh §15a-bc-12588). Reads ``severity`` only; zero re-detection."""
+    """The changed command's gate-tier structural findings as block-reason strings —
+    what flips to blocking in the diff-gate. Advisory findings are dropped (they stay
+    WARN, surfaced by validate.sh §15a-bc-12588). Reads ``severity`` only; zero
+    re-detection. Today this is R1 (the disable-model-invocation flag) plus any R3/R5/R6
+    a changed command introduces.
+
+    EXCEPT ``BASELINE_RULE`` (R2-body-too-long): R2 is grandfathered-with-baseline via
+    docs/structural-lint-debt.md, which ONLY ``--structural`` reads. The diff-gate has
+    no access to those baselines, so it would block every edit to a grandfathered
+    >=500-line command with no escape hatch (BC-13216 fork ①). ``--structural`` runs
+    full-surface on every PR (the REQUIRED eval-gate job + validate.sh §15a Part 3), so
+    it is R2's sole authority — a new >=500-line command and growth past a baseline are
+    both still caught there, no enforcement gap. This exclusion is intentionally
+    R2-only: R3/R5/R6 carry no debt rows (cleaned at their flips), and BC-13217's R4
+    grandfathers SKILLS, which the diff-gate (commands-only via COMMAND_GLOB) never
+    sees — so no other rule has the diff-gate-vs-structural divergence R2 has."""
     return [
         f"structural[{f.rule_id}]: {f.message}"
         for f in lint_spec(repo_root / cmd_path)
-        if f.severity == SEV_GATE
+        if f.severity == SEV_GATE and f.rule_id != BASELINE_RULE
     ]
 
 
