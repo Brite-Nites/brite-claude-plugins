@@ -420,10 +420,14 @@ def filter_structural(
 
       - gate finding, no row            → blocking
       - gate finding, row w/o baseline  → suppressed
-      - gate finding, row w/ baseline   → suppressed iff count <= baseline,
+      - gate finding, row w/ baseline   → suppressed iff count == baseline;
                                           blocking once the body GROWS past it;
-                                          a missing count is a loud problem +
-                                          blocking (never a silent exemption)
+                                          a baseline that EXCEEDS the count is a
+                                          loud problem (inflated/stale-high → only
+                                          ratchets down, never a silent growth
+                                          permit, BC-13287); a missing count is a
+                                          loud problem + blocking (never a silent
+                                          exemption)
       - row with no live (file, rule) finding of ANY severity → stale problem
         (the self-cleaning invariant: fix the file ⇒ remove the row, same PR)
     """
@@ -460,7 +464,21 @@ def filter_structural(
                 "is available — treating the finding as blocking"
             )
             blocking.append(f)
-        elif count <= baseline:
+        elif baseline > count:
+            # An inflated/stale-high baseline (EXCEEDS the live body) silently grants
+            # growth headroom up to the inflated value — the unbounded-growth hole R2
+            # exists to close, reached via a too-high baseline rather than a missing
+            # one (BC-13287). A legitimate shrink below the baseline is the SAME
+            # condition and must likewise re-baseline DOWN (the ratchet only tightens).
+            # PROBLEMS-ONLY (not blocking): exit 1 still holds via problems, and routing
+            # it like the stale-row path keeps the BLOCK-render "grew past" note — which
+            # describes growth — from mis-firing on a row whose body is UNDER its baseline.
+            problems.append(
+                f"({f.file}, {f.rule_id}): debt baseline {baseline} exceeds the current "
+                f"body line count {count} — the body shrank or the baseline was set too "
+                f"high; lower the baseline to {count} (an inflated baseline silently permits growth)"
+            )
+        elif count == baseline:
             suppressed.append(f)
         else:
             blocking.append(f)  # grew past the grandfathered baseline
@@ -778,11 +796,16 @@ def run_structural(repo_root: Path, as_json: bool) -> int:
         for f in blocking:
             note = ""
             row = debt_rows.get((f.file, f.rule_id))
+            baseline = row.get("baseline") if row is not None else None
             count = body_counts.get(f.file)
-            if row is not None and row.get("baseline") is not None and count is not None:
-                # count can be None on the missing-body-count path — the PROBLEM
-                # line is the sole explanation there; this note covers only growth.
-                note = f" (body grew to {count} lines, past the grandfathered baseline {row['baseline']})"
+            # The note describes GROWTH only — so guard on count > baseline with both
+            # ints. The isinstance checks skip the missing-count path (count is None;
+            # the PROBLEM line is the sole explanation there) and the non-integer-
+            # baseline path (baseline not int — without the guard a bare count > baseline
+            # would TypeError), and the note never fires for an inflated baseline (which
+            # is problems-only, not blocking, so it never reaches this loop).
+            if isinstance(baseline, int) and isinstance(count, int) and count > baseline:
+                note = f" (body grew to {count} lines, past the grandfathered baseline {baseline})"
             print(f"  BLOCK  [{f.rule_id}] {finding_loc(f)} — {f.message}{note}")
         for f in suppressed:
             row = debt_rows[(f.file, f.rule_id)]  # suppressed ⇒ a row exists

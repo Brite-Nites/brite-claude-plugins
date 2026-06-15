@@ -13,15 +13,20 @@
     plugins/<p>/skills/<s>/SKILL.md).
   - rule: the structural_lint rule_id (e.g. R2-body-too-long, R4-nested-refs).
   - baseline: ONLY for R2-body-too-long rows — the grandfathered body line count.
-    The gate suppresses the finding only while the body stays <= baseline; growth
-    past it BLOCKS (a plain file-level exemption would mute the size rule exactly
-    on the biggest files). Leave empty for every other rule.
+    The gate suppresses the finding only while the body line count EQUALS the
+    baseline; growth past it BLOCKS, and a baseline that EXCEEDS the live body count
+    is a loud PROBLEM (BC-13287 — an inflated/stale-high baseline would otherwise
+    silently grant growth headroom). So the baseline only ratchets DOWN: any
+    count-changing edit (up or down) to a grandfathered body must re-baseline in the
+    same PR (a plain file-level exemption would mute the size rule exactly on the
+    biggest files). Leave empty for every other rule.
 
   Self-cleaning invariants, enforced by the gate (a red --structural run):
   - STALE row: a row whose (file, rule) has no live lint finding fails the gate —
     when you fix a file, remove its row in the same PR.
-  - A malformed row (bad baseline, baseline on a non-R2 rule, missing rule id,
-    duplicate key) is a loud PROBLEM and never suppresses anything.
+  - A malformed row (bad baseline, baseline exceeding the current body count, baseline
+    on a non-R2 rule, missing rule id, duplicate key) is a loud PROBLEM and never
+    suppresses anything.
 
   This list is the PER-RULE STRUCTURAL analogue of docs/skill-eval-debt.md (which
   is command-level EVAL debt — different axis, different consumer). Rows are added
