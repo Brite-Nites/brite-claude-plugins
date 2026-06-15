@@ -420,10 +420,14 @@ def filter_structural(
 
       - gate finding, no row            → blocking
       - gate finding, row w/o baseline  → suppressed
-      - gate finding, row w/ baseline   → suppressed iff count <= baseline,
+      - gate finding, row w/ baseline   → suppressed iff count == baseline;
                                           blocking once the body GROWS past it;
-                                          a missing count is a loud problem +
-                                          blocking (never a silent exemption)
+                                          a baseline that EXCEEDS the count is a
+                                          loud problem (inflated/stale-high → only
+                                          ratchets down, never a silent growth
+                                          permit, BC-13287); a missing count is a
+                                          loud problem + blocking (never a silent
+                                          exemption)
       - row with no live (file, rule) finding of ANY severity → stale problem
         (the self-cleaning invariant: fix the file ⇒ remove the row, same PR)
     """
@@ -795,10 +799,11 @@ def run_structural(repo_root: Path, as_json: bool) -> int:
             baseline = row.get("baseline") if row is not None else None
             count = body_counts.get(f.file)
             # The note describes GROWTH only — so guard on count > baseline with both
-            # ints. This skips the missing-count path (count is None; the PROBLEM line
-            # is the sole explanation there), the non-integer-baseline path (baseline
-            # not int — comparing would TypeError), and never fires for an inflated
-            # baseline (which is problems-only, not blocking, so it never reaches here).
+            # ints. The isinstance checks skip the missing-count path (count is None;
+            # the PROBLEM line is the sole explanation there) and the non-integer-
+            # baseline path (baseline not int — without the guard a bare count > baseline
+            # would TypeError), and the note never fires for an inflated baseline (which
+            # is problems-only, not blocking, so it never reaches this loop).
             if isinstance(baseline, int) and isinstance(count, int) and count > baseline:
                 note = f" (body grew to {count} lines, past the grandfathered baseline {baseline})"
             print(f"  BLOCK  [{f.rule_id}] {finding_loc(f)} — {f.message}{note}")
