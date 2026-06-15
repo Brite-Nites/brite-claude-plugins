@@ -436,13 +436,35 @@ printf -- '| file | rule | reason | added | baseline |\n|---|---|---|---|---|\n'
 gate --repo-root "$st5" --structural
 assert_rc_and_contains "F9 fresh >=500-line spec, no debt row → BLOCK, exit 1" 1 "R2-body-too-long"
 
+# ── R4 reference-edit fresh-violation (graph-shaped, BC-13217 ratchet 5/5) ──────
+# R4 is GRAPH-shaped (ADR-034's raison d'être): a chain regression can be introduced
+# by editing a bundled REFERENCE file, with NO spec (SKILL.md) in the diff at all —
+# invisible to the commands-only changed-set diff-gate, which is exactly why
+# --structural is full-surface. Two-step proof: a clean one-level skill, then a
+# refA→refB edit (refB really exists under the skill dir, resolved relative to refA)
+# flips it to blocking with SKILL.md untouched. Non-vacuous: on the pre-flip
+# (advisory) R4, filter_structural skips the finding (severity != gate) → F11 exits
+# 0 — RED before the flip (F10 is clean either way; F11 is the discriminating case).
+sk6="$tmproot/structural6/plugins/foo/skills/chain"; mkdir -p "$sk6"
+printf -- '---\nname: chain\ndescription: third-person summary of what it does and when to use it\n---\nFor details see `refA.md` in this directory.\n' > "$sk6/SKILL.md"
+printf -- '# Reference A\n\nOne level deep — no further bundled pointers.\n' > "$sk6/refA.md"
+printf -- '# Reference B\n\nLeaf reference.\n' > "$sk6/refB.md"   # exists, UNREFERENCED yet
+gate --repo-root "$tmproot/structural6" --structural
+assert_rc_and_contains "F10 one-level skill ref (refB exists but unreferenced) → clean, exit 0" 0 "STRUCTURAL blocking=0 suppressed=0 problems=0"
+
+# F11 edit ONLY refA to point at the existing refB — a bundled reference-file edit,
+# NO SKILL.md change → the chain now resolves → BLOCK on R4.
+printf -- '\nSee `refB.md` for the second hop.\n' >> "$sk6/refA.md"
+gate --repo-root "$tmproot/structural6" --structural
+assert_rc_and_contains "F11 refA→refB added (no SKILL.md change) → BLOCK on R4, exit 1" 1 "R4-nested-refs"
+
 # ── exact count — a silently-skipped (or silently-added) assertion fails loudly ─
 # Total = the (dynamic) pure-case count + the fixed integration-assertion count.
 # `set -u` (not -e): a mid-section setup failure changes WHAT later assertions test
 # without aborting, so assert the EXACT total — catches a 1-assertion skip AND forces
 # EXPECTED_INTEGRATION to move in lockstep when integration assertions are added.
 echo ""
-EXPECTED_INTEGRATION=40
+EXPECTED_INTEGRATION=42
 EXPECTED_TOTAL=$((npure_listed + EXPECTED_INTEGRATION))
 if [ "$((pass + fail))" -ne "$EXPECTED_TOTAL" ]; then
   echo "FATAL: $((pass + fail)) assertions ran, expected exactly $EXPECTED_TOTAL ($npure_listed pure + $EXPECTED_INTEGRATION integration) — a block was skipped or added without updating EXPECTED_INTEGRATION" >&2

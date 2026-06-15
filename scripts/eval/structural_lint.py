@@ -417,12 +417,21 @@ def rule_r6_hardcoded_paths(path: Path, text: str) -> list[Finding]:
     return out
 
 
-# ── R4 — reference chain > 1 level deep (advisory) ──────────────────────────────
+# ── R4 — reference chain > 1 level deep (GATE — flipped BC-13217, ratchet 5/5) ──
+# Fifth and FINAL advisory rule promoted to gate — completes the BC-12700 bullet-#2
+# ratchet (R3→R5→R6→R2→R4). Surface at flip time: email-copywriting's one chain was
+# CLEANED (its SKILL→presets/README citation severed); the 8 revops upstream-subtree
+# skills (sf-apex/-connected-apps/-data/-debug/-diagram-mermaid/-flow/-integration/-lwc)
+# are grandfathered file-level (NO baseline) in docs/structural-lint-debt.md —
+# restructuring an upstream reference tree is ADR-007 augment-not-replace drift.
+# Enforced full-surface by eval_gate --structural (ADR-034); NOT the changed-set
+# diff-gate, which is commands-only (COMMAND_GLOB) and never sees these skills — so
+# structural_gate_reasons needs no R4 change (unlike R2's fork ①).
+#
 # High precision: fire ONLY when spec → ref-A → ref-B all resolve to EXISTING
 # in-plugin .md files. References resolve against the spec's own dir (or, for
 # ${CLAUDE_PLUGIN_ROOT}/${CLAUDE_SKILL_DIR}, the plugin/skill dir) — never the repo
-# root, so a prose path mention can't accidentally resolve. May find 0 today — it
-# is a regression guard against the chained-ref anti-pattern.
+# root, so a prose path mention can't accidentally resolve.
 MD_PATH_RE = re.compile(r"[\w./${}-]+\.md\b")
 
 
@@ -509,7 +518,7 @@ def rule_r4_nested_refs(path: Path, text: str) -> list[Finding]:
         if deeper:
             out.append(
                 Finding(
-                    "R4-nested-refs", SEV_ADVISORY,
+                    "R4-nested-refs", SEV_GATE,
                     f"bundled reference '{_rel(ref)}' itself references further bundled file(s) "
                     f"(e.g. '{_rel(deeper[0])}'); keep references one level deep",
                     rel, _first_token_line(text, token),
