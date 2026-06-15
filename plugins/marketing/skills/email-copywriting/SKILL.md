@@ -119,7 +119,7 @@ Body:
 
 When the operator supplies a `vertical` value matching a handbook-canonical slug (see `Brite-Nites/handbook@main:marketing/go-to-market/verticals/README.md`), the skill reads ONE preset file per invocation at `plugins/marketing/skills/email-copywriting/presets/{preset}-{vertical}.md`. Per D3 this bounds runtime context cost — only the single matching file loads, not the 46-file library.
 
-**Preset file shape** (frontmatter + 4 sections, ~40-60 lines each — canonical shape in `presets/README.md`):
+**Preset file shape** (frontmatter + 4 sections, ~40-60 lines each — canonical shape in the README index under `presets/`):
 
 ```yaml
 ---
@@ -133,7 +133,7 @@ situation_mining_row: <cite situation-mining §3 row>
 
 Body sections: Hook (vertical-specific recency waterfall line) → Step 1 skeleton (override of base skeleton A or B with vertical-specific variables) → Step 2 bump → Vertical anti-slop (3-5 bullets for what NOT to say in that vertical).
 
-**Fallback behavior** — when the operator does NOT supply a `vertical`, OR supplies one but no matching preset file exists, the skill falls back to the base inline skeleton (A or B) plus the entity tone from `docs/marketing-context.md`. In the artifact, `vertical` is written as `null` (per D3 nullable schema) and a one-line warning surfaces to the operator naming which fan-out issue (BC-5879 / BC-5880 / BC-5881) will eventually ship that preset. The skill NEVER halts on missing preset files. See `presets/README.md` for the lazy-load index + per-tier fan-out mapping.
+**Fallback behavior** — when the operator does NOT supply a `vertical`, OR supplies one but no matching preset file exists, the skill falls back to the base inline skeleton (A or B) plus the entity tone from `docs/marketing-context.md`. In the artifact, `vertical` is written as `null` (per D3 nullable schema) and a one-line warning surfaces to the operator naming which fan-out issue (BC-5879 / BC-5880 / BC-5881) will eventually ship that preset. The skill NEVER halts on missing preset files. See the README index under `presets/` for the lazy-load index + per-tier fan-out mapping.
 
 ### Liquid + spintax for graceful per-lead fallback
 

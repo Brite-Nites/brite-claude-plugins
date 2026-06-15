@@ -58,3 +58,11 @@ always toward an empty table.
 | `plugins/marketing/skills/campaign-debrief/SKILL.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 582 |
 | `plugins/flow-architecture/commands/add-domain.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 582 |
 | `plugins/marketing/commands/portfolio-snapshot.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 534 |
+| `plugins/revops/skills/sf-apex/SKILL.md` | R4-nested-refs | revops upstream subtree (ADR-007 augment-not-replace) — restructuring the reference tree = drift; grandfathered per BC-12700 (ratchet 5/5) | 2026-06-14 |  |
+| `plugins/revops/skills/sf-connected-apps/SKILL.md` | R4-nested-refs | revops upstream subtree (ADR-007 augment-not-replace) — restructuring the reference tree = drift; grandfathered per BC-12700 (ratchet 5/5) | 2026-06-14 |  |
+| `plugins/revops/skills/sf-data/SKILL.md` | R4-nested-refs | revops upstream subtree (ADR-007 augment-not-replace) — restructuring the reference tree = drift; grandfathered per BC-12700 (ratchet 5/5) | 2026-06-14 |  |
+| `plugins/revops/skills/sf-debug/SKILL.md` | R4-nested-refs | revops upstream subtree (ADR-007 augment-not-replace) — restructuring the reference tree = drift; grandfathered per BC-12700 (ratchet 5/5) | 2026-06-14 |  |
+| `plugins/revops/skills/sf-diagram-mermaid/SKILL.md` | R4-nested-refs | revops upstream subtree (ADR-007 augment-not-replace) — restructuring the reference tree = drift; grandfathered per BC-12700 (ratchet 5/5) | 2026-06-14 |  |
+| `plugins/revops/skills/sf-flow/SKILL.md` | R4-nested-refs | revops upstream subtree (ADR-007 augment-not-replace) — restructuring the reference tree = drift; grandfathered per BC-12700 (ratchet 5/5) | 2026-06-14 |  |
+| `plugins/revops/skills/sf-integration/SKILL.md` | R4-nested-refs | revops upstream subtree (ADR-007 augment-not-replace) — restructuring the reference tree = drift; grandfathered per BC-12700 (ratchet 5/5) | 2026-06-14 |  |
+| `plugins/revops/skills/sf-lwc/SKILL.md` | R4-nested-refs | revops upstream subtree (ADR-007 augment-not-replace) — restructuring the reference tree = drift; grandfathered per BC-12700 (ratchet 5/5) | 2026-06-14 |  |

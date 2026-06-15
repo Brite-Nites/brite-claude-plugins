@@ -146,10 +146,10 @@ assert_finding    "R6: real username glued behind an ellipsis lead → still fla
 run "$FIX/commands/r6-cross-regex.md"
 assert_finding    "R6: exempted ABS placeholder falls through to a real WIN path (ABS-before-WIN)" R6-hardcoded-paths gate
 
-# ── R4 — reference chain > 1 level deep (advisory) ──────────────────────────────
+# ── R4 — reference chain > 1 level deep (GATE — flipped BC-13217, ratchet 5/5) ──
 echo "── R4 nested-refs ──"
 run "$FIX/skills/r4-nested/SKILL.md"
-assert_finding    "R4: referenced file itself references a further file → advisory" R4-nested-refs advisory
+assert_finding    "R4: referenced file itself references a further file → gate (blocking via eval-gate)" R4-nested-refs gate
 run "$FIX/commands/clean.md"
 assert_no_finding "R4: no resolvable nested chain → no R4" R4-nested-refs
 
