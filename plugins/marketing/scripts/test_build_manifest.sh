@@ -170,15 +170,17 @@ run_a() {  # standard happy path
   assert_exit "A: standard happy path exit 0" 0
   assert_json "A: manifest slug" "$out/manifest.json" \
     "d['slug']=='municipalities-parks-rec-director-parks-bond-fy26-m05'"
-  assert_json "A: manifest schema_version 1" "$out/manifest.json" "d['schema_version']==1"
+  assert_json "A: manifest schema_version 2" "$out/manifest.json" "d['schema_version']==2"
   assert_json "A: manifest entity/vertical/persona/offer" "$out/manifest.json" \
     "d['entity']=='nites' and d['vertical']=='municipalities' and d['persona']=='parks-rec-director' and d['offer']=='parks-bond'"
   assert_json "A: manifest theme null (full V/P/O campaign)" "$out/manifest.json" "d['theme'] is None"
   assert_json "A: manifest year/month" "$out/manifest.json" "d['year']==2026 and d['month']==5"
-  assert_json "A: manifest linear/sf IDs null" "$out/manifest.json" \
-    "d['linear']['milestone_id'] is None and d['salesforce']['campaign_id'] is None and d['email_bison']['campaign_id'] is None"
+  assert_json "A: manifest linear/sf IDs null + empty eb campaigns[] (v2 unlaunched)" "$out/manifest.json" \
+    "d['linear']['milestone_id'] is None and d['salesforce']['campaign_id'] is None and d['email_bison']['campaigns']==[]"
   assert_json "A: manifest eb workspace + sf/eb name" "$out/manifest.json" \
     "d['email_bison']['workspace']=='emailbison-personal' and d['salesforce']['campaign_name']==d['slug'] and d['email_bison']['campaign_name']==d['slug']"
+  assert_json "A: manifest eb block is v2 shape (no singular campaign_id)" "$out/manifest.json" \
+    "'campaign_id' not in d['email_bison'] and 'campaigns' in d['email_bison']"
   assert_json "A: manifest created_at injected" "$out/manifest.json" "d['created_at']=='2026-05-01T00:00:00Z'"
   assert_json "A: manifest scaffolded_by" "$out/manifest.json" "d['scaffolded_by']=='/marketing:plan-campaign'"
   assert_json "A: 8 standard issues (no optionals)" "$out/issues.json" "len(d['issues'])==8"
@@ -194,8 +196,8 @@ run_a() {  # standard happy path
     "(lambda x: x.startswith('Outbound operator builds') and 'enriched lead CSV' in x and 'Handbook citation' in x and 'Sub-issue role' in x and 'Expected plugin command' in x)([i for i in d['issues'] if i['index']==2][0]['description'])"
   assert_json "A: every issue description carries all 3 contract lines" "$out/issues.json" \
     "all('Handbook citation' in i['description'] and 'Sub-issue role' in i['description'] and 'Expected plugin command' in i['description'] for i in d['issues'])"
-  assert_json "A: manifest linear.project + url/launched_at null" "$out/manifest.json" \
-    "d['linear']['project']=='Brite GTM' and d['linear']['milestone_url'] is None and d['email_bison']['launched_at'] is None"
+  assert_json "A: manifest linear.project + url null (eb launched_at now per-record)" "$out/manifest.json" \
+    "d['linear']['project']=='Brite GTM' and d['linear']['milestone_url'] is None and 'launched_at' not in d['email_bison']"
 }
 
 run_b() {  # disambiguator → -v2

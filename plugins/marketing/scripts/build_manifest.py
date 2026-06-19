@@ -55,7 +55,12 @@ ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SLUG_RE = re.compile(r"^[a-z0-9-]+-fy\d{2}-m\d{2}(-v\d+)?$")
 
 STANDARD_IDS = (1, 2, 3, 4, 5, 6, 7, 8)
-SCHEMA_VERSION = 1
+# v2 per ADR-020 / BC-11852: email_bison.campaign_id (singular) replaced by
+# email_bison.campaigns[] (one record per workspace × audience_tier × ESP). The
+# scaffolder emits an EMPTY campaigns[] (no EB record exists at scaffold time —
+# the command's EB-draft phase backfills draft records per ADR-035). Closing the
+# deferred BC-11857 scaffolder-v2 pin: build_manifest previously emitted v1.
+SCHEMA_VERSION = 2
 SCAFFOLDED_BY = "/marketing:plan-campaign"
 
 # Inline fallback brief skeleton (mirror of plan-campaign Step 8a.4). Used when
@@ -458,11 +463,15 @@ def build_manifest(a: argparse.Namespace, slug: str, created_at: str) -> dict:
         "month": a.month,
         "linear": {"milestone_id": None, "milestone_url": None, "project": "Brite GTM"},
         "salesforce": {"campaign_id": None, "campaign_name": slug},
+        # v2 email_bison block (ADR-020): `campaigns[]` replaces the singular
+        # `campaign_id`. Empty at scaffold time — the command's EB-draft phase
+        # (ADR-035) appends one `status: "draft"` record per ESP after the MCP
+        # create, with the real `campaign_id` backfilled (same IO-boundary pattern
+        # as linear.milestone_id / salesforce.campaign_id).
         "email_bison": {
             "workspace": a.eb_workspace,
-            "campaign_id": None,
             "campaign_name": slug,
-            "launched_at": None,
+            "campaigns": [],
         },
         "created_at": created_at,
         "scaffolded_by": SCAFFOLDED_BY,

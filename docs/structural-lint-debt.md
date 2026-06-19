@@ -51,13 +51,13 @@ always toward an empty table.
 | file | rule | reason | added | baseline |
 |---|---|---|---|---|
 | `plugins/workflows/commands/project-start.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 1081 |
-| `plugins/marketing/commands/launch-campaign.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 1053 |
-| `plugins/marketing/commands/plan-campaign.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 906 |
+| `plugins/marketing/commands/launch-campaign.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); re-baselined 1053→841 — shrank when the EB-draft phases (VARIABLES/CAMPAIGN CREATE/ATTACH SENDERS/SEQUENCE) moved to plan-campaign per BC-13628/ADR-035, then trimmed slightly when the leads-only Phase 2 was rewritten to the ESP-bucket model (review fix) | 2026-06-19 | 841 |
+| `plugins/marketing/commands/plan-campaign.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); re-baselined 906→1075 for the BC-13628/ADR-035 Step-8c EB-draft phase incl. the ESP-partitioned sender-attach tag map + the step-1 A/B variant wiring (content moved in from launch-campaign, which shrinks in lockstep) | 2026-06-19 | 1075 |
 | `plugins/flow-architecture/commands/retrofit-project.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 761 |
 | `plugins/marketing/commands/tam-map.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 676 |
 | `plugins/marketing/skills/tam-mapping/SKILL.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 630 |
 | `plugins/marketing/commands/import-campaign.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 612 |
-| `plugins/marketing/skills/email-copywriting/SKILL.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); BC-13217 cleans its R4 ref — re-baseline if body line count changes | 2026-06-14 | 611 |
+| `plugins/marketing/skills/email-copywriting/SKILL.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); re-baselined 611→620 for the BC-13628 step-1 A/B variant (`step_1_variant_b`) support | 2026-06-19 | 620 |
 | `plugins/flow-architecture/commands/start-project.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 602 |
 | `plugins/cadence/commands/weekly.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 600 |
 | `plugins/marketing/skills/campaign-debrief/SKILL.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 582 |

@@ -7,7 +7,7 @@
     "year", "month", "linear", "salesforce", "email_bison", "created_at", "scaffolded_by"
   ],
   "properties": {
-    "schema_version": { "type": "integer", "const": 1 },
+    "schema_version": { "type": "integer", "const": 2 },
     "slug": { "type": "string" },
     "entity": { "type": "string", "enum": ["nites", "supply", "labs", "cross-entity"] },
     "vertical": { "type": ["string", "null"] },
@@ -38,12 +38,11 @@
     "email_bison": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["workspace", "campaign_id", "campaign_name", "launched_at"],
+      "required": ["workspace", "campaign_name", "campaigns"],
       "properties": {
         "workspace": { "type": "string", "enum": ["emailbison-personal", "emailbison-b2b"] },
-        "campaign_id": { "type": ["string", "null"] },
         "campaign_name": { "type": "string" },
-        "launched_at": { "type": ["string", "null"] }
+        "campaigns": { "type": "array" }
       }
     },
     "created_at": { "type": "string" },

@@ -48,7 +48,7 @@ Every artifact the skill emits MUST satisfy all of these rules before Write. Ada
 - Paragraph breaks are `<br><br>`, never `<p>...</p>` tags. EB's HTML-to-plain converter eats `<p>` and corrupts the greeting-merged first sentence.
 - Greeting merges into the first sentence. No separate "Hi {FIRST_NAME}," line. Write: "Quick note {FIRST_NAME}, ..." or "Saw the {DOWNTOWN_INITIATIVE} news {FIRST_NAME}, ..." — the salutation lives inline.
 - Zero em-dashes (`—`) in body copy. Em-dashes are a known EB spam trigger; replace with commas, periods, or hyphens. This is auto-replaced at draft time, not prompted per-occurrence.
-- Maximum sequence length is 2 steps (step 1 + step 2 bump). 3+ step sequences are a hard failure. Deeper sequences belong in `campaign-orchestration`'s multi-phase flow.
+- Maximum sequence length is 2 steps (step 1 + step 2 bump). 3+ step sequences are a hard failure. Deeper sequences belong in `campaign-orchestration`'s multi-phase flow. **A step-1 A/B variant (`step_1_variant_b`) is NOT a third step** — variant A and variant B share the step-1 slot and EB tests them against each other; the 2-step count is unchanged.
 - No `{FIRST_NAME}` (or any merge variable) in the subject line. Subjects are the highest-impact spam signal; merge personalization in subjects under-performs generic subjects across every deliverability benchmark.
 - Subject line length 1-3 words, with 3-option spintax. Example: `{Quick|Fast|30s} {question|check|idea}`.
 - Spintax at the word level, not the sentence level: `{option1|option2|option3}`. Apply every 3-5 words where grammar permits — too little and EB sees identical sends; too much and the sentence loses meaning.
@@ -68,6 +68,10 @@ See [handbook/marketing/frameworks/offer-postures.md](https://github.com/Brite-N
 ### Recency waterfall (6-level hierarchy)
 
 See [handbook/marketing/frameworks/recency-waterfall.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/recency-waterfall.md) for the canonical 6-level hierarchy. Walk the waterfall top-to-bottom and use the highest-level signal available: (1) new job / role change, (2) LinkedIn post within 90 days, (3) company news within 90 days, (4) CEO podcast within 180 days, (5) company blog post, (6) fallback vertical-anchored trigger. Level 6 fires when the situation artifact yielded <2 recency-grade signals — flag the email as LOW-confidence.
+
+### Step-1 A/B variant (optional, BC-13628)
+
+Some offers carry two distinct, comparably-strong step-1 **angles** on the SAME offer — and the highest-leverage thing to learn is which angle the segment responds to. Example: a winter landscape-lighting renewal can lead with an **electrical / GFCI-safety** angle (A) OR a **heat-strips / warmth** angle (B). When (and only when) two such angles genuinely exist, emit both: `step_1` is variant A, `step_1_variant_b` is variant B (same EB format rules; B inherits step 1's `wait_in_days`). Both occupy the step-1 slot — this is an A/B test, **not** a third step (the 2-step max holds). Step 2 (the bump) is shared across both variants. Recommend the A/B to the operator and confirm (same recommend-and-confirm discipline as offer posture); if there is no genuine second angle, omit `step_1_variant_b` rather than inventing a weak B. `/marketing:plan-campaign` Step 8c.6 builds A + B + step 2 in a single from-scratch create and wires B as a variant of step-1 A in-request via `variant_from_step` (A's in-request order); the saved-step-`id` form (`variant_from_step_id`) is only the cross-call fallback, since EB cannot add a variant to an existing sequence after the fact.
 
 ### Base template skeletons (2, entity-agnostic, inline)
 
@@ -377,6 +381,10 @@ Every invocation that completes writes exactly one JSON file. Full shape:
     "body": "Saw the {RECENCY_ANCHOR} at {COMPANY} {FIRST_NAME}, ...",
     "wait_in_days": 0
   },
+  "step_1_variant_b": {
+    "subject": "{Quick|Fast|30s} {question|idea}",
+    "body": "{An alternative step-1 angle for the SAME offer} {FIRST_NAME}, ..."
+  },
   "step_2": {
     "subject": "{Quick|Fast|30s} {question|check|idea}",
     "body": "{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. ...",
@@ -398,6 +406,7 @@ Every invocation that completes writes exactly one JSON file. Full shape:
 - `offer_summary` — one-sentence operator-readable summary of the offer (for `/marketing:launch-campaign` to echo in its preflight confirmation).
 - `custom_variables` — array of `{name, default}` objects. The `/marketing:launch-campaign` command feeds this array into `create_custom_variable` before `bulk_create_leads` runs.
 - `step_1` + `step_2` — each has `subject` (EB format rules), `body` (EB format rules + spintax + `<br><br>`), `wait_in_days` (integer, 0 for step 1, typically 3-5 for step 2).
+- `step_1_variant_b` — **OPTIONAL** (BC-13628). When the offer has two distinct, comparably-strong step-1 **angles** worth A/B-testing (e.g. an electrical/GFCI-safety angle vs a heat-strips/warmth angle for the same winter-renewal offer), emit the B angle here as `{subject, body}` (same EB format rules as `step_1`; NO `wait_in_days` — a variant inherits step 1's wait). `step_1` is the A variant; this is B. **A step-1 A/B variant is NOT a third step** — both A and B occupy the step-1 slot; the 2-step max still holds (step_1[A/B] + step_2). Omit the field entirely (or `null`) when there is no second angle worth testing — do NOT invent a weak B just to fill it. `/marketing:plan-campaign` Step 8c.6 wires B as an EB sequence-step variant of step-1 A in the single from-scratch create, via `variant_from_step` (A's in-request order); `variant_from_step_id` (by saved step id) is only the cross-call fallback.
 - `situation_mining_source` — path to the input artifact when this campaign flowed from `situation-mining`. Omitted / empty when §6 Flow 2 (scratch path) ran.
 - `generated_at` — ISO-8601 timestamp. `/marketing:launch-campaign` checks this against a staleness threshold before launching.
 
@@ -593,7 +602,7 @@ Base guardrails (shared across marketing plugin) + skill-specific hard failures.
 - **Do not emit lowercase or mixed-case `{token}` references in subjects or bodies.** EB's render engine ONLY resolves UPPERCASE tokens (e.g., `{FIRST_NAME}`); lowercase or mixed-case tokens (`{first_name}`, `{First_Name}`) render as literal text in delivery — verified BC-6308 round-3 R-2a Preview Body output. If a draft contains any `{[a-z][A-Za-z_]*}` pattern, self-correct to UPPERCASE before emit. Hard failure if present in the written artifact.
 - **Do not emit `<p>` or `</p>` tags in body copy.** EB's HTML-to-plain converter eats `<p>` and corrupts the greeting-merged first sentence. Use `<br><br>` for paragraph breaks. Hard failure if present.
 - **Do not emit em-dashes (`—`) in body copy.** Known EB spam trigger. Auto-replace with commas, periods, or hyphens at draft time. Hard failure if present in the written artifact. (Em-dashes in this SKILL.md spec prose are OK where explaining the rule; the rule applies only to body template examples and generated artifact text.)
-- **Do not emit sequences with more than 2 steps.** v0.1 of this skill supports step 1 + step 2 only. Longer sequences belong in `campaign-orchestration`'s multi-phase flow. Hard failure on 3+ steps.
+- **Do not emit sequences with more than 2 steps.** This skill supports step 1 + step 2 only. Longer sequences belong in `campaign-orchestration`'s multi-phase flow. Hard failure on 3+ steps. **Exception (BC-13628): an optional step-1 A/B variant (`step_1_variant_b`) is allowed and is NOT a third step** — both variants occupy the step-1 slot. Hard failure only if a `step_2_variant`/`step_3` or any beyond-step-2 content appears.
 - **Do not emit `{FIRST_NAME}` (or any merge variable) in the subject line.** Subjects are the highest-impact spam signal; merge variables under-perform generic subjects across every deliverability benchmark. Hard failure.
 - **Do not frame inferences as facts.** Inherited from situation-mining §3 — body copy MUST read as hypothesis when referencing a prospect worldview or inferred signal. Write "we noticed the {INITIATIVE} announcement and thought it might line up with how your team is scoping {VERTICAL_DESCRIPTOR}" — never "your team is scoping {VERTICAL_DESCRIPTOR}." Fact-claim framing is a hard failure; §7 1-3 band.
 - **Do not emit Supply-vertical triggers in body copy.** The handbook 23-vertical taxonomy excludes professional installers + property management. Body copy that keys to installer hiring, PM company onboarding, or other Supply signals is a hard failure per handbook canon + BC-5824 precedent. If an operator supplies a Supply-framed prospect, pause and clarify per §6 Flow 6 error handling.

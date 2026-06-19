@@ -224,8 +224,11 @@ class PlanCampaignAdapter:
 
         # manifest.json — VALUES (every deterministic field, incl. the pinned
         # created_at + the constant Linear project + the must-stay-null IDs).
+        # Manifest is schema v2 (ADR-020 / BC-11852): email_bison.campaigns[] (array,
+        # empty at scaffold — the EB-draft records are appended later by the command's
+        # Step 8c IO layer, not the builder) replaced the singular email_bison.campaign_id.
         manifest_checks = assert_lib.key_fields(manifest, {
-            "schema_version": 1,
+            "schema_version": 2,
             "slug": slug,
             "entity": fixture["entity"],
             "vertical": fixture.get("vertical"),
@@ -240,8 +243,7 @@ class PlanCampaignAdapter:
             "linear.milestone_id": None,
             "linear.milestone_url": None,
             "salesforce.campaign_id": None,
-            "email_bison.campaign_id": None,
-            "email_bison.launched_at": None,
+            "email_bison.campaigns": [],
             "salesforce.campaign_name": slug,
             "email_bison.campaign_name": slug,
         }, artifact="manifest.json")

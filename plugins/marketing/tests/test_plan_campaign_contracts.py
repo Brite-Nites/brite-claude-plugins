@@ -509,6 +509,10 @@ def test_manifest_schema_keys_present() -> None:
         '"campaign_id"',
         '"campaign_name"',
         '"workspace"',
+        # v2 (ADR-020 / BC-11852): email_bison.campaigns[] replaced the singular
+        # email_bison.campaign_id (the latter survives only in the salesforce block).
+        '"campaigns"',
+        # Per-record launched_at lives in the Step-8c EB-draft record schema (ADR-035).
         '"launched_at"',
     ]
     missing = [k for k in expected_keys if k not in body]
@@ -520,6 +524,39 @@ def test_manifest_path_format_documented() -> None:
     expected = "docs/campaigns/{entity}/{slug}/manifest.json"
     assert expected in body or "docs/campaigns/<entity>/<slug>/manifest.json" in body, (
         "Manifest path format must appear in Step 7 spec"
+    )
+
+
+def test_eb_draft_phase_documented() -> None:
+    """Step 8c (ADR-035 / BC-13628) stages the EB draft: 3 ESP-split campaign
+    drafts + custom-vars + 2-step sequence + senders, NO leads, soft-fail. The
+    contract: the phase exists, is soft-fail + idempotent, and writes v2
+    `campaigns[]` draft records. Regressions here re-break the boundary re-cut.
+    """
+    body = read_command()
+    required_markers = [
+        "Step 8c",                # the EB-draft staging phase exists
+        "--copy-artifact",        # copy resolution flag
+        "--no-eb-draft",          # skip escape hatch
+        "email-copywriting",      # in-flow copy sub-phase (Option 2)
+        "search_api_spec",        # ground-truthing rule before extended call_api
+        '"status": "draft"',      # drafts, not launched
+        "pending_classification", # placeholder tier marker (ADR-020 reuse)
+        "soft-fail",              # failure mode
+    ]
+    missing = [m for m in required_markers if m not in body]
+    assert not missing, f"Step 8c EB-draft contract markers missing: {missing}"
+
+
+def test_no_eb_draft_creation_negative_claim_removed() -> None:
+    """The pre-ADR-035 contract claimed plan-campaign creates NO EB campaign.
+    That claim is now false (Step 8c stages drafts) — guard against it creeping
+    back into the spec and re-introducing the old boundary.
+    """
+    body = read_command()
+    assert "NO EB campaign created here" not in body, (
+        "Stale pre-ADR-035 claim 'NO EB campaign created here' must not reappear — "
+        "plan-campaign now stages the EB draft at Step 8c."
     )
 
 

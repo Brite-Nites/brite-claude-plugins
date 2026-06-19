@@ -285,6 +285,19 @@
           "type": "array",
           "items": { "$ref": "#/definitions/eb_campaign_record" },
           "description": "EB campaign records — one entry per (workspace × audience_tier × ESP) split. Empty array = not yet launched. A single logical Brite campaign may produce multiple EB records (empirically up to 6, e.g., Professional Emails + Personal Emails + Role Emails across both workspaces)."
+        },
+        "copy_artifact_path": {
+          "type": "string",
+          "description": "OPTIONAL (ADR-035 / BC-13628). Path to the email-copywriting JSON artifact used to build the staged draft sequence at plan-campaign Step 8c. Recorded so launch-campaign + debrief can trace the copy provenance."
+        },
+        "draft_created_at": {
+          "type": ["string", "null"],
+          "description": "OPTIONAL (ADR-035 / BC-13628). ISO-8601 UTC timestamp when plan-campaign Step 8c staged the EB drafts. Distinct from each record's launched_at (set later by launch-campaign)."
+        },
+        "custom_variables_created": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "OPTIONAL (ADR-035 / BC-13628). Names of the custom variables plan-campaign Step 8c registered in the workspace from the copy artifact's custom_variables[]."
         }
       }
     },
@@ -307,7 +320,7 @@
         },
         "esp": {
           "type": "string",
-          "description": "Email Service Provider this record targets (e.g., 'gmail-workspace', 'office365', 'all'). Free-form — EB does not enforce an ESP enum."
+          "description": "Email Service Provider this record targets. plan-campaign Step 8c (ADR-035) writes one of 'google' / 'microsoft' / 'smtp' (the ESP-split draft triplet); launch-campaign keys its per-bucket maps by the same values. Free-form — EB does not enforce an ESP enum; legacy records may carry other strings."
         },
         "audience_tier": { "$ref": "#/definitions/audience_tier_object" },
         "name": {
@@ -325,7 +338,25 @@
         },
         "pending_classification": {
           "type": "boolean",
-          "description": "Set true by migrate_manifest_v1_to_v2.py when a v1 launched-but-unclassified campaign is auto-migrated with a placeholder audience_tier. Operators clear this flag once they've classified the record via /marketing:import-campaign (BC-11849)."
+          "description": "Set true by migrate_manifest_v1_to_v2.py when a v1 launched-but-unclassified campaign is auto-migrated with a placeholder audience_tier. ALSO set true by plan-campaign Step 8c (ADR-035) on each staged ESP draft — the placeholder tier (the shared PLACEHOLDER_AUDIENCE_TIER) is non-authoritative because the drafts are intentionally not tier-split. Operators clear this flag once they've classified the record via /marketing:import-campaign (BC-11849)."
+        },
+        "sequence_id": {
+          "oneOf": [
+            { "type": "integer" },
+            { "type": "string", "pattern": "^[0-9]+$" },
+            { "type": "null" }
+          ],
+          "description": "OPTIONAL (ADR-035 / BC-13628). EB sequence ID created on this draft by plan-campaign Step 8c.6 (the 2-step sequence from the copy artifact). Null if no sequence was staged."
+        },
+        "senders_attached": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "integer" },
+              { "type": "string", "pattern": "^[0-9]+$" }
+            ]
+          },
+          "description": "OPTIONAL (ADR-035 / BC-13628). Sender-email IDs attached to this draft by plan-campaign Step 8c.7 — the ESP-partitioned subset (only this draft's `ScaledMail-{ESP}`-tagged senders; DIFFERENT per draft, NOT identical across the 3 ESP drafts). This supersedes the legacy Revgrowth-10 all-to-all sender invariant (ADR-035). launch-campaign PRE-FLIGHT re-validates each draft against the live pool per ESP."
         }
       }
     },

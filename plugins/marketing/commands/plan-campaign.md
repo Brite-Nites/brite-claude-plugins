@@ -1,7 +1,7 @@
 ---
-description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 8 standard sub-issues (with up to 2 optional) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison workspace assignment. Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
-argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--situation-mining] [--creative-angles] [--dry-run] | --emit <fixture.json> <sandbox-dir>
-allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_workflows_linear-server__create_issue_label, mcp__plugin_revops_salesforce__get_username, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__list_pages
+description: Scaffold one GTM campaign across all 4 layers — Linear milestone in "Brite GTM" project + 8 standard sub-issues (with up to 2 optional) + plugin docs/campaigns/{entity}/{slug}/manifest.json + Salesforce Campaign via /revops:create-sf-campaign (soft-fail) + Email Bison draft staging (3 ESP-split campaign drafts + custom-vars + 2-step sequence + senders, NO leads — soft-fail, ADR-035). Hybrid flag-or-prompt mode — operator can pass --vertical/--persona/--offer (and entity/month/year) explicitly, OR be walked through the missing pieces interactively (one question at a time). Triggers on "plan campaign", "scaffold campaign", "new GTM campaign", "set up campaign", "campaign orchestration", or direct /marketing:plan-campaign invocation.
+argument-hint: --vertical <slug> --persona <slug> --offer <slug> [--entity <nites|supply|labs|cross-entity>] [--month <1-12>] [--year <YYYY>] [--launch-date <YYYY-MM-DD>] [--owner-email <email>] [--eb-workspace <emailbison-personal|emailbison-b2b>] [--theme <slug>] [--copy-artifact <path>] [--no-eb-draft] [--situation-mining] [--creative-angles] [--dry-run] | --emit <fixture.json> <sandbox-dir>
+allowed-tools: Read, Write, Bash, AskUserQuestion, Skill, mcp__plugin_workflows_linear-server__list_projects, mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__save_issue, mcp__plugin_workflows_linear-server__list_issue_labels, mcp__plugin_workflows_linear-server__create_issue_label, mcp__plugin_revops_salesforce__get_username, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__list_pages, mcp__emailbison-b2b__*, mcp__emailbison-personal__*
 disable-model-invocation: true
 gbrain:
   schema: 1
@@ -34,7 +34,7 @@ The campaign-scaffolding orchestrator. One invocation creates one campaign acros
 | Plugin filesystem | `docs/campaigns/{entity}/{slug}/manifest.json` | Cross-layer index — the breadcrumb that ties Linear ↔ SF ↔ EB together |
 | Linear | 1 project-milestone in "Brite GTM" + 8 standard sub-issues + up to 2 optional sub-issues (blocked-by chained) | Orchestration + work-tracking surface |
 | Salesforce | 1 Campaign record (Status=Planned, custom fields populated) | Portfolio reporting surface (rollups, pipeline attribution) |
-| Email Bison | Workspace assignment recorded in manifest (NO EB campaign created here) | Sending-execution surface — actual EB campaign is created later by `/marketing:launch-campaign` at sub-issue #6 |
+| Email Bison | Workspace assignment + **3 ESP-split campaign drafts** (custom-vars + 2-step sequence + senders, Draft state, NO leads) recorded in `email_bison.campaigns[]` — soft-fail (Step 8c, ADR-035) | Sending-execution surface — the draft is staged here; `/marketing:launch-campaign` adds leads + activates |
 
 ## Deterministic builder — the source of truth (BC-12587)
 
@@ -45,7 +45,7 @@ The campaign-scaffolding orchestrator. One invocation creates one campaign acros
 
 It writes three artifacts into a build dir: `manifest.json`, `issues.json` (shape `{container, issues[]}`, cross-referenced **by INDEX** — there are no real Linear IDs yet), and `brief.md`.
 
-**The command owns the IO boundary** — what the builder structurally cannot do: the Linear collision read (Step 3.3, re-invoking the builder with `--disambiguator` on a hit), all MCP writes (milestone / sub-issues / SF / EB — Steps 8–10), backfilling the real Linear/SF IDs into the live records + the manifest, the two-call confirm gate (Step 6), soft-fail SF (Step 8b), the handbook brief-template `gh api` fetch (Step 8a.2, handed to the builder via `--brief-template`), the interactive prompts (Step 1), and EB workspace assignment.
+**The command owns the IO boundary** — what the builder structurally cannot do: the Linear collision read (Step 3.3, re-invoking the builder with `--disambiguator` on a hit), all MCP writes (milestone / sub-issues / SF / EB — Steps 8–10), backfilling the real Linear/SF/EB IDs into the live records + the manifest, the two-call confirm gate (Step 6), soft-fail SF (Step 8b), soft-fail EB-draft staging (Step 8c — `email-copywriting` sub-phase + EB campaign/var/sequence/sender MCP writes), the handbook brief-template `gh api` fetch (Step 8a.2, handed to the builder via `--brief-template`), the interactive prompts (Step 1), and EB workspace assignment. The builder emits `email_bison.campaigns: []` (empty); the command's Step 8c appends the draft records after the EB MCP writes (same backfill pattern as the Linear/SF IDs).
 
 **The crux (do not skip):** the command MUST literally **execute** the builder via `Bash` and consume its output files. It MUST NOT re-derive the slug / dates / labels / issue set inline from the prose below. Re-implementing that math in-context silently recreates the drift this design exists to kill — the per-PR behavioral eval (BC-12589) runs the builder, so an inline re-derivation would be an untested shadow path. The step prose below documents the **shape of what the builder produces** and the IO the command layers on top; it is a contract to read, not a computation to perform by hand. (A nightly LLM smoke, BC-12606, guards that the command actually drove the builder.)
 
@@ -98,6 +98,7 @@ Substitute `{vertical}` / `{persona}` / `{offer}` with this invocation's flags (
 - 1 Linear milestone (with labels applied to the 8-10 child issues, not the milestone itself — see § Step 8a).
 - 8 standard sub-issues (+ optional #9 Situation Mining for Labs, + optional #10 Creative Angles).
 - 1 Salesforce Campaign record (if `/revops:create-sf-campaign` succeeded; null `campaign_id` in manifest if it soft-failed).
+- 3 Email Bison ESP-split campaign **drafts** (custom-vars + 2-step sequence + senders, Draft state, NO leads) recorded in `email_bison.campaigns[]` — unless `--no-eb-draft` or a soft-fail (then `campaigns: []`). Step 8c, ADR-035.
 - Operator-readable summary printed at Step 11.
 
 **Precedent + sources**:
@@ -112,6 +113,8 @@ Substitute `{vertical}` / `{persona}` / `{offer}` with this invocation's flags (
 
 The Salesforce auto-create step (Step 8b) is **soft-fail**: any error returned by `/revops:create-sf-campaign` (duplicate slug, missing owner, SF CLI error, invalid slug format) does NOT halt scaffolding. The manifest gets `salesforce.campaign_id: null`, a WARN line is logged, and the operator is told at Step 11 how to reconcile (manual re-run of `/revops:create-sf-campaign --slug=<slug> ...` once the underlying issue is resolved). Linear milestone + sub-issues + plugin manifest must always land — they are the gate that keeps the team able to plan against the campaign even if SF is temporarily unhealthy.
 
+The **Email Bison draft staging step (Step 8c) is also soft-fail** (ADR-035): any EB error — MCP disconnected, auth failure, 4xx/5xx, an `email-copywriting` abort, or operator Abort at the 8c gate — does NOT halt scaffolding. The manifest keeps `email_bison.campaigns: []`, a WARN is logged, and the operator is told to re-run `/marketing:plan-campaign --copy-artifact <path>` (idempotent — Step 8c.0 detects + reuses existing drafts) once EB is healthy. Same principle as SF: the Linear/plugin planning surface must land even when the EB sending surface is temporarily unavailable.
+
 Hard-fail paths (which DO halt scaffolding) are limited to:
 - Canonicality validation (Step 2) — invalid vertical/persona/offer tuple. Pointer to `/marketing:new-vertical|new-persona|new-offer` (BC-8725).
 - Cross-entity slug missing required `--theme`.
@@ -119,10 +122,10 @@ Hard-fail paths (which DO halt scaffolding) are limited to:
 
 ## Non-goals
 
-- Do NOT create the Email Bison campaign — that's `/marketing:launch-campaign` invoked at sub-issue #6.
-- Do NOT generate copy — that's `/marketing:email-copywriting` invoked at sub-issue #3.
+- Do NOT upload, validate, or attach **leads**, and do NOT **activate** — those are `/marketing:launch-campaign`'s job (it reads the draft IDs from `email_bison.campaigns[]`). Step 8c stages the draft (campaigns + vars + sequence + senders) but leaves it in Draft with no leads. This is the ADR-035 boundary re-cut: `plan-campaign` = the whole vessel except leads; `launch-campaign` = leads + QC + go-live.
+- Do NOT split EB campaigns by audience-tier — exactly **3 ESP drafts** (Google/Microsoft/SMTP), never the 6-way `tier × ESP` fan-out (operator decision, BC-13628). Personal/general inboxes are not targeted (filtered at `launch-campaign` HOST-LOOKUP).
 - Do NOT fill out the brief content (Audience / Messaging / etc.) at scaffold time — the brief is a sub-issue #1 deliverable. This command provides the template SKELETON populated with handbook citations + canonicals metadata; the marketing brief author fills the substantive content at sub-issue #1.
-- Do NOT support `--reference <campaign-id>` for cloning — that lives in `/marketing:launch-campaign`; not part of plan-campaign's surface.
+- Do NOT support `--reference <campaign-id>` for cloning — that lives in `/marketing:launch-campaign`; `plan-campaign` reads its own manifest's `email_bison.campaigns[]` for idempotency instead.
 
 ---
 
@@ -144,6 +147,8 @@ Parse the invocation arguments. Required flags: `--vertical`, `--persona`, `--of
 | `--owner-email` | no | Resolve via the chain in Step 4. |
 | `--eb-workspace` | no | Resolve from entity per the map in Step 4. |
 | `--theme` | conditional | Required if `--entity=cross-entity`. Otherwise ignored. |
+| `--copy-artifact` | no | Path to an existing `email-copywriting` JSON artifact (`docs/campaigns/{short_entity}/copy-*.json`). When provided, Step 8c uses it directly and SKIPS the in-flow `email-copywriting` sub-phase. When omitted (and `--no-eb-draft` is not set), Step 8c invokes the `email-copywriting` Skill to generate copy. Validated at Step 1b (must exist + be readable JSON). |
+| `--no-eb-draft` | no | Skip Step 8c entirely — scaffold the Linear/SF/manifest surface only, leave `email_bison.campaigns: []`. Escape hatch for pure scaffolding (mirrors `launch-campaign`'s `--no-sequence`). The EB draft can be attached later by re-running with `--copy-artifact` (idempotent — Step 8c.0). |
 | `--situation-mining` | no | Enable optional sub-issue #9 (Labs-only — Step 10 enforces). |
 | `--creative-angles` | no | Enable optional sub-issue #10. |
 | `--dry-run` | no | Print the full preview at Step 5 and exit without writing anything. |
@@ -179,6 +184,7 @@ Before any downstream step, validate every operator-controlled flag value. These
 | `--owner-email` | If provided, matches `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` | `ERROR: --owner-email failed regex; got '<value>'` |
 | `--vertical` / `--persona` / `--offer` | Strict kebab-case `^[a-z0-9]+(-[a-z0-9]+)*$` (canonicality membership checked in Step 2; this is the SHAPE check) | `ERROR: --<flag> must be strict kebab-case; got '<value>'` |
 | `--eb-workspace` | If provided, must be one of `emailbison-personal` / `emailbison-b2b` | `ERROR: --eb-workspace must be emailbison-personal or emailbison-b2b; got '<value>'` |
+| `--copy-artifact` | If provided, **confine the path before any `Read`** (operator-controlled → mirror the launch-campaign IV-2/IV-8 realpath pattern, NOT a substring check on the raw string): resolve via `realpath`/`readlink -f`, assert the resolved absolute path begins with `$(git rev-parse --show-toplevel)/docs/campaigns/`, and reject any symlink that escapes that prefix. HALT on mismatch. Only after confinement passes: `Read` it and confirm it parses as JSON with the `email-copywriting` schema (`schema_version`, `custom_variables[]`, `step_1`, `step_2`). This is a command-side IO check (not a `build_manifest.py` invariant — the builder never touches copy). | `ERROR: --copy-artifact must resolve under <repo>/docs/campaigns/ (no traversal/symlink escape) and parse as email-copywriting JSON; got '<value>'` |
 
 The validator runs unconditionally, regardless of interactive vs non-interactive mode. Interactive prompts in Step 1 use AskUserQuestion which constrains the operator's input to a closed set + Other; the regex on the Other free-text path is the only place where prompt output could otherwise leak into downstream interpolation.
 
@@ -407,7 +413,7 @@ Print the operator-readable plan. Use this format (or a close variant — readab
 
   Plugin manifest:
     Path:         docs/campaigns/<entity>/<slug>/manifest.json
-    Schema:       v1 (top-level keys per Step 7)
+    Schema:       v2 (top-level keys per Step 7; email_bison.campaigns[] array)
 
   Linear milestone:
     Project:      "Brite GTM" (<gtm-project-id>)
@@ -419,6 +425,14 @@ Print the operator-readable plan. Use this format (or a close variant — readab
 
   Salesforce auto-create (via /revops:create-sf-campaign --dry-run):
     <output of /revops:create-sf-campaign --dry-run with the same args>
+
+  Email Bison draft (Step 8c — soft-fail; SKIPPED if --no-eb-draft):
+    Workspace:    <eb-workspace>
+    Copy:         <--copy-artifact path>  OR  "will invoke email-copywriting sub-phase"
+    ESP drafts:   <slug> | Google, <slug> | Microsoft, <slug> | SMTP  (Draft, plain_text, NO leads)
+    Sequence:     2-step from copy artifact (step-1 wait>=1d, step-2 wait>=3d)
+    Senders:      ESP-partitioned by ScaledMail-{ESP} tag (Google senders -> Google draft, etc.)
+    NOTE:         --dry-run performs NO EB writes and does NOT invoke email-copywriting.
 
   Sub-issues to create (8 standard + N optional — titles/schedule are illustrative;
   canonical source is references/campaign-sub-issue-templates.md):
@@ -459,7 +473,7 @@ On `Cancel`, halt cleanly with no writes and re-print the Step 5 dry-run preview
 
 ## Step 7 — Write plugin dir + manifest.json
 
-> **`manifest.json` is produced by `build_manifest.py`** (§ Deterministic builder) — it already wrote it to `<build-dir>` (with `linear.milestone_id` / `salesforce.campaign_id` / `email_bison.campaign_id` = `null`). Step 7 is the IO move: after confirm, create the real campaign dir and **copy the builder's `manifest.json` into it** (real IDs get backfilled in 8a/8b). Do NOT hand-author the JSON — the schema below is the builder's output contract, shown for reference.
+> **`manifest.json` is produced by `build_manifest.py`** (§ Deterministic builder) — it already wrote it to `<build-dir>` (with `linear.milestone_id` / `salesforce.campaign_id` = `null` and `email_bison.campaigns` = `[]`). Step 7 is the IO move: after confirm, create the real campaign dir and **copy the builder's `manifest.json` into it** (real IDs get backfilled in 8a/8b; EB draft records get appended by the EB-draft phase). Do NOT hand-author the JSON — the schema below is the builder's output contract, shown for reference. **Schema is v2 (ADR-020): `email_bison.campaigns[]` (array) replaced the singular `campaign_id`.**
 
 After confirm, create the campaign directory and place the builder's manifest:
 
@@ -472,7 +486,7 @@ The builder's `docs/campaigns/<entity>/<slug>/manifest.json` carries the FULL sc
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "slug": "<slug>",
   "entity": "<entity>",
   "vertical": "<vertical>",
@@ -492,16 +506,15 @@ The builder's `docs/campaigns/<entity>/<slug>/manifest.json` carries the FULL sc
   },
   "email_bison": {
     "workspace": "<eb-workspace>",
-    "campaign_id": null,
     "campaign_name": "<slug>",
-    "launched_at": null
+    "campaigns": []
   },
   "created_at": "<ISO 8601 UTC timestamp from `date -u +%Y-%m-%dT%H:%M:%SZ`>",
   "scaffolded_by": "/marketing:plan-campaign"
 }
 ```
 
-Initial state: `linear.milestone_id` and `salesforce.campaign_id` are `null`. These get backfilled in Step 8a + Step 8b respectively via `Read` → mutate JSON → `Write`.
+Initial state: `linear.milestone_id` and `salesforce.campaign_id` are `null`; `email_bison.campaigns` is `[]` (no EB record exists at scaffold time). `milestone_id` / `campaign_id` get backfilled in Step 8a + Step 8b via `Read` → mutate JSON → `Write`. The EB-draft phase (Step 8c) appends one `status: "draft"` record per ESP to `email_bison.campaigns[]` — see that step for the per-record schema (`{workspace, campaign_id, esp, audience_tier, name, launched_at, status, ...}` per ADR-020 / ADR-035).
 
 For cross-entity campaigns, `theme` carries the campaign identity (a first-class field, so the manifest is self-describing without slug-parsing), and `vertical` / `persona` / `offer` are recorded if provided, otherwise `null` (NOT empty string — empty string would break downstream parsers that distinguish "absent" from "empty"). For a full V/P/O campaign, `theme` is `null`. The builder (`build_manifest.py`) fills all of these.
 
@@ -517,9 +530,9 @@ To prove the write landed. Do NOT `git add` or `git commit` — that's `/workflo
 
 ---
 
-## Step 8 — Write Linear milestone + Salesforce Campaign
+## Step 8 — Write Linear milestone + Salesforce Campaign + Email Bison draft
 
-Sub-steps 8a and 8b run in order. 8a (Linear milestone create) is the hard-gate write — it MUST succeed before plan-campaign considers itself successful. 8b (SF Campaign auto-create) is the soft-fail write per the philosophy section above.
+Sub-steps 8a, 8b, and 8c run in order. 8a (Linear milestone create) is the hard-gate write — it MUST succeed before plan-campaign considers itself successful. 8b (SF Campaign auto-create) and 8c (Email Bison draft staging) are both soft-fail writes per the philosophy section above — a failure in either leaves its manifest slot null/empty and logs a reconcile WARN, but scaffolding (milestone + sub-issues + manifest) still completes. 8c is skipped entirely when `--no-eb-draft` is passed.
 
 ### Step 8a — Linear milestone create + brief template
 
@@ -747,6 +760,153 @@ Same `Read` → JSON-mutate → `Write` pattern as Step 8a.5.
 
 ---
 
+### Step 8c — Email Bison draft staging (campaigns + custom-vars + sequence + senders, NO leads)
+
+Per ADR-035 (BC-13628), `plan-campaign` stages the **whole EB vessel except the leads**: the ESP-split campaign drafts, the custom variables, the 2-step sequence, and the sender pool — all in **Draft** state. Leads (CSV validation, upload, attach, activate) are `/marketing:launch-campaign`'s job; it reads the draft IDs back from `email_bison.campaigns[]`. This lets the sequence be built/approved **in parallel with list-building** instead of waiting on the list.
+
+This is an **IO-boundary phase** — the EB MCP writes are command-side, NOT `build_manifest.py` computation (same boundary as the Step-8a Linear writes and the Step-8b SF soft-fail). EB servers are registered at **user level** (`mcp__emailbison-personal__*` / `mcp__emailbison-b2b__*` — no `plugin_marketing_` prefix); the assigned `<eb-workspace>` (Step 4.1) selects which one.
+
+#### 8c.0 — Gating, soft-fail, and idempotency contract
+
+- **Skip entirely if `--no-eb-draft`** — log `INFO: --no-eb-draft set; leaving email_bison.campaigns: []. Re-run with --copy-artifact to attach the draft later.` and continue to Step 9.
+- **Soft-fail, like Step 8b SF.** Any EB error (auth, MCP-down, 4xx/5xx, operator abort at the 8c gate) does NOT halt scaffolding. Leave `email_bison.campaigns: []`, log a WARN with the reconcile instruction (`Re-run /marketing:plan-campaign --copy-artifact <path> once EB is healthy; idempotent — existing drafts are detected + reused`), and continue to Step 9. Linear milestone + sub-issues + manifest must always land (the planning gate) even when EB is temporarily unavailable. **EB MCP was observed disconnected in the originating session** — a connectivity failure here is expected to soft-fail cleanly, not crash the scaffold.
+- **Idempotency / no duplicate drafts (8c pre-flight).** Before creating anything, `list_campaigns(search="<slug>")` in `<eb-workspace>` (core-tier, directly callable). EB's `search` is substring-matched with NO API-side dedup — calling `create_campaign` twice with the same name yields two IDs with no warning. If the pre-list already contains the 3 ESP drafts for this slug (exact-name match on `<slug> | Google` / `<slug> | Microsoft` / `<slug> | SMTP`), **reuse their IDs** — skip create, skip var/sequence/sender creation for any draft already fully built, and only fill gaps. Surface the reuse to the operator at the 8c gate. This is the live-trap guard from `gotcha_plan_campaign_duplicates_existing_milestone`, extended to EB: a re-run on an existing campaign must not double-create EB drafts (the dogfood case `landscape-lighting-...-fy26-m07` may already carry 06-08 drafts).
+- **Ground-truthing rule (mandatory).** `search_api_spec` before any extended-tier `call_api` — EB's surface drifts; the spec is the source of truth. `call_api` takes `body` (NOT `data`).
+
+#### 8c.1 — Resolve copy
+
+The EB sequence needs copy. Two paths:
+
+- **`--copy-artifact <path>` provided** → `Read` it (Step 1b already validated existence + JSON shape). Use it directly; SKIP the sub-phase.
+- **Otherwise** → invoke the `email-copywriting` Skill in-flow (one entry point, per ADR-035):
+
+  ```
+  Skill(skill: "marketing:email-copywriting",
+        args: "<entity> + offer posture + situation artifact (or scratch) for <slug>")
+  ```
+
+  `email-copywriting` runs its OWN interactive gates (entity hard-gate, offer-posture confirm, value-equation 4-input gate) and emits `docs/campaigns/{short_entity}/copy-{campaign-name}-{YYYY-MM-DD}.json`. Capture that path as `<copy-artifact>`. **Honor its ABORT semantics**: if it aborts (missing proof point, declined entity, missing `marketing-context.md` with no entity), that is a soft-fail per 8c.0 — log WARN, leave `email_bison.campaigns: []`, continue to Step 9. Inputs (entity from Step 4.1; offer/persona/vertical already resolved; situation-mining artifact if one exists or `--situation-mining` was set) are available by this point.
+
+Parse the artifact: `custom_variables[]` (each `{name, default}`), `step_1` / `step_2` (each `{subject, body, wait_in_days}`), `offer_summary`. This is the same artifact `launch-campaign` previously consumed — the contract is unchanged; only the consumer moved.
+
+#### 8c.2 — Validate copy artifact format (HARD-FAIL within this phase → soft-fail the phase)
+
+Re-check the EB format rules on the resolved artifact (the same gate `launch-campaign` Phase 9 enforced — it moves here with the sequence logic):
+
+- `step_1.subject` / `step_2.subject`: no merge variables (no `{FIRST_NAME}`), no spintax in subjects is NOT required (subjects MAY carry spintax) — but **no `{TOKEN}` merge vars**.
+- All `{TOKEN}` references in step_1/step_2 subject+body MUST be UPPERCASE (grep `\{[A-Za-z_]+\}`; any lowercase char → reject). EB resolves only UPPERCASE tokens; lowercase render as literal text (BC-6308 R-2a).
+- Bodies: `<br><br>` paragraph breaks, no `<p>` tags, no em-dashes, no `{{TOKEN}}` double-brace EB-token typos (Liquid `{{ var }}` lowercase is allowed).
+- `step_2.subject` does NOT start with `Re:` (EB auto-prepends `Re: ` when `thread_reply: true`; including it → double-prefix, BC-5906 Sx-14).
+- Exactly 2 steps.
+
+On any violation, log the specific error and **soft-fail the phase** (8c.0) — the operator fixes the artifact and re-runs with `--copy-artifact`.
+
+#### 8c.3 — 8c gate (two-call confirm, BC-2707)
+
+Before any EB write, show the plan and gate via `AskUserQuestion` (the EB writes are the side-effecting boundary `disable-model-invocation: true` protects; the gate creates the required user turn between describe and execute):
+
+> Stage the Email Bison draft in workspace `<eb-workspace>`?
+> - **3 ESP campaign drafts** (Draft state, no leads): `<slug> | Google`, `<slug> | Microsoft`, `<slug> | SMTP`
+> - **{N} custom variables**: {names}
+> - **2-step sequence** from `<copy-artifact>` (step-1 wait {X}d, step-2 wait {Y}d)
+> - **senders attached per ESP** — each draft gets only its `ScaledMail-{ESP}`-tagged senders (Google senders → Google draft, etc.), NOT the whole pool
+> {if pre-list found existing drafts: "⚠️ {K} matching drafts already exist — will REUSE, not recreate."}
+>
+> - Yes, stage the EB draft (Recommended)
+> - Abort (soft-fail — scaffold continues without the EB draft)
+
+On Abort → soft-fail per 8c.0.
+
+#### 8c.4 — Custom variables
+
+Ground-truth via `search_api_spec` (`custom variable create` / `list`). `list_custom_variables` in `<eb-workspace>`; for each artifact variable not already present (case-insensitive — EB lowercases on store, Sx-3/BC-6299), `create_custom_variable` with `{name}` ONLY (EB's `POST /api/custom-variables` accepts only `name`; `default` is consumed per-lead at launch time, not a workspace property). Collect created `{id, name}` into `<custom-vars-created>`. There is no `DELETE` endpoint (Sx-4) — duplicate POSTs 422, so reuse existing.
+
+#### 8c.5 — Create the 3 ESP campaign drafts (idempotent)
+
+Ground-truth via `search_api_spec` (`create campaign` → `create_campaign`, `POST /api/campaigns`). For each ESP in **Google / Microsoft / SMTP**:
+
+1. If 8c.0's pre-list already has an exact-name match (`<slug> | <ESP>`), reuse that `campaign_id`; else `create_campaign(name="<slug> | <ESP>")` and capture the returned ID.
+2. Apply the cold-outreach deliverability default: `update_campaign` (`PATCH /api/campaigns/{id}/update`) with `plain_text: true`. EB defaults `plain_text:false` (HTML); the `<br><br>`-formatted spintax copy assumes plain-text. **EB PATCH treats omitted booleans as false** (BC-6544) — this single PATCH is safe because drafts start all-false, but any future PATCH must re-send `plain_text: true` explicitly.
+
+Campaigns stay in **Draft** — `plan-campaign` never activates (that's `launch-campaign --activate`). The ESP triplet is a **sender-side partition**: EB has no native recipient-ESP routing (verified), so same-ESP sending is achieved by one campaign per ESP with that ESP's senders. **Tier is intentionally NOT a split axis** (operator decision, BC-13628): professional + role leads share their ESP's draft at attach-time; personal/general are excluded at `launch-campaign` HOST-LOOKUP. Hence exactly **3 drafts, never the 6-way `tier × ESP` fan-out**.
+
+#### 8c.6 — Create the 2-step sequence on each draft
+
+Ground-truth via `search_api_spec` (`sequence steps create`; prefer the **v1.1** endpoint `POST /api/campaigns/v1.1/{id}/sequence-steps` — legacy `/sequence-steps` is deprecated). **Build the COMPLETE sequence — step 1 (A), the optional step-1 B variant, and step 2 — in a SINGLE from-scratch create call per draft.** This is non-negotiable: EB has **no API path to add a step or variant to an existing sequence** (verified BC-13628 dogfood — `DELETE` of the last step 400s; a second from-scratch `POST` on a campaign that already has a sequence 422s; `PUT` update requires an `id` on every step so it cannot add new ones). A variant that isn't in the initial create cannot be retrofitted without deleting + recreating the campaign.
+
+For each of the 3 drafts, `call_api` (body, not data):
+
+```json
+{
+  "title": "<slug> | <ESP>",
+  "sequence_steps": [
+    {"email_subject": "<step_1.subject>", "email_body": "<step_1.body>",
+     "wait_in_days": <max(1, step_1.wait_in_days)>, "order": 1, "variant": false, "thread_reply": false},
+
+    // ONLY if the copy artifact carries `step_1_variant_b` — the step-1 A/B variant
+    // (e.g. A = electrical/GFCI angle, B = heat-strips angle, same offer). Omit this
+    // object entirely when `step_1_variant_b` is absent/null.
+    {"email_subject": "<step_1_variant_b.subject>", "email_body": "<step_1_variant_b.body>",
+     "wait_in_days": <max(1, step_1.wait_in_days)>, "order": 1, "variant": true,
+     "variant_from_step": 1, "thread_reply": false},
+
+    {"email_subject": "<step_2.subject>", "email_body": "<step_2.body>",
+     "wait_in_days": <step_2.wait_in_days>, "order": 2, "variant": false, "thread_reply": true}
+  ]
+}
+```
+
+Ported gotchas (move with the sequence logic): field is `wait_in_days` (NOT `wait_days`); `email_subject` (NOT `subject`); **step-1 `wait_in_days >= 1`** — apply `max(1, ...)` regardless of the artifact's value (production never ships sub-day step-1 delays); step-2 `wait_in_days >= 3` (HARD-FAIL lower → soft-fail the phase); sequence-step body newlines must already be `<br>` (the artifact carries them); `thread_reply:true` on step 2 auto-prepends `Re: `.
+
+**A/B step-1 variant wiring (BC-13628).** When `step_1_variant_b` is present, B is an A/B variant of step 1 — NOT a third step (the 2-step max holds; step 2 is shared). In the single from-scratch create above, link B with `variant: true` + `variant_from_step: 1` (the in-request **order** of step-1 A). The EB sequence gotcha — *"wire the variant by the saved step `id`, not the order"* — applies to the cross-call path (`variant_from_step_id: <saved A id>`), which is the **only** option if you ever add a variant after the fact; but since EB blocks post-hoc variant addition (above), `plan-campaign` always wires in-request. If the in-request `variant_from_step` is rejected, fall back to a two-pass create within the SAME phase (create A + step 2, capture A's returned step `id`, then re-create the whole sequence including B with `variant_from_step_id: <A id>`) — never leave a half-built sequence. Capture each draft's returned `sequence_id` (and, when a variant was wired, the step `id`s) for the manifest + verification.
+
+#### 8c.7 — Attach senders, **ESP-partitioned** (like-to-like sending)
+
+**The sender pool is partitioned by ESP, NOT pooled across drafts** (BC-13628 dogfood correction — supersedes the legacy launch-campaign Phase-7 "all senders to all campaigns" invariant). The entire reason the draft is split into a Google / Microsoft / SMTP triplet is so each draft sends from **its own ESP's senders to that ESP's recipients** (EB has no native recipient-ESP routing — Context ground-truth). Attaching all senders to all drafts would scramble the like-to-like routing the split exists to create.
+
+Each ESP draft gets only the senders carrying that ESP's **`ScaledMail` tag** in the assigned workspace. The tag names differ by workspace (operator-maintained convention — verify against the live tag list via `GET /api/tags` before relying on them; dated SMTP cohort tags in particular drift as new batches are added):
+
+| ESP / draft | `emailbison-personal` (personal.outbase.so) tag | `emailbison-b2b` (send.outbase.so) tag |
+|---|---|---|
+| Google | `ScaledMail-Google` | `Google` |
+| Microsoft | `ScaledMail-Microsoft` | `ScaledMail-Microsoft` |
+| SMTP | `ScaledMail - SMTP - 11/26/2025` | `Scaledmail SMTP` |
+
+Steps (ground-truth tool names via `search_api_spec` first — `list sender emails`, `attach sender emails`):
+
+1. Resolve the tag **id** for this workspace+ESP from `GET /api/tags` (match by exact name from the table). If a draft's ESP tag is absent or matches zero connected senders, log a WARN and leave that draft sender-less (soft-fail per 8c.0; a draft with no senders simply can't send until senders are attached) — do NOT fall back to attaching another ESP's senders.
+2. For each ESP draft, list connected senders filtered to that tag: `GET /api/sender-emails?status=connected&tag_ids[]=<tag-id>` (lowercase `connected` — `Connected` 422s, Sx-11; `per_page` is hardcoded 15 regardless of the param, so paginate `meta.last_page` pages and collect every `id`).
+3. `attach_sender_emails_to_campaign` (`POST /api/campaigns/{draft-id}/attach-sender-emails`, body `{"sender_email_ids": [<this ESP's ids>]}`) — attach ONLY that ESP's senders to that ESP's draft.
+4. Verify per draft: re-query the attached count and confirm it matches the tag-filtered connected count for that ESP; soft-fail with the specific draft + delta on a persistent mismatch after a 30s retry.
+5. Record `senders_attached` per draft record (the ESP-specific id list — different per draft, NOT identical).
+
+> **Scope note (BC-13628 / Corinne, BC-12434).** When a workspace's ESP pools are large (the personal workspace has ~450 Microsoft + ~178 Google connected senders), the per-page enumeration (EB caps `per_page` at 15) is the only cost — the attach itself is one call per draft. If that enumeration is impractical in a given run, attaching senders MAY be deferred to `/marketing:launch-campaign` (whose PRE-FLIGHT already re-validates the attached pool) and tracked in the list-building issue scope; the ESP→tag mapping above is the single source of truth either way.
+
+`launch-campaign` PRE-FLIGHT re-validates each draft's attached senders **per ESP** at launch time in case the pool drifted.
+
+#### 8c.8 — Backfill `email_bison.campaigns[]` (v2 record per ESP)
+
+`Read` → JSON-mutate → `Write` (same pattern as 8a.5/8b.2). Append one v2 `eb_campaign_record` per ESP draft to `email_bison.campaigns[]` (ADR-020 schema + the ADR-035 additive optional fields):
+
+```json
+{
+  "workspace": "<eb-workspace>",
+  "campaign_id": <created-or-reused-id>,
+  "esp": "google",
+  "audience_tier": {"tier": "professional", "seniority": null, "modifiers": []},
+  "pending_classification": true,
+  "name": "<slug> | Google",
+  "launched_at": null,
+  "status": "draft",
+  "sequence_id": <sequence-id>,
+  "senders_attached": [<sender-id>, ...]
+}
+```
+
+`audience_tier` reuses the **existing `PLACEHOLDER_AUDIENCE_TIER`** (`tier: "professional"` + `pending_classification: true`) verbatim — the same value `migrate_manifest_v1_to_v2.py` writes — because the drafts are intentionally NOT tier-split; `pending_classification: true` marks the tier non-authoritative (resolved at attach-time by `launch-campaign`). Also set on the `email_bison` block: `copy_artifact_path: "<copy-artifact>"`, `draft_created_at: "<ISO-8601 UTC>"`, `custom_variables_created: [<name>, ...]`. `status` stays `"draft"` and `launched_at` stays `null` until `launch-campaign --activate`. On a soft-fail anywhere in 8c, `email_bison.campaigns` stays `[]` (no partial record) and the WARN names the reconcile re-run.
+
+---
+
 ## Step 9 — Create 8 standard sub-issues with blockedBy chain
 
 > **The sub-issue payloads are produced by `build_manifest.py`** in `<build-dir>/issues.json` (shape `{container, issues[]}`). Each entry already carries its `title`, verbatim-stamped `description`, **absolute** `dueDate` (the builder did `<launch-date>` + `dueDate_offset_days`), the 8-label set, `blockedBy` **by INDEX**, `optional`, and `labs_gated`. Step 9 is pure IO: `Read` `issues.json` and `save_issue` each entry, then wire `blockedBy` in a second pass by **resolving each INDEX → the real Linear `id`** captured in pass 1. The command does NOT recompute dates, labels, descriptions, or the dependency graph — it consumes them. (The field mapping below names where each `save_issue` arg comes from in `issues.json`.)
@@ -860,8 +1020,11 @@ Campaign scaffolded — /marketing:plan-campaign
                     #8  Campaign closed + debrief       <id>
                     #9  Situation Mining (Labs)         <id>   <-- if --situation-mining
                     #10 Creative Angles                 <id>   <-- if --creative-angles
-  EB workspace:   <eb-workspace>  (campaign will be created at sub-issue #6
-                                   via /marketing:launch-campaign — NOT now)
+  EB workspace:   <eb-workspace>
+  EB drafts:      <slug> | Google (<id>), <slug> | Microsoft (<id>), <slug> | SMTP (<id>)
+                    State: Draft · sequence staged · senders attached · NO leads
+                    (OR "none — soft-failed, see reminder" / "skipped (--no-eb-draft)")
+                    Next: /marketing:launch-campaign adds leads + activates
 
 =================================================================
 ```
@@ -872,6 +1035,11 @@ If the σ3 SF auto-create soft-failed (`salesforce.campaign_id` is `null` in man
 
 > To reconcile manually:
 > `Skill(skill: "revops:create-sf-campaign", args: "--slug=<slug> --entity=<entity> --vertical=<vertical> --persona=<persona> --offer=<offer> --year=<year> --month=<month> --owner-email=<corrected-owner-email> --launch-date=<launch-date>")`
+
+If the Step-8c EB-draft staging soft-failed (`email_bison.campaigns` is `[]` in the manifest and `--no-eb-draft` was NOT set), append:
+
+> EB draft was not staged (EB unavailable, copy aborted, or operator declined). To reconcile once EB is healthy, re-run with the copy artifact (idempotent — existing drafts are detected + reused, never duplicated):
+> `/marketing:plan-campaign --vertical=<vertical> --persona=<persona> --offer=<offer> --entity=<entity> --copy-artifact=<path>`
 
 ### 11.2 — Status-transition guidance
 
@@ -894,6 +1062,7 @@ End with:
 This orchestrator is **partially** idempotent:
 
 - **Step 3.3 collision check** + **Step 8b duplicate_slug handling** ensure repeated invocations with the same slug don't create duplicates in Linear or SF.
+- **Step 8c EB-draft staging IS idempotent** — the 8c.0 pre-flight `list_campaigns(search="<slug>")` detects existing ESP drafts by exact name and reuses their IDs (no double-create of EB campaigns, custom vars, or sequences). This is the intended reconcile path: a re-run with `--copy-artifact` after a soft-fail attaches the draft without duplicating. Mirrors the live-trap guard `gotcha_plan_campaign_duplicates_existing_milestone`, extended to EB.
 - **Step 7 manifest write** is destructive (overwrites any existing manifest.json). If re-running plan-campaign on an existing slug, the prior manifest is lost — copy it aside first if needed for diff comparison.
 - **Step 9 sub-issue create** is NOT idempotent — calling `save_issue` with the same title against the same parent creates a NEW sub-issue (Linear doesn't dedupe on title). Re-runs will produce duplicate sub-issue chains.
 
