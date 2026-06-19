@@ -1892,6 +1892,37 @@ else
   fi
 fi
 
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/marketing/scripts/test_build_deck_template.sh — the unit/contract
+# suite for build_deck_template.py, the deterministic per-vertical intro-deck
+# template generator (BC-12975 follow-on). Asserts the resolved persona/offer/
+# posture + brand tokens land, the three rep blanks survive literally, an unknown
+# slug hard-fails, internal targeting data never leaks, output is deterministic,
+# and the committed municipalities pilot matches a fresh regenerate (--check).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-12975. deck-template builder regression harness (BC-12975)"
+
+dt_harness="$REPO_ROOT/plugins/marketing/scripts/test_build_deck_template.sh"
+dt_helper="$REPO_ROOT/plugins/marketing/scripts/build_deck_template.py"
+
+if [ ! -f "$dt_helper" ]; then
+  warn "plugins/marketing/scripts/build_deck_template.py not found — deck-template harness skipped"
+elif [ ! -f "$dt_harness" ]; then
+  warn "plugins/marketing/scripts/test_build_deck_template.sh not found — deck-template harness skipped"
+else
+  if dt_harness_out=$(bash "$dt_harness" "$dt_helper" 2>&1); then
+    dt_pass_count=$(printf '%s\n' "$dt_harness_out" | sed -n 's/^build_deck_template: \([0-9][0-9]*\) passed.*/\1/p' | tail -1)
+    if [ -n "$dt_pass_count" ]; then
+      pass "deck-template builder regression harness (${dt_pass_count} assertions)"
+    else
+      pass "deck-template builder regression harness — passed (count unparsed)"
+    fi
+  else
+    fail "deck-template builder regression harness failed:"
+    printf '%s\n' "$dt_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
 # ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12589 — Behavioral-eval harness + first plan-campaign eval (BC-12589)
 # ──────────────────────────────────────────────────────────────────────

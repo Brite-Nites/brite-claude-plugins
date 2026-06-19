@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BriteBase — Intro Deck Skeleton</title>
+<!--
+  BriteBase — Intro Deck Skeleton  (rapid-asset-design, BC-12975)
+  ----------------------------------------------------------------
+  The VISUAL standard for Brite intro/concept decks: brand + slide structure,
+  authored ONCE. Content is placeholder — replace the copy, keep the brand.
+
+  This file is the in-repo source of truth. Publish it into the BriteBase Design
+  System (claude.ai/design) via the /design-sync skill so every Claude Design deck
+  inherits it; pair it with a per-vertical prompt from
+  plugins/marketing/data/deck-templates/{vertical}-intro-deck.md (build_deck_template.py).
+
+  Every token below is from the BriteBase Design System (colors_and_type.css).
+  MagdaClean (the display "Base" wordmark) ships as fonts/MagdaClean.woff2 in the DS;
+  it falls back to Geist with MagdaClean letter-spacing here and is flagged, not faked.
+
+  Four reusable slide archetypes: (1) dark title, (2) light content-cards,
+  (3) product/program peek, (4) dark close. ?slide=N deep-links; ?static=1 settles
+  entrances for render-checks.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --brite-primary: #ff4d00;
+    --white: #fbfbfa; --pure-white: #ffffff; --sidebar-grey: #efefef;
+    --neutral-black: #0b0b0b; --neutral-darker: #1f1f1f; --neutral-dark: #464646;
+    --neutral-medium: #767676; --neutral-muted: #9f9f9f; --neutral: #dadada; --neutral-light: #f4f4f4;
+    --status-green-dark: #4d9c00; --status-blue: #96b1ff;
+    --radius-md: 8px; --radius-lg: 10px; --radius-xl: 14px; --radius-2xl: 18px;
+    --shadow-menu: 0 2px 3.9px 0 rgba(0,0,0,0.11);
+    --shadow-modal: 4px 16px 39.5px 7px rgba(0,0,0,0.14);
+    --btn-shadow-rest: 0 10px 10.4px -7px rgba(0,0,0,0.05);
+    --btn-gradient-bg: linear-gradient(135deg, rgba(255,233,200,0.16) 0%, rgba(255,255,255,0) 100%);
+    --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --font-eyebrow: "Geist", ui-sans-serif, sans-serif; /* real: "MagdaClean", "Geist" — see note */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--neutral-black); color: var(--neutral-dark); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+  .deck { position: fixed; inset: 0; }
+  .slide { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; padding: clamp(32px, 7vw, 110px); opacity: 0; transition: opacity 420ms ease; }
+  .slide[data-active] { display: flex; opacity: 1; }
+  .slide--light { background: var(--sidebar-grey); color: var(--neutral-dark); }
+  .slide--paper { background: var(--white); color: var(--neutral-dark); }
+  .slide--dark  { background: var(--neutral-black); color: var(--white); }
+
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--brite-primary); margin-bottom: 22px; }
+  .display { font-size: clamp(34px, 6vw, 72px); font-weight: 600; letter-spacing: -2.2px; line-height: 1.04; color: inherit; }
+  .slide--light .display, .slide--paper .display { color: var(--neutral-black); }
+  .lede { margin-top: 22px; font-size: clamp(16px, 1.7vw, 21px); line-height: 1.5; color: var(--neutral-medium); max-width: 34ch; }
+  .slide--dark .lede { color: var(--neutral-muted); }
+  .ph { outline: 1px dashed color-mix(in srgb, currentColor 22%, transparent); outline-offset: 3px; } /* placeholder marker — delete when filling */
+
+  .rise { opacity: 0; transform: translateY(18px); transition: opacity 600ms ease, transform 600ms cubic-bezier(.22,.61,.36,1); }
+  .slide.is-active .rise { opacity: 1; transform: none; }
+  .slide.is-active .rise:nth-child(1) { transition-delay: 80ms; }
+  .slide.is-active .rise:nth-child(2) { transition-delay: 180ms; }
+  .slide.is-active .rise:nth-child(3) { transition-delay: 280ms; }
+  .slide.is-active .rise:nth-child(4) { transition-delay: 380ms; }
+
+  .brite-logo { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; }
+  .brite-logo__mark { width: 44px; height: 24px; transform: rotate(90deg); border-radius: 7px; background: linear-gradient(to bottom, var(--brite-primary) 24%, transparent); }
+  .brite-logo__wordmark { display: inline-flex; align-items: baseline; }
+  .brite-logo__brite { font-family: var(--font-sans); font-size: 30px; font-weight: 600; letter-spacing: -1.1px; }
+  .brite-logo__base { font-family: var(--font-eyebrow); font-size: 38px; letter-spacing: -4px; }
+  .slide--dark .brite-logo__brite, .slide--dark .brite-logo__base { color: var(--pure-white); }
+  .slide--light .brite-logo__brite, .slide--light .brite-logo__base, .slide--paper .brite-logo__brite, .slide--paper .brite-logo__base { color: var(--neutral-black); }
+
+  .hero-glow { position: absolute; top: 50%; right: -8%; width: 60vw; height: 60vw; max-width: 780px; max-height: 780px; transform: translateY(-50%); background: radial-gradient(circle at center, rgba(255,77,0,0.42) 0%, rgba(255,77,0,0.10) 38%, transparent 66%); filter: blur(8px); animation: glowPulse 6.5s ease-in-out infinite; pointer-events: none; }
+  @keyframes glowPulse { 0%,100% { opacity:.7; transform: translateY(-50%) scale(1); } 50% { opacity:1; transform: translateY(-50%) scale(1.08); } }
+  .title-stack { position: relative; z-index: 1; max-width: 20ch; }
+  .title-stack .brite-logo { margin-bottom: 40px; }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 48px; max-width: 1000px; }
+  .card { background: var(--white); border-radius: var(--radius-xl); box-shadow: inset 0 0 0 1px var(--neutral); padding: 26px 24px; }
+  .card__icon { width: 40px; height: 40px; border-radius: var(--radius-md); display: grid; place-items: center; margin-bottom: 18px; background: var(--neutral-light); box-shadow: inset 0 0 0 1px var(--neutral); }
+  .card__num { font-family: var(--font-mono); font-size: 11px; color: var(--brite-primary); font-weight: 600; }
+  .card h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.34px; color: var(--neutral-black); margin: 8px 0; }
+  .card p { font-size: 14px; line-height: 1.5; color: var(--neutral-medium); }
+
+  .peek-wrap { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 56px; align-items: center; max-width: 1100px; }
+  .app { height: 360px; background: var(--white); border-radius: var(--radius-2xl); box-shadow: var(--shadow-modal); display: grid; grid-template-columns: 132px 1fr; overflow: hidden; transform-origin: left center; opacity: 0; transform: perspective(1400px) rotateY(-9deg) rotateX(2deg) translateY(16px); transition: opacity 640ms ease, transform 760ms cubic-bezier(.22,.61,.36,1); transition-delay: 220ms; }
+  .slide.is-active .app { opacity: 1; transform: perspective(1400px) rotateY(-9deg) rotateX(2deg); }
+  .app__side { background: var(--sidebar-grey); padding: 16px 12px; border-right: 1px solid var(--neutral); }
+  .app__side .brite-logo { gap: 7px; margin-bottom: 20px; }
+  .app__side .brite-logo__mark { width: 24px; height: 13px; border-radius: 5px; }
+  .app__side .brite-logo__brite { font-size: 15px; letter-spacing: -0.6px; }
+  .app__side .brite-logo__base { font-size: 18px; letter-spacing: -2px; }
+  .nav-item { height: 26px; border-radius: 8px; display: flex; align-items: center; padding: 0 10px; font-size: 12px; color: var(--neutral-medium); margin-bottom: 4px; }
+  .nav-item--on { background: var(--pure-white); color: var(--neutral-black); font-weight: 500; box-shadow: var(--shadow-menu); }
+  .nav-item__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brite-primary); margin-right: 8px; }
+  .app__canvas { padding: 18px 20px; }
+  .app__topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .crumb { font-size: 13px; color: var(--neutral-medium); } .crumb b { color: var(--neutral-black); font-weight: 600; }
+  .pill-btn { height: 26px; padding: 0 12px; border-radius: 13px; background: var(--brite-primary); background-image: var(--btn-gradient-bg); color: #fff; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; box-shadow: var(--btn-shadow-rest); }
+  .row { height: 34px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--neutral); margin-bottom: 8px; display: flex; align-items: center; padding: 0 12px; gap: 10px; background: var(--white); }
+  .row__av { width: 18px; height: 18px; border-radius: 50%; background: var(--status-blue); }
+  .row__bar { height: 7px; border-radius: 4px; background: var(--neutral); }
+  .tag { margin-left: auto; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; color: var(--status-green-dark); background: #d3f8bf; }
+
+  .close-cta { margin-top: 40px; display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 22px; border-radius: 22px; background: var(--brite-primary); background-image: var(--btn-gradient-bg); color: #fff; font-weight: 600; font-size: 16px; white-space: nowrap; align-self: flex-start; box-shadow: var(--btn-shadow-rest); }
+
+  .dots { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); display: flex; gap: 9px; z-index: 20; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--neutral-muted); opacity: .5; cursor: pointer; transition: all 200ms ease; border: 0; padding: 0; }
+  .dot[aria-current="true"] { opacity: 1; background: var(--brite-primary); width: 22px; border-radius: 4px; }
+  .counter { position: fixed; top: 26px; right: 30px; font-family: var(--font-mono); font-size: 12px; color: var(--neutral-muted); z-index: 20; }
+  .skeleton-badge { position: fixed; top: 24px; left: 30px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; color: var(--brite-primary); z-index: 20; }
+
+  @media (max-width: 760px) { .grid-3, .peek-wrap { grid-template-columns: 1fr; } .app { transform: none; height: 300px; } }
+  @media (prefers-reduced-motion: reduce) { .hero-glow { animation: none; } .rise { transition: none; opacity: 1; transform: none; } }
+  html.static .rise { opacity: 1 !important; transform: none !important; transition: none !important; }
+  html.static .app { opacity: 1 !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- ARCHETYPE 1 · DARK TITLE -->
+  <section class="slide slide--dark" data-active>
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="title-stack">
+      <a class="brite-logo rise" href="#"><span class="brite-logo__mark"></span><span class="brite-logo__wordmark"><span class="brite-logo__brite">Brite</span><span class="brite-logo__base">Base</span></span></a>
+      <p class="eyebrow rise ph">Eyebrow / vertical</p>
+      <h1 class="display rise ph">Deck headline goes here.</h1>
+      <p class="lede rise ph">One supporting line — the promise, in the buyer's terms. Keep it to a sentence.</p>
+    </div>
+  </section>
+
+  <!-- ARCHETYPE 2 · LIGHT CONTENT-CARDS -->
+  <section class="slide slide--light">
+    <p class="eyebrow rise ph">Section eyebrow</p>
+    <h2 class="display rise ph" style="max-width:16ch;">A point worth one slide.</h2>
+    <div class="grid-3">
+      <div class="card rise"><span class="card__num">01</span><h3 class="ph">Card title</h3><p class="ph">One or two lines of supporting detail. No fabricated stats.</p></div>
+      <div class="card rise"><span class="card__num">02</span><h3 class="ph">Card title</h3><p class="ph">One or two lines of supporting detail. No fabricated stats.</p></div>
+      <div class="card rise"><span class="card__num">03</span><h3 class="ph">Card title</h3><p class="ph">One or two lines of supporting detail. No fabricated stats.</p></div>
+    </div>
+  </section>
+
+  <!-- ARCHETYPE 3 · PRODUCT / PROGRAM PEEK -->
+  <section class="slide slide--paper">
+    <div class="peek-wrap">
+      <div>
+        <p class="eyebrow rise ph">What it looks like</p>
+        <h2 class="display rise ph" style="font-size:clamp(30px,4.4vw,52px); max-width:14ch;">Show, don't tell.</h2>
+        <p class="lede rise ph">A line that frames the visual to the right.</p>
+      </div>
+      <div class="app" role="img" aria-label="Product/program peek placeholder">
+        <div class="app__side">
+          <a class="brite-logo" href="#"><span class="brite-logo__mark"></span><span class="brite-logo__wordmark"><span class="brite-logo__brite">Brite</span><span class="brite-logo__base">Base</span></span></a>
+          <div class="nav-item nav-item--on"><span class="nav-item__dot"></span>Item</div>
+          <div class="nav-item">Item</div><div class="nav-item">Item</div><div class="nav-item">Item</div>
+        </div>
+        <div class="app__canvas">
+          <div class="app__topbar"><span class="crumb">Workspace / <b>View</b></span><span class="pill-btn">+ Action</span></div>
+          <div class="row"><span class="row__av"></span><span class="row__bar" style="width:120px;"></span><span class="tag">Status</span></div>
+          <div class="row"><span class="row__av" style="background:#8cba5e;"></span><span class="row__bar" style="width:96px;"></span><span class="tag">Status</span></div>
+          <div class="row"><span class="row__av" style="background:#b68cf7;"></span><span class="row__bar" style="width:140px;"></span><span class="tag">Status</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHETYPE 4 · DARK CLOSE -->
+  <section class="slide slide--dark">
+    <div class="hero-glow" aria-hidden="true" style="right:-20%; opacity:.6;"></div>
+    <div class="title-stack">
+      <p class="eyebrow rise ph">Next step</p>
+      <h2 class="display rise ph" style="max-width:14ch;">Close on the ask.</h2>
+      <p class="lede rise ph">A posture-appropriate CTA — soft for knowledge, concrete for pilot.</p>
+      <span class="close-cta rise ph">Call to action →</span>
+      <div class="rise" style="margin-top:48px;"><a class="brite-logo" href="#"><span class="brite-logo__mark" style="width:30px;height:17px;"></span><span class="brite-logo__wordmark"><span class="brite-logo__brite" style="font-size:22px;">Brite</span><span class="brite-logo__base" style="font-size:26px;">Base</span></span></a></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="skeleton-badge">BriteBase · Intro Deck Skeleton</div>
+<nav class="dots" id="dots" aria-label="Slide navigation"></nav>
+<div class="counter" id="counter">01 / 04</div>
+
+<script>
+  if (new URLSearchParams(location.search).get('static') === '1') document.documentElement.classList.add('static');
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const dotsWrap = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  let current = 0;
+  slides.forEach((_, i) => { const b = document.createElement('button'); b.className = 'dot'; b.setAttribute('aria-label', 'Slide ' + (i + 1)); b.addEventListener('click', (e) => { e.stopPropagation(); go(i); }); dotsWrap.appendChild(b); });
+  const dots = Array.from(dotsWrap.children);
+  function go(n) {
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    slides[current].removeAttribute('data-active'); slides[current].classList.remove('is-active'); dots[current].setAttribute('aria-current', 'false');
+    current = n; const s = slides[current]; s.setAttribute('data-active', '');
+    requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('is-active')));
+    dots[current].setAttribute('aria-current', 'true');
+    counter.textContent = String(current + 1).padStart(2, '0') + ' / ' + String(slides.length).padStart(2, '0');
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(current + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(current - 1); }
+  });
+  document.getElementById('deck').addEventListener('click', () => go(current + 1));
+  const startParam = parseInt(new URLSearchParams(location.search).get('slide'), 10);
+  go(Number.isFinite(startParam) ? startParam - 1 : 0);
+</script>
+</body>
+</html>

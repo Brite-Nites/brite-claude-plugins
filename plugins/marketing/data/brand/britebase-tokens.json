@@ -1,0 +1,41 @@
+{
+  "$comment": "BriteBase brand-token snapshot — the in-repo, hermetic design-system source consumed by the rapid-asset-design deck-template generator (build_deck_template.py) and mirrored by the skill's {brand_tokens} block. SYNCED FROM the BriteBase Design System (claude.ai/design) -> colors_and_type.css. Re-sync via the /design-sync skill (get_file colors_and_type.css) when the DS changes; do not hand-drift this file from the DS.",
+  "schema_version": 1,
+  "design_system": "BriteBase Design System",
+  "entity_default": "brite-nites",
+  "entity_default_note": "All 27 physical-lighting verticals are Brite Nites customers; Brite Labs is a separate entity and is not covered by these deck templates.",
+  "primary": "#ff4d00",
+  "primary_role": "Brite orange — accents, the primary CTA, and the focus ring; not large fills.",
+  "saturation_rule": "orange #ff4d00 is the ONLY saturated color on a light monochrome base",
+  "surfaces": {
+    "background": "#efefef",
+    "card": "#fbfbfa",
+    "ink": "#1f1f1f",
+    "ink_muted": "#464646",
+    "hero_dark": "#0b0b0b"
+  },
+  "surfaces_note": "Light, low-contrast, monochrome base. A dark #0b0b0b hero is an allowed deck-only extension.",
+  "fonts": {
+    "sans": "Geist",
+    "mono": "Geist Mono",
+    "display": "MagdaClean"
+  },
+  "fonts_note": "Geist for body; Geist Mono for eyebrows/labels (uppercase, letter-spaced); MagdaClean for the display 'Base' wordmark. MagdaClean is licensed and ships as fonts/MagdaClean.woff2 — if it can't be embedded, fall back to Geist with MagdaClean's letter-spacing and flag the substitution.",
+  "logo": {
+    "lockup": "brite·base — 'Brite' in Geist 600 + 'Base' in MagdaClean, with the rotated orange-gradient mark",
+    "asset": "assets/logo.svg"
+  },
+  "shape": {
+    "radii": "10-22px",
+    "corners": "superellipse corner-smoothing",
+    "strokes": "1.5px inset (never 1px solid)",
+    "focus": "Linear-style ring (inset brand stroke + outer halo)"
+  },
+  "motif": "the lightbulb mark (assets/bulb.svg, drawn in currentColor) + a soft orange radial glow — Brite is a lighting company, so lean on light/glow for motion, not generic gradients",
+  "posture_voice": {
+    "knowledge": "educational, outcome-focused",
+    "free-asset": "generous, helpful",
+    "pilot": "confident, proof-oriented",
+    "risk-reversal": "reassuring, low-risk"
+  }
+}

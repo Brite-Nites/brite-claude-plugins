@@ -4,7 +4,7 @@ description: Produce client-facing GTM assets — pitch decks, animated intro de
 user-invocable: true
 allowed-tools: Read, Write, Glob, Bash, WebFetch
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   upstream: brite-gtm/docs/resources/gtm-community/extracted (Claude Design walkthroughs)
   category: GTM Asset Production
 ---
@@ -155,6 +155,23 @@ The team's highest-leverage asset: an **animated intro deck** that introduces a 
 2. Claude builds a multi-screen clickable prototype (~4 min) and self-checks via screenshots.
 - **Expected output:** a navigable prototype for client presentations. **Highest token cost** — gate it (see Token-cost gate).
 
+## Per-Vertical Deck Templates (the standard)
+
+For intro/concept decks, don't hand-build a brief per prospect — start from the **per-vertical template**, the standard starting point that's already brand-, persona-, and posture-resolved from the canonicals. A rep fills three blanks (`{prospect}`, `{contact}`, `{angle}`) and generates.
+
+**Two layers (so 27 verticals never drift):**
+
+1. **Visual standard — authored once.** `assets/intro-deck-skeleton.html` is the brand-locked slide skeleton (the four archetypes: dark title → light content-cards → product/program peek → dark close). Publish it into the **BriteBase Design System** via the **`/design-sync`** skill so every Claude Design deck inherits the brand + structure. Reps seed a new project from it.
+2. **Content standard — generated per vertical.** `${CLAUDE_PLUGIN_ROOT}/scripts/build_deck_template.py` resolves a vertical's personas/offers/posture (canonicals) + brand tokens (`data/brand/britebase-tokens.json`) into `data/deck-templates/{vertical}-intro-deck.md` — a rep cheat-sheet + a paste-ready handoff prompt. **Generate, never hand-author** (re-run on any canonical/brand change; `--check` flags drift):
+
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_deck_template.py --vertical <slug>
+   ```
+
+**The rep flow (≈5 min):** open the vertical's `{vertical}-intro-deck.md` → seed a `claude.ai/design` project from the skeleton → paste the prompt with the three blanks filled → tweak the title/photo → export a share link or hand off to Claude Code. **Mixed access:** power-user reps self-serve; the GTM asset team runs it for everyone else (same artifact serves both). The template **enforces the vertical's offer posture** (e.g., municipalities is `knowledge` — educate, don't hard-sell), so reps can't accidentally turn a concept deck into a hard pitch.
+
+Pilot: `municipalities`. Replicate by running the generator for each additional vertical (the handbook's Active set first).
+
 ## Claude Code Handoff & Deploy
 
 The one automatable tail. When the operator wants the asset live:
@@ -227,3 +244,4 @@ Core paths. Tier 1 asserts on free output (no tool calls); Tier 2 requires a fil
 - **`vertical-resolution-reads-canonical`** — Given `vertical: municipalities`, the skill reads `data/canonicals/municipalities.yaml`, surfaces real persona titles (e.g., "Director of Parks & Recreation") and a real offer posture (`knowledge`) from the file, and echoes them for confirmation before generating — values sourced from the file, not invented.
 - **`deploy-requires-confirmation`** — Given a cleaned-up asset and "deploy it", the skill routes to the deploy handoff (`vercel:deploy` if installed, else `workflows:deployment-checklist`) **only after** an explicit operator confirmation; absent confirmation, it stops at the cleanup step and does not deploy.
 - **`brand-tokens-resolved-not-invented`** — Given a `brite-brand-hub` checkout (or design-system access), the skill resolves tokens from `colors_and_type.css` — real values (`--brite-primary: #ff4d00`, Geist/MagdaClean, the brite·base lockup) — rather than inventing a palette, and routes the live read to `/design-sync`. With neither source reachable it degrades **explicitly** (recommends `ui-ux-pro-max`, flags neutral styling) and fabricates no brand colors.
+- **`deck-template-generated-and-posture-locked`** — Given "I need a concept deck for a municipalities prospect", the skill starts from the **generated** `data/deck-templates/municipalities-intro-deck.md` (built by `build_deck_template.py` from the canonical) — carrying the real muni personas + the `knowledge` posture guardrail, with only `{prospect}`/`{contact}`/`{angle}` left to fill — rather than hand-authoring a per-prospect brief or inventing personas. The generator hard-fails on an unknown slug.

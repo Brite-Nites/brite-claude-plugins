@@ -105,3 +105,15 @@ The skill resolves the target vertical against the canonicals and injects the re
 - Bump `plugins/marketing/.claude-plugin/plugin.json` **and** the `.claude-plugin/marketplace.json` marketing entry in the same commit.
 - `scripts/validate.sh` green (frontmatter, step-sequence lint — use `Step Nb` not `Step N.M`; no hallucinated MCP names; `${CLAUDE_PLUGIN_ROOT}`/`${CLAUDE_SKILL_DIR}` paths).
 - No command ⇒ no emit-mode/eval gate. Skill ships Tier 1/2 behavioral tests per house style.
+
+## 9. Extension — BriteBase Design System wiring + per-vertical deck templates (added 2026-06-19)
+
+The original design treated brand palette/fonts/logo as "lives in brite-gtm, degrade gracefully" (§5, R4) because the design system wasn't reachable from this repo. It now is: the **BriteBase Design System** is a live `claude.ai/design` project (readable via the `/design-sync` skill) mirrored by the `brite-brand-hub` repo's `colors_and_type.css`. Two extensions landed on this branch:
+
+**9.1 Brand-token resolution (skill).** Added a **Resolve Brand Tokens** step (ordered sources: live DS via `/design-sync` → `brite-brand-hub` checkout → operator paste → explicit degrade) + a reusable `{brand_tokens}` block embedded in Flow A and the Handoff Prompt. Routes the live read to `/design-sync` rather than declaring the design-system tool (R1's "route, don't declare"). Flow A retargeted to the **animated intro deck**. Brand snapshot committed at `plugins/marketing/data/brand/britebase-tokens.json` (synced from `colors_and_type.css`).
+
+**9.2 Per-vertical deck templates — reversing §7's "out of scope" deferral.** §7 deferred per-vertical template *files*; this builds them as the GTM-asset-team standard, **generated, not hand-authored** (the canonicals are the per-vertical truth and they change — 27 hand-made copies would rot). Two layers:
+- **Visual standard (once):** `skills/rapid-asset-design/assets/intro-deck-skeleton.html` — the brand-locked 4-archetype slide skeleton, published into the BriteBase DS via `/design-sync`; reps seed projects from it.
+- **Content standard (generated):** `scripts/build_deck_template.py` (deterministic, stdlib-only, `--check` drift mode; mirrors the `build_*.py` + `test_*.sh` house pattern) resolves canonical personas/offers/posture + brand tokens → `data/deck-templates/{vertical}-intro-deck.md` (rep cheat-sheet + paste-ready prompt, three blanks `{prospect}`/`{contact}`/`{angle}`, posture guardrail). Pilot: `municipalities`.
+
+**Decisions (this session):** form = generated prompts + 1 DS skeleton; access = mixed (power reps self-serve, asset team runs for the rest); coverage = municipalities pilot → replicate (Active set first); landing = extend PR #483 (folded in rather than a new ticket). Self-test `test_build_deck_template.sh` wired into `validate.sh` (§15a-bc-12975). The generator structurally never reads the ICP layer, so `seed_accounts`/`exclusions` cannot leak into a client-facing template. Marketing `0.14.0 → 0.14.2`.
