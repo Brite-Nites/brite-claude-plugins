@@ -1,10 +1,10 @@
 ---
 name: rapid-asset-design
-description: Produce client-facing GTM assets — pitch decks, campaign landing pages, animated demos, and clickable mobile prototypes — fast, via the hosted Claude Design product (claude.ai/design), then hand off to Claude Code for cleanup and deploy. Triggers on pitch deck, proposal deck, landing page, campaign page, animated demo, interactive visual, mobile prototype, clickable prototype, Claude Design, rapid asset, GTM asset, asset turnaround. NOT for coding a UI from scratch (use frontend-design) or design-system / palette / font planning (use ui-ux-pro-max). Sourced from the brite-gtm GTM-community Claude Design walkthroughs.
+description: Produce client-facing GTM assets — pitch decks, animated intro decks, campaign landing pages, animated demos, and clickable mobile prototypes — fast, via the hosted Claude Design product (claude.ai/design), each aligned to the BriteBase Design System, then hand off to Claude Code for cleanup and deploy. Triggers on pitch deck, intro deck, animated intro deck, proposal deck, landing page, campaign page, animated demo, interactive visual, mobile prototype, clickable prototype, Claude Design, rapid asset, GTM asset, asset turnaround, on-brand deck, BriteBase design system. NOT for coding a UI from scratch (use frontend-design) or planning a NEW design system / palette / fonts from zero (use ui-ux-pro-max). Sourced from the brite-gtm GTM-community Claude Design walkthroughs.
 user-invocable: true
 allowed-tools: Read, Write, Glob, Bash, WebFetch
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   upstream: brite-gtm/docs/resources/gtm-community/extracted (Claude Design walkthroughs)
   category: GTM Asset Production
 ---
@@ -35,11 +35,33 @@ Vertical-aware brief-shaping is the core value of this skill — it makes assets
 
 This skill **reads** the canonicals — it does not re-implement the resolver, mutate canonicals, or add new data files.
 
+## Resolve Brand Tokens
+
+Vertical-aware *copy* is half the job; **on-brand visuals** are the other half. Brite has a real, machine-readable design system — the **BriteBase Design System** — so an asset should never start from a generic "clean, modern" guess when the actual tokens are one read away. Resolve them once, alongside the vertical, and feed them into every brief.
+
+**Sources, in order — use the first that's reachable:**
+
+1. **Live design system (preferred)** — the **BriteBase Design System** project on `claude.ai/design`. Route the read to the **`/design-sync`** skill (which owns the design-system tool): ask the operator to run `/design-sync` and pull `colors_and_type.css` (plus `assets/logo.svg`, `fonts/`). This skill does **not** declare or call the design-system tool itself — route, don't declare, the same posture as the deploy tail.
+2. **Local brand-hub checkout** — if a sibling **`brite-brand-hub`** repo is checked out, read its `colors_and_type.css` / Tailwind token config directly with `Read`/`Glob` (no network, no design-system scopes needed).
+3. **Operator-supplied** — a paste of the palette / fonts / logo.
+4. **Degrade (explicit)** — none reachable → say so, recommend `ui-ux-pro-max` to generate a direction, and proceed with neutral styling the operator tunes via the tweaks panel. Never silently invent brand colors.
+
+**Extract a reusable `{brand_tokens}` block** (current BriteBase values below — re-read the source; don't trust this snapshot if it has drifted):
+
+- **Brand primary:** `#ff4d00` (Brite orange) — accents, the primary CTA, and the focus ring; not large fills.
+- **Surfaces:** background `#efefef`, card `#fbfbfa`, ink `#1f1f1f`/`#464646` — a light, low-contrast, monochrome base with orange as the *only* saturated color. (A dark `#0b0b0b` hero is an allowed deck-only extension.)
+- **Type:** Geist (sans), Geist Mono (eyebrows / labels — uppercase, letter-spaced), MagdaClean (the display "Base" wordmark). Tight negative letter-spacing on headings.
+- **Logo:** the brite·base lockup — "Brite" in Geist 600 + "Base" in MagdaClean, with the rotated orange-gradient mark (`assets/logo.svg`).
+- **Shape & depth:** 10–22px radii, superellipse corner-smoothing, 1.5px **inset** strokes (never `1px solid`), soft layered shadows, a Linear-style focus ring (inset brand stroke + outer halo).
+- **Motif:** the lightbulb mark (`assets/bulb.svg`, drawn in `currentColor`) and a soft orange radial glow — Brite is a lighting company, so lean on light/glow for motion, not generic gradients.
+
+**`MagdaClean` is a licensed font shipped with the design system** — if you can't embed `fonts/MagdaClean.woff2` in an export, fall back to Geist with MagdaClean's letter-spacing and **flag the substitution** (degradation is explicit, never silent).
+
 ## Methodology — the asset-production loop
 
 A single repeatable loop underlies every asset type:
 
-1. **Brief** — assemble the Claude Design brief from: asset type, the resolved vertical (persona titles + offer + posture), entity voice, and any palette/font direction.
+1. **Brief** — assemble the Claude Design brief from: asset type, the resolved vertical (persona titles + offer + posture), entity voice, and the resolved `{brand_tokens}` (see **Resolve Brand Tokens**).
 2. **Copy-first** — for text-heavy assets (decks, landing pages), draft and finalize the copy in a normal Claude chat *before* opening Claude Design. Hand off `content-strategy` / `email-copywriting` when the copy itself needs work.
 3. **Generate** — open `claude.ai/design`, choose **high-fidelity** (skip wireframe), paste the brief, answer its clarifying questions specifically.
 4. **Edit** — use the right tool for the change: **tweaks panel** (palette/density/motion, no prompt), **edit mode** (single element, no tokens), **comments** (batch multiple changes into one pass).
@@ -58,10 +80,10 @@ The skill expects, but does not require, these brand inputs. Missing inputs degr
 |---|---|---|
 | Voice / tone | `docs/marketing-context.md` | Warn; ask inline or proceed neutral |
 | Entity (Nites / Labs) | marketing-context.md / operator | Ask via AskUserQuestion; never default, never Supply |
-| Palette / fonts / logo | operator-supplied or a brite-gtm pointer | Note the dependency; recommend `ui-ux-pro-max` to generate a direction |
+| Palette / fonts / logo | **BriteBase Design System** (live via `/design-sync`) or a `brite-brand-hub` checkout — see **Resolve Brand Tokens** | Operator paste; else recommend `ui-ux-pro-max` and proceed neutral (flagged) |
 | Vertical positioning | resolved in **Resolve Target Vertical** | Generic positioning + hypothesis-framing |
 
-> Brite's design-system / brand-hub lives in the **brite-gtm** repo, not here. This skill documents the contract and degrades gracefully; wiring the actual brand-hub is a separate future ticket.
+> Brite's design system is the **BriteBase Design System** — a live `claude.ai/design` project (read it through the `/design-sync` skill) mirrored by the **`brite-brand-hub`** repo's `colors_and_type.css`. Resolve real tokens via **Resolve Brand Tokens**; degrade to neutral only when neither source is reachable, and say so.
 
 ### Token-cost gate
 
@@ -71,7 +93,8 @@ Claude Design burns tokens fast — a few prototype screens or an animated deck 
 
 | Need | Route to |
 |---|---|
-| Design system / palette / font direction *before* generating | `ui-ux-pro-max` |
+| Pull live brand tokens from the **BriteBase Design System** | `/design-sync` (owns the design-system read tool) |
+| Plan a **new** design system / palette / font direction from zero | `ui-ux-pro-max` |
 | Real code polish beyond cleanup | `frontend-design` |
 | Accessibility / UX audit of a deployed page | `web-design-guidelines` |
 | Slide or landing copy needs drafting | `content-strategy` / `email-copywriting` |
@@ -81,14 +104,14 @@ This skill **owns** the brief-framing, vertical injection, asset-type routing, t
 
 ## Claude Design Handoff Prompt (copy-paste)
 
-The tangible output of the brief-framing step: a single prompt the operator pastes into a new `claude.ai/design` project. It **pre-answers the clarifying questions Claude Design asks** (visual style, audience, sections, interactivity, tweakability) using the resolved vertical + entity, so the first draft lands close. Fill the `{placeholders}` from **Resolve Target Vertical** and the brand-interface contract; drop a line if its input degraded (state the gap, never fake it).
+The tangible output of the brief-framing step: a single prompt the operator pastes into a new `claude.ai/design` project. It **pre-answers the clarifying questions Claude Design asks** (visual style, audience, sections, interactivity, tweakability) using the resolved vertical + entity + brand tokens, so the first draft lands close *and on-brand*. Fill the `{placeholders}` from **Resolve Target Vertical**, **Resolve Brand Tokens**, and the brand-interface contract; drop a line if its input degraded (state the gap, never fake it).
 
 ```
 Build a {asset_type} for {entity} ({entity_voice} voice).
 
 Audience: {persona_titles} — decision-makers in the {vertical} vertical.
 What it sells + how: {offer_display}. Stance = {posture} (knowledge / free-asset / pilot / risk-reversal) — keep the tone and CTA true to that posture, not a hard sell unless posture says so.
-Visual style: {palette_or_font_direction — or "you choose a clean, modern direction; I'll tune the palette after"}.
+Brand tokens (use exactly): {brand_tokens — BriteBase: orange #ff4d00 as the only saturated color on a light #efefef / #fbfbfa monochrome base; Geist + Geist Mono + MagdaClean type; the brite·base lockup; 1.5px inset strokes (never 1px solid); Linear-style focus ring; lightbulb + soft orange-glow motif}. If a token degraded, say so here — never fake brand colors.
 Sections: {asset_type_sections}.
 Interactivity: {interactivity_level}.  Tweakable: {what_should_be_tweakable}.
 
@@ -101,15 +124,16 @@ Each flow below adds its own **opener** on top of this prompt (e.g., Flow A past
 
 Four flows. Each consumes the resolved vertical (persona titles + offer + posture) and the Handoff Prompt above in its brief.
 
-### Flow A — Pitch deck (animated-video-first trick)
+### Flow A — Animated intro / pitch deck (video-first, brand-aligned)
 
-Static decks built straight from copy look flat. Build an **animated video first, then convert it to a deck** — same effort, far more engaging.
+The team's highest-leverage asset: an **animated intro deck** that introduces a product, offer, or the company. Static decks built straight from copy look flat — build an **animated video first, then convert it to a deck** (same effort, far more engaging) and bind it to the BriteBase tokens from the first prompt.
 
-1. Draft and finalize the slide copy in a normal Claude chat (apply offer posture + persona language from the resolved vertical).
-2. In Claude Design, paste the copy and say: **"Make an animated video based on this content."** (Do *not* say "make a slide deck" yet.)
-3. Once the video looks right, **duplicate the project** (Share → Duplicate), then prompt: **"Convert this video into an animated slide deck that I can manually toggle through."**
-4. Apply the 90/10 manual edits; use the tweaks panel to match the brand palette.
-- **Expected output:** an animated, navigable deck. Export to PowerPoint only if the client must edit it themselves (animations won't carry; layout + content will).
+1. Draft and finalize the slide copy in a normal Claude chat (apply offer posture + persona language from the resolved vertical). One idea per slide.
+2. In Claude Design, paste the copy **and the `{brand_tokens}` block**, then say: **"Make an animated video based on this content. Use these brand tokens exactly — orange `#ff4d00` as the only saturated color on a light monochrome base, Geist + Geist Mono + MagdaClean type, the brite·base lockup, 1.5px inset strokes, Linear-style focus. Motion: a slow orange radial glow and the lightbulb motif — not generic gradients."** (Do *not* say "make a slide deck" yet.)
+3. Once the video looks right, **duplicate the project** (Share → Duplicate), then prompt: **"Convert this video into an animated slide deck I can manually toggle through — one idea per slide, with a staggered entrance on each."**
+4. Apply the 90/10 manual edits; use the tweaks panel to lock the palette to `#ff4d00` + neutrals and kill any default AI-deck font.
+- **On-brand intro-deck shape** (what "good" looks like): a dark `#0b0b0b` title slide with the lockup + an animated orange glow → light `#efefef` content slides (eyebrow + tight display + one supporting line; cards with 1.5px inset strokes) → an optional product-shell peek (220px sidebar + rounded canvas, orange-dot active nav) → a dark orange-glow close with the primary CTA. Keyboard-navigable, per-slide staggered rise, `prefers-reduced-motion` respected.
+- **Expected output:** an animated, navigable, on-brand deck. Export to PowerPoint only if the client must edit it themselves (animations won't carry; layout + content will).
 
 ### Flow B — Campaign landing page (from screenshot or URL)
 
@@ -144,9 +168,9 @@ The one automatable tail. When the operator wants the asset live:
 
 Run before sharing any asset with a client. Each item is pass/fail:
 
-- [ ] Palette matches the brand (or the `ui-ux-pro-max` direction) — adjusted via the tweaks panel.
-- [ ] Typography is on-brand; no default AI-deck fonts left in.
-- [ ] Logo usage is correct (or flagged as a known gap when brand assets are absent).
+- [ ] Palette matches the resolved `{brand_tokens}` — `#ff4d00` is the only saturated color on the neutral base; adjusted via the tweaks panel.
+- [ ] Typography is Geist / Geist Mono / MagdaClean; no default AI-deck fonts left in (any MagdaClean substitution is flagged).
+- [ ] The brite·base lockup is correct (real `assets/logo.svg`, orange-gradient mark) — or flagged as a known gap when tokens degraded.
 - [ ] Voice matches `marketing-context.md` / the confirmed entity (Nites vs Labs).
 - [ ] **Positioning matches the resolved offer posture** — a `knowledge` offer must not read like a hard `pilot` pitch, etc.
 - [ ] Vertical-appropriate: persona titles, segment language, and exclusions respected; no Supply positioning.
@@ -157,7 +181,7 @@ Run before sharing any asset with a client. Each item is pass/fail:
 
 | Use case | Asset | Claude Design mode | Token-cost tier |
 |---|---|---|---|
-| Sales pitch / proposal | **Pitch deck** (Flow A) | Slide deck via animated video | Medium — **highest-leverage** |
+| Product / company / offer intro, sales pitch | **Animated intro / pitch deck** (Flow A) | Slide deck via animated video | Medium — **highest-leverage** |
 | New service / offer page, A/B directions | **Campaign landing page** (Flow B) | Landing from screenshot/URL | Low–Medium — **highest-leverage** |
 | Sales-call embed, launch content | Animated demo / visual (Flow C) | Interactive visual | Medium |
 | Client presentation of a product idea | Clickable mobile prototype (Flow D) | High-fidelity prototype | **High — gate first** |
@@ -176,6 +200,7 @@ Pitch decks and campaign landing pages are the highest-leverage asset types for 
 Non-negotiable:
 
 - **No generic AI-deck aesthetics** — cookie-cutter heading-plus-bullets decks fail the rubric. Use Flow A's video-first trick.
+- **Resolve real tokens before guessing** — when the BriteBase Design System or a `brite-brand-hub` checkout is reachable, the brief uses its real tokens (`#ff4d00`, Geist/MagdaClean, the brite·base lockup). "You choose a clean, modern direction" is a *degraded* fallback, stated as such — never the default when the system is one read away.
 - **Token-cost gate is mandatory** — do not reach for Claude Design when a doc or existing template would do; state the cost before multi-screen prototypes / animated decks.
 - **No fabricated data** — never invent stats, logos, customer names, or case studies on an asset. Every claim traces to a real source.
 - **Degradation is explicit, never silent** — a missing brand input (palette, logo, voice, context doc) is stated to the operator and flagged on the asset; it is never faked.
@@ -190,13 +215,15 @@ Core paths. Tier 1 asserts on free output (no tool calls); Tier 2 requires a fil
 ### Tier 1 — Free assertions (no tool calls needed)
 
 - **`routing-pitch-deck`** — Given "I need a pitch deck for a municipalities proposal", the skill routes to **Flow A** (deck via animated-video trick), not a direct "make a slide deck" prompt, and the brief includes municipalities persona titles + an offer posture resolved from the canonical.
+- **`intro-deck-on-brand`** — Given "make an animated intro deck for BriteBase", the skill routes to **Flow A**, uses the video-first trick (not "make a slide deck"), and the brief embeds the `{brand_tokens}` block (`#ff4d00` as the only saturated color, Geist/Geist Mono/MagdaClean, the brite·base lockup) plus the dark-hero → light-content → dark-close shape with orange-glow/lightbulb motion.
 - **`marketing-context-absent-graceful`** — Given `docs/marketing-context.md` does not exist, the skill emits the "Marketing context doc not found" warning, asks for the entity via AskUserQuestion, and **continues** (does not halt). No entity is silently defaulted.
 - **`unknown-vertical-hard-fail`** — Given a vertical slug not in `data/canonicals/_manifest.yaml` `verticals[]` (e.g., `food-trucks`), the skill **hard-fails**, names the invalid slug, and lists the valid 27-vertical set. It does not proceed to generate with an invented vertical.
 - **`supply-entity-refused`** — Given a request positioning the asset for a Supply-side audience (e.g., professional installers / property management), the skill refuses the Supply framing and restates Nites/Labs-only canon.
 - **`token-cost-gate-stated`** — Given a request for a multi-screen clickable mobile prototype, the skill states the token-cost reality and confirms the visual output is the point before proceeding.
-- **`handoff-prompt-preanswers-and-excludes-internal`** — Given a resolved vertical, the emitted Claude Design Handoff Prompt fills audience (persona titles), offer + posture, visual style, sections, and interactivity (Claude Design's clarifying questions), and contains **no** `seed_accounts` or exclusion content; it carries the no-fabrication + client-facing rules inline.
+- **`handoff-prompt-preanswers-and-excludes-internal`** — Given a resolved vertical, the emitted Claude Design Handoff Prompt fills audience (persona titles), offer + posture, the `{brand_tokens}` block, sections, and interactivity (Claude Design's clarifying questions), and contains **no** `seed_accounts` or exclusion content; it carries the no-fabrication + client-facing rules inline.
 
 ### Tier 2 — Tool-assisted (requires file read or skill routing)
 
 - **`vertical-resolution-reads-canonical`** — Given `vertical: municipalities`, the skill reads `data/canonicals/municipalities.yaml`, surfaces real persona titles (e.g., "Director of Parks & Recreation") and a real offer posture (`knowledge`) from the file, and echoes them for confirmation before generating — values sourced from the file, not invented.
 - **`deploy-requires-confirmation`** — Given a cleaned-up asset and "deploy it", the skill routes to the deploy handoff (`vercel:deploy` if installed, else `workflows:deployment-checklist`) **only after** an explicit operator confirmation; absent confirmation, it stops at the cleanup step and does not deploy.
+- **`brand-tokens-resolved-not-invented`** — Given a `brite-brand-hub` checkout (or design-system access), the skill resolves tokens from `colors_and_type.css` — real values (`--brite-primary: #ff4d00`, Geist/MagdaClean, the brite·base lockup) — rather than inventing a palette, and routes the live read to `/design-sync`. With neither source reachable it degrades **explicitly** (recommends `ui-ux-pro-max`, flags neutral styling) and fabricates no brand colors.
