@@ -1,0 +1,38 @@
+name: 'FDA CI Audit'
+description: >-
+  Deterministic Flow-Driven-Architecture doc audit for consumer-repo CI (BC-12303,
+  layer-3 continuous enforcement). Blocks off-canon FDA docs at PR time: frontmatter
+  schema (config-gated story + journey), story-frame (config-gated), and body
+  link-resolution. Reuses the canonical flow-architecture lint as the single source
+  of truth — no per-repo copies. Fails the job (exit 1) on any violation.
+inputs:
+  repo-path:
+    description: 'Path to the consumer repo checkout root (where docs/product/flows lives).'
+    required: false
+    default: '.'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run deterministic FDA audit
+      shell: bash
+      # Route the ${{ }} expressions through env (NOT direct interpolation into the
+      # run-string) so an untrusted repo-path can't break shell quoting / inject —
+      # per GitHub's script-injection hardening guidance.
+      env:
+        REPO_PATH: ${{ inputs.repo-path }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        command -v python3 >/dev/null 2>&1 || { echo "::error::python3 is required to run the FDA CI audit"; exit 1; }
+        runner="$ACTION_PATH/../../../plugins/flow-architecture/scripts/run_fda_ci_audit.py"
+        set +e
+        python3 "$runner" "$REPO_PATH"
+        rc=$?
+        set -e
+        # Exit-code contract: 0 pass · 1 violation (block) · 2 not-an-FDA-repo / usage.
+        # Treat 2 as a clean SKIP (a repo without docs/product/flows, or a path typo)
+        # so adopting the action early never falsely blocks a non-FDA repo's PR.
+        if [ "$rc" = "2" ]; then
+          echo "::notice::FDA CI audit skipped — '$REPO_PATH' is not an FDA repo (no docs/product/flows) or the path is misconfigured."
+          exit 0
+        fi
+        exit "$rc"
