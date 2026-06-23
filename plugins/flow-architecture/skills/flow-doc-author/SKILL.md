@@ -53,6 +53,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_story_frontmatter.py \
 
 **Why `personas`/`related_flows` are skill-derived params, not builder inventory reads.** The consumer `master-flow-inventory.md` schema is not standardized across repos and usually carries no personas/related_flows column, so the builder cannot source them deterministically --- it does **not** parse the inventory at all. The skill derives them (from the inventory row when a persona column is present, else the parent journey / `docs/product/personas/` / interview `partial_state`, per BC-13028's "pass personas via `partial_state`") and passes them through; absent → the builder stamps an honest empty `[]`, never a silent placeholder. The lock is `tests/run-story-frontmatter-vslice.sh` (ADR-028 D2-style golden + populated-key assertions).
 
+**Redirect stubs (alias sub-flows).** When a sub-flow is an intentional **alias** --- its canonical story lives at another `flow_id` (commonly another domain in the same repo, e.g. `SFI-05` → `ACL-06`) --- stamp a redirect stub instead of a story doc and author **no body**:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_story_frontmatter.py \
+  --flow-id <DOMAIN-NN> --doc-type redirect --redirect-to <canonical-DOMAIN-NN> --as-of <today>
+```
+
+This emits the 6-key `REDIRECT_CANON` front-matter (no `--scaffold-log`, no body); the audit validates it as a redirect (resolvable pointer + strict-gated front-matter) and skips the story-frame / AC / children gates. Use this only for an alias you or the orchestrator have already identified --- the skill does **not** auto-detect which flows are aliases. Full convention in `docs/decisions/037-fda-redirect-stub-convention.md` (ADR-037).
+
 ### Agent-authored body (body-only contract)
 
 One `Agent(story-doc-author, run_in_background: true)` per sub-flow authors the **body only** --- the H1 title `# <DOMAIN-NN>: <Inventory title>`, the doc-type-warning blockquote, and the narrative sections below --- and returns it as markdown. The skill prepends the builder-stamped frontmatter and writes the file. The agent **never emits frontmatter**: it is filesystem-only with no Linear/scaffold-log access, so it cannot know `children: [BC-…]` --- that contradiction was the proximate cause of the empties. Each agent fills:
