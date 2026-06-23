@@ -228,7 +228,7 @@ def build_frontmatter(scaffold_log: Path, flows_dir: Path, as_of: str) -> str:
         "status: in-progress",
         "figma: TBD",
         "intent: ../intent.md",
-        f"last_reviewed: {as_of}",
+        f"last_reviewed: '{as_of}'",  # quote: an unquoted ISO date is YAML-coerced to a date (BC-13796)
         "---",
     ]
     return "\n".join(lines) + "\n"

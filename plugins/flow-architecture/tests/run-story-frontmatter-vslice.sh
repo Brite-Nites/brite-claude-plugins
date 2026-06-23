@@ -250,6 +250,20 @@ python3 "$BUILDER" --flow-id SFI-05 --as-of "$AS_OF" >/dev/null 2>&1 \
   && fail "story without --scaffold-log should exit 2" \
   || pass "story without --scaffold-log → exit 2"
 
+# ── §13: last_reviewed is YAML-quoted (BC-13796) ──────────────────────
+# Stdlib-only proxy for "yaml.safe_load(...)['last_reviewed'] is str": for an ISO
+# YYYY-MM-DD, quoted ⟺ string, unquoted ⟺ YAML coerces it to a date. Locks the value
+# type-consistent with consumer repos (which quote it); the line-based lint is blind to
+# this, so assert the emitted FORM here.
+section "13" "last_reviewed emitted quoted (no YAML date-coercion)"
+for out in "$TMP/WGT-01.out" "$TMP/redirect.out"; do
+  if grep -qE "^last_reviewed: '[0-9]{4}-[0-9]{2}-[0-9]{2}'\$" "$out"; then
+    pass "$(basename "$out"): last_reviewed is quoted"
+  else
+    fail "$(basename "$out"): last_reviewed NOT quoted — YAML would coerce to a date: $(grep '^last_reviewed:' "$out")"
+  fi
+done
+
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

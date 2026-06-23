@@ -229,5 +229,15 @@ else
   fail "output differs across runs (non-determinism)"
 fi
 
+# last_reviewed is YAML-quoted (BC-13796): stdlib-only proxy for "parses as str" —
+# for an ISO YYYY-MM-DD, quoted ⟺ string, unquoted ⟺ YAML date-coercion. Keeps the
+# value type-consistent with consumer repos (which quote it).
+section "9" "last_reviewed emitted quoted (no YAML date-coercion)"
+if grep -qE "^last_reviewed: '[0-9]{4}-[0-9]{2}-[0-9]{2}'\$" "$TMP/happy.out"; then
+  pass "journey last_reviewed is quoted"
+else
+  fail "journey last_reviewed NOT quoted — YAML would coerce to a date: $(grep '^last_reviewed:' "$TMP/happy.out")"
+fi
+
 printf '\nRESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
