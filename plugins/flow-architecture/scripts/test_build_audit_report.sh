@@ -68,6 +68,45 @@ DECOY = "# T\n\n> no frame here.\n\n## Acceptance\n\nScenario: s\n  When the use
 truthy("region-scoped: Gherkin 'When' below ## Acceptance does not satisfy the frame",
        not bar._story_frame_present(DECOY, "lenient"))
 
+# ── 2b. marker-form brittleness (BC-13751): core keyword INSIDE a bold span ────
+# The predicate matches a marker's keyword inside a bold span, not only as the exact
+# `**keyword**` span — so phrase-bolded / "to"-less near-misses that ARE valid frames
+# stop being false-negatives. The bold REQUIREMENT is unchanged (unbolded prose never
+# passes); keywords are word-boundaried (no "must" in "mustard", no "I want" in "I wanted").
+PHRASE_MUST = ("# T\n\n> **Given** a req, **the system MUST** serve, **so that** crawlable.\n\n"
+               "## Acceptance\n")
+truthy("phrase-bolded **the system MUST** accepted under lenient (was a false-negative)",
+       bar._story_frame_present(PHRASE_MUST, "lenient"))
+truthy("phrase-bolded constraint still REJECTED under strict (mode guard intact)",
+       not bar._story_frame_present(PHRASE_MUST, "strict"))
+IWANT_NO_TO = "# T\n\n> **When** x, **I want** y, **so I can** z.\n\n## Acceptance\n"
+truthy("human **I want** (no 'to') accepted under lenient",
+       bar._story_frame_present(IWANT_NO_TO, "lenient"))
+truthy("human **I want** (no 'to') is strict-ready (passes strict)",
+       bar._story_frame_present(IWANT_NO_TO, "strict"))
+# Negative controls — the loosening must NOT widen any of these:
+UNBOLDED = ("# T\n\n> Given a crawler requests the page, the system MUST serve a sitemap, "
+            "so that pages rank.\n\n## Acceptance\n")
+truthy("UNBOLDED prose constraint still rejected (bold requirement intact)",
+       not bar._story_frame_present(UNBOLDED, "lenient"))
+SO_TRUNC = "# T\n\n> **When** x, **I want to** y, **so** z.\n\n## Acceptance\n"
+truthy("**so** (not 'so I can') still rejected (deferred to brite-base epic)",
+       not bar._story_frame_present(SO_TRUNC, "lenient"))
+MUSTARD = ("# T\n\n> **Given** a req, **mustard glaze** is applied, **so that** it works.\n\n"
+           "## Acceptance\n")
+truthy("word-boundary: 'must' in **mustard** does NOT satisfy the MUST marker",
+       not bar._story_frame_present(MUSTARD, "lenient"))
+IWANTED = "# T\n\n> **When** x, **I wanted to** y, **so I can** z.\n\n## Acceptance\n"
+truthy("word-boundary: 'I want' in **I wanted to** does NOT satisfy the want marker",
+       not bar._story_frame_present(IWANTED, "lenient"))
+# GAP control (the real brite-labs false-positive): two UNRELATED bold spans with
+# unbolded Given/MUST/so-that prose BETWEEN them must NOT read as one bold span. The
+# closing `**` of span A + the opening `**` of span B must never pair across the gap.
+GAP = ("# T\n\n> **Doc type:** Constraint spec. Given a req, the system MUST serve, "
+       "so that crawlable. Beneficiary: **[Persona](p.md)**\n\n## Acceptance\n")
+truthy("UNBOLDED markers between two bold spans do not satisfy the frame (gap is not a span)",
+       not bar._story_frame_present(GAP, "lenient"))
+
 # ── 3. config story_frame mode reader (fail-safe lenient) ─────────────────────
 def cfgmode(val):
     box = tempfile.mkdtemp()
