@@ -208,6 +208,32 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-ci — flow-architecture FDA CI-audit runner vslice (BC-12303)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-fda-ci-audit-vslice.sh — asserts the
+# deterministic CI-audit runner (scripts/run_fda_ci_audit.py) blocks off-canon FDA
+# docs at PR time: clean canon → exit 0; frontmatter_schema/story_frame strict
+# violations + broken body .md links → exit 1; config-gating + negative controls.
+# The runner reuses build_audit_report.py's canonical Phase-B predicates (single
+# source) + journey lint + link-resolution; it is what the brite-claude-plugins
+# composite action invokes from consumer-repo CI (layer-3 continuous enforcement).
+section "2b-ci. flow-architecture FDA CI-audit runner vslice (BC-12303)"
+
+fda_ci_test="$REPO_ROOT/plugins/flow-architecture/tests/run-fda-ci-audit-vslice.sh"
+
+if [ ! -f "$fda_ci_test" ]; then
+  warn "plugins/flow-architecture/tests/run-fda-ci-audit-vslice.sh not found — skipped"
+else
+  if fda_ci_out=$(bash "$fda_ci_test" 2>&1); then
+    fda_ci_pass_count=$(printf '%s\n' "$fda_ci_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture FDA CI-audit runner vslice (${fda_ci_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture FDA CI-audit runner vslice failed — run plugins/flow-architecture/tests/run-fda-ci-audit-vslice.sh for details"
+    printf '%s\n' "$fda_ci_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b''' — flow-architecture built-criterion fixture vslice (BC-10730)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-built-criterion-fixture-vslice.sh —
