@@ -113,7 +113,7 @@ def audit(repo: Path) -> list:
                 # redirect front-matter); the story-frame + populated gates are skipped.
                 # Body link-resolution below still applies (the alias must link a real doc).
                 rt = bar._yaml_scalar_text(text, "redirect_to")
-                if not bar._redirect_to_resolvable(repo, rt):
+                if not bar._redirect_to_resolvable(repo, rt, doc.stem):
                     failures.append({"gate": "redirect-target", "scope": scope,
                                      "detail": "redirect_to=" + (rt.strip() or "∅") + " does not resolve"})
                 if fm_mode == "strict":

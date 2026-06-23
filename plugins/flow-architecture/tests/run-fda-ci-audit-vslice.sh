@@ -225,6 +225,19 @@ if [ "$RC" = "1" ] && printf '%s' "$OUT" | grep -qi 'redirect-target'; then
 else
   fail "dangling redirect not caught: exit $RC; OUT: $OUT"
 fi
+# self-pointer: redirect_to == the doc's own flow_id (a no-op loop) → exit 1 (BC-12907 review-fix)
+python3 - "$ALIAS" <<'PY'
+import os, re, sys
+p = sys.argv[1]; fid = os.path.splitext(os.path.basename(p))[0]
+s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: %s' % fid, s, count=1, flags=re.M))
+PY
+run_audit "$FR"
+if [ "$RC" = "1" ] && printf '%s' "$OUT" | grep -qi 'redirect-target'; then
+  pass "self-pointer redirect_to (== own flow_id) → exit 1 + names redirect-target"
+else
+  fail "self-pointer redirect not caught: exit $RC; OUT: $OUT"
+fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%s\n' '------------------------------------------'

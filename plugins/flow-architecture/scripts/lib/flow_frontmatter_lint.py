@@ -259,8 +259,8 @@ def lint_doc(path, doc_type):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[0] not in ("--type",) or argv[1] not in ("story", "journey"):
-        sys.stderr.write("usage: flow_frontmatter_lint.py --type {story|journey} <doc> [<doc> ...]\n")
+    if len(argv) < 2 or argv[0] not in ("--type",) or argv[1] not in ("story", "journey", "redirect"):
+        sys.stderr.write("usage: flow_frontmatter_lint.py --type {story|journey|redirect} <doc> [<doc> ...]\n")
         return 2
     doc_type = argv[1]
     docs = argv[2:]

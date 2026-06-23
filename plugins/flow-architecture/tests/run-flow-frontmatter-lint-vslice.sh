@@ -320,6 +320,18 @@ if [ "$RE_M" = "0" ] && lint_bucket "$REXTRA" redirect unknown | grep -q 'status
 else
   fail "redirect story-only extra handled wrong (missing=$RE_M)"
 fi
+# CLI parity (BC-12907 review-fix): the runner + python main() accept --type redirect
+# (the library supported it; the CLI guards were out of sync until this fix).
+if bash "$RUNNER" --type redirect "$RVALID" >/dev/null 2>&1; then
+  pass "runner --type redirect: valid stub → exit 0"
+else
+  fail "runner rejected --type redirect on a valid stub"
+fi
+if bash "$RUNNER" --type redirect "$RMISS" >/dev/null 2>&1; then
+  fail "runner --type redirect: missing redirect_to should exit 1"
+else
+  pass "runner --type redirect: missing redirect_to → exit 1 (loud)"
+fi
 
 printf '\nflow-frontmatter-lint v-slice summary: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"

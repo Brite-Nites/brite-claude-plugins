@@ -345,7 +345,13 @@ PY
           # children / qa gates. Mirrors build_audit_report.evaluate()'s redirect branch.
           local rt
           rt="$(awk -F':[[:space:]]*' '/^redirect_to:/ {print $2; exit}' "$doc")"
-          if [ -n "$rt" ] && ls "$fixture"/docs/product/flows/*/"$rt".md >/dev/null 2>&1; then
+          # Mirror _redirect_to_resolvable's normalization (build_audit_report.py): strip
+          # surrounding backticks/quotes + trailing whitespace, so a hand-authored
+          # `redirect_to: \`ACL-06\`` resolves identically on this twin and in evaluate().
+          rt="$(printf '%s' "$rt" | sed -e 's/[[:space:]]*$//' -e 's/^[`"'"'"']*//' -e 's/[`"'"'"']*$//')"
+          # Self-pointer ($rt == this doc's own flow_id) is a no-op loop → not resolvable
+          # (parity with _redirect_to_resolvable's self_fid guard).
+          if [ -n "$rt" ] && [ "$rt" != "$fid" ] && ls "$fixture"/docs/product/flows/*/"$rt".md >/dev/null 2>&1; then
             emit_gate PASS redirect-target-resolvable "$scope" "redirect_to=$rt"
           else
             emit_gate FAIL redirect-target-resolvable "$scope" "redirect_to=${rt:-∅}"
@@ -554,6 +560,42 @@ if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-target-resolvable"
   pass "dangling redirect_to → redirect-target-resolvable FAIL"
 else
   fail "dangling redirect not caught"
+fi
+# Backtick/quote parity (BC-12907 review-fix): a hand-authored `redirect_to: `TGT`` must
+# normalize + resolve on this twin exactly as _redirect_to_resolvable does in evaluate().
+python3 - "$RALIAS" "$RTGT" <<'PY'
+import re, sys
+p, tgt = sys.argv[1], sys.argv[2]; s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: `%s`' % tgt, s, count=1, flags=re.M))
+PY
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="PASS" && $2=="redirect-target-resolvable" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "backticked redirect_to normalizes + resolves (Python↔bash parity)"
+else
+  fail "backticked redirect_to not resolved on bash twin (parity gap)"
+fi
+# Self-pointer (BC-12907 review-fix): redirect_to == own flow_id is a no-op loop → FAIL.
+python3 - "$RALIAS" "$RAFID" <<'PY'
+import re, sys
+p, fid = sys.argv[1], sys.argv[2]; s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: %s' % fid, s, count=1, flags=re.M))
+PY
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-target-resolvable" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "self-pointer redirect_to (== own flow_id) → redirect-target-resolvable FAIL"
+else
+  fail "self-pointer redirect not caught (no-op loop slipped through)"
+fi
+# Strict-mode redirect front-matter (BC-12907 review-fix): under frontmatter_schema:strict a
+# redirect missing a REDIRECT_CANON key hard-fails redirect-front-matter-valid (config-gated
+# path — mirrors evaluate()/CI-runner; the lenient default leaves it a pass).
+mkdir -p "$RDIR/.flow"; printf '{"frontmatter_schema": "strict"}\n' > "$RDIR/.flow/config.json"
+printf -- '---\nflow_id: %s\ndomain: %s\ndoc_type: redirect\nredirect_to: %s\nlast_reviewed: y\n---\n# %s (redirect, missing intent)\n' "$RAFID" "$RADOM" "$RTGT" "$RAFID" > "$RALIAS"
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-front-matter-valid" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "strict: redirect missing canon key (intent) → redirect-front-matter-valid FAIL"
+else
+  fail "strict redirect missing-key not caught on bash twin"
 fi
 rm -rf "$RDIR"
 

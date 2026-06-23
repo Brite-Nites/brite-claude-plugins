@@ -128,6 +128,10 @@ try:
            not bar._redirect_to_resolvable(bar.Path(_RB), "NOPE-99"))
     truthy("redirect_to empty → False",
            not bar._redirect_to_resolvable(bar.Path(_RB), ""))
+    truthy("redirect_to self-pointer (== own flow_id) → False (no-op loop, BC-12907 review-fix)",
+           not bar._redirect_to_resolvable(bar.Path(_RB), "SFI-05", "SFI-05"))
+    truthy("redirect_to to a DIFFERENT flow with self_fid set still resolves",
+           bar._redirect_to_resolvable(bar.Path(_RB), "ACL-06", "SFI-05"))
 finally:
     shutil.rmtree(_RB, ignore_errors=True)
 
@@ -157,6 +161,40 @@ try:
            ("redirect-target-resolvable", "hard-fail") in _sfi_gates(_E2))
 finally:
     shutil.rmtree(_E2, ignore_errors=True)
+_E3 = _eval_redirect_repo("SFI-05")  # self-pointer: redirect_to == own flow_id
+try:
+    truthy("evaluate: self-pointer redirect → redirect-target-resolvable=hard-fail (BC-12907 review-fix)",
+           ("redirect-target-resolvable", "hard-fail") in _sfi_gates(_E3))
+finally:
+    shutil.rmtree(_E3, ignore_errors=True)
+
+# R2b. strict mode: redirect-front-matter-valid enforces REDIRECT_CANON (config-gated path).
+def _eval_redirect_strict_repo(omit_key=None):
+    box = tempfile.mkdtemp()
+    os.makedirs(os.path.join(box, ".flow"))
+    open(os.path.join(box, ".flow", "config.json"), "w").write(
+        json.dumps({"frontmatter_schema": "strict"}))
+    a = os.path.join(box, "docs", "product", "flows", "audit-acl"); os.makedirs(a)
+    open(os.path.join(a, "ACL-06.md"), "w").write("# ACL-06\n")
+    s = os.path.join(box, "docs", "product", "flows", "secure-file-ingestion"); os.makedirs(s)
+    pairs = [("flow_id", "SFI-05"), ("domain", "secure-file-ingestion"),
+             ("doc_type", "redirect"), ("redirect_to", "ACL-06"),
+             ("intent", "../../intent.md"), ("last_reviewed", "2026-06-23")]
+    fm = "---\n" + "".join("%s: %s\n" % (k, v) for k, v in pairs if k != omit_key) + "---\n# SFI-05\n"
+    open(os.path.join(s, "SFI-05.md"), "w").write(fm)
+    return box
+_ES1 = _eval_redirect_strict_repo()
+try:
+    truthy("evaluate strict: complete redirect canon → redirect-front-matter-valid=pass",
+           ("redirect-front-matter-valid", "pass") in _sfi_gates(_ES1))
+finally:
+    shutil.rmtree(_ES1, ignore_errors=True)
+_ES2 = _eval_redirect_strict_repo(omit_key="intent")
+try:
+    truthy("evaluate strict: redirect missing canon key → redirect-front-matter-valid=hard-fail (BC-12907 review-fix)",
+           ("redirect-front-matter-valid", "hard-fail") in _sfi_gates(_ES2))
+finally:
+    shutil.rmtree(_ES2, ignore_errors=True)
 
 # ── 3. config story_frame mode reader (fail-safe lenient) ─────────────────────
 def cfgmode(val):
@@ -344,6 +382,12 @@ for bad in (["a"], {"k": "v"}, 42, True):
 # a VALID gate id is NOT a 64 (only unrecognized ids guard).
 valid_gate = bar.decide({"id": "vg", "repo": "audit-clean-shape", "gate": "intent-exists"}, bar.Path(FIXTURES))
 truthy("valid --gate id is not rejected as 64", valid_gate["summary"]["exit_code"] != 64)
+# the redirect gate ids evaluate() emits MUST be in VALID_GATE_IDS, else a --gate filter on
+# them hits the arg-guard and returns exit-64 instead of running (BC-12907 review-fix).
+for rgid in ("redirect-target-resolvable", "redirect-front-matter-valid"):
+    truthy(f"{rgid} ∈ VALID_GATE_IDS", rgid in bar.VALID_GATE_IDS)
+    rg = bar.decide({"id": "rg", "repo": "audit-clean-shape", "gate": rgid}, bar.Path(FIXTURES))
+    truthy(f"--gate={rgid} not rejected as 64", rg["summary"]["exit_code"] != 64)
 
 # ── 8. exit-2-or-clean crash-defense contract via the CLI ─────────────────────
 box = tempfile.mkdtemp()
