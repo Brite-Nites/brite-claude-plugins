@@ -196,6 +196,35 @@ try:
 finally:
     shutil.rmtree(_ES2, ignore_errors=True)
 
+# R2c. cross-cutting parity (BC-12907 review-fix): a redirect stub has a flow_id but NO status,
+# so index-story-doc-status-match must SKIP it (guarded `fid and stat`) — not emit a spurious
+# project-scope hard-fail — while inventory-story-doc-id-match still PASSES (its fid is in the
+# inventory). Locks the Python side of the bash-twin guard fix (Greptile #487).
+def _eval_redirect_xcut_repo():
+    box = tempfile.mkdtemp()
+    s = os.path.join(box, "docs", "product", "flows", "secure-file-ingestion"); os.makedirs(s)
+    open(os.path.join(s, "SFI-05.md"), "w").write(
+        "---\nflow_id: SFI-05\ndomain: secure-file-ingestion\ndoc_type: redirect\n"
+        "redirect_to: ACL-06\nintent: ../../intent.md\nlast_reviewed: 2026-06-23\n---\n# SFI-05\n")
+    a = os.path.join(box, "docs", "product", "flows", "audit-acl"); os.makedirs(a)
+    open(os.path.join(a, "ACL-06.md"), "w").write(
+        "---\nflow_id: ACL-06\ndomain: audit-acl\nstatus: BUILT\n---\n# ACL-06\n")
+    flows = os.path.join(box, "docs", "product", "flows")
+    open(os.path.join(flows, "INDEX.md"), "w").write(
+        "# INDEX\n\n| F | S | x |\n|---|---|---|\n| SFI-05 | NOT_STARTED | a |\n| ACL-06 | BUILT | b |\n")
+    open(os.path.join(box, "docs", "product", "master-flow-inventory.md"), "w").write(
+        "# Inv\n\n## Domain: secure-file-ingestion\n\n| SFI-05 | x |\n\n## Domain: audit-acl\n\n| ACL-06 | y |\n")
+    return box
+_EX = _eval_redirect_xcut_repo()
+try:
+    _xg = {(g["id"], g["status"]) for g in bar.evaluate(bar.Path(_EX)) if g["scope"] == "project"}
+    truthy("evaluate: redirect stub (no status) does NOT trip index-story-doc-status-match",
+           ("index-story-doc-status-match", "pass") in _xg)
+    truthy("evaluate: redirect stub does NOT trip inventory-story-doc-id-match (fid in inventory)",
+           ("inventory-story-doc-id-match", "pass") in _xg)
+finally:
+    shutil.rmtree(_EX, ignore_errors=True)
+
 # ── 3. config story_frame mode reader (fail-safe lenient) ─────────────────────
 def cfgmode(val):
     box = tempfile.mkdtemp()

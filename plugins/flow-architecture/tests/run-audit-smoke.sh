@@ -458,10 +458,14 @@ except Exception:
       [ -f "$doc" ] || continue
       fid="$(awk '/^flow_id:/ {print $2; exit}' "$doc")"
       stat="$(awk '/^status:/ {print $2; exit}' "$doc")"
-      if ! grep -qE "^\| $fid \|" "$fixture/docs/product/master-flow-inventory.md"; then
+      # Guard emptiness to mirror evaluate()'s `if fid and ...` / `if fid and stat and ...`
+      # (build_audit_report.py): a redirect stub (BC-12907) has a flow_id but NO status, so
+      # it must be SKIPPED by the status-match (not matched against an INDEX row it has no
+      # status for) — else an empty $stat spuriously trips status_mismatch on every redirect.
+      if [ -n "$fid" ] && ! grep -qE "^\| $fid \|" "$fixture/docs/product/master-flow-inventory.md"; then
         id_mismatch=1
       fi
-      if ! grep -qE "^\| $fid \| $stat " "$fixture/docs/product/flows/INDEX.md"; then
+      if [ -n "$fid" ] && [ -n "$stat" ] && ! grep -qE "^\| $fid \| $stat " "$fixture/docs/product/flows/INDEX.md"; then
         status_mismatch=1
       fi
     done
@@ -549,6 +553,20 @@ if awk -F'\t' -v s="flow:$RAFID" '$2=="story-job-story-regex" && $3==s{seen=1} E
   pass "redirect doc SKIPS story-job-story-regex (no story gate emitted)"
 else
   fail "redirect doc still emitted story-job-story-regex"
+fi
+# Cross-cutting parity (BC-12907 review-fix): a redirect stub has NO status field, so the
+# project-scope index-story-doc-status-match gate must SKIP it (Python guards `fid and stat`)
+# rather than emit a spurious FAIL. This section previously asserted only redirect gates,
+# never all-pass — which hid the bash twin's missing `[ -n "$stat" ]` guard (Greptile #487).
+if awk -F'\t' '$1=="FAIL" && $2=="index-story-doc-status-match"{bad=1} END{exit bad}' "$GATE_REPORT"; then
+  pass "redirect stub (no status) does NOT trip index-story-doc-status-match (Python↔bash parity)"
+else
+  fail "redirect stub spuriously FAILs index-story-doc-status-match (bash twin missing \$stat guard)"
+fi
+if awk -F'\t' '$1=="FAIL" && $2=="inventory-story-doc-id-match"{bad=1} END{exit bad}' "$GATE_REPORT"; then
+  pass "redirect stub does NOT trip inventory-story-doc-id-match (fid is in inventory)"
+else
+  fail "redirect stub spuriously FAILs inventory-story-doc-id-match"
 fi
 python3 - "$RALIAS" <<'PY'
 import re, sys
