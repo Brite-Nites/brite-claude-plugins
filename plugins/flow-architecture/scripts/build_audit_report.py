@@ -73,6 +73,8 @@ VALID_GATE_IDS = frozenset({
     # per-flow [Story]
     "story-doc-exists", "story-front-matter-populated", "story-job-story-regex",
     "story-ac-gherkin-count", "story-verify-docs-pass",
+    # per-flow [redirect] (BC-12907 — emitted by evaluate()'s redirect branch)
+    "redirect-target-resolvable", "redirect-front-matter-valid",
     # per-flow [Eng]
     "eng-linear-completed", "eng-build-lint-test-pass", "eng-sandbox-http-200",
     "eng-children-engineering-populated",
@@ -256,6 +258,29 @@ def _story_docs(repo: Path, domain: str) -> list:
     return sorted(p for p in d.glob("*.md") if p.is_file())
 
 
+def _doc_type(doc_text: str) -> str:
+    """The `doc_type:` front-matter scalar, lower-cased (e.g. 'redirect'), '' if absent.
+    Selects the redirect-validation profile (BC-12907)."""
+    return _yaml_scalar_text(doc_text, "doc_type").strip().strip('"').strip("'").lower()
+
+
+def _redirect_to_resolvable(repo: Path, redirect_to: str, self_fid: str = "") -> bool:
+    """True if `redirect_to` names a resolvable flow (BC-12907). The pointer is a
+    canonical flow_id (e.g. `ACL-06`), resolved by GLOBAL lookup across all domains —
+    a redirect commonly targets ANOTHER domain (roster SFI-05 → audit-acl/ACL-06), so a
+    same-directory check would wrongly fail. Empty or no-such-flow → False (a dangling
+    pointer hard-fails the redirect gate). `self_fid` (the redirecting doc's own flow_id,
+    when known) makes a SELF-pointer fail: `redirect_to == self_fid` is a no-op loop, not
+    a resolvable redirect — the load-bearing invariant is "points at a DIFFERENT canonical
+    home", not merely "some file with this stem exists" (BC-12907 review-fix)."""
+    fid = (redirect_to or "").strip().strip("`").strip().strip('"').strip("'")
+    if not fid:
+        return False
+    if self_fid and fid == self_fid:
+        return False
+    return any(d.stem == fid for dom in _domains(repo) for d in _story_docs(repo, dom))
+
+
 # ── the Phase-B gate evaluator (pure; the load-bearing logic under test) ──────
 
 
@@ -333,6 +358,27 @@ def evaluate(repo: Path) -> list:
             t = _read(doc)
 
             emit("pass", "story-doc-exists", scope)
+
+            if _doc_type(t) == "redirect":
+                # Redirect stub (BC-12907): an intentional alias to another flow's
+                # canonical home — validated AS a redirect (resolvable pointer + valid
+                # redirect front-matter); the story-frame / populated / gherkin /
+                # children / qa gates are skipped (it has no job story by design).
+                rt = _yaml_scalar_text(t, "redirect_to")
+                emit("pass" if _redirect_to_resolvable(repo, rt, fid) else "hard-fail",
+                     "redirect-target-resolvable", scope, f"redirect_to={rt.strip() or '∅'}")
+                if fm_schema_mode == "strict":
+                    rres = _ffl.lint_text(t, "redirect")
+                    bits = []
+                    if rres["missing"]:
+                        bits.append("missing=" + ",".join(m.split(" ")[0] for m in rres["missing"][:4]))
+                    if rres["drift"]:
+                        bits.append("drift=" + ",".join(d.split(" ")[0] for d in rres["drift"][:4]))
+                    emit("hard-fail" if bits else "pass", "redirect-front-matter-valid",
+                         scope, "; ".join(bits))
+                else:
+                    emit("pass", "redirect-front-matter-valid", scope)
+                continue
 
             emit("pass" if _story_frontmatter_populated(t, fm_schema_mode)
                  else "hard-fail", "story-front-matter-populated", scope)

@@ -3,7 +3,7 @@
 # schema lint (scripts/lib/flow_frontmatter_lint.py) over a consumer repo's docs.
 #
 # Usage:
-#   flow-frontmatter-lint.sh --type {story|journey} <path> [<path> ...]
+#   flow-frontmatter-lint.sh --type {story|journey|redirect} <path> [<path> ...]
 #
 # Each <path> is a directory (every `*.md` under it except `INDEX.md` is linted)
 # OR an explicit doc file. Prints one block per doc — `PASS <path>` or the doc's
@@ -27,8 +27,8 @@ LIB="$SCRIPT_DIR/lib/flow_frontmatter_lint.py"
 command -v python3 >/dev/null 2>&1 || { echo "fatal: python3 required" >&2; exit 127; }
 [ -f "$LIB" ] || { echo "FATAL: lib not found at $LIB" >&2; exit 2; }
 
-if [ "${1:-}" != "--type" ] || { [ "${2:-}" != "story" ] && [ "${2:-}" != "journey" ]; }; then
-  echo "usage: flow-frontmatter-lint.sh --type {story|journey} <path> [<path> ...]" >&2
+if [ "${1:-}" != "--type" ] || { [ "${2:-}" != "story" ] && [ "${2:-}" != "journey" ] && [ "${2:-}" != "redirect" ]; }; then
+  echo "usage: flow-frontmatter-lint.sh --type {story|journey|redirect} <path> [<path> ...]" >&2
   exit 2
 fi
 doc_type="$2"

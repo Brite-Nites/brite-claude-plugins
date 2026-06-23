@@ -107,6 +107,124 @@ GAP = ("# T\n\n> **Doc type:** Constraint spec. Given a req, the system MUST ser
 truthy("UNBOLDED markers between two bold spans do not satisfy the frame (gap is not a span)",
        not bar._story_frame_present(GAP, "lenient"))
 
+# ── R. redirect-stub predicates (BC-12907): doc_type marker + resolvable pointer ──
+eq("_doc_type reads the marker", bar._doc_type("---\ndoc_type: redirect\n---\n# x\n"), "redirect")
+eq("_doc_type case/quote tolerant", bar._doc_type('---\ndoc_type: "Redirect"\n---\n'), "redirect")
+eq("_doc_type absent → ''", bar._doc_type("---\nflow_id: X-01\n---\n"), "")
+def _redirect_repo():
+    box = tempfile.mkdtemp()
+    for dom, fid in (("audit-acl", "ACL-06"), ("secure-file-ingestion", "SFI-05")):
+        d = os.path.join(box, "docs", "product", "flows", dom)
+        os.makedirs(d)
+        open(os.path.join(d, fid + ".md"), "w").write("# " + fid + "\n")
+    return box
+_RB = _redirect_repo()
+try:
+    truthy("redirect_to resolvable across domains (SFI-05 alias → ACL-06)",
+           bar._redirect_to_resolvable(bar.Path(_RB), "ACL-06"))
+    truthy("redirect_to tolerates backticks/space (`ACL-06`)",
+           bar._redirect_to_resolvable(bar.Path(_RB), "`ACL-06`"))
+    truthy("redirect_to dangling (no such flow) → False",
+           not bar._redirect_to_resolvable(bar.Path(_RB), "NOPE-99"))
+    truthy("redirect_to empty → False",
+           not bar._redirect_to_resolvable(bar.Path(_RB), ""))
+    truthy("redirect_to self-pointer (== own flow_id) → False (no-op loop, BC-12907 review-fix)",
+           not bar._redirect_to_resolvable(bar.Path(_RB), "SFI-05", "SFI-05"))
+    truthy("redirect_to to a DIFFERENT flow with self_fid set still resolves",
+           bar._redirect_to_resolvable(bar.Path(_RB), "ACL-06", "SFI-05"))
+finally:
+    shutil.rmtree(_RB, ignore_errors=True)
+
+# ── R2. evaluate() honors the redirect profile (BC-12907): redirect gates, story gates skipped ──
+def _eval_redirect_repo(target):
+    box = tempfile.mkdtemp()
+    a = os.path.join(box, "docs", "product", "flows", "audit-acl"); os.makedirs(a)
+    open(os.path.join(a, "ACL-06.md"), "w").write("# ACL-06\n")
+    s = os.path.join(box, "docs", "product", "flows", "secure-file-ingestion"); os.makedirs(s)
+    open(os.path.join(s, "SFI-05.md"), "w").write(
+        "---\nflow_id: SFI-05\ndomain: secure-file-ingestion\ndoc_type: redirect\n"
+        "redirect_to: %s\nintent: x\nlast_reviewed: y\n---\n# SFI-05 (redirect)\n" % target)
+    return box
+def _sfi_gates(box):
+    return {(g["id"], g["status"]) for g in bar.evaluate(bar.Path(box)) if g["scope"] == "flow:SFI-05"}
+_E1 = _eval_redirect_repo("ACL-06")
+try:
+    g1 = _sfi_gates(_E1); ids1 = {i for (i, s) in g1}
+    truthy("evaluate: valid redirect → redirect-target-resolvable=pass", ("redirect-target-resolvable", "pass") in g1)
+    truthy("evaluate: redirect SKIPS story-job-story-regex", "story-job-story-regex" not in ids1)
+    truthy("evaluate: redirect SKIPS story-front-matter-populated", "story-front-matter-populated" not in ids1)
+finally:
+    shutil.rmtree(_E1, ignore_errors=True)
+_E2 = _eval_redirect_repo("NOPE-99")
+try:
+    truthy("evaluate: dangling redirect → redirect-target-resolvable=hard-fail",
+           ("redirect-target-resolvable", "hard-fail") in _sfi_gates(_E2))
+finally:
+    shutil.rmtree(_E2, ignore_errors=True)
+_E3 = _eval_redirect_repo("SFI-05")  # self-pointer: redirect_to == own flow_id
+try:
+    truthy("evaluate: self-pointer redirect → redirect-target-resolvable=hard-fail (BC-12907 review-fix)",
+           ("redirect-target-resolvable", "hard-fail") in _sfi_gates(_E3))
+finally:
+    shutil.rmtree(_E3, ignore_errors=True)
+
+# R2b. strict mode: redirect-front-matter-valid enforces REDIRECT_CANON (config-gated path).
+def _eval_redirect_strict_repo(omit_key=None):
+    box = tempfile.mkdtemp()
+    os.makedirs(os.path.join(box, ".flow"))
+    open(os.path.join(box, ".flow", "config.json"), "w").write(
+        json.dumps({"frontmatter_schema": "strict"}))
+    a = os.path.join(box, "docs", "product", "flows", "audit-acl"); os.makedirs(a)
+    open(os.path.join(a, "ACL-06.md"), "w").write("# ACL-06\n")
+    s = os.path.join(box, "docs", "product", "flows", "secure-file-ingestion"); os.makedirs(s)
+    pairs = [("flow_id", "SFI-05"), ("domain", "secure-file-ingestion"),
+             ("doc_type", "redirect"), ("redirect_to", "ACL-06"),
+             ("intent", "../../intent.md"), ("last_reviewed", "2026-06-23")]
+    fm = "---\n" + "".join("%s: %s\n" % (k, v) for k, v in pairs if k != omit_key) + "---\n# SFI-05\n"
+    open(os.path.join(s, "SFI-05.md"), "w").write(fm)
+    return box
+_ES1 = _eval_redirect_strict_repo()
+try:
+    truthy("evaluate strict: complete redirect canon → redirect-front-matter-valid=pass",
+           ("redirect-front-matter-valid", "pass") in _sfi_gates(_ES1))
+finally:
+    shutil.rmtree(_ES1, ignore_errors=True)
+_ES2 = _eval_redirect_strict_repo(omit_key="intent")
+try:
+    truthy("evaluate strict: redirect missing canon key → redirect-front-matter-valid=hard-fail (BC-12907 review-fix)",
+           ("redirect-front-matter-valid", "hard-fail") in _sfi_gates(_ES2))
+finally:
+    shutil.rmtree(_ES2, ignore_errors=True)
+
+# R2c. cross-cutting parity (BC-12907 review-fix): a redirect stub has a flow_id but NO status,
+# so index-story-doc-status-match must SKIP it (guarded `fid and stat`) — not emit a spurious
+# project-scope hard-fail — while inventory-story-doc-id-match still PASSES (its fid is in the
+# inventory). Locks the Python side of the bash-twin guard fix (Greptile #487).
+def _eval_redirect_xcut_repo():
+    box = tempfile.mkdtemp()
+    s = os.path.join(box, "docs", "product", "flows", "secure-file-ingestion"); os.makedirs(s)
+    open(os.path.join(s, "SFI-05.md"), "w").write(
+        "---\nflow_id: SFI-05\ndomain: secure-file-ingestion\ndoc_type: redirect\n"
+        "redirect_to: ACL-06\nintent: ../../intent.md\nlast_reviewed: 2026-06-23\n---\n# SFI-05\n")
+    a = os.path.join(box, "docs", "product", "flows", "audit-acl"); os.makedirs(a)
+    open(os.path.join(a, "ACL-06.md"), "w").write(
+        "---\nflow_id: ACL-06\ndomain: audit-acl\nstatus: BUILT\n---\n# ACL-06\n")
+    flows = os.path.join(box, "docs", "product", "flows")
+    open(os.path.join(flows, "INDEX.md"), "w").write(
+        "# INDEX\n\n| F | S | x |\n|---|---|---|\n| SFI-05 | NOT_STARTED | a |\n| ACL-06 | BUILT | b |\n")
+    open(os.path.join(box, "docs", "product", "master-flow-inventory.md"), "w").write(
+        "# Inv\n\n## Domain: secure-file-ingestion\n\n| SFI-05 | x |\n\n## Domain: audit-acl\n\n| ACL-06 | y |\n")
+    return box
+_EX = _eval_redirect_xcut_repo()
+try:
+    _xg = {(g["id"], g["status"]) for g in bar.evaluate(bar.Path(_EX)) if g["scope"] == "project"}
+    truthy("evaluate: redirect stub (no status) does NOT trip index-story-doc-status-match",
+           ("index-story-doc-status-match", "pass") in _xg)
+    truthy("evaluate: redirect stub does NOT trip inventory-story-doc-id-match (fid in inventory)",
+           ("inventory-story-doc-id-match", "pass") in _xg)
+finally:
+    shutil.rmtree(_EX, ignore_errors=True)
+
 # ── 3. config story_frame mode reader (fail-safe lenient) ─────────────────────
 def cfgmode(val):
     box = tempfile.mkdtemp()
@@ -293,6 +411,12 @@ for bad in (["a"], {"k": "v"}, 42, True):
 # a VALID gate id is NOT a 64 (only unrecognized ids guard).
 valid_gate = bar.decide({"id": "vg", "repo": "audit-clean-shape", "gate": "intent-exists"}, bar.Path(FIXTURES))
 truthy("valid --gate id is not rejected as 64", valid_gate["summary"]["exit_code"] != 64)
+# the redirect gate ids evaluate() emits MUST be in VALID_GATE_IDS, else a --gate filter on
+# them hits the arg-guard and returns exit-64 instead of running (BC-12907 review-fix).
+for rgid in ("redirect-target-resolvable", "redirect-front-matter-valid"):
+    truthy(f"{rgid} ∈ VALID_GATE_IDS", rgid in bar.VALID_GATE_IDS)
+    rg = bar.decide({"id": "rg", "repo": "audit-clean-shape", "gate": rgid}, bar.Path(FIXTURES))
+    truthy(f"--gate={rgid} not rejected as 64", rg["summary"]["exit_code"] != 64)
 
 # ── 8. exit-2-or-clean crash-defense contract via the CLI ─────────────────────
 box = tempfile.mkdtemp()

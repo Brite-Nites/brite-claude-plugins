@@ -67,6 +67,14 @@ JOURNEY_CANON = (
 )
 JOURNEY_MILESTONE_SUBKEYS = ("name", "id")
 
+# Redirect stub (BC-12907 / BC-12905 C1): an intentional alias doc pointing to another
+# flow's canonical home (e.g. roster SFI-05 → ACL-06). Validated as a redirect, NOT a
+# story — a minimal canon; the audit/runner skip the story-frame, gherkin-AC, and
+# children gates for it but still require these keys + a resolvable redirect_to.
+REDIRECT_CANON = (
+    "flow_id", "domain", "doc_type", "redirect_to", "intent", "last_reviewed",
+)
+
 # ── Drift maps (wrong-name key → its remediation hint) ────────────────────────
 # Grounded in the live census of all 7 WS-E consumer repos, not invented:
 # brand-hub (sub_flow_id/linear_parent/linear_children), brite-roster + brite-labs
@@ -231,7 +239,11 @@ def lint_text(text, doc_type):
         return _lint(parsed["present"], parsed["nested"], JOURNEY_CANON, JOURNEY_DRIFT,
                      {"linear_milestone": JOURNEY_MILESTONE_SUBKEYS}, JOURNEY_TOLERATED,
                      "journey")
-    raise ValueError("doc_type must be 'story' or 'journey', got {!r}".format(doc_type))
+    if doc_type == "redirect":
+        return _lint(parsed["present"], parsed["nested"], REDIRECT_CANON, STORY_DRIFT,
+                     {}, frozenset(), "redirect")
+    raise ValueError(
+        "doc_type must be 'story', 'journey', or 'redirect', got {!r}".format(doc_type))
 
 
 def lint_doc(path, doc_type):
@@ -247,8 +259,8 @@ def lint_doc(path, doc_type):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[0] not in ("--type",) or argv[1] not in ("story", "journey"):
-        sys.stderr.write("usage: flow_frontmatter_lint.py --type {story|journey} <doc> [<doc> ...]\n")
+    if len(argv) < 2 or argv[0] not in ("--type",) or argv[1] not in ("story", "journey", "redirect"):
+        sys.stderr.write("usage: flow_frontmatter_lint.py --type {story|journey|redirect} <doc> [<doc> ...]\n")
         return 2
     doc_type = argv[1]
     docs = argv[2:]

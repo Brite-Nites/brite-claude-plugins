@@ -295,6 +295,44 @@ else
   pass "runner non-zero on bad invocation"
 fi
 
+# ── Section 9: REDIRECT_CANON — doc_type:redirect validates AS a redirect (BC-12907) ──
+section "9" "A-12 redirect — valid stub clean; missing redirect_to loud; story-only extra quiet"
+RVALID="$TMP/redirect-valid.frontmatter"
+printf -- '---\nflow_id: SFI-05\ndomain: secure-file-ingestion\ndoc_type: redirect\nredirect_to: ACL-06\nintent: ../../intent.md\nlast_reviewed: 2026-05-20\n---\n' > "$RVALID"
+RV_M="$(lint_bucket "$RVALID" redirect missing | head -1)"; RV_D="$(lint_bucket "$RVALID" redirect drift | head -1)"
+if [ "$RV_M" = "0" ] && [ "$RV_D" = "0" ]; then
+  pass "valid redirect stub → 0 missing / 0 drift"
+else
+  fail "valid redirect stub wrongly flagged (missing=$RV_M drift=$RV_D)"
+fi
+RMISS="$TMP/redirect-missing.frontmatter"
+printf -- '---\nflow_id: SFI-05\ndomain: d\ndoc_type: redirect\nintent: x\nlast_reviewed: y\n---\n' > "$RMISS"
+if lint_bucket "$RMISS" redirect missing | grep -q 'redirect_to'; then
+  pass "redirect missing redirect_to → MISSING (loud; a dead pointer is not a back-door)"
+else
+  fail "missing redirect_to not flagged"
+fi
+REXTRA="$TMP/redirect-extra.frontmatter"
+printf -- '---\nflow_id: SFI-05\ndomain: d\ndoc_type: redirect\nredirect_to: ACL-06\nintent: x\nlast_reviewed: y\nstatus: NOT_STARTED\n---\n' > "$REXTRA"
+RE_M="$(lint_bucket "$REXTRA" redirect missing | head -1)"
+if [ "$RE_M" = "0" ] && lint_bucket "$REXTRA" redirect unknown | grep -q 'status'; then
+  pass "redirect with story-only 'status' → quiet UNKNOWN (skips story bar, not a bypass)"
+else
+  fail "redirect story-only extra handled wrong (missing=$RE_M)"
+fi
+# CLI parity (BC-12907 review-fix): the runner + python main() accept --type redirect
+# (the library supported it; the CLI guards were out of sync until this fix).
+if bash "$RUNNER" --type redirect "$RVALID" >/dev/null 2>&1; then
+  pass "runner --type redirect: valid stub → exit 0"
+else
+  fail "runner rejected --type redirect on a valid stub"
+fi
+if bash "$RUNNER" --type redirect "$RMISS" >/dev/null 2>&1; then
+  fail "runner --type redirect: missing redirect_to should exit 1"
+else
+  pass "runner --type redirect: missing redirect_to → exit 1 (loud)"
+fi
+
 printf '\nflow-frontmatter-lint v-slice summary: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -gt 0 ] && exit 1

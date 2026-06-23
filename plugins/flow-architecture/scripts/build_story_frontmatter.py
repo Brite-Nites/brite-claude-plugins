@@ -160,6 +160,24 @@ def _emit(flow_id: str, parent: str, children: dict[str, str], status: str,
     return "\n".join(lines) + "\n"
 
 
+def _emit_redirect(flow_id: str, redirect_to: str, as_of: str) -> str:
+    """Minimal redirect-stub frontmatter (BC-12907 / REDIRECT_CANON): an intentional
+    alias to `redirect_to`'s canonical home. No children / story / status keys — the
+    audit applies the redirect-validation profile (resolvable pointer + these keys) and
+    skips the story-frame / gherkin / children gates for it."""
+    domain = flow_id.split("-", 1)[0]
+    return "\n".join([
+        "---",
+        f"flow_id: {flow_id}",
+        f"domain: {domain}",
+        "doc_type: redirect",
+        f"redirect_to: {redirect_to}",
+        "intent: ../../intent.md",
+        f"last_reviewed: {as_of}",
+        "---",
+    ]) + "\n"
+
+
 def _csv(value: str | None) -> list[str]:
     # NB: items are .strip()'d here, BEFORE _SLUG_RE runs in main() — so _SLUG_RE's
     # `\Z` anchor is belt-and-suspenders for the slug path (the real interior-metachar
@@ -173,8 +191,13 @@ def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(
         prog="build_story_frontmatter.py",
         description="Stamp deterministic story-doc frontmatter from a scaffold-log.")
-    p.add_argument("--scaffold-log", required=True, type=Path)
+    p.add_argument("--scaffold-log", type=Path,
+                   help="required for --doc-type=story; not needed for redirect")
     p.add_argument("--flow-id", required=True)
+    p.add_argument("--doc-type", default="story", choices=("story", "redirect"),
+                   help="story (default) or redirect — an intentional alias stub (BC-12907)")
+    p.add_argument("--redirect-to", default="",
+                   help="for --doc-type=redirect: the canonical flow_id this aliases (DOMAIN-NN)")
     p.add_argument("--as-of", required=True, help="ISO date for last_reviewed (defeats now())")
     p.add_argument("--status", default="NOT_STARTED",
                    help="story-doc status (skill passes code-evidence result; default NOT_STARTED)")
@@ -187,6 +210,17 @@ def main(argv: list[str]) -> int:
         return 2
     if not _AS_OF_RE.match(args.as_of):
         print(f"usage: --as-of must be YYYY-MM-DD, got {args.as_of!r}", file=sys.stderr)
+        return 2
+    if args.doc_type == "redirect":
+        # Redirect stub (BC-12907): a minimal alias marker, no scaffold-log / children.
+        if not _FLOW_ID_RE.match(args.redirect_to or ""):
+            print(f"usage: --doc-type=redirect requires --redirect-to as a DOMAIN-NN flow_id, "
+                  f"got {args.redirect_to!r}", file=sys.stderr)
+            return 2
+        sys.stdout.write(_emit_redirect(args.flow_id, args.redirect_to, args.as_of))
+        return 0
+    if args.scaffold_log is None:
+        print("usage: --scaffold-log is required for --doc-type=story", file=sys.stderr)
         return 2
     if args.status not in _STATUS_TAXONOMY:
         print(f"usage: --status must be one of {sorted(_STATUS_TAXONOMY)}, got {args.status!r}",

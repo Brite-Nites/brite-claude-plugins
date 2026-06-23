@@ -61,7 +61,8 @@ story-docs-complete journey-complete index-complete \
 story-doc-exists story-front-matter-populated story-job-story-regex story-ac-gherkin-count \
 eng-children-engineering-populated design-children-design-populated docs-children-docs-populated \
 qa-children-qa-populated qa-status-signed-off qa-last-signed-off-iso8601 qa-history-row-signed-off \
-inventory-story-doc-id-match index-story-doc-status-match cross-domain-deps-bidirectional"
+inventory-story-doc-id-match index-story-doc-status-match cross-domain-deps-bidirectional \
+redirect-target-resolvable redirect-front-matter-valid"
 
 is_recognized_gate() {
   case " $RECOGNIZED_GATES " in
@@ -338,6 +339,39 @@ PY
 
         emit_gate PASS story-doc-exists "$scope"
 
+        if grep -qE '^doc_type:[[:space:]]*redirect[[:space:]]*$' "$doc"; then
+          # Redirect stub (BC-12907): validate AS a redirect (resolvable pointer +
+          # valid redirect front-matter); skip the story-frame / populated / gherkin /
+          # children / qa gates. Mirrors build_audit_report.evaluate()'s redirect branch.
+          local rt
+          rt="$(awk -F':[[:space:]]*' '/^redirect_to:/ {print $2; exit}' "$doc")"
+          # Mirror _redirect_to_resolvable's normalization (build_audit_report.py): strip
+          # surrounding backticks/quotes + trailing whitespace, so a hand-authored
+          # `redirect_to: \`ACL-06\`` resolves identically on this twin and in evaluate().
+          rt="$(printf '%s' "$rt" | sed -e 's/[[:space:]]*$//' -e 's/^[`"'"'"']*//' -e 's/[`"'"'"']*$//')"
+          # Self-pointer ($rt == this doc's own flow_id) is a no-op loop → not resolvable
+          # (parity with _redirect_to_resolvable's self_fid guard).
+          if [ -n "$rt" ] && [ "$rt" != "$fid" ] && ls "$fixture"/docs/product/flows/*/"$rt".md >/dev/null 2>&1; then
+            emit_gate PASS redirect-target-resolvable "$scope" "redirect_to=$rt"
+          else
+            emit_gate FAIL redirect-target-resolvable "$scope" "redirect_to=${rt:-∅}"
+          fi
+          if [ "$fm_schema_mode" = "strict" ]; then
+            local rmiss=""
+            for k in flow_id domain doc_type redirect_to intent last_reviewed; do
+              grep -qE "^$k:" "$doc" || rmiss="$rmiss $k"
+            done
+            if [ -z "$rmiss" ]; then
+              emit_gate PASS redirect-front-matter-valid "$scope"
+            else
+              emit_gate FAIL redirect-front-matter-valid "$scope" "missing=$rmiss"
+            fi
+          else
+            emit_gate PASS redirect-front-matter-valid "$scope"
+          fi
+          continue
+        fi
+
         if story_frontmatter_populated "$doc" "$fm_schema_mode"; then
           emit_gate PASS story-front-matter-populated "$scope"
         else
@@ -424,10 +458,14 @@ except Exception:
       [ -f "$doc" ] || continue
       fid="$(awk '/^flow_id:/ {print $2; exit}' "$doc")"
       stat="$(awk '/^status:/ {print $2; exit}' "$doc")"
-      if ! grep -qE "^\| $fid \|" "$fixture/docs/product/master-flow-inventory.md"; then
+      # Guard emptiness to mirror evaluate()'s `if fid and ...` / `if fid and stat and ...`
+      # (build_audit_report.py): a redirect stub (BC-12907) has a flow_id but NO status, so
+      # it must be SKIPPED by the status-match (not matched against an INDEX row it has no
+      # status for) — else an empty $stat spuriously trips status_mismatch on every redirect.
+      if [ -n "$fid" ] && ! grep -qE "^\| $fid \|" "$fixture/docs/product/master-flow-inventory.md"; then
         id_mismatch=1
       fi
-      if ! grep -qE "^\| $fid \| $stat " "$fixture/docs/product/flows/INDEX.md"; then
+      if [ -n "$fid" ] && [ -n "$stat" ] && ! grep -qE "^\| $fid \| $stat " "$fixture/docs/product/flows/INDEX.md"; then
         status_mismatch=1
       fi
     done
@@ -494,6 +532,90 @@ else
   fail "clean fixture: $CLEAN_FAILS FAIL, $CLEAN_UNCAT UNCATEGORIZED-GATE-FAIL (expected 0/0)"
   awk -F'\t' '$1 != "PASS" {printf "    | %s\t%s\t%s\t%s\n",$1,$2,$3,$4}' "$GATE_REPORT"
 fi
+
+# ── Section 2-redirect: redirect-stub gate (BC-12907) ────────────────────────
+# A doc_type:redirect stub is validated AS a redirect (resolvable pointer; story gates
+# skipped) — mirrors build_audit_report.evaluate(). Dedicated temp repo so the clean /
+# broken fixtures stay redirect-free (the eval oracle cross-checks only those two).
+section "2-redirect" "redirect-stub gate: valid alias skips story-frame; dangling fails"
+RDIR="$(mktemp -d)"; cp -R "$CLEAN_FIXTURE/." "$RDIR/"
+RALIAS="$(ls "$RDIR"/docs/product/flows/*/*.md | head -1)"
+RTGT="$(basename "$(ls "$RDIR"/docs/product/flows/*/*.md | tail -1)" .md)"
+RAFID="$(basename "$RALIAS" .md)"; RADOM="$(basename "$(dirname "$RALIAS")")"
+printf -- '---\nflow_id: %s\ndomain: %s\ndoc_type: redirect\nredirect_to: %s\nintent: x\nlast_reviewed: y\n---\n# %s (redirect)\n' "$RAFID" "$RADOM" "$RTGT" "$RAFID" > "$RALIAS"
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="PASS" && $2=="redirect-target-resolvable" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "valid redirect → redirect-target-resolvable PASS at flow:$RAFID"
+else
+  fail "valid redirect: redirect-target-resolvable not PASS at flow:$RAFID"
+fi
+if awk -F'\t' -v s="flow:$RAFID" '$2=="story-job-story-regex" && $3==s{seen=1} END{exit seen}' "$GATE_REPORT"; then
+  pass "redirect doc SKIPS story-job-story-regex (no story gate emitted)"
+else
+  fail "redirect doc still emitted story-job-story-regex"
+fi
+# Cross-cutting parity (BC-12907 review-fix): a redirect stub has NO status field, so the
+# project-scope index-story-doc-status-match gate must SKIP it (Python guards `fid and stat`)
+# rather than emit a spurious FAIL. This section previously asserted only redirect gates,
+# never all-pass — which hid the bash twin's missing `[ -n "$stat" ]` guard (Greptile #487).
+if awk -F'\t' '$1=="FAIL" && $2=="index-story-doc-status-match"{bad=1} END{exit bad}' "$GATE_REPORT"; then
+  pass "redirect stub (no status) does NOT trip index-story-doc-status-match (Python↔bash parity)"
+else
+  fail "redirect stub spuriously FAILs index-story-doc-status-match (bash twin missing \$stat guard)"
+fi
+if awk -F'\t' '$1=="FAIL" && $2=="inventory-story-doc-id-match"{bad=1} END{exit bad}' "$GATE_REPORT"; then
+  pass "redirect stub does NOT trip inventory-story-doc-id-match (fid is in inventory)"
+else
+  fail "redirect stub spuriously FAILs inventory-story-doc-id-match"
+fi
+python3 - "$RALIAS" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: NOPE-99', s, count=1, flags=re.M))
+PY
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-target-resolvable" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "dangling redirect_to → redirect-target-resolvable FAIL"
+else
+  fail "dangling redirect not caught"
+fi
+# Backtick/quote parity (BC-12907 review-fix): a hand-authored `redirect_to: `TGT`` must
+# normalize + resolve on this twin exactly as _redirect_to_resolvable does in evaluate().
+python3 - "$RALIAS" "$RTGT" <<'PY'
+import re, sys
+p, tgt = sys.argv[1], sys.argv[2]; s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: `%s`' % tgt, s, count=1, flags=re.M))
+PY
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="PASS" && $2=="redirect-target-resolvable" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "backticked redirect_to normalizes + resolves (Python↔bash parity)"
+else
+  fail "backticked redirect_to not resolved on bash twin (parity gap)"
+fi
+# Self-pointer (BC-12907 review-fix): redirect_to == own flow_id is a no-op loop → FAIL.
+python3 - "$RALIAS" "$RAFID" <<'PY'
+import re, sys
+p, fid = sys.argv[1], sys.argv[2]; s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: %s' % fid, s, count=1, flags=re.M))
+PY
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-target-resolvable" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "self-pointer redirect_to (== own flow_id) → redirect-target-resolvable FAIL"
+else
+  fail "self-pointer redirect not caught (no-op loop slipped through)"
+fi
+# Strict-mode redirect front-matter (BC-12907 review-fix): under frontmatter_schema:strict a
+# redirect missing a REDIRECT_CANON key hard-fails redirect-front-matter-valid (config-gated
+# path — mirrors evaluate()/CI-runner; the lenient default leaves it a pass).
+mkdir -p "$RDIR/.flow"; printf '{"frontmatter_schema": "strict"}\n' > "$RDIR/.flow/config.json"
+printf -- '---\nflow_id: %s\ndomain: %s\ndoc_type: redirect\nredirect_to: %s\nlast_reviewed: y\n---\n# %s (redirect, missing intent)\n' "$RAFID" "$RADOM" "$RTGT" "$RAFID" > "$RALIAS"
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-front-matter-valid" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "strict: redirect missing canon key (intent) → redirect-front-matter-valid FAIL"
+else
+  fail "strict redirect missing-key not caught on bash twin"
+fi
+rm -rf "$RDIR"
 
 # ── Section 3: broken fixture — Phase B gate runner ─────────────────────────
 section "3/5" "Phase B gates against broken fixture (expect 3 named fails, 0 UNCATEGORIZED-GATE-FAIL)"

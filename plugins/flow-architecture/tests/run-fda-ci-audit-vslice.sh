@@ -193,6 +193,52 @@ else
   fail "broken titled link not caught: exit $RC; OUT: $OUT"
 fi
 
+# ── Section 9: redirect-stub gate (BC-12907) ─────────────────────────────────
+# A doc_type:redirect stub is validated AS a redirect: resolvable pointer + valid
+# redirect front-matter; the story-frame/populated gates are skipped (it has no job
+# story by design). A dangling redirect_to hard-fails (renamed/removed canonical home).
+section "9" "redirect-stub gate: valid alias → exit 0 (story gates skipped); dangling → exit 1"
+FR="$(fresh_copy)"
+ALIAS="$(ls "$FR"/docs/product/flows/*/*.md | head -1)"
+TARGET_FID="$(basename "$(ls "$FR"/docs/product/flows/*/*.md | tail -1)" .md)"
+python3 - "$ALIAS" "$TARGET_FID" <<'PY'
+import os, sys
+p, target = sys.argv[1], sys.argv[2]
+fid = os.path.splitext(os.path.basename(p))[0]
+dom = os.path.basename(os.path.dirname(p))
+open(p, "w").write(
+    "---\nflow_id: %s\ndomain: %s\ndoc_type: redirect\nredirect_to: %s\n"
+    "intent: ../../intent.md\nlast_reviewed: '2026-05-20'\n---\n# %s (redirect stub)\n"
+    % (fid, dom, target, fid))
+PY
+run_audit "$FR"
+if [ "$RC" = "0" ]; then pass "valid redirect stub (lenient) → exit 0 (story-frame skipped)"; else fail "valid redirect blocked: exit $RC; OUT: $OUT"; fi
+# dangling: point redirect_to at a non-existent flow (kept LENIENT so redirect-target is the SOLE failure)
+python3 - "$ALIAS" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: NOPE-00', s, count=1, flags=re.M))
+PY
+run_audit "$FR"
+if [ "$RC" = "1" ] && printf '%s' "$OUT" | grep -qi 'redirect-target'; then
+  pass "dangling redirect_to → exit 1 + names redirect-target"
+else
+  fail "dangling redirect not caught: exit $RC; OUT: $OUT"
+fi
+# self-pointer: redirect_to == the doc's own flow_id (a no-op loop) → exit 1 (BC-12907 review-fix)
+python3 - "$ALIAS" <<'PY'
+import os, re, sys
+p = sys.argv[1]; fid = os.path.splitext(os.path.basename(p))[0]
+s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: %s' % fid, s, count=1, flags=re.M))
+PY
+run_audit "$FR"
+if [ "$RC" = "1" ] && printf '%s' "$OUT" | grep -qi 'redirect-target'; then
+  pass "self-pointer redirect_to (== own flow_id) → exit 1 + names redirect-target"
+else
+  fail "self-pointer redirect not caught: exit $RC; OUT: $OUT"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%s\n' '------------------------------------------'
 printf 'BC-12303 fda-ci-audit vslice: %d pass / %d fail\n' "$PASS" "$FAIL"

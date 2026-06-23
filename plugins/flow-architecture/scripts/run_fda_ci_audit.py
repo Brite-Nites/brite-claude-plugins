@@ -107,6 +107,26 @@ def audit(repo: Path) -> list:
         for doc in bar._story_docs(repo, domain):
             text = bar._read(doc)
             scope = "flow:" + doc.stem
+            if bar._doc_type(text) == "redirect":
+                # Redirect stub (BC-12907): an intentional alias to another flow's
+                # canonical home — validated AS a redirect (resolvable pointer + valid
+                # redirect front-matter); the story-frame + populated gates are skipped.
+                # Body link-resolution below still applies (the alias must link a real doc).
+                rt = bar._yaml_scalar_text(text, "redirect_to")
+                if not bar._redirect_to_resolvable(repo, rt, doc.stem):
+                    failures.append({"gate": "redirect-target", "scope": scope,
+                                     "detail": "redirect_to=" + (rt.strip() or "∅") + " does not resolve"})
+                if fm_mode == "strict":
+                    res = ffl.lint_text(text, "redirect")
+                    if res["drift"] or res["missing"]:
+                        bits = []
+                        if res["drift"]:
+                            bits.append("drift=" + ",".join(d.split(" ")[0] for d in res["drift"][:4]))
+                        if res["missing"]:
+                            bits.append("missing=" + ",".join(m.split(" ")[0] for m in res["missing"][:4]))
+                        failures.append({"gate": "frontmatter-schema", "scope": scope,
+                                         "detail": "; ".join(bits)})
+                continue
             if not bar._story_frontmatter_populated(text, fm_mode):
                 detail = ""
                 if fm_mode == "strict":
