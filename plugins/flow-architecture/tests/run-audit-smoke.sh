@@ -101,10 +101,12 @@ children_field_present() {
 # hardcode the human-only frame (the global end-state). Tracked on a BC-11983 child;
 # see memory/decision_fda_gate_narrowing_per_repo_transient.md. Do not let it ossify.
 #
-# story_frame_present <doc> [<mode>] — the `story-job-story-regex` gate. Always
-# accepts the human job-story frame (**When** + **I want to** + **so I can**). The
-# retired constraint-spec frame (**Given** + **MUST** + **so that**, non-human /
-# infrastructure actors, per rubric D11) is accepted ONLY under the LENIENT floor
+# story_frame_present <doc> [<mode>] — the `story-job-story-regex` gate. Each marker
+# is matched as a keyword inside a bold span (not only an exact `**keyword**` span,
+# BC-13751). Always accepts the human job-story frame: **When** + **I want** (trailing
+# "to" optional) + **so I can**. The retired constraint-spec frame (**Given** +
+# **MUST** + **so that** — **MUST** also matches inside e.g. **the system MUST** —
+# non-human / infrastructure actors, per rubric D11) is accepted ONLY under the LENIENT floor
 # (BC-12134) — the default. When <mode> is `strict` (per-repo gate-narrowing, the
 # consumer repo's .flow/config.json `story_frame: strict`, Q29 amendment 3) the
 # constraint-spec frame NO LONGER satisfies the gate, so a constraint-spec-only doc
@@ -121,6 +123,15 @@ children_field_present() {
 # present in the section. Cosmetic blockquote / capitalization differences are
 # tolerated (grep -i); the gate enforces the semantic FRAME, not line breaks. Gate
 # ID unchanged across both modes (Q29 gate-stack stability).
+# _frame_marker <region> <keyword> — true if <keyword> (word-boundaried) sits inside a
+# bold span (`**…**`) in <region>. Extracts each real bold run first (`grep -oE
+# '\*\*[^*]+\*\*'`, non-overlapping per line, so the plain text BETWEEN two spans is
+# never read as one span — guards the brite-labs false-positive where `**Doc type:**`
+# … unbolded `Given … MUST … so that` … `**persona link**` would pair across the gap),
+# then matches the keyword inside. Loosens marker matching from the exact `**keyword**`
+# span to keyword-in-span, so phrase-bolded `**the system MUST**` / the "to"-less
+# `**I want**` pass; the bold REQUIREMENT is unchanged. Mirrors build_audit_report marker().
+_frame_marker() { printf '%s' "$1" | grep -oE '\*\*[^*]+\*\*' | grep -qiE "\b$2\b"; }
 story_frame_present() {
   local doc="$1" mode region
   # Normalize <mode> to lowercase (bash-3.2-safe via tr, NOT ${2,,}) so the function
@@ -137,21 +148,24 @@ story_frame_present() {
   # both structures; if there is no `## Acceptance` heading, fall back to the whole
   # doc. The frame markers never appear in the front-matter, summary, or ACs.
   region="$(awk '/^## Acceptance/{exit} {print}' "$doc")"
-  # Human job-story frame: all three bold markers present in the region. The
-  # canonical human-anchored JTBD frame — always accepted, in either mode.
-  if printf '%s' "$region" | grep -qiE '\*\*When\*\*' \
-     && printf '%s' "$region" | grep -qiE '\*\*I want to\*\*' \
-     && printf '%s' "$region" | grep -qiE '\*\*so I can\*\*'; then
+  # Human job-story frame: all three markers present (each a keyword inside a bold
+  # span) in the region. The canonical human-anchored JTBD frame — always accepted, in
+  # either mode. `I want` (not `I want to`) so the "to"-less near-miss passes; `so I can`
+  # keeps its full phrase (bare `**so**` is deferred to the brite-base epic).
+  if _frame_marker "$region" 'When' \
+     && _frame_marker "$region" 'I want' \
+     && _frame_marker "$region" 'so I can'; then
     return 0
   fi
   # Constraint-spec frame: Given + MUST + so that. The RETIRED non-human / system
   # frame — accepted only under the lenient floor so not-yet-reframed consumer
   # repos keep passing mid-migration. Under `strict` it is rejected (the doc must
-  # be re-anchored on the human the mechanism serves).
+  # be re-anchored on the human the mechanism serves). `MUST` matched inside its bold
+  # span recognizes phrase-bolded `**the system MUST**`.
   if [ "$mode" != "strict" ]; then
-    if printf '%s' "$region" | grep -qiE '\*\*Given\*\*' \
-       && printf '%s' "$region" | grep -qiE '\*\*MUST\*\*' \
-       && printf '%s' "$region" | grep -qiE '\*\*so that\*\*'; then
+    if _frame_marker "$region" 'Given' \
+       && _frame_marker "$region" 'MUST' \
+       && _frame_marker "$region" 'so that'; then
       return 0
     fi
   fi
@@ -599,6 +613,34 @@ if story_frame_present "$FRAME_TMP/jobstory-1line.md" Strict; then
 else
   fail "strict (mixed-case mode 'Strict'): gate rejected a valid human frame"
 fi
+
+# ── Section 4b-bis: marker-form brittleness — core keyword INSIDE a bold span ──
+# BC-13751. story_frame_present matches a marker's keyword inside a bold span, not
+# only as the exact `**keyword**` span — so phrase-bolded `**the system MUST**` and
+# the "to"-less `**I want**` are recognized (valid frames previously flagged as false-
+# negatives across supply/roster). The bold REQUIREMENT is unchanged (unbolded prose
+# never passes) and keywords are word-boundaried. Mirror of test_build_audit_report.sh § 2b.
+section "4b-bis/5" "marker-form brittleness: keyword-in-bold-span (BC-13751)"
+printf '## Job story\n\n%s\n' '> **Given** a req, **the system MUST** serve, **so that** crawlable.' > "$FRAME_TMP/phrase-must.md"
+printf '## Job story\n\n%s\n' '> **When** x, **I want** y, **so I can** z.' > "$FRAME_TMP/iwant-no-to.md"
+printf '## Job story\n\n%s\n' '> Given a crawler requests the page, the system MUST serve a sitemap, so that pages rank.' > "$FRAME_TMP/unbolded.md"
+printf '## Job story\n\n%s\n' '> **When** x, **I want to** y, **so** z.' > "$FRAME_TMP/so-trunc.md"
+printf '## Job story\n\n%s\n' '> **Given** a req, **mustard glaze** is applied, **so that** it works.' > "$FRAME_TMP/mustard.md"
+printf '## Job story\n\n%s\n' '> **When** x, **I wanted to** y, **so I can** z.' > "$FRAME_TMP/iwanted.md"
+# Positives (lenient): the two real fan-out near-miss shapes are now accepted.
+for v in phrase-must iwant-no-to; do
+  if story_frame_present "$FRAME_TMP/$v.md"; then pass "lenient accepts near-miss $v"; else fail "lenient rejected valid near-miss $v"; fi
+done
+# **I want** (human) is strict-ready; **the system MUST** (constraint) stays strict-rejected.
+if story_frame_present "$FRAME_TMP/iwant-no-to.md" strict; then pass "strict accepts **I want** human near-miss (strict-ready)"; else fail "strict rejected **I want** human near-miss"; fi
+if story_frame_present "$FRAME_TMP/phrase-must.md" strict; then fail "strict accepted phrase-bolded constraint (mode guard broken)"; else pass "strict still rejects phrase-bolded constraint"; fi
+# GAP control (the real brite-labs false-positive): two unrelated bold spans with
+# unbolded Given/MUST/so-that prose BETWEEN them must NOT read as one bold span.
+printf '## Job story\n\n%s\n' '> **Doc type:** Constraint spec. Given a req, the system MUST serve, so that crawlable. Beneficiary: **[Persona](p.md)**' > "$FRAME_TMP/gap.md"
+# Negative controls (lenient): the loosening must NOT widen any of these.
+for v in unbolded so-trunc mustard iwanted gap; do
+  if story_frame_present "$FRAME_TMP/$v.md"; then fail "lenient WRONGLY accepted $v (over-loosened)"; else pass "lenient still rejects $v"; fi
+done
 
 # ── Section 4c: story_frame:strict threads through run_phase_b_gates end-to-end ─
 # The unit assertions above pin the function; this pins the WIRING — that

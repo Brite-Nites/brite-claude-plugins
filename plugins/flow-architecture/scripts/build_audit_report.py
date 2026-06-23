@@ -183,9 +183,13 @@ def _story_frontmatter_populated(doc_text: str, mode: str) -> bool:
 
 def _story_frame_present(doc_text: str, mode: str) -> bool:
     """The story-job-story-regex predicate. Region-scoped (title → first
-    `## Acceptance`); the human frame (When/I want to/so I can) always passes; the
-    legacy constraint-spec frame (Given/MUST/so that) passes only under lenient.
-    Mirrors smoke story_frame_present() — case-insensitive, line-form-agnostic."""
+    `## Acceptance`). Each marker is matched as its core keyword inside a bold span
+    (`**…**`), not only as an exact `**keyword**` span (BC-13751): the human frame is
+    When + `I want` (trailing "to" optional) + `so I can`; the legacy constraint-spec
+    frame is Given + MUST + so that (e.g. `**the system MUST**`). The human frame
+    always passes; the constraint frame passes only under lenient. Bold is required —
+    unbolded prose never matches. Mirrors smoke story_frame_present() —
+    case-insensitive, line-form-agnostic."""
     region_lines = []
     for ln in doc_text.splitlines():
         if ln.startswith("## Acceptance"):
@@ -193,13 +197,27 @@ def _story_frame_present(doc_text: str, mode: str) -> bool:
         region_lines.append(ln)
     region = "\n".join(region_lines)
 
-    def has(pat: str) -> bool:
-        return re.search(pat, region, re.IGNORECASE) is not None
+    # Extract the CONTENT of each bold span (`**…**`) left-to-right, non-overlapping —
+    # `[^*\n]+` can't cross an asterisk or a newline, so each match is one real
+    # single-line bold run and the plain text BETWEEN two spans is never captured.
+    # (Guards a false-positive where `**A** … keyword … **B**` would read as one span:
+    # a `**Doc type:**` blockquote followed much later by a bolded persona link, with
+    # unbolded `Given … MUST … so that` prose in between — observed in brite-labs.)
+    # A marker is present if its word-boundaried keyword sits inside one of those spans
+    # (BC-13751): recognizes phrase-bolded `**the system MUST**` / "to"-less `**I want**`
+    # while the bold REQUIREMENT stays intact (unbolded prose has no qualifying span);
+    # keywords are word-boundaried so "must" in "mustard" / "I want" in "I wanted" do
+    # not leak. `so I can` keeps its full phrase (bare `**so**` is deferred to the
+    # brite-base epic). Line-scoped (`[^*\n]`) to mirror the bash twin's `grep -o`.
+    bold_spans = re.findall(r"\*\*([^*\n]+)\*\*", region)
 
-    if has(r"\*\*When\*\*") and has(r"\*\*I want to\*\*") and has(r"\*\*so I can\*\*"):
+    def marker(kw: str) -> bool:
+        return any(re.search(r"\b" + kw + r"\b", s, re.IGNORECASE) for s in bold_spans)
+
+    if marker("When") and marker("I want") and marker("so I can"):
         return True
     if mode != "strict":
-        if has(r"\*\*Given\*\*") and has(r"\*\*MUST\*\*") and has(r"\*\*so that\*\*"):
+        if marker("Given") and marker("MUST") and marker("so that"):
             return True
     return False
 
