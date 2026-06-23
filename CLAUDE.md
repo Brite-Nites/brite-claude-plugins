@@ -28,6 +28,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full script reference, `plugin.js
 - **Skill ↔ tool integration pattern:** [`docs/guides/skill-tool-integration-pattern.md`](docs/guides/skill-tool-integration-pattern.md) — how skills reference MCP servers. Apply the 6-item PR checklist before merging any skill that calls an external service.
 - **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) — plugin resolution, runtime flow, hook execution, full skill routing catalog.
 - **Marketing skill porting:** [`docs/guides/marketing-skill-porting.md`](docs/guides/marketing-skill-porting.md) — upstream `coreyhaines31/marketingskills` → `plugins/marketing/` conventions.
+- **Marketing context (Tier 2, BC-1966):** @docs/marketing-context.md — entity positioning/ICP/voice read by all marketing skills; session-start staleness-checks its `last_refreshed`.
 
 ## Architecture Decisions
 
