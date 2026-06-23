@@ -101,10 +101,12 @@ children_field_present() {
 # hardcode the human-only frame (the global end-state). Tracked on a BC-11983 child;
 # see memory/decision_fda_gate_narrowing_per_repo_transient.md. Do not let it ossify.
 #
-# story_frame_present <doc> [<mode>] — the `story-job-story-regex` gate. Always
-# accepts the human job-story frame (**When** + **I want to** + **so I can**). The
-# retired constraint-spec frame (**Given** + **MUST** + **so that**, non-human /
-# infrastructure actors, per rubric D11) is accepted ONLY under the LENIENT floor
+# story_frame_present <doc> [<mode>] — the `story-job-story-regex` gate. Each marker
+# is matched as a keyword inside a bold span (not only an exact `**keyword**` span,
+# BC-13751). Always accepts the human job-story frame: **When** + **I want** (trailing
+# "to" optional) + **so I can**. The retired constraint-spec frame (**Given** +
+# **MUST** + **so that** — **MUST** also matches inside e.g. **the system MUST** —
+# non-human / infrastructure actors, per rubric D11) is accepted ONLY under the LENIENT floor
 # (BC-12134) — the default. When <mode> is `strict` (per-repo gate-narrowing, the
 # consumer repo's .flow/config.json `story_frame: strict`, Q29 amendment 3) the
 # constraint-spec frame NO LONGER satisfies the gate, so a constraint-spec-only doc

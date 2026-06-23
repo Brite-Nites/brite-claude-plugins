@@ -183,9 +183,13 @@ def _story_frontmatter_populated(doc_text: str, mode: str) -> bool:
 
 def _story_frame_present(doc_text: str, mode: str) -> bool:
     """The story-job-story-regex predicate. Region-scoped (title → first
-    `## Acceptance`); the human frame (When/I want to/so I can) always passes; the
-    legacy constraint-spec frame (Given/MUST/so that) passes only under lenient.
-    Mirrors smoke story_frame_present() — case-insensitive, line-form-agnostic."""
+    `## Acceptance`). Each marker is matched as its core keyword inside a bold span
+    (`**…**`), not only as an exact `**keyword**` span (BC-13751): the human frame is
+    When + `I want` (trailing "to" optional) + `so I can`; the legacy constraint-spec
+    frame is Given + MUST + so that (e.g. `**the system MUST**`). The human frame
+    always passes; the constraint frame passes only under lenient. Bold is required —
+    unbolded prose never matches. Mirrors smoke story_frame_present() —
+    case-insensitive, line-form-agnostic."""
     region_lines = []
     for ln in doc_text.splitlines():
         if ln.startswith("## Acceptance"):
