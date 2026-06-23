@@ -220,6 +220,36 @@ grep -Eq '^  story: BC-26011$' "$TMP/WGT-06.out" \
   && pass "duplicate children rows resolve last-wins (second row's BC stamped)" \
   || fail "duplicate-row last-wins not honored"
 
+# ── §12: redirect-stub emission (BC-12907) ────────────────────────────
+section "12" "redirect stub: --doc-type redirect emits REDIRECT_CANON, round-trips the lint, guards"
+python3 "$BUILDER" --flow-id SFI-05 --as-of "$AS_OF" --doc-type redirect --redirect-to ACL-06 \
+  > "$TMP/redirect.out" 2>"$TMP/redirect.err" \
+  && pass "redirect emit exits 0 (no scaffold-log needed)" \
+  || { fail "redirect emit non-zero"; cat "$TMP/redirect.err" >&2; }
+if grep -q '^doc_type: redirect$' "$TMP/redirect.out" && grep -q '^redirect_to: ACL-06$' "$TMP/redirect.out" \
+   && ! grep -qE '^(children|status|personas|qa_status):' "$TMP/redirect.out"; then
+  pass "redirect frontmatter has doc_type+redirect_to, no story-only keys"
+else
+  fail "redirect frontmatter shape wrong"; cat "$TMP/redirect.out" >&2
+fi
+RLINT="$(python3 - "$PLUGIN_ROOT/scripts/lib" "$TMP/redirect.out" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import flow_frontmatter_lint as m
+r = m.lint_text(open(sys.argv[2]).read(), "redirect")
+print("%d %d" % (len(r["missing"]), len(r["drift"])))
+PY
+)"
+[ "$RLINT" = "0 0" ] \
+  && pass "emitted redirect round-trips REDIRECT_CANON (0 missing / 0 drift)" \
+  || fail "emitted redirect fails its own lint: missing/drift=$RLINT"
+python3 "$BUILDER" --flow-id SFI-05 --as-of "$AS_OF" --doc-type redirect >/dev/null 2>&1 \
+  && fail "redirect without --redirect-to should exit 2" \
+  || pass "redirect without --redirect-to → exit 2"
+python3 "$BUILDER" --flow-id SFI-05 --as-of "$AS_OF" >/dev/null 2>&1 \
+  && fail "story without --scaffold-log should exit 2" \
+  || pass "story without --scaffold-log → exit 2"
+
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
