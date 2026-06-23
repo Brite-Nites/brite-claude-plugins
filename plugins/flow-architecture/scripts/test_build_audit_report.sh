@@ -131,6 +131,33 @@ try:
 finally:
     shutil.rmtree(_RB, ignore_errors=True)
 
+# ── R2. evaluate() honors the redirect profile (BC-12907): redirect gates, story gates skipped ──
+def _eval_redirect_repo(target):
+    box = tempfile.mkdtemp()
+    a = os.path.join(box, "docs", "product", "flows", "audit-acl"); os.makedirs(a)
+    open(os.path.join(a, "ACL-06.md"), "w").write("# ACL-06\n")
+    s = os.path.join(box, "docs", "product", "flows", "secure-file-ingestion"); os.makedirs(s)
+    open(os.path.join(s, "SFI-05.md"), "w").write(
+        "---\nflow_id: SFI-05\ndomain: secure-file-ingestion\ndoc_type: redirect\n"
+        "redirect_to: %s\nintent: x\nlast_reviewed: y\n---\n# SFI-05 (redirect)\n" % target)
+    return box
+def _sfi_gates(box):
+    return {(g["id"], g["status"]) for g in bar.evaluate(bar.Path(box)) if g["scope"] == "flow:SFI-05"}
+_E1 = _eval_redirect_repo("ACL-06")
+try:
+    g1 = _sfi_gates(_E1); ids1 = {i for (i, s) in g1}
+    truthy("evaluate: valid redirect → redirect-target-resolvable=pass", ("redirect-target-resolvable", "pass") in g1)
+    truthy("evaluate: redirect SKIPS story-job-story-regex", "story-job-story-regex" not in ids1)
+    truthy("evaluate: redirect SKIPS story-front-matter-populated", "story-front-matter-populated" not in ids1)
+finally:
+    shutil.rmtree(_E1, ignore_errors=True)
+_E2 = _eval_redirect_repo("NOPE-99")
+try:
+    truthy("evaluate: dangling redirect → redirect-target-resolvable=hard-fail",
+           ("redirect-target-resolvable", "hard-fail") in _sfi_gates(_E2))
+finally:
+    shutil.rmtree(_E2, ignore_errors=True)
+
 # ── 3. config story_frame mode reader (fail-safe lenient) ─────────────────────
 def cfgmode(val):
     box = tempfile.mkdtemp()

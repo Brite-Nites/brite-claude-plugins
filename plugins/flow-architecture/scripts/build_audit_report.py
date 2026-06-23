@@ -352,6 +352,27 @@ def evaluate(repo: Path) -> list:
 
             emit("pass", "story-doc-exists", scope)
 
+            if _doc_type(t) == "redirect":
+                # Redirect stub (BC-12907): an intentional alias to another flow's
+                # canonical home — validated AS a redirect (resolvable pointer + valid
+                # redirect front-matter); the story-frame / populated / gherkin /
+                # children / qa gates are skipped (it has no job story by design).
+                rt = _yaml_scalar_text(t, "redirect_to")
+                emit("pass" if _redirect_to_resolvable(repo, rt) else "hard-fail",
+                     "redirect-target-resolvable", scope, f"redirect_to={rt.strip() or '∅'}")
+                if fm_schema_mode == "strict":
+                    rres = _ffl.lint_text(t, "redirect")
+                    bits = []
+                    if rres["missing"]:
+                        bits.append("missing=" + ",".join(m.split(" ")[0] for m in rres["missing"][:4]))
+                    if rres["drift"]:
+                        bits.append("drift=" + ",".join(d.split(" ")[0] for d in rres["drift"][:4]))
+                    emit("hard-fail" if bits else "pass", "redirect-front-matter-valid",
+                         scope, "; ".join(bits))
+                else:
+                    emit("pass", "redirect-front-matter-valid", scope)
+                continue
+
             emit("pass" if _story_frontmatter_populated(t, fm_schema_mode)
                  else "hard-fail", "story-front-matter-populated", scope)
 

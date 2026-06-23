@@ -61,7 +61,8 @@ story-docs-complete journey-complete index-complete \
 story-doc-exists story-front-matter-populated story-job-story-regex story-ac-gherkin-count \
 eng-children-engineering-populated design-children-design-populated docs-children-docs-populated \
 qa-children-qa-populated qa-status-signed-off qa-last-signed-off-iso8601 qa-history-row-signed-off \
-inventory-story-doc-id-match index-story-doc-status-match cross-domain-deps-bidirectional"
+inventory-story-doc-id-match index-story-doc-status-match cross-domain-deps-bidirectional \
+redirect-target-resolvable redirect-front-matter-valid"
 
 is_recognized_gate() {
   case " $RECOGNIZED_GATES " in
@@ -338,6 +339,33 @@ PY
 
         emit_gate PASS story-doc-exists "$scope"
 
+        if grep -qE '^doc_type:[[:space:]]*redirect[[:space:]]*$' "$doc"; then
+          # Redirect stub (BC-12907): validate AS a redirect (resolvable pointer +
+          # valid redirect front-matter); skip the story-frame / populated / gherkin /
+          # children / qa gates. Mirrors build_audit_report.evaluate()'s redirect branch.
+          local rt
+          rt="$(awk -F':[[:space:]]*' '/^redirect_to:/ {print $2; exit}' "$doc")"
+          if [ -n "$rt" ] && ls "$fixture"/docs/product/flows/*/"$rt".md >/dev/null 2>&1; then
+            emit_gate PASS redirect-target-resolvable "$scope" "redirect_to=$rt"
+          else
+            emit_gate FAIL redirect-target-resolvable "$scope" "redirect_to=${rt:-∅}"
+          fi
+          if [ "$fm_schema_mode" = "strict" ]; then
+            local rmiss=""
+            for k in flow_id domain doc_type redirect_to intent last_reviewed; do
+              grep -qE "^$k:" "$doc" || rmiss="$rmiss $k"
+            done
+            if [ -z "$rmiss" ]; then
+              emit_gate PASS redirect-front-matter-valid "$scope"
+            else
+              emit_gate FAIL redirect-front-matter-valid "$scope" "missing=$rmiss"
+            fi
+          else
+            emit_gate PASS redirect-front-matter-valid "$scope"
+          fi
+          continue
+        fi
+
         if story_frontmatter_populated "$doc" "$fm_schema_mode"; then
           emit_gate PASS story-front-matter-populated "$scope"
         else
@@ -494,6 +522,40 @@ else
   fail "clean fixture: $CLEAN_FAILS FAIL, $CLEAN_UNCAT UNCATEGORIZED-GATE-FAIL (expected 0/0)"
   awk -F'\t' '$1 != "PASS" {printf "    | %s\t%s\t%s\t%s\n",$1,$2,$3,$4}' "$GATE_REPORT"
 fi
+
+# ── Section 2-redirect: redirect-stub gate (BC-12907) ────────────────────────
+# A doc_type:redirect stub is validated AS a redirect (resolvable pointer; story gates
+# skipped) — mirrors build_audit_report.evaluate(). Dedicated temp repo so the clean /
+# broken fixtures stay redirect-free (the eval oracle cross-checks only those two).
+section "2-redirect" "redirect-stub gate: valid alias skips story-frame; dangling fails"
+RDIR="$(mktemp -d)"; cp -R "$CLEAN_FIXTURE/." "$RDIR/"
+RALIAS="$(ls "$RDIR"/docs/product/flows/*/*.md | head -1)"
+RTGT="$(basename "$(ls "$RDIR"/docs/product/flows/*/*.md | tail -1)" .md)"
+RAFID="$(basename "$RALIAS" .md)"; RADOM="$(basename "$(dirname "$RALIAS")")"
+printf -- '---\nflow_id: %s\ndomain: %s\ndoc_type: redirect\nredirect_to: %s\nintent: x\nlast_reviewed: y\n---\n# %s (redirect)\n' "$RAFID" "$RADOM" "$RTGT" "$RAFID" > "$RALIAS"
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="PASS" && $2=="redirect-target-resolvable" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "valid redirect → redirect-target-resolvable PASS at flow:$RAFID"
+else
+  fail "valid redirect: redirect-target-resolvable not PASS at flow:$RAFID"
+fi
+if awk -F'\t' -v s="flow:$RAFID" '$2=="story-job-story-regex" && $3==s{seen=1} END{exit seen}' "$GATE_REPORT"; then
+  pass "redirect doc SKIPS story-job-story-regex (no story gate emitted)"
+else
+  fail "redirect doc still emitted story-job-story-regex"
+fi
+python3 - "$RALIAS" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+open(p, "w").write(re.sub(r'^redirect_to:.*$', 'redirect_to: NOPE-99', s, count=1, flags=re.M))
+PY
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-target-resolvable" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "dangling redirect_to → redirect-target-resolvable FAIL"
+else
+  fail "dangling redirect not caught"
+fi
+rm -rf "$RDIR"
 
 # ── Section 3: broken fixture — Phase B gate runner ─────────────────────────
 section "3/5" "Phase B gates against broken fixture (expect 3 named fails, 0 UNCATEGORIZED-GATE-FAIL)"
