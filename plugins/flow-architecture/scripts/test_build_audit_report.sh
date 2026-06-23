@@ -107,6 +107,30 @@ GAP = ("# T\n\n> **Doc type:** Constraint spec. Given a req, the system MUST ser
 truthy("UNBOLDED markers between two bold spans do not satisfy the frame (gap is not a span)",
        not bar._story_frame_present(GAP, "lenient"))
 
+# ── R. redirect-stub predicates (BC-12907): doc_type marker + resolvable pointer ──
+eq("_doc_type reads the marker", bar._doc_type("---\ndoc_type: redirect\n---\n# x\n"), "redirect")
+eq("_doc_type case/quote tolerant", bar._doc_type('---\ndoc_type: "Redirect"\n---\n'), "redirect")
+eq("_doc_type absent → ''", bar._doc_type("---\nflow_id: X-01\n---\n"), "")
+def _redirect_repo():
+    box = tempfile.mkdtemp()
+    for dom, fid in (("audit-acl", "ACL-06"), ("secure-file-ingestion", "SFI-05")):
+        d = os.path.join(box, "docs", "product", "flows", dom)
+        os.makedirs(d)
+        open(os.path.join(d, fid + ".md"), "w").write("# " + fid + "\n")
+    return box
+_RB = _redirect_repo()
+try:
+    truthy("redirect_to resolvable across domains (SFI-05 alias → ACL-06)",
+           bar._redirect_to_resolvable(bar.Path(_RB), "ACL-06"))
+    truthy("redirect_to tolerates backticks/space (`ACL-06`)",
+           bar._redirect_to_resolvable(bar.Path(_RB), "`ACL-06`"))
+    truthy("redirect_to dangling (no such flow) → False",
+           not bar._redirect_to_resolvable(bar.Path(_RB), "NOPE-99"))
+    truthy("redirect_to empty → False",
+           not bar._redirect_to_resolvable(bar.Path(_RB), ""))
+finally:
+    shutil.rmtree(_RB, ignore_errors=True)
+
 # ── 3. config story_frame mode reader (fail-safe lenient) ─────────────────────
 def cfgmode(val):
     box = tempfile.mkdtemp()

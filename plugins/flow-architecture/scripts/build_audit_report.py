@@ -256,6 +256,24 @@ def _story_docs(repo: Path, domain: str) -> list:
     return sorted(p for p in d.glob("*.md") if p.is_file())
 
 
+def _doc_type(doc_text: str) -> str:
+    """The `doc_type:` front-matter scalar, lower-cased (e.g. 'redirect'), '' if absent.
+    Selects the redirect-validation profile (BC-12907)."""
+    return _yaml_scalar_text(doc_text, "doc_type").strip().strip('"').strip("'").lower()
+
+
+def _redirect_to_resolvable(repo: Path, redirect_to: str) -> bool:
+    """True if `redirect_to` names a resolvable flow (BC-12907). The pointer is a
+    canonical flow_id (e.g. `ACL-06`), resolved by GLOBAL lookup across all domains —
+    a redirect commonly targets ANOTHER domain (roster SFI-05 → audit-acl/ACL-06), so a
+    same-directory check would wrongly fail. Empty or no-such-flow → False (a dangling
+    pointer hard-fails the redirect gate)."""
+    fid = (redirect_to or "").strip().strip("`").strip().strip('"').strip("'")
+    if not fid:
+        return False
+    return any(d.stem == fid for dom in _domains(repo) for d in _story_docs(repo, dom))
+
+
 # ── the Phase-B gate evaluator (pure; the load-bearing logic under test) ──────
 
 
