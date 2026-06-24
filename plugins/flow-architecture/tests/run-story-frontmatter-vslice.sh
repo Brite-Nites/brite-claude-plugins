@@ -277,6 +277,15 @@ if grep -qxF 'personas: [operator, "off", "123"]' "$TMP/coerce.out" \
 else
   fail "list tokens not coercion-guarded: $(grep -E '^(personas|related_flows):' "$TMP/coerce.out")"
 fi
+# domain (flow_id prefix) is coercion-guarded too — a prefix like ON/NO/OFF coerces
+# (case-insensitive). Tested via the redirect path (no scaffold-log needed); _emit and
+# _emit_redirect share the identical guarded `domain:` line (BC-13797 review-fix).
+python3 "$BUILDER" --flow-id ON-01 --doc-type redirect --redirect-to WGT-01 --as-of "$AS_OF" > "$TMP/coerce-dom.out" 2>/dev/null
+if grep -qxF 'domain: "ON"' "$TMP/coerce-dom.out"; then
+  pass "coercion-prone domain prefix (ON) quoted"
+else
+  fail "domain prefix not coercion-guarded: $(grep '^domain:' "$TMP/coerce-dom.out")"
+fi
 
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"

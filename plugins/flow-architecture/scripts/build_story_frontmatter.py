@@ -142,7 +142,7 @@ def _emit(flow_id: str, parent: str, children: dict[str, str], status: str,
     lines = [
         "---",
         f"flow_id: {flow_id}",
-        f"domain: {domain}",
+        f"domain: {_yaml_safe_token(domain)}",
         f"status: {status}",
         f"parent_issue: {parent}",
         "children:",
@@ -180,7 +180,7 @@ def _emit_redirect(flow_id: str, redirect_to: str, as_of: str) -> str:
     return "\n".join([
         "---",
         f"flow_id: {flow_id}",
-        f"domain: {domain}",
+        f"domain: {_yaml_safe_token(domain)}",
         "doc_type: redirect",
         f"redirect_to: {redirect_to}",
         "intent: ../../intent.md",
