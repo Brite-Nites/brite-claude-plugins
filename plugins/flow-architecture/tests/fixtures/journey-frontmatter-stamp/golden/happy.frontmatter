@@ -9,5 +9,5 @@ flow_ids_in_scope: [WGT-1, WGT-2, WGT-3, WGT-10]
 status: in-progress
 figma: TBD
 intent: ../intent.md
-last_reviewed: 2026-06-11
+last_reviewed: '2026-06-11'
 ---

@@ -154,7 +154,7 @@ def _emit(flow_id: str, parent: str, children: dict[str, str], status: str,
         "design_status: not-started",
         "docs_status: not-started",
         "intent: ../../intent.md",
-        f"last_reviewed: {as_of}",
+        f"last_reviewed: '{as_of}'",  # quote: an unquoted ISO date is YAML-coerced to a date (BC-13796)
         "---",
     ]
     return "\n".join(lines) + "\n"
@@ -173,7 +173,7 @@ def _emit_redirect(flow_id: str, redirect_to: str, as_of: str) -> str:
         "doc_type: redirect",
         f"redirect_to: {redirect_to}",
         "intent: ../../intent.md",
-        f"last_reviewed: {as_of}",
+        f"last_reviewed: '{as_of}'",  # quote: an unquoted ISO date is YAML-coerced to a date (BC-13796)
         "---",
     ]) + "\n"
 
