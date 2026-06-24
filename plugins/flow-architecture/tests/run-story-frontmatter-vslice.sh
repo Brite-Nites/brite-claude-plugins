@@ -264,6 +264,29 @@ for out in "$TMP/WGT-01.out" "$TMP/redirect.out"; do
   fi
 done
 
+# ── §14: list tokens YAML-coercion-guarded (BC-13797) ─────────────────
+# personas/related_flows tokens are double-quoted IFF YAML would coerce them
+# (off→bool, 123→int, 2024-01-01→date); safe slugs stay raw. Without the guard a
+# `personas: [off]` parses as [False].
+section "14" "list tokens quoted iff YAML-coercion-prone (off/123/date), safe raw"
+python3 "$BUILDER" --scaffold-log "$LOG" --flow-id WGT-01 --as-of "$AS_OF" \
+  --personas "operator,off,123" --related-flows "WGT-02,2024-01-01" > "$TMP/coerce.out" 2>/dev/null
+if grep -qxF 'personas: [operator, "off", "123"]' "$TMP/coerce.out" \
+   && grep -qxF 'related_flows: [WGT-02, "2024-01-01"]' "$TMP/coerce.out"; then
+  pass "coercing list tokens quoted, safe tokens raw"
+else
+  fail "list tokens not coercion-guarded: $(grep -E '^(personas|related_flows):' "$TMP/coerce.out")"
+fi
+# domain (flow_id prefix) is coercion-guarded too — a prefix like ON/NO/OFF coerces
+# (case-insensitive). Tested via the redirect path (no scaffold-log needed); _emit and
+# _emit_redirect share the identical guarded `domain:` line (BC-13797 review-fix).
+python3 "$BUILDER" --flow-id ON-01 --doc-type redirect --redirect-to WGT-01 --as-of "$AS_OF" > "$TMP/coerce-dom.out" 2>/dev/null
+if grep -qxF 'domain: "ON"' "$TMP/coerce-dom.out"; then
+  pass "coercion-prone domain prefix (ON) quoted"
+else
+  fail "domain prefix not coercion-guarded: $(grep '^domain:' "$TMP/coerce-dom.out")"
+fi
+
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

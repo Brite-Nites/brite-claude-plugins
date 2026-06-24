@@ -208,7 +208,8 @@ def build_frontmatter(scaffold_log: Path, flows_dir: Path, as_of: str) -> str:
     log_scalars, _ = parsed
 
     domain_raw = log_scalars.get("domain", "").strip()
-    domain = domain_raw if _KEBAB_RE.match(domain_raw) else TBD
+    # YAML-coercion-guard a kebab domain ("off"→bool, "2024"→int) — BC-13797.
+    domain = _yaml_safe_token(domain_raw) if _KEBAB_RE.match(domain_raw) else TBD
     name = _yaml_safe_name(log_scalars.get("linear_milestone_name", "").strip())
     mid_raw = log_scalars.get("linear_milestone_id", "").strip()
     milestone_id = mid_raw if _UUID_RE.match(mid_raw) else TBD

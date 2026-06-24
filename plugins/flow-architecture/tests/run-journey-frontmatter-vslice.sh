@@ -172,6 +172,19 @@ else
   fail "missing milestone name did not degrade to TBD"; grep -E 'display_name|^  name' "$TMP/noname.out" >&2 || true
 fi
 
+# ── §4d: coercion-prone kebab domain is YAML-quoted (BC-13797) ─────────
+# A single-token kebab domain like `off`/`on`/`2024` passes _KEBAB_RE but YAML
+# would coerce it (off→bool, 2024→int); it must be quoted to stay a string.
+section "4d" "coercion-prone kebab domain (off) is YAML-quoted"
+printf -- '---\ndomain: off\nlinear_milestone_id: 7f3c2a10-aaaa-4bbb-8ccc-0123456789ab\nlinear_milestone_name: Widgets\n---\nbody\n' > "$TMP/coerce-domain-log.md"
+python3 "$BUILDER" --scaffold-log "$TMP/coerce-domain-log.md" --flows-dir "$FLOWS" --as-of "$AS_OF" \
+  > "$TMP/coerce-domain.out" 2>/dev/null || true
+if grep -qxF 'domain: "off"' "$TMP/coerce-domain.out"; then
+  pass "coercion-prone domain quoted (parses as str, not bool)"
+else
+  fail "domain not coercion-guarded: $(grep '^domain:' "$TMP/coerce-domain.out")"
+fi
+
 # ── §5: skip-don't-crash ───────────────────────────────────────────────
 section "5" "stray / junk-flow_id / unterminated docs are skipped whole, never aborting"
 if grep -qE 'stray|ghost-persona|not-a-flow|leaky-persona|WGT-7' "$TMP/happy.out"; then
