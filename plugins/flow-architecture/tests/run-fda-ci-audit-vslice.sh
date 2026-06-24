@@ -254,6 +254,40 @@ else
   fail "flow_index:skip doc was audited: exit $RC; OUT: $OUT"
 fi
 
+# ── §11: flow_index:skip excludes overview/index JOURNEY docs (BC-13819) ──────
+# Mirrors §10 for the journey surface. _journey_docs honors flow_index:skip so an
+# overview index (e.g. journeys/INDEX.md) is excluded from BOTH the ADR-033 schema
+# lint AND link-resolution — symmetric with the _story_docs exclusion. Tested via
+# the always-on link-resolution gate under LENIENT (a broken link in a skip doc must
+# NOT fire), isolating the exclusion where §4b proves a NON-skip journey link WOULD.
+section "11" "flow_index:skip journey overview excluded (broken link in skip doc → exit 0)"
+FJ="$(fresh_copy)"
+printf -- '---\nflow_index: skip\n---\n# Journey Index\n\nSee [ghost](./nonexistent-journey-overview-ref.md).\n' \
+  > "$FJ/docs/product/journeys/INDEX.md"
+run_audit "$FJ"
+if [ "$RC" = "0" ]; then
+  pass "flow_index:skip journey overview excluded → exit 0 (schema + link-res skipped)"
+else
+  fail "flow_index:skip journey doc was audited: exit $RC; OUT: $OUT"
+fi
+
+# ── §11b: …and from the STRICT journey schema-lint path too ───────────────────
+# §11 isolates the exclusion via the always-on link-resolution gate (lenient). This
+# covers the OTHER consumer of _journey_docs: the strict ADR-033 schema lint (gated
+# by frontmatter_schema:strict). Under strict the lean story docs fail (exit 1), so
+# we assert on the OUTPUT — a skip journey with junk frontmatter must NOT be NAMED as
+# a journey frontmatter-schema failure (it would be, were it not excluded).
+section "11b" "flow_index:skip journey excluded from the STRICT schema lint (not named)"
+FJS="$(fresh_copy)"; set_flag "$FJS" frontmatter_schema strict
+printf -- '---\nflow_index: skip\n---\n# Overview\nNot a journey — no ADR-033 canon.\n' \
+  > "$FJS/docs/product/journeys/zzz-overview.md"
+run_audit "$FJS"
+if printf '%s' "$OUT" | grep -qi 'journey:zzz-overview'; then
+  fail "flow_index:skip journey was schema-linted under strict: $OUT"
+else
+  pass "flow_index:skip journey excluded from strict schema lint (not named as a failure)"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%s\n' '------------------------------------------'
 printf 'BC-12303 fda-ci-audit vslice: %d pass / %d fail\n' "$PASS" "$FAIL"

@@ -58,11 +58,15 @@ _MD_LINK_RE = re.compile(
 def _journey_docs(repo: Path) -> list:
     # Intentionally covers ALL journeys/*.md (broader than bar.evaluate's per-domain
     # `journeys/{domain}.md` model) — safe for link-resolution, and the journey schema
-    # lint should hold any journey-shaped doc here to ADR-033 canon.
+    # lint should hold any journey-shaped doc here to ADR-033 canon. Docs marked
+    # `flow_index: skip` are excluded — overview/index docs (e.g. journeys/INDEX.md),
+    # not journeys (BC-13819, mirroring the _story_docs exclusion from BC-13805); the
+    # exclusion covers BOTH the schema lint and link-resolution, symmetric with stories.
     d = repo / "docs" / "product" / "journeys"
     if not d.is_dir():
         return []
-    return sorted(p for p in d.glob("*.md") if p.is_file())
+    return sorted(p for p in d.glob("*.md")
+                  if p.is_file() and not bar._flow_index_skipped(p))
 
 
 def _body_of(text: str) -> str:
