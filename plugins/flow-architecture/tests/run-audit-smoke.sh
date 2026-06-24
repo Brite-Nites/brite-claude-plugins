@@ -133,6 +133,9 @@ children_field_present() {
 # span to keyword-in-span, so phrase-bolded `**the system MUST**` / the "to"-less
 # `**I want**` pass; the bold REQUIREMENT is unchanged. Mirrors build_audit_report marker().
 _frame_marker() { printf '%s' "$1" | grep -oE '\*\*[^*]+\*\*' | grep -qiE "\b$2\b"; }
+# A doc opting out of flow enumeration (flow_index: skip) is an overview/index doc, not
+# a sub-flow story doc — mirrors build_audit_report._flow_index_skipped (BC-13805).
+_flow_index_skip() { grep -qiE "^flow_index:[[:space:]]*[\"']?skip[\"']?[[:space:]]*\$" "$1"; }
 story_frame_present() {
   local doc="$1" mode region
   # Normalize <mode> to lowercase (bash-3.2-safe via tr, NOT ${2,,}) so the function
@@ -320,7 +323,11 @@ PY
     ' "$fixture/docs/product/master-flow-inventory.md")"
     doc_count=0
     if [ -d "$fixture/docs/product/flows/$domain" ]; then
-      doc_count="$(find "$fixture/docs/product/flows/$domain" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+      for _d in "$fixture/docs/product/flows/$domain"/*.md; do
+        [ -f "$_d" ] || continue
+        _flow_index_skip "$_d" && continue   # overview/index docs aren't sub-flows (BC-13805)
+        doc_count=$((doc_count + 1))
+      done
     fi
     if [ "$inv_count" -gt 0 ] && [ "$inv_count" = "$doc_count" ]; then
       emit_gate PASS story-docs-complete "domain:$domain" "inventory=$inv_count docs=$doc_count"
@@ -333,6 +340,7 @@ PY
     if [ -d "$fixture/docs/product/flows/$domain" ]; then
       for doc in "$fixture/docs/product/flows/$domain"/*.md; do
         [ -f "$doc" ] || continue
+        _flow_index_skip "$doc" && continue   # skip overview/index docs (BC-13805)
         local fid scope
         fid="$(basename "$doc" .md)"
         scope="flow:$fid"
@@ -456,6 +464,7 @@ except Exception:
     [ -d "$fixture/docs/product/flows/$domain" ] || continue
     for doc in "$fixture/docs/product/flows/$domain"/*.md; do
       [ -f "$doc" ] || continue
+      _flow_index_skip "$doc" && continue   # skip overview/index docs (BC-13805)
       fid="$(awk '/^flow_id:/ {print $2; exit}' "$doc")"
       stat="$(awk '/^status:/ {print $2; exit}' "$doc")"
       # Guard emptiness to mirror evaluate()'s `if fid and ...` / `if fid and stat and ...`
@@ -616,6 +625,23 @@ else
   fail "strict redirect missing-key not caught on bash twin"
 fi
 rm -rf "$RDIR"
+
+# ── Section 2-skip: flow_index:skip excludes overview docs (BC-13805) ─────────
+# Bash-twin parity with build_audit_report._story_docs: a doc with `flow_index: skip`
+# is an overview/index, not a sub-flow — the twin must NOT emit per-flow gates for it
+# (even with content that would otherwise fail).
+section "2-skip" "flow_index:skip doc excluded from per-flow gates (Python↔bash parity)"
+SDIR="$(mktemp -d)"; cp -R "$CLEAN_FIXTURE/." "$SDIR/"
+SDOM="$(basename "$(dirname "$(ls "$SDIR"/docs/product/flows/*/*.md | head -1)")")"
+printf -- '---\ndomain: %s\nflow_index: skip\n---\n# Overview (not a sub-flow)\nNo job story.\n' "$SDOM" \
+  > "$SDIR/docs/product/flows/$SDOM/overview.md"
+run_phase_b_gates "$SDIR"
+if awk -F'\t' '$3=="flow:overview"{seen=1} END{exit seen}' "$GATE_REPORT"; then
+  pass "no per-flow gates emitted for the flow_index:skip doc"
+else
+  fail "bash twin audited a flow_index:skip doc (parity gap)"
+fi
+rm -rf "$SDIR"
 
 # ── Section 3: broken fixture — Phase B gate runner ─────────────────────────
 section "3/5" "Phase B gates against broken fixture (expect 3 named fails, 0 UNCATEGORIZED-GATE-FAIL)"

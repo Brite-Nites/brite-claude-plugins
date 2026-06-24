@@ -250,12 +250,25 @@ def _domains(repo: Path) -> list:
     return sorted(d.name for d in flows.iterdir() if d.is_dir())
 
 
+def _flow_index_skipped(p: Path) -> bool:
+    """True if the doc opts out of flow enumeration via `flow_index: skip` frontmatter
+    — an overview/index doc co-located in flows/, NOT a sub-flow story doc (BC-13805).
+    Unreadable → False (still audit it; never silently skip)."""
+    try:
+        text = _read(p)
+    except OSError:
+        return False
+    return _yaml_scalar_text(text, "flow_index").strip().strip('"').strip("'").lower() == "skip"
+
+
 def _story_docs(repo: Path, domain: str) -> list:
-    """Sorted *.md story docs in a domain dir (deterministic glob order)."""
+    """Sorted *.md story docs in a domain dir (deterministic glob order). Docs marked
+    `flow_index: skip` are excluded — overview/index docs, not sub-flows (BC-13805)."""
     d = repo / "docs" / "product" / "flows" / domain
     if not d.is_dir():
         return []
-    return sorted(p for p in d.glob("*.md") if p.is_file())
+    return sorted(p for p in d.glob("*.md")
+                  if p.is_file() and not _flow_index_skipped(p))
 
 
 def _doc_type(doc_text: str) -> str:

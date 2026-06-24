@@ -239,6 +239,21 @@ else
   fail "self-pointer redirect not caught: exit $RC; OUT: $OUT"
 fi
 
+# ── §10: flow_index:skip excludes overview/index docs (BC-13805) ──────────────
+# A non-sub-flow doc opting out via `flow_index: skip` must NOT be audited — even
+# with content that would otherwise hard-fail (no canon frontmatter, no frame).
+section "10" "flow_index:skip overview doc excluded from the audit"
+FS="$(fresh_copy)"
+ADOM="$(basename "$(dirname "$(ls "$FS"/docs/product/flows/*/*.md | head -1)")")"
+printf -- '---\ndomain: %s\nflow_index: skip\n---\n# Overview\nNo job story, no canon frontmatter.\n' "$ADOM" \
+  > "$FS/docs/product/flows/$ADOM/overview.md"
+run_audit "$FS"
+if [ "$RC" = "0" ]; then
+  pass "flow_index:skip overview doc excluded → exit 0 (not audited as a story)"
+else
+  fail "flow_index:skip doc was audited: exit $RC; OUT: $OUT"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%s\n' '------------------------------------------'
 printf 'BC-12303 fda-ci-audit vslice: %d pass / %d fail\n' "$PASS" "$FAIL"
