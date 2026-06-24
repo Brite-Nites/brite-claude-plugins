@@ -32,6 +32,7 @@ in the log (a deliberate literal `2`, matched by the harness — not POSIX os.EX
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -56,6 +57,9 @@ _LINEAR_ID_RE = re.compile(_ID_PATTERN)
 _STATUS_TAXONOMY = frozenset(
     {"NOT_STARTED", "IN_PROGRESS", "BUILT", "QA_SIGNED_OFF", "SHIPPED", "BLOCKED"})
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*\Z")
+# A _SLUG_RE-valid token whose bare YAML form coerces to a non-string (bool/int/date)
+# — mirrors build_journey_frontmatter's _YAML_AMBIGUOUS_RE/_yaml_safe_token (BC-13797).
+_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|on|off)\Z|^\d[\d_.,:-]*\Z")
 _CHILD_SLOTS = ("story", "engineering", "design", "qa", "docs")
 
 
@@ -120,9 +124,16 @@ def _parse_scaffold_log(text: str, flow_id: str) -> tuple[str, dict[str, str]]:
     return parent, children
 
 
+def _yaml_safe_token(token: str) -> str:
+    """A _SLUG_RE-validated list token → double-quoted iff YAML would coerce it
+    ("off"→bool, "123"→int, "2024-01-01"→date); otherwise emitted raw (BC-13797)."""
+    return json.dumps(token, ensure_ascii=True) if _YAML_AMBIGUOUS_RE.match(token) else token
+
+
 def _yaml_list(values: list[str]) -> str:
-    """Flow-style YAML list matching the job-story template (`[a, b]` / `[]`)."""
-    return "[" + ", ".join(values) + "]"
+    """Flow-style YAML list matching the job-story template (`[a, b]` / `[]`).
+    Each token is YAML-coercion-guarded (BC-13797)."""
+    return "[" + ", ".join(_yaml_safe_token(v) for v in values) + "]"
 
 
 def _emit(flow_id: str, parent: str, children: dict[str, str], status: str,
