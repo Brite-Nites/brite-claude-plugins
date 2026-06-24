@@ -225,6 +225,30 @@ try:
 finally:
     shutil.rmtree(_EX, ignore_errors=True)
 
+# ── R3. flow_index:skip excludes overview/index docs from story gates (BC-13805) ──
+def _skip_repo():
+    box = tempfile.mkdtemp()
+    d = os.path.join(box, "docs", "product", "flows", "quotes"); os.makedirs(d)
+    # a real sub-flow + an overview doc opting out via flow_index: skip
+    open(os.path.join(d, "QUO-01.md"), "w").write(
+        "---\nflow_id: QUO-01\ndomain: quotes\nstatus: BUILT\n---\n# QUO-01\n")
+    open(os.path.join(d, "user-flows.md"), "w").write(
+        "---\ndomain: quotes\nflow_index: skip\n---\n# Quote user flows (overview)\nNo job story.\n")
+    return box
+_SK = _skip_repo()
+try:
+    stems = {p.stem for p in bar._story_docs(bar.Path(_SK), "quotes")}
+    truthy("_story_docs EXCLUDES a flow_index:skip doc", "user-flows" not in stems)
+    truthy("_story_docs keeps the real sub-flow", "QUO-01" in stems)
+    truthy("_flow_index_skipped True for skip doc",
+           bar._flow_index_skipped(bar.Path(_SK) / "docs/product/flows/quotes/user-flows.md"))
+    truthy("_flow_index_skipped False for real doc",
+           not bar._flow_index_skipped(bar.Path(_SK) / "docs/product/flows/quotes/QUO-01.md"))
+    sk_scopes = {g["scope"] for g in bar.evaluate(bar.Path(_SK))}
+    truthy("evaluate emits NO gates for the skip doc", "flow:user-flows" not in sk_scopes)
+finally:
+    shutil.rmtree(_SK, ignore_errors=True)
+
 # ── 3. config story_frame mode reader (fail-safe lenient) ─────────────────────
 def cfgmode(val):
     box = tempfile.mkdtemp()
