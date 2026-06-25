@@ -174,9 +174,9 @@ while IFS= read -r fpath; do
     pat="${pattern#/}"
     [ -z "$pat" ] && continue
     hit=0
-    case "$fpath" in *"$pat"*) hit=1 ;; esac
+    case "$fpath" in *$pat*) hit=1 ;; esac
     if [ "$hit" = "0" ]; then
-      case "$fpath_rel" in *"$pat"*) hit=1 ;; esac
+      case "$fpath_rel" in *$pat*) hit=1 ;; esac
     fi
     if [ "$hit" = "1" ]; then
       matched_pattern="$pattern"
