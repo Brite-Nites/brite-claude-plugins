@@ -53,59 +53,58 @@ eq("broken fixture: EXACTLY the 3 documented hard-fails", fails(BROKEN), {
     ("eng-children-engineering-populated", "flow:SHIP-01"),
 })
 
-# ── 2. frame-mode predicate: strict narrows, lenient floors ───────────────────
+# ── 2. story-frame predicate: human-only (constraint-spec rejected) ───────────
+# BC-12197 collapsed the per-repo story_frame flag — the predicate is now single-arg
+# and accepts ONLY the human job-story frame; the retired constraint-spec frame is
+# rejected unconditionally.
 HUMAN = "# T\n\n> **When** x, **I want to** y, **so I can** z.\n\n## Acceptance\n"
 CONSTRAINT = ("# T\n\n> **Given** a req, the system **MUST** serve, **so that** crawlable.\n\n"
               "## Acceptance\n")
 FRAMELESS = "# T\n\n> This renders a page for a crawler. No frame.\n\n## Acceptance\n"
-truthy("human frame passes under strict", bar._story_frame_present(HUMAN, "strict"))
-truthy("human frame passes under lenient", bar._story_frame_present(HUMAN, "lenient"))
-truthy("constraint frame REJECTED under strict", not bar._story_frame_present(CONSTRAINT, "strict"))
-truthy("constraint frame accepted under lenient (floor)", bar._story_frame_present(CONSTRAINT, "lenient"))
-truthy("frameless rejected (gate not vacuous)", not bar._story_frame_present(FRAMELESS, "lenient"))
+truthy("human frame passes", bar._story_frame_present(HUMAN))
+truthy("constraint frame REJECTED (human-only end-state)", not bar._story_frame_present(CONSTRAINT))
+truthy("frameless rejected (gate not vacuous)", not bar._story_frame_present(FRAMELESS))
 # A decoy 'When' AFTER the ## Acceptance heading (Gherkin) must not satisfy the region-scoped gate.
 DECOY = "# T\n\n> no frame here.\n\n## Acceptance\n\nScenario: s\n  When the user acts\n"
 truthy("region-scoped: Gherkin 'When' below ## Acceptance does not satisfy the frame",
-       not bar._story_frame_present(DECOY, "lenient"))
+       not bar._story_frame_present(DECOY))
 
 # ── 2b. marker-form brittleness (BC-13751): core keyword INSIDE a bold span ────
 # The predicate matches a marker's keyword inside a bold span, not only as the exact
-# `**keyword**` span — so phrase-bolded / "to"-less near-misses that ARE valid frames
-# stop being false-negatives. The bold REQUIREMENT is unchanged (unbolded prose never
-# passes); keywords are word-boundaried (no "must" in "mustard", no "I want" in "I wanted").
+# `**keyword**` span — so the "to"-less human near-miss stops being a false-negative.
+# The bold REQUIREMENT is unchanged (unbolded prose never passes); keywords are
+# word-boundaried (no "I want" in "I wanted"). The negatives confirm the keyword-in-span
+# loosening does NOT over-widen: none carry the human frame, so all are rejected —
+# including the phrase-bolded constraint marker (no human frame, human-only end-state).
+# Mirror of tests/run-audit-smoke.sh § 4b (kept in lockstep per BC-13148).
+IWANT_NO_TO = "# T\n\n> **When** x, **I want** y, **so I can** z.\n\n## Acceptance\n"
+truthy("human **I want** (no 'to') accepted (keyword-in-span, BC-13751)",
+       bar._story_frame_present(IWANT_NO_TO))
 PHRASE_MUST = ("# T\n\n> **Given** a req, **the system MUST** serve, **so that** crawlable.\n\n"
                "## Acceptance\n")
-truthy("phrase-bolded **the system MUST** accepted under lenient (was a false-negative)",
-       bar._story_frame_present(PHRASE_MUST, "lenient"))
-truthy("phrase-bolded constraint still REJECTED under strict (mode guard intact)",
-       not bar._story_frame_present(PHRASE_MUST, "strict"))
-IWANT_NO_TO = "# T\n\n> **When** x, **I want** y, **so I can** z.\n\n## Acceptance\n"
-truthy("human **I want** (no 'to') accepted under lenient",
-       bar._story_frame_present(IWANT_NO_TO, "lenient"))
-truthy("human **I want** (no 'to') is strict-ready (passes strict)",
-       bar._story_frame_present(IWANT_NO_TO, "strict"))
-# Negative controls — the loosening must NOT widen any of these:
+truthy("phrase-bolded constraint **the system MUST** REJECTED (no human frame)",
+       not bar._story_frame_present(PHRASE_MUST))
 UNBOLDED = ("# T\n\n> Given a crawler requests the page, the system MUST serve a sitemap, "
             "so that pages rank.\n\n## Acceptance\n")
-truthy("UNBOLDED prose constraint still rejected (bold requirement intact)",
-       not bar._story_frame_present(UNBOLDED, "lenient"))
+truthy("UNBOLDED prose rejected (bold requirement intact)",
+       not bar._story_frame_present(UNBOLDED))
 SO_TRUNC = "# T\n\n> **When** x, **I want to** y, **so** z.\n\n## Acceptance\n"
-truthy("**so** (not 'so I can') still rejected (deferred to brite-base epic)",
-       not bar._story_frame_present(SO_TRUNC, "lenient"))
+truthy("**so** (not 'so I can') still rejected — human marker incomplete (deferred to brite-base epic)",
+       not bar._story_frame_present(SO_TRUNC))
 MUSTARD = ("# T\n\n> **Given** a req, **mustard glaze** is applied, **so that** it works.\n\n"
            "## Acceptance\n")
-truthy("word-boundary: 'must' in **mustard** does NOT satisfy the MUST marker",
-       not bar._story_frame_present(MUSTARD, "lenient"))
+truthy("constraint-shaped doc with no human markers rejected (**mustard** is not a marker)",
+       not bar._story_frame_present(MUSTARD))
 IWANTED = "# T\n\n> **When** x, **I wanted to** y, **so I can** z.\n\n## Acceptance\n"
 truthy("word-boundary: 'I want' in **I wanted to** does NOT satisfy the want marker",
-       not bar._story_frame_present(IWANTED, "lenient"))
+       not bar._story_frame_present(IWANTED))
 # GAP control (the real brite-labs false-positive): two UNRELATED bold spans with
-# unbolded Given/MUST/so-that prose BETWEEN them must NOT read as one bold span. The
-# closing `**` of span A + the opening `**` of span B must never pair across the gap.
+# unbolded prose BETWEEN them must NOT read as one bold span. The closing `**` of span
+# A + the opening `**` of span B must never pair across the gap.
 GAP = ("# T\n\n> **Doc type:** Constraint spec. Given a req, the system MUST serve, "
        "so that crawlable. Beneficiary: **[Persona](p.md)**\n\n## Acceptance\n")
 truthy("UNBOLDED markers between two bold spans do not satisfy the frame (gap is not a span)",
-       not bar._story_frame_present(GAP, "lenient"))
+       not bar._story_frame_present(GAP))
 
 # ── R. redirect-stub predicates (BC-12907): doc_type marker + resolvable pointer ──
 eq("_doc_type reads the marker", bar._doc_type("---\ndoc_type: redirect\n---\n# x\n"), "redirect")
@@ -249,23 +248,9 @@ try:
 finally:
     shutil.rmtree(_SK, ignore_errors=True)
 
-# ── 3. config story_frame mode reader (fail-safe lenient) ─────────────────────
-def cfgmode(val):
-    box = tempfile.mkdtemp()
-    try:
-        os.makedirs(os.path.join(box, ".flow"))
-        if val is not None:
-            open(os.path.join(box, ".flow", "config.json"), "w").write(json.dumps({"story_frame": val}))
-        return bar._config_story_frame_mode(bar.Path(box))
-    finally:
-        shutil.rmtree(box, ignore_errors=True)
-eq("config story_frame:strict → strict", cfgmode("strict"), "strict")
-eq("config story_frame:STRICT (uppercase) → strict", cfgmode("STRICT"), "strict")
-eq("config story_frame:lenient → lenient", cfgmode("lenient"), "lenient")
-eq("config story_frame:banana (unrecognized) → lenient", cfgmode("banana"), "lenient")
-eq("config story_frame field absent → lenient", cfgmode(None), "lenient")
-
-# ── 3b. config frontmatter_schema mode reader (BC-12572; fail-safe lenient) ────
+# ── 3. config frontmatter_schema mode reader (BC-12572; fail-safe lenient) ─────
+# (The story_frame mode reader was deleted with the flag — BC-12197; the gate is now
+# hardcoded human-only, so there is no story_frame config to resolve.)
 def fmcfgmode(val):
     box = tempfile.mkdtemp()
     try:
@@ -294,10 +279,8 @@ eq("non-dict config (JSON list) → frontmatter_schema lenient (no crash)",
    rawcfg('["a","b"]', bar._config_frontmatter_schema_mode), "lenient")
 eq("non-dict config (JSON scalar) → frontmatter_schema lenient (no crash)",
    rawcfg('42', bar._config_frontmatter_schema_mode), "lenient")
-eq("non-dict config (JSON list) → story_frame lenient (twin hardened too)",
-   rawcfg('["a","b"]', bar._config_story_frame_mode), "lenient")
 
-# ── 3c. story-front-matter-populated predicate: lenient floor vs strict canon ──
+# ── 3b. story-front-matter-populated predicate: lenient floor vs strict canon ──
 # Directly exercises the NEW Python strict branch (lint_text delegation), the twin of
 # run-audit-smoke.sh §4e — so the bash↔Python ORACLE covers BOTH impls of the widening.
 FM_LEAN = "---\nflow_id: X-01\nstatus: BUILT\nfigma: TBD\nuser_docs_url: TBD\n---\n# b\n"
@@ -372,10 +355,10 @@ def strip_children_qa(r):
 truthy("removing children.qa → qa-children-qa-populated fails",
        ("qa-children-qa-populated", "flow:TEAM-01") in with_mutation(strip_children_qa))
 
-def strict_constraint(r):
-    # strict config + swap one doc's human frame for a constraint-spec frame.
-    cfgp = os.path.join(r, ".flow", "config.json")
-    c = json.load(open(cfgp)); c["story_frame"] = "strict"; json.dump(c, open(cfgp, "w"))
+# BC-12197: the story-frame gate is hardcoded human-only — no config to set. A
+# constraint-spec doc FAILs story-job-story-regex unconditionally (the per-repo flag +
+# its lenient floor were removed).
+def constraint_doc(r):
     d = os.path.join(r, "docs/product/flows/TEAM/TEAM-01.md")
     t = open(d).read()
     import re as _re
@@ -383,19 +366,8 @@ def strict_constraint(r):
                 "> **Given** a req, the system **MUST** act, **so that** it works.",
                 t, count=1, flags=_re.M)
     open(d, "w").write(t)
-truthy("story_frame:strict + constraint-spec doc → story-job-story-regex fails",
-       ("story-job-story-regex", "flow:TEAM-01") in with_mutation(strict_constraint))
-# control: the SAME swap under lenient (no strict config) must NOT fail the gate.
-def lenient_constraint(r):
-    d = os.path.join(r, "docs/product/flows/TEAM/TEAM-01.md")
-    t = open(d).read()
-    import re as _re
-    t = _re.sub(r"^> \*\*When\*\*.*$",
-                "> **Given** a req, the system **MUST** act, **so that** it works.",
-                t, count=1, flags=_re.M)
-    open(d, "w").write(t)
-truthy("control: constraint-spec doc under lenient does NOT fail (flag, not doc, drives it)",
-       ("story-job-story-regex", "flow:TEAM-01") not in with_mutation(lenient_constraint))
+truthy("constraint-spec doc → story-job-story-regex fails (human-only end-state)",
+       ("story-job-story-regex", "flow:TEAM-01") in with_mutation(constraint_doc))
 
 # frontmatter_schema:strict (BC-12572) e2e: the clean fixture's docs carry only the
 # 4-key floor, so flipping the repo to strict flips story-front-matter-populated to a

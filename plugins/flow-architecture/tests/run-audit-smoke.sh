@@ -94,57 +94,45 @@ children_field_present() {
   ' "$doc"
 }
 
-# TRANSIENT (Q29 amendment 3 / BC-11983) — the per-repo `story_frame` mode below is
-# a strangler-fig migration device, NOT a permanent feature. Once ALL 7 WS-E consumer
-# repos (brite-sites, brite-roster, brand-hub, brite-labs-site, brite-supply-react,
-# brite-pim, brite-lseo) carry `story_frame: strict` in their .flow/config.json, DELETE
-# the `<mode>` param + `story_frame_mode` + the `if [ "$mode" != "strict" ]` guard and
-# hardcode the human-only frame (the global end-state). Tracked on a BC-11983 child;
-# see memory/decision_fda_gate_narrowing_per_repo_transient.md. Do not let it ossify.
+# COLLAPSED (Q29 amendment 4 / BC-12197) — the per-repo `story_frame` mode was a
+# strangler-fig migration device, NOT a permanent feature. Once ALL FDA consumer repos
+# (brand-hub, brite-base, brite-labs, brite-roster, brite-sites, brite-supply-commerce,
+# lseo-tool) carried `story_frame: strict` in their .flow/config.json, the `<mode>`
+# param, the `story_frame_mode` reader, and the `if [ "$mode" != "strict" ]` guard were
+# DELETED and the human-only frame hardcoded as the global end-state (this is that
+# end-state). See memory/decision_fda_gate_narrowing_per_repo_transient.md.
 #
-# story_frame_present <doc> [<mode>] — the `story-job-story-regex` gate. Each marker
-# is matched as a keyword inside a bold span (not only an exact `**keyword**` span,
-# BC-13751). Always accepts the human job-story frame: **When** + **I want** (trailing
-# "to" optional) + **so I can**. The retired constraint-spec frame (**Given** +
-# **MUST** + **so that** — **MUST** also matches inside e.g. **the system MUST** —
-# non-human / infrastructure actors, per rubric D11) is accepted ONLY under the LENIENT floor
-# (BC-12134) — the default. When <mode> is `strict` (per-repo gate-narrowing, the
-# consumer repo's .flow/config.json `story_frame: strict`, Q29 amendment 3) the
-# constraint-spec frame NO LONGER satisfies the gate, so a constraint-spec-only doc
-# FAILs. <mode> defaults to `lenient`, so every existing caller is unchanged.
+# story_frame_present <doc> — the `story-job-story-regex` gate. Each marker is matched
+# as a keyword inside a bold span (not only an exact `**keyword**` span, BC-13751).
+# Accepts ONLY the human job-story frame: **When** + **I want** (trailing "to" optional)
+# + **so I can**. The retired constraint-spec frame (**Given** + **MUST** + **so that**
+# — non-human / infrastructure actors, per rubric D11) is rejected unconditionally:
+# BC-12134 retired it from the generators, and BC-12197 retired the lenient floor that
+# still accepted it at this gate. A constraint-spec-only doc now FAILs.
 #
-# Lenient is FRAME-AGNOSTIC and LINE-FORM-AGNOSTIC (T0-4 / BC-11988); strict is
-# frame-narrowing but still LINE-FORM-AGNOSTIC. The check is SECTION-SCOPED
-# (markers may span multiple lines), not a single self-contained-line regex: the
-# canonical brite-base GOLD job story spreads its three clauses across three
-# blockquoted lines (`> **When** ..\n> **I want to** ..\n> **so I can** ..`), which
-# a single-line `^> .*When.*I want to.*so I can` regex would FAIL — the original
-# gate never matched the hand-written gold. The single-line form (one blockquote
-# line carrying all three markers) still passes, since all three markers are then
-# present in the section. Cosmetic blockquote / capitalization differences are
-# tolerated (grep -i); the gate enforces the semantic FRAME, not line breaks. Gate
-# ID unchanged across both modes (Q29 gate-stack stability).
+# The gate is FRAME-AGNOSTIC of line form (T0-4 / BC-11988) and SECTION-SCOPED (markers
+# may span multiple lines), not a single self-contained-line regex: the canonical
+# brite-base GOLD job story spreads its three clauses across three blockquoted lines
+# (`> **When** ..\n> **I want to** ..\n> **so I can** ..`), which a single-line
+# `^> .*When.*I want to.*so I can` regex would FAIL — the original gate never matched
+# the hand-written gold. The single-line form (one blockquote line carrying all three
+# markers) still passes, since all three markers are then present in the section.
+# Cosmetic blockquote / capitalization differences are tolerated (grep -i); the gate
+# enforces the semantic FRAME, not line breaks. Gate ID unchanged (Q29 gate-stack stability).
 # _frame_marker <region> <keyword> — true if <keyword> (word-boundaried) sits inside a
 # bold span (`**…**`) in <region>. Extracts each real bold run first (`grep -oE
 # '\*\*[^*]+\*\*'`, non-overlapping per line, so the plain text BETWEEN two spans is
 # never read as one span — guards the brite-labs false-positive where `**Doc type:**`
 # … unbolded `Given … MUST … so that` … `**persona link**` would pair across the gap),
 # then matches the keyword inside. Loosens marker matching from the exact `**keyword**`
-# span to keyword-in-span, so phrase-bolded `**the system MUST**` / the "to"-less
-# `**I want**` pass; the bold REQUIREMENT is unchanged. Mirrors build_audit_report marker().
+# span to keyword-in-span, so the "to"-less `**I want**` passes; the bold REQUIREMENT is
+# unchanged. Mirrors build_audit_report marker().
 _frame_marker() { printf '%s' "$1" | grep -oE '\*\*[^*]+\*\*' | grep -qiE "\b$2\b"; }
 # A doc opting out of flow enumeration (flow_index: skip) is an overview/index doc, not
 # a sub-flow story doc — mirrors build_audit_report._flow_index_skipped (BC-13805).
 _flow_index_skip() { grep -qiE "^flow_index:[[:space:]]*[\"']?skip[\"']?[[:space:]]*\$" "$1"; }
 story_frame_present() {
-  local doc="$1" mode region
-  # Normalize <mode> to lowercase (bash-3.2-safe via tr, NOT ${2,,}) so the function
-  # is self-consistent with the case-insensitive `story_frame` contract and safe to
-  # call independently: a caller passing `STRICT`/`Strict` narrows correctly instead
-  # of silently falling through to lenient (a fail-OPEN footgun on a frame-enforcement
-  # gate). Only the literal lowercase `strict` narrows; everything else → lenient,
-  # mirroring story_frame_mode's fail-safe. Default (no arg) = lenient.
-  mode="$(printf '%s' "${2:-lenient}" | tr '[:upper:]' '[:lower:]')"
+  local doc="$1" region
   # The frame always sits between the title and `## Acceptance criteria` — under a
   # `## Job story` heading in brite-base / brite-sites docs, or directly beneath
   # the `# Title` blockquote in the leaner audit fixtures. Scope to that region
@@ -153,60 +141,30 @@ story_frame_present() {
   # doc. The frame markers never appear in the front-matter, summary, or ACs.
   region="$(awk '/^## Acceptance/{exit} {print}' "$doc")"
   # Human job-story frame: all three markers present (each a keyword inside a bold
-  # span) in the region. The canonical human-anchored JTBD frame — always accepted, in
-  # either mode. `I want` (not `I want to`) so the "to"-less near-miss passes; `so I can`
-  # keeps its full phrase (bare `**so**` is deferred to the brite-base epic).
+  # span) in the region. The canonical human-anchored JTBD frame is the ONLY accepted
+  # frame (BC-12197: the per-repo `story_frame` strangler-fig collapsed to this
+  # hardcoded human-only end-state once every FDA consumer reached `story_frame: strict`;
+  # the retired constraint-spec frame `Given` + `MUST` + `so that` is now rejected
+  # unconditionally — a constraint-spec-only doc must be re-anchored on the human the
+  # mechanism serves). `I want` (not `I want to`) so the "to"-less near-miss passes;
+  # `so I can` keeps its full phrase (bare `**so**` is deferred to the brite-base epic).
   if _frame_marker "$region" 'When' \
      && _frame_marker "$region" 'I want' \
      && _frame_marker "$region" 'so I can'; then
     return 0
   fi
-  # Constraint-spec frame: Given + MUST + so that. The RETIRED non-human / system
-  # frame — accepted only under the lenient floor so not-yet-reframed consumer
-  # repos keep passing mid-migration. Under `strict` it is rejected (the doc must
-  # be re-anchored on the human the mechanism serves). `MUST` matched inside its bold
-  # span recognizes phrase-bolded `**the system MUST**`.
-  if [ "$mode" != "strict" ]; then
-    if _frame_marker "$region" 'Given' \
-       && _frame_marker "$region" 'MUST' \
-       && _frame_marker "$region" 'so that'; then
-      return 0
-    fi
-  fi
   return 1
-}
-
-# story_frame_mode <fixture> — resolve a consumer repo's story-frame strictness
-# from .flow/config.json `story_frame` (Q29 amendment 3 / BC-11983). Returns
-# `strict` ONLY for an explicit string `story_frame: "strict"` (case-insensitive);
-# every other state — file absent, field absent, unrecognized value, parse error —
-# resolves to `lenient`. Fail-safe by construction: the gate can only ever
-# accidentally STAY permissive, never accidentally narrow. python3 is required
-# (checked at top); the try/except always prints + exits 0, so `set -e` is safe.
-story_frame_mode() {
-  local fixture="$1" mode="lenient"
-  [ -f "$fixture/.flow/config.json" ] || { printf 'lenient'; return 0; }
-  mode="$(python3 - "$fixture/.flow/config.json" <<'PY'
-import json, sys
-try:
-    v = json.load(open(sys.argv[1])).get('story_frame')
-    print('strict' if isinstance(v, str) and v.lower() == 'strict' else 'lenient')
-except Exception:
-    print('lenient')
-PY
-)"
-  printf '%s' "$mode"
 }
 
 # frontmatter_schema_mode <fixture> — resolve a consumer repo's frontmatter-schema
 # strictness from .flow/config.json `frontmatter_schema` (BC-12572). Returns
 # `strict` ONLY for an explicit string `frontmatter_schema: "strict"`
 # (case-insensitive); every other state — file absent, field absent, unrecognized
-# value, parse error — resolves to `lenient`. Same fail-safe construction as
-# story_frame_mode (the gate can only ever STAY permissive, never accidentally
-# narrow). Per-repo strangler-fig: repos flip to `strict` as their story docs are
-# migrated to full canon; once all WS-E repos converge, `strict` becomes the
-# hardcoded default + this flag is deleted (tracked on a BC-11983 child).
+# value, parse error — resolves to `lenient`. Fail-safe by construction (the gate can
+# only ever STAY permissive, never accidentally narrow) — the same shape the now-deleted
+# story_frame reader used before BC-12197 collapsed it. Per-repo strangler-fig: repos
+# flip to `strict` as their story docs are migrated to full canon; once all consumers
+# converge, `strict` becomes the hardcoded default + this flag is deleted (its own track).
 frontmatter_schema_mode() {
   local fixture="$1" mode="lenient"
   [ -f "$fixture/.flow/config.json" ] || { printf 'lenient'; return 0; }
@@ -258,11 +216,8 @@ run_phase_b_gates() {
   local fixture="$1"
   : > "$GATE_REPORT"
 
-  # Per-repo story-frame strictness (Q29 amendment 3): lenient unless the consumer
-  # repo's .flow/config.json sets `story_frame: strict`. Threaded into the
-  # story-job-story-regex gate below.
-  local frame_mode
-  frame_mode="$(story_frame_mode "$fixture")"
+  # The story-job-story-regex gate is unconditional (human-only frame, BC-12197 / Q29
+  # amendment 4) — no per-repo story_frame mode to resolve any more.
   # Per-repo frontmatter-schema strictness (BC-12572): lenient unless the consumer
   # repo's .flow/config.json sets `frontmatter_schema: strict`. Threaded into the
   # story-front-matter-populated gate below.
@@ -386,7 +341,7 @@ PY
           emit_gate FAIL story-front-matter-populated "$scope"
         fi
 
-        if story_frame_present "$doc" "$frame_mode"; then
+        if story_frame_present "$doc"; then
           emit_gate PASS story-job-story-regex "$scope"
         else
           emit_gate FAIL story-job-story-regex "$scope"
@@ -681,15 +636,16 @@ else
   awk -F'\t' '$1 == "FAIL" {printf "    | %s\t%s\t%s\n",$2,$3,$4}' "$GATE_REPORT"
 fi
 
-# ── Section 4: story-job-story-regex gate is frame- + line-form-agnostic ──────
-# The gate must PASS the human job-story frame AND the non-human constraint-spec
-# frame, in BOTH the single-line and the canonical brite-base GOLD multi-line
-# blockquoted form, and FAIL a doc carrying neither. Locks the T0-4 broadening so
-# a future edit cannot silently narrow it back to (a) job-story-only — which
-# would fail every crawler/sitemap/cron/CDN flow authored per D11 — or (b)
-# single-line-only — which would fail the multi-line GOLD format every brite-base
-# / brite-sites story doc actually uses.
-section "4/5" "story-job-story-regex gate accepts both frames in single- and multi-line form"
+# ── Section 4: story-job-story-regex gate is human-frame-only + line-form-agnostic ──
+# The gate must PASS the human job-story frame in BOTH the single-line and the
+# canonical brite-base GOLD multi-line blockquoted form, and FAIL both the retired
+# constraint-spec frame (BC-12197 collapsed the per-repo lenient floor that once
+# accepted it — the hardcoded human-only end-state) and a doc carrying neither frame.
+# Locks the human-only end-state + the T0-4 line-form broadening so a future edit
+# cannot silently (a) re-accept the constraint-spec frame, or (b) narrow to
+# single-line-only — which would fail the multi-line GOLD format every brite-base /
+# brite-sites story doc actually uses.
+section "4/5" "story-job-story-regex gate accepts the human frame (both line forms), rejects constraint-spec + frameless"
 FRAME_TMP="$(mktemp -d)"
 trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP"' EXIT
 
@@ -702,11 +658,20 @@ printf '## Job story\n\n%s\n%s\n%s\n' '> **Given** a request resolves to a publi
 # Neither frame — and a decoy crawler mention OUTSIDE any frame marker.
 printf '## Job story\n\n%s\n' '> This sub-flow renders a page for a crawler. No frame sentence here.' > "$FRAME_TMP/frameless.md"
 
-for variant in jobstory-1line constraint-1line jobstory-multi constraint-multi; do
+# Human job-story frame PASSes in both line forms.
+for variant in jobstory-1line jobstory-multi; do
   if story_frame_present "$FRAME_TMP/$variant.md"; then
-    pass "gate accepts $variant"
+    pass "gate accepts the human job-story frame ($variant)"
   else
-    fail "gate rejected a valid frame: $variant"
+    fail "gate rejected a valid human frame: $variant"
+  fi
+done
+# Retired constraint-spec frame FAILs in both line forms (human-only end-state).
+for variant in constraint-1line constraint-multi; do
+  if story_frame_present "$FRAME_TMP/$variant.md"; then
+    fail "gate accepted the retired constraint-spec frame ($variant) — human-only end-state not enforced"
+  else
+    pass "gate rejects the retired constraint-spec frame ($variant)"
   fi
 done
 if story_frame_present "$FRAME_TMP/frameless.md"; then
@@ -715,94 +680,50 @@ else
   pass "gate still rejects a doc carrying neither frame (decoy crawler mention ignored)"
 fi
 
-# ── Section 4b: story_frame:strict gate-narrowing (BC-11983 / Q29 amendment 3) ─
-# Per-repo gate-narrowing: when the consumer repo's .flow/config.json sets
-# `story_frame: strict`, the retired constraint-spec frame (Given + MUST + so that)
-# no longer satisfies story-job-story-regex — only the human job-story frame does.
-# Lenient (default / field absent) is byte-identical to Section 4 above. THREE
-# states locked (BC-12134 lenient floor → per-repo strict narrowing):
-#   (1) human-frame doc PASS under strict,
-#   (2) constraint-spec doc FAIL under strict,
-#   (3) constraint-spec doc STILL PASS under lenient (proves the flag GATES the
-#       behavior — it is not a blanket removal; the floor survives for un-reframed
-#       consumer repos mid-migration).
-section "4b/5" "story_frame:strict narrows story-job-story-regex to the human frame"
-for variant in jobstory-1line jobstory-multi; do
-  if story_frame_present "$FRAME_TMP/$variant.md" strict; then
-    pass "strict: gate accepts the human job-story frame ($variant)"
-  else
-    fail "strict: gate rejected a valid human frame ($variant)"
-  fi
-done
-for variant in constraint-1line constraint-multi; do
-  if story_frame_present "$FRAME_TMP/$variant.md" strict; then
-    fail "strict: gate accepted the retired constraint-spec frame ($variant) — narrowing not enforced"
-  else
-    pass "strict: gate rejects the retired constraint-spec frame ($variant)"
-  fi
-done
-for variant in constraint-1line constraint-multi; do
-  if story_frame_present "$FRAME_TMP/$variant.md" lenient; then
-    pass "lenient: gate still accepts the constraint-spec frame ($variant) — floor preserved"
-  else
-    fail "lenient: gate rejected the constraint-spec frame ($variant) — lenient floor broken"
-  fi
-done
-# <mode> arg is case-insensitive (locks the tr-normalization in story_frame_present
-# against a fail-OPEN regression): an uppercase `STRICT` must narrow (reject the
-# constraint-spec frame), and a mixed-case `Strict` must still accept the human frame.
-if story_frame_present "$FRAME_TMP/constraint-1line.md" STRICT; then
-  fail "strict (uppercase mode 'STRICT'): gate accepted the constraint-spec frame — case-sensitive fail-open"
-else
-  pass "strict (uppercase mode 'STRICT'): gate rejects the constraint-spec frame"
-fi
-if story_frame_present "$FRAME_TMP/jobstory-1line.md" Strict; then
-  pass "strict (mixed-case mode 'Strict'): gate accepts the human job-story frame"
-else
-  fail "strict (mixed-case mode 'Strict'): gate rejected a valid human frame"
-fi
-
-# ── Section 4b-bis: marker-form brittleness — core keyword INSIDE a bold span ──
+# ── Section 4b: marker-form brittleness — core keyword INSIDE a bold span ──────
 # BC-13751. story_frame_present matches a marker's keyword inside a bold span, not
-# only as the exact `**keyword**` span — so phrase-bolded `**the system MUST**` and
-# the "to"-less `**I want**` are recognized (valid frames previously flagged as false-
-# negatives across supply/roster). The bold REQUIREMENT is unchanged (unbolded prose
-# never passes) and keywords are word-boundaried. Mirror of test_build_audit_report.sh § 2b.
-section "4b-bis/5" "marker-form brittleness: keyword-in-bold-span (BC-13751)"
+# only as the exact `**keyword**` span — so the "to"-less `**I want**` human near-miss
+# is recognized (valid human frames previously flagged as false-negatives across
+# supply/roster). The bold REQUIREMENT is unchanged (unbolded prose never passes) and
+# keywords are word-boundaried. The negative controls confirm the keyword-in-span
+# loosening does NOT over-widen: a phrase-bolded constraint marker (`**the system
+# MUST**`) carries no human frame and is rejected (BC-12197 human-only end-state), as
+# are the bold-requirement, truncated-`so`, and word-boundary near-misses. Mirror of
+# test_build_audit_report.sh § 2b.
+section "4b/5" "marker-form brittleness: keyword-in-bold-span (BC-13751)"
 printf '## Job story\n\n%s\n' '> **Given** a req, **the system MUST** serve, **so that** crawlable.' > "$FRAME_TMP/phrase-must.md"
 printf '## Job story\n\n%s\n' '> **When** x, **I want** y, **so I can** z.' > "$FRAME_TMP/iwant-no-to.md"
 printf '## Job story\n\n%s\n' '> Given a crawler requests the page, the system MUST serve a sitemap, so that pages rank.' > "$FRAME_TMP/unbolded.md"
 printf '## Job story\n\n%s\n' '> **When** x, **I want to** y, **so** z.' > "$FRAME_TMP/so-trunc.md"
 printf '## Job story\n\n%s\n' '> **Given** a req, **mustard glaze** is applied, **so that** it works.' > "$FRAME_TMP/mustard.md"
 printf '## Job story\n\n%s\n' '> **When** x, **I wanted to** y, **so I can** z.' > "$FRAME_TMP/iwanted.md"
-# Positives (lenient): the two real fan-out near-miss shapes are now accepted.
-for v in phrase-must iwant-no-to; do
-  if story_frame_present "$FRAME_TMP/$v.md"; then pass "lenient accepts near-miss $v"; else fail "lenient rejected valid near-miss $v"; fi
-done
-# **I want** (human) is strict-ready; **the system MUST** (constraint) stays strict-rejected.
-if story_frame_present "$FRAME_TMP/iwant-no-to.md" strict; then pass "strict accepts **I want** human near-miss (strict-ready)"; else fail "strict rejected **I want** human near-miss"; fi
-if story_frame_present "$FRAME_TMP/phrase-must.md" strict; then fail "strict accepted phrase-bolded constraint (mode guard broken)"; else pass "strict still rejects phrase-bolded constraint"; fi
 # GAP control (the real brite-labs false-positive): two unrelated bold spans with
 # unbolded Given/MUST/so-that prose BETWEEN them must NOT read as one bold span.
 printf '## Job story\n\n%s\n' '> **Doc type:** Constraint spec. Given a req, the system MUST serve, so that crawlable. Beneficiary: **[Persona](p.md)**' > "$FRAME_TMP/gap.md"
-# Negative controls (lenient): the loosening must NOT widen any of these.
-for v in unbolded so-trunc mustard iwanted gap; do
-  if story_frame_present "$FRAME_TMP/$v.md"; then fail "lenient WRONGLY accepted $v (over-loosened)"; else pass "lenient still rejects $v"; fi
+# Positive: the human "to"-less near-miss is accepted (keyword-in-bold-span, BC-13751).
+if story_frame_present "$FRAME_TMP/iwant-no-to.md"; then pass "accepts **I want** human near-miss (BC-13751 keyword-in-span)"; else fail "rejected **I want** human near-miss"; fi
+# Negatives: none carry the human frame, so all must FAIL — the phrase-bolded constraint
+# marker (no human frame), the unbolded prose (bold required), the truncated **so**, the
+# word-boundary near-misses (mustard ≠ MUST, iwanted ≠ I want), and the brite-labs
+# cross-span false-positive (gap).
+for v in phrase-must unbolded so-trunc mustard iwanted gap; do
+  if story_frame_present "$FRAME_TMP/$v.md"; then fail "WRONGLY accepted $v (no human frame present)"; else pass "rejects $v"; fi
 done
 
-# ── Section 4c: story_frame:strict threads through run_phase_b_gates end-to-end ─
-# The unit assertions above pin the function; this pins the WIRING — that
-# .flow/config.json `story_frame: strict` actually reaches the gate via
-# run_phase_b_gates (guards against a "function correct but never wired" silent
-# no-op). Copy the clean fixture, swap ONE doc's human frame for a constraint-spec
-# frame (only the frame line changes → only story-job-story-regex can flip), then
-# assert that doc FAILs the gate under strict and PASSes under lenient.
-section "4c/5" "story_frame:strict threads through run_phase_b_gates (config → gate)"
-STRICT_FIX="$(mktemp -d)"
-trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$STRICT_FIX"' EXIT
-cp -R "$CLEAN_FIXTURE/." "$STRICT_FIX/"
-STRICT_DOC="$STRICT_FIX/docs/product/flows/TEAM/TEAM-01.md"
-python3 - "$STRICT_DOC" <<'PY'
+# ── Section 4c: constraint-spec frame FAILs story-job-story-regex through run_phase_b_gates ─
+# The unit assertions above pin the function; this pins the WIRING — that a
+# constraint-spec doc actually FAILs the gate via run_phase_b_gates (guards against a
+# "function correct but never wired" silent no-op). Copy the clean fixture, swap ONE
+# doc's human frame for a constraint-spec frame (only the frame line changes → only
+# story-job-story-regex can flip), then assert that doc FAILs the gate. No config to set
+# — story_frame is hardcoded human-only (BC-12197), so the constraint-spec doc FAILs
+# unconditionally.
+section "4c/5" "constraint-spec frame FAILs story-job-story-regex through run_phase_b_gates"
+CONSTRAINT_FIX="$(mktemp -d)"
+trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$CONSTRAINT_FIX"' EXIT
+cp -R "$CLEAN_FIXTURE/." "$CONSTRAINT_FIX/"
+CONSTRAINT_DOC="$CONSTRAINT_FIX/docs/product/flows/TEAM/TEAM-01.md"
+python3 - "$CONSTRAINT_DOC" <<'PY'
 import sys, re
 p = sys.argv[1]
 s = open(p).read()
@@ -818,65 +739,19 @@ PY
 # replaces the whole line and leaves no orphans; this guard makes that explicit AND
 # fails LOUDLY if the fixture ever becomes multi-line (then the single-line subn
 # would strand the I-want-to / so-I-can lines → hybrid doc). Defeats both a vacuous
-# pass (swap no-op) and the mixed-marker fixture Greptile flagged. (Human markers
-# are bold-wrapped only in the frame; Gherkin `When` in scenarios is unbolded, so a
-# whole-doc scan is safe.)
-if grep -q 'the system \*\*MUST\*\*' "$STRICT_DOC" \
-   && ! grep -qiE '\*\*When\*\*|\*\*I want to\*\*|\*\*so I can\*\*' "$STRICT_DOC"; then
+# pass (swap no-op) and a mixed-marker fixture. (Human markers are bold-wrapped only in
+# the frame; Gherkin `When` in scenarios is unbolded, so a whole-doc scan is safe.)
+if grep -q 'the system \*\*MUST\*\*' "$CONSTRAINT_DOC" \
+   && ! grep -qiE '\*\*When\*\*|\*\*I want to\*\*|\*\*so I can\*\*' "$CONSTRAINT_DOC"; then
   pass "e2e setup: TEAM-01 swapped to a pure constraint-spec doc (no residual human markers)"
 else
-  fail "e2e setup: swap left residual human markers or didn't take — e2e assertions are invalid"
+  fail "e2e setup: swap left residual human markers or didn't take — e2e assertion is invalid"
 fi
 
-# strict config → the constraint-spec doc FAILs story-job-story-regex end-to-end.
-python3 - "$STRICT_FIX/.flow/config.json" <<'PY'
-import json, sys
-p = sys.argv[1]
-d = json.load(open(p)); d['story_frame'] = 'strict'
-json.dump(d, open(p, 'w'))
-PY
-run_phase_b_gates "$STRICT_FIX"
+# The constraint-spec doc FAILs story-job-story-regex end-to-end (no config needed —
+# the gate is hardcoded human-only).
+run_phase_b_gates "$CONSTRAINT_FIX"
 assert_failed story-job-story-regex flow:TEAM-01
-
-# lenient config (field removed) → the same doc PASSes (control: proves the flag,
-# not the doc, drives the verdict).
-python3 - "$STRICT_FIX/.flow/config.json" <<'PY'
-import json, sys
-p = sys.argv[1]
-d = json.load(open(p)); d.pop('story_frame', None)
-json.dump(d, open(p, 'w'))
-PY
-run_phase_b_gates "$STRICT_FIX"
-if awk -F'\t' '$1=="PASS" && $2=="story-job-story-regex" && $3=="flow:TEAM-01"{f=1} END{exit !f}' "$GATE_REPORT"; then
-  pass "lenient (control): TEAM-01 constraint-spec doc PASSes story-job-story-regex"
-else
-  fail "lenient (control): TEAM-01 constraint-spec doc did not PASS — lenient floor broken end-to-end"
-fi
-
-# ── Section 4d: story_frame_mode config reader (default-resolution edge cases) ─
-# Pins the fail-safe default-resolution the e2e path can't see: only an explicit
-# `story_frame: "strict"` narrows; everything else stays lenient.
-section "4d/5" "story_frame_mode resolves .flow/config.json story_frame (fail-safe lenient)"
-MODE_TMP="$(mktemp -d)"
-trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$STRICT_FIX" "$MODE_TMP"' EXIT
-mkdir -p "$MODE_TMP/.flow"
-[ "$(story_frame_mode "$MODE_TMP/absent")" = "lenient" ] \
-  && pass "absent .flow/config.json → lenient" || fail "absent config did not resolve lenient"
-printf '%s' '{"version":"1"}' > "$MODE_TMP/.flow/config.json"
-[ "$(story_frame_mode "$MODE_TMP")" = "lenient" ] \
-  && pass "config present, story_frame field absent → lenient" || fail "field-absent did not resolve lenient"
-printf '%s' '{"version":"1","story_frame":"strict"}' > "$MODE_TMP/.flow/config.json"
-[ "$(story_frame_mode "$MODE_TMP")" = "strict" ] \
-  && pass "story_frame:strict → strict" || fail "story_frame:strict did not resolve strict"
-printf '%s' '{"version":"1","story_frame":"STRICT"}' > "$MODE_TMP/.flow/config.json"
-[ "$(story_frame_mode "$MODE_TMP")" = "strict" ] \
-  && pass "story_frame:STRICT (uppercase) → strict (case-insensitive contract)" || fail "uppercase STRICT did not resolve strict — case-insensitive contract broken"
-printf '%s' '{"version":"1","story_frame":"lenient"}' > "$MODE_TMP/.flow/config.json"
-[ "$(story_frame_mode "$MODE_TMP")" = "lenient" ] \
-  && pass "story_frame:lenient → lenient" || fail "story_frame:lenient did not resolve lenient"
-printf '%s' '{"version":"1","story_frame":"banana"}' > "$MODE_TMP/.flow/config.json"
-[ "$(story_frame_mode "$MODE_TMP")" = "lenient" ] \
-  && pass "unrecognized story_frame value → lenient (fail-safe: never accidentally narrow)" || fail "unrecognized value did not resolve lenient"
 
 # ── Section 4e: frontmatter_schema:strict widens story-front-matter-populated ─
 # BC-12572: .flow/config.json `frontmatter_schema: strict` widens the
@@ -888,7 +763,7 @@ printf '%s' '{"version":"1","story_frame":"banana"}' > "$MODE_TMP/.flow/config.j
 # (2) a still-lean doc FAILs strict, (3) BOTH PASS lenient (the flag GATES it).
 section "4e/5" "frontmatter_schema:strict widens story-front-matter-populated to full canon"
 SCHEMA_FIX="$(mktemp -d)"
-trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$STRICT_FIX" "$MODE_TMP" "$SCHEMA_FIX"' EXIT
+trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$CONSTRAINT_FIX" "$SCHEMA_FIX"' EXIT
 cp -R "$CLEAN_FIXTURE/." "$SCHEMA_FIX/"
 # Upgrade TEAM-01 to the FULL 20-key canon by inserting the keys the lean fixture
 # lacks before the closing front-matter `---`.
@@ -950,7 +825,7 @@ fi
 # ── Section 4f: frontmatter_schema_mode config reader (fail-safe lenient) ─────
 section "4f/5" "frontmatter_schema_mode resolves .flow/config.json (fail-safe lenient)"
 SCHEMA_MODE_TMP="$(mktemp -d)"
-trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$STRICT_FIX" "$MODE_TMP" "$SCHEMA_FIX" "$SCHEMA_MODE_TMP"' EXIT
+trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$CONSTRAINT_FIX" "$SCHEMA_FIX" "$SCHEMA_MODE_TMP"' EXIT
 mkdir -p "$SCHEMA_MODE_TMP/.flow"
 [ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP/absent")" = "lenient" ] \
   && pass "absent .flow/config.json → lenient" || fail "absent config did not resolve lenient"

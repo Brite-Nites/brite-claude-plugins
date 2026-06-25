@@ -131,29 +131,13 @@ def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace")
 
 
-def _config_story_frame_mode(repo: Path) -> str:
-    """`.flow/config.json` story_frame → 'strict' iff the string 'strict'
-    (case-insensitive); every other state (absent file/field, bad value, parse
-    error) resolves fail-safe to 'lenient'. Mirrors smoke story_frame_mode()."""
-    cfg = repo / ".flow" / "config.json"
-    if not cfg.is_file():
-        return "lenient"
-    try:
-        v = json.loads(_read(cfg)).get("story_frame")
-    except (ValueError, OSError, AttributeError):
-        # AttributeError: valid-but-non-dict JSON (e.g. a top-level list) → .get fails.
-        # Fail-safe to lenient on ANY unusable config, matching the smoke twin's broad
-        # catch — the gate can only ever STAY permissive, never accidentally narrow.
-        return "lenient"
-    return "strict" if isinstance(v, str) and v.lower() == "strict" else "lenient"
-
-
 def _config_frontmatter_schema_mode(repo: Path) -> str:
     """`.flow/config.json` frontmatter_schema → 'strict' iff the string 'strict'
     (case-insensitive); every other state (absent file/field, bad value, parse
-    error) resolves fail-safe to 'lenient'. Mirrors _config_story_frame_mode and
-    the smoke's frontmatter_schema_mode() — same per-repo strangler-fig as
-    story_frame (BC-12572 / mirrors Q29 amendment 3)."""
+    error) resolves fail-safe to 'lenient'. Mirrors the smoke's
+    frontmatter_schema_mode() — a per-repo strangler-fig (BC-12572), the same shape as
+    the now-collapsed story_frame gate-narrowing (Q29 amendment 3 → collapsed in
+    amendment 4 / BC-12197); its own collapse is tracked separately."""
     cfg = repo / ".flow" / "config.json"
     if not cfg.is_file():
         return "lenient"
@@ -162,7 +146,7 @@ def _config_frontmatter_schema_mode(repo: Path) -> str:
     except (ValueError, OSError, AttributeError):
         # AttributeError: valid-but-non-dict JSON (e.g. a top-level list) → .get fails.
         # Fail-safe to lenient on ANY unusable config (parity with the smoke twin's
-        # broad catch + _config_story_frame_mode above).
+        # broad catch).
         return "lenient"
     return "strict" if isinstance(v, str) and v.lower() == "strict" else "lenient"
 
@@ -183,15 +167,16 @@ def _story_frontmatter_populated(doc_text: str, mode: str) -> bool:
                ("flow_id", "status", "figma", "user_docs_url"))
 
 
-def _story_frame_present(doc_text: str, mode: str) -> bool:
+def _story_frame_present(doc_text: str) -> bool:
     """The story-job-story-regex predicate. Region-scoped (title → first
     `## Acceptance`). Each marker is matched as its core keyword inside a bold span
-    (`**…**`), not only as an exact `**keyword**` span (BC-13751): the human frame is
-    When + `I want` (trailing "to" optional) + `so I can`; the legacy constraint-spec
-    frame is Given + MUST + so that (e.g. `**the system MUST**`). The human frame
-    always passes; the constraint frame passes only under lenient. Bold is required —
-    unbolded prose never matches. Mirrors smoke story_frame_present() —
-    case-insensitive, line-form-agnostic."""
+    (`**…**`), not only as an exact `**keyword**` span (BC-13751): the human job-story
+    frame is When + `I want` (trailing "to" optional) + `so I can`. ONLY the human frame
+    satisfies the gate — the legacy constraint-spec frame (Given + MUST + so that) is
+    rejected unconditionally. (BC-12197: the per-repo `story_frame` strangler-fig was
+    collapsed to this hardcoded human-only end-state once every FDA consumer reached
+    `story_frame: strict`; see Q29 amendment 4.) Bold is required — unbolded prose never
+    matches. Mirrors smoke story_frame_present() — case-insensitive, line-form-agnostic."""
     region_lines = []
     for ln in doc_text.splitlines():
         if ln.startswith("## Acceptance"):
@@ -206,22 +191,17 @@ def _story_frame_present(doc_text: str, mode: str) -> bool:
     # a `**Doc type:**` blockquote followed much later by a bolded persona link, with
     # unbolded `Given … MUST … so that` prose in between — observed in brite-labs.)
     # A marker is present if its word-boundaried keyword sits inside one of those spans
-    # (BC-13751): recognizes phrase-bolded `**the system MUST**` / "to"-less `**I want**`
-    # while the bold REQUIREMENT stays intact (unbolded prose has no qualifying span);
-    # keywords are word-boundaried so "must" in "mustard" / "I want" in "I wanted" do
-    # not leak. `so I can` keeps its full phrase (bare `**so**` is deferred to the
-    # brite-base epic). Line-scoped (`[^*\n]`) to mirror the bash twin's `grep -o`.
+    # (BC-13751): recognizes the "to"-less `**I want**` while the bold REQUIREMENT stays
+    # intact (unbolded prose has no qualifying span); keywords are word-boundaried so
+    # "I want" in "I wanted" does not leak. `so I can` keeps its full phrase (bare
+    # `**so**` is deferred to the brite-base epic). Line-scoped (`[^*\n]`) to mirror the
+    # bash twin's `grep -o`.
     bold_spans = re.findall(r"\*\*([^*\n]+)\*\*", region)
 
     def marker(kw: str) -> bool:
         return any(re.search(r"\b" + kw + r"\b", s, re.IGNORECASE) for s in bold_spans)
 
-    if marker("When") and marker("I want") and marker("so I can"):
-        return True
-    if mode != "strict":
-        if marker("Given") and marker("MUST") and marker("so that"):
-            return True
-    return False
+    return marker("When") and marker("I want") and marker("so I can")
 
 
 def _children_field_present(doc_text: str, field: str) -> bool:
@@ -311,7 +291,6 @@ def evaluate(repo: Path) -> list:
             "status": status, "scope": scope, "message": message,
         })
 
-    frame_mode = _config_story_frame_mode(repo)
     fm_schema_mode = _config_frontmatter_schema_mode(repo)
 
     # --- preflight-complete (Q29.1) ---
@@ -396,7 +375,7 @@ def evaluate(repo: Path) -> list:
             emit("pass" if _story_frontmatter_populated(t, fm_schema_mode)
                  else "hard-fail", "story-front-matter-populated", scope)
 
-            emit("pass" if _story_frame_present(t, frame_mode) else "hard-fail",
+            emit("pass" if _story_frame_present(t) else "hard-fail",
                  "story-job-story-regex", scope)
 
             scn = sum(1 for l in t.splitlines() if l.startswith("Scenario:"))
