@@ -41,16 +41,15 @@
 #                  It deliberately does NOT flag a `Given … the system MUST … so
 #                  that` constraint-spec doc — that rejection lives in the audit
 #                  story-frame gate (`story-job-story-regex`), which since Q29
-#                  amendment 3 (BC-11983) rejects the constraint-spec frame in any
-#                  consumer repo whose `.flow/config.json` sets `story_frame:
-#                  strict`, and still tolerates it under the default `lenient`
-#                  floor (BC-12134) so not-yet-reframed repos keep passing. The
-#                  deterministic mirror is `tests/run-audit-smoke.sh`
-#                  `story_frame_present <doc> <mode>`. This lint is intentionally
-#                  NOT a second detection surface for the constraint-spec frame
-#                  (the floor gate is authoritative — the 2-surface scope locked
-#                  with Q29 amendment 3); under `lenient` such a doc is also caught
-#                  by the LLM quality-reviewer via rubric D11.
+#                  amendment 4 (BC-12197) rejects the constraint-spec frame
+#                  unconditionally (the per-repo `story_frame: strict` flag of
+#                  amendment 3 was collapsed to the hardcoded human-only end-state
+#                  once all FDA consumers converged). The deterministic mirror is
+#                  `tests/run-audit-smoke.sh` `story_frame_present <doc>`. This lint
+#                  is intentionally NOT a second detection surface for the
+#                  constraint-spec frame (the audit gate is authoritative); a
+#                  constraint-spec doc is additionally caught by the LLM
+#                  quality-reviewer via rubric D11.
 #   BAD_STATUS     (BC-13029) front-matter `status:` is not one of the canonical
 #                  6-value INDEX taxonomy (NOT_STARTED / IN_PROGRESS / BUILT /
 #                  QA_SIGNED_OFF / SHIPPED / BLOCKED). Catches the lowercase

@@ -6,8 +6,8 @@
 # time — layer-3 / continuous enforcement (vs layer-2 audit-time /flow:audit).
 #
 # It reuses the CANONICAL Phase-B predicates from build_audit_report.py
-# (_config_frontmatter_schema_mode / _config_story_frame_mode /
-# _story_frontmatter_populated / _story_frame_present / _domains / _story_docs) so
+# (_config_frontmatter_schema_mode / _story_frontmatter_populated /
+# _story_frame_present / _domains / _story_docs) so
 # there is ONE source of truth, plus journey frontmatter-schema lint (strict) and a
 # body link-resolution check (every `](path.md)` resolves on disk — the BC-13710
 # broken-link class). Exit-code contract: 0 all-pass, 1 ≥1 hard-fail, 2 usage.
@@ -89,11 +89,12 @@ else
   fail "strict schema gate not enforced: exit $RC; OUT: $OUT"
 fi
 
-# ── Section 3: story_frame:strict + a constraint-spec frame → exit 1 ──────────
-# Flip ONLY story_frame:strict (schema stays lenient → isolates the frame gate).
-# All fixture docs carry the human When-frame; mutate ONE to constraint-spec.
-section "3/8" "story_frame strict: constraint-spec frame → exit 1 (names story-frame)"
-F3="$(fresh_copy)"; set_flag "$F3" story_frame strict
+# ── Section 3: a constraint-spec frame → exit 1 ───────────────────────────────
+# The story-frame gate is hardcoded human-only (BC-12197) — no flag to set; schema
+# stays lenient so this isolates the frame gate. All fixture docs carry the human
+# When-frame; mutate ONE to constraint-spec → it FAILs unconditionally.
+section "3/8" "constraint-spec frame → exit 1 (names story-frame)"
+F3="$(fresh_copy)"
 python3 - "$(first_story "$F3")" <<'PY'
 import re, sys
 p = sys.argv[1]

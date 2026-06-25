@@ -12,17 +12,20 @@ run-audit-smoke.sh also use) so there is exactly one definition of each gate:
   * frontmatter-schema  — _story_frontmatter_populated(text, mode) over story docs
                           (config-gated: lenient = 4-key floor, strict = full ADR-029
                           canon) + the journey frontmatter lint under strict (ADR-033).
-  * story-frame         — _story_frame_present(text, mode) over story docs
-                          (config-gated: lenient accepts the legacy constraint-spec
-                          frame, strict requires the human job-story frame).
+  * story-frame         — _story_frame_present(text) over story docs (the human
+                          job-story frame is required everywhere; the legacy
+                          constraint-spec frame is rejected — BC-12197 collapsed the
+                          per-repo story_frame flag to this hardcoded end-state).
   * link-resolution     — every `](<path>.md[#anchor])` link in any story/journey doc
                           BODY resolves to a file on disk (ALWAYS on, not config-gated;
                           the BC-13710 broken-cross-reference-link class). Frontmatter
                           and `http(s)`/`mailto` links are not checked.
 
-Modes are read per-repo from .flow/config.json (fail-safe lenient), so the runner is
-safe to wire into every repo regardless of its migration state — a not-yet-strict repo
-is held to the floor, a strict repo to full canon.
+The frontmatter-schema mode is read per-repo from .flow/config.json (fail-safe lenient),
+so the runner is safe to wire into every repo regardless of its migration state — a
+not-yet-strict repo is held to the 4-key floor, a strict repo to full canon. The
+story-frame gate is unconditional (the human job-story frame is required everywhere)
+since BC-12197 collapsed its per-repo flag.
 
 Usage:  run_fda_ci_audit.py <repo_root>
 Exit:   0 = all gates pass · 1 = >=1 hard-fail · 2 = usage / repo not found.
@@ -104,9 +107,8 @@ def audit(repo: Path) -> list:
     {gate, scope, detail}. Empty list ⇒ all pass."""
     failures = []
     fm_mode = bar._config_frontmatter_schema_mode(repo)
-    frame_mode = bar._config_story_frame_mode(repo)
 
-    # --- story docs: frontmatter-schema + story-frame (config-gated) ---
+    # --- story docs: frontmatter-schema (config-gated) + story-frame (always strict) ---
     for domain in bar._domains(repo):
         for doc in bar._story_docs(repo, domain):
             text = bar._read(doc)
@@ -139,10 +141,9 @@ def audit(repo: Path) -> list:
                 else:
                     detail = "4-key floor incomplete"
                 failures.append({"gate": "frontmatter-schema", "scope": scope, "detail": detail})
-            if not bar._story_frame_present(text, frame_mode):
+            if not bar._story_frame_present(text):
                 failures.append({"gate": "story-frame", "scope": scope,
-                                 "detail": "no human job-story frame" if frame_mode == "strict"
-                                 else "no recognized frame"})
+                                 "detail": "no human job-story frame"})
 
     # --- journey docs: frontmatter-schema under strict (ADR-033 canon) ---
     if fm_mode == "strict":
@@ -183,11 +184,10 @@ def main(argv: list) -> int:
         return 2
 
     fm_mode = bar._config_frontmatter_schema_mode(repo)
-    frame_mode = bar._config_story_frame_mode(repo)
     failures = audit(repo)
 
     print("FDA CI audit — {}".format(repo))
-    print("  frontmatter_schema={}  story_frame={}".format(fm_mode, frame_mode))
+    print("  frontmatter_schema={}  story_frame=strict (hardcoded; BC-12197)".format(fm_mode))
     if not failures:
         print("  ✓ all gates pass")
         return 0
