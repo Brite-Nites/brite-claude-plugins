@@ -106,8 +106,117 @@ Ask via `AskUserQuestion`:
 
 - Question: `Deploy to brite-sandbox?`
 - Options:
-  - `Yes, brite-sandbox` — proceed to Phase 2.
+  - `Yes, brite-sandbox` — proceed to Phase 1.3.
   - `No, pick a different alias` — halt. Tell the user: *"This command pins `brite-sandbox` by design (from `brite-salesforce/CLAUDE.md` §Development Flow). If you need a different sandbox, run the `sf` commands manually or open an issue to parameterize this command."*
+
+### 1.3 .forceignore pre-flight (BC-12347)
+
+Narrate: `Phase 1.3/6: .forceignore pre-flight...`
+
+**Skip if deploy mode is `reconcile`** (user opted into full-tree intentionally): print `NOTE: reconcile mode — skipping .forceignore pre-flight.` and proceed to Phase 2.
+
+If deploy mode is `branch-diff`, run:
+
+```bash
+set +e  # individual checks may return non-zero legitimately
+
+if [ ! -f .forceignore ]; then
+  echo "NOTE: no .forceignore found — pre-flight skipped."
+  exit 0
+fi
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ "$BRANCH" = "main" ]; then
+  RANGE="main~1..main"
+else
+  if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+    echo "WARN: origin/main not reachable — skipping .forceignore pre-flight (not blocking)."
+    exit 0
+  fi
+  MERGE_BASE=$(git merge-base origin/main HEAD 2>/dev/null)
+  if [ -z "$MERGE_BASE" ]; then
+    echo "WARN: could not compute merge-base — skipping .forceignore pre-flight (not blocking)."
+    exit 0
+  fi
+  RANGE="${MERGE_BASE}..HEAD"
+fi
+
+RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1)
+if [ $? -ne 0 ]; then
+  echo "WARN: git diff failed — skipping .forceignore pre-flight (not blocking)."
+  printf '%s\n' "$RAW_CHANGED"
+  exit 0
+fi
+CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
+
+if [ -z "$CHANGED" ]; then
+  echo "INFO: no force-app/** paths in branch diff — .forceignore pre-flight: nothing to check."
+  exit 0
+fi
+
+NC_EXCLUDED=""
+OTHER_EXCLUDED=""
+
+while IFS= read -r fpath; do
+  [ -z "$fpath" ] && continue
+  fpath_rel="${fpath#force-app/main/default/}"
+  matched_pattern=""
+  while IFS= read -r pattern; do
+    case "$pattern" in ''|\#*) continue ;; esac
+    pat="${pattern#/}"
+    [ -z "$pat" ] && continue
+    hit=0
+    case "$fpath" in *$pat*) hit=1 ;; esac
+    if [ "$hit" = "0" ]; then
+      case "$fpath_rel" in *$pat*) hit=1 ;; esac
+    fi
+    if [ "$hit" = "1" ]; then
+      matched_pattern="$pattern"
+      break
+    fi
+  done < .forceignore
+  if [ -n "$matched_pattern" ]; then
+    case "$matched_pattern" in
+      *namedCredential*)
+        NC_EXCLUDED="${NC_EXCLUDED}  ${fpath} (pattern: ${matched_pattern})\n"
+        ;;
+      *)
+        OTHER_EXCLUDED="${OTHER_EXCLUDED}  ${fpath} (pattern: ${matched_pattern})\n"
+        ;;
+    esac
+  fi
+done <<< "$CHANGED"
+
+if [ -z "$NC_EXCLUDED" ] && [ -z "$OTHER_EXCLUDED" ]; then
+  echo "✓ .forceignore pre-flight: no deploy paths excluded."
+  exit 0
+fi
+
+if [ -n "$NC_EXCLUDED" ]; then
+  printf '\nNamed Credential exclusions (expected — placeholder URLs; handled by /revops:post-deploy-runbook Phase 5):\n'
+  printf '%b' "$NC_EXCLUDED"
+fi
+
+if [ -n "$OTHER_EXCLUDED" ]; then
+  printf '\n⚠️  .forceignore exclusions detected — these paths will be silently dropped by sf project deploy:\n'
+  printf '%b' "$OTHER_EXCLUDED"
+  printf '\nRemediation: temporarily comment out the matching .forceignore line(s), run the deploy, then restore.\n'
+  echo "FORCEIGNORE_BLOCKED=1"
+else
+  echo "FORCEIGNORE_BLOCKED=0"
+fi
+```
+
+After the script runs:
+
+- If `FORCEIGNORE_BLOCKED=1` — ask via `AskUserQuestion`:
+  - Question: `⚠️ .forceignore will silently drop the paths listed above. How do you want to proceed?`
+  - Options:
+    - `I've resolved the .forceignore conflict — continue` → proceed to Phase 2.
+    - `Halt — fix .forceignore first` → **halt** cleanly. Print: *"Stopped at .forceignore pre-flight. Comment out the relevant .forceignore lines, verify the fix, then re-run `/revops:deploy-sandbox`."* Exit.
+- If `FORCEIGNORE_BLOCKED=0` or no exclusions at all → proceed to Phase 2 silently (NC exclusions are expected and already printed above).
+
+Narrate: `Phase 1.3/6: .forceignore pre-flight... done`
 
 Narrate: `Phase 1/6: Pre-flight checks... done`
 
