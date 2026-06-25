@@ -32,12 +32,23 @@ Run this single block with the Bash tool. Every command is a read (`--version`, 
 emit() { printf '%s\t%s\t%s\n' "$1" "$2" "$3"; }
 command -v python3 >/dev/null 2>&1 && PY_OK=1 || PY_OK=0
 
-# 1. sf CLI present + v2.x
+# 1. sf CLI present + v2.x, minimum 2.135.7 (BC-12348: 2.134.x OAuth token-exchange bug)
 if command -v sf >/dev/null 2>&1; then
   sf_ver="$(sf --version 2>/dev/null | head -1)"
-  sf_major="$(printf '%s' "$sf_ver" | grep -oE '@salesforce/cli/[0-9]+' | grep -oE '[0-9]+$')"
-  if [ "$sf_major" = "2" ]; then emit PASS "sf CLI" "$sf_ver"; SF_OK=1
-  else emit FAIL "sf CLI" "expected v2.x, got: ${sf_ver:-unknown} — npm install -g @salesforce/cli"; SF_OK=0; fi
+  sf_full="$(printf '%s' "$sf_ver" | grep -oE '@salesforce/cli/[0-9]+\.[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+  sf_major="$(printf '%s' "$sf_full" | cut -d. -f1)"
+  if [ "$sf_major" != "2" ]; then
+    emit FAIL "sf CLI" "expected v2.x, got: ${sf_full:-${sf_ver:-unknown}} — npm install -g @salesforce/cli"; SF_OK=0
+  else
+    sf_ok="$(awk -v v="$sf_full" 'BEGIN {
+      split(v, a, ".")
+      if (a[2]+0 > 135) { print 1; exit }
+      if (a[2]+0 < 135) { print 0; exit }
+      print (a[3]+0 >= 7)
+    }')"
+    if [ "$sf_ok" = "1" ]; then emit PASS "sf CLI" "$sf_full"; SF_OK=1
+    else emit FAIL "sf CLI" "version $sf_full below minimum 2.135.7 (2.134.x OAuth token-exchange bug — sf org login web raises misleading AuthCodeExchangeError despite server-side success) — npm install -g @salesforce/cli@latest"; SF_OK=0; fi
+  fi
 else
   emit FAIL "sf CLI" "not installed — npm install -g @salesforce/cli (needs Node 18+)"; SF_OK=0
 fi

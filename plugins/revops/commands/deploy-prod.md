@@ -132,7 +132,101 @@ git status --porcelain
 
   Print the `git status --porcelain` output verbatim so the user can see what's dirty.
 
-### 1.4 Confirm intent
+### 1.4 .forceignore pre-flight (BC-12347)
+
+Narrate: `Phase 1.4/7: .forceignore pre-flight...`
+
+**Skip if deploy mode is `reconcile`** (user opted into full-tree intentionally): print `NOTE: reconcile mode — skipping .forceignore pre-flight.` and proceed to Phase 1.5.
+
+If deploy mode is `pr-diff`, run:
+
+```bash
+set +e  # individual checks may return non-zero legitimately
+
+if [ ! -f .forceignore ]; then
+  echo "NOTE: no .forceignore found — pre-flight skipped."
+  exit 0
+fi
+
+RANGE="main~1..main"
+RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1)
+if [ $? -ne 0 ]; then
+  echo "WARN: git diff failed — skipping .forceignore pre-flight (not blocking)."
+  printf '%s\n' "$RAW_CHANGED"
+  exit 0
+fi
+CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
+
+if [ -z "$CHANGED" ]; then
+  echo "INFO: no force-app/** paths in PR diff — .forceignore pre-flight: nothing to check."
+  exit 0
+fi
+
+NC_EXCLUDED=""
+OTHER_EXCLUDED=""
+
+while IFS= read -r fpath; do
+  [ -z "$fpath" ] && continue
+  fpath_rel="${fpath#force-app/main/default/}"
+  matched_pattern=""
+  while IFS= read -r pattern; do
+    case "$pattern" in ''|\#*) continue ;; esac
+    pat="${pattern#/}"
+    [ -z "$pat" ] && continue
+    hit=0
+    case "$fpath" in *"$pat"*) hit=1 ;; esac
+    if [ "$hit" = "0" ]; then
+      case "$fpath_rel" in *"$pat"*) hit=1 ;; esac
+    fi
+    if [ "$hit" = "1" ]; then
+      matched_pattern="$pattern"
+      break
+    fi
+  done < .forceignore
+  if [ -n "$matched_pattern" ]; then
+    case "$matched_pattern" in
+      *namedCredential*)
+        NC_EXCLUDED="${NC_EXCLUDED}  ${fpath} (pattern: ${matched_pattern})\n"
+        ;;
+      *)
+        OTHER_EXCLUDED="${OTHER_EXCLUDED}  ${fpath} (pattern: ${matched_pattern})\n"
+        ;;
+    esac
+  fi
+done <<< "$CHANGED"
+
+if [ -z "$NC_EXCLUDED" ] && [ -z "$OTHER_EXCLUDED" ]; then
+  echo "✓ .forceignore pre-flight: no deploy paths excluded."
+  exit 0
+fi
+
+if [ -n "$NC_EXCLUDED" ]; then
+  printf '\nNamed Credential exclusions (expected — placeholder URLs; handled by /revops:post-deploy-runbook Phase 5):\n'
+  printf '%b' "$NC_EXCLUDED"
+fi
+
+if [ -n "$OTHER_EXCLUDED" ]; then
+  printf '\n⚠️  .forceignore exclusions detected — these paths will be silently dropped by sf project deploy:\n'
+  printf '%b' "$OTHER_EXCLUDED"
+  printf '\nRemediation: temporarily comment out the matching .forceignore line(s), run the deploy, then restore.\n'
+  echo "FORCEIGNORE_BLOCKED=1"
+else
+  echo "FORCEIGNORE_BLOCKED=0"
+fi
+```
+
+After the script runs:
+
+- If `FORCEIGNORE_BLOCKED=1` — ask via `AskUserQuestion`:
+  - Question: `⚠️ .forceignore will silently drop the paths listed above. How do you want to proceed?`
+  - Options:
+    - `I've resolved the .forceignore conflict — continue` → proceed to Phase 1.5.
+    - `Halt — fix .forceignore first` → **halt** cleanly. Print: *"Stopped at .forceignore pre-flight. Comment out the relevant .forceignore lines, verify the fix, then re-run `/revops:deploy-prod`."* Exit.
+- If `FORCEIGNORE_BLOCKED=0` or no exclusions at all → proceed to Phase 1.5 silently (NC exclusions are expected and already printed above).
+
+Narrate: `Phase 1.4/7: .forceignore pre-flight... done`
+
+### 1.5 Confirm intent
 
 Collect:
 
