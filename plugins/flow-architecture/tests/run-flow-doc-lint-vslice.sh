@@ -65,9 +65,10 @@ BAD_BOILER="$FIX/bad-boilerplate-ac/docs/product/flows/team/team-03.md"
 BAD_SCEN="$FIX/bad-too-few-scenarios/docs/product/flows/team/team-04.md"
 BAD_PERSONA="$FIX/bad-generic-persona/docs/product/flows/team/team-05.md"
 BAD_FRAME="$FIX/bad-frame-mismatch/docs/product/flows/seo/seo-02.md"
+BAD_MECH="$FIX/bad-mechanism-leak/docs/product/flows/team/team-06.md"
 
 section "1/4" "lib loads + fixtures present"
-for d in "$GOOD" "$GATE_OWNED_CS" "$GOOD_HI" "$BAD_GRAMMAR" "$BAD_BOILER" "$BAD_SCEN" "$BAD_PERSONA" "$BAD_FRAME"; do
+for d in "$GOOD" "$GATE_OWNED_CS" "$GOOD_HI" "$BAD_GRAMMAR" "$BAD_BOILER" "$BAD_SCEN" "$BAD_PERSONA" "$BAD_FRAME" "$BAD_MECH"; do
   if [ -f "$d" ]; then pass "fixture present: ${d#$FIX/}"; else fail "fixture MISSING: $d"; fi
 done
 
@@ -82,6 +83,7 @@ assert_defect "bad-boilerplate-ac → BOILERPLATE" "$BAD_BOILER" "BOILERPLATE"
 assert_defect "bad-too-few-scenarios → FEW_SCENARIOS" "$BAD_SCEN" "FEW_SCENARIOS"
 assert_defect "bad-generic-persona → GENERIC_PERSONA" "$BAD_PERSONA" "GENERIC_PERSONA"
 assert_defect "bad-frame-mismatch → FRAME_MISMATCH" "$BAD_FRAME" "FRAME_MISMATCH"
+assert_defect "bad-mechanism-leak → MECHANISM_LEAK (.ts in prose)" "$BAD_MECH" "MECHANISM_LEAK"
 
 # Single-axis check: the frame-mismatch fixture is otherwise well-formed and must
 # trip ONLY FRAME_MISMATCH (proves the lint's defects are independent).
@@ -91,6 +93,15 @@ case " $frame_verdict " in
     fail "bad-frame-mismatch leaks an unintended defect: $frame_verdict" ;;
   *) pass "bad-frame-mismatch trips ONLY the frame defect" ;;
 esac
+
+# Single-axis check: bad-mechanism-leak is otherwise well-formed and must trip
+# ONLY MECHANISM_LEAK (its leak is a lone .ts filename in the Actor prose).
+mech_verdict="$(lint_story_doc "$BAD_MECH" || true)"
+if [ "$mech_verdict" = "MECHANISM_LEAK" ]; then
+  pass "bad-mechanism-leak trips ONLY MECHANISM_LEAK (verdict exactly: $mech_verdict)"
+else
+  fail "bad-mechanism-leak expected EXACTLY MECHANISM_LEAK, got: $mech_verdict"
+fi
 
 section "4/4" "inline lib-branch coverage (OR-branches the one-per-defect fixtures miss)"
 
@@ -338,6 +349,280 @@ Scenario: c
   Then z
 DOC
 assert_clean "valid 'QA_SIGNED_OFF' status → no BAD_STATUS (accept path)" "$TMP_DOCS/goodstatus.md"
+
+# ── MECHANISM_LEAK branch coverage (the committed fixture exercises only P1) ──
+# P2 — a function-call shape (lowercase-initial identifier + '(') in the Actor
+# prose fires even with no .ts filename present.
+mk_tmp_doc mech_func <<'DOC'
+---
+flow_id: team-09
+status: BUILT
+personas: Workspace owner auditing access changes
+---
+# team-09
+
+## Job story
+
+> **When** a teammate's role changes, **I want to** re-check their access from the members screen, **so I can** keep workspace permissions tight.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). The access gate runs beforeLogin() on every request.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_defect "function-call shape in prose → MECHANISM_LEAK (P2)" "$TMP_DOCS/mech_func.md" "MECHANISM_LEAK"
+
+# P3 — a source-root path prefix (src/ node_modules/ dist/ build/) in prose fires.
+mk_tmp_doc mech_path <<'DOC'
+---
+flow_id: team-10
+status: BUILT
+personas: Workspace owner reviewing the audit log
+---
+# team-10
+
+## Job story
+
+> **When** a teammate is removed, **I want to** see the change in the audit log, **so I can** prove who lost access and when.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). The audit handler is wired under src/audit before the members screen renders.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_defect "source-root path in prose → MECHANISM_LEAK (P3)" "$TMP_DOCS/mech_path.md" "MECHANISM_LEAK"
+
+# Region exemption — code symbols confined to `## Status` + the Gherkin ACs
+# (everything from `## Acceptance` onward, outside `_fdl_frame_region`) stay clean:
+# a `.ts:line`, a `funcName()`, and a `src/` path all in `## Status`/an AC, prose clean.
+mk_tmp_doc mech_region_exempt <<'DOC'
+---
+flow_id: team-11
+status: BUILT
+personas: Workspace owner confirming a removal took effect
+---
+# team-11
+
+## Job story
+
+> **When** a teammate is offboarded, **I want to** confirm their access is gone, **so I can** close the ticket with confidence.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). They watch the members screen update after a removal.
+
+## Acceptance criteria
+
+Scenario: removal invalidates the session
+  Given an active teammate
+  When the owner removes them and revokeSession() runs
+  Then the teammate's next request returns a 401.
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+
+## Status
+
+BUILT — enforced in `middleware.ts:42` via revokeSession(); evidence in src/auth/guard.ts.
+DOC
+assert_clean "code symbols confined to ## Status + ACs stay clean (region exemption)" "$TMP_DOCS/mech_region_exempt.md"
+
+# Narrowness guard — legitimate prose tokens must NOT trip MECHANISM_LEAK:
+# a leading-slash route (/photos), the company domain (@britenites.com), a
+# camelCase product name (iPhone), and an ALL-CAPS acronym with parens (API(s)).
+mk_tmp_doc mech_fp_guards <<'DOC'
+---
+flow_id: team-12
+status: BUILT
+personas: Workspace owner managing access on the go
+---
+# team-12
+
+## Job story
+
+> **When** a teammate leaves, **I want to** revoke access from my iPhone, **so I can** act before I reach a desk.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). They review activity on the /photos page and over the API(s) we expose, and reach support at help@britenites.com.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_clean "legitimate prose (/photos, @britenites.com, iPhone, API(s)) stays clean (narrowness guard)" "$TMP_DOCS/mech_fp_guards.md"
+
+# Pluralization guard — lowercase `word(s)` plurals (role(s), page(s), permission(s))
+# are legitimate prose and must NOT trip P2. The function-call shape requires EMPTY
+# parens `()`, which `(s)` is not.
+mk_tmp_doc mech_plural_guard <<'DOC'
+---
+flow_id: team-13
+status: BUILT
+personas: Workspace owner assigning the right roles to new hires
+---
+# team-13
+
+## Job story
+
+> **When** a new hire starts, **I want to** assign the right role(s) on the members screen, **so I can** grant the page(s) they need without over-provisioning.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). They manage permission(s) for their team's field(s) of work.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_clean "lowercase pluralization role(s)/page(s)/permission(s) stays clean (P2 requires empty parens)" "$TMP_DOCS/mech_plural_guard.md"
+
+# Front-matter exemption (Greptile #501 P1) — YAML metadata is NOT story prose. A
+# front-matter value that carries a code path (`e2e_test: src/auth/revoke.test.ts`)
+# must NOT trip MECHANISM_LEAK; the scan is scoped to the prose body, not metadata.
+mk_tmp_doc mech_frontmatter_exempt <<'DOC'
+---
+flow_id: team-14
+status: BUILT
+personas: Workspace owner offboarding a departing teammate
+e2e_test: src/auth/revoke.test.ts
+---
+# team-14
+
+## Job story
+
+> **When** a teammate leaves, **I want to** revoke their access from the members screen, **so I can** close the security gap immediately.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). They confirm the removal on the members screen.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_clean "code path in front-matter (e2e_test: src/auth/revoke.test.ts) stays clean — metadata, not prose (Greptile #501 P1)" "$TMP_DOCS/mech_frontmatter_exempt.md"
+
+# ## Status notes exemption (Greptile #501 P2) — `## Status notes` is the sibling of
+# `## Status` (build-state evidence), positioned before `## Acceptance`. It legitimately
+# records file:symbol evidence and must be exempt like `## Status`, even though it sits
+# inside the pre-Acceptance span.
+mk_tmp_doc mech_status_notes_exempt <<'DOC'
+---
+flow_id: team-15
+status: IN_PROGRESS
+personas: Workspace owner waiting on the self-serve revoke UI
+---
+# team-15
+
+## Job story
+
+> **When** a teammate leaves, **I want to** revoke their access right away, **so I can** keep the workspace secure.
+
+## Status notes
+
+Engine ships — getInvoices() query runs in middleware.ts; no /revoke route under src/app yet, so revocation is manual today.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). They currently ask an admin to remove the seat.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_clean "code evidence in ## Status notes (getInvoices()/middleware.ts/src/app) stays clean — status sibling, not prose (Greptile #501 P2)" "$TMP_DOCS/mech_status_notes_exempt.md"
 
 printf '\nflow-doc-lint v-slice summary: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"

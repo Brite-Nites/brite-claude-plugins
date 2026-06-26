@@ -91,6 +91,26 @@ _fdl_frame_region() {
   awk '/^##[[:space:]]+Acceptance/{exit} {print}' "$1" 2>/dev/null
 }
 
+# Extract the story PROSE region for the MECHANISM_LEAK check: the body before
+# `## Acceptance`, MINUS the YAML front-matter (metadata, not prose) AND the
+# conditional `## Status notes` section (the sibling of `## Status` — it
+# legitimately records `file:symbol` build evidence and must be exempt like
+# `## Status` itself). So the scan sees only the H1, the summary hook,
+# `## Job story`, `## Actor`, and `## Preconditions`. Narrower than
+# `_fdl_frame_region`, which over-scans both zones (Greptile #501 P1/P2).
+_fdl_prose_region() {
+  awk '
+    NR==1 && /^---[[:space:]]*$/  { infm=1; next }
+    infm && /^---[[:space:]]*$/   { infm=0; next }
+    infm                          { next }
+    /^##[[:space:]]+Acceptance/   { exit }
+    /^##[[:space:]]+Status notes/ { skip=1; next }
+    /^##[[:space:]]/              { skip=0 }
+    skip                          { next }
+    { print }
+  ' "$1" 2>/dev/null
+}
+
 # Extract ONLY the YAML front-matter block (between the opening `---` on line 1
 # and the next `---`). Used to scope front-matter-key checks so a body line that
 # happens to start with `status:` (prose, a code block) can't false-positive.
@@ -204,6 +224,40 @@ EOF
        || printf '%s' "$js" | grep -iqE "$FDL_FIRST_PERSON_RE"; then
       defects="$defects FRAME_MISMATCH"
     fi
+  fi
+
+  # ── MECHANISM_LEAK (D11 sibling): code-symbol shapes in the story prose ──
+  # The locked altitude: the story prose (hook / Job story / Actor / Preconditions)
+  # stays plain outcome terms; `file:symbol` / mechanism detail belongs in `## Status`.
+  # Scanned over `_fdl_prose_region` (NOT `$region`): the body before `## Acceptance`,
+  # MINUS the YAML front-matter (metadata) and the `## Status notes` section (the
+  # `## Status` sibling that legitimately carries build evidence) — so metadata, status
+  # evidence, the Gherkin ACs, and `## Status` are all exempt (Greptile #501 P1/P2; a
+  # test legitimately names confirmed symbols in the ACs per rubric D2). NARROW by
+  # design: only unambiguous code shapes flag deterministically; bare camelCase
+  # (`beforeLogin`) and hyphenated jargon (`payload-token`) are left to the LLM
+  # quality-reviewer (rubric D11) so prose like `iPhone` / `real-time` never
+  # false-trips. Single-file greps, no backtick in any regex, bash-3.2 safe.
+  #   P1 — code-extension filenames `<word>.ts` / `<word>.tsx`. NOT `.js`/`.jsx`
+  #        (collide with the prose tokens Node.js / Next.js) and NOT `.xml`/`.txt`/
+  #        `.md` (sitemap.xml, robots.txt, persona `.md` links are legitimate).
+  #   P2 — a function-call shape: a LOWERCASE-initial identifier + EMPTY parens
+  #        `()` (`beforeLogin()`, `revokeSession()`). The EMPTY parens are load-
+  #        bearing: prose plurals `role(s)` / `page(s)` / `permission(s)` and the
+  #        ALL-CAPS `API(s)` carry `(s)`, not `()`, so they never match; and
+  #        `the workspace (a shared space)` / markdown `[label](…)` never produce
+  #        `word()`. A call WITH args (`getUser(id)`) in prose is left to the LLM
+  #        rubric — rarer in prose, and not worth widening the net for.
+  #   P3 — source-root path prefixes `src/` `node_modules/` `dist/` `build/` at a
+  #        token boundary (so `websrc/` doesn't match). NOT `app/` (collides with
+  #        "the app"), NOT `docs/` (persona / intent `.md` links), NOT leading-slash
+  #        page routes like `/photos` — the dir name itself must be a code root.
+  local prose
+  prose="$(_fdl_prose_region "$doc")"
+  if printf '%s' "$prose" | grep -qE '[A-Za-z0-9_-]\.(ts|tsx)([^[:alnum:]]|$)' \
+     || printf '%s' "$prose" | grep -qE '[a-z][A-Za-z0-9_]*\(\)' \
+     || printf '%s' "$prose" | grep -qE '(^|[^A-Za-z0-9_])(src|node_modules|dist|build)/'; then
+    defects="$defects MECHANISM_LEAK"
   fi
 
   if [ -n "$defects" ]; then
