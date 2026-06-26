@@ -206,6 +206,36 @@ EOF
     fi
   fi
 
+  # ── MECHANISM_LEAK (D11 sibling): code-symbol shapes in the story prose ──
+  # The locked altitude: the story prose (hook / Job story / Actor / Preconditions
+  # — the `$region` before `## Acceptance`) stays plain outcome terms; `file:symbol`
+  # / mechanism detail belongs in `## Status`. `$region` ends at `## Acceptance`, so
+  # `## Status` AND the Gherkin ACs are exempt for free — a test legitimately names
+  # confirmed symbols there (rubric D2). NARROW by design: only unambiguous code
+  # shapes flag deterministically; bare camelCase (`beforeLogin`) and hyphenated
+  # jargon (`payload-token`) are left to the LLM quality-reviewer (rubric D11) so
+  # prose like `iPhone` / `real-time` never false-trips. Single-file `$region`
+  # greps, no backtick in any regex, bash-3.2 safe.
+  #   P1 — code-extension filenames `<word>.ts` / `<word>.tsx`. NOT `.js`/`.jsx`
+  #        (collide with the prose tokens Node.js / Next.js) and NOT `.xml`/`.txt`/
+  #        `.md` (sitemap.xml, robots.txt, persona `.md` links are legitimate).
+  #   P2 — a function-call shape: a LOWERCASE-initial identifier + EMPTY parens
+  #        `()` (`beforeLogin()`, `revokeSession()`). The EMPTY parens are load-
+  #        bearing: prose plurals `role(s)` / `page(s)` / `permission(s)` and the
+  #        ALL-CAPS `API(s)` carry `(s)`, not `()`, so they never match; and
+  #        `the workspace (a shared space)` / markdown `[label](…)` never produce
+  #        `word()`. A call WITH args (`getUser(id)`) in prose is left to the LLM
+  #        rubric — rarer in prose, and not worth widening the net for.
+  #   P3 — source-root path prefixes `src/` `node_modules/` `dist/` `build/` at a
+  #        token boundary (so `websrc/` doesn't match). NOT `app/` (collides with
+  #        "the app"), NOT `docs/` (persona / intent `.md` links), NOT leading-slash
+  #        page routes like `/photos` — the dir name itself must be a code root.
+  if printf '%s' "$region" | grep -qE '[A-Za-z0-9_-]\.(ts|tsx)([^[:alnum:]]|$)' \
+     || printf '%s' "$region" | grep -qE '[a-z][A-Za-z0-9_]*\(\)' \
+     || printf '%s' "$region" | grep -qE '(^|[^A-Za-z0-9_])(src|node_modules|dist|build)/'; then
+    defects="$defects MECHANISM_LEAK"
+  fi
+
   if [ -n "$defects" ]; then
     printf '%s' "${defects# }"
     return 1
