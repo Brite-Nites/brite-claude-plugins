@@ -58,7 +58,7 @@ trap 'rm -rf "$TMP_DOCS"' EXIT
 mk_tmp_doc() { cat > "$TMP_DOCS/$1.md"; }
 
 GOOD="$FIX/good-britebase-grade/docs/product/flows/team/team-01.md"
-GOOD_CS="$FIX/good-constraint-spec/docs/product/flows/seo/seo-01.md"
+GATE_OWNED_CS="$FIX/constraint-spec-gate-owned/docs/product/flows/seo/seo-01.md"
 GOOD_HI="$FIX/good-human-infra-mention/docs/product/flows/ops/ops-01.md"
 BAD_GRAMMAR="$FIX/bad-grammar-collapse/docs/product/flows/team/team-02.md"
 BAD_BOILER="$FIX/bad-boilerplate-ac/docs/product/flows/team/team-03.md"
@@ -67,13 +67,13 @@ BAD_PERSONA="$FIX/bad-generic-persona/docs/product/flows/team/team-05.md"
 BAD_FRAME="$FIX/bad-frame-mismatch/docs/product/flows/seo/seo-02.md"
 
 section "1/4" "lib loads + fixtures present"
-for d in "$GOOD" "$GOOD_CS" "$GOOD_HI" "$BAD_GRAMMAR" "$BAD_BOILER" "$BAD_SCEN" "$BAD_PERSONA" "$BAD_FRAME"; do
+for d in "$GOOD" "$GATE_OWNED_CS" "$GOOD_HI" "$BAD_GRAMMAR" "$BAD_BOILER" "$BAD_SCEN" "$BAD_PERSONA" "$BAD_FRAME"; do
   if [ -f "$d" ]; then pass "fixture present: ${d#$FIX/}"; else fail "fixture MISSING: $d"; fi
 done
 
-section "2/4" "GOOD fixtures lint clean (human job-story + constraint-spec + human-mentions-infra)"
+section "2/4" "Deterministically-clean fixtures lint clean (human job-story + gate-owned constraint-spec + human-mentions-infra)"
 assert_clean "good human job-story → PASS" "$GOOD"
-assert_clean "good constraint-spec → PASS" "$GOOD_CS"
+assert_clean "gate-owned constraint-spec → PASS (frame rejection is the audit gate's + rubric D11's job, not this lint's)" "$GATE_OWNED_CS"
 assert_clean "good human-mentions-infra (crawler as object) → PASS" "$GOOD_HI"
 
 section "3/4" "BAD fixtures trip their defect"

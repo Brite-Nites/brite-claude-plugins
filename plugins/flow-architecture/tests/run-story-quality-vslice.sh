@@ -20,12 +20,15 @@
 #       "Brite team member") rather than a sub-flow-specific persona.
 #   (e) Frame mismatch (D11 / T0-4) — a non-human / automated / infra actor
 #       (a crawler, googlebot, spider, bot) forced into the first-person
-#       job-story frame (`When .. I want .. so I can`) instead of the
-#       constraint-spec frame (`Given .. the system MUST .. so that`). This is
+#       job-story frame (`When .. I want .. so I can`). The fix is to re-anchor
+#       on the human the mechanism serves (operator or customer) — NOT to switch
+#       to the `Given .. the system MUST .. so that` constraint-spec frame, which
+#       is retired (BC-12134) and rejected outright by the audit gate
+#       (`story-job-story-regex`, BC-12197) + rubric D11. This is
 #       the canonical "When I'm a search-engine crawler, I want a sitemap.."
 #       defect (brite-labs-site / brite-sites sitemap-and-robots). The check is
 #       (1) scoped to the `## Job story` section so AC-level `When a crawler
-#       requests ..` lines (legitimate in a constraint-spec Given/When/Then)
+#       requests ..` lines (legitimate Gherkin When steps in `## Acceptance`)
 #       never fire it, and (2) ACTOR-scoped within that section so a human flow
 #       that merely names a crawler as an OBJECT ("When I review crawler
 #       activity reports, I want ..") does not false-trip — the non-human noun
@@ -33,9 +36,12 @@
 #       CDN, ISR, canonical, CSP) is judgment-scored by the `quality-reviewer`;
 #       this deterministic lock targets the high-signal crawler/bot agent class.
 #
-# Contract: each GOOD fixture (a human BriteBase-grade story AND a non-human
-# constraint-spec story) PASSES all five checks; each BAD fixture trips exactly
-# the defect it is named for.
+# Contract: the two clean fixtures (the human BriteBase-grade story + the
+# human-mentions-infra story) AND the gate-owned constraint-spec fixture (a
+# retired-frame doc this deterministic proxy deliberately does NOT flag — its
+# rejection is owned by the audit gate `story-job-story-regex` (BC-12197) +
+# rubric D11, not this proxy) all PASS the five deterministic checks; each BAD
+# fixture trips exactly the defect it is named for.
 #
 # Bash 3.2 compatible (macOS default) per FDA parking-lot #32. Stdlib only.
 #
@@ -55,7 +61,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES_DIR="$SCRIPT_DIR/fixtures/synthetic-story-quality"
 
 GOOD_DIR="$FIXTURES_DIR/good-britebase-grade"
-GOOD_CONSTRAINT_DIR="$FIXTURES_DIR/good-constraint-spec"
+GATE_OWNED_CONSTRAINT_DIR="$FIXTURES_DIR/constraint-spec-gate-owned"
 GOOD_HUMAN_INFRA_DIR="$FIXTURES_DIR/good-human-infra-mention"
 BAD_GRAMMAR_DIR="$FIXTURES_DIR/bad-grammar-collapse"
 BAD_BOILERPLATE_DIR="$FIXTURES_DIR/bad-boilerplate-ac"
@@ -264,7 +270,7 @@ assert_defect() {
 section "1/3" "Fixture presence"
 
 GOOD_DOC="$GOOD_DIR/docs/product/flows/team/team-01.md"
-GOOD_CONSTRAINT_DOC="$GOOD_CONSTRAINT_DIR/docs/product/flows/seo/seo-01.md"
+GATE_OWNED_CONSTRAINT_DOC="$GATE_OWNED_CONSTRAINT_DIR/docs/product/flows/seo/seo-01.md"
 GOOD_HUMAN_INFRA_DOC="$GOOD_HUMAN_INFRA_DIR/docs/product/flows/ops/ops-01.md"
 BAD_GRAMMAR_DOC="$BAD_GRAMMAR_DIR/docs/product/flows/team/team-02.md"
 BAD_BOILERPLATE_DOC="$BAD_BOILERPLATE_DIR/docs/product/flows/team/team-03.md"
@@ -273,7 +279,7 @@ BAD_PERSONA_DOC="$BAD_PERSONA_DIR/docs/product/flows/team/team-05.md"
 BAD_FRAME_DOC="$BAD_FRAME_DIR/docs/product/flows/seo/seo-02.md"
 BAD_FRAME_FP_DOC="$BAD_FRAME_FP_DIR/docs/product/flows/seo/seo-09.md"
 
-for d in "$GOOD_DOC" "$GOOD_CONSTRAINT_DOC" "$GOOD_HUMAN_INFRA_DOC" \
+for d in "$GOOD_DOC" "$GATE_OWNED_CONSTRAINT_DOC" "$GOOD_HUMAN_INFRA_DOC" \
          "$BAD_GRAMMAR_DOC" "$BAD_BOILERPLATE_DOC" "$BAD_SCENARIOS_DOC" \
          "$BAD_PERSONA_DOC" "$BAD_FRAME_DOC" "$BAD_FRAME_FP_DOC"; do
   if [ -f "$d" ]; then
@@ -286,10 +292,10 @@ done
 # ──────────────────────────────────────────────────────────────────────
 # Section 2 — GOOD fixtures pass all five checks
 # ──────────────────────────────────────────────────────────────────────
-section "2/3" "GOOD fixtures (human job-story + non-human constraint-spec + human-mentions-infra) are clean"
+section "2/3" "Deterministically-clean fixtures (human job-story + gate-owned constraint-spec + human-mentions-infra) pass all five checks"
 
 assert_clean "good human fixture passes all five quality checks" "$GOOD_DOC"
-assert_clean "good constraint-spec fixture passes all five quality checks" "$GOOD_CONSTRAINT_DOC"
+assert_clean "gate-owned constraint-spec fixture passes the five deterministic checks (frame rejection is the audit gate's + rubric D11's job, not this proxy's)" "$GATE_OWNED_CONSTRAINT_DOC"
 assert_clean "good human-mentions-infra fixture passes all five quality checks" "$GOOD_HUMAN_INFRA_DOC"
 
 # Cross-checks on the good fixture's structural soundness — these guard the
@@ -308,33 +314,37 @@ else
   fail "good fixture must have 3-5 Scenario blocks (found $good_scen)"
 fi
 
-# Constraint-spec good fixture: guard it against rotting into either a thin
-# stub or a job-story frame. It MUST carry the Given / the system MUST / so
-# that constraint-spec shape and MUST NOT use the first-person job-story frame.
-if grep -qiE '^> \*\*Given\*\*.*\*\*MUST\*\*.*\*\*so that\*\*' "$GOOD_CONSTRAINT_DOC"; then
-  pass "good constraint-spec fixture uses the Given/MUST/so that frame"
+# Gate-owned constraint-spec fixture: guard it against rotting into either a thin
+# stub or a job-story frame. It MUST carry the Given / the system MUST / so that
+# constraint-spec shape — the retired frame this deterministic proxy passes
+# through untouched (its rejection is owned by the audit gate
+# `story-job-story-regex` (BC-12197) + rubric D11, NOT this proxy) — and MUST NOT
+# use the first-person job-story frame (that would make it a FRAME_MISMATCH case,
+# a different fixture).
+if grep -qiE '^> \*\*Given\*\*.*\*\*MUST\*\*.*\*\*so that\*\*' "$GATE_OWNED_CONSTRAINT_DOC"; then
+  pass "gate-owned constraint-spec fixture uses the Given/MUST/so that frame"
 else
-  fail "good constraint-spec fixture does NOT match the Given/MUST/so that shape"
+  fail "gate-owned constraint-spec fixture does NOT match the Given/MUST/so that shape"
 fi
 
 constraint_js="$(awk '
   /^##[[:space:]]+Job story/ { in_js=1; next }
   /^##[[:space:]]/           { in_js=0 }
   in_js                      { print }
-' "$GOOD_CONSTRAINT_DOC" 2>/dev/null || true)"
+' "$GATE_OWNED_CONSTRAINT_DOC" 2>/dev/null || true)"
 if printf '%s' "$constraint_js" | grep -iqE 'I want' \
    && printf '%s' "$constraint_js" | grep -iqE 'so I can'; then
-  fail "good constraint-spec fixture leaked a first-person job-story frame"
+  fail "gate-owned constraint-spec fixture leaked a first-person job-story frame"
 else
-  pass "good constraint-spec fixture avoids the first-person job-story frame"
+  pass "gate-owned constraint-spec fixture avoids the first-person job-story frame"
 fi
 
-constraint_scen="$(grep -cE '^[[:space:]]*Scenario:' "$GOOD_CONSTRAINT_DOC" 2>/dev/null || true)"
+constraint_scen="$(grep -cE '^[[:space:]]*Scenario:' "$GATE_OWNED_CONSTRAINT_DOC" 2>/dev/null || true)"
 [ -n "$constraint_scen" ] || constraint_scen=0
 if [ "$constraint_scen" -ge 3 ] && [ "$constraint_scen" -le 5 ]; then
-  pass "good constraint-spec fixture has 3-5 Scenario blocks (found $constraint_scen)"
+  pass "gate-owned constraint-spec fixture has 3-5 Scenario blocks (found $constraint_scen)"
 else
-  fail "good constraint-spec fixture must have 3-5 Scenario blocks (found $constraint_scen)"
+  fail "gate-owned constraint-spec fixture must have 3-5 Scenario blocks (found $constraint_scen)"
 fi
 
 # Actor-scoping lock: the human-mentions-infra fixture uses the job-story frame

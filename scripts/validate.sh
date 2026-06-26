@@ -423,8 +423,8 @@ fi
 # regression lock for the reusable, multi-line-aware story-doc lint lib
 # (scripts/lib/flow_doc_lint.sh) used by WS-E remediation to lint any consumer
 # repo's flows. Asserts lint_story_doc returns the right verdict on the shared
-# synthetic-story-quality fixtures: GOOD (human job-story + constraint-spec +
-# human-mentions-infra) → PASS; each BAD fixture → its named defect (A-1 GRAMMAR
+# synthetic-story-quality fixtures: the clean docs (human job-story +
+# gate-owned constraint-spec + human-mentions-infra) → PASS; each BAD fixture → its named defect (A-1 GRAMMAR
 # / A-3 BOILERPLATE / FEW_SCENARIOS / A-2 GENERIC_PERSONA / D11 FRAME_MISMATCH).
 # Pass count auto-derived from the harness's RESULT line.
 section "2b''''''''. flow-architecture WS-A doc-lint vslice (BC-11983)"
