@@ -11,7 +11,7 @@
 # link-resolution check (every `](path.md)` resolves on disk — the BC-13710
 # broken-link class). Exit-code contract: 0 all-pass, 1 ≥1 hard-fail, 2 usage.
 #
-# Both the frontmatter-schema gate (full canon) and the story-frame gate (human-only)
+# Both the frontmatter-populated gates (full canon) and the story-frame gate (human-only)
 # are UNCONDITIONAL — the per-repo `frontmatter_schema` (BC-13915) and `story_frame`
 # (BC-12197) strangler-fig flags were collapsed once every consumer converged. The
 # tests/fixtures/audit-clean-shape fixture carries the FULL canon, so a fresh copy passes
@@ -85,12 +85,13 @@ if [ "$RC" = "0" ]; then pass "clean full-canon fixture → exit 0"; else fail "
 
 # ── Section 2: a doc downgraded to the lean 4-key floor → exit 1 ──────────────
 # The full-canon frontmatter gate is unconditional (BC-13915) — no flag to set; strip a
-# doc back to the lean shape → the missing canon keys FAIL frontmatter-schema.
-section "2/8" "lean (non-canon) doc → exit 1 (names frontmatter-schema)"
+# doc back to the lean shape → the missing canon keys FAIL story-front-matter-populated.
+# (BC-13956: the runner emits the granular manifest id, matching /flow:audit's evaluate().)
+section "2/8" "lean (non-canon) doc → exit 1 (names story-front-matter-populated)"
 F2="$(fresh_copy)"; strip_canon "$(first_story "$F2")"
 run_audit "$F2"
-if [ "$RC" = "1" ] && printf '%s' "$OUT" | grep -qi 'frontmatter-schema'; then
-  pass "lean doc → exit 1 + names frontmatter-schema"
+if [ "$RC" = "1" ] && printf '%s' "$OUT" | grep -qi 'story-front-matter-populated'; then
+  pass "lean doc → exit 1 + names story-front-matter-populated"
 else
   fail "full-canon schema gate not enforced: exit $RC; OUT: $OUT"
 fi
@@ -269,7 +270,7 @@ fi
 # §11 isolates the exclusion via the always-on link-resolution gate. This covers the
 # OTHER consumer of _journey_docs: the ADR-033 journey schema lint (now unconditional —
 # BC-13915). We assert on the OUTPUT — a skip journey with junk frontmatter must NOT be
-# NAMED as a journey frontmatter-schema failure (it would be, were it not excluded).
+# NAMED as a journey-front-matter-populated failure (it would be, were it not excluded).
 section "11b" "flow_index:skip journey excluded from the journey schema lint (not named)"
 FJS="$(fresh_copy)"
 printf -- '---\nflow_index: skip\n---\n# Overview\nNot a journey — no ADR-033 canon.\n' \

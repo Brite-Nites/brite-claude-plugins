@@ -9,11 +9,15 @@ SINGLE SOURCE OF TRUTH: the gate logic is NOT re-implemented here — it imports
 canonical Phase-B predicates from build_audit_report.py (which the audit report and
 run-audit-smoke.sh also use) so there is exactly one definition of each gate:
 
-  * frontmatter-schema  — _story_frontmatter_populated(text) over story docs (the full
+  * story-front-matter-populated / redirect-front-matter-valid / journey-front-matter-populated
+                          — _story_frontmatter_populated(text) over story docs (the full
                           ADR-029 canon, unconditional) + the redirect-canon check + the
                           journey frontmatter lint (ADR-033). BC-13915 collapsed the
                           per-repo `frontmatter_schema` flag to this hardcoded full-canon
-                          end-state.
+                          end-state; BC-13956 harmonized the emitted gate-ids to these
+                          granular manifest ids (previously a coarse runner-only
+                          `frontmatter-schema` umbrella) so red CI names the SAME gate as
+                          local `/flow:audit`.
   * story-frame         — _story_frame_present(text) over story docs (the human
                           job-story frame is required everywhere; the legacy
                           constraint-spec frame is rejected — BC-12197 collapsed the
@@ -23,7 +27,7 @@ run-audit-smoke.sh also use) so there is exactly one definition of each gate:
                           the BC-13710 broken-cross-reference-link class). Frontmatter
                           and `http(s)`/`mailto` links are not checked.
 
-Both the frontmatter-schema gate (full canon) and the story-frame gate (human-only) are
+Both the frontmatter-populated gates (full canon) and the story-frame gate (human-only) are
 now UNCONDITIONAL — the per-repo `.flow/config.json` `frontmatter_schema` (BC-13915) and
 `story_frame` (BC-12197) strangler-fig flags were collapsed once every consumer converged.
 Leftover keys in a consumer config are harmless ignored extras.
@@ -94,8 +98,10 @@ def audit(repo: Path) -> list:
     {gate, scope, detail}. Empty list ⇒ all pass."""
     failures = []
 
-    # --- story docs: frontmatter-schema (full canon) + story-frame (human-only) — both
-    #     unconditional since BC-12197 (story_frame) + BC-13915 (frontmatter_schema). ---
+    # --- story docs: story-front-matter-populated (full canon) / redirect-front-matter-valid
+    #     (redirect stubs) + story-frame (human-only) — all unconditional since BC-12197
+    #     (story_frame) + BC-13915 (frontmatter_schema); gate-ids harmonized to the Q29
+    #     manifest in BC-13956. ---
     for domain in bar._domains(repo):
         for doc in bar._story_docs(repo, domain):
             text = bar._read(doc)
@@ -116,24 +122,24 @@ def audit(repo: Path) -> list:
                         bits.append("drift=" + ",".join(d.split(" ")[0] for d in res["drift"][:4]))
                     if res["missing"]:
                         bits.append("missing=" + ",".join(m.split(" ")[0] for m in res["missing"][:4]))
-                    failures.append({"gate": "frontmatter-schema", "scope": scope,
+                    failures.append({"gate": "redirect-front-matter-valid", "scope": scope,
                                      "detail": "; ".join(bits)})
                 continue
             if not bar._story_frontmatter_populated(text):
                 miss = ffl.lint_text(text, "story")["missing"]
                 detail = "missing=" + ",".join(miss[:6]) + ("…" if len(miss) > 6 else "")
-                failures.append({"gate": "frontmatter-schema", "scope": scope, "detail": detail})
+                failures.append({"gate": "story-front-matter-populated", "scope": scope, "detail": detail})
             if not bar._story_frame_present(text):
                 failures.append({"gate": "story-frame", "scope": scope,
                                  "detail": "no human job-story frame"})
 
-    # --- journey docs: frontmatter-schema (ADR-033 canon, unconditional — BC-13915).
-    #     bar._journey_docs is the shared journey set (single-sourced into
+    # --- journey docs: journey-front-matter-populated (ADR-033 canon, unconditional —
+    #     BC-13915). bar._journey_docs is the shared journey set (single-sourced into
     #     build_audit_report per BC-13935) — the SAME set bar.evaluate's
     #     journey-front-matter-populated gate lints, keeping this CI runner and
-    #     /flow:audit's Phase-B evaluator in lockstep (BC-13148). The runner keeps the
-    #     coarse `frontmatter-schema` scope-prefixed id; evaluate() uses the granular
-    #     `journey-front-matter-populated` — same pass/fail behavior, different label. ---
+    #     /flow:audit's Phase-B evaluator in lockstep (BC-13148). The runner now emits the
+    #     SAME granular gate-id as evaluate() (harmonized in BC-13956); it keeps its own
+    #     `journey:<stem>` scope as the unfiltered CI surface. ---
     for doc in bar._journey_docs(repo):
         res = ffl.lint_text(bar._read(doc), "journey")
         if res["drift"] or res["missing"]:
@@ -142,7 +148,7 @@ def audit(repo: Path) -> list:
                 bits.append("drift=" + ",".join(d.split(" ")[0] for d in res["drift"][:4]))
             if res["missing"]:
                 bits.append("missing=" + ",".join(res["missing"][:4]))
-            failures.append({"gate": "frontmatter-schema", "scope": "journey:" + doc.stem,
+            failures.append({"gate": "journey-front-matter-populated", "scope": "journey:" + doc.stem,
                              "detail": "; ".join(bits)})
 
     # --- link-resolution: body .md links resolve (ALWAYS on) ---
