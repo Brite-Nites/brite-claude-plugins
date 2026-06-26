@@ -542,6 +542,88 @@ Scenario: c
 DOC
 assert_clean "lowercase pluralization role(s)/page(s)/permission(s) stays clean (P2 requires empty parens)" "$TMP_DOCS/mech_plural_guard.md"
 
+# Front-matter exemption (Greptile #501 P1) — YAML metadata is NOT story prose. A
+# front-matter value that carries a code path (`e2e_test: src/auth/revoke.test.ts`)
+# must NOT trip MECHANISM_LEAK; the scan is scoped to the prose body, not metadata.
+mk_tmp_doc mech_frontmatter_exempt <<'DOC'
+---
+flow_id: team-14
+status: BUILT
+personas: Workspace owner offboarding a departing teammate
+e2e_test: src/auth/revoke.test.ts
+---
+# team-14
+
+## Job story
+
+> **When** a teammate leaves, **I want to** revoke their access from the members screen, **so I can** close the security gap immediately.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). They confirm the removal on the members screen.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_clean "code path in front-matter (e2e_test: src/auth/revoke.test.ts) stays clean — metadata, not prose (Greptile #501 P1)" "$TMP_DOCS/mech_frontmatter_exempt.md"
+
+# ## Status notes exemption (Greptile #501 P2) — `## Status notes` is the sibling of
+# `## Status` (build-state evidence), positioned before `## Acceptance`. It legitimately
+# records file:symbol evidence and must be exempt like `## Status`, even though it sits
+# inside the pre-Acceptance span.
+mk_tmp_doc mech_status_notes_exempt <<'DOC'
+---
+flow_id: team-15
+status: IN_PROGRESS
+personas: Workspace owner waiting on the self-serve revoke UI
+---
+# team-15
+
+## Job story
+
+> **When** a teammate leaves, **I want to** revoke their access right away, **so I can** keep the workspace secure.
+
+## Status notes
+
+Engine ships — getInvoices() query runs in middleware.ts; no /revoke route under src/app yet, so revocation is manual today.
+
+## Actor
+
+Workspace owner (RBAC: `workspace.admin`). They currently ask an admin to remove the seat.
+
+## Acceptance criteria
+
+Scenario: a
+  Given x
+  When y
+  Then z
+
+Scenario: b
+  Given x
+  When y
+  Then z
+
+Scenario: c
+  Given x
+  When y
+  Then z
+DOC
+assert_clean "code evidence in ## Status notes (getInvoices()/middleware.ts/src/app) stays clean — status sibling, not prose (Greptile #501 P2)" "$TMP_DOCS/mech_status_notes_exempt.md"
+
 printf '\nflow-doc-lint v-slice summary: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -gt 0 ] && exit 1
