@@ -1,6 +1,6 @@
 # 038. FDA-audit action distributed via a scoped moving major tag (`fda-audit-v1`)
 
-**Status:** Accepted
+**Status:** Accepted — the "Enforcement stays advisory" decision point is **superseded by [ADR-039](039-fda-audit-advisory-to-required.md)** (2026-06-26)
 **Date:** 2026-06-23
 **Linear:** [BC-13773](https://linear.app/brite-nites/issue/BC-13773) (fan-out foundation) · [BC-12303](https://linear.app/brite-nites/issue/BC-12303) (wire FDA audit into consumer CI) · [BC-11983](https://linear.app/brite-nites/issue/BC-11983) (FDA quality-enforcement epic)
 **Related ADRs:** [036](036-fda-story-frame-bold-span-match.md) (α — story-frame predicate) · [037](037-fda-redirect-stub-convention.md) (β — redirect-stub gate). Both shipped the runner this tag distributes.
@@ -25,6 +25,7 @@ uses: Brite-Nites/brite-claude-plugins/.github/actions/fda-audit@fda-audit-v1
 - **Breaking changes → opt-in `fda-audit-v2`.** A backward-incompatible runner/gate change cuts a new major; consumers migrate their `@ref` deliberately. `fda-audit-v1` only ever moves forward-compatibly.
 - **The third-party `actions/checkout` stays SHA-pinned.** We move-pin only our own first-party action in our own org; we do not relax supply-chain hygiene on third-party actions (GitHub's own guidance).
 - **Enforcement stays advisory.** All consumer mains are unprotected → the `fda-audit` check is visible-but-not-required. Promoting it to a GitHub branch-protection *required* check is a deferred, per-repo follow-up (see ADR-037 / the BC-12303 tracks; grill Q6).
+  - **[Superseded 2026-06-26 by [ADR-039](039-fda-audit-advisory-to-required.md), BC-13795.]** Both halves of this bullet were overturned by live verification: (a) the mains are **not** uniformly unprotected — `brite-sites`/`brite-base` use classic branch protection and `brand-hub` uses rulesets; (b) `fda-audit` is now a **required** check on those three (the other four stay advisory pending an owner-approved protection decision). The deferred follow-up referenced here is what ADR-039 resolves.
 
 ## Consequences
 
