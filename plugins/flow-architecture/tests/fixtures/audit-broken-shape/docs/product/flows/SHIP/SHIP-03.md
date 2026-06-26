@@ -13,6 +13,18 @@ children:
   design: BC-2302
   qa: BC-2303
   docs: BC-2304
+domain: SHIP
+parent_issue: BC-1
+personas: []
+related_flows: []
+sandbox_url: TBD
+staging_url: TBD
+real_app_url: TBD
+e2e_test: TBD
+eng_status: done
+design_status: done
+docs_status: done
+intent: ../../intent.md
 ---
 
 # SHIP-03 — Ship telemetry

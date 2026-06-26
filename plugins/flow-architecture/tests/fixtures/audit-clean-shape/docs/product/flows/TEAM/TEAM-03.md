@@ -13,6 +13,18 @@ children:
   design: BC-1302
   qa: BC-1303
   docs: BC-1304
+domain: TEAM
+parent_issue: BC-1
+personas: []
+related_flows: []
+sandbox_url: TBD
+staging_url: TBD
+real_app_url: TBD
+e2e_test: TBD
+eng_status: done
+design_status: done
+docs_status: done
+intent: ../../intent.md
 ---
 
 # TEAM-03 — Team invitations

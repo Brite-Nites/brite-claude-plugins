@@ -156,57 +156,31 @@ story_frame_present() {
   return 1
 }
 
-# frontmatter_schema_mode <fixture> — resolve a consumer repo's frontmatter-schema
-# strictness from .flow/config.json `frontmatter_schema` (BC-12572). Returns
-# `strict` ONLY for an explicit string `frontmatter_schema: "strict"`
-# (case-insensitive); every other state — file absent, field absent, unrecognized
-# value, parse error — resolves to `lenient`. Fail-safe by construction (the gate can
-# only ever STAY permissive, never accidentally narrow) — the same shape the now-deleted
-# story_frame reader used before BC-12197 collapsed it. Per-repo strangler-fig: repos
-# flip to `strict` as their story docs are migrated to full canon; once all consumers
-# converge, `strict` becomes the hardcoded default + this flag is deleted (its own track).
-frontmatter_schema_mode() {
-  local fixture="$1" mode="lenient"
-  [ -f "$fixture/.flow/config.json" ] || { printf 'lenient'; return 0; }
-  mode="$(python3 - "$fixture/.flow/config.json" <<'PY'
-import json, sys
-try:
-    v = json.load(open(sys.argv[1])).get('frontmatter_schema')
-    print('strict' if isinstance(v, str) and v.lower() == 'strict' else 'lenient')
-except Exception:
-    print('lenient')
-PY
-)"
-  printf '%s' "$mode"
-}
-
-# story_frontmatter_populated <doc> [<mode>] — the story-front-matter-populated gate
-# (BC-12572 config-gated widening). LENIENT (default): the 4-key presence floor
-# (flow_id/status/figma/user_docs_url) — today's behavior, byte-unchanged. STRICT:
-# the FULL 20-key story canon must be present (presence, NEVER non-emptiness —
-# honest-empty `personas: []` passes), delegated to the WS-A frontmatter lint
-# (scripts/lib/flow_frontmatter_lint.py) so the canon is single-sourced, not
-# re-listed a third time. PASS iff zero MISSING_KEY. A drift key (sub_flow_id …)
-# fails here only via the canonical key it displaces going MISSING — naming the
-# drift is the standalone lint's job, not this completeness gate. <mode> defaults
-# to lenient so every existing caller is unchanged.
+# story_frontmatter_populated <doc> — the story-front-matter-populated gate. Requires
+# the FULL canonical story frontmatter (presence, NEVER non-emptiness — honest-empty
+# `personas: []` passes), delegated to the WS-A frontmatter lint
+# (scripts/lib/flow_frontmatter_lint.py) so the canon is single-sourced, not re-listed
+# a third time. PASS iff zero MISSING_KEY. A drift key (sub_flow_id …) fails here only
+# via the canonical key it displaces going MISSING — naming the drift is the standalone
+# lint's job, not this completeness gate.
+#
+# COLLAPSED (BC-13915) — the per-repo `frontmatter_schema` mode was a strangler-fig
+# migration device (BC-12572), the structural twin of the story_frame flag. Once ALL FDA
+# consumer repos (brand-hub, brite-base, brite-labs, brite-roster, brite-sites,
+# brite-supply-commerce, lseo-tool) carried `frontmatter_schema: strict`, the `<mode>`
+# param, the `frontmatter_schema_mode` reader, and the lenient 4-key floor were DELETED
+# and the full-canon check hardcoded as the global end-state (this is that end-state),
+# mirroring the story_frame collapse (BC-12197).
 story_frontmatter_populated() {
-  local doc="$1" mode
-  mode="$(printf '%s' "${2:-lenient}" | tr '[:upper:]' '[:lower:]')"
-  if [ "$mode" = "strict" ]; then
-    local missing
-    missing="$(python3 - "$SCRIPT_DIR/../scripts/lib" "$doc" <<'PY'
+  local doc="$1" missing
+  missing="$(python3 - "$SCRIPT_DIR/../scripts/lib" "$doc" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1])
 import flow_frontmatter_lint as m
 print(len(m.lint_doc(sys.argv[2], "story")["missing"]))
 PY
 )"
-    [ "$missing" = "0" ]
-    return
-  fi
-  grep -q '^flow_id:' "$doc" && grep -q '^status:' "$doc" \
-    && grep -q '^figma:' "$doc" && grep -q '^user_docs_url:' "$doc"
+  [ "$missing" = "0" ]
 }
 
 # === Phase B-equivalent gate runner (filesystem-only checks) =================
@@ -216,13 +190,10 @@ run_phase_b_gates() {
   local fixture="$1"
   : > "$GATE_REPORT"
 
-  # The story-job-story-regex gate is unconditional (human-only frame, BC-12197 / Q29
-  # amendment 4) — no per-repo story_frame mode to resolve any more.
-  # Per-repo frontmatter-schema strictness (BC-12572): lenient unless the consumer
-  # repo's .flow/config.json sets `frontmatter_schema: strict`. Threaded into the
-  # story-front-matter-populated gate below.
-  local fm_schema_mode
-  fm_schema_mode="$(frontmatter_schema_mode "$fixture")"
+  # Both per-flow frontmatter/story-frame gates are now unconditional: the
+  # story-job-story-regex gate (human-only frame, BC-12197 / Q29 amendment 4) and the
+  # story-front-matter-populated gate (full canon, BC-13915) — no per-repo story_frame or
+  # frontmatter_schema mode to resolve any more.
 
   # --- preflight-complete (Q29.1) ---
   if [ -f "$fixture/.flow/config.json" ] && python3 - "$fixture" <<'PY' >/dev/null 2>&1
@@ -319,23 +290,21 @@ PY
           else
             emit_gate FAIL redirect-target-resolvable "$scope" "redirect_to=${rt:-∅}"
           fi
-          if [ "$fm_schema_mode" = "strict" ]; then
-            local rmiss=""
-            for k in flow_id domain doc_type redirect_to intent last_reviewed; do
-              grep -qE "^$k:" "$doc" || rmiss="$rmiss $k"
-            done
-            if [ -z "$rmiss" ]; then
-              emit_gate PASS redirect-front-matter-valid "$scope"
-            else
-              emit_gate FAIL redirect-front-matter-valid "$scope" "missing=$rmiss"
-            fi
-          else
+          # redirect-front-matter-valid is now unconditional (BC-13915): the redirect
+          # canon is enforced everywhere, no longer gated on `frontmatter_schema: strict`.
+          local rmiss=""
+          for k in flow_id domain doc_type redirect_to intent last_reviewed; do
+            grep -qE "^$k:" "$doc" || rmiss="$rmiss $k"
+          done
+          if [ -z "$rmiss" ]; then
             emit_gate PASS redirect-front-matter-valid "$scope"
+          else
+            emit_gate FAIL redirect-front-matter-valid "$scope" "missing=$rmiss"
           fi
           continue
         fi
 
-        if story_frontmatter_populated "$doc" "$fm_schema_mode"; then
+        if story_frontmatter_populated "$doc"; then
           emit_gate PASS story-front-matter-populated "$scope"
         else
           emit_gate FAIL story-front-matter-populated "$scope"
@@ -568,16 +537,15 @@ if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-target-resolvable"
 else
   fail "self-pointer redirect not caught (no-op loop slipped through)"
 fi
-# Strict-mode redirect front-matter (BC-12907 review-fix): under frontmatter_schema:strict a
-# redirect missing a REDIRECT_CANON key hard-fails redirect-front-matter-valid (config-gated
-# path — mirrors evaluate()/CI-runner; the lenient default leaves it a pass).
-mkdir -p "$RDIR/.flow"; printf '{"frontmatter_schema": "strict"}\n' > "$RDIR/.flow/config.json"
+# Redirect front-matter (BC-12907; unconditional since BC-13915): a redirect missing a
+# REDIRECT_CANON key hard-fails redirect-front-matter-valid everywhere (mirrors
+# evaluate()/CI-runner — no longer gated on `frontmatter_schema: strict`).
 printf -- '---\nflow_id: %s\ndomain: %s\ndoc_type: redirect\nredirect_to: %s\nlast_reviewed: y\n---\n# %s (redirect, missing intent)\n' "$RAFID" "$RADOM" "$RTGT" "$RAFID" > "$RALIAS"
 run_phase_b_gates "$RDIR"
 if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-front-matter-valid" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
-  pass "strict: redirect missing canon key (intent) → redirect-front-matter-valid FAIL"
+  pass "redirect missing canon key (intent) → redirect-front-matter-valid FAIL"
 else
-  fail "strict redirect missing-key not caught on bash twin"
+  fail "redirect missing-key not caught on bash twin"
 fi
 rm -rf "$RDIR"
 
@@ -599,7 +567,7 @@ fi
 rm -rf "$SDIR"
 
 # ── Section 3: broken fixture — Phase B gate runner ─────────────────────────
-section "3/5" "Phase B gates against broken fixture (expect 3 named fails, 0 UNCATEGORIZED-GATE-FAIL)"
+section "3/5" "Phase B gates against broken fixture (expect 4 named fails, 0 UNCATEGORIZED-GATE-FAIL)"
 run_phase_b_gates "$BROKEN_FIXTURE"
 BROKEN_UNCAT="$(awk -F'\t' '$1 == "UNCATEGORIZED-GATE-FAIL"' "$GATE_REPORT" | wc -l | tr -d ' ')"
 
@@ -615,6 +583,10 @@ assert_failed() {
 assert_failed story-docs-complete domain:TEAM
 assert_failed index-complete project
 assert_failed eng-children-engineering-populated flow:SHIP-01
+# SHIP-01's missing children.engineering is a STORY_CANON key, so since BC-13915
+# hardcoded the full-canon floor it trips story-front-matter-populated too (one
+# structural omission, two gates). The other broken docs are full canon.
+assert_failed story-front-matter-populated flow:SHIP-01
 
 if [ "$BROKEN_UNCAT" -eq 0 ]; then
   pass "broken fixture: 0 UNCATEGORIZED-GATE-FAIL (gate-registry coverage holds)"
@@ -624,11 +596,14 @@ else
 fi
 
 BROKEN_FAIL_COUNT="$(awk -F'\t' '$1 == "FAIL"' "$GATE_REPORT" | wc -l | tr -d ' ')"
-# Strict count match — broken fixture is pinned to exactly 3 deliberate
-# violations per the audit-broken-shape README; a 4th unintended FAIL would
-# pass the per-gate assert_failed checks but break this tight count. Update
-# this number iff the fixture mutation table changes (and update the README).
-EXPECTED_BROKEN_FAILS=3
+# Strict count match — broken fixture is pinned to exactly 4 hard-gate FAILs: the 3
+# deliberate structural violations per the audit-broken-shape README PLUS the
+# story-front-matter-populated FAIL that SHIP-01's missing children.engineering now
+# also trips (BC-13915 hardcoded full-canon — children.engineering is a STORY_CANON
+# key). A 5th unintended FAIL would pass the per-gate assert_failed checks but break
+# this tight count. Update this number iff the fixture mutation table changes (and
+# update the README).
+EXPECTED_BROKEN_FAILS=4
 if [ "$BROKEN_FAIL_COUNT" -eq "$EXPECTED_BROKEN_FAILS" ]; then
   pass "broken fixture: $BROKEN_FAIL_COUNT hard-gate FAIL(s) (== $EXPECTED_BROKEN_FAILS expected) → /flow:audit would exit 1 (Q38 sub-decision 6)"
 else
@@ -753,94 +728,54 @@ fi
 run_phase_b_gates "$CONSTRAINT_FIX"
 assert_failed story-job-story-regex flow:TEAM-01
 
-# ── Section 4e: frontmatter_schema:strict widens story-front-matter-populated ─
-# BC-12572: .flow/config.json `frontmatter_schema: strict` widens the
-# story-front-matter-populated gate from the 4-key floor to the full 20-key story
-# canon (presence, not non-emptiness). Default/absent = the 4-key floor (Sections
-# 2/3 above already pin lenient). Mirrors Section 4c's copy-and-mutate wiring: the
-# clean fixture's docs carry only the 4 floor keys (+ children/qa), so under strict
-# they FAIL until upgraded to full canon. Proves (1) a full-canon doc PASSes strict,
-# (2) a still-lean doc FAILs strict, (3) BOTH PASS lenient (the flag GATES it).
-section "4e/5" "frontmatter_schema:strict widens story-front-matter-populated to full canon"
+# ── Section 4e: story-front-matter-populated requires full canon (unconditional) ─
+# BC-13915: story-front-matter-populated now requires the FULL canonical story
+# frontmatter UNCONDITIONALLY (presence, not non-emptiness) — the per-repo
+# `frontmatter_schema` flag + its lenient 4-key floor were collapsed once every consumer
+# converged (the structural twin of the story_frame collapse). The clean fixture's docs
+# are now full canon (so Section 2 already pins the PASS path end-to-end); this section
+# pins the FAIL path: a doc stripped back to the lean 4-key shape FAILs the gate, while a
+# full-canon sibling PASSes. No config to set — the gate is hardcoded full-canon.
+section "4e/5" "story-front-matter-populated requires full canon (a lean doc FAILs)"
 SCHEMA_FIX="$(mktemp -d)"
 trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$CONSTRAINT_FIX" "$SCHEMA_FIX"' EXIT
 cp -R "$CLEAN_FIXTURE/." "$SCHEMA_FIX/"
-# Upgrade TEAM-01 to the FULL 20-key canon by inserting the keys the lean fixture
-# lacks before the closing front-matter `---`.
-SCHEMA_DOC="$SCHEMA_FIX/docs/product/flows/TEAM/TEAM-01.md"
+# Downgrade TEAM-02 to the lean 4-key floor by stripping the canon keys the full fixture
+# now carries — making it incomplete frontmatter.
+SCHEMA_DOC="$SCHEMA_FIX/docs/product/flows/TEAM/TEAM-02.md"
 python3 - "$SCHEMA_DOC" <<'PY'
-import sys
+import sys, re
 p = sys.argv[1]
-lines = open(p).read().splitlines(keepends=True)
-add = ("domain: TEAM\nparent_issue: BC-1\npersonas: []\nrelated_flows: []\n"
-       "sandbox_url: TBD\nstaging_url: TBD\nreal_app_url: TBD\ne2e_test: TBD\n"
-       "eng_status: not-started\ndesign_status: not-started\ndocs_status: not-started\n"
-       "intent: ../../intent.md\n")
-idx = [i for i, l in enumerate(lines) if l.strip() == "---"]
-lines.insert(idx[1], add)  # before the front-matter close
-open(p, "w").write("".join(lines))
+strip = {"domain","parent_issue","personas","related_flows","sandbox_url","staging_url",
+         "real_app_url","e2e_test","eng_status","design_status","docs_status","intent"}
+out = []
+for l in open(p):
+    m = re.match(r'^([a-z_]+):', l)
+    if m and m.group(1) in strip:
+        continue
+    out.append(l)
+open(p, "w").write("".join(out))
 PY
-# Guard: confirm the upgraded doc now satisfies the full canon (zero MISSING_KEY)
-# while a sibling lean doc does not — defeats a vacuous pass if the insert no-ops.
-if story_frontmatter_populated "$SCHEMA_DOC" strict \
-   && ! story_frontmatter_populated "$SCHEMA_FIX/docs/product/flows/TEAM/TEAM-02.md" strict; then
-  pass "e2e setup: TEAM-01 upgraded to full canon; TEAM-02 still lean (strict-separable)"
+# Guard: confirm the downgraded doc now FAILs the full canon while the untouched sibling
+# (full canon) still passes — defeats a vacuous pass if the strip no-ops.
+if ! story_frontmatter_populated "$SCHEMA_DOC" \
+   && story_frontmatter_populated "$SCHEMA_FIX/docs/product/flows/TEAM/TEAM-01.md"; then
+  pass "e2e setup: TEAM-02 downgraded to lean; TEAM-01 still full canon (separable)"
 else
-  fail "e2e setup: upgrade no-op or TEAM-02 already full — e2e assertions invalid"
+  fail "e2e setup: strip no-op or TEAM-01 already lean — e2e assertions invalid"
 fi
 
-python3 - "$SCHEMA_FIX/.flow/config.json" <<'PY'
-import json, sys
-p = sys.argv[1]
-d = json.load(open(p)); d['frontmatter_schema'] = 'strict'
-json.dump(d, open(p, 'w'))
-PY
 run_phase_b_gates "$SCHEMA_FIX"
 if awk -F'\t' '$1=="FAIL" && $2=="story-front-matter-populated" && $3=="flow:TEAM-02"{f=1} END{exit !f}' "$GATE_REPORT"; then
-  pass "strict: lean TEAM-02 FAILs story-front-matter-populated (4-key floor insufficient)"
+  pass "lean TEAM-02 FAILs story-front-matter-populated (4-key floor insufficient — full canon required)"
 else
-  fail "strict: lean TEAM-02 did not FAIL — widening not enforced"
+  fail "lean TEAM-02 did not FAIL — full-canon enforcement not wired"
 fi
 if awk -F'\t' '$1=="PASS" && $2=="story-front-matter-populated" && $3=="flow:TEAM-01"{f=1} END{exit !f}' "$GATE_REPORT"; then
-  pass "strict: full-canon TEAM-01 PASSes story-front-matter-populated"
+  pass "full-canon TEAM-01 PASSes story-front-matter-populated"
 else
-  fail "strict: full-canon TEAM-01 did not PASS — widening rejects a complete doc"
+  fail "full-canon TEAM-01 did not PASS — gate rejects a complete doc"
 fi
-
-# lenient control (field removed) → the lean TEAM-02 PASSes the 4-key floor again
-# (proves the flag, not the doc, drives the verdict).
-python3 - "$SCHEMA_FIX/.flow/config.json" <<'PY'
-import json, sys
-p = sys.argv[1]
-d = json.load(open(p)); d.pop('frontmatter_schema', None)
-json.dump(d, open(p, 'w'))
-PY
-run_phase_b_gates "$SCHEMA_FIX"
-if awk -F'\t' '$1=="PASS" && $2=="story-front-matter-populated" && $3=="flow:TEAM-02"{f=1} END{exit !f}' "$GATE_REPORT"; then
-  pass "lenient (control): lean TEAM-02 still PASSes the 4-key floor"
-else
-  fail "lenient (control): lean TEAM-02 FAILed the floor — lenient floor broken end-to-end"
-fi
-
-# ── Section 4f: frontmatter_schema_mode config reader (fail-safe lenient) ─────
-section "4f/5" "frontmatter_schema_mode resolves .flow/config.json (fail-safe lenient)"
-SCHEMA_MODE_TMP="$(mktemp -d)"
-trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP" "$CONSTRAINT_FIX" "$SCHEMA_FIX" "$SCHEMA_MODE_TMP"' EXIT
-mkdir -p "$SCHEMA_MODE_TMP/.flow"
-[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP/absent")" = "lenient" ] \
-  && pass "absent .flow/config.json → lenient" || fail "absent config did not resolve lenient"
-printf '%s' '{"version":"1"}' > "$SCHEMA_MODE_TMP/.flow/config.json"
-[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP")" = "lenient" ] \
-  && pass "field absent → lenient" || fail "field-absent did not resolve lenient"
-printf '%s' '{"version":"1","frontmatter_schema":"strict"}' > "$SCHEMA_MODE_TMP/.flow/config.json"
-[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP")" = "strict" ] \
-  && pass "frontmatter_schema:strict → strict" || fail "strict did not resolve strict"
-printf '%s' '{"version":"1","frontmatter_schema":"STRICT"}' > "$SCHEMA_MODE_TMP/.flow/config.json"
-[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP")" = "strict" ] \
-  && pass "frontmatter_schema:STRICT (uppercase) → strict" || fail "uppercase STRICT did not resolve strict"
-printf '%s' '{"version":"1","frontmatter_schema":"banana"}' > "$SCHEMA_MODE_TMP/.flow/config.json"
-[ "$(frontmatter_schema_mode "$SCHEMA_MODE_TMP")" = "lenient" ] \
-  && pass "unrecognized value → lenient (fail-safe)" || fail "unrecognized value did not resolve lenient"
 
 # ── Section 5: skip-with-reason for Phase A / C / LLM-runner ────────────────
 section "5/5" "Phase A / C / LLM-runner gates (skipped per vslice-greenfield precedent)"

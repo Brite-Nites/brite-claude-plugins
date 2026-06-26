@@ -13,6 +13,18 @@ children:
   design: BC-2102
   qa: BC-2103
   docs: BC-2104
+domain: SHIP
+parent_issue: BC-1
+personas: []
+related_flows: []
+sandbox_url: TBD
+staging_url: TBD
+real_app_url: TBD
+e2e_test: TBD
+eng_status: done
+design_status: done
+docs_status: done
+intent: ../../intent.md
 ---
 
 # SHIP-01 — Ship readiness

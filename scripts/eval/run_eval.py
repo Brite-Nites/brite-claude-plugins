@@ -2601,7 +2601,7 @@ class AuditAdapter:
 
     Drift between this Python impl and the bash run_phase_b_gates() is bounded by a
     shared ORACLE: both evaluate the same two fixtures, the smoke pins the broken
-    fixture's 3 named fails (and the harness runs it green alongside this eval), and
+    fixture's 4 named fails (and the harness runs it green alongside this eval), and
     ORACLE_BROKEN_FAILS below re-pins the same set inside this check — so a predicate
     divergence on the fixtures reds one side or the other."""
 
@@ -2616,13 +2616,16 @@ class AuditAdapter:
 
     EXPECTED_SCENARIO_IDS = ("clean", "broken", "invalid_gate")
 
-    # The broken fixture's THREE documented hard-fails (audit-broken-shape/README.md
+    # The broken fixture's FOUR documented hard-fails (audit-broken-shape/README.md
     # + run-audit-smoke.sh's assert_failed calls). Re-pinned here so the behavioral
-    # eval itself enforces the oracle, not just the golden.
+    # eval itself enforces the oracle, not just the golden. SHIP-01's missing
+    # children.engineering is a STORY_CANON key, so since BC-13915 hardcoded the
+    # full-canon floor it trips story-front-matter-populated too (one omission, two gates).
     ORACLE_BROKEN_FAILS = frozenset({
         ("story-docs-complete", "domain:TEAM"),
         ("index-complete", "project"),
         ("eng-children-engineering-populated", "flow:SHIP-01"),
+        ("story-front-matter-populated", "flow:SHIP-01"),
     })
 
     def build(self, fixture: dict, sandbox: Path) -> None:

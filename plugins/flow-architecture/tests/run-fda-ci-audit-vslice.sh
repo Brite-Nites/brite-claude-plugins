@@ -6,16 +6,16 @@
 # time — layer-3 / continuous enforcement (vs layer-2 audit-time /flow:audit).
 #
 # It reuses the CANONICAL Phase-B predicates from build_audit_report.py
-# (_config_frontmatter_schema_mode / _story_frontmatter_populated /
-# _story_frame_present / _domains / _story_docs) so
-# there is ONE source of truth, plus journey frontmatter-schema lint (strict) and a
-# body link-resolution check (every `](path.md)` resolves on disk — the BC-13710
+# (_story_frontmatter_populated / _story_frame_present / _domains / _story_docs) so
+# there is ONE source of truth, plus journey frontmatter-schema lint and a body
+# link-resolution check (every `](path.md)` resolves on disk — the BC-13710
 # broken-link class). Exit-code contract: 0 all-pass, 1 ≥1 hard-fail, 2 usage.
 #
-# Fixture note: tests/fixtures/audit-clean-shape ships LEAN story docs (the 4-key
-# floor), so it is "clean" under LENIENT but intentionally NOT full-canon under
-# STRICT — flipping frontmatter_schema:strict on it is exactly how we exercise the
-# strict schema gate firing (mirrors run-audit-smoke.sh § 4e).
+# Both the frontmatter-schema gate (full canon) and the story-frame gate (human-only)
+# are UNCONDITIONAL — the per-repo `frontmatter_schema` (BC-13915) and `story_frame`
+# (BC-12197) strangler-fig flags were collapsed once every consumer converged. The
+# tests/fixtures/audit-clean-shape fixture carries the FULL canon, so a fresh copy passes
+# clean; the FAIL paths are exercised by downgrading one doc (mirrors run-audit-smoke.sh § 4e).
 #
 # Pattern template: run-audit-smoke.sh (copy-the-clean-fixture + targeted mutation).
 # Bash 3.2 compatible (macOS); stdlib python3 only.
@@ -48,19 +48,24 @@ TMPS=()
 cleanup() { set +e; for t in "${TMPS[@]:-}"; do [ -n "$t" ] && rm -rf "$t"; done; :; }
 trap cleanup EXIT
 
-# fresh_copy → a temp copy of the clean (lean, lenient) fixture; echo its path.
+# fresh_copy → a temp copy of the clean (FULL canon) fixture; echo its path.
 fresh_copy() { local d; d="$(mktemp -d)"; cp -R "$CLEAN_FIXTURE/." "$d/"; TMPS+=("$d"); printf '%s' "$d"; }
 
-# set_flag <repo> <key> <value> — set a .flow/config.json strict flag.
-set_flag() {
-  python3 - "$1/.flow/config.json" "$2" "$3" <<'PY'
-import json, sys
-p, k, v = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(p) as fh:
-    d = json.load(fh)
-d[k] = v
-with open(p, 'w') as fh:
-    json.dump(d, fh)
+# strip_canon <doc> — remove the non-floor canonical story keys to downgrade a full-canon
+# doc to the lean 4-key shape (so it FAILs the now-unconditional full-canon gate).
+strip_canon() {
+  python3 - "$1" <<'PY'
+import re, sys
+p = sys.argv[1]
+strip = {"domain","parent_issue","personas","related_flows","sandbox_url","staging_url",
+         "real_app_url","e2e_test","eng_status","design_status","docs_status","intent"}
+out = []
+for l in open(p):
+    m = re.match(r'^([a-z_]+):', l)
+    if m and m.group(1) in strip:
+        continue
+    out.append(l)
+open(p, 'w').write("".join(out))
 PY
 }
 
@@ -72,27 +77,28 @@ if [ -f "$RUNNER" ]; then pass "run_fda_ci_audit.py present"; else fail "run_fda
 run_audit; [ "$RC" = "2" ] && pass "no-arg → exit 2 (usage)" || fail "no-arg exit $RC (expected 2)"
 run_audit /nonexistent/repo/path; [ "$RC" = "2" ] && pass "bad repo path → exit 2" || fail "bad path exit $RC (expected 2)"
 
-# ── Section 1: clean fixture under LENIENT (natural) → PASS, exit 0 ───────────
-section "1/8" "clean lean canon under lenient → exit 0"
+# ── Section 1: clean full-canon fixture → PASS, exit 0 ───────────────────────
+section "1/8" "clean full-canon fixture → exit 0"
 F1="$(fresh_copy)"
 run_audit "$F1"
-if [ "$RC" = "0" ]; then pass "clean lenient fixture → exit 0"; else fail "clean lenient → exit $RC; OUT: $OUT"; fi
+if [ "$RC" = "0" ]; then pass "clean full-canon fixture → exit 0"; else fail "clean fixture → exit $RC; OUT: $OUT"; fi
 
-# ── Section 2: frontmatter_schema:strict on the LEAN fixture → exit 1 ─────────
-# The lean docs are the 4-key floor, NOT full 20-key canon → strict schema FAILs.
-section "2/8" "frontmatter_schema strict on lean docs → exit 1 (names frontmatter-schema)"
-F2="$(fresh_copy)"; set_flag "$F2" frontmatter_schema strict
+# ── Section 2: a doc downgraded to the lean 4-key floor → exit 1 ──────────────
+# The full-canon frontmatter gate is unconditional (BC-13915) — no flag to set; strip a
+# doc back to the lean shape → the missing canon keys FAIL frontmatter-schema.
+section "2/8" "lean (non-canon) doc → exit 1 (names frontmatter-schema)"
+F2="$(fresh_copy)"; strip_canon "$(first_story "$F2")"
 run_audit "$F2"
 if [ "$RC" = "1" ] && printf '%s' "$OUT" | grep -qi 'frontmatter-schema'; then
-  pass "lean docs under strict → exit 1 + names frontmatter-schema"
+  pass "lean doc → exit 1 + names frontmatter-schema"
 else
-  fail "strict schema gate not enforced: exit $RC; OUT: $OUT"
+  fail "full-canon schema gate not enforced: exit $RC; OUT: $OUT"
 fi
 
 # ── Section 3: a constraint-spec frame → exit 1 ───────────────────────────────
-# The story-frame gate is hardcoded human-only (BC-12197) — no flag to set; schema
-# stays lenient so this isolates the frame gate. All fixture docs carry the human
-# When-frame; mutate ONE to constraint-spec → it FAILs unconditionally.
+# The story-frame gate is hardcoded human-only (BC-12197) — no flag to set. All fixture
+# docs carry the human When-frame; mutate ONE to constraint-spec, keeping its full-canon
+# frontmatter intact (so ONLY story-frame can flip) → it FAILs unconditionally.
 section "3/8" "constraint-spec frame → exit 1 (names story-frame)"
 F3="$(fresh_copy)"
 python3 - "$(first_story "$F3")" <<'PY'
@@ -141,23 +147,10 @@ else
   fail "broken journey link not caught: exit $RC; OUT: $OUT"
 fi
 
-# ── Section 5: config-gating — lenient repo NOT blocked by non-canon doc → 0 ──
-# Same lean docs as Section 2, but lenient (no strict flag): the schema gate must
-# NOT fire on a missing NON-floor canon key. Proves the flag GATES the schema gate
-# (pairs with Section 2: identical docs, opposite verdict by flag alone).
-section "5/8" "config-gating: lenient repo with non-canon doc → exit 0"
-F5="$(fresh_copy)"   # no strict flags
-python3 - "$(first_story "$F5")" <<'PY'
-import re, sys
-p = sys.argv[1]
-with open(p) as fh:
-    s = fh.read()
-s = re.sub(r'^real_app_url:.*\n', '', s, flags=re.M)  # drop a non-floor canon key (no-op if absent)
-with open(p, 'w') as fh:
-    fh.write(s)
-PY
-run_audit "$F5"
-if [ "$RC" = "0" ]; then pass "lenient + missing non-floor canon key → exit 0 (gated)"; else fail "lenient wrongly blocked: exit $RC; OUT: $OUT"; fi
+# (The former Section 5 — "lenient repo NOT blocked by a non-canon doc → exit 0" — was
+# removed with the frontmatter_schema flag: BC-13915 collapsed the lenient 4-key floor,
+# so there is no longer a config-gated pass for a non-canon doc. Section 2 now pins the
+# unconditional FAIL path.)
 
 # ── Section 6: negative control — valid sibling link stays exit 0 ────────────
 section "6/8" "negative control: valid sibling .md link does not trip link-resolution"
@@ -272,14 +265,13 @@ else
   fail "flow_index:skip journey doc was audited: exit $RC; OUT: $OUT"
 fi
 
-# ── §11b: …and from the STRICT journey schema-lint path too ───────────────────
-# §11 isolates the exclusion via the always-on link-resolution gate (lenient). This
-# covers the OTHER consumer of _journey_docs: the strict ADR-033 schema lint (gated
-# by frontmatter_schema:strict). Under strict the lean story docs fail (exit 1), so
-# we assert on the OUTPUT — a skip journey with junk frontmatter must NOT be NAMED as
-# a journey frontmatter-schema failure (it would be, were it not excluded).
-section "11b" "flow_index:skip journey excluded from the STRICT schema lint (not named)"
-FJS="$(fresh_copy)"; set_flag "$FJS" frontmatter_schema strict
+# ── §11b: …and from the journey schema-lint path too ─────────────────────────
+# §11 isolates the exclusion via the always-on link-resolution gate. This covers the
+# OTHER consumer of _journey_docs: the ADR-033 journey schema lint (now unconditional —
+# BC-13915). We assert on the OUTPUT — a skip journey with junk frontmatter must NOT be
+# NAMED as a journey frontmatter-schema failure (it would be, were it not excluded).
+section "11b" "flow_index:skip journey excluded from the journey schema lint (not named)"
+FJS="$(fresh_copy)"
 printf -- '---\nflow_index: skip\n---\n# Overview\nNot a journey — no ADR-033 canon.\n' \
   > "$FJS/docs/product/journeys/zzz-overview.md"
 run_audit "$FJS"
