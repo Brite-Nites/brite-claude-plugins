@@ -47,10 +47,14 @@ def fails(repo):
 
 # ── 1. the two real fixtures reproduce the documented oracle ──────────────────
 eq("clean fixture: zero hard-fails", fails(CLEAN), set())
-eq("broken fixture: EXACTLY the 3 documented hard-fails", fails(BROKEN), {
+eq("broken fixture: EXACTLY the 4 documented hard-fails", fails(BROKEN), {
     ("story-docs-complete", "domain:TEAM"),
     ("index-complete", "project"),
     ("eng-children-engineering-populated", "flow:SHIP-01"),
+    # SHIP-01's missing children.engineering is a STORY_CANON key, so since BC-13915
+    # hardcoded the full-canon floor it trips story-front-matter-populated too (one
+    # structural omission, two gates). See tests/fixtures/audit-broken-shape/README.md.
+    ("story-front-matter-populated", "flow:SHIP-01"),
 })
 
 # ── 2. story-frame predicate: human-only (constraint-spec rejected) ───────────
@@ -167,12 +171,10 @@ try:
 finally:
     shutil.rmtree(_E3, ignore_errors=True)
 
-# R2b. strict mode: redirect-front-matter-valid enforces REDIRECT_CANON (config-gated path).
-def _eval_redirect_strict_repo(omit_key=None):
+# R2b. redirect-front-matter-valid enforces REDIRECT_CANON unconditionally (BC-13915 —
+# no longer gated on `frontmatter_schema: strict`; the per-repo flag was collapsed).
+def _eval_redirect_canon_repo(omit_key=None):
     box = tempfile.mkdtemp()
-    os.makedirs(os.path.join(box, ".flow"))
-    open(os.path.join(box, ".flow", "config.json"), "w").write(
-        json.dumps({"frontmatter_schema": "strict"}))
     a = os.path.join(box, "docs", "product", "flows", "audit-acl"); os.makedirs(a)
     open(os.path.join(a, "ACL-06.md"), "w").write("# ACL-06\n")
     s = os.path.join(box, "docs", "product", "flows", "secure-file-ingestion"); os.makedirs(s)
@@ -182,15 +184,15 @@ def _eval_redirect_strict_repo(omit_key=None):
     fm = "---\n" + "".join("%s: %s\n" % (k, v) for k, v in pairs if k != omit_key) + "---\n# SFI-05\n"
     open(os.path.join(s, "SFI-05.md"), "w").write(fm)
     return box
-_ES1 = _eval_redirect_strict_repo()
+_ES1 = _eval_redirect_canon_repo()
 try:
-    truthy("evaluate strict: complete redirect canon → redirect-front-matter-valid=pass",
+    truthy("evaluate: complete redirect canon → redirect-front-matter-valid=pass",
            ("redirect-front-matter-valid", "pass") in _sfi_gates(_ES1))
 finally:
     shutil.rmtree(_ES1, ignore_errors=True)
-_ES2 = _eval_redirect_strict_repo(omit_key="intent")
+_ES2 = _eval_redirect_canon_repo(omit_key="intent")
 try:
-    truthy("evaluate strict: redirect missing canon key → redirect-front-matter-valid=hard-fail (BC-12907 review-fix)",
+    truthy("evaluate: redirect missing canon key → redirect-front-matter-valid=hard-fail (BC-12907 review-fix)",
            ("redirect-front-matter-valid", "hard-fail") in _sfi_gates(_ES2))
 finally:
     shutil.rmtree(_ES2, ignore_errors=True)
@@ -248,41 +250,11 @@ try:
 finally:
     shutil.rmtree(_SK, ignore_errors=True)
 
-# ── 3. config frontmatter_schema mode reader (BC-12572; fail-safe lenient) ─────
-# (The story_frame mode reader was deleted with the flag — BC-12197; the gate is now
-# hardcoded human-only, so there is no story_frame config to resolve.)
-def fmcfgmode(val):
-    box = tempfile.mkdtemp()
-    try:
-        os.makedirs(os.path.join(box, ".flow"))
-        if val is not None:
-            open(os.path.join(box, ".flow", "config.json"), "w").write(
-                json.dumps({"frontmatter_schema": val}))
-        return bar._config_frontmatter_schema_mode(bar.Path(box))
-    finally:
-        shutil.rmtree(box, ignore_errors=True)
-eq("config frontmatter_schema:strict → strict", fmcfgmode("strict"), "strict")
-eq("config frontmatter_schema:STRICT (uppercase) → strict", fmcfgmode("STRICT"), "strict")
-eq("config frontmatter_schema:banana (unrecognized) → lenient", fmcfgmode("banana"), "lenient")
-eq("config frontmatter_schema field absent → lenient", fmcfgmode(None), "lenient")
-# valid-but-non-dict config.json (a top-level JSON list/scalar) must fail-safe to
-# lenient, NOT raise AttributeError on .get — the malformed-injected-state class.
-def rawcfg(text, fn):
-    box = tempfile.mkdtemp()
-    try:
-        os.makedirs(os.path.join(box, ".flow"))
-        open(os.path.join(box, ".flow", "config.json"), "w").write(text)
-        return fn(bar.Path(box))
-    finally:
-        shutil.rmtree(box, ignore_errors=True)
-eq("non-dict config (JSON list) → frontmatter_schema lenient (no crash)",
-   rawcfg('["a","b"]', bar._config_frontmatter_schema_mode), "lenient")
-eq("non-dict config (JSON scalar) → frontmatter_schema lenient (no crash)",
-   rawcfg('42', bar._config_frontmatter_schema_mode), "lenient")
-
-# ── 3b. story-front-matter-populated predicate: lenient floor vs strict canon ──
-# Directly exercises the NEW Python strict branch (lint_text delegation), the twin of
-# run-audit-smoke.sh §4e — so the bash↔Python ORACLE covers BOTH impls of the widening.
+# ── 3. story-front-matter-populated predicate: full canon required (unconditional) ──
+# The story_frame AND frontmatter_schema mode readers were both deleted with their flags
+# (BC-12197 / BC-13915); both gates are now hardcoded, so there is no config to resolve.
+# This directly exercises the single-arg full-canon predicate (lint_text delegation), the
+# twin of run-audit-smoke.sh §4e — the bash↔Python ORACLE covers BOTH impls.
 FM_LEAN = "---\nflow_id: X-01\nstatus: BUILT\nfigma: TBD\nuser_docs_url: TBD\n---\n# b\n"
 FM_FULL = ("---\nflow_id: X-01\ndomain: X\nstatus: BUILT\nparent_issue: BC-1\n"
            "children:\n  story: BC-2\n  engineering: BC-3\n  design: BC-4\n  qa: BC-5\n  docs: BC-6\n"
@@ -290,16 +262,11 @@ FM_FULL = ("---\nflow_id: X-01\ndomain: X\nstatus: BUILT\nparent_issue: BC-1\n"
            "real_app_url: TBD\ne2e_test: TBD\nuser_docs_url: TBD\nqa_status: not-tested\n"
            "qa_last_signed_off: null\neng_status: not-started\ndesign_status: not-started\n"
            "docs_status: not-started\nintent: ../../intent.md\nlast_reviewed: 2026-06-14\n---\n# b\n")
-truthy("lenient: the 4-key floor doc PASSes populated", bar._story_frontmatter_populated(FM_LEAN, "lenient"))
-truthy("strict: the 4-key floor doc FAILs populated (needs full canon)",
-       not bar._story_frontmatter_populated(FM_LEAN, "strict"))
-truthy("strict: the full-canon doc PASSes populated", bar._story_frontmatter_populated(FM_FULL, "strict"))
-truthy("strict: honest-empty personas:[]/null still PASS (presence not non-emptiness)",
-       bar._story_frontmatter_populated(FM_FULL, "strict"))
-# control: the clean fixture's lean docs do NOT fail story-front-matter-populated under
-# the default (lenient) — the e2e strict flip is asserted in Section 5 via with_mutation.
-truthy("lenient default: lean clean-fixture doc PASSes story-front-matter-populated",
-       ("story-front-matter-populated", "flow:TEAM-01") not in fails(CLEAN))
+truthy("the 4-key floor doc FAILs populated (full canon required — BC-13915)",
+       not bar._story_frontmatter_populated(FM_LEAN))
+truthy("the full-canon doc PASSes populated", bar._story_frontmatter_populated(FM_FULL))
+truthy("honest-empty personas:[]/null still PASS (presence not non-emptiness)",
+       bar._story_frontmatter_populated(FM_FULL))
 
 # ── 4. children-block parser ──────────────────────────────────────────────────
 DOC_CHILDREN = ("---\nflow_id: X-01\nchildren:\n  story: BC-1\n  engineering: BC-2\n"
@@ -369,15 +336,25 @@ def constraint_doc(r):
 truthy("constraint-spec doc → story-job-story-regex fails (human-only end-state)",
        ("story-job-story-regex", "flow:TEAM-01") in with_mutation(constraint_doc))
 
-# frontmatter_schema:strict (BC-12572) e2e: the clean fixture's docs carry only the
-# 4-key floor, so flipping the repo to strict flips story-front-matter-populated to a
-# hard-fail — exercising the NEW Python strict branch (lint_text) through evaluate(),
-# the twin of run-audit-smoke.sh §4e (bash↔Python ORACLE now covers both impls).
-def strict_frontmatter(r):
-    cfgp = os.path.join(r, ".flow", "config.json")
-    c = json.load(open(cfgp)); c["frontmatter_schema"] = "strict"; json.dump(c, open(cfgp, "w"))
-truthy("frontmatter_schema:strict + lean clean-fixture doc → story-front-matter-populated fails (e2e)",
-       ("story-front-matter-populated", "flow:TEAM-01") in with_mutation(strict_frontmatter))
+# story-front-matter-populated requires full canon UNCONDITIONALLY (BC-13915) e2e: the
+# clean fixture is now full canon (so fails(CLEAN) is empty — §1 pins that); a doc
+# DOWNGRADED to the lean 4-key floor hard-fails through evaluate(), exercising the Python
+# full-canon lint_text path — the twin of run-audit-smoke.sh §4e (bash↔Python ORACLE).
+def lean_frontmatter(r):
+    import re as _re
+    d = os.path.join(r, "docs/product/flows/TEAM/TEAM-01.md")
+    strip = {"domain", "parent_issue", "personas", "related_flows", "sandbox_url",
+             "staging_url", "real_app_url", "e2e_test", "eng_status", "design_status",
+             "docs_status", "intent"}
+    out = []
+    for l in open(d):
+        m = _re.match(r'^([a-z_]+):', l)
+        if m and m.group(1) in strip:
+            continue
+        out.append(l)
+    open(d, "w").write("".join(out))
+truthy("lean doc (canon keys stripped) → story-front-matter-populated fails (full canon required, BC-13915)",
+       ("story-front-matter-populated", "flow:TEAM-01") in with_mutation(lean_frontmatter))
 
 # ── 6. determinism: gates sorted by total (id, scope); no absolute-path leak ───
 # NOTE: evaluate() returns UNSORTED; decide()/CLI sort. Assert the sort key is total
@@ -394,7 +371,7 @@ clean_row = bar.decide({"id": "clean", "repo": "audit-clean-shape"}, bar.Path(FI
 eq("clean row exit_code 0", clean_row["summary"]["exit_code"], 0)
 broken_row = bar.decide({"id": "broken", "repo": "audit-broken-shape"}, bar.Path(FIXTURES))
 eq("broken row exit_code 1", broken_row["summary"]["exit_code"], 1)
-eq("broken row hard_fail count 3", broken_row["summary"]["hard_fail"], 3)
+eq("broken row hard_fail count 4", broken_row["summary"]["hard_fail"], 4)
 bad_gate = bar.decide({"id": "ig", "repo": "audit-clean-shape", "gate": "nope"}, bar.Path(FIXTURES))
 eq("invalid --gate → exit_code 64", bad_gate["summary"]["exit_code"], 64)
 truthy("invalid --gate → error message present", bad_gate["error"] is not None)

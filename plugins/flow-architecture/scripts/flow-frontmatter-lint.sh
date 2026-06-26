@@ -13,8 +13,9 @@
 #
 # This is the always-honest TRUTH surface — standalone WS-E remediation tooling,
 # NOT a ship gate (the gate is /flow:audit Phase B `story-front-matter-populated`,
-# config-gated per repo via .flow/config.json `frontmatter_schema: strict`). It
-# reports the full canon regardless of any repo config, so it can go red anywhere
+# which since BC-13915 enforces the full canon UNCONDITIONALLY — the per-repo
+# `frontmatter_schema: strict` flag was collapsed once all consumers converged). This
+# lint reports the full canon regardless of any repo config, so it can go red anywhere
 # without halting a ship.
 #
 # Bash 3.2 compatible. Stdlib python3 only.

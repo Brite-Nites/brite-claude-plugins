@@ -131,40 +131,19 @@ def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace")
 
 
-def _config_frontmatter_schema_mode(repo: Path) -> str:
-    """`.flow/config.json` frontmatter_schema → 'strict' iff the string 'strict'
-    (case-insensitive); every other state (absent file/field, bad value, parse
-    error) resolves fail-safe to 'lenient'. Mirrors the smoke's
-    frontmatter_schema_mode() — a per-repo strangler-fig (BC-12572), the same shape as
-    the now-collapsed story_frame gate-narrowing (Q29 amendment 3 → collapsed in
-    amendment 4 / BC-12197); its own collapse is tracked separately."""
-    cfg = repo / ".flow" / "config.json"
-    if not cfg.is_file():
-        return "lenient"
-    try:
-        v = json.loads(_read(cfg)).get("frontmatter_schema")
-    except (ValueError, OSError, AttributeError):
-        # AttributeError: valid-but-non-dict JSON (e.g. a top-level list) → .get fails.
-        # Fail-safe to lenient on ANY unusable config (parity with the smoke twin's
-        # broad catch).
-        return "lenient"
-    return "strict" if isinstance(v, str) and v.lower() == "strict" else "lenient"
+def _story_frontmatter_populated(doc_text: str) -> bool:
+    """The story-front-matter-populated predicate. Requires the FULL canonical story
+    frontmatter (ADR-029 + the job-story template) — presence, never non-emptiness
+    (honest-empty `personas: []` passes) — delegated to the WS-A lint (over the
+    already-read doc_text, no re-read) so the canon is single-sourced. Drift keys fail
+    here only via the canonical key they displace going MISSING — naming the drift
+    itself is the standalone lint's job, not this completeness gate.
 
-
-def _story_frontmatter_populated(doc_text: str, mode: str) -> bool:
-    """The story-front-matter-populated predicate (BC-12572 config-gated widening).
-
-    LENIENT (default): the 4-key presence floor (flow_id/status/figma/user_docs_url)
-    — today's behavior, unchanged. STRICT: the FULL 20-key story canon must be
-    present (presence, never non-emptiness — honest-empty `personas: []` passes),
-    delegated to the WS-A lint (over the already-read doc_text, no re-read) so the
-    canon is single-sourced. Drift keys fail here only via the canonical key they
-    displace going MISSING — naming the drift itself is the standalone lint's job,
-    not this completeness gate."""
-    if mode == "strict":
-        return not _ffl.lint_text(doc_text, "story")["missing"]
-    return all(re.search(rf"^{k}:", doc_text, re.MULTILINE) for k in
-               ("flow_id", "status", "figma", "user_docs_url"))
+    BC-13915: the per-repo `frontmatter_schema` strangler-fig was collapsed to this
+    hardcoded full-canon end-state once every FDA consumer reached
+    `frontmatter_schema: strict` — the same lifecycle as the story_frame collapse
+    (BC-12197). The 4-key presence floor (the lenient migration floor) was removed."""
+    return not _ffl.lint_text(doc_text, "story")["missing"]
 
 
 def _story_frame_present(doc_text: str) -> bool:
@@ -291,8 +270,6 @@ def evaluate(repo: Path) -> list:
             "status": status, "scope": scope, "message": message,
         })
 
-    fm_schema_mode = _config_frontmatter_schema_mode(repo)
-
     # --- preflight-complete (Q29.1) ---
     cfg = repo / ".flow" / "config.json"
     required = ("version", "linear_project_id", "linear_project_name",
@@ -359,20 +336,20 @@ def evaluate(repo: Path) -> list:
                 rt = _yaml_scalar_text(t, "redirect_to")
                 emit("pass" if _redirect_to_resolvable(repo, rt, fid) else "hard-fail",
                      "redirect-target-resolvable", scope, f"redirect_to={rt.strip() or '∅'}")
-                if fm_schema_mode == "strict":
-                    rres = _ffl.lint_text(t, "redirect")
-                    bits = []
-                    if rres["missing"]:
-                        bits.append("missing=" + ",".join(m.split(" ")[0] for m in rres["missing"][:4]))
-                    if rres["drift"]:
-                        bits.append("drift=" + ",".join(d.split(" ")[0] for d in rres["drift"][:4]))
-                    emit("hard-fail" if bits else "pass", "redirect-front-matter-valid",
-                         scope, "; ".join(bits))
-                else:
-                    emit("pass", "redirect-front-matter-valid", scope)
+                # redirect-front-matter-valid is now unconditional (BC-13915): the
+                # redirect frontmatter canon is enforced everywhere, no longer gated on
+                # the collapsed per-repo `frontmatter_schema: strict` flag.
+                rres = _ffl.lint_text(t, "redirect")
+                bits = []
+                if rres["missing"]:
+                    bits.append("missing=" + ",".join(m.split(" ")[0] for m in rres["missing"][:4]))
+                if rres["drift"]:
+                    bits.append("drift=" + ",".join(d.split(" ")[0] for d in rres["drift"][:4]))
+                emit("hard-fail" if bits else "pass", "redirect-front-matter-valid",
+                     scope, "; ".join(bits))
                 continue
 
-            emit("pass" if _story_frontmatter_populated(t, fm_schema_mode)
+            emit("pass" if _story_frontmatter_populated(t)
                  else "hard-fail", "story-front-matter-populated", scope)
 
             emit("pass" if _story_frame_present(t) else "hard-fail",

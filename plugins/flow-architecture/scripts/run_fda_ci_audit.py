@@ -9,9 +9,11 @@ SINGLE SOURCE OF TRUTH: the gate logic is NOT re-implemented here — it imports
 canonical Phase-B predicates from build_audit_report.py (which the audit report and
 run-audit-smoke.sh also use) so there is exactly one definition of each gate:
 
-  * frontmatter-schema  — _story_frontmatter_populated(text, mode) over story docs
-                          (config-gated: lenient = 4-key floor, strict = full ADR-029
-                          canon) + the journey frontmatter lint under strict (ADR-033).
+  * frontmatter-schema  — _story_frontmatter_populated(text) over story docs (the full
+                          ADR-029 canon, unconditional) + the redirect-canon check + the
+                          journey frontmatter lint (ADR-033). BC-13915 collapsed the
+                          per-repo `frontmatter_schema` flag to this hardcoded full-canon
+                          end-state.
   * story-frame         — _story_frame_present(text) over story docs (the human
                           job-story frame is required everywhere; the legacy
                           constraint-spec frame is rejected — BC-12197 collapsed the
@@ -21,11 +23,10 @@ run-audit-smoke.sh also use) so there is exactly one definition of each gate:
                           the BC-13710 broken-cross-reference-link class). Frontmatter
                           and `http(s)`/`mailto` links are not checked.
 
-The frontmatter-schema mode is read per-repo from .flow/config.json (fail-safe lenient),
-so the runner is safe to wire into every repo regardless of its migration state — a
-not-yet-strict repo is held to the 4-key floor, a strict repo to full canon. The
-story-frame gate is unconditional (the human job-story frame is required everywhere)
-since BC-12197 collapsed its per-repo flag.
+Both the frontmatter-schema gate (full canon) and the story-frame gate (human-only) are
+now UNCONDITIONAL — the per-repo `.flow/config.json` `frontmatter_schema` (BC-13915) and
+`story_frame` (BC-12197) strangler-fig flags were collapsed once every consumer converged.
+Leftover keys in a consumer config are harmless ignored extras.
 
 Usage:  run_fda_ci_audit.py <repo_root>
 Exit:   0 = all gates pass · 1 = >=1 hard-fail · 2 = usage / repo not found.
@@ -106,9 +107,9 @@ def audit(repo: Path) -> list:
     """Run the three CI gates over `repo` → a list of failure dicts
     {gate, scope, detail}. Empty list ⇒ all pass."""
     failures = []
-    fm_mode = bar._config_frontmatter_schema_mode(repo)
 
-    # --- story docs: frontmatter-schema (config-gated) + story-frame (always strict) ---
+    # --- story docs: frontmatter-schema (full canon) + story-frame (human-only) — both
+    #     unconditional since BC-12197 (story_frame) + BC-13915 (frontmatter_schema). ---
     for domain in bar._domains(repo):
         for doc in bar._story_docs(repo, domain):
             text = bar._read(doc)
@@ -122,41 +123,35 @@ def audit(repo: Path) -> list:
                 if not bar._redirect_to_resolvable(repo, rt, doc.stem):
                     failures.append({"gate": "redirect-target", "scope": scope,
                                      "detail": "redirect_to=" + (rt.strip() or "∅") + " does not resolve"})
-                if fm_mode == "strict":
-                    res = ffl.lint_text(text, "redirect")
-                    if res["drift"] or res["missing"]:
-                        bits = []
-                        if res["drift"]:
-                            bits.append("drift=" + ",".join(d.split(" ")[0] for d in res["drift"][:4]))
-                        if res["missing"]:
-                            bits.append("missing=" + ",".join(m.split(" ")[0] for m in res["missing"][:4]))
-                        failures.append({"gate": "frontmatter-schema", "scope": scope,
-                                         "detail": "; ".join(bits)})
+                res = ffl.lint_text(text, "redirect")
+                if res["drift"] or res["missing"]:
+                    bits = []
+                    if res["drift"]:
+                        bits.append("drift=" + ",".join(d.split(" ")[0] for d in res["drift"][:4]))
+                    if res["missing"]:
+                        bits.append("missing=" + ",".join(m.split(" ")[0] for m in res["missing"][:4]))
+                    failures.append({"gate": "frontmatter-schema", "scope": scope,
+                                     "detail": "; ".join(bits)})
                 continue
-            if not bar._story_frontmatter_populated(text, fm_mode):
-                detail = ""
-                if fm_mode == "strict":
-                    miss = ffl.lint_text(text, "story")["missing"]
-                    detail = "missing=" + ",".join(miss[:6]) + ("…" if len(miss) > 6 else "")
-                else:
-                    detail = "4-key floor incomplete"
+            if not bar._story_frontmatter_populated(text):
+                miss = ffl.lint_text(text, "story")["missing"]
+                detail = "missing=" + ",".join(miss[:6]) + ("…" if len(miss) > 6 else "")
                 failures.append({"gate": "frontmatter-schema", "scope": scope, "detail": detail})
             if not bar._story_frame_present(text):
                 failures.append({"gate": "story-frame", "scope": scope,
                                  "detail": "no human job-story frame"})
 
-    # --- journey docs: frontmatter-schema under strict (ADR-033 canon) ---
-    if fm_mode == "strict":
-        for doc in _journey_docs(repo):
-            res = ffl.lint_text(bar._read(doc), "journey")
-            if res["drift"] or res["missing"]:
-                bits = []
-                if res["drift"]:
-                    bits.append("drift=" + ",".join(d.split(" ")[0] for d in res["drift"][:4]))
-                if res["missing"]:
-                    bits.append("missing=" + ",".join(res["missing"][:4]))
-                failures.append({"gate": "frontmatter-schema", "scope": "journey:" + doc.stem,
-                                 "detail": "; ".join(bits)})
+    # --- journey docs: frontmatter-schema (ADR-033 canon, unconditional — BC-13915) ---
+    for doc in _journey_docs(repo):
+        res = ffl.lint_text(bar._read(doc), "journey")
+        if res["drift"] or res["missing"]:
+            bits = []
+            if res["drift"]:
+                bits.append("drift=" + ",".join(d.split(" ")[0] for d in res["drift"][:4]))
+            if res["missing"]:
+                bits.append("missing=" + ",".join(res["missing"][:4]))
+            failures.append({"gate": "frontmatter-schema", "scope": "journey:" + doc.stem,
+                             "detail": "; ".join(bits)})
 
     # --- link-resolution: body .md links resolve (ALWAYS on) ---
     link_docs = []
@@ -183,11 +178,10 @@ def main(argv: list) -> int:
         sys.stderr.write("error: no docs/product/flows under {} — not an FDA repo?\n".format(repo))
         return 2
 
-    fm_mode = bar._config_frontmatter_schema_mode(repo)
     failures = audit(repo)
 
     print("FDA CI audit — {}".format(repo))
-    print("  frontmatter_schema={}  story_frame=strict (hardcoded; BC-12197)".format(fm_mode))
+    print("  frontmatter_schema=strict (hardcoded; BC-13915)  story_frame=strict (hardcoded; BC-12197)")
     if not failures:
         print("  ✓ all gates pass")
         return 0

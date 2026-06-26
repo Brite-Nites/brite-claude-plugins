@@ -938,7 +938,7 @@
         {
           "id": "story-front-matter-populated",
           "type": "per-flow",
-          "status": "pass",
+          "status": "hard-fail",
           "scope": "flow:SHIP-01",
           "message": ""
         },
@@ -1007,8 +1007,8 @@
         }
       ],
       "summary": {
-        "hard_pass": 62,
-        "hard_fail": 3,
+        "hard_pass": 61,
+        "hard_fail": 4,
         "soft_warn": 0,
         "overrides": 0,
         "exit_code": 1

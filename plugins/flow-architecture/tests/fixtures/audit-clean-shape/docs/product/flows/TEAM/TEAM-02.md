@@ -13,6 +13,18 @@ children:
   design: BC-1202
   qa: BC-1203
   docs: BC-1204
+domain: TEAM
+parent_issue: BC-1
+personas: []
+related_flows: []
+sandbox_url: TBD
+staging_url: TBD
+real_app_url: TBD
+e2e_test: TBD
+eng_status: done
+design_status: done
+docs_status: done
+intent: ../../intent.md
 ---
 
 # TEAM-02 — Team settings
