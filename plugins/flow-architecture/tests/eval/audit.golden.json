@@ -181,6 +181,20 @@
           "message": ""
         },
         {
+          "id": "journey-front-matter-populated",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "journey:SHIP",
+          "message": ""
+        },
+        {
+          "id": "journey-front-matter-populated",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "journey:TEAM",
+          "message": ""
+        },
+        {
           "id": "preflight-complete",
           "type": "phase-transition",
           "status": "pass",
@@ -539,7 +553,7 @@
         }
       ],
       "summary": {
-        "hard_pass": 76,
+        "hard_pass": 78,
         "hard_fail": 0,
         "soft_warn": 0,
         "overrides": 0,
@@ -702,6 +716,20 @@
           "type": "phase-transition",
           "status": "pass",
           "scope": "domain:TEAM",
+          "message": ""
+        },
+        {
+          "id": "journey-front-matter-populated",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "journey:SHIP",
+          "message": ""
+        },
+        {
+          "id": "journey-front-matter-populated",
+          "type": "phase-transition",
+          "status": "pass",
+          "scope": "journey:TEAM",
           "message": ""
         },
         {
@@ -1007,7 +1035,7 @@
         }
       ],
       "summary": {
-        "hard_pass": 61,
+        "hard_pass": 63,
         "hard_fail": 4,
         "soft_warn": 0,
         "overrides": 0,

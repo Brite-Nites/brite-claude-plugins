@@ -59,20 +59,6 @@ _MD_LINK_RE = re.compile(
     r"\)")
 
 
-def _journey_docs(repo: Path) -> list:
-    # Intentionally covers ALL journeys/*.md (broader than bar.evaluate's per-domain
-    # `journeys/{domain}.md` model) — safe for link-resolution, and the journey schema
-    # lint should hold any journey-shaped doc here to ADR-033 canon. Docs marked
-    # `flow_index: skip` are excluded — overview/index docs (e.g. journeys/INDEX.md),
-    # not journeys (BC-13819, mirroring the _story_docs exclusion from BC-13805); the
-    # exclusion covers BOTH the schema lint and link-resolution, symmetric with stories.
-    d = repo / "docs" / "product" / "journeys"
-    if not d.is_dir():
-        return []
-    return sorted(p for p in d.glob("*.md")
-                  if p.is_file() and not bar._flow_index_skipped(p))
-
-
 def _body_of(text: str) -> str:
     """The doc body (everything after the closing frontmatter fence); the whole text
     if there is no frontmatter block. Link-resolution only scans the body — a `.md`
@@ -141,8 +127,14 @@ def audit(repo: Path) -> list:
                 failures.append({"gate": "story-frame", "scope": scope,
                                  "detail": "no human job-story frame"})
 
-    # --- journey docs: frontmatter-schema (ADR-033 canon, unconditional — BC-13915) ---
-    for doc in _journey_docs(repo):
+    # --- journey docs: frontmatter-schema (ADR-033 canon, unconditional — BC-13915).
+    #     bar._journey_docs is the shared journey set (single-sourced into
+    #     build_audit_report per BC-13935) — the SAME set bar.evaluate's
+    #     journey-front-matter-populated gate lints, keeping this CI runner and
+    #     /flow:audit's Phase-B evaluator in lockstep (BC-13148). The runner keeps the
+    #     coarse `frontmatter-schema` scope-prefixed id; evaluate() uses the granular
+    #     `journey-front-matter-populated` — same pass/fail behavior, different label. ---
+    for doc in bar._journey_docs(repo):
         res = ffl.lint_text(bar._read(doc), "journey")
         if res["drift"] or res["missing"]:
             bits = []
@@ -157,7 +149,7 @@ def audit(repo: Path) -> list:
     link_docs = []
     for domain in bar._domains(repo):
         link_docs.extend(bar._story_docs(repo, domain))
-    link_docs.extend(_journey_docs(repo))
+    link_docs.extend(bar._journey_docs(repo))
     for doc in link_docs:
         for target in _check_links(doc):
             scope = ("journey:" if doc.parent.name == "journeys" else "flow:") + doc.stem
