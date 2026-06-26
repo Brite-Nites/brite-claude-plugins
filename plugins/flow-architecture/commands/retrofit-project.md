@@ -721,7 +721,7 @@ Inline terminator phase. No sub-skill dispatch — orchestrator owns the final s
 2. **Final breadcrumb write:** `status: completed`, `current_phase: 9`, `completed_phases: ["1"..."9"]`. The Q31.5 atomic-rename write through `flow-resume-breadcrumb.sh write` is the **last operation** of the orchestrator — never write the `completed` marker before all artifacts land on disk (BC-5761 precedent applied here).
 
 3. Recommend next steps:
-   - Run `/flow:audit` (Q38; pending) for project-health snapshot covering the 36-gate stack (post-Q29 amendment 2).
+   - Run `/flow:audit` (Q38; pending) for project-health snapshot covering the 37-gate stack (post-Q29 amendment 6).
    - Run `/flow:plan-<discipline>` per discipline child for AC + Tasks population.
    - The retrofit cross-reference doc at `docs/plans/<retrofit-slug>-cross-reference.md` is retained as a transient run artifact per `docs/plans/` convention; deletable post-retrofit at the user's discretion. The Linear-side `## FDA migration` sections persist as the cross-reference's durable representation.
    - Per Q9 policy: in-flight legacy work continues in its existing Phase Pattern shape; new work after this retrofit should be created under the new FDA-shape milestones produced in Phase 5. This boundary is reviewer-enforced, not breadcrumb-encoded.

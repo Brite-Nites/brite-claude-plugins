@@ -67,9 +67,10 @@ import flow_frontmatter_lint as _ffl  # noqa: E402
 # actually EMITS is whatever evaluate() emits (the Phase A/C ids + env-ready +
 # scaffold-complete are valid-but-not-emitted here).
 VALID_GATE_IDS = frozenset({
-    # phase-transition (Q29.1)
+    # phase-transition (Q29.1; journey-front-matter-populated added per Q29 amendment 6)
     "env-ready", "preflight-complete", "intent-exists", "inventory-complete",
-    "scaffold-complete", "story-docs-complete", "journey-complete", "index-complete",
+    "scaffold-complete", "story-docs-complete", "journey-complete",
+    "journey-front-matter-populated", "index-complete",
     # per-flow [Story]
     "story-doc-exists", "story-front-matter-populated", "story-job-story-regex",
     "story-ac-gherkin-count", "story-verify-docs-pass",
@@ -101,7 +102,8 @@ VALID_GATE_IDS = frozenset({
 # RECOGNIZED_GATES. _gate_type() only ever classifies an emitted gate id.
 _PHASE_TRANSITION = frozenset({
     "preflight-complete", "intent-exists", "inventory-complete",
-    "story-docs-complete", "journey-complete", "index-complete",
+    "story-docs-complete", "journey-complete", "journey-front-matter-populated",
+    "index-complete",
 })
 _CROSS_CUTTING = frozenset({
     "inventory-story-doc-id-match", "index-story-doc-status-match",
@@ -224,6 +226,23 @@ def _story_docs(repo: Path, domain: str) -> list:
     """Sorted *.md story docs in a domain dir (deterministic glob order). Docs marked
     `flow_index: skip` are excluded — overview/index docs, not sub-flows (BC-13805)."""
     d = repo / "docs" / "product" / "flows" / domain
+    if not d.is_dir():
+        return []
+    return sorted(p for p in d.glob("*.md")
+                  if p.is_file() and not _flow_index_skipped(p))
+
+
+def _journey_docs(repo: Path) -> list:
+    """Sorted *.md journey docs in docs/product/journeys/ (deterministic glob order),
+    excluding overview/index docs marked `flow_index: skip` (BC-13805) — symmetric with
+    _story_docs. Intentionally covers ALL journeys/*.md, NOT just the per-domain
+    journeys/{domain}.md that the journey-complete gate checks: the
+    journey-front-matter-populated gate (Q29 amendment 6, BC-13935) lints every
+    journey-shaped doc against the ADR-033 canon, so an orphan journey can't pass the
+    local /flow:audit while hard-failing CI. This is the SINGLE source consumed by both
+    the Phase-B evaluator below AND run_fda_ci_audit.py (which imports it as
+    bar._journey_docs) — keeping the two impls in lockstep per BC-13148."""
+    d = repo / "docs" / "product" / "journeys"
     if not d.is_dir():
         return []
     return sorted(p for p in d.glob("*.md")
@@ -376,6 +395,32 @@ def evaluate(repo: Path) -> list:
                 t, re.MULTILINE) else "hard-fail", "qa-last-signed-off-iso8601", scope)
             emit("pass" if "| signed-off |" in t else "hard-fail",
                  "qa-history-row-signed-off", scope)
+
+    # --- journey-front-matter-populated (Q29.1 / Q29 amendment 6, BC-13935) ---
+    # Journey frontmatter against the ADR-033 canon, over ALL journeys (the shared
+    # _journey_docs set), NOT just the per-domain journeys/{domain}.md that
+    # journey-complete checks — brings the Phase-B evaluator up to parity with
+    # run_fda_ci_audit.py's journey lint so an orphan/overview journey missing an
+    # ADR-033 key surfaces in the local audit too, not only in CI. Mirrors the redirect
+    # emit above: missing first, drift second, first-token, capped at 4.
+    #
+    # Scope encodes domain membership so a --domain=<D> audit (and the /flow:ship that
+    # calls it) filters MECHANICALLY by scope-prefix — never blocked by an unrelated or
+    # orphan journey: a per-domain journey (journeys/{D}.md, D a real flows/ domain) →
+    # scope domain:<D>, IDENTICAL to journey-complete for the same file; a journey whose
+    # stem matches no domain (genuine orphan/overview) → scope journey:<stem>, a
+    # project-level row only the UNFILTERED audit + CI surface (CI always runs unfiltered).
+    journey_domains = set(_domains(repo))
+    for doc in _journey_docs(repo):
+        jres = _ffl.lint_text(_read(doc), "journey")
+        bits = []
+        if jres["missing"]:
+            bits.append("missing=" + ",".join(m.split(" ")[0] for m in jres["missing"][:4]))
+        if jres["drift"]:
+            bits.append("drift=" + ",".join(d.split(" ")[0] for d in jres["drift"][:4]))
+        jscope = ("domain:" + doc.stem) if doc.stem in journey_domains else ("journey:" + doc.stem)
+        emit("hard-fail" if bits else "pass", "journey-front-matter-populated",
+             jscope, "; ".join(bits))
 
     # --- index-complete (Q29.1): INDEX generated_at >= breadcrumb run_started_at ---
     index_at = _yaml_scalar(repo / "docs" / "product" / "flows" / "INDEX.md", "generated_at")

@@ -57,7 +57,7 @@ section() { printf '\n[%s] %s\n' "$1" "$2"; }
 # absent — neither is reachable from filesystem alone (scaffold-log
 # integration + Linear MCP / gh auth respectively).
 RECOGNIZED_GATES="preflight-complete intent-exists inventory-complete \
-story-docs-complete journey-complete index-complete \
+story-docs-complete journey-complete journey-front-matter-populated index-complete \
 story-doc-exists story-front-matter-populated story-job-story-regex story-ac-gherkin-count \
 eng-children-engineering-populated design-children-design-populated docs-children-docs-populated \
 qa-children-qa-populated qa-status-signed-off qa-last-signed-off-iso8601 qa-history-row-signed-off \
@@ -367,6 +367,41 @@ PY
     fi
   done
 
+  # --- journey-front-matter-populated (Q29.1 / Q29 amendment 6, BC-13935) ---
+  # Journey frontmatter against the ADR-033 canon over ALL journeys/*.md (the
+  # all-journeys model — the same _journey_docs set build_audit_report.evaluate() and
+  # run_fda_ci_audit iterate), NOT just the per-domain journeys/{domain}.md that
+  # journey-complete checks. Single-sourced through flow_frontmatter_lint(journey) so
+  # this twin fails on BOTH a MISSING canon key AND a DRIFT key — byte-for-byte the
+  # predicate the Python gates use (BC-13148 two-impl lockstep; a presence-only loop
+  # here would silently pass a journey carrying a drift key the Python gates reject).
+  if [ -d "$fixture/docs/product/journeys" ]; then
+    for jdoc in "$fixture/docs/product/journeys"/*.md; do
+      [ -f "$jdoc" ] || continue
+      _flow_index_skip "$jdoc" && continue   # skip overview/index docs (BC-13819)
+      local jstem jdefects jscope
+      jstem="$(basename "$jdoc" .md)"
+      # Scope encodes domain membership (mirrors build_audit_report.evaluate()): a
+      # per-domain journey (stem is a real flows/ domain) → domain:<stem> so a
+      # --domain=<D> audit filters it mechanically; an orphan/overview journey whose
+      # stem matches no domain → journey:<stem> (unfiltered + CI only).
+      if [ -d "$fixture/docs/product/flows/$jstem" ]; then jscope="domain:$jstem"; else jscope="journey:$jstem"; fi
+      jdefects="$(python3 - "$SCRIPT_DIR/../scripts/lib" "$jdoc" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import flow_frontmatter_lint as m
+r = m.lint_doc(sys.argv[2], "journey")
+print(len(r["missing"]) + len(r["drift"]))
+PY
+)"
+      if [ "$jdefects" = "0" ]; then
+        emit_gate PASS journey-front-matter-populated "$jscope"
+      else
+        emit_gate FAIL journey-front-matter-populated "$jscope" "canon defects=$jdefects"
+      fi
+    done
+  fi
+
   # --- index-complete (Q29.1): INDEX generated_at >= breadcrumb run_started_at ---
   local index_at brk_at
   index_at=""
@@ -585,6 +620,52 @@ else
   fail "bash twin audited a flow_index:skip doc (parity gap)"
 fi
 rm -rf "$SDIR"
+
+# ── Section 2-journey: journey-front-matter-populated gate (BC-13935) ─────────
+# The all-journeys journey-frontmatter gate (Q29 amendment 6) lints EVERY journeys/*.md
+# against the ADR-033 canon — bringing the Phase-B twin up to parity with
+# run_fda_ci_audit's journey lint (CI↔/flow:audit lockstep, BC-13148). Dedicated temp
+# repo so the clean/broken fixtures (the eval oracle's only two) stay full-canon.
+# Single-sourced through flow_frontmatter_lint(journey) → fails on MISSING and DRIFT.
+section "2-journey" "journey-front-matter-populated: full-canon passes; missing/drift key fails"
+JDIR="$(mktemp -d)"; cp -R "$CLEAN_FIXTURE/." "$JDIR/"
+JRNY="$JDIR/docs/product/journeys/TEAM.md"
+# Positive control: the unmutated clean journey passes the gate.
+run_phase_b_gates "$JDIR"
+if awk -F'\t' '$1=="PASS" && $2=="journey-front-matter-populated" && $3=="domain:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "full-canon journey (TEAM is a domain) → journey-front-matter-populated PASS at domain:TEAM"
+else
+  fail "full-canon journey did not PASS journey-front-matter-populated"
+fi
+# MISSING parity: drop an ADR-033 canon key (display_name) → FAIL.
+python3 - "$JRNY" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+open(p, "w").write(re.sub(r'^display_name:.*\n', '', s, count=1, flags=re.M))
+PY
+run_phase_b_gates "$JDIR"
+if awk -F'\t' '$1=="FAIL" && $2=="journey-front-matter-populated" && $3=="domain:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "journey missing canon key (display_name) → journey-front-matter-populated FAIL"
+else
+  fail "journey missing-key not caught on bash twin"
+fi
+# DRIFT parity (BC-13148): restore full canon + inject a drift key (linear_project_id,
+# dropped by ADR-033) INSIDE the frontmatter → FAIL. The twin checks DRIFT, not just
+# presence, so it can't silently pass a journey the Python evaluate()/CI-runner reject
+# (the Greptile #496 P2 lesson, journey side).
+cp -f "$CLEAN_FIXTURE/docs/product/journeys/TEAM.md" "$JRNY"
+python3 - "$JRNY" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+open(p, "w").write(re.sub(r'^(---\n)', r'\1linear_project_id: dead-beef\n', s, count=1, flags=re.M))
+PY
+run_phase_b_gates "$JDIR"
+if awk -F'\t' '$1=="FAIL" && $2=="journey-front-matter-populated" && $3=="domain:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "journey with drift key (linear_project_id) → journey-front-matter-populated FAIL (drift parity w/ Python)"
+else
+  fail "journey drift key slipped through the bash twin (presence-only regression)"
+fi
+rm -rf "$JDIR"
 
 # ── Section 3: broken fixture — Phase B gate runner ─────────────────────────
 section "3/5" "Phase B gates against broken fixture (expect 4 named fails, 0 UNCATEGORIZED-GATE-FAIL)"

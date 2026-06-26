@@ -4,13 +4,13 @@ Quality gates in FDA are **filesystem-artifact-existence checks**, NOT LLM self-
 
 ## Why
 
-LLM self-report drifts. An agent can say "phase 2 complete" while the artifact it was supposed to produce is missing, malformed, or partial. Filesystem checks do not drift — either the file exists with the required content shape or it does not. Q7 locks this philosophy; Q29 enumerates the 36 gate types that follow from it; `/flow:audit` (Q38, pending) is the runner.
+LLM self-report drifts. An agent can say "phase 2 complete" while the artifact it was supposed to produce is missing, malformed, or partial. Filesystem checks do not drift — either the file exists with the required content shape or it does not. Q7 locks this philosophy; Q29 enumerates the 37 gate types that follow from it; `/flow:audit` (Q38, pending) is the runner.
 
 ## Gate categories
 
-Q29 manifests **36 distinct gate types** across three categories (post-Q29 amendment 2 adding the 6th cross-cutting gate). Full per-gate definitions are locked at `docs/design-rationale/fda-plugin-interview.md` lines 240-273; this file names the categories and counts and points at the canonical source.
+Q29 manifests **37 distinct gate types** across three categories (post-Q29 amendment 6 adding the 9th phase-transition gate `journey-front-matter-populated`). Full per-gate definitions are locked at `docs/design-rationale/fda-plugin-interview.md` lines 240-273; this file names the categories and counts and points at the canonical source.
 
-### Phase-transition gates (8)
+### Phase-transition gates (9)
 
 Fire between FDA orchestrator phases. Per Q29 sub-decision 1 (`:242`) plus Q29 amendment 1 (`:275`, LOCKED 2026-05-11 per BC-7066 reconciliation):
 
@@ -21,6 +21,7 @@ Fire between FDA orchestrator phases. Per Q29 sub-decision 1 (`:242`) plus Q29 a
 - `scaffold-complete` (per domain) — `.flow/scaffold-log/<domain>.md` has rows for 1 milestone + N parents + 5N children, all `result: executed` or `skipped-idempotent`.
 - `story-docs-complete` (per domain) — N story-doc files at `docs/product/flows/<domain>/*.md` for all N flows in the domain.
 - `journey-complete` (per domain) — `docs/product/journeys/<domain>.md` exists.
+- `journey-front-matter-populated` (per journey doc, all-journeys set) — every `docs/product/journeys/*.md` (minus `flow_index: skip` overview docs) satisfies the ADR-033 journey frontmatter canon (no missing/drift key). The frontmatter sibling of `journey-complete`, lockstep with the CI runner's journey lint. **Added per Q29 amendment 6 (BC-13935).**
 - `index-complete` — `INDEX.md` `generated_at` >= orchestrator's `run_started_at` from the breadcrumb. Semantically: "INDEX regenerated as part of this orchestrator run."
 
 ### Discipline-child-completion gates (~22 per-flow)
@@ -46,7 +47,7 @@ Cross-file integrity per Q29 sub-decision 3 (`:261`) plus Q29 amendment 2 (`cros
 - `milestone-subflows-table-match` — Linear domain milestone description's Sub-flows table matches actual children of that milestone (Q22).
 - `cross-domain-deps-bidirectional` — every story-doc `## Cross-domain dependencies` bullet (Q27 amendment 1 mod 4) has a matching Linear `blockedBy` relation on the sub-flow parent issue, and every Linear `blockedBy` between FDA sub-flow parents has a matching doc-side bullet. Bidirectional set-comparison via the same batched `list_issues({label: "domain:<slug>"})` call backing `linear-children-match`. Same-domain sibling blockedBy (tracked via `related_flows` front-matter) and discipline-child relations excluded. **Added per Q29 amendment 2.**
 
-Arithmetic: 8 + 22 + 6 = 36 distinct gate types (multiplied by N flows for per-flow gates).
+Arithmetic: 9 + 22 + 6 = 37 distinct gate types (multiplied by N flows for per-flow gates).
 
 ## Hard vs soft classification
 

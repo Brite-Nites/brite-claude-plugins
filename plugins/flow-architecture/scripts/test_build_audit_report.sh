@@ -356,6 +356,33 @@ def lean_frontmatter(r):
 truthy("lean doc (canon keys stripped) → story-front-matter-populated fails (full canon required, BC-13915)",
        ("story-front-matter-populated", "flow:TEAM-01") in with_mutation(lean_frontmatter))
 
+# journey-front-matter-populated requires the ADR-033 journey canon UNCONDITIONALLY over
+# ALL journeys (Q29 amendment 6 / BC-13935). A journey DOWNGRADED by dropping a canon key
+# hard-fails through evaluate() at domain:<D> for a per-domain journey (journey:<stem> for an
+# orphan) — the Python twin of run-audit-smoke.sh
+# §2-journey (bash↔Python ORACLE). The clean fixture's journeys are full canon, so
+# fails(CLEAN) is empty (§1 pins that); these mutations exercise the FAIL path without
+# touching the shared broken fixture's oracle.
+def lean_journey_frontmatter(r):
+    import re as _re
+    d = os.path.join(r, "docs/product/journeys/TEAM.md")
+    t = open(d).read()
+    # Drop the ADR-033 `display_name:` canon key → journey lint reports it MISSING.
+    open(d, "w").write(_re.sub(r"^display_name:.*\n", "", t, count=1, flags=_re.M))
+truthy("journey w/ dropped canon key (display_name) → journey-front-matter-populated fails (ADR-033, BC-13935)",
+       ("journey-front-matter-populated", "domain:TEAM") in with_mutation(lean_journey_frontmatter))
+
+def drift_journey_frontmatter(r):
+    import re as _re
+    d = os.path.join(r, "docs/product/journeys/TEAM.md")
+    t = open(d).read()
+    # Inject a DRIFT key (linear_project_id, dropped by ADR-033) INSIDE the frontmatter →
+    # the gate must FAIL on drift, not just on missing (lockstep w/ the bash twin's
+    # single-sourced lint_doc; a presence-only check would silently pass this).
+    open(d, "w").write(_re.sub(r"^(---\n)", r"\1linear_project_id: dead-beef\n", t, count=1, flags=_re.M))
+truthy("journey w/ drift key (linear_project_id) → journey-front-matter-populated fails (drift parity, BC-13148)",
+       ("journey-front-matter-populated", "domain:TEAM") in with_mutation(drift_journey_frontmatter))
+
 # ── 6. determinism: gates sorted by total (id, scope); no absolute-path leak ───
 # NOTE: evaluate() returns UNSORTED; decide()/CLI sort. Assert the sort key is total
 # (no crash) and that decide() output is sorted.
@@ -390,6 +417,12 @@ for rgid in ("redirect-target-resolvable", "redirect-front-matter-valid"):
     truthy(f"{rgid} ∈ VALID_GATE_IDS", rgid in bar.VALID_GATE_IDS)
     rg = bar.decide({"id": "rg", "repo": "audit-clean-shape", "gate": rgid}, bar.Path(FIXTURES))
     truthy(f"--gate={rgid} not rejected as 64", rg["summary"]["exit_code"] != 64)
+# the journey-frontmatter gate evaluate() emits MUST be in VALID_GATE_IDS, else a --gate
+# filter on it hits the arg-guard and returns exit-64 instead of running (BC-13935).
+truthy("journey-front-matter-populated ∈ VALID_GATE_IDS",
+       "journey-front-matter-populated" in bar.VALID_GATE_IDS)
+jg = bar.decide({"id": "jg", "repo": "audit-clean-shape", "gate": "journey-front-matter-populated"}, bar.Path(FIXTURES))
+truthy("--gate=journey-front-matter-populated not rejected as 64", jg["summary"]["exit_code"] != 64)
 
 # ── 8. exit-2-or-clean crash-defense contract via the CLI ─────────────────────
 box = tempfile.mkdtemp()

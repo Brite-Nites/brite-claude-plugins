@@ -93,9 +93,9 @@ Invoke `/flow:audit --domain=<DOMAIN>` (scope-filtered via the Q24 mod 3 `domain
 - **exit 1** — any unoverridden hard gate fails. **Halt ship.** Surface the audit's failed-gate rows to the developer and direct them to resolve or override via the audit's `AskUserQuestion` flow.
 - **exit 2** — `verify-docs.sh` failed (Phase A) so Phase B + C were skipped. **Halt ship.** Direct the developer to fix the mechanical failure surfaced by `verify-docs.sh` (build / lint / test / link checks) before re-running `/flow:ship`.
 
-**Soft-gate warnings** (advisory rows in the audit output) **surface but do not halt** — they are reported to the developer for visibility but do not block the ship. The soft-gate categorization comes from the gate's own classification in the 36-gate stack (post-Q29 amendment 2), not from `/flow:ship`'s judgement.
+**Soft-gate warnings** (advisory rows in the audit output) **surface but do not halt** — they are reported to the developer for visibility but do not block the ship. The soft-gate categorization comes from the gate's own classification in the 37-gate stack (post-Q29 amendment 6), not from `/flow:ship`'s judgement.
 
-This is a Q53-specific gate (not part of Q29's 36-gate stack post-amendment 2); a v1.1 parking-lot candidate is to extend Q29 with a plan-X-section discipline-completion gate so `/flow:audit` covers what augment 2 below verifies, retiring this caller-side check.
+This is a Q53-specific gate (not part of Q29's 37-gate stack post-amendment 6); a v1.1 parking-lot candidate is to extend Q29 with a plan-X-section discipline-completion gate so `/flow:audit` covers what augment 2 below verifies, retiring this caller-side check.
 
 ### FDA augment 2 — Plan-X-section verification (Q43 caller-side double-layer safety)
 
