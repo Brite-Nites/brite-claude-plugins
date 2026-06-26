@@ -292,14 +292,24 @@ PY
           fi
           # redirect-front-matter-valid is now unconditional (BC-13915): the redirect
           # canon is enforced everywhere, no longer gated on `frontmatter_schema: strict`.
-          local rmiss=""
-          for k in flow_id domain doc_type redirect_to intent last_reviewed; do
-            grep -qE "^$k:" "$doc" || rmiss="$rmiss $k"
-          done
-          if [ -z "$rmiss" ]; then
+          # Single-sourced through flow_frontmatter_lint (redirect mode) so this twin
+          # fails on BOTH a MISSING canon key AND a DRIFT key — byte-for-byte the
+          # predicate build_audit_report.evaluate() / run_fda_ci_audit use (BC-13148
+          # two-impl lockstep; a presence-only loop here would silently pass a redirect
+          # carrying a drift key like `sub_flow_id` that the Python gates reject).
+          local rdefects
+          rdefects="$(python3 - "$SCRIPT_DIR/../scripts/lib" "$doc" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import flow_frontmatter_lint as m
+r = m.lint_doc(sys.argv[2], "redirect")
+print(len(r["missing"]) + len(r["drift"]))
+PY
+)"
+          if [ "$rdefects" = "0" ]; then
             emit_gate PASS redirect-front-matter-valid "$scope"
           else
-            emit_gate FAIL redirect-front-matter-valid "$scope" "missing=$rmiss"
+            emit_gate FAIL redirect-front-matter-valid "$scope" "canon defects=$rdefects"
           fi
           continue
         fi
@@ -546,6 +556,16 @@ if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-front-matter-valid
   pass "redirect missing canon key (intent) → redirect-front-matter-valid FAIL"
 else
   fail "redirect missing-key not caught on bash twin"
+fi
+# DRIFT parity (BC-13148): a redirect with ALL canon keys present PLUS a drift key
+# (sub_flow_id) must FAIL — the bash twin checks DRIFT, not just presence, so it can't
+# silently pass a doc the Python evaluate()/CI-runner reject (Greptile #496 P2).
+printf -- '---\nflow_id: %s\ndomain: %s\ndoc_type: redirect\nredirect_to: %s\nsub_flow_id: %s\nintent: x\nlast_reviewed: y\n---\n# %s (redirect, drift key)\n' "$RAFID" "$RADOM" "$RTGT" "$RAFID" "$RAFID" > "$RALIAS"
+run_phase_b_gates "$RDIR"
+if awk -F'\t' -v s="flow:$RAFID" '$1=="FAIL" && $2=="redirect-front-matter-valid" && $3==s{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "redirect with drift key (sub_flow_id) → redirect-front-matter-valid FAIL (drift parity w/ Python)"
+else
+  fail "redirect drift key slipped through the bash twin (presence-only regression)"
 fi
 rm -rf "$RDIR"
 
