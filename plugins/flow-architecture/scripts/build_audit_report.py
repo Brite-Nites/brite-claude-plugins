@@ -403,6 +403,14 @@ def evaluate(repo: Path) -> list:
     # run_fda_ci_audit.py's journey lint so an orphan/overview journey missing an
     # ADR-033 key surfaces in the local audit too, not only in CI. Mirrors the redirect
     # emit above: missing first, drift second, first-token, capped at 4.
+    #
+    # Scope encodes domain membership so a --domain=<D> audit (and the /flow:ship that
+    # calls it) filters MECHANICALLY by scope-prefix — never blocked by an unrelated or
+    # orphan journey: a per-domain journey (journeys/{D}.md, D a real flows/ domain) →
+    # scope domain:<D>, IDENTICAL to journey-complete for the same file; a journey whose
+    # stem matches no domain (genuine orphan/overview) → scope journey:<stem>, a
+    # project-level row only the UNFILTERED audit + CI surface (CI always runs unfiltered).
+    journey_domains = set(_domains(repo))
     for doc in _journey_docs(repo):
         jres = _ffl.lint_text(_read(doc), "journey")
         bits = []
@@ -410,8 +418,9 @@ def evaluate(repo: Path) -> list:
             bits.append("missing=" + ",".join(m.split(" ")[0] for m in jres["missing"][:4]))
         if jres["drift"]:
             bits.append("drift=" + ",".join(d.split(" ")[0] for d in jres["drift"][:4]))
+        jscope = ("domain:" + doc.stem) if doc.stem in journey_domains else ("journey:" + doc.stem)
         emit("hard-fail" if bits else "pass", "journey-front-matter-populated",
-             "journey:" + doc.stem, "; ".join(bits))
+             jscope, "; ".join(bits))
 
     # --- index-complete (Q29.1): INDEX generated_at >= breadcrumb run_started_at ---
     index_at = _yaml_scalar(repo / "docs" / "product" / "flows" / "INDEX.md", "generated_at")

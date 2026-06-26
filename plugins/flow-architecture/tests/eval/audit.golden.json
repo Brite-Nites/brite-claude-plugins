@@ -184,14 +184,14 @@
           "id": "journey-front-matter-populated",
           "type": "phase-transition",
           "status": "pass",
-          "scope": "journey:SHIP",
+          "scope": "domain:SHIP",
           "message": ""
         },
         {
           "id": "journey-front-matter-populated",
           "type": "phase-transition",
           "status": "pass",
-          "scope": "journey:TEAM",
+          "scope": "domain:TEAM",
           "message": ""
         },
         {
@@ -722,14 +722,14 @@
           "id": "journey-front-matter-populated",
           "type": "phase-transition",
           "status": "pass",
-          "scope": "journey:SHIP",
+          "scope": "domain:SHIP",
           "message": ""
         },
         {
           "id": "journey-front-matter-populated",
           "type": "phase-transition",
           "status": "pass",
-          "scope": "journey:TEAM",
+          "scope": "domain:TEAM",
           "message": ""
         },
         {

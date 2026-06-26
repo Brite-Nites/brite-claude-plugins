@@ -379,8 +379,13 @@ PY
     for jdoc in "$fixture/docs/product/journeys"/*.md; do
       [ -f "$jdoc" ] || continue
       _flow_index_skip "$jdoc" && continue   # skip overview/index docs (BC-13819)
-      local jstem jdefects
+      local jstem jdefects jscope
       jstem="$(basename "$jdoc" .md)"
+      # Scope encodes domain membership (mirrors build_audit_report.evaluate()): a
+      # per-domain journey (stem is a real flows/ domain) → domain:<stem> so a
+      # --domain=<D> audit filters it mechanically; an orphan/overview journey whose
+      # stem matches no domain → journey:<stem> (unfiltered + CI only).
+      if [ -d "$fixture/docs/product/flows/$jstem" ]; then jscope="domain:$jstem"; else jscope="journey:$jstem"; fi
       jdefects="$(python3 - "$SCRIPT_DIR/../scripts/lib" "$jdoc" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1])
@@ -390,9 +395,9 @@ print(len(r["missing"]) + len(r["drift"]))
 PY
 )"
       if [ "$jdefects" = "0" ]; then
-        emit_gate PASS journey-front-matter-populated "journey:$jstem"
+        emit_gate PASS journey-front-matter-populated "$jscope"
       else
-        emit_gate FAIL journey-front-matter-populated "journey:$jstem" "canon defects=$jdefects"
+        emit_gate FAIL journey-front-matter-populated "$jscope" "canon defects=$jdefects"
       fi
     done
   fi
@@ -627,8 +632,8 @@ JDIR="$(mktemp -d)"; cp -R "$CLEAN_FIXTURE/." "$JDIR/"
 JRNY="$JDIR/docs/product/journeys/TEAM.md"
 # Positive control: the unmutated clean journey passes the gate.
 run_phase_b_gates "$JDIR"
-if awk -F'\t' '$1=="PASS" && $2=="journey-front-matter-populated" && $3=="journey:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
-  pass "full-canon journey → journey-front-matter-populated PASS at journey:TEAM"
+if awk -F'\t' '$1=="PASS" && $2=="journey-front-matter-populated" && $3=="domain:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+  pass "full-canon journey (TEAM is a domain) → journey-front-matter-populated PASS at domain:TEAM"
 else
   fail "full-canon journey did not PASS journey-front-matter-populated"
 fi
@@ -639,7 +644,7 @@ p = sys.argv[1]; s = open(p).read()
 open(p, "w").write(re.sub(r'^display_name:.*\n', '', s, count=1, flags=re.M))
 PY
 run_phase_b_gates "$JDIR"
-if awk -F'\t' '$1=="FAIL" && $2=="journey-front-matter-populated" && $3=="journey:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+if awk -F'\t' '$1=="FAIL" && $2=="journey-front-matter-populated" && $3=="domain:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
   pass "journey missing canon key (display_name) → journey-front-matter-populated FAIL"
 else
   fail "journey missing-key not caught on bash twin"
@@ -655,7 +660,7 @@ p = sys.argv[1]; s = open(p).read()
 open(p, "w").write(re.sub(r'^(---\n)', r'\1linear_project_id: dead-beef\n', s, count=1, flags=re.M))
 PY
 run_phase_b_gates "$JDIR"
-if awk -F'\t' '$1=="FAIL" && $2=="journey-front-matter-populated" && $3=="journey:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
+if awk -F'\t' '$1=="FAIL" && $2=="journey-front-matter-populated" && $3=="domain:TEAM"{ok=1} END{exit !ok}' "$GATE_REPORT"; then
   pass "journey with drift key (linear_project_id) → journey-front-matter-populated FAIL (drift parity w/ Python)"
 else
   fail "journey drift key slipped through the bash twin (presence-only regression)"
