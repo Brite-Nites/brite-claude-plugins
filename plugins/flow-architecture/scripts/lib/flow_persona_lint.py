@@ -103,8 +103,15 @@ def _clean_slug(s: str) -> str:
     `installer (primary)` / `SYSTEM (cron)`; the slug is the leading token, matching
     the `<slug>.md` filename convention. (`;`-separated multi-entries are split
     upstream in `personas()`.)"""
-    s = s.strip().strip("`\"'").strip()
-    s = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()   # drop a trailing (qualifier)
+    # Order matters: strip an inline ` # comment` BEFORE the surrounding quotes, else a
+    # quoted item's closing quote is left interior once the comment is removed
+    # (`"alice"  # note`: quote-strip-first → `alice"  # note` → `alice"`). Comment first,
+    # then quotes, then a trailing (qualifier).
+    s = s.strip()
+    s = re.sub(r"(^|\s+)#.*$", "", s).strip()         # drop a YAML comment: inline (` # note`)
+    #                                                   OR a whole-value comment (`# note` → "")
+    s = s.strip("`\"'").strip()                       # strip surrounding quotes/backticks
+    s = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()    # drop a trailing (qualifier)
     return s
 
 
@@ -129,8 +136,10 @@ def personas(text: str) -> list:
             # block list (subsequent `  - <slug>` lines) or genuinely empty
             slugs = []
             for cont in lines[i + 1:]:
-                if not cont.strip():
-                    continue  # a blank line between items does NOT end a YAML list
+                s = cont.strip()
+                if not s or s.startswith("#"):
+                    continue  # a blank line OR a full-line YAML comment between items
+                    #          does NOT end the list (a comment is not a terminator)
                 mm = re.match(r"^\s+-\s+(.+?)\s*$", cont)
                 if not mm:
                     break  # next top-level key / non-item line ends the block list
@@ -138,7 +147,8 @@ def personas(text: str) -> list:
                 if slug:
                     slugs.append(slug)
             return slugs
-        return [_clean_slug(rest)]  # scalar single value
+        slug = _clean_slug(rest)  # scalar single value
+        return [slug] if slug else []  # `personas: # note` cleans to "" → honest-empty
     return []  # no personas key → honest-absent
 
 

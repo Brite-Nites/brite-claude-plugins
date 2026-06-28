@@ -54,6 +54,41 @@ t = "---\npersonas:\n  - operator\n\n  - finance-auditor\nstatus: BUILT\n---\n# 
 sys.exit(0 if m.personas(t) == ["operator", "finance-auditor"] else 1)
 PY
 
+py <<'PY' && pass "block list with a full-line COMMENT between items reads both (Greptile P1)" || fail "block list comment line"
+import flow_persona_lint as m, sys
+# A full-line YAML comment between items must NOT end the list early — same silent
+# under-lint risk as the blank-line case (the later slug would skip the required check).
+t = "---\npersonas:\n  - operator\n  # primary contact\n  - finance-auditor\nstatus: BUILT\n---\n# t\n"
+sys.exit(0 if m.personas(t) == ["operator", "finance-auditor"] else 1)
+PY
+
+py <<'PY' && pass "inline ' # comment' on a list item is stripped to the bare slug" || fail "inline comment strip"
+import flow_persona_lint as m, sys
+# An inline YAML comment on an item (`- alice  # note`) is not part of the value;
+# the slug is the bare token, else it would never resolve to <slug>.md (false miss).
+t = "---\npersonas:\n  - operator  # primary\n  - finance-auditor\nstatus: BUILT\n---\n# t\n"
+sys.exit(0 if m.personas(t) == ["operator", "finance-auditor"] else 1)
+PY
+
+py <<'PY' && pass "QUOTED item + inline comment strips to bare slug (no stray quote)" || fail "quoted+inline comment"
+import flow_persona_lint as m, sys
+# A quoted item + inline comment (`- "operator"  # primary`): the comment must be
+# stripped BEFORE the quotes, else the closing quote is left interior -> `operator"`
+# (a never-resolving filename). Covers both block and inline-flow forms.
+block = m.personas("---\npersonas:\n  - \"operator\"  # primary\n  - 'finance-auditor'  # x\n---\n# t\n")
+flow  = m.personas("---\npersonas: [\"operator\", 'finance-auditor']\n---\n# t\n")
+sys.exit(0 if block == ["operator", "finance-auditor"] and flow == ["operator", "finance-auditor"] else 1)
+PY
+
+py <<'PY' && pass "comment-only item / value yields no slug (YAML reads it as null)" || fail "comment-only item"
+import flow_persona_lint as m, sys
+# A list item that is ONLY a comment (`- # note`) is a null YAML item — it must not
+# become a garbage `# note` slug. Same for a scalar that is only a comment.
+block  = m.personas("---\npersonas:\n  - # just a note\n  - alice\nstatus: BUILT\n---\n# t\n")
+scalar = m.personas("---\npersonas: # none yet\n---\n# t\n")
+sys.exit(0 if block == ["alice"] and scalar == [] else 1)
+PY
+
 py <<'PY' && pass "honest-empty [] / absent / null -> [] (no false missing)" || fail "honest-empty"
 import flow_persona_lint as m, sys
 empty = m.personas("---\npersonas: []\n---\n# t\n")
