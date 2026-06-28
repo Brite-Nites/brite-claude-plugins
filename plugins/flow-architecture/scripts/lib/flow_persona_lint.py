@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""WS-A persona-exists lint (BC-12573).
+
+The deterministic FLOOR of the 3-layer persona system: existence (here — binary,
+HARD) + LLM persona-resolution (quality-reviewer, post-#502) + LLM persona-depth
+(Lane B C2). For each story doc, every NON-EMPTY `personas:` front-matter slug must
+resolve to an existing `docs/product/personas/<slug>.md`. Honest-empty PASSES:
+`personas: []` / absent / null is persona-less by design — presence is the
+front-matter lint's job (BC-12572); this lint checks that a NAMED slug RESOLVES on
+disk. Distinct from WS-A A-2 GENERIC_PERSONA (which checks the persona isn't a
+generic project-wide default) — this checks it EXISTS.
+
+REFRAME (BC-13916 precedent — a falsified-premise ticket re-framed and documented so
+it is not re-discovered cold). The ticket bundled persona-exists with a
+journey-exists check; journey-exists is ALREADY covered and is NOT re-implemented:
+
+  * "every domain has its journey" → the audit-manifest `journey-complete` gate
+    already asserts `docs/product/journeys/<domain>.md` exists per domain.
+  * "a story's parent-journey link resolves" → the CI runner's `link-resolution`
+    gate already asserts every body `](<path>.md)` link resolves on disk, and the
+    parent-journey reference IS such a body link.
+  * the only net-new journey sliver (asserting a parent-journey link is PRESENT) is
+    deliberately DROPPED: real consumers diverge on its form (brand-hub 51/51 use a
+    `- Parent journey: [...]` list line; brite-supply-react 0/32 use a prose
+    blockquote variant), so a deterministic presence check keyed on line-form would
+    false-fail brite-supply-react, and recognizing the link across prose/bold/list
+    forms is the LLM layer's job, not a deterministic floor.
+
+So BC-12573 collapses to pure persona-exists. The persona path convention
+`docs/product/personas/<slug>.md` (+ sibling INDEX.md) is G1-locked and verified on
+brite-supply-react (installer.md, commercial-buyer.md).
+
+Runner: scripts/flow-persona-lint.sh. Test surface:
+tests/run-flow-persona-lint-vslice.sh.
+
+python3 3.6+ (no `from __future__ import annotations` — 3.7+; not needed). Stdlib only.
+"""
+import re
+import sys
+from pathlib import Path
+
+
+def _read(p) -> str:
+    return Path(p).read_text(encoding="utf-8", errors="replace")
+
+
+def _frontmatter_block(text: str) -> str:
+    """Text between the opening `---` (line 1) and the next `---`; '' if the doc does
+    not open with a front-matter fence or it is unterminated. Twin of the minimal
+    parser in flow_evidence_lint / build_journey_frontmatter (house twin-helper rule —
+    independent lifecycle, not cross-imported)."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    out = []
+    for ln in lines[1:]:
+        if ln.strip() == "---":
+            return "\n".join(out)
+        out.append(ln)
+    return ""
+
+
+def _flow_index_skipped(text: str) -> bool:
+    return bool(re.search(r"^flow_index:\s*[\"']?skip[\"']?\s*$",
+                          _frontmatter_block(text), re.M))
+
+
+def _story_docs(repo: Path) -> list:
+    """Story docs under docs/product/flows, recursively (matches the inventory-lint
+    family). INDEX.md and `flow_index: skip` overview docs excluded."""
+    base = repo / "docs" / "product" / "flows"
+    if not base.is_dir():
+        return []
+    docs = []
+    for p in sorted(base.rglob("*.md")):
+        if p.name == "INDEX.md":
+            continue
+        if _flow_index_skipped(_read(p)):
+            continue
+        docs.append(p)
+    return docs
+
+
+def _clean_slug(s: str) -> str:
+    """Normalize one persona list entry to its slug. Strips quotes/backticks and a
+    trailing parenthetical qualifier — some repos annotate an entry as
+    `installer (primary)` / `SYSTEM (cron)`; the slug is the leading token, matching
+    the `<slug>.md` filename convention. (`;`-separated multi-entries are split
+    upstream in `personas()`.)"""
+    s = s.strip().strip("`\"'").strip()
+    s = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()   # drop a trailing (qualifier)
+    return s
+
+
+def personas(text: str) -> list:
+    """The `personas:` front-matter slugs (inline `[a, b]` or block `- a` form), with
+    quotes/backticks stripped. Honest-empty (`personas: []` / `personas:` with no
+    items / `null`) and an absent key both yield [] — never a false 'missing persona'.
+    A non-list scalar (`personas: admin`) is tolerated as a single slug."""
+    block = _frontmatter_block(text)
+    lines = block.splitlines()
+    for i, ln in enumerate(lines):
+        m = re.match(r"^personas:\s*(.*)$", ln)
+        if not m:
+            continue
+        rest = m.group(1).strip()
+        if rest.startswith("["):
+            inner = rest[1:rest.index("]")] if "]" in rest else rest[1:]
+            # Split on , and ; — some repos use `;` to separate annotated entries
+            # (`[ADMIN (full); MANAGER (limited)]`).
+            return [_clean_slug(s) for s in re.split(r"[,;]", inner) if _clean_slug(s)]
+        if rest in ("", "null", "Null", "NULL", "~"):
+            # block list (subsequent `  - <slug>` lines) or genuinely empty
+            slugs = []
+            for cont in lines[i + 1:]:
+                mm = re.match(r"^\s+-\s+(.+?)\s*$", cont)
+                if not mm:
+                    break  # next top-level key / non-item line ends the block list
+                slug = _clean_slug(mm.group(1))
+                if slug:
+                    slugs.append(slug)
+            return slugs
+        return [_clean_slug(rest)]  # scalar single value
+    return []  # no personas key → honest-absent
+
+
+def audit_persona_exists(repo) -> list:
+    """Return a list of violation dicts {doc, slug}. Each non-empty `personas:` slug
+    in a story doc that has no matching docs/product/personas/<slug>.md is a
+    violation. Empty ⇒ clean."""
+    repo = Path(repo)
+    personas_dir = repo / "docs" / "product" / "personas"
+    violations = []
+    for d in _story_docs(repo):
+        for slug in personas(_read(d)):
+            if not slug:
+                continue
+            if not (personas_dir / (slug + ".md")).is_file():
+                violations.append({"doc": d.stem, "slug": slug})
+    return violations
+
+
+def main(argv: list) -> int:
+    if len(argv) != 1:
+        sys.stderr.write("usage: flow_persona_lint.py <repo_root>\n")
+        return 2
+    repo = Path(argv[0])
+    if not repo.is_dir():
+        sys.stderr.write("error: repo root not found: %s\n" % repo)
+        return 2
+    violations = audit_persona_exists(repo)
+    if not violations:
+        print("✓ persona-exists: clean")
+        return 0
+    for v in violations:
+        print("FAIL  persona-exists  %-28s persona '%s' → no docs/product/"
+              "personas/%s.md" % (v["doc"], v["slug"], v["slug"]))
+    print("✗ %d persona-exists violation(s)" % len(violations))
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
