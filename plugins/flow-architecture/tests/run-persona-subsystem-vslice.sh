@@ -70,14 +70,14 @@ assert_no_grep() {
 }
 
 # ── Section 1: all four artifacts present ────────────────────────────
-section "1/5" "Persona subsystem artifacts present"
+section "1/6" "Persona subsystem artifacts present"
 assert_file "persona template present"      "$PERSONA_TMPL"
 assert_file "persona-doc-author present"    "$PERSONA_AGENT"
 assert_file "quality-rubric present"        "$RUBRIC"
 assert_file "quality-reviewer present"      "$QR_AGENT"
 
 # ── Section 2: template carries the 5 FLOOR depth-spine sections ─────
-section "2/5" "persona.md carries the depth-spine FLOOR sections (not the thin pre-PRD shape)"
+section "2/6" "persona.md carries the depth-spine FLOOR sections (not the thin pre-PRD shape)"
 # The five FLOOR sections the depth check + persona-exists gate key on.
 assert_grep_re "template: ## At a glance"                 '^## At a glance'                    "$PERSONA_TMPL"
 assert_grep_re "template: ## How they think"              '^## How they think'                 "$PERSONA_TMPL"
@@ -92,7 +92,7 @@ assert_grep "template: linear_label frontmatter (no Linear children)" "linear_la
 assert_grep "template: cross-links the persona_doc reviewer kind"      "doc_kind: persona_doc"        "$PERSONA_TMPL"
 
 # ── Section 3: persona-doc-author prose contract ────────────────────
-section "3/5" "persona-doc-author teaches whole-file + depth-spine + no-fabrication"
+section "3/6" "persona-doc-author teaches whole-file + depth-spine + no-fabrication"
 # Whole-file (NOT body-only) — the no-builder decision.
 assert_grep "author: emits the WHOLE file (front-matter + body)" "whole file" "$PERSONA_AGENT"
 assert_grep "author: no persona builder"                         "no persona builder" "$PERSONA_AGENT"
@@ -109,7 +109,7 @@ assert_grep "author: last_reviewed the only dispatcher-stamped field" "last_revi
 assert_no_grep "author: NOT body-only (no build_persona_frontmatter.py)" "build_persona_frontmatter" "$PERSONA_AGENT"
 
 # ── Section 4: rubric persona dimensions P1–P5 ──────────────────────
-section "4/5" "quality-rubric.md carries persona dimensions P1–P5 on the D7/J2 spine"
+section "4/6" "quality-rubric.md carries persona dimensions P1–P5 on the D7/J2 spine"
 assert_grep "rubric: persona dimensions header"      "# Persona dimensions (per standalone persona doc)" "$RUBRIC"
 assert_grep "rubric: P1 at-a-glance substance"       "## P1 — At-a-glance substance" "$RUBRIC"
 assert_grep "rubric: P2 how-they-think depth"        "## P2 — How-they-think depth" "$RUBRIC"
@@ -126,7 +126,7 @@ assert_grep "rubric: P4 in corpus-dependent table"   "P4 (hand-off validity)" "$
 assert_grep "rubric: P5 byte-reuse in corpus-dependent table" "P5 (persona byte-reuse)" "$RUBRIC"
 
 # ── Section 5: reviewer persona_doc doc_kind ────────────────────────
-section "5/5" "quality-reviewer.md routes the persona_doc doc_kind to P1–P5"
+section "5/6" "quality-reviewer.md routes the persona_doc doc_kind to P1–P5"
 assert_grep "reviewer: persona_doc in doc_kind enum"  "story_doc | journey_doc | persona_doc" "$QR_AGENT"
 assert_grep "reviewer: persona_doc selects P1–P5"     "persona_doc\` → P1–P5" "$QR_AGENT"
 # Persona corpus dims wired into resolve-first Step 5 + Conventions.
@@ -137,6 +137,41 @@ assert_grep "reviewer: #502 resolve-first title still present" \
   "Resolve corpus-dependent claims with your own tools first" "$QR_AGENT"
 assert_no_grep "reviewer: NO retired flag-gate posture reintroduced" \
   "Absence of a field means you do NOT have that evidence" "$QR_AGENT"
+
+# ── Section 6: synthetic fixtures exhibit the thin-vs-rich split ─────
+section "6/6" "synthetic fixtures demonstrate the thin-stub-fails / rich-passes split"
+# Make the fixtures load-bearing: the thin stub must LACK every FLOOR section
+# (this is *why* it fails the depth floor); the rich pair must CARRY all five
+# plus the two At-a-glance load-bearing rows, and its hand-off must resolve to a
+# real sibling (P4 — no fabricated adjacent). These are the same inputs the
+# BC-12573 persona-exists gate calibrates against.
+FIX_DIR="$PLUGIN_ROOT/tests/fixtures/synthetic-persona-quality"
+THIN_PERSONA="$FIX_DIR/thin-stub/docs/product/personas/commercial-buyer.md"
+RICH_PERSONA="$FIX_DIR/rich-persona/docs/product/personas/dispatcher.md"
+RICH_ADJACENT="$FIX_DIR/rich-persona/docs/product/personas/booking-agent.md"
+
+assert_file "fixture: thin-stub persona present"                       "$THIN_PERSONA"
+assert_file "fixture: rich persona present"                            "$RICH_PERSONA"
+assert_file "fixture: rich persona hand-off target present"            "$RICH_ADJACENT"
+
+# Thin stub LACKS every FLOOR section (demonstrates the deterministic-floor fail).
+assert_no_grep "fixture: thin stub LACKS ## At a glance"              "## At a glance"        "$THIN_PERSONA"
+assert_no_grep "fixture: thin stub LACKS ## How they think"          "## How they think"     "$THIN_PERSONA"
+assert_no_grep "fixture: thin stub LACKS ## What they see"           "## What they see"      "$THIN_PERSONA"
+assert_no_grep "fixture: thin stub LACKS ## Hand-offs"               "## Hand-offs"          "$THIN_PERSONA"
+assert_no_grep "fixture: thin stub LACKS ## In their words"          "## In their words"     "$THIN_PERSONA"
+
+# Rich persona CARRIES every FLOOR section + the two load-bearing At-a-glance rows.
+assert_grep_re "fixture: rich persona has ## At a glance"             '^## At a glance'        "$RICH_PERSONA"
+assert_grep_re "fixture: rich persona has ## How they think"          '^## How they think'     "$RICH_PERSONA"
+assert_grep_re "fixture: rich persona has ## What they see — and …"   '^## What they see — and what they' "$RICH_PERSONA"
+assert_grep_re "fixture: rich persona has ## Hand-offs"               '^## Hand-offs'          "$RICH_PERSONA"
+assert_grep_re "fixture: rich persona has ## In their words"          '^## In their words'     "$RICH_PERSONA"
+assert_grep "fixture: rich persona has Mental unit row"               "**Mental unit**"               "$RICH_PERSONA"
+assert_grep "fixture: rich persona has the-failure-they-can't-absorb row" "The failure they can't absorb" "$RICH_PERSONA"
+# Hand-off resolves to a real sibling (P4 no-fabrication), both directions.
+assert_grep "fixture: rich persona hand-off links the adjacent persona" "booking-agent.md" "$RICH_PERSONA"
+assert_grep "fixture: rich adjacent hand-off links back to the persona" "dispatcher.md"    "$RICH_ADJACENT"
 
 # ── Summary ──────────────────────────────────────────────────────────
 printf '\npersona subsystem v-slice summary: %d PASS / %d FAIL / %d SKIP\n' "$PASS" "$FAIL" "$SKIP"
