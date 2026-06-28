@@ -53,12 +53,12 @@ always toward an empty table.
 | `plugins/workflows/commands/project-start.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 1081 |
 | `plugins/marketing/commands/launch-campaign.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 1053 |
 | `plugins/marketing/commands/plan-campaign.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 906 |
-| `plugins/flow-architecture/commands/retrofit-project.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 761 |
+| `plugins/flow-architecture/commands/retrofit-project.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth (re-baselined +2 for the persona.md template seed, BC-12905 C2) | 2026-06-14 | 763 |
 | `plugins/marketing/commands/tam-map.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 676 |
 | `plugins/marketing/skills/tam-mapping/SKILL.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 630 |
 | `plugins/marketing/commands/import-campaign.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 612 |
 | `plugins/marketing/skills/email-copywriting/SKILL.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); BC-13217 cleans its R4 ref — re-baseline if body line count changes | 2026-06-14 | 611 |
-| `plugins/flow-architecture/commands/start-project.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 602 |
+| `plugins/flow-architecture/commands/start-project.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth (re-baselined +2 for the persona.md template seed, BC-12905 C2) | 2026-06-14 | 604 |
 | `plugins/cadence/commands/weekly.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 600 |
 | `plugins/marketing/skills/campaign-debrief/SKILL.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 582 |
 | `plugins/flow-architecture/commands/add-domain.md` | R2-body-too-long | oversized body grandfathered per BC-12700 (ratchet 4/5); baseline pins growth | 2026-06-14 | 582 |
