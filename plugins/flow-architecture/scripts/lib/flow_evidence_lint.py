@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""WS-A evidence-reality lint (BC-12692 inventory ↔ story-doc consistency).
+"""WS-A evidence-reality lints (BC-12692 inventory ↔ story-doc consistency +
+BC-12690 cross-domain double-credit). Two audits sharing one strict-`src/` path
+extractor; each has its own runner + vslice + validate.sh section.
+
+BC-12692 — inventory ↔ story-doc consistency.
 
 The VALUE-LEVEL companion to flow_frontmatter_lint.py — that lint is "key-level
 only (values are BC-12692's territory)"; this one IS that territory. It machine-
@@ -31,7 +35,24 @@ pending: brite-sites uses slash-form `domain/sub-flow` flow_ids — splitting on
 as DOMAIN-NN would exit-break it). Row col-1 == doc front-matter id, byte-for-byte.
 
 Runner: scripts/flow-evidence-lint.sh. Test surface:
-tests/run-flow-evidence-lint-vslice.sh. python3 3.6+; stdlib only.
+tests/run-flow-evidence-lint-vslice.sh.
+
+BC-12690 — cross-domain double-credit. A built code surface can legitimately serve
+two flows, but each story doc's `## Status notes` must declare OWNERSHIP, or the
+same `src/` code is credited as the BUILT deliverable of two docs (inflating the
+apparent build surface + muddying who owns the spec). The lint collects each story
+doc's `## Status notes` evidence-anchor `src/` paths and flags any path cited as a
+built deliverable in >=2 docs UNLESS at least one of the citing docs frames it with
+a recognized ownership qualifier (`owns` / `owned by` / `reuses` / `reused by` /
+`shared with`) on the SAME markdown bullet as the path (the grill-locked same-bullet
+carve — start strict, loosen later; relationship mentions like "Downstream consumer
+— analytics-dashboard-02" use flow-IDs, not `src/` paths, so the path grammar already
+excludes them). Runner: scripts/flow-double-credit-lint.sh; test surface:
+tests/run-flow-double-credit-lint-vslice.sh. Distinct from the audit-manifest
+`cross-domain-deps-bidirectional` gate (that mirrors `## Cross-domain dependencies`
+bullets ↔ Linear blockedBy; this is `## Status notes` src-anchor ownership).
+
+python3 3.6+; stdlib only.
 """
 # No `from __future__ import annotations` — that PEP-563 import is 3.7+, and the
 # house target is python3 3.6+ (sibling flow_frontmatter_lint / run_fda_ci_audit).
@@ -66,6 +87,12 @@ _GLYPH_MISSING = "✗"                               # ✗ — skip evidence-rea
 # there would not be inside a `src/.../x.js` shape anyway.
 _SRC_GRAMMAR = re.compile(r"^src/\S+\.(?:ts|tsx|js|jsx)$")
 _BACKTICK = re.compile(r"`([^`]+)`")
+
+# Recognized ownership qualifiers (BC-12690 grill lock). A path double-cited across
+# >=2 docs' `## Status notes` is carved (not flagged) when >=1 citing bullet frames
+# it with one of these. Word-boundaried, case-insensitive; `owned by` / `reused by` /
+# `shared with` are matched as phrases (the bare `owns`/`reuses` cover the rest).
+_QUALIFIER = re.compile(r"\b(owns?|owned by|reuses?|reused by|shared with)\b", re.I)
 
 
 # ── IO + front-matter (minimal twin of build_journey_frontmatter._parse) ──────
@@ -220,6 +247,47 @@ def _extract_src_tokens(cell: str) -> list:
     return out
 
 
+# ── ## Status notes section + bullet carve (BC-12690) ─────────────────────────
+def _status_notes_section(text: str) -> str:
+    """The body of a story doc's `## Status` / `## Status notes` H2 (lines until the
+    next H2); '' if absent. `^##\\s+Status\\b` matches both `## Status` and
+    `## Status notes` but not `## Statuses`."""
+    out, in_sec = [], False
+    for ln in text.splitlines():
+        if re.match(r"^##\s+Status\b", ln):
+            in_sec = True
+            continue
+        if in_sec and re.match(r"^##\s+", ln):
+            break
+        if in_sec:
+            out.append(ln)
+    return "\n".join(out)
+
+
+def _carve_units(section_text: str) -> list:
+    """Split a `## Status notes` section into carve units — one per markdown bullet
+    (a `- `/`* `/`N. ` line plus its non-marker continuation lines) or prose block.
+    A unit boundary is a blank line OR a new list-marker line. This is the
+    same-bullet granularity of the ownership carve: a qualifier clears a path only
+    when both sit in the same unit."""
+    units, cur = [], []
+    for ln in section_text.splitlines():
+        if ln.strip() == "":
+            if cur:
+                units.append("\n".join(cur))
+                cur = []
+            continue
+        if re.match(r"^\s*([-*+]|\d+\.)\s", ln):
+            if cur:
+                units.append("\n".join(cur))
+            cur = [ln]
+        else:
+            cur.append(ln)
+    if cur:
+        units.append("\n".join(cur))
+    return units
+
+
 def _resolve(repo: Path, token: str) -> bool:
     """True iff `token` resolves to >=1 real path under `repo`. A `*`/`?` token is
     globbed (with `[` neutralized to a literal so a Next.js `[id]` dynamic segment
@@ -353,14 +421,61 @@ def audit_inventory_consistency(repo) -> list:
     return violations
 
 
-def main(argv: list) -> int:
-    if len(argv) != 1:
-        sys.stderr.write("usage: flow_evidence_lint.py <repo_root>\n")
-        return 2
-    repo = Path(argv[0])
-    if not repo.is_dir():
-        sys.stderr.write("error: repo root not found: %s\n" % repo)
-        return 2
+def _domain_of(doc: Path, flows_base: Path) -> str:
+    """The top-level domain dir under docs/product/flows that a (possibly nested)
+    story doc belongs to — `flows/<domain>/…/<flow>.md` → `<domain>`."""
+    try:
+        return doc.relative_to(flows_base).parts[0]
+    except (ValueError, IndexError):
+        return doc.parent.name
+
+
+def audit_cross_doc_double_credit(repo) -> list:
+    """Return a list of double-credit violation dicts {check, path, docs, domains}.
+    A `src/` path cited as a built deliverable in the `## Status notes` of story docs
+    spanning >=2 distinct DOMAINS is flagged UNLESS at least one citing bullet (in
+    any doc) frames it with an ownership qualifier (same-bullet carve). Empty ⇒ clean.
+
+    CROSS-domain by design (ticket title + Problem: "the same src/ code gets credited
+    as the BUILT deliverable of two docs ACROSS DOMAINS"). Same-domain sub-flows
+    sharing a surface is normal decomposition, not double-credit — only a surface
+    claimed across domain boundaries inflates the build surface / muddies ownership.
+    `check` == 'double-credit'."""
+    repo = Path(repo)
+    flows_base = repo / "docs" / "product" / "flows"
+    # path → {"docs": set of citing stems, "domains": set of citing domains,
+    # "qualified": True if any citing bullet (any doc) carried a qualifier}. Keyed on
+    # the brace-EXPANDED token so a `{a,b}` family in one doc overlaps a bare `a` in
+    # another at the real-file level.
+    cited = {}
+    for d in _story_docs(repo):
+        section = _status_notes_section(_read(d))
+        if not section:
+            continue
+        stem, dom = d.stem, _domain_of(d, flows_base)
+        for unit in _carve_units(section):
+            qualified = bool(_QUALIFIER.search(unit))
+            for group in _extract_src_groups(unit):
+                for tok in group:
+                    rec = cited.setdefault(
+                        tok, {"docs": set(), "domains": set(), "qualified": False})
+                    rec["docs"].add(stem)
+                    rec["domains"].add(dom)
+                    if qualified:
+                        rec["qualified"] = True
+
+    violations = []
+    for path in sorted(cited):
+        rec = cited[path]
+        if len(rec["domains"]) >= 2 and not rec["qualified"]:
+            violations.append({
+                "check": "double-credit", "path": path,
+                "docs": sorted(rec["docs"]), "domains": sorted(rec["domains"]),
+            })
+    return violations
+
+
+def _run_inventory(repo: Path) -> int:
     violations = audit_inventory_consistency(repo)
     if not violations:
         print("✓ inventory ↔ story-doc consistency: clean")
@@ -369,6 +484,37 @@ def main(argv: list) -> int:
         print("FAIL  %-18s %-28s %s" % (v["check"], v["flow_id"], v["detail"]))
     print("✗ %d inventory-consistency violation(s)" % len(violations))
     return 1
+
+
+def _run_double_credit(repo: Path) -> int:
+    violations = audit_cross_doc_double_credit(repo)
+    if not violations:
+        print("✓ cross-domain double-credit: clean")
+        return 0
+    for v in violations:
+        print("FAIL  double-credit  %s  cited as built across domains [%s] by: %s "
+              "(no ownership qualifier)"
+              % (v["path"], ", ".join(v["domains"]), ", ".join(v["docs"])))
+    print("✗ %d double-credit violation(s)" % len(violations))
+    return 1
+
+
+def main(argv: list) -> int:
+    args = list(argv)
+    mode = "inventory"
+    if args and args[0] == "--double-credit":
+        mode = "double-credit"
+        args = args[1:]
+    if len(args) != 1:
+        sys.stderr.write(
+            "usage: flow_evidence_lint.py [--double-credit] <repo_root>\n")
+        return 2
+    repo = Path(args[0])
+    if not repo.is_dir():
+        sys.stderr.write("error: repo root not found: %s\n" % repo)
+        return 2
+    return _run_double_credit(repo) if mode == "double-credit" \
+        else _run_inventory(repo)
 
 
 if __name__ == "__main__":
