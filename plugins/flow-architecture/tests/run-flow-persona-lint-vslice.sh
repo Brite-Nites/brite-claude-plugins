@@ -70,6 +70,16 @@ t = "---\npersonas:\n  - operator  # primary\n  - finance-auditor\nstatus: BUILT
 sys.exit(0 if m.personas(t) == ["operator", "finance-auditor"] else 1)
 PY
 
+py <<'PY' && pass "QUOTED item + inline comment strips to bare slug (no stray quote)" || fail "quoted+inline comment"
+import flow_persona_lint as m, sys
+# A quoted item + inline comment (`- "operator"  # primary`): the comment must be
+# stripped BEFORE the quotes, else the closing quote is left interior -> `operator"`
+# (a never-resolving filename). Covers both block and inline-flow forms.
+block = m.personas("---\npersonas:\n  - \"operator\"  # primary\n  - 'finance-auditor'  # x\n---\n# t\n")
+flow  = m.personas("---\npersonas: [\"operator\", 'finance-auditor']\n---\n# t\n")
+sys.exit(0 if block == ["operator", "finance-auditor"] and flow == ["operator", "finance-auditor"] else 1)
+PY
+
 py <<'PY' && pass "honest-empty [] / absent / null -> [] (no false missing)" || fail "honest-empty"
 import flow_persona_lint as m, sys
 empty = m.personas("---\npersonas: []\n---\n# t\n")

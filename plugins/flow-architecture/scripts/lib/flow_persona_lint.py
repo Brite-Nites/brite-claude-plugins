@@ -103,8 +103,13 @@ def _clean_slug(s: str) -> str:
     `installer (primary)` / `SYSTEM (cron)`; the slug is the leading token, matching
     the `<slug>.md` filename convention. (`;`-separated multi-entries are split
     upstream in `personas()`.)"""
-    s = s.strip().strip("`\"'").strip()
+    # Order matters: strip an inline ` # comment` BEFORE the surrounding quotes, else a
+    # quoted item's closing quote is left interior once the comment is removed
+    # (`"alice"  # note`: quote-strip-first → `alice"  # note` → `alice"`). Comment first,
+    # then quotes, then a trailing (qualifier).
+    s = s.strip()
     s = re.sub(r"\s+#.*$", "", s).strip()            # drop an inline YAML comment (` # note`)
+    s = s.strip("`\"'").strip()                      # strip surrounding quotes/backticks
     s = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()   # drop a trailing (qualifier)
     return s
 
