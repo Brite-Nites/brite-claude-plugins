@@ -287,6 +287,109 @@ else
   fail "domain prefix not coercion-guarded: $(grep '^domain:' "$TMP/coerce-dom.out")"
 fi
 
+# ── §15: slash-form opaque flow_id (ADR-040, brite-sites shape) ───────
+# End-to-end proof that an opaque slash-form flow_id (`<domain>/<slug>`) works:
+# accepted by the relaxed _FLOW_ID_RE, domain read from the scaffold-log's explicit
+# domain_code (NOT split out of flow_id → the load-bearing landmine: split("-") would
+# yield "admin"), and children/parent matched by the shape-agnostic _cell_is_flow.
+section "15" "slash-form flow_id: accepted, domain from scaffold-log domain_code, children matched"
+SLASHLOG="$TMP/slash-log.md"
+{
+  printf -- '---\n'
+  printf -- 'domain: admin-panel\n'
+  printf -- 'domain_code: admin-panel\n'
+  printf -- 'linear_milestone_id: 9a059ce3-ec63-4c82-92c8-6f4a0fa11612\n'
+  printf -- 'linear_milestone_name: Admin Panel\n'
+  printf -- '---\n\n'
+  printf -- '## Parents\n\n'
+  printf -- '| # | Sub-flow | Linear identifier | Result |\n'
+  printf -- '|---|---|---|---|\n'
+  printf -- '| 2 | admin-panel/layout-and-auth — Operator signs in | BC-30001 | executed |\n\n'
+  printf -- '## Discipline children\n\n'
+  printf -- '| Sub-flow | Story | Engineering | Design | QA | Docs | Result |\n'
+  printf -- '|---|---|---|---|---|---|---|\n'
+  printf -- '| admin-panel/layout-and-auth | BC-30002 | BC-30003 | BC-30004 | BC-30005 | BC-30006 | executed |\n'
+} > "$SLASHLOG"
+python3 "$BUILDER" --scaffold-log "$SLASHLOG" --flow-id admin-panel/layout-and-auth --as-of "$AS_OF" \
+  --personas operator > "$TMP/slash.out" 2>"$TMP/slash.err" \
+  || { fail "builder exited non-zero on slash-form flow_id (ADR-040 regression)"; cat "$TMP/slash.err" >&2; }
+grep -qxF 'flow_id: admin-panel/layout-and-auth' "$TMP/slash.out" \
+  && pass "slash-form flow_id accepted + emitted verbatim (opaque, not DOMAIN-NN)" \
+  || fail "slash-form flow_id not emitted"
+grep -qxF 'domain: admin-panel' "$TMP/slash.out" \
+  && pass "domain from scaffold-log domain_code (NOT split → 'admin' — the landmine)" \
+  || fail "domain not resolved from scaffold-log domain_code: $(grep '^domain:' "$TMP/slash.out")"
+grep -qxF '  story: BC-30002' "$TMP/slash.out" \
+  && pass "slash-form Sub-flow cell matched (children populated, shape-agnostic)" \
+  || fail "slash-form children cell silently missed → all-TBD regression"
+grep -qxF 'parent_issue: BC-30001' "$TMP/slash.out" \
+  && pass "slash-form annotated parents cell matched" \
+  || fail "slash-form parents cell not matched"
+
+# ── §16: coercion-prone OPAQUE flow_id / redirect_to are YAML-quoted ───
+# The relaxed _FLOW_ID_RE (ADR-040) now admits bare coercion-prone ids (off / 2024); like
+# personas/domain, every flow_id-family emission must be _yaml_safe_token-guarded or a YAML
+# consumer silently reads a bool/int instead of the string id. Covers _emit (story flow_id) +
+# _emit_redirect (redirect flow_id + redirect_to).
+section "16" "coercion-prone opaque flow_id + redirect_to emitted quoted (no YAML bool/int coercion)"
+COERCELOG="$TMP/coerce-log.md"
+{
+  printf -- '---\ndomain_code: ops\n---\n\n'
+  printf -- '## Parents\n\n| # | Sub-flow | Linear identifier | Result |\n|---|---|---|---|\n'
+  printf -- '| 2 | off — Toggle widget | BC-40001 | executed |\n'
+} > "$COERCELOG"
+python3 "$BUILDER" --scaffold-log "$COERCELOG" --flow-id off --as-of "$AS_OF" \
+  > "$TMP/coerce-story.out" 2>/dev/null || true
+grep -qxF 'flow_id: "off"' "$TMP/coerce-story.out" \
+  && pass "story-path coercion-prone flow_id (off) quoted (parses as str, not bool)" \
+  || fail "story flow_id not coercion-guarded: $(grep '^flow_id:' "$TMP/coerce-story.out")"
+python3 "$BUILDER" --flow-id 2024 --as-of "$AS_OF" --doc-type redirect --redirect-to off --domain ops \
+  > "$TMP/coerce-redirect.out" 2>/dev/null || true
+grep -qxF 'flow_id: "2024"' "$TMP/coerce-redirect.out" \
+  && pass "redirect-path coercion-prone flow_id (2024) quoted (parses as str, not int)" \
+  || fail "redirect flow_id not coercion-guarded: $(grep '^flow_id:' "$TMP/coerce-redirect.out")"
+grep -qxF 'redirect_to: "off"' "$TMP/coerce-redirect.out" \
+  && pass "redirect_to coercion-prone target (off) quoted (resolver reads str, not bool)" \
+  || fail "redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-redirect.out")"
+# Radix literals (hex/octal) are digit-led but NOT matched by the enumerated coercion regex —
+# the all-digit-led quote rule must catch them, else `0x1A` parses back as int 26.
+python3 "$BUILDER" --flow-id 0x1A --as-of "$AS_OF" --doc-type redirect --redirect-to 0o17 --domain ops \
+  > "$TMP/coerce-radix.out" 2>/dev/null || true
+grep -qxF 'flow_id: "0x1A"' "$TMP/coerce-radix.out" \
+  && pass "radix-literal flow_id (0x1A) quoted (parses as str, not hex int)" \
+  || fail "radix flow_id not coercion-guarded: $(grep '^flow_id:' "$TMP/coerce-radix.out")"
+grep -qxF 'redirect_to: "0o17"' "$TMP/coerce-radix.out" \
+  && pass "radix-literal redirect_to (0o17) quoted (parses as str, not octal int)" \
+  || fail "radix redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-radix.out")"
+# Single-letter YAML-1.1 bool short forms (y/Y/n/N) are now valid opaque ids and must be
+# quoted for consistency with on/off/yes/no, else a strict YAML-1.1 reader loads a bool.
+python3 "$BUILDER" --flow-id n --as-of "$AS_OF" --doc-type redirect --redirect-to Y --domain ops \
+  > "$TMP/coerce-yn.out" 2>/dev/null || true
+grep -qxF 'flow_id: "n"' "$TMP/coerce-yn.out" \
+  && pass "single-letter bool-shortform flow_id (n) quoted (YAML-1.1 consistency)" \
+  || fail "single-letter flow_id not coercion-guarded: $(grep '^flow_id:' "$TMP/coerce-yn.out")"
+grep -qxF 'redirect_to: "Y"' "$TMP/coerce-yn.out" \
+  && pass "single-letter bool-shortform redirect_to (Y) quoted" \
+  || fail "single-letter redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-yn.out")"
+
+# ── §17: backtick-wrapped Sub-flow id WITH a description still matches ──
+# A parents cell `` `<id>` — <desc> `` (backtick-wrapped id + description) must match — else a
+# whole-cell strip("`") leaves the closing backtick interior and silently degrades parent to TBD
+# (the exact all-TBD miss _cell_is_flow exists to prevent). The bare-backticked + plain-with-desc
+# cells are already covered by §7/§1; this pins the combined form.
+section "17" "backtick-wrapped id WITH description matches (no silent parent-TBD)"
+BTLOG="$TMP/backtick-log.md"
+{
+  printf -- '---\ndomain_code: WGT\n---\n\n'
+  printf -- '## Parents\n\n| # | Sub-flow | Linear identifier | Result |\n|---|---|---|---|\n'
+  printf -- '| 2 | `WGT-77` — Backtick-wrapped with desc | BC-77001 | executed |\n'
+} > "$BTLOG"
+python3 "$BUILDER" --scaffold-log "$BTLOG" --flow-id WGT-77 --as-of "$AS_OF" \
+  > "$TMP/backtick.out" 2>/dev/null || true
+grep -qxF 'parent_issue: BC-77001' "$TMP/backtick.out" \
+  && pass "backtick-wrapped id with desc matched (parent stamped, not TBD)" \
+  || fail "backtick-wrapped id with desc silently missed → parent: $(grep '^parent_issue:' "$TMP/backtick.out")"
+
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

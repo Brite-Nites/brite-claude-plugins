@@ -64,12 +64,12 @@ _UUID_RE = re.compile(
 _KEBAB_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\Z")
 # Persona tokens share the story builder's slug charset (duplicated, not imported).
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*\Z")
-# Suffix bounded to 9 digits so `int(suffix)` in _natural_key is TOTAL — an
-# unbounded `\d+` admits a >4300-digit suffix that raises ValueError under
-# CPython's int-conversion guard (sys.int_max_str_digits), breaking the
-# exit-0-degrade/exit-2 contract. The story twin keeps `\d+` because it never
-# int()s the suffix. An over-long suffix fails the match → doc skipped whole.
-_FLOW_ID_RE = re.compile(r"^[A-Za-z]+-\d{1,9}\Z")
+# flow_id is an OPAQUE identifier (ADR-040): both `DOMAIN-NN` and slash-form
+# (`admin-panel/layout-and-auth`) are valid; the only constraint is a safe charset.
+# A story doc whose flow_id fails this is skipped whole (junk/missing). _natural_key
+# below orders BOTH shapes totally without int()-ing an unbounded suffix, so the regex
+# no longer needs the `\d{1,9}` bound that previously kept int(suffix) total.
+_FLOW_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9/_-]*\Z")
 # Milestone/display names safe to emit UNQUOTED in YAML value position: must not
 # start with an indicator char and must avoid `:`/`#`/quotes/brackets anywhere.
 # Anything else is emitted via json.dumps (a JSON string is a valid YAML
@@ -81,7 +81,11 @@ _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 &/().,'+_-]*\Z")
 # string type. The digit-led branch admits `-`/`:` so date/time shapes are
 # covered too. Leading +/- can't reach here (first char must be alnum in both
 # charsets above); mixed digit+alpha/space strings ("2024 Holiday") don't coerce.
-_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|on|off)\Z|^\d[\d_.,:-]*\Z")
+# `y|n` are the single-char YAML-1.1 bool short forms: now that an opaque flow_id
+# (ADR-040) can BE a single letter, they're quoted for consistency with the
+# on/off/yes/no already covered (defensive strict-YAML-1.1 — PyYAML/js-yaml don't
+# coerce bare y/n, a strict YAML-1.1 reader would). `(?i)` covers Y/N.
+_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|y|n|on|off)\Z|^\d[\d_.,:-]*\Z")
 # Frontmatter line shapes (top-level `key: value` and block-list `- item`).
 _KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):(.*)$")
 _ITEM_RE = re.compile(r"^\s+-\s*(.+?)\s*$")
@@ -152,17 +156,29 @@ def _yaml_safe_name(raw: str) -> str:
 
 
 def _yaml_safe_token(token: str) -> str:
-    """A _SLUG_RE-validated list token → quoted iff YAML would coerce it ("off", "123")."""
-    return json.dumps(token, ensure_ascii=True) if _YAML_AMBIGUOUS_RE.match(token) else token
+    """A token → quoted iff YAML would coerce it to a non-string; else raw. Quote iff a
+    bool/null keyword OR ANY digit-led token. Quoting every digit-led token covers ints/dates
+    AND radix literals (`0x1A`/`0o17`/`0b11`) that `_YAML_AMBIGUOUS_RE`'s digit branch misses —
+    complete without enumerating each coercion form, now that opaque flow_ids (ADR-040) can be
+    bare digit-led tokens. A letter-led non-keyword token stays raw (byte-identical for real ids)."""
+    return (json.dumps(token, ensure_ascii=True)
+            if token[:1].isdigit() or _YAML_AMBIGUOUS_RE.match(token) else token)
 
 
-def _natural_key(flow_id: str) -> tuple[str, int]:
-    prefix, _, suffix = flow_id.rpartition("-")
-    # suffix is all-digits and ≤9 long by _FLOW_ID_RE, so int() is total here.
-    # The prefix component is defensive — the builder runs per-domain (one
-    # prefix in practice); kept so ordering stays total if a mixed-prefix
-    # flows dir ever occurs.
-    return (prefix, int(suffix))
+def _natural_key(flow_id: str) -> tuple[int, str, int, str]:
+    """Total ordering for both id shapes (ADR-040). A `DOMAIN-NN` id sorts by
+    (prefix, numeric suffix) exactly as before — byte-identical for existing goldens.
+    An opaque / slash-form id with no trailing `-<digits>` suffix has no numeric
+    component, so it degrades to a lexicographic sort on the full id — mirroring
+    regenerate-flow-index.mts's numericSuffix graceful-degrade and brite-sites'
+    alphabetical flow_ids_in_scope. The leading class flag (0 = numeric-suffixed,
+    1 = opaque) keeps the two classes from interleaving and makes every tuple mutually
+    comparable. The `\\d{1,9}` bound keeps int() total (an unbounded suffix would hit
+    CPython's int_max_str_digits guard); an over-long suffix falls to the opaque branch."""
+    m = re.search(r"-(\d{1,9})\Z", flow_id)
+    if m:
+        return (0, flow_id[:m.start()], int(m.group(1)), "")
+    return (1, "", 0, flow_id)
 
 
 def _aggregate_story_docs(flows_dir: Path) -> tuple[list[str], list[str]]:
@@ -179,10 +195,15 @@ def _aggregate_story_docs(flows_dir: Path) -> tuple[list[str], list[str]]:
         if parsed is None:
             continue  # no frontmatter block → not a story doc
         scalars, lists = parsed
-        flow_id = scalars.get("flow_id", "").strip().strip("`")
+        # Strip surrounding quotes: a coercion-prone opaque id is stamped QUOTED by the story
+        # builder (`flow_id: "off"`), so an unquoted-only read would reject it (leading `"` fails
+        # _FLOW_ID_RE) and silently drop the doc from flow_ids_in_scope (ADR-040 round-trip).
+        flow_id = scalars.get("flow_id", "").strip().strip("`").strip('"').strip("'")
         if not _FLOW_ID_RE.match(flow_id):
             continue  # junk/missing flow_id → skip the doc whole (and its personas)
-        personas = [t for t in lists.get("personas", []) if _SLUG_RE.match(t)]
+        # Same quote-strip as flow_id: a coercion-prone persona is stamped quoted too.
+        personas = [s for s in (t.strip().strip('"').strip("'") for t in lists.get("personas", []))
+                    if _SLUG_RE.match(s)]
         # A duplicate flow_id across docs merges personas (first-seen dedup runs
         # downstream); builder-stamped docs can't produce duplicates, hand-edits
         # merge benignly.
@@ -207,7 +228,9 @@ def build_frontmatter(scaffold_log: Path, flows_dir: Path, as_of: str) -> str:
         raise BuildError(f"scaffold-log has no frontmatter block: {scaffold_log}")
     log_scalars, _ = parsed
 
-    domain_raw = log_scalars.get("domain", "").strip()
+    # Quote-strip to mirror the story builder's _scaffold_log_domain reader — a quoted
+    # domain scalar round-trips instead of degrading to TBD (ADR-040 round-trip symmetry).
+    domain_raw = log_scalars.get("domain", "").strip().strip('"').strip("'")
     # YAML-coercion-guard a kebab domain ("off"→bool, "2024"→int) — BC-13797.
     domain = _yaml_safe_token(domain_raw) if _KEBAB_RE.match(domain_raw) else TBD
     name = _yaml_safe_name(log_scalars.get("linear_milestone_name", "").strip())
@@ -225,7 +248,7 @@ def build_frontmatter(scaffold_log: Path, flows_dir: Path, as_of: str) -> str:
         f"  name: {name}",
         f"  id: {milestone_id}",
         f"personas: [{', '.join(_yaml_safe_token(t) for t in personas)}]",
-        f"flow_ids_in_scope: [{', '.join(flow_ids)}]",
+        f"flow_ids_in_scope: [{', '.join(_yaml_safe_token(f) for f in flow_ids)}]",
         "status: in-progress",
         "figma: TBD",
         "intent: ../intent.md",

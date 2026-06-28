@@ -640,6 +640,33 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-persona — flow-architecture persona subsystem contract (BC-12905 C2)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-persona-subsystem-vslice.sh — a PROSE
+# tripwire locking the persona authoring subsystem: the canonical persona template's
+# five FLOOR depth-spine sections (At a glance + mental-unit + the-failure-they-can't-
+# absorb / How they think / What they see — and what they don't / Hand-offs / In their
+# words), the persona-doc-author whole-file (no-builder) contract, the quality-rubric
+# persona dimensions P1–P5 on the D7/J2 spine, and the quality-reviewer persona_doc
+# doc_kind. Guards the depth-spine against drift back to the thin pre-PRD persona stub.
+# Named (not tick-chained) section per the 2b-ci / 2b-stamp / 2b-qr-resolve-first precedent.
+section "2b-persona. flow-architecture persona subsystem contract (BC-12905 C2)"
+
+fda_persona_test="$REPO_ROOT/plugins/flow-architecture/tests/run-persona-subsystem-vslice.sh"
+
+if [ ! -f "$fda_persona_test" ]; then
+  warn "plugins/flow-architecture/tests/run-persona-subsystem-vslice.sh not found — skipped"
+else
+  if fda_persona_out=$(bash "$fda_persona_test" 2>&1); then
+    fda_persona_pass_count=$(printf '%s\n' "$fda_persona_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture persona subsystem contract vslice (${fda_persona_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture persona subsystem contract vslice failed — run plugins/flow-architecture/tests/run-persona-subsystem-vslice.sh for details"
+    printf '%s\n' "$fda_persona_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b'''''''''''' — flow-architecture shift-left clone-drift regression (BC-12410)
 # ══════════════════════════════════════════════════════════════════════
 # Naming: the flow-architecture sub-sections chain off "2b" with one added

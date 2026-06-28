@@ -40,26 +40,30 @@ from pathlib import Path
 # Canonical job-story template frontmatter key order
 # (plugins/flow-architecture/templates/docs/templates/job-story.md).
 TBD = "TBD"
-# `DOMAIN-NN` / `BC-NNNN`: an alpha prefix + numeric suffix. `\Z` not `$` ($ matches before
-# a trailing `\n` — the BC-12945 lesson). One shared pattern, two semantically-named compiled
-# objects: _FLOW_ID_RE validates the --flow-id ARG (a DOMAIN-NN); _LINEAR_ID_RE validates
-# scaffold-log id CELLS (a BC-NNNN) — distinct namespaces that currently share a shape and
-# may diverge. Scaffold-log id cells failing _LINEAR_ID_RE degrade to TBD (not emitted raw),
-# the same charset rigor the caller params get below — so a degraded cell's stray `#`/`:`/`,`
-# can never malform the emitted YAML at exit 0.
-_ID_PATTERN = r"^[A-Za-z]+-\d+\Z"
-_FLOW_ID_RE = re.compile(_ID_PATTERN)
-_LEAD_FLOW_ID_RE = re.compile(r"^([A-Za-z]+-\d+)")  # intentionally unanchored (leading token in `NN — desc`)
+# `flow_id` is an OPAQUE identifier (ADR-040): both `DOMAIN-NN` (`PROD-08`) and slash-form
+# (`admin-panel/layout-and-auth`) are valid. The ONLY constraint on the value is a safe
+# CHARACTER SET so it can never malform emitted YAML — NOT a `DOMAIN-NN` shape. Domain is read
+# explicitly (scaffold-log `domain_code`), never split out of flow_id (see _resolve_domain).
+# `\Z` not `$` ($ matches before a trailing `\n` — the BC-12945 lesson).
+_FLOW_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9/_-]*\Z")
+# `BC-NNNN` Linear-id CELLS stay strict (alpha prefix + numeric suffix) — a DISTINCT namespace
+# from flow_id (which is opaque above). Scaffold-log id cells failing _LINEAR_ID_RE degrade to TBD
+# (not emitted raw), the same charset rigor the caller params get below — so a degraded cell's
+# stray `#`/`:`/`,` can never malform the emitted YAML at exit 0.
+_LINEAR_ID_RE = re.compile(r"^[A-Za-z]+-\d+\Z")
 _AS_OF_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\Z")
-_LINEAR_ID_RE = re.compile(_ID_PATTERN)
 # Caller-derived enums/slugs are emitted raw into YAML, so they are validated to a
 # safe charset up front (exit 2).
 _STATUS_TAXONOMY = frozenset(
     {"NOT_STARTED", "IN_PROGRESS", "BUILT", "QA_SIGNED_OFF", "SHIPPED", "BLOCKED"})
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*\Z")
-# A _SLUG_RE-valid token whose bare YAML form coerces to a non-string (bool/int/date)
+# A token whose bare YAML form coerces to a non-string (bool/null/int/date)
 # — mirrors build_journey_frontmatter's _YAML_AMBIGUOUS_RE/_yaml_safe_token (BC-13797).
-_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|on|off)\Z|^\d[\d_.,:-]*\Z")
+# `y|n` are the single-char YAML-1.1 bool short forms: now that an opaque flow_id (ADR-040)
+# can BE a single letter, they're quoted for consistency with the on/off/yes/no the guard
+# already covers under the strict-YAML-1.1 standard (defensive — PyYAML/js-yaml don't coerce
+# bare y/n, but a strict YAML-1.1 reader would). `(?i)` covers Y/N. Real ids are never y/n.
+_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|y|n|on|off)\Z|^\d[\d_.,:-]*\Z")
 _CHILD_SLOTS = ("story", "engineering", "design", "qa", "docs")
 
 
@@ -88,18 +92,32 @@ def _clean_id(cell: str) -> str:
     return val if _LINEAR_ID_RE.match(val) else TBD
 
 
+def _cell_is_flow(cell: str, flow_id: str) -> bool:
+    """True if a scaffold-log Sub-flow cell names `flow_id`. flow_id is OPAQUE (ADR-040),
+    so we match the KNOWN id as the cell's first whitespace-delimited token rather than
+    extracting a `DOMAIN-NN` shape (which slash-form ids like `admin-panel/layout-and-auth`
+    don't have). The cell is either the bare id (children table) or `<id> — <desc> [<annot>]`
+    (parents table), with the id optionally backtick-wrapped; an opaque id contains no
+    whitespace, so the first token IS the whole id. Backticks are stripped AFTER splitting —
+    `strip("`")` on the whole cell would leave the closing backtick of a `` `<id>` — <desc> ``
+    cell interior and silently miss it. Exact match on the de-backticked token also rules out
+    `WGT-01` vs `WGT-010`. Header / separator / milestone cells never lead with the id."""
+    tokens = cell.split()
+    return bool(tokens) and tokens[0].strip("`") == flow_id
+
+
 def _parse_scaffold_log(text: str, flow_id: str) -> tuple[str, dict[str, str]]:
     """Return (parent_issue, children{slot->BC}) for flow_id from the log's tables.
 
     Parents table rows have 4 cells: `# | Sub-flow | Linear identifier | Result`, where
-    Sub-flow is `DOMAIN-NN — <desc> [<annot>]`. Discipline-children rows have 7 cells:
+    Sub-flow is `<flow_id> — <desc> [<annot>]`. Discipline-children rows have 7 cells:
     `Sub-flow | Story | Engineering | Design | QA | Docs | Result`, where Sub-flow is the
-    bare `DOMAIN-NN`. BOTH Sub-flow columns are matched by extracting the leading flow-id
-    token (backticks stripped first), so a `` `DOMAIN-NN` `` or `DOMAIN-NN — desc` cell
-    still matches — never a silent all-`TBD` miss. Header/separator/milestone rows never
-    yield a matching leading token, so they fall through. The `Result` column is
-    informational-only (never parsed); duplicate rows for one flow_id resolve last-wins
-    (an idempotent in-place rewrite per SCHEMA.md).
+    bare `<flow_id>`. BOTH Sub-flow columns are matched by `_cell_is_flow` against the known
+    opaque flow_id (backticks stripped first), so a `` `<id>` `` or `<id> — desc` cell still
+    matches — never a silent all-`TBD` miss. Header/separator/milestone rows never equal or
+    lead with the id, so they fall through. The `Result` column is informational-only (never
+    parsed); duplicate rows for one flow_id resolve last-wins (an idempotent in-place rewrite
+    per SCHEMA.md).
     """
     parent = TBD
     children = {slot: TBD for slot in _CHILD_SLOTS}
@@ -109,14 +127,12 @@ def _parse_scaffold_log(text: str, flow_id: str) -> tuple[str, dict[str, str]]:
         if not cells or _is_separator(cells):
             continue
         if len(cells) == 7:  # discipline-children row
-            m = _LEAD_FLOW_ID_RE.match(cells[0].strip("`").strip())
-            if m and m.group(1) == flow_id:
+            if _cell_is_flow(cells[0], flow_id):
                 for i, slot in enumerate(_CHILD_SLOTS, start=1):
                     children[slot] = _clean_id(cells[i])
                 found = True
         elif len(cells) == 4:  # parents row: # | Sub-flow | Linear identifier | Result
-            m = _LEAD_FLOW_ID_RE.match(cells[1].strip("`").strip())
-            if m and m.group(1) == flow_id:
+            if _cell_is_flow(cells[1], flow_id):
                 parent = _clean_id(cells[2])
                 found = True
     if not found:
@@ -124,10 +140,59 @@ def _parse_scaffold_log(text: str, flow_id: str) -> tuple[str, dict[str, str]]:
     return parent, children
 
 
+def _fallback_domain(flow_id: str) -> str:
+    """Derive domain from flow_id — a BACKWARD-COMPAT fallback ONLY, used when no explicit
+    domain is available (a legacy scaffold-log without `domain_code`, or the redirect path
+    which has no scaffold-log). ADR-040 keeps domain EXPLICIT in the normal path; this
+    fallback honors the id's own separator so it stays correct for both shapes: a slash-form
+    `<domain>/<slug>` splits on the first `/`; a `DOMAIN-NN` splits on the first `-`. The
+    result is a prefix of the safe-charset flow_id, so it is always _SLUG_RE-valid."""
+    if "/" in flow_id:
+        return flow_id.split("/", 1)[0]
+    return flow_id.split("-", 1)[0]
+
+
+def _scaffold_log_domain(text: str) -> str:
+    """The scaffold-log's EXPLICIT domain from its frontmatter (ADR-040: domain is explicit,
+    never derived from flow_id). Prefers `domain_code` (the code that matches the story-doc
+    `domain` field + master-flow-inventory per SCHEMA.md), falling back to `domain` (kebab),
+    else ''. Line-based — stdlib has no YAML; only the leading `---` block is scanned. A value
+    failing the safe charset is ignored (caller falls back), never emitted raw."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    found: dict[str, str] = {}
+    for raw in lines[1:]:
+        if raw.strip() == "---":
+            break
+        m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):(.*)$", raw)
+        if m and m.group(1) in ("domain_code", "domain"):
+            found[m.group(1)] = m.group(2).strip().strip('"').strip("'")
+    return found.get("domain_code", "") or found.get("domain", "")
+
+
+def _resolve_domain(explicit: str, scaffold_text: str | None, flow_id: str) -> str:
+    """The story-doc `domain` value, EXPLICIT-first (ADR-040): an explicit `--domain` arg,
+    then the scaffold-log's `domain_code`/`domain` frontmatter, then the `_fallback_domain`
+    split (legacy / redirect). Each candidate must pass the safe charset (_SLUG_RE) to be
+    emitted; an invalid one is skipped. The final `_fallback_domain` is a prefix of the
+    safe-charset flow_id, so it always passes — domain is never empty and never malforms YAML."""
+    scaffold_domain = _scaffold_log_domain(scaffold_text) if scaffold_text else ""
+    for cand in (explicit, scaffold_domain):
+        if cand and _SLUG_RE.match(cand):
+            return cand
+    return _fallback_domain(flow_id)
+
+
 def _yaml_safe_token(token: str) -> str:
-    """A _SLUG_RE-validated list token → double-quoted iff YAML would coerce it
-    ("off"→bool, "123"→int, "2024-01-01"→date); otherwise emitted raw (BC-13797)."""
-    return json.dumps(token, ensure_ascii=True) if _YAML_AMBIGUOUS_RE.match(token) else token
+    """A token → double-quoted iff YAML would coerce it to a non-string; else raw (BC-13797).
+    Quote iff a bool/null keyword OR ANY digit-led token. Quoting every digit-led token covers
+    ints/dates AND radix literals (`0x1A`/`0o17`/`0b11`) that `_YAML_AMBIGUOUS_RE`'s digit branch
+    misses — complete without enumerating each coercion form, now that opaque flow_ids (ADR-040)
+    can be bare digit-led tokens. A letter-led non-keyword token (`PROD-08`, `admin-panel/x`) is
+    provably a YAML string → stays raw, so existing DOMAIN-NN / slash-form output is byte-identical."""
+    return (json.dumps(token, ensure_ascii=True)
+            if token[:1].isdigit() or _YAML_AMBIGUOUS_RE.match(token) else token)
 
 
 def _yaml_list(values: list[str]) -> str:
@@ -136,12 +201,12 @@ def _yaml_list(values: list[str]) -> str:
     return "[" + ", ".join(_yaml_safe_token(v) for v in values) + "]"
 
 
-def _emit(flow_id: str, parent: str, children: dict[str, str], status: str,
+def _emit(flow_id: str, domain: str, parent: str, children: dict[str, str], status: str,
           personas: list[str], related_flows: list[str], as_of: str) -> str:
-    domain = flow_id.split("-", 1)[0]  # flow_id is pre-validated to DOMAIN-NN in main()
+    # domain is resolved EXPLICITLY by _resolve_domain (ADR-040) — never split from flow_id here.
     lines = [
         "---",
-        f"flow_id: {flow_id}",
+        f"flow_id: {_yaml_safe_token(flow_id)}",  # opaque id may be coercion-prone (ADR-040)
         f"domain: {_yaml_safe_token(domain)}",
         f"status: {status}",
         f"parent_issue: {parent}",
@@ -171,18 +236,18 @@ def _emit(flow_id: str, parent: str, children: dict[str, str], status: str,
     return "\n".join(lines) + "\n"
 
 
-def _emit_redirect(flow_id: str, redirect_to: str, as_of: str) -> str:
+def _emit_redirect(flow_id: str, domain: str, redirect_to: str, as_of: str) -> str:
     """Minimal redirect-stub frontmatter (BC-12907 / REDIRECT_CANON): an intentional
     alias to `redirect_to`'s canonical home. No children / story / status keys — the
     audit applies the redirect-validation profile (resolvable pointer + these keys) and
-    skips the story-frame / gherkin / children gates for it."""
-    domain = flow_id.split("-", 1)[0]
+    skips the story-frame / gherkin / children gates for it. domain is resolved explicitly
+    (ADR-040) — for the redirect path, from --domain or the _fallback_domain split."""
     return "\n".join([
         "---",
-        f"flow_id: {flow_id}",
+        f"flow_id: {_yaml_safe_token(flow_id)}",  # opaque id may be coercion-prone (ADR-040)
         f"domain: {_yaml_safe_token(domain)}",
         "doc_type: redirect",
-        f"redirect_to: {redirect_to}",
+        f"redirect_to: {_yaml_safe_token(redirect_to)}",  # opaque target may be coercion-prone (ADR-040)
         "intent: ../../intent.md",
         f"last_reviewed: '{as_of}'",  # quote: an unquoted ISO date is YAML-coerced to a date (BC-13796)
         "---",
@@ -205,19 +270,28 @@ def main(argv: list[str]) -> int:
     p.add_argument("--scaffold-log", type=Path,
                    help="required for --doc-type=story; not needed for redirect")
     p.add_argument("--flow-id", required=True)
+    p.add_argument("--domain", default="",
+                   help="explicit domain code (ADR-040); default reads the scaffold-log "
+                        "`domain_code` frontmatter, else falls back to the flow_id prefix")
     p.add_argument("--doc-type", default="story", choices=("story", "redirect"),
                    help="story (default) or redirect — an intentional alias stub (BC-12907)")
     p.add_argument("--redirect-to", default="",
-                   help="for --doc-type=redirect: the canonical flow_id this aliases (DOMAIN-NN)")
+                   help="for --doc-type=redirect: the canonical flow_id this aliases (opaque slug)")
     p.add_argument("--as-of", required=True, help="ISO date for last_reviewed (defeats now())")
     p.add_argument("--status", default="NOT_STARTED",
                    help="story-doc status (skill passes code-evidence result; default NOT_STARTED)")
     p.add_argument("--personas", default="", help="comma-separated role slugs (caller-derived)")
-    p.add_argument("--related-flows", default="", help="comma-separated DOMAIN-NN ids (caller-derived)")
+    p.add_argument("--related-flows", default="", help="comma-separated flow_id slugs (caller-derived)")
     args = p.parse_args(argv)
 
+    # flow_id is an OPAQUE identifier (ADR-040): validated to a safe charset, NOT a DOMAIN-NN shape.
     if not _FLOW_ID_RE.match(args.flow_id):
-        print(f"usage: --flow-id must be DOMAIN-NN, got {args.flow_id!r}", file=sys.stderr)
+        print(f"usage: --flow-id must be a safe-charset slug [A-Za-z0-9][A-Za-z0-9/_-]* "
+              f"(DOMAIN-NN or slash-form), got {args.flow_id!r}", file=sys.stderr)
+        return 2
+    if args.domain and not _SLUG_RE.match(args.domain):
+        print(f"usage: --domain must be a slug [A-Za-z0-9][A-Za-z0-9_-]*, got {args.domain!r}",
+              file=sys.stderr)
         return 2
     if not _AS_OF_RE.match(args.as_of):
         print(f"usage: --as-of must be YYYY-MM-DD, got {args.as_of!r}", file=sys.stderr)
@@ -225,10 +299,12 @@ def main(argv: list[str]) -> int:
     if args.doc_type == "redirect":
         # Redirect stub (BC-12907): a minimal alias marker, no scaffold-log / children.
         if not _FLOW_ID_RE.match(args.redirect_to or ""):
-            print(f"usage: --doc-type=redirect requires --redirect-to as a DOMAIN-NN flow_id, "
+            print(f"usage: --doc-type=redirect requires --redirect-to as an opaque flow_id slug, "
                   f"got {args.redirect_to!r}", file=sys.stderr)
             return 2
-        sys.stdout.write(_emit_redirect(args.flow_id, args.redirect_to, args.as_of))
+        # No scaffold-log on the redirect path → domain from --domain or the flow_id-prefix fallback.
+        redirect_domain = _resolve_domain(args.domain, None, args.flow_id)
+        sys.stdout.write(_emit_redirect(args.flow_id, redirect_domain, args.redirect_to, args.as_of))
         return 0
     if args.scaffold_log is None:
         print("usage: --scaffold-log is required for --doc-type=story", file=sys.stderr)
@@ -256,8 +332,10 @@ def main(argv: list[str]) -> int:
         print(f"usage: {e}", file=sys.stderr)
         return 2
 
+    # domain EXPLICIT-first (ADR-040): --domain > scaffold-log `domain_code` > flow_id-prefix fallback.
+    domain = _resolve_domain(args.domain, text, args.flow_id)
     sys.stdout.write(_emit(
-        args.flow_id, parent, children, args.status, personas, related_flows, args.as_of))
+        args.flow_id, domain, parent, children, args.status, personas, related_flows, args.as_of))
     return 0
 
 
