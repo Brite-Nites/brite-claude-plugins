@@ -556,6 +556,35 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-double-credit — flow-architecture WS-A cross-domain double-credit lint (BC-12690)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-flow-double-credit-lint-vslice.sh — the
+# regression lock for the cross-domain double-credit check
+# (scripts/lib/flow_evidence_lint.py --double-credit): a strict-`src/` evidence
+# anchor cited as a built deliverable in the `## Status notes` of story docs
+# spanning ≥2 DOMAINS is flagged UNLESS ≥1 citing bullet frames it with an
+# ownership qualifier (owns / owned by / reuses / reused by / shared with) on the
+# same bullet (same-bullet carve). Cross-domain by design (ticket title + Problem);
+# same-domain sub-flow sharing is normal decomposition. Shares the strict-`src/`
+# extractor with the BC-12692 evidence lint. Distinct from the audit-manifest
+# `cross-domain-deps-bidirectional` gate. Pass count auto-derived from the RESULT line.
+section "2b-double-credit. flow-architecture WS-A cross-domain double-credit lint (BC-12690)"
+
+fda_dclint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-double-credit-lint-vslice.sh"
+
+if [ ! -f "$fda_dclint_test" ]; then
+  warn "plugins/flow-architecture/tests/run-flow-double-credit-lint-vslice.sh not found — skipped"
+else
+  if fda_dclint_out=$(bash "$fda_dclint_test" 2>&1); then
+    fda_dclint_pass_count=$(printf '%s\n' "$fda_dclint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture WS-A cross-domain double-credit lint vslice (${fda_dclint_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture WS-A cross-domain double-credit lint vslice failed — run plugins/flow-architecture/tests/run-flow-double-credit-lint-vslice.sh for details"
+    printf '%s\n' "$fda_dclint_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b''''''''''' — flow-architecture journey/story template alignment (BC-11983 WS-E precursor)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-template-alignment-vslice.sh — the
