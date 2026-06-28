@@ -64,12 +64,12 @@ _UUID_RE = re.compile(
 _KEBAB_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\Z")
 # Persona tokens share the story builder's slug charset (duplicated, not imported).
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*\Z")
-# Suffix bounded to 9 digits so `int(suffix)` in _natural_key is TOTAL — an
-# unbounded `\d+` admits a >4300-digit suffix that raises ValueError under
-# CPython's int-conversion guard (sys.int_max_str_digits), breaking the
-# exit-0-degrade/exit-2 contract. The story twin keeps `\d+` because it never
-# int()s the suffix. An over-long suffix fails the match → doc skipped whole.
-_FLOW_ID_RE = re.compile(r"^[A-Za-z]+-\d{1,9}\Z")
+# flow_id is an OPAQUE identifier (ADR-040): both `DOMAIN-NN` and slash-form
+# (`admin-panel/layout-and-auth`) are valid; the only constraint is a safe charset.
+# A story doc whose flow_id fails this is skipped whole (junk/missing). _natural_key
+# below orders BOTH shapes totally without int()-ing an unbounded suffix, so the regex
+# no longer needs the `\d{1,9}` bound that previously kept int(suffix) total.
+_FLOW_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9/_-]*\Z")
 # Milestone/display names safe to emit UNQUOTED in YAML value position: must not
 # start with an indicator char and must avoid `:`/`#`/quotes/brackets anywhere.
 # Anything else is emitted via json.dumps (a JSON string is a valid YAML
@@ -156,13 +156,20 @@ def _yaml_safe_token(token: str) -> str:
     return json.dumps(token, ensure_ascii=True) if _YAML_AMBIGUOUS_RE.match(token) else token
 
 
-def _natural_key(flow_id: str) -> tuple[str, int]:
-    prefix, _, suffix = flow_id.rpartition("-")
-    # suffix is all-digits and ≤9 long by _FLOW_ID_RE, so int() is total here.
-    # The prefix component is defensive — the builder runs per-domain (one
-    # prefix in practice); kept so ordering stays total if a mixed-prefix
-    # flows dir ever occurs.
-    return (prefix, int(suffix))
+def _natural_key(flow_id: str) -> tuple[int, str, int, str]:
+    """Total ordering for both id shapes (ADR-040). A `DOMAIN-NN` id sorts by
+    (prefix, numeric suffix) exactly as before — byte-identical for existing goldens.
+    An opaque / slash-form id with no trailing `-<digits>` suffix has no numeric
+    component, so it degrades to a lexicographic sort on the full id — mirroring
+    regenerate-flow-index.mts's numericSuffix graceful-degrade and brite-sites'
+    alphabetical flow_ids_in_scope. The leading class flag (0 = numeric-suffixed,
+    1 = opaque) keeps the two classes from interleaving and makes every tuple mutually
+    comparable. The `\\d{1,9}` bound keeps int() total (an unbounded suffix would hit
+    CPython's int_max_str_digits guard); an over-long suffix falls to the opaque branch."""
+    m = re.search(r"-(\d{1,9})\Z", flow_id)
+    if m:
+        return (0, flow_id[:m.start()], int(m.group(1)), "")
+    return (1, "", 0, flow_id)
 
 
 def _aggregate_story_docs(flows_dir: Path) -> tuple[list[str], list[str]]:

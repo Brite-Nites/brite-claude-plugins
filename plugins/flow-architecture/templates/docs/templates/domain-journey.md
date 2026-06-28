@@ -5,7 +5,7 @@ linear_milestone:                  # the Linear milestone this domain maps 1:1 t
   name: <Milestone display name>
   id: <milestone-uuid>
 personas: [<role>, <role>]         # aggregated from the domain's story-doc front-matter (first-seen dedup in flow_id order, per ADR-033)
-flow_ids_in_scope: [<DOMAIN-01>..<DOMAIN-NN>]  # the domain's story-doc flow_ids, natural-sorted
+flow_ids_in_scope: [<flow_id>, ...]  # the domain's story-doc flow_ids (opaque slugs, ADR-040), natural-sorted — e.g. QUO-01..QUO-NN or admin-panel/layout-and-auth
 status: not-started | in-progress | shipped   # the doc's AUTHORING lifecycle, NOT the domain's delivery state (delivery is aggregated per-flow in INDEX.md)
 figma: <domain-hub-frame-url or TBD>
 intent: ../intent.md               # FDA: project-intent cross-link (Q26 mod 1; journeys sit ONE level under docs/product/)

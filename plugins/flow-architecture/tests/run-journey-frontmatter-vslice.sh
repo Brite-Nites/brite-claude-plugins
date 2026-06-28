@@ -23,8 +23,9 @@
 #                    would coerce to int); missing name → TBD.
 #   §5 skip        — no-frontmatter, junk-flow_id, and unterminated-frontmatter
 #                    docs excluded without abort (leak grep pins sentinels).
-#   §5b totality   — a >9-digit flow_id suffix is skipped whole, never an
-#                    uncaught int() ValueError (CPython int_max_str_digits).
+#   §5b totality   — a >9-digit flow_id suffix is a VALID opaque id (ADR-040) →
+#                    aggregated via _natural_key's lexicographic degrade branch,
+#                    never an uncaught int() ValueError (CPython int_max_str_digits).
 #   §6 empty dir   — zero valid story docs → exit 2 (Q16.8 ordering violation).
 #   §7 no log      — missing scaffold-log → exit 2.
 #   §8 bad as-of   — malformed --as-of → exit 2; missing required arg → exit 2
@@ -193,25 +194,28 @@ else
   pass "no-frontmatter + junk-flow_id + unterminated-frontmatter docs excluded"
 fi
 
-# ── §5b: over-long flow_id suffix is skipped, never an uncaught crash ──
-section "5b" "a >9-digit flow_id suffix degrades to skip (int() stays total)"
+# ── §5b: over-long flow_id suffix — valid opaque id (ADR-040), aggregated via the
+#         lexicographic degrade branch, never an uncaught int() crash ──
+section "5b" "a >9-digit flow_id suffix is a valid opaque id, sorted without int() crash (ADR-040)"
 mkdir -p "$TMP/long-flows"
 cp "$FLOWS/WGT-1.md" "$TMP/long-flows/"
-{ printf -- '---\nflow_id: WGT-'; printf '9%.0s' $(seq 1 5000); printf -- '\npersonas: [crash-persona]\n---\nbody\n'; } > "$TMP/long-flows/long.md"
+{ printf -- '---\nflow_id: WGT-'; printf '9%.0s' $(seq 1 5000); printf -- '\npersonas: [longsuffix-persona]\n---\nbody\n'; } > "$TMP/long-flows/long.md"
 set +e
 python3 "$BUILDER" --scaffold-log "$LOG" --flows-dir "$TMP/long-flows" --as-of "$AS_OF" \
   > "$TMP/long.out" 2>"$TMP/long.err"
 rc=$?
 set -e
 if [ "$rc" -eq 0 ]; then
-  pass "exit 0 — no uncaught int() ValueError (CPython 4300-digit guard)"
+  pass "exit 0 — _natural_key opaque branch avoids int() on the >9-digit suffix (CPython 4300-digit guard)"
 else
   fail "over-long suffix exited $rc (want 0)"; cat "$TMP/long.err" >&2
 fi
-if grep -qE 'crash-persona|WGT-9999999999' "$TMP/long.out"; then
-  fail "over-long doc leaked into the output"
+# Under ADR-040 the id is a valid opaque slug (safe charset), so it IS aggregated — it is
+# no longer dropped the way the old DOMAIN-NN-only `\d{1,9}` regex skipped it whole.
+if grep -qF 'longsuffix-persona' "$TMP/long.out"; then
+  pass "over-long-suffix opaque id aggregated, not skipped (ADR-040)"
 else
-  pass "over-long doc excluded from aggregation"
+  fail "over-long-suffix opaque id was dropped (should aggregate under ADR-040)"
 fi
 
 # ── §6: empty flows-dir → exit 2 ───────────────────────────────────────
@@ -251,6 +255,27 @@ if grep -qE "^last_reviewed: '[0-9]{4}-[0-9]{2}-[0-9]{2}'\$" "$TMP/happy.out"; t
 else
   fail "journey last_reviewed NOT quoted — YAML would coerce to a date: $(grep '^last_reviewed:' "$TMP/happy.out")"
 fi
+
+# ── §11: slash-form opaque flow_ids aggregate (ADR-040, brite-sites shape) ──
+# End-to-end proof that slash-form story docs aggregate into flow_ids_in_scope (no
+# DOMAIN-NN skip), ordered by _natural_key's lexicographic degrade branch — matching
+# the real brite-sites journey (alphabetical [admin-panel/..., admin-panel/...]).
+section "11" "slash-form flow_ids: aggregated + lexicographically ordered (opaque degrade branch)"
+mkdir -p "$TMP/slash-flows"
+printf -- '---\nflow_id: admin-panel/website-management\ndomain: admin-panel\npersonas: [brite-nites-ops]\n---\nbody\n' > "$TMP/slash-flows/website-management.md"
+printf -- '---\nflow_id: admin-panel/layout-and-auth\ndomain: admin-panel\npersonas: [brite-nites-ops]\n---\nbody\n' > "$TMP/slash-flows/layout-and-auth.md"
+printf -- '---\ndomain: admin-panel\ndomain_code: admin-panel\nlinear_milestone_id: 9a059ce3-ec63-4c82-92c8-6f4a0fa11612\nlinear_milestone_name: Admin Panel\n---\nbody\n' > "$TMP/slash-journey-log.md"
+python3 "$BUILDER" --scaffold-log "$TMP/slash-journey-log.md" --flows-dir "$TMP/slash-flows" --as-of "$AS_OF" \
+  > "$TMP/slash-journey.out" 2>"$TMP/slash-journey.err" \
+  || { fail "journey builder exited non-zero on slash-form flows (ADR-040 regression)"; cat "$TMP/slash-journey.err" >&2; }
+if grep -qxF 'flow_ids_in_scope: [admin-panel/layout-and-auth, admin-panel/website-management]' "$TMP/slash-journey.out"; then
+  pass "slash-form flow_ids aggregated + lexicographically ordered (no DOMAIN-NN skip, no int() crash)"
+else
+  fail "slash-form flow_ids_in_scope wrong: $(grep '^flow_ids_in_scope:' "$TMP/slash-journey.out")"
+fi
+grep -qxF 'domain: admin-panel' "$TMP/slash-journey.out" \
+  && pass "journey domain from scaffold-log frontmatter (kebab path, unchanged)" \
+  || fail "journey domain wrong: $(grep '^domain:' "$TMP/slash-journey.out")"
 
 printf '\nRESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

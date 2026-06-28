@@ -287,6 +287,45 @@ else
   fail "domain prefix not coercion-guarded: $(grep '^domain:' "$TMP/coerce-dom.out")"
 fi
 
+# ── §15: slash-form opaque flow_id (ADR-040, brite-sites shape) ───────
+# End-to-end proof that an opaque slash-form flow_id (`<domain>/<slug>`) works:
+# accepted by the relaxed _FLOW_ID_RE, domain read from the scaffold-log's explicit
+# domain_code (NOT split out of flow_id → the load-bearing landmine: split("-") would
+# yield "admin"), and children/parent matched by the shape-agnostic _cell_is_flow.
+section "15" "slash-form flow_id: accepted, domain from scaffold-log domain_code, children matched"
+SLASHLOG="$TMP/slash-log.md"
+{
+  printf -- '---\n'
+  printf -- 'domain: admin-panel\n'
+  printf -- 'domain_code: admin-panel\n'
+  printf -- 'linear_milestone_id: 9a059ce3-ec63-4c82-92c8-6f4a0fa11612\n'
+  printf -- 'linear_milestone_name: Admin Panel\n'
+  printf -- '---\n\n'
+  printf -- '## Parents\n\n'
+  printf -- '| # | Sub-flow | Linear identifier | Result |\n'
+  printf -- '|---|---|---|---|\n'
+  printf -- '| 2 | admin-panel/layout-and-auth — Operator signs in | BC-30001 | executed |\n\n'
+  printf -- '## Discipline children\n\n'
+  printf -- '| Sub-flow | Story | Engineering | Design | QA | Docs | Result |\n'
+  printf -- '|---|---|---|---|---|---|---|\n'
+  printf -- '| admin-panel/layout-and-auth | BC-30002 | BC-30003 | BC-30004 | BC-30005 | BC-30006 | executed |\n'
+} > "$SLASHLOG"
+python3 "$BUILDER" --scaffold-log "$SLASHLOG" --flow-id admin-panel/layout-and-auth --as-of "$AS_OF" \
+  --personas operator > "$TMP/slash.out" 2>"$TMP/slash.err" \
+  || { fail "builder exited non-zero on slash-form flow_id (ADR-040 regression)"; cat "$TMP/slash.err" >&2; }
+grep -qxF 'flow_id: admin-panel/layout-and-auth' "$TMP/slash.out" \
+  && pass "slash-form flow_id accepted + emitted verbatim (opaque, not DOMAIN-NN)" \
+  || fail "slash-form flow_id not emitted"
+grep -qxF 'domain: admin-panel' "$TMP/slash.out" \
+  && pass "domain from scaffold-log domain_code (NOT split → 'admin' — the landmine)" \
+  || fail "domain not resolved from scaffold-log domain_code: $(grep '^domain:' "$TMP/slash.out")"
+grep -qxF '  story: BC-30002' "$TMP/slash.out" \
+  && pass "slash-form Sub-flow cell matched (children populated, shape-agnostic)" \
+  || fail "slash-form children cell silently missed → all-TBD regression"
+grep -qxF 'parent_issue: BC-30001' "$TMP/slash.out" \
+  && pass "slash-form annotated parents cell matched" \
+  || fail "slash-form parents cell not matched"
+
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

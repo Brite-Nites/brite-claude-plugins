@@ -1,6 +1,6 @@
 # 029. Canonical FDA flow-doc identity key is `flow_id`/`DOMAIN-NN`
 
-**Status:** Accepted
+**Status:** Accepted — the `DOMAIN-NN` **value-format** sub-claim is **superseded by [ADR-040](040-fda-flow-id-opaque-identifier.md)** (2026-06-28, BC-13294): `flow_id` is an opaque identifier and `domain` is explicit, never derived by splitting `flow_id`. The **key** decision below (`flow_id`/`parent_issue`, not `sub_flow_id`; the plugin is single-key, not bilingual) + the 20-key story canon **stand**.
 **Date:** 2026-06-10
 **Linear:** [BC-13028](https://linear.app/brite-nites/issue/BC-13028) (Tier-0 status/frontmatter cluster) · [BC-13152](https://linear.app/brite-nites/issue/BC-13152) (kebab→canonical convergence) · [BC-11983](https://linear.app/brite-nites/issue/BC-11983) (FDA quality-enforcement epic)
 **Related ADRs:** none (FDA-internal convention). Supersedes the unshipped `020-fda-central-doc-templates` draft, which never landed — see Consequences.
@@ -20,7 +20,7 @@ A 2026-06-10 re-baseline (during the BC-11997 step-away generator-fixes workstre
 
 ## Decision
 
-**`flow_id`/`DOMAIN-NN` (with `parent_issue`) is the single canonical FDA flow-doc identity convention.** The plugin tooling reads `flow_id`/`parent_issue` only — it is **not** made bilingual.
+**`flow_id` (with `parent_issue`) is the single canonical FDA flow-doc identity convention.** The plugin tooling reads `flow_id`/`parent_issue` only — it is **not** made bilingual. *(The `DOMAIN-NN` value shape named throughout this ADR was the style of the two canonical repos at the time; it is **not** a constraint on the `flow_id` value — [ADR-040](040-fda-flow-id-opaque-identifier.md) supersedes that sub-claim and makes `flow_id` an opaque identifier with `domain` carried explicitly. This ADR's decision is about the **key**, which is unchanged.)*
 
 - The doc template, the authoring agents, the regen, and `verify-linear-references` all key on `flow_id`/`parent_issue`.
 - The two kebab/`sub_flow_id` deviation repos (brite-supply-react, brite-labs) **converge** to canonical (tracked in BC-13152) — rather than the tooling accommodating them.
