@@ -1,10 +1,10 @@
 # Flow-Doc Quality Rubric — Substance Spine
 
-Reference contract for the FDA `quality-reviewer` agent and for the two author agents (`story-doc-author`, `journey-doc-author`) that should write *to* this bar. It judges what a doc **says**, not that its sections exist — front-matter fields and section order are the fidelity-reviewer's job (`fidelity-reviewer`, Q13.3). Do not re-check structure here.
+Reference contract for the FDA `quality-reviewer` agent and for the three author agents (`story-doc-author`, `journey-doc-author`, `persona-doc-author`) that should write *to* this bar. It judges what a doc **says**, not that its sections exist — front-matter fields and section order are the fidelity-reviewer's job (`fidelity-reviewer`, Q13.3). Do not re-check structure here.
 
 This file is **principles**, not a shape to copy. It is calibrated against general JTBD and PRD practice plus shipped-app norms (the Mobbin corpus that informs the app-type profiles); BriteBase is one lived witness, not the template. Any app type can produce a high-scoring doc. App-specific tightening lives in the companion `app-type-profiles.md` — apply the profile that matches the project's app type **on top of** this spine, never instead of it.
 
-Two layers of the same spine: **story dimensions** (D1–D11) judge a single sub-flow's outcome spec; **journey dimensions** (J1–J8) judge a domain's end-to-end arc one layer up. A quality-reviewer scoring a story doc uses D1–D11; scoring a journey doc uses J1–J8.
+Three layers of the same spine: **story dimensions** (D1–D11) judge a single sub-flow's outcome spec; **journey dimensions** (J1–J8) judge a domain's end-to-end arc one layer up; **persona dimensions** (P1–P5) judge a standalone persona doc — the behavioral profile that story `## Actor` and journey persona sections cross-link to. A quality-reviewer scoring a story doc uses D1–D11; a journey doc uses J1–J8; a persona doc uses P1–P5. The persona layer is the same behavioral-persona spine as story D7 and journey J2 (device, working context, tolerances, *the failure they cannot absorb*, domain-specificity) — D7/J2 score the persona *as embedded inside* a story/journey doc; P1–P5 score the *standalone* persona doc those two cross-link to. Same spine, different target; do not double-score the same persona under both unless reviewing both doc kinds.
 
 ## How to score
 
@@ -18,7 +18,7 @@ The rubric is gameability-resistant by construction. The failure mode each dimen
 
 ### Evidence the dimension needs — resolve it first, withhold only what you truly can't reach
 
-Most dimensions are **single-doc-judgeable**: everything you need to score them is in the doc text under review. A reviewer holding only the doc can score these honestly: **D1, D2, D3, D4, D5, D8, D11, J1, J3, J5, J6, J7, J8**.
+Most dimensions are **single-doc-judgeable**: everything you need to score them is in the doc text under review. A reviewer holding only the doc can score these honestly: **D1, D2, D3, D4, D5, D8, D11, J1, J3, J5, J6, J7, J8, P1, P2, P3**.
 
 Some dimensions are **corpus-dependent** — they cannot be settled from the doc text alone, because the failure mode lives outside it:
 
@@ -29,6 +29,8 @@ Some dimensions are **corpus-dependent** — they cannot be settled from the doc
 | D9 over-decomposition | sibling flow titles in `master-flow-inventory.md` — are there 5+ near-identical siblings? |
 | D10 (fabrication) | the codebase — does the cited path / symbol / column resolve? |
 | J4 (cross-domain stitching seams) | the adjacent-domain docs / inventory — do named upstream/downstream domains exist? |
+| P4 (hand-off validity) | `docs/product/personas/` + the inventory — do the named adjacent personas / domains resolve to real ones? |
+| P5 (persona byte-reuse) | sibling persona docs — is this persona byte-reused across `docs/product/personas/`? |
 
 **Rule.** A pass/concern/fail dimension that requires evidence outside the doc under review must be **resolved against that evidence — obtained with the reviewer's own tools where the corpus is reachable, or supplied by the dispatcher — and the resolution cited.** It **defaults to CONCERN, not PASS, only when the evidence is genuinely unreachable** (the corpus is absent under the doc's repo, in another repo not checked out, or out of the reviewer's sandbox). A bare PASS on a dimension whose evidence was never resolved is itself a P2 review defect — it converts a fail-capable contract into a rubber stamp, which is exactly the gameability hole the rubric exists to close. A fabricated identifier reads identically to a real one in markdown (see D10); a thin clone reads like a clean atomic flow in isolation (see D9). So **resolve first**: grep the codebase, glob the siblings, look owners up in the inventory — then *cite* a Pass, raise a *substantiated finding* if the cited target is genuinely absent from a reachable corpus, or *withhold* the Pass (naming what you could not reach) only when the evidence is genuinely unreachable. Do not infer Pass from the doc looking complete — and do not withhold on resolvable claims.
 
@@ -348,6 +350,85 @@ Journey docs sit one layer above story docs: they narrate the arc a persona live
 - Pass — every open question is a genuine unresolved call; each names a resolver (Linear issue, discipline child, or owner).
 - Concern — most genuine; one or two answerable from the codebase but kept as a hedge.
 - Fail — questions are predominantly answerable from source, or the section is absent in a domain with known unresolved decisions.
+
+---
+
+# Persona dimensions (per standalone persona doc)
+
+A persona doc at `docs/product/personas/<slug>.md` is the behavioral profile of one role the product serves — the shared answer to *"who is this person, how do they think, and what can't they afford to get wrong?"* that every story doc's `## Actor` and every journey doc's persona section cross-links to instead of restating. P1–P5 are the **same behavioral-persona spine** the embedded D7 (story) and J2 (journey) dimensions score — re-aimed at the standalone doc and given room to grade the sections a one-paragraph embedded persona can't carry (scope shape, hand-offs, the person's own voice). The defining failure across all five is the **generic block**: a persona that could be pasted unchanged into another domain and predicts nothing. Anchor every score on *domain-specificity* — could this section be true of any other product's user, or only this one? The persona-exists / required-sections gate already guarantees the five depth-spine sections are present; P1–P5 judge whether they say anything.
+
+## P1 — At-a-glance substance (mental unit + the failure they can't absorb)
+
+**Definition.** The `## At a glance` block carries a **mental unit** — the thing this person actually thinks in, stated in domain terms (the work and the people it's about, an order, a job-site run) — and **the failure they can't absorb**: the one concrete, domain-consequential, unrecoverable outcome. Both are the load-bearing rows that separate a behavioral persona from a demographic card.
+
+**Good signal.** Mental unit: "the work in my inbox and the people it's about — *who needs onboarding, who's off-boarding and why, did the integration fire* — not collections, hooks, or queue mechanics." Failure they can't absorb: "a silent drop — the insurance driver-add that never reached the broker (an unlicensed driver on a Brite vehicle = real legal exposure) — discovered weeks later." Each predicts behavior and is unique to this domain.
+
+**Failure mode it catches.** The mental unit phrased as machinery ("they think about the jobs queue and the adapter retries") — which means the author modeled the system, not the person; or the failure-they-can't-absorb filled with a generic non-stake ("dislikes bugs," "wants the app to be reliable," "values efficiency") that is true of every user of every product and names no specific unrecoverable outcome.
+
+**How to judge (1–5).**
+- 5 — mental unit is a concrete domain unit-of-work in the person's own terms; failure-they-can't-absorb is one specific, unrecoverable, domain-consequential outcome with the stakes named.
+- 4 — both present and domain-specific, but one is slightly abstract (a real stake stated without its concrete consequence).
+- 3 — both rows filled and beyond demographics, but generic enough to fit a neighboring role.
+- 2 — mental unit is phrased as system internals, **or** the failure-they-can't-absorb is a generic non-stake; cap at 2.
+- 1 — rows absent, or pure demographics ("45, manages a team, uses email").
+
+## P2 — How-they-think depth
+
+**Definition.** `## How they think` names the working context (device + the moment in the workday), the physical/mental state, and the mindset — *what question is in their head as they act* — plus the instinct that predicts how they react to an edge case. This is the standalone-doc home of the D7/J2 "device, working context, tolerances" criteria.
+
+**Good signal.** "They think in work and people, not machinery — *what needs to happen to this person next, and did the system actually do it?* Their instinct after years of the old tool is distrust of any alert that requires manual follow-up: if the system raised it, the system should have acted on it." Device, moment, mindset, and a behavior-predicting instinct all present and domain-specific.
+
+**Failure mode it catches.** Role-and-permission restatement ("the admin can edit everyone; the manager can edit their team") with no working context or mindset — it states *what they can do*, never *how they think* or *how they'll react when something breaks*. Also catches the dressed-up generic: a real device word ("uses a laptop") bolted onto an otherwise context-free description.
+
+**How to judge (1–5).**
+- 5 — device + moment-in-workday + mental state + a mindset/instinct that predicts edge-case reactions, all specific to this domain.
+- 4 — working context and mindset present; the behavior-predicting instinct implied not stated.
+- 3 — beyond role+permission but abstract ("manages the schedule day to day"); no device or moment.
+- 2 — role name + permission level only; **or** generic enough to appear unchanged in another persona doc — cap at 2 regardless of cosmetic device/timing words.
+- 1 — absent, or pure demographics.
+
+## P3 — Scope shape (what they see and don't)
+
+**Definition.** `## What they see — and what they don't` names what is in the persona's view and — just as load-bearing — what is deliberately not. The "don't see" column is usually the trusted machinery the person relies on without watching; naming it is what stops a reviewer mistaking an unobserved guarantee for an unbuilt feature, and it is the persona-level source of the scope expectations a story doc's `## Actor` and a journey's per-role scope shape inherit.
+
+**Good signal.** A see/don't-see split: sees "their department inbox, the people they're onboarding, pay-change requests"; doesn't see "the `afterChange` hook enqueueing a job, or whether the Gusto / insurance adapter actually delivered." The boundary between what they act on and what they trust is explicit.
+
+**Failure mode it catches.** A one-sided scope ("has full access to everything") that names no boundary, so no reviewer can answer "should this be visible to this role?"; or a see/don't-see table that is generic ("sees the app; doesn't see the database") rather than tied to this domain's surfaces and trusted mechanisms.
+
+**How to judge (1–5).**
+- 5 — both columns concrete and domain-specific; the don't-see column names the trusted mechanisms the persona relies on without watching.
+- 4 — both columns present; the don't-see side thin or partly generic.
+- 3 — scope described in prose but not resolved into an explicit see / don't-see boundary.
+- 2 — one-sided ("full access") with no boundary; or generic enough to fit any role.
+- 1 — absent.
+
+## P4 — Hand-off validity
+
+**Definition.** `## Hand-offs` names who the persona receives work *from* and hands work *to*, by the adjacent persona slug or domain code, with the seam crossing each boundary. Naming the seam is single-doc-judgeable; whether each named adjacent persona / domain **resolves to a real one** is corpus-dependent — same class as D6 (boundary owner validity) and J4 (cross-domain seams).
+
+**Good signal.** "From the TM (as requester): the TM flags an off-board (LSM-06) or submits a pay change (PCA-01); the operator executes the transition. To audit-finance (as the record): every mutation the operator fires lands in the audit log Jaime reads." Each adjacent is a real persona / domain and the seam is a named artifact (a flow ID, a record, a status).
+
+**Failure mode it catches.** Hand-offs to vague or invented adjacents ("hands off to the other teams") with no named persona / domain and no seam; or a named adjacent persona that does not resolve against `docs/product/personas/` — a fabrication that reads real in markdown (cross-link D6/D10).
+
+**How to judge (pass / concern / fail).** Seam-naming is single-doc-judgeable; adjacent validity is corpus-dependent (resolve it per the evidence rule — locate `docs/product/personas/` and the inventory relative to the doc).
+- Pass — every hand-off names a specific adjacent persona / domain and the crossing seam; **and** every named adjacent resolves against `docs/product/personas/` / the inventory when reachable.
+- Concern — most hand-offs named but one or two vague on the seam; **or** adjacents named but the personas dir / inventory is genuinely unreachable to confirm them (withhold the Pass per the evidence rule, naming what you could not reach).
+- Fail — hand-offs are generic with no named adjacent or seam; the section is absent; or a named adjacent persona / domain is confirmed not to exist.
+
+## P5 — Domain-specificity and voice
+
+**Definition.** The whole persona could not be pasted unchanged into another domain's doc, and `## In their words` carries first-person quotes in the persona's authentic voice — the sentences this person would actually say about the job, the pain, or the failure they can't absorb. This is the standalone-doc form of the D7/J2 domain-specificity anchor plus its byte-reuse CONCERN-trigger.
+
+**Good signal.** Quotes that name a domain-specific stake — "I don't want an alert that tells me to go do six more things. I want the system to have done them." / "If the insurance push fails, I need to *know* — not find out when a driver's already on the road." — and a persona whose every section reads as true only of this product's surfaces.
+
+**Failure mode it catches.** Generic voice — quotes that could come from any user of any product ("I just want it to work," "make my job easier"); and the defining persona failure, a block byte-reused across persona docs (a persona that reads identically in two domains tells reviewers nothing about either). Domain-specificity is single-doc-judgeable; cross-doc byte-reuse is corpus-dependent — treat suspected reuse as a CONCERN-trigger, resolved against sibling persona docs per the evidence rule, not a silent Pass.
+
+**How to judge (1–5).** Score domain-specificity + voice from the doc (single-doc-judgeable); treat byte-reuse across siblings as the corpus-dependent CONCERN-trigger.
+- 5 — every section is unmistakably this domain's; quotes are authentic, concrete, and at least one names the failure they can't absorb.
+- 4 — clearly domain-specific; quotes present but one or two generic.
+- 3 — mostly specific but some sections could fit a neighboring role; quotes thin.
+- 2 — generic enough to plausibly appear unchanged in another domain's persona doc — cap at 2 regardless of cosmetic device/timing words; or `## In their words` is boilerplate.
+- 1 — confirmed byte-reused from another persona doc (when you can see the sibling), or `## In their words` absent.
 
 ---
 

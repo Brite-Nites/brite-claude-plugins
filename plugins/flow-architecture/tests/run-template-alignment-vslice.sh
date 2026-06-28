@@ -26,6 +26,7 @@ PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 JOURNEY_TMPL="$PLUGIN_ROOT/templates/docs/templates/domain-journey.md"
 STORY_TMPL="$PLUGIN_ROOT/templates/docs/templates/job-story.md"
+PERSONA_TMPL="$PLUGIN_ROOT/templates/docs/templates/persona.md"
 JOURNEY_AGENT="$PLUGIN_ROOT/agents/journey-doc-author.md"
 STORY_AGENT="$PLUGIN_ROOT/agents/story-doc-author.md"
 START_CMD="$PLUGIN_ROOT/commands/start-project.md"
@@ -89,17 +90,18 @@ section "1/5" "Seeded canonical template files present"
 
 assert_file "journey template present in plugin templates/" "$JOURNEY_TMPL"
 assert_file "story template present in plugin templates/" "$STORY_TMPL"
+assert_file "persona template present in plugin templates/" "$PERSONA_TMPL"
 
-# Extra-file guard: the docs-template seed subtree must contain EXACTLY these two
+# Extra-file guard: the docs-template seed subtree must contain EXACTLY these three
 # files. run-verify-docs-ecosystem-vslice.sh §3b excludes templates/docs/ from ITS
-# count, so without this guard an undeclared third file dropped under templates/docs/
+# count, so without this guard an undeclared fourth file dropped under templates/docs/
 # would be caught by neither harness.
 DOCS_TMPL_DIR="$PLUGIN_ROOT/templates/docs/templates"
 docs_tmpl_count=$(find "$DOCS_TMPL_DIR" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-if [ "$docs_tmpl_count" = "2" ]; then
-  pass "templates/docs/templates/ contains exactly 2 seeded templates (no undeclared extras)"
+if [ "$docs_tmpl_count" = "3" ]; then
+  pass "templates/docs/templates/ contains exactly 3 seeded templates (no undeclared extras)"
 else
-  fail "templates/docs/templates/ has $docs_tmpl_count files, expected 2 (domain-journey.md + job-story.md)"
+  fail "templates/docs/templates/ has $docs_tmpl_count files, expected 3 (domain-journey.md + job-story.md + persona.md)"
   find "$DOCS_TMPL_DIR" -type f -name '*.md' 2>/dev/null | sed "s|$PLUGIN_ROOT/||; s/^/    /"
 fi
 
@@ -213,6 +215,8 @@ for cmd_label in "start-project:$START_CMD" "retrofit-project:$RETROFIT_CMD"; do
     "templates/docs/templates/domain-journey.md" "$cmd"
   assert_grep "$label SRC array includes job-story.md" \
     "templates/docs/templates/job-story.md" "$cmd"
+  assert_grep "$label SRC array includes persona.md" \
+    "templates/docs/templates/persona.md" "$cmd"
   # Needle includes the $REPO_ROOT/ prefix so it matches ONLY the TARGET-array line,
   # not the SRC line ($CLAUDE_PLUGIN_ROOT/templates/docs/templates/<f>), whose path
   # contains "/docs/templates/<f>" as a substring.
@@ -220,12 +224,14 @@ for cmd_label in "start-project:$START_CMD" "retrofit-project:$RETROFIT_CMD"; do
     "\$REPO_ROOT/docs/templates/domain-journey.md" "$cmd"
   assert_grep "$label TARGET array writes \$REPO_ROOT/docs/templates/job-story.md" \
     "\$REPO_ROOT/docs/templates/job-story.md" "$cmd"
-  assert_grep "$label orchestrator prose states the seeded-template count (currently 11)" \
-    "Build the 11 template-source" "$cmd"
+  assert_grep "$label TARGET array writes \$REPO_ROOT/docs/templates/persona.md" \
+    "\$REPO_ROOT/docs/templates/persona.md" "$cmd"
+  assert_grep "$label orchestrator prose states the seeded-template count (currently 12)" \
+    "Build the 12 template-source" "$cmd"
   # Lock the confirmation-line count too — it must move in lockstep with the array
   # count (the stale-"9" drift class already hit once, fixed in 63ae7a0e).
-  assert_grep "$label confirmation line states 11 files + docs/templates/" \
-    "11 files written under scripts/ + docs/templates/" "$cmd"
+  assert_grep "$label confirmation line states 12 files + docs/templates/" \
+    "12 files written under scripts/ + docs/templates/" "$cmd"
 done
 
 # ── Summary ──────────────────────────────────────────────────────────
