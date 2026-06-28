@@ -104,6 +104,7 @@ def _clean_slug(s: str) -> str:
     the `<slug>.md` filename convention. (`;`-separated multi-entries are split
     upstream in `personas()`.)"""
     s = s.strip().strip("`\"'").strip()
+    s = re.sub(r"\s+#.*$", "", s).strip()            # drop an inline YAML comment (` # note`)
     s = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()   # drop a trailing (qualifier)
     return s
 
@@ -129,8 +130,10 @@ def personas(text: str) -> list:
             # block list (subsequent `  - <slug>` lines) or genuinely empty
             slugs = []
             for cont in lines[i + 1:]:
-                if not cont.strip():
-                    continue  # a blank line between items does NOT end a YAML list
+                s = cont.strip()
+                if not s or s.startswith("#"):
+                    continue  # a blank line OR a full-line YAML comment between items
+                    #          does NOT end the list (a comment is not a terminator)
                 mm = re.match(r"^\s+-\s+(.+?)\s*$", cont)
                 if not mm:
                     break  # next top-level key / non-item line ends the block list
