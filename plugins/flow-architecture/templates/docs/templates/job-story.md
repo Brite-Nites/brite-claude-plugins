@@ -1,6 +1,6 @@
 ---
-flow_id: <DOMAIN-NN>           # e.g. QUO-17
-domain: <DOMAIN>               # e.g. QUO
+flow_id: <opaque slug>         # opaque identifier (ADR-040) — e.g. QUO-17 or admin-panel/page-editor
+domain: <DOMAIN>               # explicit (ADR-040), never split from flow_id — e.g. QUO or admin-panel
 status: NOT_STARTED | IN_PROGRESS | BUILT | QA_SIGNED_OFF | SHIPPED | BLOCKED
 parent_issue: BC-XXXX
 children:                       # backfilled once flow-linear-scaffold creates the 5N issues; TBD until then
