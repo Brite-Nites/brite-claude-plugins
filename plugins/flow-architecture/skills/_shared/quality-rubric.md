@@ -16,7 +16,7 @@ The rubric is gameability-resistant by construction. The failure mode each dimen
 - A **concern** is a P2 (note it, don't block). A **fail** is a P1.
 - Cite the specific clause or scenario that earns the score. A bare number is not a review.
 
-### Evidence the dimension needs — withhold Pass when you don't have it
+### Evidence the dimension needs — resolve it first, withhold only what you truly can't reach
 
 Most dimensions are **single-doc-judgeable**: everything you need to score them is in the doc text under review. A reviewer holding only the doc can score these honestly: **D1, D2, D3, D4, D5, D8, D11, J1, J3, J5, J6, J7, J8**.
 
@@ -30,9 +30,9 @@ Some dimensions are **corpus-dependent** — they cannot be settled from the doc
 | D10 (fabrication) | the codebase — does the cited path / symbol / column resolve? |
 | J4 (cross-domain stitching seams) | the adjacent-domain docs / inventory — do named upstream/downstream domains exist? |
 
-**Rule.** Any pass/concern/fail dimension that requires evidence outside the doc under review **defaults to CONCERN, not PASS, unless the reviewer was actually given that evidence and cites it.** A bare PASS on an unverifiable dimension is itself a P2 review defect — it converts a fail-capable contract into a rubber stamp, which is exactly the gameability hole the rubric exists to close. A fabricated identifier reads identically to a real one in markdown (see D10); a thin clone reads like a clean atomic flow in isolation (see D9). If you cannot grep the codebase, cannot see the siblings, or cannot resolve owners against the inventory, say so in the finding and withhold the Pass. Do not infer Pass from the doc looking complete.
+**Rule.** A pass/concern/fail dimension that requires evidence outside the doc under review must be **resolved against that evidence — obtained with the reviewer's own tools where the corpus is reachable, or supplied by the dispatcher — and the resolution cited.** It **defaults to CONCERN, not PASS, only when the evidence is genuinely unreachable** (the corpus is absent under the doc's repo, in another repo not checked out, or out of the reviewer's sandbox). A bare PASS on a dimension whose evidence was never resolved is itself a P2 review defect — it converts a fail-capable contract into a rubber stamp, which is exactly the gameability hole the rubric exists to close. A fabricated identifier reads identically to a real one in markdown (see D10); a thin clone reads like a clean atomic flow in isolation (see D9). So **resolve first**: grep the codebase, glob the siblings, look owners up in the inventory — then *cite* a Pass, raise a *substantiated finding* if the cited target is genuinely absent from a reachable corpus, or *withhold* the Pass (naming what you could not reach) only when the evidence is genuinely unreachable. Do not infer Pass from the doc looking complete — and do not withhold on resolvable claims.
 
-The single-doc-judgeable dimensions are the model: each names a signal observable in the doc text itself. Hold the corpus-dependent dimensions to the same standard — *judgeable from stated evidence, else withhold Pass.*
+The single-doc-judgeable dimensions are the model: each names a signal observable in the doc text itself. Hold the corpus-dependent dimensions to the same standard — *resolve the evidence with your own tools and judge from what you find; raise a substantiated finding when a cited target is genuinely absent, and withhold Pass only when the evidence is genuinely unreachable.*
 
 ---
 
@@ -196,8 +196,8 @@ The single-doc-judgeable dimensions are the model: each names a signal observabl
 **Failure mode it catches.** Fabricated identifiers — a doc cites `createAppointmentFlow()` or `appointmentService.ts:42` when neither exists. The reader trusts it, the engineer follows it, it is wrong. Invented identifiers look identical to real ones in markdown, so they slip past any review that doesn't `grep` the claim.
 
 **How to judge (pass / concern / fail).** This is corpus-dependent — settling it requires grepping the codebase, which a doc-text-only reviewer cannot do.
-- Pass — every cited path/symbol resolves to real code or is explicitly marked TBD, **and you verified the resolutions against the codebase**. If you were not given codebase access, you cannot award Pass — record CONCERN noting that identifier resolution was not verifiable, per the evidence rule.
-- Concern — one or two identifiers unverifiable but the claim is qualified ("exact column is TBD — capture on the [Eng] child"); **or** the codebase was unavailable to confirm any cited identifier.
+- Pass — every cited path/symbol resolves to real code or is explicitly marked TBD, **and you verified the resolutions by grepping the codebase** (cite the resolving `file:line`). Withhold the Pass and record CONCERN only when the codebase is genuinely unreachable (out of sandbox / another repo not checked out), naming what you could not reach — never merely because a dispatcher flag was absent.
+- Concern — one or two identifiers unverifiable but the claim is qualified ("exact column is TBD — capture on the [Eng] child"); **or** the codebase was genuinely unreachable, so no cited identifier could be confirmed.
 - Fail — one or more identifiers stated as confirmed fact but not found in the codebase (when you checked).
 
 ---

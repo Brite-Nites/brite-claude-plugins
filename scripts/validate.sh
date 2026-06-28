@@ -555,6 +555,32 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-qr-resolve-first — flow-architecture quality-reviewer resolve-first contract (BC-13030)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-quality-reviewer-resolve-first-vslice.sh —
+# a PROSE tripwire locking the WS-B resolve-first reframe: the quality-reviewer
+# agent + quality-rubric must teach "resolve corpus-dependent claims with your own
+# Read/Glob/Grep first, cite the resolution, withhold only when genuinely
+# unreachable" and must NOT carry the retired "default to CONCERN unless the
+# dispatcher pre-supplied an evidence flag" gate (the BC-11996 false-negative bug).
+# Named (not tick-chained) section per the 2b-ci / 2b-stamp precedent.
+section "2b-qr-resolve-first. flow-architecture quality-reviewer resolve-first contract (BC-13030)"
+
+fda_qr_resolve_test="$REPO_ROOT/plugins/flow-architecture/tests/run-quality-reviewer-resolve-first-vslice.sh"
+
+if [ ! -f "$fda_qr_resolve_test" ]; then
+  warn "plugins/flow-architecture/tests/run-quality-reviewer-resolve-first-vslice.sh not found — skipped"
+else
+  if fda_qr_resolve_out=$(bash "$fda_qr_resolve_test" 2>&1); then
+    fda_qr_resolve_pass_count=$(printf '%s\n' "$fda_qr_resolve_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture quality-reviewer resolve-first contract vslice (${fda_qr_resolve_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture quality-reviewer resolve-first contract vslice failed — run plugins/flow-architecture/tests/run-quality-reviewer-resolve-first-vslice.sh for details"
+    printf '%s\n' "$fda_qr_resolve_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b'''''''''''' — flow-architecture shift-left clone-drift regression (BC-12410)
 # ══════════════════════════════════════════════════════════════════════
 # Naming: the flow-architecture sub-sections chain off "2b" with one added
