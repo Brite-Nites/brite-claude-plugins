@@ -249,6 +249,21 @@ else
   fail "dead family not caught (out: $(printf '%s' "$out_k" | tr '\n' '|'))"
 fi
 
+# Repo N: nested story doc (flows/dom/sub/deep-01.md) is indexed (rglob) — a status
+# mismatch on a deeper-than-2-level doc is still caught (matches A-8 recursive find).
+N="$TMP/repoN"
+mk_inv_header "$N/docs/product/master-flow-inventory.md"
+printf '| deep-01 | Deep | ✓ | |\n' >> "$N/docs/product/master-flow-inventory.md"
+mkdir -p "$N/docs/product/flows/demo/sub"
+printf -- '---\nflow_id: deep-01\ndomain: demo\nstatus: NOT_STARTED\n---\n# t\n' \
+  > "$N/docs/product/flows/demo/sub/deep-01.md"
+out_n="$("$RUNNER" "$N" 2>/dev/null || true)"
+if printf '%s' "$out_n" | grep -q 'status-agreement .*deep-01'; then
+  pass "nested story doc (3-level) is indexed → status mismatch caught (rglob)"
+else
+  fail "nested story doc not indexed (out: $(printf '%s' "$out_n" | tr '\n' '|'))"
+fi
+
 # Repo I: brite-supply-react shape — inventory with NO Status / NO Evidence column
 # → neither check fires → clean (no false-fail on a non-migrated layout).
 I="$TMP/repoI"

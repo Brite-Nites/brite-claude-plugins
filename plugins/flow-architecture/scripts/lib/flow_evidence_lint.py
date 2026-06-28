@@ -117,11 +117,19 @@ def _flow_index_skipped(text: str) -> bool:
 
 
 def _story_docs(repo: Path) -> list:
+    """Story docs under docs/product/flows, found RECURSIVELY (rglob) — matching the
+    inventory-lint sibling flow_inventory_lint._fil_doc_ids, which likewise `find`s
+    docs at any depth. Every real consumer lays story docs out 2-level
+    (flows/<domain>/<flow>.md), so on today's repos rglob is identical to a 2-level
+    glob; recursing future-proofs a deeper layout without risk, because indexing is
+    keyed on a `flow_id` front-matter match — a non-story nested `.md` (no flow_id)
+    is simply never added to the status index. INDEX.md and `flow_index: skip`
+    overview docs are excluded."""
     base = repo / "docs" / "product" / "flows"
     if not base.is_dir():
         return []
     docs = []
-    for p in sorted(base.glob("*/*.md")):
+    for p in sorted(base.rglob("*.md")):
         if p.name == "INDEX.md":
             continue
         if _flow_index_skipped(_read(p)):
