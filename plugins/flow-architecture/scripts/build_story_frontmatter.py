@@ -197,7 +197,7 @@ def _emit(flow_id: str, domain: str, parent: str, children: dict[str, str], stat
     # domain is resolved EXPLICITLY by _resolve_domain (ADR-040) — never split from flow_id here.
     lines = [
         "---",
-        f"flow_id: {flow_id}",
+        f"flow_id: {_yaml_safe_token(flow_id)}",  # opaque id may be coercion-prone (ADR-040)
         f"domain: {_yaml_safe_token(domain)}",
         f"status: {status}",
         f"parent_issue: {parent}",
@@ -235,10 +235,10 @@ def _emit_redirect(flow_id: str, domain: str, redirect_to: str, as_of: str) -> s
     (ADR-040) — for the redirect path, from --domain or the _fallback_domain split."""
     return "\n".join([
         "---",
-        f"flow_id: {flow_id}",
+        f"flow_id: {_yaml_safe_token(flow_id)}",  # opaque id may be coercion-prone (ADR-040)
         f"domain: {_yaml_safe_token(domain)}",
         "doc_type: redirect",
-        f"redirect_to: {redirect_to}",
+        f"redirect_to: {_yaml_safe_token(redirect_to)}",  # opaque target may be coercion-prone (ADR-040)
         "intent: ../../intent.md",
         f"last_reviewed: '{as_of}'",  # quote: an unquoted ISO date is YAML-coerced to a date (BC-13796)
         "---",

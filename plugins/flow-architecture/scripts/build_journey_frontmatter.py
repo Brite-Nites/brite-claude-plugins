@@ -232,7 +232,7 @@ def build_frontmatter(scaffold_log: Path, flows_dir: Path, as_of: str) -> str:
         f"  name: {name}",
         f"  id: {milestone_id}",
         f"personas: [{', '.join(_yaml_safe_token(t) for t in personas)}]",
-        f"flow_ids_in_scope: [{', '.join(flow_ids)}]",
+        f"flow_ids_in_scope: [{', '.join(_yaml_safe_token(f) for f in flow_ids)}]",
         "status: in-progress",
         "figma: TBD",
         "intent: ../intent.md",

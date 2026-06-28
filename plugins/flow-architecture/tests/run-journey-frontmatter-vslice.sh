@@ -277,5 +277,21 @@ grep -qxF 'domain: admin-panel' "$TMP/slash-journey.out" \
   && pass "journey domain from scaffold-log frontmatter (kebab path, unchanged)" \
   || fail "journey domain wrong: $(grep '^domain:' "$TMP/slash-journey.out")"
 
+# ── §12: coercion-prone opaque flow_id is YAML-quoted in flow_ids_in_scope ──
+# The relaxed _FLOW_ID_RE (ADR-040) admits bare coercion-prone ids (off / 2024); each must be
+# _yaml_safe_token-guarded in the flow_ids_in_scope list (as personas already are) or a YAML
+# consumer reads [False]/[2024] instead of the string id.
+section "12" "coercion-prone opaque flow_id quoted in flow_ids_in_scope (no YAML bool coercion)"
+mkdir -p "$TMP/coerce-flows"
+printf -- '---\nflow_id: off\ndomain: ops\npersonas: [op]\n---\nbody\n' > "$TMP/coerce-flows/off.md"
+printf -- '---\ndomain: ops\ndomain_code: ops\nlinear_milestone_id: 7f3c2a10-aaaa-4bbb-8ccc-0123456789ab\nlinear_milestone_name: Ops\n---\nbody\n' > "$TMP/coerce-journey-log.md"
+python3 "$BUILDER" --scaffold-log "$TMP/coerce-journey-log.md" --flows-dir "$TMP/coerce-flows" --as-of "$AS_OF" \
+  > "$TMP/coerce-journey.out" 2>/dev/null || true
+if grep -qxF 'flow_ids_in_scope: ["off"]' "$TMP/coerce-journey.out"; then
+  pass "coercion-prone flow_id quoted in flow_ids_in_scope (parses as str, not bool)"
+else
+  fail "flow_ids_in_scope not coercion-guarded: $(grep '^flow_ids_in_scope:' "$TMP/coerce-journey.out")"
+fi
+
 printf '\nRESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

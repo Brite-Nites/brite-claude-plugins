@@ -326,6 +326,32 @@ grep -qxF 'parent_issue: BC-30001' "$TMP/slash.out" \
   && pass "slash-form annotated parents cell matched" \
   || fail "slash-form parents cell not matched"
 
+# ── §16: coercion-prone OPAQUE flow_id / redirect_to are YAML-quoted ───
+# The relaxed _FLOW_ID_RE (ADR-040) now admits bare coercion-prone ids (off / 2024); like
+# personas/domain, every flow_id-family emission must be _yaml_safe_token-guarded or a YAML
+# consumer silently reads a bool/int instead of the string id. Covers _emit (story flow_id) +
+# _emit_redirect (redirect flow_id + redirect_to).
+section "16" "coercion-prone opaque flow_id + redirect_to emitted quoted (no YAML bool/int coercion)"
+COERCELOG="$TMP/coerce-log.md"
+{
+  printf -- '---\ndomain_code: ops\n---\n\n'
+  printf -- '## Parents\n\n| # | Sub-flow | Linear identifier | Result |\n|---|---|---|---|\n'
+  printf -- '| 2 | off — Toggle widget | BC-40001 | executed |\n'
+} > "$COERCELOG"
+python3 "$BUILDER" --scaffold-log "$COERCELOG" --flow-id off --as-of "$AS_OF" \
+  > "$TMP/coerce-story.out" 2>/dev/null || true
+grep -qxF 'flow_id: "off"' "$TMP/coerce-story.out" \
+  && pass "story-path coercion-prone flow_id (off) quoted (parses as str, not bool)" \
+  || fail "story flow_id not coercion-guarded: $(grep '^flow_id:' "$TMP/coerce-story.out")"
+python3 "$BUILDER" --flow-id 2024 --as-of "$AS_OF" --doc-type redirect --redirect-to off --domain ops \
+  > "$TMP/coerce-redirect.out" 2>/dev/null || true
+grep -qxF 'flow_id: "2024"' "$TMP/coerce-redirect.out" \
+  && pass "redirect-path coercion-prone flow_id (2024) quoted (parses as str, not int)" \
+  || fail "redirect flow_id not coercion-guarded: $(grep '^flow_id:' "$TMP/coerce-redirect.out")"
+grep -qxF 'redirect_to: "off"' "$TMP/coerce-redirect.out" \
+  && pass "redirect_to coercion-prone target (off) quoted (resolver reads str, not bool)" \
+  || fail "redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-redirect.out")"
+
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
