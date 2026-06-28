@@ -585,6 +585,36 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-persona-exists — flow-architecture WS-A persona-exists lint (BC-12573)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-flow-persona-lint-vslice.sh — the
+# regression lock for the persona-exists lint (scripts/lib/flow_persona_lint.py):
+# every NON-EMPTY `personas:` front-matter slug in a story doc resolves to an
+# existing docs/product/personas/<slug>.md. Honest-empty (`personas: []` / absent /
+# null) passes (presence is the frontmatter lint's job — BC-12572). The deterministic
+# FLOOR of the 3-layer persona system (existence here; LLM persona-resolution +
+# persona-depth above — BC-12908/Lane B C2). REFRAME (BC-13916 precedent): the
+# ticket's journey-exists half is already covered (journey-complete + link-resolution
+# gates), so BC-12573 collapses to pure persona-exists; the journey-link-PRESENCE
+# sliver is dropped (consumers diverge on its line-form → LLM-layer's job). Pass count
+# auto-derived from the RESULT line.
+section "2b-persona-exists. flow-architecture WS-A persona-exists lint (BC-12573)"
+
+fda_pslint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-persona-lint-vslice.sh"
+
+if [ ! -f "$fda_pslint_test" ]; then
+  warn "plugins/flow-architecture/tests/run-flow-persona-lint-vslice.sh not found — skipped"
+else
+  if fda_pslint_out=$(bash "$fda_pslint_test" 2>&1); then
+    fda_pslint_pass_count=$(printf '%s\n' "$fda_pslint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture WS-A persona-exists lint vslice (${fda_pslint_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture WS-A persona-exists lint vslice failed — run plugins/flow-architecture/tests/run-flow-persona-lint-vslice.sh for details"
+    printf '%s\n' "$fda_pslint_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b''''''''''' — flow-architecture journey/story template alignment (BC-11983 WS-E precursor)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-template-alignment-vslice.sh — the
