@@ -108,9 +108,10 @@ def _clean_slug(s: str) -> str:
     # (`"alice"  # note`: quote-strip-first → `alice"  # note` → `alice"`). Comment first,
     # then quotes, then a trailing (qualifier).
     s = s.strip()
-    s = re.sub(r"\s+#.*$", "", s).strip()            # drop an inline YAML comment (` # note`)
-    s = s.strip("`\"'").strip()                      # strip surrounding quotes/backticks
-    s = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()   # drop a trailing (qualifier)
+    s = re.sub(r"(^|\s+)#.*$", "", s).strip()         # drop a YAML comment: inline (` # note`)
+    #                                                   OR a whole-value comment (`# note` → "")
+    s = s.strip("`\"'").strip()                       # strip surrounding quotes/backticks
+    s = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()    # drop a trailing (qualifier)
     return s
 
 
@@ -146,7 +147,8 @@ def personas(text: str) -> list:
                 if slug:
                     slugs.append(slug)
             return slugs
-        return [_clean_slug(rest)]  # scalar single value
+        slug = _clean_slug(rest)  # scalar single value
+        return [slug] if slug else []  # `personas: # note` cleans to "" → honest-empty
     return []  # no personas key → honest-absent
 
 

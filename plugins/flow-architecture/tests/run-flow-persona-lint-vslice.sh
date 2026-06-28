@@ -80,6 +80,15 @@ flow  = m.personas("---\npersonas: [\"operator\", 'finance-auditor']\n---\n# t\n
 sys.exit(0 if block == ["operator", "finance-auditor"] and flow == ["operator", "finance-auditor"] else 1)
 PY
 
+py <<'PY' && pass "comment-only item / value yields no slug (YAML reads it as null)" || fail "comment-only item"
+import flow_persona_lint as m, sys
+# A list item that is ONLY a comment (`- # note`) is a null YAML item — it must not
+# become a garbage `# note` slug. Same for a scalar that is only a comment.
+block  = m.personas("---\npersonas:\n  - # just a note\n  - alice\nstatus: BUILT\n---\n# t\n")
+scalar = m.personas("---\npersonas: # none yet\n---\n# t\n")
+sys.exit(0 if block == ["alice"] and scalar == [] else 1)
+PY
+
 py <<'PY' && pass "honest-empty [] / absent / null -> [] (no false missing)" || fail "honest-empty"
 import flow_persona_lint as m, sys
 empty = m.personas("---\npersonas: []\n---\n# t\n")
