@@ -277,21 +277,30 @@ grep -qxF 'domain: admin-panel' "$TMP/slash-journey.out" \
   && pass "journey domain from scaffold-log frontmatter (kebab path, unchanged)" \
   || fail "journey domain wrong: $(grep '^domain:' "$TMP/slash-journey.out")"
 
-# ── §12: coercion-prone opaque flow_id is YAML-quoted in flow_ids_in_scope ──
-# The relaxed _FLOW_ID_RE (ADR-040) admits bare coercion-prone ids (off / 2024); each must be
-# _yaml_safe_token-guarded in the flow_ids_in_scope list (as personas already are) or a YAML
-# consumer reads [False]/[2024] instead of the string id.
-section "12" "coercion-prone opaque flow_id quoted in flow_ids_in_scope (no YAML bool coercion)"
+# ── §12: opaque-id round-trip — quoted-on-disk ids aggregate, radix ids re-quoted ──
+# Two coupled guarantees once flow_ids can be coercion-prone (ADR-040):
+#   (1) a QUOTED-on-disk id (`flow_id: "off"`, as the story builder stamps it) must still be
+#       aggregated — the reader strips quotes before _FLOW_ID_RE, else the doc is silently
+#       dropped from flow_ids_in_scope;
+#   (2) a radix-literal id (`0x1A`) must be re-quoted on emit (the all-digit-led rule), else a
+#       YAML consumer reads it back as an int.
+section "12" "opaque-id round-trip: quoted-on-disk id aggregated, radix id re-quoted"
 mkdir -p "$TMP/coerce-flows"
-printf -- '---\nflow_id: off\ndomain: ops\npersonas: [op]\n---\nbody\n' > "$TMP/coerce-flows/off.md"
+printf -- '---\nflow_id: "off"\ndomain: ops\npersonas: ["op"]\n---\nbody\n' > "$TMP/coerce-flows/off.md"
+printf -- '---\nflow_id: 0x1A\ndomain: ops\npersonas: [tm]\n---\nbody\n' > "$TMP/coerce-flows/hex.md"
 printf -- '---\ndomain: ops\ndomain_code: ops\nlinear_milestone_id: 7f3c2a10-aaaa-4bbb-8ccc-0123456789ab\nlinear_milestone_name: Ops\n---\nbody\n' > "$TMP/coerce-journey-log.md"
 python3 "$BUILDER" --scaffold-log "$TMP/coerce-journey-log.md" --flows-dir "$TMP/coerce-flows" --as-of "$AS_OF" \
   > "$TMP/coerce-journey.out" 2>/dev/null || true
-if grep -qxF 'flow_ids_in_scope: ["off"]' "$TMP/coerce-journey.out"; then
-  pass "coercion-prone flow_id quoted in flow_ids_in_scope (parses as str, not bool)"
+# 0x1A sorts first (opaque branch, lexicographic); both emitted quoted.
+if grep -qxF 'flow_ids_in_scope: ["0x1A", "off"]' "$TMP/coerce-journey.out"; then
+  pass "quoted-on-disk id round-trips (not dropped) + radix/keyword ids re-quoted"
 else
-  fail "flow_ids_in_scope not coercion-guarded: $(grep '^flow_ids_in_scope:' "$TMP/coerce-journey.out")"
+  fail "flow_ids_in_scope round-trip/coercion wrong: $(grep '^flow_ids_in_scope:' "$TMP/coerce-journey.out")"
 fi
+# The quoted-on-disk persona "op" must also survive the read (quote-strip before _SLUG_RE).
+grep -qE '^personas: \[.*\bop\b' "$TMP/coerce-journey.out" \
+  && pass "quoted-on-disk persona round-trips (not dropped)" \
+  || fail "quoted persona dropped: $(grep '^personas:' "$TMP/coerce-journey.out")"
 
 printf '\nRESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

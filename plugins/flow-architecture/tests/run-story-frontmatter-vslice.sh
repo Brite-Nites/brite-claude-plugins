@@ -351,6 +351,16 @@ grep -qxF 'flow_id: "2024"' "$TMP/coerce-redirect.out" \
 grep -qxF 'redirect_to: "off"' "$TMP/coerce-redirect.out" \
   && pass "redirect_to coercion-prone target (off) quoted (resolver reads str, not bool)" \
   || fail "redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-redirect.out")"
+# Radix literals (hex/octal) are digit-led but NOT matched by the enumerated coercion regex —
+# the all-digit-led quote rule must catch them, else `0x1A` parses back as int 26.
+python3 "$BUILDER" --flow-id 0x1A --as-of "$AS_OF" --doc-type redirect --redirect-to 0o17 --domain ops \
+  > "$TMP/coerce-radix.out" 2>/dev/null || true
+grep -qxF 'flow_id: "0x1A"' "$TMP/coerce-radix.out" \
+  && pass "radix-literal flow_id (0x1A) quoted (parses as str, not hex int)" \
+  || fail "radix flow_id not coercion-guarded: $(grep '^flow_id:' "$TMP/coerce-radix.out")"
+grep -qxF 'redirect_to: "0o17"' "$TMP/coerce-radix.out" \
+  && pass "radix-literal redirect_to (0o17) quoted (parses as str, not octal int)" \
+  || fail "radix redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-radix.out")"
 
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"

@@ -152,8 +152,13 @@ def _yaml_safe_name(raw: str) -> str:
 
 
 def _yaml_safe_token(token: str) -> str:
-    """A _SLUG_RE-validated list token → quoted iff YAML would coerce it ("off", "123")."""
-    return json.dumps(token, ensure_ascii=True) if _YAML_AMBIGUOUS_RE.match(token) else token
+    """A token → quoted iff YAML would coerce it to a non-string; else raw. Quote iff a
+    bool/null keyword OR ANY digit-led token. Quoting every digit-led token covers ints/dates
+    AND radix literals (`0x1A`/`0o17`/`0b11`) that `_YAML_AMBIGUOUS_RE`'s digit branch misses —
+    complete without enumerating each coercion form, now that opaque flow_ids (ADR-040) can be
+    bare digit-led tokens. A letter-led non-keyword token stays raw (byte-identical for real ids)."""
+    return (json.dumps(token, ensure_ascii=True)
+            if token[:1].isdigit() or _YAML_AMBIGUOUS_RE.match(token) else token)
 
 
 def _natural_key(flow_id: str) -> tuple[int, str, int, str]:
@@ -186,10 +191,15 @@ def _aggregate_story_docs(flows_dir: Path) -> tuple[list[str], list[str]]:
         if parsed is None:
             continue  # no frontmatter block → not a story doc
         scalars, lists = parsed
-        flow_id = scalars.get("flow_id", "").strip().strip("`")
+        # Strip surrounding quotes: a coercion-prone opaque id is stamped QUOTED by the story
+        # builder (`flow_id: "off"`), so an unquoted-only read would reject it (leading `"` fails
+        # _FLOW_ID_RE) and silently drop the doc from flow_ids_in_scope (ADR-040 round-trip).
+        flow_id = scalars.get("flow_id", "").strip().strip("`").strip('"').strip("'")
         if not _FLOW_ID_RE.match(flow_id):
             continue  # junk/missing flow_id → skip the doc whole (and its personas)
-        personas = [t for t in lists.get("personas", []) if _SLUG_RE.match(t)]
+        # Same quote-strip as flow_id: a coercion-prone persona is stamped quoted too.
+        personas = [s for s in (t.strip().strip('"').strip("'") for t in lists.get("personas", []))
+                    if _SLUG_RE.match(s)]
         # A duplicate flow_id across docs merges personas (first-seen dedup runs
         # downstream); builder-stamped docs can't produce duplicates, hand-edits
         # merge benignly.

@@ -181,9 +181,14 @@ def _resolve_domain(explicit: str, scaffold_text: str | None, flow_id: str) -> s
 
 
 def _yaml_safe_token(token: str) -> str:
-    """A _SLUG_RE-validated list token → double-quoted iff YAML would coerce it
-    ("off"→bool, "123"→int, "2024-01-01"→date); otherwise emitted raw (BC-13797)."""
-    return json.dumps(token, ensure_ascii=True) if _YAML_AMBIGUOUS_RE.match(token) else token
+    """A token → double-quoted iff YAML would coerce it to a non-string; else raw (BC-13797).
+    Quote iff a bool/null keyword OR ANY digit-led token. Quoting every digit-led token covers
+    ints/dates AND radix literals (`0x1A`/`0o17`/`0b11`) that `_YAML_AMBIGUOUS_RE`'s digit branch
+    misses — complete without enumerating each coercion form, now that opaque flow_ids (ADR-040)
+    can be bare digit-led tokens. A letter-led non-keyword token (`PROD-08`, `admin-panel/x`) is
+    provably a YAML string → stays raw, so existing DOMAIN-NN / slash-form output is byte-identical."""
+    return (json.dumps(token, ensure_ascii=True)
+            if token[:1].isdigit() or _YAML_AMBIGUOUS_RE.match(token) else token)
 
 
 def _yaml_list(values: list[str]) -> str:
