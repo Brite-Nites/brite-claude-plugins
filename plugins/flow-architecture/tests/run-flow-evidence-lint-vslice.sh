@@ -68,6 +68,15 @@ sys.exit(0 if r == ["src/app/api/imagekit/auth/route.ts",
                     "src/app/api/imagekit/config/route.ts"] else 1)
 PY
 
+py <<'PY' && pass "flow_index:skip is front-matter-scoped (body example ignored)" || fail "flow_index:skip scoping"
+import flow_evidence_lint as m, sys
+fm_skip = "---\nflow_id: a\nflow_index: skip\n---\n# t\n"
+body_skip = "---\nflow_id: a\n---\n# t\n```yaml\nflow_index: skip\n```\n"
+# Real skip in front-matter → True; a `flow_index: skip` only in the BODY → False
+# (must not exclude a real story doc from the status index).
+sys.exit(0 if (m._flow_index_skipped(fm_skip) and not m._flow_index_skipped(body_skip)) else 1)
+PY
+
 section "2/4" "on-disk resolution: literal / glob / [id]-literal"
 # Build a tiny tree to resolve against.
 mkdir -p "$TMP/r/src/app/api/dedup/x" "$TMP/r/src/app/api/assets/[id]" "$TMP/r/src/lib"

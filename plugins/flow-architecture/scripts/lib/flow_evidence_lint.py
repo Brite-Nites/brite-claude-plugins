@@ -33,8 +33,9 @@ as DOMAIN-NN would exit-break it). Row col-1 == doc front-matter id, byte-for-by
 Runner: scripts/flow-evidence-lint.sh. Test surface:
 tests/run-flow-evidence-lint-vslice.sh. python3 3.6+; stdlib only.
 """
-from __future__ import annotations
-
+# No `from __future__ import annotations` — that PEP-563 import is 3.7+, and the
+# house target is python3 3.6+ (sibling flow_frontmatter_lint / run_fda_ci_audit).
+# The annotations here are all runtime-evaluable builtins (no forward refs).
 import glob
 import re
 import sys
@@ -107,7 +108,12 @@ def _doc_flow_id(text: str):
 
 
 def _flow_index_skipped(text: str) -> bool:
-    return bool(re.search(r"^flow_index:\s*[\"']?skip[\"']?\s*$", text, re.M))
+    """True iff the FRONT-MATTER declares `flow_index: skip` (overview/index doc,
+    BC-13805). Scoped to the front-matter block — a body line or a fenced-yaml
+    example carrying `flow_index: skip` must NOT exclude a real story doc (mirrors
+    the front-matter scoping flow_inventory_lint._fil_doc_ids applies to flow_id)."""
+    return bool(re.search(r"^flow_index:\s*[\"']?skip[\"']?\s*$",
+                          _frontmatter_block(text), re.M))
 
 
 def _story_docs(repo: Path) -> list:
