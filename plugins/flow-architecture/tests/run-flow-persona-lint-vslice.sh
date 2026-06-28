@@ -46,6 +46,14 @@ t = "---\npersonas:\n  - installer\n  - commercial-buyer\nrelated_flows: [x]\n--
 sys.exit(0 if m.personas(t) == ["installer", "commercial-buyer"] else 1)
 PY
 
+py <<'PY' && pass "block list with a BLANK LINE between items reads both (Greptile P1)" || fail "block list blank line"
+import flow_persona_lint as m, sys
+# A blank line between YAML list items must NOT end the list early (else a later
+# slug's missing persona file would silently pass the required lint).
+t = "---\npersonas:\n  - operator\n\n  - finance-auditor\nstatus: BUILT\n---\n# t\n"
+sys.exit(0 if m.personas(t) == ["operator", "finance-auditor"] else 1)
+PY
+
 py <<'PY' && pass "honest-empty [] / absent / null -> [] (no false missing)" || fail "honest-empty"
 import flow_persona_lint as m, sys
 empty = m.personas("---\npersonas: []\n---\n# t\n")
@@ -129,6 +137,40 @@ if printf '%s' "$out_d" | grep -q "persona 'missing-one'"; then
   pass "block-form personas: missing slug flagged"
 else
   fail "block-form missing slug not caught (out: $(printf '%s' "$out_d" | tr '\n' '|'))"
+fi
+
+# Repo E: a co-located NON-story doc (no flow_id-family key) that mentions personas:
+# must NOT be persona-linted (Greptile P1 — only story docs are in scope).
+E="$TMP/repoE"
+mkdir -p "$E/docs/product/flows/shop"
+# A real story doc (has flow_id) with a resolvable persona → clean.
+mk_persona "$E" installer
+printf -- '---\nflow_id: pdp-01\ndomain: shop\nstatus: BUILT\npersonas: [installer]\n---\n# t\n' \
+  > "$E/docs/product/flows/shop/pdp-01.md"
+# A support/overview doc — NO flow_id-family key — that names a non-existent persona.
+printf -- '---\ntitle: Shop overview\npersonas: [ghost-support]\n---\n# overview\n' \
+  > "$E/docs/product/flows/shop/_overview.md"
+if "$RUNNER" "$E" >/dev/null 2>&1; then
+  pass "non-story doc (no flow_id) with personas: is NOT linted (story-scope gate)"
+else
+  fail "non-story support doc was wrongly persona-linted (out: $("$RUNNER" "$E" 2>&1 | tr '\n' '|'))"
+fi
+
+# Repo F: two same-stem story docs in DIFFERENT domains both fail → the output must
+# disambiguate by domain (Greptile P2 — d.stem alone is ambiguous).
+F="$TMP/repoF"
+mk_persona "$F" installer  # exists; the missing one below is 'ghost'
+mkdir -p "$F/docs/product/flows/shop" "$F/docs/product/flows/checkout"
+printf -- '---\nflow_id: shop/overview\ndomain: shop\nstatus: BUILT\npersonas: [ghost]\n---\n# t\n' \
+  > "$F/docs/product/flows/shop/overview.md"
+printf -- '---\nflow_id: checkout/overview\ndomain: checkout\nstatus: BUILT\npersonas: [ghost]\n---\n# t\n' \
+  > "$F/docs/product/flows/checkout/overview.md"
+out_f="$("$RUNNER" "$F" 2>/dev/null || true)"
+if printf '%s' "$out_f" | grep -q 'shop/overview' \
+   && printf '%s' "$out_f" | grep -q 'checkout/overview'; then
+  pass "same-stem docs in different domains are disambiguated in output (domain-qualified)"
+else
+  fail "violation doc id not domain-qualified (out: $(printf '%s' "$out_f" | tr '\n' '|'))"
 fi
 
 printf '\nflow-persona-lint v-slice summary: %d PASS / %d FAIL\n' "$PASS" "$FAIL"

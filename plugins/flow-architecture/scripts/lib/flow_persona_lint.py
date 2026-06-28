@@ -65,9 +65,22 @@ def _flow_index_skipped(text: str) -> bool:
                           _frontmatter_block(text), re.M))
 
 
+def _is_story_doc(text: str) -> bool:
+    """A doc is a story doc iff its front-matter declares a flow-ID-family key
+    (`flow_id` / `sub_flow_id` / `fda_sub_flow_id`) — mirrors the inventory-lint
+    family (`_fil_doc_ids`). A co-located overview / support doc (or a fenced
+    `personas:` example) without one of these keys is NOT a story doc and is not
+    persona-linted."""
+    fm = _frontmatter_block(text)
+    return bool(re.search(r"^(flow_id|sub_flow_id|fda_sub_flow_id):\s*\S+", fm, re.M))
+
+
 def _story_docs(repo: Path) -> list:
     """Story docs under docs/product/flows, recursively (matches the inventory-lint
-    family). INDEX.md and `flow_index: skip` overview docs excluded."""
+    family). A doc counts only if it carries a flow-ID-family front-matter key
+    (`_is_story_doc`) — INDEX.md, `flow_index: skip` overview docs, and co-located
+    non-story support docs are excluded, so a support doc that merely mentions
+    `personas:` is never persona-linted."""
     base = repo / "docs" / "product" / "flows"
     if not base.is_dir():
         return []
@@ -75,7 +88,10 @@ def _story_docs(repo: Path) -> list:
     for p in sorted(base.rglob("*.md")):
         if p.name == "INDEX.md":
             continue
-        if _flow_index_skipped(_read(p)):
+        text = _read(p)
+        if _flow_index_skipped(text):
+            continue
+        if not _is_story_doc(text):
             continue
         docs.append(p)
     return docs
@@ -113,6 +129,8 @@ def personas(text: str) -> list:
             # block list (subsequent `  - <slug>` lines) or genuinely empty
             slugs = []
             for cont in lines[i + 1:]:
+                if not cont.strip():
+                    continue  # a blank line between items does NOT end a YAML list
                 mm = re.match(r"^\s+-\s+(.+?)\s*$", cont)
                 if not mm:
                     break  # next top-level key / non-item line ends the block list
@@ -129,14 +147,21 @@ def audit_persona_exists(repo) -> list:
     in a story doc that has no matching docs/product/personas/<slug>.md is a
     violation. Empty ⇒ clean."""
     repo = Path(repo)
+    flows_base = repo / "docs" / "product" / "flows"
     personas_dir = repo / "docs" / "product" / "personas"
     violations = []
     for d in _story_docs(repo):
+        # Domain-qualified doc id so same-stem stories in different domains are
+        # distinguishable (flows/shop/overview vs flows/checkout/overview).
+        try:
+            doc_id = str(d.relative_to(flows_base).with_suffix(""))
+        except ValueError:
+            doc_id = d.stem
         for slug in personas(_read(d)):
             if not slug:
                 continue
             if not (personas_dir / (slug + ".md")).is_file():
-                violations.append({"doc": d.stem, "slug": slug})
+                violations.append({"doc": doc_id, "slug": slug})
     return violations
 
 
