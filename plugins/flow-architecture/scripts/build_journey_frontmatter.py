@@ -224,7 +224,9 @@ def build_frontmatter(scaffold_log: Path, flows_dir: Path, as_of: str) -> str:
         raise BuildError(f"scaffold-log has no frontmatter block: {scaffold_log}")
     log_scalars, _ = parsed
 
-    domain_raw = log_scalars.get("domain", "").strip()
+    # Quote-strip to mirror the story builder's _scaffold_log_domain reader — a quoted
+    # domain scalar round-trips instead of degrading to TBD (ADR-040 round-trip symmetry).
+    domain_raw = log_scalars.get("domain", "").strip().strip('"').strip("'")
     # YAML-coercion-guard a kebab domain ("off"→bool, "2024"→int) — BC-13797.
     domain = _yaml_safe_token(domain_raw) if _KEBAB_RE.match(domain_raw) else TBD
     name = _yaml_safe_name(log_scalars.get("linear_milestone_name", "").strip())

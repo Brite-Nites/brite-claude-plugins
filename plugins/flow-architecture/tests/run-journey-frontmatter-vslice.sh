@@ -186,6 +186,19 @@ else
   fail "domain not coercion-guarded: $(grep '^domain:' "$TMP/coerce-domain.out")"
 fi
 
+# ── §4e: a QUOTED-on-disk scaffold-log domain round-trips (not degraded to TBD) ──
+# Mirrors the story builder's _scaffold_log_domain quote-strip: a quoted `domain: "ops"`
+# must be read as `ops` (passing _KEBAB_RE), not left wrapped → degraded to TBD.
+section "4e" "quoted scaffold-log domain round-trips (read quote-stripped, not TBD)"
+printf -- '---\ndomain: "ops"\nlinear_milestone_id: 7f3c2a10-aaaa-4bbb-8ccc-0123456789ab\nlinear_milestone_name: Widgets\n---\nbody\n' > "$TMP/quoted-domain-log.md"
+python3 "$BUILDER" --scaffold-log "$TMP/quoted-domain-log.md" --flows-dir "$FLOWS" --as-of "$AS_OF" \
+  > "$TMP/quoted-domain.out" 2>/dev/null || true
+if grep -qxF 'domain: ops' "$TMP/quoted-domain.out"; then
+  pass "quoted scaffold-log domain read as ops (round-trip, not TBD)"
+else
+  fail "quoted domain not round-tripped: $(grep '^domain:' "$TMP/quoted-domain.out")"
+fi
+
 # ── §5: skip-don't-crash ───────────────────────────────────────────────
 section "5" "stray / junk-flow_id / unterminated docs are skipped whole, never aborting"
 if grep -qE 'stray|ghost-persona|not-a-flow|leaky-persona|WGT-7' "$TMP/happy.out"; then

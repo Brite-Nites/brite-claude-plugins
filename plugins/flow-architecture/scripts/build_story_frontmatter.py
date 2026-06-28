@@ -90,16 +90,16 @@ def _clean_id(cell: str) -> str:
 
 def _cell_is_flow(cell: str, flow_id: str) -> bool:
     """True if a scaffold-log Sub-flow cell names `flow_id`. flow_id is OPAQUE (ADR-040),
-    so we match the KNOWN id as a whole leading token rather than extracting a `DOMAIN-NN`
-    shape (which slash-form ids like `admin-panel/layout-and-auth` don't have). After
-    stripping backticks/whitespace the cell is either the bare id (children table) or
-    `<id> — <desc> [<annot>]` (parents table); the boundary check (exact, or the id followed
-    by whitespace) stops `WGT-01` matching `WGT-010` and works for any id shape. Header /
-    separator / milestone cells never equal or lead with the id, so they fall through."""
-    c = cell.strip("`").strip()
-    if c == flow_id:
-        return True
-    return c.startswith(flow_id) and c[len(flow_id):len(flow_id) + 1].isspace()
+    so we match the KNOWN id as the cell's first whitespace-delimited token rather than
+    extracting a `DOMAIN-NN` shape (which slash-form ids like `admin-panel/layout-and-auth`
+    don't have). The cell is either the bare id (children table) or `<id> — <desc> [<annot>]`
+    (parents table), with the id optionally backtick-wrapped; an opaque id contains no
+    whitespace, so the first token IS the whole id. Backticks are stripped AFTER splitting —
+    `strip("`")` on the whole cell would leave the closing backtick of a `` `<id>` — <desc> ``
+    cell interior and silently miss it. Exact match on the de-backticked token also rules out
+    `WGT-01` vs `WGT-010`. Header / separator / milestone cells never lead with the id."""
+    tokens = cell.split()
+    return bool(tokens) and tokens[0].strip("`") == flow_id
 
 
 def _parse_scaffold_log(text: str, flow_id: str) -> tuple[str, dict[str, str]]:

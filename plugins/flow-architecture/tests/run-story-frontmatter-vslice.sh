@@ -362,6 +362,24 @@ grep -qxF 'redirect_to: "0o17"' "$TMP/coerce-radix.out" \
   && pass "radix-literal redirect_to (0o17) quoted (parses as str, not octal int)" \
   || fail "radix redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-radix.out")"
 
+# ── §17: backtick-wrapped Sub-flow id WITH a description still matches ──
+# A parents cell `` `<id>` — <desc> `` (backtick-wrapped id + description) must match — else a
+# whole-cell strip("`") leaves the closing backtick interior and silently degrades parent to TBD
+# (the exact all-TBD miss _cell_is_flow exists to prevent). The bare-backticked + plain-with-desc
+# cells are already covered by §7/§1; this pins the combined form.
+section "17" "backtick-wrapped id WITH description matches (no silent parent-TBD)"
+BTLOG="$TMP/backtick-log.md"
+{
+  printf -- '---\ndomain_code: WGT\n---\n\n'
+  printf -- '## Parents\n\n| # | Sub-flow | Linear identifier | Result |\n|---|---|---|---|\n'
+  printf -- '| 2 | `WGT-77` — Backtick-wrapped with desc | BC-77001 | executed |\n'
+} > "$BTLOG"
+python3 "$BUILDER" --scaffold-log "$BTLOG" --flow-id WGT-77 --as-of "$AS_OF" \
+  > "$TMP/backtick.out" 2>/dev/null || true
+grep -qxF 'parent_issue: BC-77001' "$TMP/backtick.out" \
+  && pass "backtick-wrapped id with desc matched (parent stamped, not TBD)" \
+  || fail "backtick-wrapped id with desc silently missed → parent: $(grep '^parent_issue:' "$TMP/backtick.out")"
+
 printf '\n──────────\n%d passed, %d failed\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
