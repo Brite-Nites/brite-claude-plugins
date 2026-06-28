@@ -79,6 +79,12 @@ assert_grep "agent: Pass must cite the concrete resolution" \
 # OUTCOME (2) — genuine absence is a substantiated finding, not a withhold
 assert_grep "agent: genuine absence is a substantiated finding" \
   "substantiated finding at the dimension's own severity band" "$QR_AGENT"
+# OUTCOME (3) — only a truly-unreachable target withholds the Pass
+assert_grep "agent: truly-unreachable is the lone withhold case" \
+  "Truly unreachable" "$QR_AGENT"
+# LOCATOR — a corpus-dependent Pass must carry a concrete cited locator
+assert_grep "agent: corpus Pass carries a cited locator" \
+  "cited locator" "$QR_AGENT"
 
 # NEGATIVE — the retired flag-gate language must be GONE
 assert_no_grep "agent: NO retired 'Absence of a field means you do NOT have that evidence' gate" \
