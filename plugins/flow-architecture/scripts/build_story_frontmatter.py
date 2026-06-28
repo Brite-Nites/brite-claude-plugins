@@ -57,9 +57,13 @@ _AS_OF_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\Z")
 _STATUS_TAXONOMY = frozenset(
     {"NOT_STARTED", "IN_PROGRESS", "BUILT", "QA_SIGNED_OFF", "SHIPPED", "BLOCKED"})
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*\Z")
-# A _SLUG_RE-valid token whose bare YAML form coerces to a non-string (bool/int/date)
+# A token whose bare YAML form coerces to a non-string (bool/null/int/date)
 # — mirrors build_journey_frontmatter's _YAML_AMBIGUOUS_RE/_yaml_safe_token (BC-13797).
-_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|on|off)\Z|^\d[\d_.,:-]*\Z")
+# `y|n` are the single-char YAML-1.1 bool short forms: now that an opaque flow_id (ADR-040)
+# can BE a single letter, they're quoted for consistency with the on/off/yes/no the guard
+# already covers under the strict-YAML-1.1 standard (defensive — PyYAML/js-yaml don't coerce
+# bare y/n, but a strict YAML-1.1 reader would). `(?i)` covers Y/N. Real ids are never y/n.
+_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|y|n|on|off)\Z|^\d[\d_.,:-]*\Z")
 _CHILD_SLOTS = ("story", "engineering", "design", "qa", "docs")
 
 

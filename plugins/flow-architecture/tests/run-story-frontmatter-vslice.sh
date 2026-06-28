@@ -361,6 +361,16 @@ grep -qxF 'flow_id: "0x1A"' "$TMP/coerce-radix.out" \
 grep -qxF 'redirect_to: "0o17"' "$TMP/coerce-radix.out" \
   && pass "radix-literal redirect_to (0o17) quoted (parses as str, not octal int)" \
   || fail "radix redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-radix.out")"
+# Single-letter YAML-1.1 bool short forms (y/Y/n/N) are now valid opaque ids and must be
+# quoted for consistency with on/off/yes/no, else a strict YAML-1.1 reader loads a bool.
+python3 "$BUILDER" --flow-id n --as-of "$AS_OF" --doc-type redirect --redirect-to Y --domain ops \
+  > "$TMP/coerce-yn.out" 2>/dev/null || true
+grep -qxF 'flow_id: "n"' "$TMP/coerce-yn.out" \
+  && pass "single-letter bool-shortform flow_id (n) quoted (YAML-1.1 consistency)" \
+  || fail "single-letter flow_id not coercion-guarded: $(grep '^flow_id:' "$TMP/coerce-yn.out")"
+grep -qxF 'redirect_to: "Y"' "$TMP/coerce-yn.out" \
+  && pass "single-letter bool-shortform redirect_to (Y) quoted" \
+  || fail "single-letter redirect_to not coercion-guarded: $(grep '^redirect_to:' "$TMP/coerce-yn.out")"
 
 # ── §17: backtick-wrapped Sub-flow id WITH a description still matches ──
 # A parents cell `` `<id>` — <desc> `` (backtick-wrapped id + description) must match — else a

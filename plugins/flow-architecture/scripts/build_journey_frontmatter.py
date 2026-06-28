@@ -81,7 +81,11 @@ _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 &/().,'+_-]*\Z")
 # string type. The digit-led branch admits `-`/`:` so date/time shapes are
 # covered too. Leading +/- can't reach here (first char must be alnum in both
 # charsets above); mixed digit+alpha/space strings ("2024 Holiday") don't coerce.
-_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|on|off)\Z|^\d[\d_.,:-]*\Z")
+# `y|n` are the single-char YAML-1.1 bool short forms: now that an opaque flow_id
+# (ADR-040) can BE a single letter, they're quoted for consistency with the
+# on/off/yes/no already covered (defensive strict-YAML-1.1 — PyYAML/js-yaml don't
+# coerce bare y/n, a strict YAML-1.1 reader would). `(?i)` covers Y/N.
+_YAML_AMBIGUOUS_RE = re.compile(r"(?i)^(?:null|true|false|yes|no|y|n|on|off)\Z|^\d[\d_.,:-]*\Z")
 # Frontmatter line shapes (top-level `key: value` and block-list `- item`).
 _KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):(.*)$")
 _ITEM_RE = re.compile(r"^\s+-\s*(.+?)\s*$")
