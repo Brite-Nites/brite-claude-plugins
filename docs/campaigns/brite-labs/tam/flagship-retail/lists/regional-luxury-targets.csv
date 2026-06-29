@@ -1,0 +1,91 @@
+region,brand,cities,category,why_it_fits,status_flag,warm_door,build_out_signal,domain,domain_confidence,domain_note
+California,Maxfield,"West Hollywood, Malibu",Multi-brand luxury concept,Gallery-grade space (custom Prouvé 'Nomade' adjunct); deep environment/art investment,,,,maxfieldla.com,high,
+California,H. Lorenzo,"West Hollywood, DTLA Arts District",Avant-garde concept boutique,"Runs a separate 'Archive' concept space; design-led, reshaping footprint",,,,hlorenzo.com,high,
+California,Just One Eye,Los Angeles (former Howard Hughes HQ),Luxury concept (fashion/jewelry/art/furniture),Inventive landmark-building interiors; discovery-driven destination,,,,justoneeye.com,high,
+California,The Webster,"LA (Beverly Center), Palm Springs",Multi-brand luxury concept,David Adjaye-designed LA flagship — architecture is the brand,,yes,,thewebster.com,high,migrated from former thewebster.us; one domain for CA + FL stores
+California,Mohawk General Store,Silver Lake / Echo Park (LA),Design-led multi-brand + in-house label,Dedicated space for own line; invests in distinct store environments,,,,mohawkgeneralstore.com,high,
+California,Market Market,Palm Springs,Experiential concept emporium,"40,000 sq ft; WWD top-10 concept store globally",,,,shopmarketmarket.com,high,
+California,Trina Turk / Mr Turk,Palm Springs,Resort fashion flagship,"5,000 sq ft flagship in landmark Albert Frey glass building",,,,trinaturk.com,high,
+California,Senreve,San Francisco (Jackson Square),Luxury accessories flagship,"On-site monogramming/art customization, beauty bar, special lighting tech; refreshed monthly",,,,senreve.com,high,
+California,Sigi's Boutique,La Jolla,Luxury fashion landmark,Landmark since 1968 on the 'Rodeo Drive of San Diego',,,,sigislajolla.com,high,
+California,Coop (Maris Collective),Napa (Carneros Resort),Experiential resort-retail boutique,Bespoke resort-wear inside a destination resort,,,,mariscollective.com,medium,no standalone Coop domain; sells under parent Maris Collective
+California,Hudson Grace,San Francisco + CA,Design-led home/lifestyle,Decorator destination; strong visual merchandising,,,,hudsongracesf.com,high,
+California,Westime,"La Jolla/San Diego, LA (Sunset, Beverly Hills)",Luxury-watch specialist,Multi-boutique watch destination; high-design environments,,,,westime.com,high,
+California,No.3 Fine Jewelry,San Francisco (Polk St),Independent fine jewelry,Design-forward custom/engagement showroom,,,,shopno3.com,high,
+California,Kerns Fine Jewelry,Burlingame (Peninsula),Regional fine jewelry,Peninsula's premier jewelry/watch destination since 1948,,,,kernjewelers.com,high,
+California,Rogers Jewelry Co.,"Modesto, Elk Grove, Folsom, Fresno, Bakersfield, SLO",Regional fine-jewelry house,Family house since 1937; expansive destination showrooms,,,,thinkrogers.com,high,
+California,Roseark,West Hollywood,Fine jewelry + concept boutique,Design-led WeHo flagship; experiential format,,,,roseark.com,high,
+California,Jacques Marie Mage,"Venice (Abbot Kinney), LA (Sycamore Ave)",Luxury eyewear / collectibles,"CA-HQ; boutiques as collector galleries, gallery lighting",,,,jacquesmariemage.com,high,
+California,Fred Segal,West Hollywood (Melrose),Multi-brand concept,Acquired by Aritzia (Feb 2026) — include only if reviving flagship wanted,"flagged: Aritzia-owned Feb 2026, no longer independent",,,fredsegal.com,medium,"online store closed Jul 2024; Aritzia acquisition Feb 2026, Melrose revival in progress"
+Mountain West & Utah,Gorsuch,"Vail, Beaver Creek, Aspen, Park City",Luxury ski/resort apparel & lifestyle,Category-defining mountain-luxury; multiple curated storefronts + new 'Ski Café' concept,,,,gorsuch.com,high,
+Mountain West & Utah,Kemo Sabe,"Aspen, Vail, Park City, Jackson Hole (+ Whitefish MT)",High-end Western wear / custom hats & boots,In-store custom hat-shaping ritual is the draw; flagship culture across resort towns,,,,kemosabe.com,high,
+Mountain West & Utah,Pitkin County Dry Goods,Aspen,Designer multi-brand boutique,"Aspen's original (1969) family clothier; Isabel Marant, Bode, Dries",,,,pitkincountydrygoods.com,high,
+Mountain West & Utah,Axel's of Vail,Vail,Luxury men's & women's clothier,Family-owned Vail Village destination; rustic-chic interior + own denim,,,,axelsltd.com,high,
+Mountain West & Utah,Cos Bar,"Aspen (flagship), Edwards CO",Luxury beauty specialty,Founded Aspen 1976; original flagship is high-touch destination,,,,cosbar.com,high,
+Mountain West & Utah,Stio (Mountain Studio),Jackson Hole town square + Teton Village,Mountain-luxury apparel flagship,Both stores designed as experiential 'Mountain Studio' flagships,,,,stio.com,high,
+Mountain West & Utah,Piper,Jackson Hole,Women's luxury boutique,Curated luxury-brand boutique downtown,,,,piperjacksonhole.com,high,
+Mountain West & Utah,WRJ Design / WRJ Home,Jackson Hole,Luxury home design showroom,"25,000 sq ft 'Stags Landing' flagship (2024); architectural-lighting fit",,yes,yes,wrjdesign.com,high,WRJ Home showroom lives under the design firm's site
+Mountain West & Utah,Meridian Jewelers,Aspen,Regional fine jeweler / timepieces,"Official Rolex (A. Lange, IWC, Kwiat) in former Hyde Park space",,,,meridianjewelers.com,high,
+Mountain West & Utah,O.C. Tanner Jewelers,"Salt Lake City (flagship), Park City Main St",Utah regional fine jeweler,Flagship in restored Hansen Planetarium; architecture-forward; Official Rolex,,,,octannerjewelers.com,high,retail jeweler; distinct from octanner.com recognition co
+Mountain West & Utah,Bennion Jewelers,Salt Lake City (City Creek area),Utah regional fine jeweler,Family-owned since 1862,,,,bennionjewelers.com,high,
+Mountain West & Utah,Morgan Jewelers,Salt Lake City (City Creek Center),Utah regional fine jeweler,Family-owned since 1941; flagship in City Creek,,,,morganjewelers.com,high,
+Mountain West & Utah,Elle Rose SV,Sun Valley ID,Luxury fashion & fine jewelry,Two adjacent Sun Valley Rd flagships; built-out footprint,,,,ellerosesv.com,high,
+Mountain West & Utah,The Brass Ranch,Sun Valley ID,High-end ski/sportswear & footwear,Long-standing Sun Valley luxury destination,,,,sunvalley.com,medium,resort-owned (email brassranch@sunvalley.com); brassranch.com no longer resolves
+Mountain West & Utah,Panache,Sun Valley ID + Park City UT,Luxury/contemporary womenswear,Multi-resort-town independent,,,,panachesunvalley.com,high,one site covers Sun Valley + Park City
+Mountain West & Utah,Belle Cose / Belle Shops,Big Sky MT (Town Center),Luxury boutique (apparel & lifestyle),Big Sky's anchor luxury boutique,,,,belleshops.com,high,rebranded as Belle Shops
+Mountain West & Utah,New West KnifeWorks,Big Sky MT + Jackson WY,Artisan luxury knives / craft flagship,Maker-flagship with experiential store design,,,,newwestknifeworks.com,high,
+Mountain West & Utah,Mary Jane's,Park City (Historic Main St),Designer boutique & shoes,20+ yr Main St boutique,CLOSED — closure announced Jan 2023; Yelp marks CLOSED May 2026,,,maryjanesshoes.com,medium,site still returns 200 but store closed
+Florida,The Webster,Bal Harbour (Miami),Multi-brand luxury concept,Art Deco brass-finish gallery interiors; design is the brand,,yes,,thewebster.com,high,migrated from former thewebster.us; one domain for CA + FL stores
+Florida,Alchemist,"Miami Beach (1111 Lincoln Rd), Design District",Avant-garde lifestyle concept,Rene Gonzalez glass-box flagship; fuses fashion + art + architecture,,yes,,shopalchemist.com,high,
+Florida,Marissa Collections,"Naples (Third St S), Palm Beach (Royal Poinciana)",Multi-brand luxury + fine jewelry,"New 4,000 sq ft experiential 'Penthouse' (viewing rooms, chef's table, bar)",,yes,yes,marissacollections.com,high,
+Florida,CNCPTS (Concepts),Miami Design District,Streetwear/luxury concept,"10,000 sq ft two-story immersive flagship",,,,cncpts.com,high,
+Florida,Cult Gaia,Miami Design District,Accessories flagship,Monumental stone sculptures + back-lit displays (lighting-led),,yes,,cultgaia.com,high,ignore lookalike cultgaiashop.com
+Florida,Provident Jewelry,"WPB, Palm Beach, Wellington, Jupiter, Naples, Fort Myers",Regional fine-jewelry house,Independent since 1993; multiple freestanding showrooms,,,,providentjewelry.com,high,
+Florida,Greenleaf & Crosby (by Betteridge),Palm Beach (Worth Ave),Fine jewelry / watches,"Landmarked 1894 store; Art Deco facade, Flagler-era cases",,,,greenleafcrosby.com,high,standalone site; betteridge.com is the sibling brand
+Florida,Yafa Signed Jewels,Palm Beach (Worth Ave),Vintage/signed jewelry,40-yr 'museum-quality' gallery-style boutique,,,,yafasignedjewels.com,high,
+Florida,Stubbs & Wootton,Palm Beach (Worth Ave),Footwear / lifestyle,Emblematic 'Palm Beach style' boutique identity,,,,stubbsandwootton.com,high,
+Florida,Marilyn's,Naples (Fifth Ave S),Luxury women's boutique,Hand-selected European couture; destination strip,,,,marilynhellman.com,high,sells under owner Marilyn Hellman's name domain
+Florida,Jackie Z Style Co.,St. Petersburg,Multi-brand luxury boutique,Award-winning curated designer boutique,,,,jackiezstyle.com,high,
+Florida,Sunni Spencer,"Tampa (Hyde Park Village), St. Pete (Vinoy)",Upscale boutique,Hyde Park pioneer; resort-located second flagship,,,,sunnispencer.com,high,
+Florida,Tuni,Winter Park (Orlando),Luxury women's boutique,Since 1986; private-shopping/styling model on Park Ave,,,,shoptuni.com,high,
+Florida,John Craig Clothier,Winter Park (Orlando),Menswear,Historic 1923 storefront + 'Current' concept next door,,,,johncraigclothier.com,high,
+Florida,Les Bijoux,Boca Raton (Mizner Park),Luxury jewelry boutique,Flagship in Boca's premier open-air district,,,,lesbijoux.com,high,
+Florida,Devon's Diamonds & Decor,Boca Raton (Royal Palm Place),Jewelry + home decor,4th-gen jeweler; experience-led showroom,,,,devonsdiamondsdecor.com,high,
+Florida,Christopher King,Palm Beach (Worth Ave),Luxury jewelry/lifestyle,New Worth Ave flagship late 2025 — fresh build-out timing,,,yes,bychristopherking.com,high,"brand site is bychristopherking.com, not christopherking.com"
+Texas / Arizona / PNW,Forty Five Ten,Dallas (downtown / Highland Park Village),Multi-brand luxury concept,Headington-backed; merchandised as an art-forward destination,,yes,,fortyfiveten.com,high,
+Texas / Arizona / PNW,Stanley Korshak,Dallas (Crescent),Independent luxury dept store,Largest independent luxury dept store in the US,,,,stanleykorshak.com,high,site 301s to stanleykorshak.mitchellstores.com (Mitchell Stores parent)
+Texas / Arizona / PNW,Eiseman Jewels,Dallas (NorthPark),Regional fine jeweler,Named finest independent jewelry store in the nation,,,,eisemanjewels.com,high,
+Texas / Arizona / PNW,de Boulle Diamond & Jewelry,Dallas (Preston/Lovers Ln),Fine jeweler / watches,In-store Patek showroom + 2nd Holland & Holland boutique — branded rooms,,yes,,deboulle.com,high,
+Texas / Arizona / PNW,Bachendorf's,Dallas / Fort Worth (Galleria),Regional fine jeweler,100+ yr family jeweler; destination Rolex showroom,,,,bachendorfs.com,high,
+Texas / Arizona / PNW,Pinto Ranch,Dallas (NorthPark) + Houston flagship,Luxury Western wear / boots,"11,000 sq ft flagship model; store-as-spectacle",,,,pintoranch.com,high,
+Texas / Arizona / PNW,Culwell & Son,Dallas (University Park),Bespoke menswear,Heritage clothier since 1920; Park Cities elite,,,,culwell.com,high,
+Texas / Arizona / PNW,Ken's Man's Shop,Dallas (North Dallas),Haberdashery / bespoke,Design-forward single-store clothier,,,,kensmansshop.com,high,
+Texas / Arizona / PNW,Grange Hall,Dallas (Travis St),Luxury home / concept lifestyle,Owner-curated 'opulent oddities' — atmosphere-driven,,yes,,ufgrangehall.com,high,own site under 'Urban Flower Grange Hall' name; not grangehall.com
+Texas / Arizona / PNW,Cornelis Hollander,Scottsdale (Old Town),Designer fine jeweler,Architecturally-inspired designs; showroom built around design experience,,yes,,cornelishollander.com,high,
+Texas / Arizona / PNW,The Clotherie,Scottsdale (Old Town),Luxury menswear,50-yr curated destination with in-house tailoring,,,,theclotheriescottsdale.com,high,theclotherie.com 404s; shoptheclotherie.com is unrelated
+Texas / Arizona / PNW,Mavericks of Scottsdale,Scottsdale (Old Town),Luxury Western apparel,Experiential custom hat bar,,,,mavericksofscottsdale.com,high,
+Texas / Arizona / PNW,Molina Fine Jewelers,Phoenix/Scottsdale (Camelback),Regional fine jeweler,'Museum-worthy' colored-gem showroom,,,,molinafinejewelers.com,high,
+Texas / Arizona / PNW,Sami Fine Jewelry,Fountain Hills (Scottsdale area),Regional fine jeweler,'Top Five Cool Jewelry Store' in America,,,,samifinejewelry.com,high,
+Texas / Arizona / PNW,Mario's,Seattle + Portland,Luxury men's & women's apparel,Seattle designer destination (Armani-Zegna); large-format experiential,,,,marios.com,high,site 301s to marios.mitchellstores.com (Mitchell Stores parent since 2015)
+Texas / Arizona / PNW,Turgeon Raine,Seattle (5th & University),Fine jeweler,Family flagship on upscale corner; master-jeweler custom shop,,,,turgeonraine.com,high,
+Texas / Arizona / PNW,Fox's Gem Shop,Seattle (downtown),Fine jeweler,Century-old elegant downtown showroom,CLOSED — April 2024 after 112 yrs (National Jeweler; Yelp CLOSED 2026-02),,,foxsseattle.com,low,rebranded Fox's Seattle; domain no longer resolves
+Texas / Arizona / PNW,Brume,Seattle + Bellevue,Design-led luxury furniture showroom,"Piet Boon, Verellen — already sells lighting",,yes,,brume.house,high,Bellevue showroom flagged closed on Yelp; Seattle active
+Texas / Arizona / PNW,MR. Studio,Seattle + Bellevue,Design collective / furnishings + lighting,Curates contemporary lighting — already lighting-literate buyer,,yes,,mr.studio,high,ex-Inform Interiors Seattle; e-comm at shop.mr.studio
+Texas / Arizona / PNW,Proto 101,Bellevue (Bellevue Square),Design-led apparel,Flagship is explicitly a design statement,verify — Bellevue Square storefront closure announced on brand Facebook,,,proto101official.com,high,
+Northeast & Mid-Atlantic,Mitchell Stores (Mitchells / Richards),Westport & Greenwich CT; Huntington NY,Luxury multi-brand apparel,"4th-gen; Richards 27,000 sq ft, Mitchells 25,000 sq ft destination stores",,,,mitchellstores.com,high,Mitchells/Richards run as subdomains
+Northeast & Mid-Atlantic,London Jewelers,"East Hampton, Manhasset, Glen Cove NY",Regional fine-jewelry house,~100-yr family; 2025 Rolex boutique in landmark Odd Fellows Hall,,,yes,londonjewelers.com,high,
+Northeast & Mid-Atlantic,Fivestory New York,"Upper East Side, NYC",Luxury concept store,Townhouse boutique pioneering 'experiential retail',,,,fivestoryny.com,high,
+Northeast & Mid-Atlantic,Kith,"NoHo, NYC (+ regional)",Experiential streetwear/lifestyle,3-story Snarkitecture flagship + Kith Treats + Daniel Arsham gallery,,,,kith.com,high,many counterfeit lookalikes rank in search; kith.com is the real one
+Northeast & Mid-Atlantic,CLIC,Madison Ave NYC + East Hampton,Multi-brand concept/lifestyle,Photography-gallery-meets-retail concept,,,,clic.com,high,
+Northeast & Mid-Atlantic,CURIO,Amagansett & Southampton NY,Multi-brand luxury boutique,100+ designers; 'immersive in-store experiences',,,,shopatcurio.com,high,
+Northeast & Mid-Atlantic,MONC XIII,Greenwich CT + Sag Harbor NY,Luxury home/lifestyle,Furniture + architectural lighting + fragrance — directly lighting-relevant,,yes,,monc13.com,high,"numeral '13' in domain, not 'xiii'"
+Northeast & Mid-Atlantic,Boyds Philadelphia,Philadelphia (1818 Chestnut),Luxury department/apparel,4th-gen flagship; recently re-designed interior + jewelry salon mezzanine,,,,boydsphila.com,high,
+Northeast & Mid-Atlantic,Joan Shepp,Philadelphia (1905 Walnut),Designer boutique,Sept 2025 reopened on Walnut — active new flagship build-out,,,yes,joanshepp.com,high,
+Northeast & Mid-Atlantic,The 1916 Company (formerly Govberg),"Rittenhouse, Philadelphia",Luxury-watch / jeweler,Official Rolex/Patek; collector-destination boutique,,,,the1916company.com,high,Govberg branding retired after 2023 merger
+Northeast & Mid-Atlantic,Capitol,"SouthPark, Charlotte NC (+ Brentwood CA)",Luxury fashion boutique,Laura Vinroot Poole destination; Charlotte cultural landmark,,,,shop-capitol.com,high,rel=canonical self-declares shop-capitol.com
+Northeast & Mid-Atlantic,Poole Shop,"SouthPark, Charlotte NC",Contemporary designer boutique,Capitol's sister store; same design-led ownership,,,,pooleshopcharlotte.com,high,
+Northeast & Mid-Atlantic,Perry's Diamonds & Estate Jewelry,"SouthPark, Charlotte NC",Fine/estate jeweler,40+ yr destination; dedicated showroom building + on-site custom shop,,,,perrysjewelry.com,high,
+Northeast & Mid-Atlantic,Bailey's Fine Jewelry,"Raleigh, Cary, Charlotte, Greenville NC",Regional fine-jewelry house,Family since 1948; multiple destination stores + Fox & Bailey watch shop,,,,baileybox.com,high,"brand sells under baileybox.com, not a baileys* domain"
+Northeast & Mid-Atlantic,Charlotte's Inc,Charlotte NC,Luxury boutique,Long-running curated regional destination,,,,charlottesinc.com,high,
+Northeast & Mid-Atlantic,Second Edition NY,Scarsdale NY (Westchester),Luxury consignment boutique,Authenticated Chanel/Gucci/Prada destination,,,,secondeditionny.com,high,
+Northeast & Mid-Atlantic,Brooke and Bel,Hoboken NJ,Multi-brand fashion boutique,Curated store on Washington St corridor,,,,brookeandbel.com,high,
