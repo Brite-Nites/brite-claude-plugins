@@ -107,7 +107,7 @@ def _check_links(doc: Path) -> list:
 
 
 def audit(repo: Path) -> list:
-    """Run the three CI gates over `repo` → a list of failure dicts
+    """Run the four CI gates over `repo` → a list of failure dicts
     {gate, scope, detail}. Empty list ⇒ all pass."""
     failures = []
 
@@ -183,7 +183,11 @@ def audit(repo: Path) -> list:
     #     slugs only; an RBAC/access-role overload is an off-canon failure here, not a
     #     carve (ADR-041). ---
     for v in fpl.audit_persona_exists(repo):
-        failures.append({"gate": "persona-exists", "scope": "flow:" + v["doc"],
+        # Sibling gates scope as `flow:<stem>` (doc.stem); the lint's `doc` id is
+        # domain-qualified (`<domain>/<stem>`) for its own cross-domain disambiguation,
+        # so take the basename here to keep a failing doc correlatable across gates.
+        stem = v["doc"].rsplit("/", 1)[-1]
+        failures.append({"gate": "persona-exists", "scope": "flow:" + stem,
                          "detail": "persona '{}' → no docs/product/personas/{}.md".format(v["slug"], v["slug"])})
 
     return failures
