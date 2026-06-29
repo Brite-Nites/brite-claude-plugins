@@ -1,13 +1,13 @@
 ---
 disable-model-invocation: true
-description: Retrofit Flow-Driven Architecture orchestrator — 9 phases / 5 gates / conditional office-hours per Q37 lock
+description: Retrofit Flow-Driven Architecture orchestrator — 10 phases / 5 gates / conditional office-hours per Q37 lock
 ---
 
-<!-- eval-waiver: Nine-phase, five-gate retrofit orchestrator: preflight, office-hours, two-pass legacy cross-reference (own-body get_milestone and save_milestone writes into legacy milestone descriptions), codebase-scan inventory, and per-domain flow-linear-scaffold; outputs are AI-authored docs plus Linear scaffold plus appended migration annotations gated by operator review, with no separable deterministic artifact to assert. -->
+<!-- eval-waiver: Ten-phase, five-gate retrofit orchestrator: preflight, office-hours, two-pass legacy cross-reference (own-body get_milestone and save_milestone writes into legacy milestone descriptions), codebase-scan inventory, per-domain flow-linear-scaffold, and globally-batched doc-author / journey-author / persona-author; outputs are AI-authored docs plus Linear scaffold plus appended migration annotations gated by operator review, with no separable deterministic artifact to assert. -->
 
 # /flow:retrofit-project
 
-Retrofit UI-bearing FDA build orchestrator for projects that already carry legacy Phase-Pattern work. Runs **9 phases / 5 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:682`). Differs from `/flow:start-project` by inserting Phase 3 `flow-legacy-cross-reference` (Q14, retrofit-only) + a Phase 3→4 review-document gate (G3 per Q14.6) + using Phase 4 `flow-inventory-codebase-scan` (Q11) instead of greenfield's interview-driven Q19. Phase 5 stays a per-domain inner loop preserving Q13.5 atomic recovery; Phases 6+7 are globally batched activating Q15.2 + Q16.2 internal parallelism. Wall ≈ depends on legacy-milestone count and FDA-domain count discovered at scan time.
+Retrofit UI-bearing FDA build orchestrator for projects that already carry legacy Phase-Pattern work. Runs **10 phases / 5 user-confirmation gates** with **hybrid control flow** per Q37 lock (`plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:682`). Differs from `/flow:start-project` by inserting Phase 3 `flow-legacy-cross-reference` (Q14, retrofit-only) + a Phase 3→4 review-document gate (G3 per Q14.6) + using Phase 4 `flow-inventory-codebase-scan` (Q11) instead of greenfield's interview-driven Q19. Phase 5 stays a per-domain inner loop preserving Q13.5 atomic recovery; Phases 6+7+8 are globally batched activating Q15.2 + Q16.2 internal parallelism + the BC-14018 per-persona fan-out. Wall ≈ depends on legacy-milestone count and FDA-domain count discovered at scan time.
 
 > **Scope:** UI-bearing retrofits only (CDR-023 partition). Non-UI-bearing work uses CDR-014's Phase Pattern with `/workflows:fix-milestone --migrate ...`, not FDA. `flow-preflight` performs upstream mode classification — `/flow:retrofit-project` runs only when mode resolves to `retrofit` (FDA artifacts absent + legacy-work signal present per Q12.3).
 
@@ -18,7 +18,7 @@ Retrofit UI-bearing FDA build orchestrator for projects that already carry legac
 ## Architecture overview
 
 ```
-  /flow:retrofit-project (retrofit) — 9 phases / 5 gates
+  /flow:retrofit-project (retrofit) — 10 phases / 5 gates
   ═══════════════════════════════════════════════════════════════════
 
    ┌─ Phase 1 ─┐ G1 ┌─ Phase 2 ──┐ G2 ┌─ Phase 3 ─┐ G3 ┌─ Phase 4 ─┐
@@ -54,12 +54,22 @@ Retrofit UI-bearing FDA build orchestrator for projects that already carry legac
                                  parent's ## L3 review summary)
 
                                                        ┌─ Phase 8 ─┐
+                                                       │  persona- │
+                                                       │   author  │
+                                                       │ (BC-14018)│
+                                                       └─────┬─────┘
+                                                             ↓ 1 agent /
+                                                          persona slug
+                                                          (intent/journey-
+                                                           derived; ADR-041
+                                                           — no code signal)
+                                                       ┌─ Phase 9 ─┐
                                                        │  regen-   │
                                                        │   index   │
                                                        │   (Q18)   │
                                                        └─────┬─────┘
                                                              ↓
-                                                       ┌─ Phase 9 ─┐
+                                                       ┌─ Phase 10 ┐
                                                        │ complete  │
                                                        │           │
                                                        └───────────┘
@@ -68,7 +78,7 @@ Retrofit UI-bearing FDA build orchestrator for projects that already carry legac
                                                        breadcrumb
 ```
 
-Greenfield SKIPS Phase 3 (`/flow:start-project` is 8 phases / 4 gates and lives in `commands/start-project.md` — BC-6962 shipped). Retrofit adds Phase 3 cross-reference + G3 review-doc gate.
+Greenfield SKIPS Phase 3 (`/flow:start-project` is 9 phases / 4 gates and lives in `commands/start-project.md` — BC-6962 shipped). Retrofit adds Phase 3 cross-reference + G3 review-doc gate.
 
 > **Diagram note on G placement.** All five gates are phase-transition gates in the textual definitions below. The ASCII boxes above place gate labels visually between adjacent phase boxes for layout reasons; the authoritative source is the per-gate prose at § The 5 user gates + the per-phase sections.
 
@@ -135,8 +145,9 @@ Breadcrumb shape (per Q31.4 — the `last_updated` field name is load-bearing: `
 | 5 | per-domain replay — iterate `breadcrumb.domains[]`; skip `scaffold_state == "completed"`; resume at first non-completed. L3 review state not persisted (re-runs per parking lot #31 v1; ~2-5 min per sub-flow). |
 | 6 | re-run whole Phase 6 (~30-60s with Q15.2 internal parallelism). Q15's skip-if-exists per Q15.3 keeps already-written story docs from being clobbered without `--force`. |
 | 7 | re-run whole Phase 7 (~60-90s with Q16.2 internal parallelism). L2 review state not persisted; re-runs (~2-5 min per domain) per parking lot #31 v1. Q16's skip-if-exists per Q16.3 likewise gates journey-doc clobber. |
-| 8 | re-run whole Phase 8. INDEX regeneration is idempotent. |
-| 9 | only reached for a mid-Phase-9 in_flight crash (after summary render, before the final breadcrumb write); re-emit the completion summary, then write `status: completed`. A breadcrumb already at `status: completed` is stale per Q31.3 and flow-preflight offers discard instead of resuming here. |
+| 8 | re-run whole Phase 8 (persona author, ~90s per BC-14018 fan-out). The skill's skip-if-exists keeps already-written persona docs from being clobbered without `--force`. |
+| 9 | re-run whole Phase 9. INDEX regeneration is idempotent. |
+| 10 | only reached for a mid-Phase-10 in_flight crash (after summary render, before the final breadcrumb write); re-emit the completion summary, then write `status: completed`. A breadcrumb already at `status: completed` is stale per Q31.3 and flow-preflight offers discard instead of resuming here. |
 
 Stale breadcrumb handling (>7 days, or `status: completed | abandoned`, or malformed) lives inside `flow-preflight` Section 3.1 and prompts the user via `AskUserQuestion` to discard / force-resume / cancel. Orchestrator does not re-implement that policy.
 
@@ -163,7 +174,7 @@ Phases flow via a single session-scoped state object. No re-fetching from filesy
   "linear_team_key":         "<e.g., BC>",
   "repo_root":               "<absolute path>",
   "run_started_at":          "<ISO-8601>",
-  "current_phase":           "1..9",
+  "current_phase":           "1..10",
   "completed_phases":        [...],
   "preamble":                { ...10 KEY=VALUE fields from flow-context-load.sh },
   "intent_existed_at_start": true | false,
@@ -176,7 +187,7 @@ Phases flow via a single session-scoped state object. No re-fetching from filesy
   "l1_review":               { "summary_written_at": "<ISO-8601 | null>" },
   "l2_review_<slug>":        "<in-memory blob, one entry per domain slug>",
   "l3_review":               { "<sub-flow-id>": "<in-memory blob>" },
-  "ship_artifacts":          { "story_docs": [...], "journey_docs": [...], "index_path": "..." },
+  "ship_artifacts":          { "story_docs": [...], "journey_docs": [...], "persona_docs": [...], "index_path": "..." },
   "status":                  "in_flight"
 }
 ```
@@ -193,7 +204,7 @@ This object is **session-scoped**. The breadcrumb is the persistent projection �
 - **G4 (4→5):** `master-flow-inventory.md` content review (post-codebase-scan, L2 stashed per inferred domain).
 - **G5 (5→6):** pre-scaffold batch preview consolidating ALL domains' planned scaffolds — NOT N separate gates. L3 reviews per sub-flow already populated at this point.
 
-Phases 6/7/8 run without further orchestrator gates per Q15.6 / Q16.6 / Q18.8 lock 0 sync gates each.
+Phases 6/7/8/9 run without further orchestrator gates per Q15.6 / Q16.6 / BC-14018 / Q18.8 lock 0 sync gates each.
 
 ## Per-phase failure matrix (Q37 sub-decision 6 generalized to retrofit — verbatim from memory:694 with Phase 3 + Phase 4 retrofit-specific rows)
 
@@ -206,8 +217,9 @@ Phases 6/7/8 run without further orchestrator gates per Q15.6 / Q16.6 / Q18.8 lo
 | 5 | per-domain Q13.5 sub-flow-atomic recovery — failure isolated to one domain. Orchestrator pauses inner loop for user adjudication (`AskUserQuestion`: retry / skip-domain / abort). On user choice "retry" or "skip", inner loop resumes with the next pending domain in `breadcrumb.domains[]`. |
 | 6 | log + continue per Q15.5. Operating at global batch scope — partial Q15 failures surface in batch summary. Orchestrator does NOT roll back since outputs are filesystem writes reviewable via `git diff` + `verify-docs.sh`. |
 | 7 | log + continue per Q16.5 (same shape as Phase 6). |
-| 8 | Q18.7 log + continue + skip-row marker. INDEX renders a "regen-failed: <reason>" row instead of clobbering with a partial INDEX. |
-| 9 | n/a — terminator. |
+| 8 | log + continue per BC-14018 (same shape as Phase 6/7). A persona whose `persona-doc-author` agent returns the `PERSONA-DOC-AUTHOR-ERROR` sentinel (or whose write fails) surfaces in the batch summary; one failed persona never aborts the batch — user re-runs with `--force`. |
+| 9 | Q18.7 log + continue + skip-row marker. INDEX renders a "regen-failed: <reason>" row instead of clobbering with a partial INDEX. |
+| 10 | n/a — terminator. |
 | user halt at any gate | breadcrumb `status: abandoned`; future `/flow:retrofit-project` invocation detects abandoned + offers discard per Q31.3 stale-breadcrumb policy. (Q31.1 lock at memory:313 reserves the `reason` field for `overrides[]` entries — Q29.5 hard-gate decisions, not user-cancel attribution; do not add a top-level `reason` field without a Q31 amendment + audit trail.) |
 
 ---
@@ -687,23 +699,53 @@ This phase is **globally batched** — orchestrator invokes `flow-journey-author
 
 ---
 
-## Phase 8: regen index
+## Phase 8: persona author (globally batched)
+
+**Sub-skill:** `flow-persona-author` (BC-14018; shipped at `plugins/flow-architecture/skills/flow-persona-author/SKILL.md`).
+
+This phase is **globally batched** — orchestrator invokes `flow-persona-author` ONCE for the whole project. The skill enumerates the project-wide persona set and fans out 1 `Agent(persona-doc-author)` per unique persona slug under a ~10 concurrency cap (~90s wall for K≤10 personas).
+
+**Pre-condition:** Phase 7 completed; journey docs written for all completed domains. Personas are authored AFTER journeys because the journey docs are the persona-doc-author agent's richest behavioral source AND the story docs (Phase 6) are the source of the `personas:` slug set this skill enumerates.
+
+> **Personas are intent/journey-derived, NOT code-derived (ADR-041).** This phase is a deliberate, exact mirror of `/flow:start-project` Phase 7 — it has **no** retrofit-specific code-evidence analog to Phase 6's Q15.7 status scan (which sets story *status* from `src/`). A persona is a behavioral artifact — anchored on the human's mental unit, the failure they cannot absorb, and how they think — so retrofit's codebase signal never shapes the persona set or its content (folding code into a behavioral persona is exactly the drift ADR-041 retired). The one persona-relevant way retrofit differs from greenfield is that existing persona docs are common on disk; the skill's **skip-if-exists** already handles that without orchestrator-side logic. The "is the feature built?" question lives in story status (Q15.7) + the status-vs-code cross-check, not here.
+
+**Run:** dispatch `flow-persona-author`. The skill:
+
+1. Reconciles the persona set — the union of every non-empty story-doc `personas:` slug (`docs/product/flows/<domain>/*.md`, the same parse as `flow_persona_lint.py`) with the inventory persona column / `intent.md` `## Target users`, minus honest-empty (ADR-041 / ADR-029 honest-empty canon).
+2. Per slug, gathers the `persona-doc-author` inputs (slug, display_name, device, `journey_paths` = journeys whose aggregate `personas:` includes the slug, `served_flows` = flows whose `personas:` include it, intent_path, template_path, today).
+3. Writes whole-file persona docs at `docs/product/personas/<slug>.md` (the agent emits front-matter + body; only `last_reviewed` is dispatcher-supplied — no builder). Strips the agent's inline HTML source-comments before writing.
+4. Per-persona fan-out runs concurrently under the cap.
+5. Skip-if-exists: existing persona docs preserved unless `--force` flag passed.
+6. Authors/refreshes `docs/product/personas/INDEX.md` (new rows land `Drafted`; `quality-reviewer` promotes to `Reviewed` — the skill does not self-certify).
+7. Log + continue: a persona returning the `PERSONA-DOC-AUTHOR-ERROR` sentinel surfaces in the batch summary.
+
+**Capture into state:** `state.ship_artifacts.persona_docs[]`.
+
+**No gate.** BC-14018 locks 0 sync gates for Phase 8 (filesystem write; git review is the implicit gate — same rule as Phases 6/7).
+
+**Breadcrumb update:** `current_phase: 9`, `completed_phases: ["1", "2", "3", "4", "5", "6", "7", "8"]`.
+
+**Failure semantics (Phase 8):** log + continue per BC-14018. Same shape as Phase 6/7 — one failed persona surfaces in the batch summary and never aborts the batch; user re-runs with `--force`.
+
+---
+
+## Phase 9: regen index
 
 **Sub-skill:** `flow-regen-index` (Q18; not yet shipped — orchestrator references by name).
 
 **Run:** dispatch `flow-regen-index`. The skill regenerates `docs/product/flows/INDEX.md` from `master-flow-inventory.md` + per-domain story doc presence. Idempotent — re-running yields the same INDEX content for the same input.
 
-**No gate.** Q18.8 locks 0 sync gates for Phase 8.
+**No gate.** Q18.8 locks 0 sync gates for Phase 9.
 
 **Capture into state:** `state.ship_artifacts.index_path`.
 
-**Breadcrumb update:** `current_phase: 9`, `completed_phases: ["1", "2", "3", "4", "5", "6", "7", "8"]`.
+**Breadcrumb update:** `current_phase: 10`, `completed_phases: ["1", "2", "3", "4", "5", "6", "7", "8", "9"]`.
 
-**Failure semantics (Phase 8):** Q18.7 log + continue + skip-row marker. If a specific row's render fails (e.g., a sub-flow's story doc missing), INDEX includes a "regen-failed: <reason>" marker for that row rather than clobbering with a partial INDEX or omitting the row silently.
+**Failure semantics (Phase 9):** Q18.7 log + continue + skip-row marker. If a specific row's render fails (e.g., a sub-flow's story doc missing), INDEX includes a "regen-failed: <reason>" marker for that row rather than clobbering with a partial INDEX or omitting the row silently.
 
 ---
 
-## Phase 9: complete
+## Phase 10: complete
 
 Inline terminator phase. No sub-skill dispatch — orchestrator owns the final summary + breadcrumb write.
 
@@ -715,12 +757,13 @@ Inline terminator phase. No sub-skill dispatch — orchestrator owns the final s
    - `docs/product/master-flow-inventory.md`
    - `docs/product/flows/<domain>/<sub-flow>.md` per sub-flow (count + sample paths)
    - `docs/product/journeys/<domain>.md` per domain
+   - `docs/product/personas/<slug>.md` per behavioral persona + `docs/product/personas/INDEX.md`
    - `docs/product/flows/INDEX.md`
    - Linear: `<N>` milestones + `<sum>` parent issues + `<sum × 5>` discipline children — list URLs grouped by domain
    - Linear legacy: `<M>` milestones cross-referenced with `## FDA migration` section
    - L-review coverage: L1 (intent.md — fired when Phase 2 ran) + L2 (`<D>` invocations, journey docs) + L3 (`<sum>` invocations, parent issues)
 
-2. **Final breadcrumb write:** `status: completed`, `current_phase: 9`, `completed_phases: ["1"..."9"]`. The Q31.5 atomic-rename write through `flow-resume-breadcrumb.sh write` is the **last operation** of the orchestrator — never write the `completed` marker before all artifacts land on disk (BC-5761 precedent applied here).
+2. **Final breadcrumb write:** `status: completed`, `current_phase: 10`, `completed_phases: ["1"..."10"]`. The Q31.5 atomic-rename write through `flow-resume-breadcrumb.sh write` is the **last operation** of the orchestrator — never write the `completed` marker before all artifacts land on disk (BC-5761 precedent applied here).
 
 3. Recommend next steps:
    - Run `/flow:audit` (Q38; pending) for project-health snapshot covering the 37-gate stack (post-Q29 amendment 6).
@@ -728,7 +771,7 @@ Inline terminator phase. No sub-skill dispatch — orchestrator owns the final s
    - The retrofit cross-reference doc at `docs/plans/<retrofit-slug>-cross-reference.md` is retained as a transient run artifact per `docs/plans/` convention; deletable post-retrofit at the user's discretion. The Linear-side `## FDA migration` sections persist as the cross-reference's durable representation.
    - Per Q9 policy: in-flight legacy work continues in its existing Phase Pattern shape; new work after this retrofit should be created under the new FDA-shape milestones produced in Phase 5. This boundary is reviewer-enforced, not breadcrumb-encoded.
 
-**Failure semantics (Phase 9):** n/a — terminator. Any failure prior to the final breadcrumb write leaves breadcrumb at Phase 8 or earlier; resume picks up appropriately.
+**Failure semantics (Phase 10):** n/a — terminator. Any failure prior to the final breadcrumb write leaves breadcrumb at Phase 9 or earlier; resume picks up appropriately.
 
 ---
 
@@ -740,11 +783,11 @@ Origin: cadence BC-5866 precedent surfaced this class-bug across orchestrators; 
 
 ## Phase-exit breadcrumb update (canonical pattern)
 
-Every phase ends with a breadcrumb update so resume can reason about what's complete. Each phase ID (`1` through `9`) appends at the phase's terminal step:
+Every phase ends with a breadcrumb update so resume can reason about what's complete. Each phase ID (`1` through `10`) appends at the phase's terminal step:
 
 1. Append the phase number to `breadcrumb.completed_phases` (in order).
-2. Set `breadcrumb.current_phase` to the next phase number (or leave at `9` after Phase 9).
-3. Set `breadcrumb.status` (`in_flight` until Phase 9 terminator; then `completed`).
+2. Set `breadcrumb.current_phase` to the next phase number (or leave at `10` after Phase 10).
+3. Set `breadcrumb.status` (`in_flight` until Phase 10 terminator; then `completed`).
 4. Refresh `breadcrumb.last_updated` with the current ISO-8601 timestamp (NOT `updated_at` — the helper script's stale-detection in `read` mode keys on `last_updated`; writing the wrong field name would silently break staleness checks).
 5. Persist via the BC-6956 helper. The helper `write` subcommand takes two positional arguments — `<state-path>` (the breadcrumb on disk) and `<input-path>` (a `mktemp`'d file holding the new JSON) — per BC-9027. See the Phase 1 example for the canonical `python3 > $TMP_JSON <<'PY' ... PY; bash $HELPER write $BREADCRUMB_PATH $TMP_JSON; rm -f $TMP_JSON` form. Construct dynamic values inside a single-quoted python heredoc (`<<'PY'`) so Linear-derived strings cannot expand into the shell; pass `$BREADCRUMB_PATH` and `$TMP_JSON` as discrete arguments to the helper (never inside `bash -c` or an unquoted `$(...)`). The `mktemp` file intermediate replaces the previous stdin-pipe pattern, which tripped the workflows security-hook classifier.
 
@@ -759,7 +802,7 @@ Phase 2's no-op skip (when `intent_existed_at_start: true`) still writes the bre
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:896` — Q42 lock (sub-decision 1 conditional invocation when intent.md absent).
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md:64` — Q9 retrofit additive-only policy.
 - `plugins/flow-architecture/docs/design-rationale/fda-plugin-architecture-overview.md` §3f — Retrofit Orchestrator Phase Flow (synthesis view; note the "Cutover timestamp recorded in .flow-phase-state.json" line is stale per Q31 lock — trust this orchestrator).
-- `plugins/flow-architecture/commands/start-project.md` — sibling greenfield orchestrator (BC-6962 shipped; 8 phases / 4 gates).
+- `plugins/flow-architecture/commands/start-project.md` — sibling greenfield orchestrator (BC-6962 shipped; 9 phases / 4 gates).
 - `plugins/flow-architecture/skills/flow-preflight/SKILL.md` — Phase 1 sub-skill (BC-6957 shipped).
 - `plugins/flow-architecture/scripts/flow-resume-breadcrumb.sh` — Q31.5 atomic-rename breadcrumb helper (BC-6956 shipped).
 - `plugins/cadence/commands/weekly.md` — orchestrator precedent (5 phases / 3 gates / phase-state breadcrumb / gate-respect contract).

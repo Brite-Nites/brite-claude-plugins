@@ -8,6 +8,7 @@
 #   1. skills/flow-persona-author/SKILL.md        the dispatch sub-skill (mirror of flow-journey-author)
 #   2. commands/start-project.md                  greenfield orchestrator wires it as a phase AFTER journey-author
 #   3. commands/add-domain.md                     incremental-add orchestrator wires it as a phase AFTER journey-author
+#   4. commands/retrofit-project.md               retrofit orchestrator wires it as a phase AFTER journey-author
 #
 # This is a PROSE tripwire, not a behavior test: the orchestrators + skill are
 # AI-dispatched markdown, so this asserts the instruction text carries the
@@ -25,6 +26,7 @@ PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILL="$PLUGIN_ROOT/skills/flow-persona-author/SKILL.md"
 START="$PLUGIN_ROOT/commands/start-project.md"
 ADD="$PLUGIN_ROOT/commands/add-domain.md"
+RETROFIT="$PLUGIN_ROOT/commands/retrofit-project.md"
 
 PASS=0
 FAIL=0
@@ -58,7 +60,7 @@ assert_no_grep() {
 }
 
 # ── Section 1: the dispatch sub-skill exists + carries its contract ──────────
-section "1/3" "flow-persona-author SKILL.md carries the dispatch contract"
+section "1/4" "flow-persona-author SKILL.md carries the dispatch contract"
 assert_file "skill present" "$SKILL"
 # NOT user-invocable (orchestrator-dispatched only, per Q7).
 assert_grep "skill: user-invocable false"       "user-invocable: false" "$SKILL"
@@ -82,7 +84,7 @@ assert_grep "skill: 1 agent per persona slug"   "1 agent per unique persona slug
 assert_no_grep "skill: NOT a builder (no build_persona_frontmatter)" "build_persona_frontmatter" "$SKILL"
 
 # ── Section 2: /flow:start-project wires it as a phase AFTER journey-author ──
-section "2/3" "start-project dispatches flow-persona-author after journey-author"
+section "2/4" "start-project dispatches flow-persona-author after journey-author"
 assert_grep "start-project: 9 phases (was 8)"   "9 phases / 4 gates" "$START"
 assert_grep "start-project: Phase 7 persona author" "## Phase 7: persona author" "$START"
 assert_grep "start-project: dispatches flow-persona-author" "flow-persona-author" "$START"
@@ -93,7 +95,7 @@ assert_grep "start-project: complete moved to Phase 9" "## Phase 9: complete" "$
 assert_grep "start-project: persona phase breadcrumb → 8" 'current_phase: 8`, `completed_phases: ["1", "2", "3", "4", "5", "6", "7"]' "$START"
 
 # ── Section 3: /flow:add-domain wires it as a phase AFTER journey-author ─────
-section "3/3" "add-domain dispatches flow-persona-author after journey-author"
+section "3/4" "add-domain dispatches flow-persona-author after journey-author"
 assert_grep "add-domain: 7 phases (was 6)"      "7 phases / 2 gates" "$ADD"
 assert_grep "add-domain: Phase 6 persona author" "## Phase 6: persona author" "$ADD"
 assert_grep "add-domain: dispatches flow-persona-author" "flow-persona-author" "$ADD"
@@ -101,6 +103,19 @@ assert_grep "add-domain: journey author still Phase 5" "## Phase 5: journey auth
 assert_grep "add-domain: regen index moved to Phase 7" "## Phase 7: regen index" "$ADD"
 # Persona phase advances the breadcrumb to 7 (chain coherence).
 assert_grep "add-domain: persona phase breadcrumb → 7" 'next phase is `7`' "$ADD"
+
+# ── Section 4: /flow:retrofit-project wires it as a phase AFTER journey-author ─
+section "4/4" "retrofit-project dispatches flow-persona-author after journey-author"
+assert_grep "retrofit: 10 phases (was 9)"        "10 phases / 5 gates" "$RETROFIT"
+assert_grep "retrofit: Phase 8 persona author"   "## Phase 8: persona author" "$RETROFIT"
+assert_grep "retrofit: dispatches flow-persona-author" "flow-persona-author" "$RETROFIT"
+assert_grep "retrofit: journey author still Phase 7" "## Phase 7: journey author" "$RETROFIT"
+assert_grep "retrofit: regen index moved to Phase 9" "## Phase 9: regen index" "$RETROFIT"
+assert_grep "retrofit: complete moved to Phase 10" "## Phase 10: complete" "$RETROFIT"
+# Persona phase advances the breadcrumb to 9 (chain coherence).
+assert_grep "retrofit: persona phase breadcrumb → 9" 'current_phase: 9`, `completed_phases: ["1", "2", "3", "4", "5", "6", "7", "8"]' "$RETROFIT"
+# ADR-041: retrofit's code-evidence layer must NOT feed personas (the Follow-on-A decision).
+assert_grep "retrofit: personas not code-derived (ADR-041)" "intent/journey-derived, NOT code-derived (ADR-041)" "$RETROFIT"
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 printf '\npersona-dispatch v-slice summary: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
