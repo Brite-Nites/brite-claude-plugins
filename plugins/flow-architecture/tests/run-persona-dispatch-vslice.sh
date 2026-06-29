@@ -75,7 +75,7 @@ assert_grep "skill: persona set is the union of story slugs" "union" "$SKILL"
 assert_grep "skill: minus honest-empty"         "honest-empty" "$SKILL"
 # Idempotency skip-if-exists + INDEX promotion contract.
 assert_grep "skill: skip-if-exists"             "skip-if-exists" "$SKILL"
-assert_grep "skill: INDEX Drafted then Reviewed" "does not self-certify" "$SKILL"
+assert_grep "skill: INDEX Drafted then Reviewed" "never self-certifies" "$SKILL"
 # 1 agent per unique persona slug (NOT per domain).
 assert_grep "skill: 1 agent per persona slug"   "1 agent per unique persona slug" "$SKILL"
 # NEGATIVE — must NOT claim a deterministic persona frontmatter builder.

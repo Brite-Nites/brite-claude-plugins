@@ -96,7 +96,13 @@ Same as Q15.5 / Q16.5. A persona whose agent returned the `PERSONA-DOC-AUTHOR-ER
 
 ## 6. INDEX — author/refresh `docs/product/personas/INDEX.md`
 
-After the batch, ensure `docs/product/personas/INDEX.md` exists and carries a row per authored persona (the canonical INDEX schema: `| Persona | Device | Status | File |`, Status ∈ {Drafted, Reviewed}). A freshly-authored persona lands as `Drafted` — it is promoted to `Reviewed` only after `quality-reviewer` passes it (the human-certifies-not-the-agent rule; this skill does not self-certify). If an INDEX already exists, add missing rows; do not downgrade an existing `Reviewed` row.
+After the batch, ensure `docs/product/personas/INDEX.md` exists and carries a row per **successfully-written** persona (the canonical INDEX schema: `| Persona | Device | Status | File |`, Status ∈ {Drafted, Reviewed}). A persona whose agent returned the `PERSONA-DOC-AUTHOR-ERROR` sentinel was not written and gets **no** row — the INDEX never advertises a doc that isn't on disk.
+
+Status rule (the human-certifies-not-the-agent invariant — this skill never self-certifies to `Reviewed`):
+
+- A **freshly-authored** persona lands as `Drafted`. It is promoted to `Reviewed` only after `quality-reviewer` passes it.
+- A persona **rewritten under `--force`** is reset to `Drafted` even if its prior row read `Reviewed` — the rewrite is unreviewed content, so a stale `Reviewed` would be a false certification.
+- A persona **skipped** (skip-if-exists, default mode) keeps its existing row and status untouched (its on-disk doc was not changed).
 
 ---
 

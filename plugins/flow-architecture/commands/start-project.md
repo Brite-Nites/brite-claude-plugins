@@ -624,7 +624,7 @@ Origin: cadence BC-5866 precedent surfaced this class-bug across orchestrators; 
 Every phase ends with a breadcrumb update so resume can reason about what's complete. Each phase ID (`1` through `8`) appends at the phase's terminal step:
 
 1. Append the phase number to `breadcrumb.completed_phases` (in order).
-2. Set `breadcrumb.current_phase` to the next phase number (or leave at `8` after Phase 8).
+2. Set `breadcrumb.current_phase` to the next phase number (or leave at `9` after Phase 9).
 3. Set `breadcrumb.status` (`in_flight` until Phase 9 terminator; then `completed`).
 4. Refresh `breadcrumb.last_updated` with the current ISO-8601 timestamp (NOT `updated_at` — the helper script's stale-detection in `read` mode keys on `last_updated`; writing the wrong field name would silently break staleness checks).
 5. Persist via the BC-6956 helper. The helper `write` subcommand takes two positional arguments — `<state-path>` (the breadcrumb on disk) and `<input-path>` (a `mktemp`'d file holding the new JSON) — per BC-9027. See the Phase 1 example for the canonical `python3 > $TMP_JSON <<'PY' ... PY; bash $HELPER write $BREADCRUMB_PATH $TMP_JSON; rm -f $TMP_JSON` form. Construct dynamic values inside a single-quoted python heredoc (`<<'PY'`) so Linear-derived strings cannot expand into the shell; pass `$BREADCRUMB_PATH` and `$TMP_JSON` as discrete arguments to the helper (never inside `bash -c` or an unquoted `$(...)`). The `mktemp` file intermediate replaces the previous stdin-pipe pattern, which tripped the workflows security-hook classifier.
