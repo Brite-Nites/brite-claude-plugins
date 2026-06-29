@@ -259,6 +259,32 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-svc — flow-architecture status-vs-code advisory vslice (BC-12909)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-status-vs-code-vslice.sh — asserts the
+# synthetic-status-vs-code-drift fixture shapes (deflation / inflation /
+# agreeing-clean / doc-only-skip) and the advisory contract in commands/audit.md
+# § Status-vs-code advisory + the reframed convention in agents/codebase-inferrer.md
+# (Q38 amendment 1). The cross-check is agent-backed + advisory (soft-warn), so —
+# like the BC-10730 sibling — this defends prose + fixture shapes, not a
+# deterministic engine; it executes no inference.
+section "2b-svc. flow-architecture status-vs-code advisory vslice (BC-12909)"
+
+fda_svc_test="$REPO_ROOT/plugins/flow-architecture/tests/run-status-vs-code-vslice.sh"
+
+if [ ! -f "$fda_svc_test" ]; then
+  warn "plugins/flow-architecture/tests/run-status-vs-code-vslice.sh not found — skipped"
+else
+  if fda_svc_out=$(bash "$fda_svc_test" 2>&1); then
+    fda_svc_pass_count=$(printf '%s\n' "$fda_svc_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture status-vs-code advisory vslice (${fda_svc_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture status-vs-code advisory vslice failed — run plugins/flow-architecture/tests/run-status-vs-code-vslice.sh for details"
+    printf '%s\n' "$fda_svc_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b-stamp — flow-architecture story-frontmatter-stamp vslice (BC-13168)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-story-frontmatter-vslice.sh — the

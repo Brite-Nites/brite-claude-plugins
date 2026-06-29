@@ -202,6 +202,27 @@ Then evaluate per-child gates against the batched response in memory — never p
 
 **Q29.2 [Eng]/[Design]/[QA]/[Docs] Linear-state checks** — the `list_issues` (and `list_comments` for [QA]) calls live here in Phase C; the per-flow row aggregation owned by Phase B (per the "Per-flow row aggregation" note in the Phase B section) consumes the cached Phase C response. A single per-flow discipline grade aggregates filesystem + Linear-state checks for that discipline.
 
+## Status-vs-code advisory
+
+Per BC-12909 (C3 of the BC-12905 PRD). A story doc's declared `status:` can disagree with what the codebase actually contains, in **both** directions, and no deterministic gate catches it — the inventory↔doc gates (`index-story-doc-status-match`, BC-12692) compare doc against doc, never doc against `src/`. This advisory closes that gap: it diffs the doc's declared `status:` against a fresh code inference and surfaces drift for a human to adjudicate.
+
+**Agent-backed, advisory, and outside the deterministic stack.** This is the **only** agent-backed check in `/flow:audit` and the only **advisory soft-warn** it emits. It **reuses the existing `codebase-inferrer` engine** (BC-12909 US-15 — this is wiring + a convention fix, not a new inference engine): at audit time, dispatch `codebase-inferrer` over the in-scope flows and read back its `status_inferred` (the `NOT_STARTED` / `IN_PROGRESS` / `BUILT` enum — the same vocabulary as the declared `status:`). Because `codebase-inferrer` is an LLM agent its output is **not byte-deterministic**, so this finding is **advisory — never auto-fail**: a coarse status proxy that hard-failed would cry wolf and train an override reflex (BC-12905 US-13). It is therefore **outside the 37-gate hard stack** — exactly as the CI-runner resolution gates (`link-resolution`, `persona-exists`) sit outside the per-flow Phase-B evaluator. It is **never** a `--gate=<id>` value, **never** contributes to `exit 1`, and **never** touches the `overrides[]` / override-counts-as-pass machinery (that is hard-gate-only).
+
+**Code-root precondition (repo-level).** The advisory runs **only** when the repo has a recognizable code root — a `src/` **or** `app/` directory exists. If neither exists (a greenfield / doc-only repo), there is **no code tree to diff** against: render the section with a single `skipped (no code tree to diff)` line, dispatch **no** inferrer, and emit **zero** warns. Without this guard a doc-only repo would infer `NOT_STARTED` for every flow and mass-warn inflation against every `BUILT`/`IN_PROGRESS` doc — pure noise on exactly the repos where the check is meaningless.
+
+**Drift matrix (symmetric, both directions).** Declared and inferred share the ordered enum `NOT_STARTED < IN_PROGRESS < BUILT`. The diagonal agrees (no warn); every off-diagonal pair warns, tagged with **direction** and **magnitude** (1-step / 2-step):
+
+| declared ＼ inferred | NOT_STARTED | IN_PROGRESS | BUILT |
+|---|---|---|---|
+| **NOT_STARTED** | — agree | ⚠ deflation (1-step) | ⚠ deflation (2-step) |
+| **IN_PROGRESS** | ⚠ inflation (1-step) | — agree | ⚠ deflation (1-step) |
+| **BUILT** | ⚠ inflation (2-step) | ⚠ inflation (1-step) | — agree |
+
+- **deflation** (`declared < inferred`) — the doc under-sells shipped work. This is the **costlier** direction: in brite-roster `ACL-02/03/04` + `SFI-01` were built and tested but stamped `NOT_STARTED`, so the team believed a pile of done work was still ahead. The build often lives at a path that carries no flow_id (`src/audit/audit-log.ts`, not `ACL-02.*`) and the `NOT_STARTED` doc cites no evidence path, so only a **semantic** read of the tree recovers it — which is why this rides the LLM inferrer, not a deterministic re-scan.
+- **inflation** (`declared > inferred`) — the doc over-claims (e.g. `BUILT` with no implementing code). The 1-step `BUILT`→`IN_PROGRESS` case is often a scan artifact (sandbox unreachable at scan time); it still warns, and the human adjudicates — the warn message discloses the evidence the inference rested on so they can judge.
+
+**Scope, exclusions, and filters.** The advisory honors the same filters as the deterministic gates: `--domain` / `--flow` scope which flows are diffed; it is **skipped entirely under `--discipline`** (status-vs-code is a per-flow property, not a discipline-child one). It is strictly local — it needs no Linear MCP, so it **runs unaffected by a Phase C skip and under `--no-verify-docs`** (it has no Phase A dependency). It **excludes** redirect stubs (`doc_type: redirect` carry no `status:` to compare) and `flow_index: skip` overview docs, and **skips** any flow whose declared `status:` is absent (the frontmatter gate owns that). If the inferrer errors or times out for a flow, render that flow as `indeterminate (inference unavailable)` — never a warn, never a hard error.
+
 ## Output formats
 
 ### Markdown (default per Q29.6)
@@ -240,6 +261,11 @@ Q25 legend: ✓ pass | 🚧 in progress | ⏳ pending | ❌ fail | — n/a | ⚠
 - linear-children-match: ✓
 - parent-l3-summary-populated: ❌ (TEAM-04 parent missing 2 of 5 discipline headlines)
 - milestone-subflows-table-match: ✓
+
+## Status-vs-code advisory
+
+⚠ ACL-02  deflation  declared=NOT_STARTED → inferred=BUILT (src/audit/audit-log.ts + test) — 2-step. Adjudicate.
+⚠ BILL-01 inflation  declared=BUILT → inferred=NOT_STARTED (no implementing code found) — 2-step. Adjudicate.
 
 ## Summary
 
@@ -286,6 +312,8 @@ Structured shape per Q38 sub-decision 4:
   }
 }
 ```
+
+**Status-vs-code advisory in `--json`.** Each drifting in-scope flow emits one gate entry `{id: "status-vs-code-agreement", type: "advisory", status: "soft-warn", scope: "flow:<DOMAIN-NN>", message: "<deflation|inflation> declared=<X> inferred=<Y> (<evidence>); N-step"}` into `gates[]`, counted in `summary.soft_warn` (so it never moves `exit_code`). Like the CI-runner resolution gates it is **not** a `--gate=<id>` value — it is agent-backed, not a deterministic re-runnable gate. When the repo has no code root the advisory emits no gate rows (the markdown renders the `skipped (no code tree to diff)` line instead).
 
 **No file write by default.** stdout is terminal-reviewable; the user redirects to a file via shell (`/flow:audit --json > audit.json`) when they want persistence. Q38 sub-decision 4's "stays strictly local in v1" resolution applies — see § v1 boundary note below.
 
@@ -355,6 +383,9 @@ The `audit-concerns marker reserved` in `_shared/linear-writeback-pattern.md`'s 
 | Phase B soft-gate fail | Surface in report only; no exit-code impact |
 | Phase C hard-gate fail (predicate mismatch; Linear MCP succeeded) | Fire override `AskUserQuestion` per Q29.5 / Q38 sub-decision 6; if Halt or unoverridden → contributes to `exit 1` |
 | Phase C soft-gate fail | Surface in report only; no exit-code impact |
+| Status-vs-code drift (deflation or inflation) | Advisory soft-warn in the `## Status-vs-code advisory` section + a `status-vs-code-agreement` `--json` row; counted in `summary.soft_warn`; **never** affects the exit code, **never** fires an override prompt (it is outside the 37 hard gates) |
+| Status-vs-code: no code root (`src/` / `app/` absent) | Advisory skipped — render `skipped (no code tree to diff)`; dispatch no inferrer; zero warns; no exit-code impact |
+| Status-vs-code: `codebase-inferrer` error / timeout for a flow | Render that flow `indeterminate (inference unavailable)`; no warn; no hard error; no exit-code impact |
 | Phase C Linear MCP error (transient) | Treat as gate `unknown` in report; surface in summary; do NOT count as hard fail |
 | Phase C Linear MCP error (persistent / auth missing) | Surface as Phase C status `SKIPPED` in Phase status table; do NOT contribute to `exit 1` (no signal); user fixes auth, re-runs |
 | Phase C HTTP smoke-test error (transient 5xx, 429 rate-limit, or 3s timeout) | Treat as gate `unknown` in report; surface in summary; do NOT count as hard fail |
