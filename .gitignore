@@ -47,3 +47,22 @@ __pycache__/
 docs/campaigns/labs/tam/**/*.jsonl
 docs/campaigns/brite-labs/tam/**/*.jsonl
 docs/campaigns/brite-labs/tam/**/_raw/
+
+# Labs TAM run scratch — analysis scripts, run logs, heavy binaries, and underscore-
+# prefixed intermediates (delete-id dumps, _seed/ inputs, scratch joins). Regenerable
+# from the tam-map pipeline. Curated artifacts (icp/tam-config/manifest .json, *.csv,
+# *.md) still stay tracked per the policy above — this only ignores the scratch.
+docs/campaigns/labs/tam/**/*.py
+docs/campaigns/labs/tam/**/*.log
+docs/campaigns/labs/tam/**/*.zip
+docs/campaigns/labs/tam/**/*.xlsx
+docs/campaigns/labs/tam/**/_*
+docs/campaigns/brite-labs/tam/**/*.py
+docs/campaigns/brite-labs/tam/**/*.log
+docs/campaigns/brite-labs/tam/**/*.zip
+docs/campaigns/brite-labs/tam/**/*.xlsx
+docs/campaigns/brite-labs/tam/**/_*
+
+# Local agent config — shows up untracked in every repo; never campaign data.
+/.codex/
+/AGENTS.md
