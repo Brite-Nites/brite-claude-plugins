@@ -282,6 +282,51 @@ else
   pass "flow_index:skip journey excluded from strict schema lint (not named as a failure)"
 fi
 
+# ── Section 12: persona-exists gate wired into the runner (BC-14036) ─────────
+# The CI runner imports flow_persona_lint and appends a persona-exists failure per
+# non-resolving story `personas:` slug — the fleet-wide activation of the BC-12573
+# floor. The lint LOGIC is unit-locked by run-flow-persona-lint-vslice.sh; this
+# section locks the WIRING (the gate actually fires through the runner + names itself).
+section "12" "persona-exists: non-resolving story persona slug → exit 1 (names persona-exists)"
+F12="$(fresh_copy)"
+# Clean fixture stories are honest-empty (`personas: []`) — flip one to a slug with no
+# docs/product/personas/<slug>.md → the gate must FAIL and name itself.
+S12="$(first_story "$F12")"
+python3 - "$S12" <<'PY'
+import sys, re
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+t = re.sub(r"(?m)^personas:.*$", "personas: [ghost-persona]", t, count=1)
+open(p, "w", encoding="utf-8").write(t)
+PY
+run_audit "$F12"
+if [ "$RC" = "1" ] && printf '%s' "$OUT" | grep -qi 'persona-exists'; then
+  pass "non-resolving persona slug → exit 1 + names persona-exists"
+else
+  fail "persona-exists gate not wired/caught: exit $RC; OUT: $OUT"
+fi
+
+# Negative control: the same slug WITH a matching persona doc on disk → exit 0
+# (the gate resolves a real slug, does not false-block).
+F12b="$(fresh_copy)"
+S12b="$(first_story "$F12b")"
+python3 - "$S12b" <<'PY'
+import sys, re
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+t = re.sub(r"(?m)^personas:.*$", "personas: [ghost-persona]", t, count=1)
+open(p, "w", encoding="utf-8").write(t)
+PY
+mkdir -p "$F12b/docs/product/personas"
+printf -- '---\nrole: ghost-persona\ndevice: desktop\nlinear_label: persona/ghost-persona\nlast_reviewed: 2026-06-29\n---\n# Ghost\n' \
+  > "$F12b/docs/product/personas/ghost-persona.md"
+run_audit "$F12b"
+if [ "$RC" = "0" ]; then
+  pass "resolving persona slug → exit 0 (no false block)"
+else
+  fail "resolving persona slug wrongly blocked: exit $RC; OUT: $OUT"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%s\n' '------------------------------------------'
 printf 'BC-12303 fda-ci-audit vslice: %d pass / %d fail\n' "$PASS" "$FAIL"

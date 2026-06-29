@@ -26,6 +26,18 @@ run-audit-smoke.sh also use) so there is exactly one definition of each gate:
                           BODY resolves to a file on disk (ALWAYS on, not config-gated;
                           the BC-13710 broken-cross-reference-link class). Frontmatter
                           and `http(s)`/`mailto` links are not checked.
+  * persona-exists      — every NON-EMPTY story-doc `personas:` slug resolves to
+                          docs/product/personas/<slug>.md (the BC-12573 deterministic
+                          FLOOR of the 3-layer persona system; ACTIVATED fleet-wide here
+                          by BC-14036 once every consumer was migrated clean). Single-
+                          sourced from flow_persona_lint — the SAME definition the
+                          validate.sh fixture vslice locks. Honest-empty (`personas: []` /
+                          absent / null) passes (presence, not non-emptiness — ADR-029).
+                          `personas:` is behavioral persona-doc slugs ONLY; an RBAC/access
+                          overload is an off-canon FAIL, not a carve (ADR-041). A sibling
+                          to link-resolution: both are deterministic cross-doc resolution
+                          gates the CI runner enforces but the per-flow Phase-B evaluator
+                          does not emit.
 
 Both the frontmatter-populated gates (full canon) and the story-frame gate (human-only) are
 now UNCONDITIONAL — the per-repo `.flow/config.json` `frontmatter_schema` (BC-13915) and
@@ -47,6 +59,7 @@ sys.path.insert(0, str(_SCRIPTS_DIR))
 sys.path.insert(0, str(_SCRIPTS_DIR / "lib"))
 import build_audit_report as bar          # canonical Phase-B predicates (single source)
 import flow_frontmatter_lint as ffl       # journey lint (+ story, via bar)
+import flow_persona_lint as fpl           # persona-exists floor (BC-12573 / BC-14036)
 
 # A markdown link whose target is a RELATIVE `<...>.md` file (optionally `#anchor`
 # and/or a `"title"` attribute), preceded by `](`. Excluded: any absolute URI
@@ -160,6 +173,18 @@ def audit(repo: Path) -> list:
         for target in _check_links(doc):
             scope = ("journey:" if doc.parent.name == "journeys" else "flow:") + doc.stem
             failures.append({"gate": "link-resolution", "scope": scope, "detail": "→ " + target})
+
+    # --- persona-exists: every non-empty story-doc `personas:` slug resolves to
+    #     docs/product/personas/<slug>.md (BC-12573 floor, activated fleet-wide by
+    #     BC-14036). Single-sourced from flow_persona_lint (the SAME definition the
+    #     validate.sh fixture vslice locks), so CI and the standalone lint never drift.
+    #     Honest-empty (`personas: []` / absent / null) passes — presence, not
+    #     non-emptiness (ADR-029 / ADR-041). `personas:` is behavioral persona-doc
+    #     slugs only; an RBAC/access-role overload is an off-canon failure here, not a
+    #     carve (ADR-041). ---
+    for v in fpl.audit_persona_exists(repo):
+        failures.append({"gate": "persona-exists", "scope": "flow:" + v["doc"],
+                         "detail": "persona '{}' → no docs/product/personas/{}.md".format(v["slug"], v["slug"])})
 
     return failures
 
