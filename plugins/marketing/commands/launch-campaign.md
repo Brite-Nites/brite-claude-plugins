@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 description: Turn an enriched lead CSV + email-copywriting JSON artifact into an activated Email Bison campaign via an 11-phase flow with user confirmation gates at every mutating step. Consumes the BC-5825 copy artifact and the BC-2718 campaign-orchestration defaults. Default path creates campaigns in draft state; pass --activate to transition them to queued (starts real sending).
-argument-hint: --csv <path> --workspace <emailbison-b2b|emailbison-personal> --copy-artifact <path> --campaign-name <base> [--entity <brite-nites|brite-labs>] [--no-host-lookup] [--no-sequence] [--preview] [--activate] [--reference <campaign-id>] [--test-send <email>] [--test-send-sender <id>]
+argument-hint: --csv <path> --workspace <emailbison-b2b|emailbison-personal> --copy-artifact <path> --campaign-name <base> [--entity <brite-nites|brite-labs>] [--identity <labs|supply|nites>] [--no-host-lookup] [--no-sequence] [--preview] [--activate] [--reference <campaign-id>] [--test-send <email>] [--test-send-sender <id>]
 allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep, Bash, AskUserQuestion, Skill
 ---
 
@@ -107,6 +107,8 @@ Detection regex applied to every per-lead value in the CSV: `\{\{|\}\}|\{%|%\}` 
 
 This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the injected Liquid. Operator can review the sidecar to decide whether to clean and re-upload. Threat model: enrichment-vendor data integrity boundary; not an attack-by-recipient (recipients can't write to the operator's CSV). Rationale parallels IV-9 — both invariants accept that CSV values come from partially-trusted sources, and the cost of a false-positive (a legitimate lead value containing literal `{%`) is operator review of the sidecar, not silent loss.
 
+**IV-11. `--identity` value validation (Phase 1 pre-flight).** If `--identity` is provided, it MUST be exactly one of `labs`, `supply`, or `nites` (lowercase). Reject any other value with a clear error — no auto-correction; the operator resubmits. This is the Brite sending identity that Phase 5 tags onto every campaign created this run, so an invalid value must fail closed before any EB campaign is created or tagged. When `--identity` is absent, it is resolved by operator prompt at Phase 1 step 10 — this check only validates an explicitly-supplied value.
+
 ---
 
 ## Argument parsing and defaults
@@ -125,6 +127,7 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 | `--test-send <email>` | no | — | Phase 10 additive mode: after the local render, call EB's `test-email` endpoint to send a real email to the specified inbox (typically the operator's own). Requires Phases 4–9 to have run. Counts toward sender reputation + daily limits. No lead is contacted. |
 | `--test-send-sender <id>` | no | first attached | Override the sender mailbox used for `--test-send`. Default: first attached sender from Phase 7. |
 | `--reference <campaign-id>` | no | — | Clone variables + naming + sender plan + schedule from an existing campaign. Pre-fills Phase 3/5/7/8 defaults — user gates still fire. |
+| `--identity <id>` | no | prompt | `labs`, `supply`, or `nites` — the Brite sending identity tagged onto every campaign this run creates (Phase 5). Validated by IV-11. If omitted, Phase 1 prompts for it. Independent of `--entity` (do not derive one from the other). |
 
 **Non-goals** (explicit — do NOT do these):
 
@@ -256,14 +259,14 @@ The worked example uses a single email-type (`professional`) only because the op
 
    **Liquid blocks are not evaluated in the local spot-check.** EmailBison evaluates Liquid (`{% assign %}`, `{% if %}`, `{{ var }}`) server-side at send time, after EB substitutes `{TOKEN}` references. The local spot-check renders only the EB-substitution layer — `{TOKEN}` references get replaced with CSV values, but Liquid blocks remain visible in the preview as raw text. To verify Liquid evaluation end-to-end, use `--test-send <your-email>` (Phase 10 Mode 2), which sends a real email through EB's render pipeline and lands in your inbox with the final rendered output. See `plugins/marketing/skills/email-copywriting/SKILL.md` § Liquid + spintax for graceful per-lead fallback for the canonical patterns.
 9. **Unique-per-lead auto-toggle.** If `lead_count < 500`, enable per-lead variable uniqueness (Josh Braun framework from Revgrowth 10 — each lead gets a slightly different variable value rendering). If `lead_count >= 500`, skip per-lead uniqueness for deliverability / sender-volume reasons. Log the decision.
-10. **Write initial metadata JSON.** Validate `--campaign-name` per IV-8 (regex + write-path realpath confinement) before constructing the path. Determine write path per § Launch metadata schema "Dogfood write path" note:
+10. **Write initial metadata JSON.** First, **resolve the sending identity**: if `--identity` was provided (validated by IV-11) use it; otherwise prompt the operator via `AskUserQuestion` to pick `labs`, `supply`, or `nites` — no default, the operator must choose, and do NOT derive it from `--entity` (identity is an independent axis). Record it as `sending_identity` in scratch state. Then validate `--campaign-name` per IV-8 (regex + write-path realpath confinement) before constructing the path. Determine write path per § Launch metadata schema "Dogfood write path" note:
     - Default: `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json`
     - Dogfood override (CSV path under `.claude/worktrees/`): `.claude/worktrees/<detected-worktree>/dogfood/{campaign-name}-{YYYY-MM-DD}.json`
-    Populate `schema_version`, `entity`, `campaign_name_base`, `workspace`, `copy_artifact_path`, `csv_path`, `lead_count`, `launched_at`. Also record the scratch-state flags from steps 3–7: `workspace_mismatch` (if any), `sender_resolution_method`, `unique_per_lead_enabled`. Set `last_completed_phase: 1`. This is the first progressive write.
+    Populate `schema_version`, `entity`, `sending_identity`, `campaign_name_base`, `workspace`, `copy_artifact_path`, `csv_path`, `lead_count`, `launched_at`. Also record the scratch-state flags from steps 3–7: `workspace_mismatch` (if any), `sender_resolution_method`, `unique_per_lead_enabled`. Set `last_completed_phase: 1`. This is the first progressive write.
 
 **User gate 1 (single end-of-Phase-1 gate, F8).** Ask via `AskUserQuestion`. Render the pre-flight summary; if a `workspace_mismatch` flag was recorded in step 3, fold its acknowledgment into the same prompt (do NOT ask twice):
 
-> Pre-flight complete. Lead count: {N}. Workspace: {workspace}. Entity: {entity}. Variables OK: {count-passed}/{count-total}. Sanity checklist: all passed.
+> Pre-flight complete. Lead count: {N}. Workspace: {workspace}. Entity: {entity}. Sending identity: {sending_identity}. Variables OK: {count-passed}/{count-total}. Sanity checklist: all passed.
 >
 > {IF workspace_mismatch recorded:}
 > ⚠️ Cross-mapping detected: entity `{entity}` normally routes to `{expected-workspace}`, but `--workspace {actual-workspace}` was explicit. Legitimate for dogfood / staging; flag for prod / real outreach. Metadata write path: `{metadata-path}` (dogfood path selected if CSV is under `.claude/worktrees/`).
