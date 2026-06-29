@@ -697,6 +697,33 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-persona-dispatch — flow-architecture persona auto-dispatch (BC-14018)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-persona-dispatch-vslice.sh — a PROSE
+# tripwire locking the persona-authoring DISPATCH wiring: the flow-persona-author
+# sub-skill's contract (whole-file / no-builder, runs-after-journey-author, persona
+# set = story-slug ∪ inventory union minus honest-empty, skip-if-exists, INDEX),
+# and that BOTH orchestrators wire it as a phase AFTER journey-author
+# (/flow:start-project Phase 7 of 9; /flow:add-domain Phase 6 of 7). Guards against
+# regression to the "agent defined-but-unwired" state #505 shipped and BC-14018 closes.
+# Named (not tick-chained) section per the 2b-persona / 2b-ci precedent.
+section "2b-persona-dispatch. flow-architecture persona auto-dispatch (BC-14018)"
+
+fda_pdispatch_test="$REPO_ROOT/plugins/flow-architecture/tests/run-persona-dispatch-vslice.sh"
+
+if [ ! -f "$fda_pdispatch_test" ]; then
+  warn "plugins/flow-architecture/tests/run-persona-dispatch-vslice.sh not found — skipped"
+else
+  if fda_pdispatch_out=$(bash "$fda_pdispatch_test" 2>&1); then
+    fda_pdispatch_pass_count=$(printf '%s\n' "$fda_pdispatch_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture persona auto-dispatch vslice (${fda_pdispatch_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture persona auto-dispatch vslice failed — run plugins/flow-architecture/tests/run-persona-dispatch-vslice.sh for details"
+    printf '%s\n' "$fda_pdispatch_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b'''''''''''' — flow-architecture shift-left clone-drift regression (BC-12410)
 # ══════════════════════════════════════════════════════════════════════
 # Naming: the flow-architecture sub-sections chain off "2b" with one added
