@@ -41,6 +41,10 @@ DOCONLY_DOC="$DOCONLY/docs/product/flows/onboarding/ONB-01.md"
 # ── Counters ─────────────────────────────────────────────────────────
 PASS=0
 FAIL=0
+# SKIP is part of the shared `RESULT pass=N fail=N skip=N` line contract that
+# validate.sh + the sibling vslices emit. Every assertion here is a fixture-shape
+# or prose grep that always runs, so nothing is skippable and skip stays 0 — kept
+# for RESULT-line parity with the sibling harnesses, not dead scaffolding.
 SKIP=0
 
 pass() { printf '  PASS  %s\n' "$1"; PASS=$((PASS + 1)); }
@@ -156,6 +160,10 @@ assert_grep "audit.md names the inflation direction" \
   "inflation" "$AUDIT_MD"
 assert_grep "audit.md encodes the code-root skip precondition" \
   "no code tree to diff" "$AUDIT_MD"
+# The --discipline skip is the one filter invariant a regression could silently
+# drop (auto-invoked from /flow:plan-{discipline}), so lock its prose too.
+assert_grep "audit.md skips the advisory entirely under --discipline" \
+  "skipped entirely under" "$AUDIT_MD"
 assert_grep "audit.md sets the advisory soft-warn altitude" \
   "advisory soft-warn" "$AUDIT_MD"
 assert_grep "audit.md keeps the advisory outside the 37 hard gates" \
