@@ -9,7 +9,7 @@ children:                       # backfilled once flow-linear-scaffold creates t
   design: BC-XXXX
   qa: BC-XXXX
   docs: BC-XXXX
-personas: [<role>]
+personas: [<role>]              # behavioral persona slug(s) → docs/product/personas/<slug>.md (= the persona doc's role:); ADR-041 — NOT RBAC/access roles
 related_flows: [<DOMAIN-NN>, <DOMAIN-NN>]
 figma: <frame-url or TBD>
 sandbox_url: <relative-path or TBD>     # e.g. /sandbox/quote-creation/quote-builder — base URL in docs/README.md
@@ -73,10 +73,13 @@ attention. Omit entirely for a clean NOT_STARTED or a clean BUILT.
 
 ## Actor
 
-Which RBAC role(s) take this action — name the role first and cross-link the canonical persona doc
-([`docs/product/personas/<role>.md`](../../personas/<role>.md)) rather than restating it. Then add
-the role's **posture** (working context + the failure modes it won't tolerate) as a secondary clause
-— that posture drives which negative ACs matter (quality-rubric D7). For an **infrastructure flow**,
+Which **behavioral persona(s)** act here — name the persona and cross-link its canonical doc
+([`docs/product/personas/<slug>.md`](../../personas/<slug>.md)) rather than restating it; the
+`personas:` front-matter slug(s) must match. Per **ADR-041** the actor is the behavioral persona,
+**not** an RBAC/access role — where a flow genuinely gates on a role, state that in the acceptance
+criteria, not here or in `personas:`. Then add the persona's **posture** (working context + the
+failure modes it won't tolerate) as a secondary clause — that posture drives which negative ACs
+matter (quality-rubric D7). For an **infrastructure flow**,
 name the human the mechanism serves (the operator who trusts the run, or the customer who reads the
 output) and their posture; the system process that acts (route handler, cron, crawler-facing surface)
 is the means — name it in the one-line summary and `## Status`, not in place of the human.

@@ -10,6 +10,9 @@ last_reviewed: YYYY-MM-DD             # stamp on each substantive edit
 > [`docs/product/personas/<slug>.md`](./<slug>.md); listed in [`INDEX.md`](./INDEX.md). Cross-linked
 > from each story doc's `## Actor` and each journey doc's personas-in-scope. The substance reviewer
 > (`quality-reviewer`, `doc_kind: persona_doc`) scores this doc against quality-rubric **P1–P5**.
+>
+> A persona is a **behavioral** profile, not an RBAC/access role: the story-doc `personas:` slug
+> names a persona (= this doc's `role:` / filename), never a permission tier (ADR-041).
 
 > One-line summary: who this person is and the job they come to the product to get done. ~15–25 words.
 
