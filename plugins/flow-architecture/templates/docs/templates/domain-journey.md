@@ -4,7 +4,7 @@ display_name: <Display name>       # human name, e.g. Quote Building (scaffold-l
 linear_milestone:                  # the Linear milestone this domain maps 1:1 to (ADR-033: a milestone is a UUID — it has no BC number)
   name: <Milestone display name>
   id: <milestone-uuid>
-personas: [<role>, <role>]         # aggregated from the domain's story-doc front-matter (first-seen dedup in flow_id order, per ADR-033)
+personas: [<role>, <role>]         # behavioral persona slug(s) → docs/product/personas/<slug>.md (ADR-041, NOT RBAC roles); aggregated from story-doc front-matter (first-seen dedup in flow_id order, per ADR-033)
 flow_ids_in_scope: [<flow_id>, ...]  # the domain's story-doc flow_ids (opaque slugs, ADR-040), natural-sorted — e.g. QUO-01..QUO-NN or admin-panel/layout-and-auth
 status: not-started | in-progress | shipped   # the doc's AUTHORING lifecycle, NOT the domain's delivery state (delivery is aggregated per-flow in INDEX.md)
 figma: <domain-hub-frame-url or TBD>
@@ -21,7 +21,7 @@ last_reviewed: YYYY-MM-DD
 
 ## Actor / Persona
 
-Which RBAC role anchors this journey. One paragraph describing them in the context of this domain
+Which **behavioral persona** anchors this journey (per **ADR-041** — a persona, not an RBAC/access role). One paragraph describing them in the context of this domain
 — working context (device, moment in the workday, physical/mental state), the scope shape they
 have (what they see vs. don't), and the failure they cannot absorb. **Behavioral, not demographic**
 (quality-rubric J2): a persona that could be pasted unchanged into the adjacent domain's journey is

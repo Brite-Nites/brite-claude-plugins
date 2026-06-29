@@ -10,6 +10,10 @@ front-matter lint's job (BC-12572); this lint checks that a NAMED slug RESOLVES 
 disk. Distinct from WS-A A-2 GENERIC_PERSONA (which checks the persona isn't a
 generic project-wide default) — this checks it EXISTS.
 
+Convention (ADR-041): `personas:` is behavioral persona-doc slugs ONLY; RBAC / access
+roles are not personas and do not belong in the field. An off-canon consumer (e.g.
+brite-lseo's uppercase RBAC enums) CONVERGES; the lint does not carve to tolerate them.
+
 REFRAME (BC-13916 precedent — a falsified-premise ticket re-framed and documented so
 it is not re-discovered cold). The ticket bundled persona-exists with a
 journey-exists check; journey-exists is ALREADY covered and is NOT re-implemented:
