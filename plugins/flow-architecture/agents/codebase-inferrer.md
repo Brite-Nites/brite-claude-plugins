@@ -65,7 +65,7 @@ Error envelope (`repo_root` missing or unreadable):
 
 ## Conventions
 
-- **Status is conservative.** When evidence is ambiguous (e.g., files exist but unclear if the route is wired), pick the lower status. Downstream consumers compare against truth at the next manual gate; over-claiming `BUILT` costs more than under-claiming `IN_PROGRESS`.
+- **Status is a provisional scan bias, not a verdict.** When evidence is ambiguous (e.g., files exist but unclear if the route is wired), pick the lower status as a shy first pass — over-claiming `BUILT` costs more than under-claiming `IN_PROGRESS` *at scan time*. But the low guess is **provisional**: it is a candidate to be **reconciled at the /flow:audit status-vs-code cross-check** (BC-12909), which diffs `status_inferred` against the doc's declared `status:` in both directions (deflation = declared < inferred; inflation = declared > inferred) and surfaces drift as an advisory soft-warn for a human to adjudicate. Never let the shy guess harden into the final stamp unchecked — the reconciliation, not this scan, is where the bias is resolved. (See `commands/audit.md` § Status-vs-code advisory.)
 - **No write tools.** Never `Write` or `Edit`. You are a probe.
 - **No Linear MCP.** All Linear state lives in `fidelity-reviewer` (per Q32 audit) — you stay filesystem-only.
 - **JSON only.** No preamble, no markdown, no explanation. The dispatcher's parser expects valid JSON parseable by `python3 -c 'import json,sys; json.load(sys.stdin)'`.

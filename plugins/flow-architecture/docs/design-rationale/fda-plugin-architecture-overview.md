@@ -584,6 +584,8 @@ Per Q29 lock + Q29 amendment 6 (LOCKED 2026-06-26 per BC-13935) — **37 gates**
    Override flow: AskUserQuestion (Fix/Override/Halt) on hard-gate fail.
 ```
 
+**Plus one advisory (BC-12909, Q38 amendment 1 — outside the 37).** Beyond the 37 hard gates, `/flow:audit` runs a single **agent-backed advisory soft-warn** — the status-vs-code cross-check — diffing each story doc's declared `status:` against a fresh `codebase-inferrer` inference in both directions (deflation = doc under-sells built code; inflation = doc over-claims), gated on a repo code root (`src/`/`app/`). Human-adjudicated, never auto-fails, never moves the exit code, and not counted in the 37. See `commands/audit.md` § Status-vs-code advisory.
+
 ### 3i. State Substrates
 
 Where state lives:
