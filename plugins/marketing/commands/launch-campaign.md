@@ -134,7 +134,7 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 - Do NOT generate copy — that's BC-5825 email-copywriting. This command CONSUMES the copy artifact.
 - Do NOT design sequences — that's BC-2718 campaign-orchestration. This command APPLIES the sequence as given.
 - Do NOT handle reply routing — that's BC-2720 reply-processing.
-- Do NOT split senders across multiple campaigns — invariant violation, explicitly forbidden in Phase 7 (Revgrowth 10 rule).
+- Do NOT split the identity-matched sender pool across that identity's campaigns — invariant violation, explicitly forbidden in Phase 7 (Revgrowth 10 rule). Scoping the pool to the run's sending identity (BC-13864) is *not* a split — every campaign still gets that identity's whole pool.
 - Do NOT skip the two-call MCP gate on Phase 4 UPLOAD or Phase 11 ACTIVATE — these are load-bearing safety mechanisms.
 - Do NOT default to `--activate`. Campaigns are created in draft unless the flag is explicit.
 - Do NOT treat "preview" as an EB server-side render. Email Bison has no standalone preview endpoint — Phase 10's default mode is a client-side local render of the copy artifact, and the optional `--test-send` mode delivers a real test email. Neither is a non-sending server-side preview in the way the term typically implies. BC-5826 X17 dogfood confirmed (F13) that an EB preview endpoint does not exist; do not search for one.
@@ -650,13 +650,15 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 ## Phase 7 — ATTACH SENDERS (CRITICAL INVARIANT)
 
-**Purpose.** Attach every connected sender inbox to every campaign. This is the single most consequential phase of the flow, and the invariant it enforces is load-bearing for deliverability.
+**Purpose.** Attach every connected sender inbox **that carries this run's sending identity** to every campaign. This is the single most consequential phase of the flow, and the invariant it enforces is load-bearing for deliverability.
+
+**Scope (BC-13864).** This step filters senders to the run's sending identity only (`tag_ids=[identity]`) — the redirect-safety core. ESP-matched sender selection (`tag_ids=[identity, esp]`) and an operator-selectable match mode are follow-on increments of the same ticket, not in this step.
 
 ### The invariant
 
-> **Attach ALL connected senders to ALL campaigns. Never split senders across campaigns.**
+> **Attach ALL of this run's identity-matched senders to ALL campaigns. Never split that pool across campaigns.**
 
-Why: sender warmup and reputation are per-inbox, not per-campaign. Splitting the sender pool across per-cell campaigns concentrates volume on a subset of inboxes, which burns reputation unevenly and produces asymmetric deliverability across campaigns for no analytical benefit. Revgrowth 10's upstream `launch.py` encodes this as an explicit rule; Brite inherits it verbatim. **Any deviation from this invariant is a hard failure and must be surfaced to the operator — the command does not offer a split-sender flag.**
+The pool is scoped to the run's sending identity (`tag_ids=[identity]`, BC-13864): an identity-mismatched sender — say a Nites inbox on a Supply campaign — lands the prospect on the wrong brand's site after the redirect cutover, which is the forcing function for this whole change. **Within the identity-matched pool the even-spread rule still holds:** sender warmup and reputation are per-inbox, not per-campaign, so every campaign gets the *whole* identity pool — splitting it across per-cell campaigns concentrates volume on a subset of inboxes, burning reputation unevenly for no analytical benefit. The only split is *across* identities (different brands, by design). Revgrowth 10's upstream `launch.py` encodes the even-spread rule; Brite inherits it, now scoped per identity. **Any deviation — splitting the identity pool, OR attaching an off-identity sender — is a hard failure surfaced to the operator; the command offers no split-sender flag.**
 
 ### Pagination is mandatory
 
@@ -682,11 +684,11 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
 ### Steps
 
 1. **Ground-truth the tool names.** `search_api_spec` with queries `list sender emails`, `attach sender emails`. Per `email-bison.md` § Common workflows the names are `list_sender_emails` (GET) and `attach_sender_emails_to_campaign` (POST `/api/campaigns/{id}/attach-sender-emails`). Request body: `{"sender_email_ids": [1, 2, 3]}`.
-2. **Enumerate connected senders.** Run the `while True` pagination loop against `list_sender_emails` with filter `?status=connected` (lowercase). EB's status filter is case-sensitive in a non-obvious way: `?status=Connected` (matching the response `status: "Connected"` data field) returns 422 (Sx-11, BC-5906) — operators copying from response payloads will hit a 422 with no diagnostic. Always pass the lowercase form. Exhaust the cursor. Record the full list. If the workspace returns zero connected senders, HALT — no campaign can send without a sender, and silently proceeding would create campaigns that queue forever.
-3. **With `--reference <campaign-id>` set:** call the reference campaign's `get_campaign` (or equivalent sender-list endpoint) to fetch its attached sender IDs. Pre-fill the gate to show "reference campaign had these senders attached — they are a subset of the current connected list." The invariant still applies — we still attach ALL connected senders from this workspace, not just the reference's subset. `--reference` pre-fills the display, not the attach payload.
+2. **Enumerate this identity's connected senders.** Run the `while True` pagination loop against `list_sender_emails` with filter `?status=connected` (lowercase) **plus `tag_ids[]=<identity_tag_id>`** — the per-workspace identity tag id already resolved before any campaign was created (Phase 1 step 10 / the Phase 5 identity pre-check, BC-13863); reuse it, never re-resolve or hardcode it (it is guaranteed present here — Phase 7 runs after that pre-check; if somehow absent on a hand-edited resume, re-run the pre-check before filtering). Ground-truth the exact tag-filter param shape via `search_api_spec` once. EB's status filter is case-sensitive in a non-obvious way: `?status=Connected` (matching the response `status: "Connected"` data field) returns 422 (Sx-11, BC-5906) — operators copying from response payloads will hit a 422 with no diagnostic. Always pass the lowercase form. Exhaust the cursor. Record the full identity-matched list. **If zero senders carry this identity tag, HALT** — surface the identity + workspace; no campaign can send without an identity-matched sender, and silently proceeding would create campaigns that queue forever. This is stricter than the old global zero-sender check: a workspace with hundreds of connected senders can still have zero for *this* identity.
+3. **With `--reference <campaign-id>` set:** call the reference campaign's `get_campaign` (or equivalent sender-list endpoint) to fetch its attached sender IDs. Pre-fill the gate to show "reference campaign had these senders attached — they are a subset of the current connected list." The invariant still applies — we still attach ALL of this run's identity-matched senders (step 2), not just the reference's subset. `--reference` pre-fills the display, not the attach payload.
 4. **Render the attach plan.** Show the operator:
 
-   > Sender pool for workspace `{workspace}`: {N-senders} connected senders.
+   > Sender pool for workspace `{workspace}`: {N-senders} connected senders carrying the `{sending_identity}` identity tag.
    >
    > Attach plan (per-campaign count must match):
    > - `{campaign_ids["professional|Google"]}` ← {N-senders} senders
@@ -697,23 +699,24 @@ Pagination applies at two points: (a) enumerating senders before attach, (b) re-
    > Sender list preview (first 5): sender@brite.co, ops@brite.co, intro@brite.co, …
 5. **User gate 7.** Ask via `AskUserQuestion`:
 
-   > Attach ALL {N-senders} senders to ALL {N-campaigns} campaigns? This is the sender invariant — splitting is forbidden. Proceed?
+   > Attach ALL {N-senders} `{sending_identity}`-identity senders to ALL {N-campaigns} campaigns? This is the sender invariant — the pool is scoped to the `{sending_identity}` identity, and splitting it across campaigns is forbidden. Proceed?
    >
-   > - Yes, attach full pool to every campaign (Recommended)
+   > - Yes, attach the full `{sending_identity}` pool to every campaign (Recommended)
    > - Abort
 6. **Execute attach per campaign.** For each campaign ID in `campaign_ids`:
-   - Call `attach_sender_emails_to_campaign` with `{"sender_email_ids": [<all connected IDs>]}`.
+   - Call `attach_sender_emails_to_campaign` with `{"sender_email_ids": [<all identity-matched IDs from step 2>]}`.
    - If the vendor returns a confirmation-gated response (unlikely for sender attach, but verify), follow the two-call pattern.
 7. **Post-attach verification (count-scalar first; paginate on mismatch).** The invariant enforcement step. For each campaign ID:
-   - **Scalar check first** — call `get_campaign` and read the `attached_senders_count` (or equivalent count field returned without paginating). Compare to the pre-attach connected-sender count. The 99% case (clean attach, no drift) returns a count match and validates without paginating anything — 1 MCP call per campaign instead of the full sender-list pagination.
+   - **Scalar check first** — call `get_campaign` and read the `attached_senders_count` (or equivalent count field returned without paginating). Compare to the pre-attach identity-matched sender count (step 2). The 99% case (clean attach, no drift) returns a count match and validates without paginating anything — 1 MCP call per campaign instead of the full sender-list pagination.
    - **If count scalar is absent OR mismatches** — THEN re-query the campaign's full attached-sender list via `get_campaign` + the `while True` pagination loop, diff the sender ID set against the pre-attach enumeration, and identify the specific missing/extra sender IDs. Pagination runs only when diagnostic detail is actually needed.
    - **If count mismatches by even one sender, HALT.** Surface the campaign ID, the expected count, the actual count, and the specific missing/extra sender IDs. Do not advance `last_completed_phase`.
    - **Ground-truth fallback** — if `get_campaign`'s schema doesn't expose a scalar count field this session (verify via `search_api_spec` once up-front), fall back to pagination-first on every campaign. Record the chosen verification mode in metadata: `sender_verify_mode: "scalar" | "paginated"`.
-8. **Append to metadata JSON.** Set `sender_ids_attached: [<full list>]`, `sender_attach_counts: {"professional|Google": N, "professional|Microsoft": N, "professional|Other": N, "role|Google": N}` (one entry per cell in `campaign_ids`; example shows 4-cell from the gate-2 `include_role` path). All values MUST be equal (that's the invariant — sender pool is the same for every campaign). `last_completed_phase: 7`.
+8. **Append to metadata JSON.** Set `sender_ids_attached: [<full identity-matched list>]`, `sender_attach_counts: {"professional|Google": N, "professional|Microsoft": N, "professional|Other": N, "role|Google": N}` (one entry per cell in `campaign_ids`; example shows 4-cell from the gate-2 `include_role` path). All values MUST be equal (that's the invariant — the identity-matched sender pool is the same for every campaign). `last_completed_phase: 7`.
 
 ### Forbidden patterns (hard failures)
 
-- Splitting senders across campaigns (e.g., senders 1–10 to `Professional|Google`, 11–20 to `Role|Microsoft`). Explicit anti-pattern — never shipped, never offered as an option.
+- Splitting the identity-matched pool across campaigns (e.g., identity senders 1–10 to `Professional|Google`, 11–20 to `Role|Microsoft`). Explicit anti-pattern — never shipped, never offered as an option. Scoping the pool to the run's identity is *not* a split — every campaign gets that identity's whole pool.
+- Attaching a sender that does not carry the run's identity tag. After the redirect cutover an off-identity sender is a wrong-brand landing; step 2 filters to the identity, and the pool must never be widened back to the full workspace.
 - Truncating the pagination loop after the first page of `list_sender_emails`. The `while True` loop must exhaust the cursor.
 - Skipping post-attach verification because the attach call returned 200. The vendor occasionally drops senders silently at high pool sizes; verification is the only authoritative check.
 
@@ -1058,7 +1061,7 @@ Before marking this command shipped, confirm:
 - [ ] All 11 phases named and ordered correctly (PRE-FLIGHT / HOST LOOKUP / VARIABLES / UPLOAD / CAMPAIGN CREATE / ATTACH LEADS / ATTACH SENDERS / SCHEDULE / SEQUENCE / PREVIEW / ACTIVATE).
 - [ ] Every mutating phase (3/4/5/6/7/8/9/11) has an explicit semantic "USER CONFIRM" gate, and Phase 10 Mode 2 (`--test-send`) has its own intent gate (10b) before the real test-send.
 - [ ] Phases 4 and 6 use **one semantic gate + minimal per-chunk/per-campaign turn-structure prompts** rather than re-prompting semantic approval per loop iteration (BC-2707 turn-structure preserved without gate fatigue).
-- [ ] Phase 7 ATTACH SENDERS documents the paginated `while True` pattern AND post-attach count verification; sender-split pattern is explicitly forbidden.
+- [ ] Phase 7 ATTACH SENDERS filters senders to the run's sending identity (`tag_ids=[identity]`, BC-13864), documents the paginated `while True` pattern AND post-attach count verification; splitting the identity-matched pool (and attaching off-identity senders) is explicitly forbidden.
 - [ ] Phase 4 UPLOAD uses the two-call MCP confirmation gate (references BC-2707 precedent).
 - [ ] Phase 11 ACTIVATE requires double-confirm (operator-intent + MCP two-call).
 - [ ] Phase 9 SEQUENCE enforces: step 1 `wait_in_days >= 1`, step 2 `wait_in_days >= 3`, field name `wait_in_days` (not `wait_days`), field name `email_subject` (not `subject`), 2-step max.
