@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 description: Turn an enriched lead CSV + email-copywriting JSON artifact into an activated Email Bison campaign via an 11-phase flow with user confirmation gates at every mutating step. Consumes the BC-5825 copy artifact and the BC-2718 campaign-orchestration defaults. Default path creates campaigns in draft state; pass --activate to transition them to queued (starts real sending).
-argument-hint: --csv <path> --workspace <emailbison-b2b|emailbison-personal> --copy-artifact <path> --campaign-name <base> [--entity <brite-nites|brite-labs>] [--identity <labs|supply|nites>] [--no-host-lookup] [--no-sequence] [--preview] [--activate] [--reference <campaign-id>] [--test-send <email>] [--test-send-sender <id>]
+argument-hint: --csv <path> --workspace <emailbison-b2b|emailbison-personal> --copy-artifact <path> --campaign-name <base> [--entity <brite-nites|brite-labs>] [--identity <labs|supply|nites>] [--sender-match <identity|esp|both|all>] [--no-host-lookup] [--no-sequence] [--preview] [--activate] [--reference <campaign-id>] [--test-send <email>] [--test-send-sender <id>]
 allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep, Bash, AskUserQuestion, Skill
 ---
 
@@ -109,6 +109,8 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 
 **IV-11. `--identity` value validation (Phase 1 pre-flight).** If `--identity` is provided, it MUST be exactly one of `labs`, `supply`, or `nites` (lowercase). Reject any other value with a clear error — no auto-correction; the operator resubmits. This is the Brite sending identity that Phase 5 tags onto every campaign created this run, so an invalid value must fail closed before any EB campaign is created or tagged. When `--identity` is absent, it is resolved by operator prompt at Phase 1 step 10 — this check only validates an explicitly-supplied value.
 
+**IV-12. `--sender-match` value validation (Phase 1 pre-flight).** If `--sender-match` is provided, it MUST be exactly one of `identity`, `esp`, `both`, or `all` (lowercase). Reject any other value with a clear error — no auto-correction; the operator resubmits. This selects which connected senders Phase 7 attaches to each campaign (`identity` = the run's brand senders only, the redirect-safe default; `esp` = senders whose ESP matches each campaign's recipient ESP; `both` = identity ∩ ESP; `all` = every connected sender, redirect-*unsafe*). An invalid value must fail closed before any EB campaign is created. When `--sender-match` is absent, the mode is resolved by operator prompt at Phase 7 — this check only validates an explicitly-supplied value.
+
 ---
 
 ## Argument parsing and defaults
@@ -128,6 +130,7 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 | `--test-send-sender <id>` | no | first attached | Override the sender mailbox used for `--test-send`. Default: first attached sender from Phase 7. |
 | `--reference <campaign-id>` | no | — | Clone variables + naming + sender plan + schedule from an existing campaign. Pre-fills Phase 3/5/7/8 defaults — user gates still fire. |
 | `--identity <id>` | no | prompt | `labs`, `supply`, or `nites` — the Brite sending identity tagged onto every campaign this run creates (Phase 5). Validated by IV-11. If omitted, Phase 1 prompts for it. Independent of `--entity` (do not derive one from the other). |
+| `--sender-match <id>` | no | prompt | `identity`, `esp`, `both`, or `all` — which connected senders Phase 7 attaches per campaign. `identity` (redirect-safe default): the run's identity senders only. `esp`: senders whose ESP matches each campaign's recipient ESP. `both`: identity ∩ ESP. `all`: every connected sender (legacy, redirect-*unsafe* — warned at the Phase 7 prompt). Validated by IV-12. If omitted, Phase 7 prompts for it. |
 
 **Non-goals** (explicit — do NOT do these):
 
@@ -207,6 +210,7 @@ The worked example uses a single email-type (`professional`) only because the op
 - Phase 5 step 10 + Phase 11 step 4: `activated_per_campaign: {<bucket>: <ISO-8601> | null, ...}` — keys initialized at Phase 5 (one per bucket in `campaign_ids`); values flip from `null` to ISO-8601 timestamp at the moment each campaign's resume call returns. Global `activated` flips to `true` only when every entry is non-null.
 - Phase 6 step 7: `lead_attach_counts: {<bucket>: <count>, ...}` keyed by `{email_type}|{esp}` (same shape as `segments`).
 - Phase 6 step 7: `lead_ids_by_bucket: {<bucket>: [<lead_id>, ...], ...}` — per-bucket lead IDs from the bucket map built in Phase 6 step 2; the resume primitive for re-running Phase 6 from metadata alone (without re-doing Phase 2 MX lookups + CSV-row joins).
+- Phase 7 mode-selection: `sender_match_mode: "identity" | "esp" | "both" | "all"` (the operator-selected sender-match mode, resolved via `--sender-match` or the Phase 7 prompt; recorded before any attach so a resumed run re-reads it instead of re-prompting. Absent if the run didn't reach Phase 7.)
 - Phase 8 step 7: `schedule_template_id: <id>` (renamed from `schedule_id`) + `campaign_schedule_ids: {<bucket>: <cloned_schedule_id>, ...}` — the source template ID applied plus the per-campaign cloned schedule entity IDs returned by `create_schedule_from_template`. Round-2 of BC-5906 confirmed each apply creates a NEW schedule entity (clone), not a reference to the template.
 - Phase 10 Mode 1 step 8: `preview_method: "local-render" | "local-render + test-send"`, `preview_lead_email: "<email>"`
 - Phase 10 Mode 2 step 6: `test_send_recipient: "<email>"`, `test_send_at: "<ISO-8601>"`
@@ -652,13 +656,29 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 **Purpose.** Attach every connected sender inbox **that carries this run's sending identity** to every campaign. This is the single most consequential phase of the flow, and the invariant it enforces is load-bearing for deliverability.
 
-**Scope (BC-13864).** This step filters senders to the run's sending identity only (`tag_ids=[identity]`) — the redirect-safety core. ESP-matched sender selection (`tag_ids=[identity, esp]`) and an operator-selectable match mode are follow-on increments of the same ticket, not in this step.
+**Scope (BC-13864).** Sender attach is an **operator-selected step**: a Phase 7 prompt (or the `--sender-match` flag) picks one of four modes — `identity` (the run's brand senders only, the redirect-safe default), `esp` (senders matching each campaign's recipient ESP), `both` (identity ∩ ESP), or `all` (every connected sender, redirect-*unsafe*). This increment wires the **mode selection** (see § Sender-match mode below); the per-mode enumeration paths for `esp` / `both` / `all` land in the next increment of the same ticket. Until then a resolved mode other than `identity` HALTs fail-closed, and `identity` keeps the verified `tag_ids=[identity]` behavior documented in the steps below.
 
 ### The invariant
 
 > **Attach ALL of this run's identity-matched senders to ALL campaigns. Never split that pool across campaigns.**
 
 The pool is scoped to the run's sending identity (`tag_ids=[identity]`, BC-13864): an identity-mismatched sender — say a Nites inbox on a Supply campaign — lands the prospect on the wrong brand's site after the redirect cutover, which is the forcing function for this whole change. **Within the identity-matched pool the even-spread rule still holds:** sender warmup and reputation are per-inbox, not per-campaign, so every campaign gets the *whole* identity pool — splitting it across per-cell campaigns concentrates volume on a subset of inboxes, burning reputation unevenly for no analytical benefit. The only split is *across* identities (different brands, by design). Revgrowth 10's upstream `launch.py` encodes the even-spread rule; Brite inherits it, now scoped per identity. **Any deviation — splitting the identity pool, OR attaching an off-identity sender — is a hard failure surfaced to the operator; the command offers no split-sender flag.**
+
+### Sender-match mode (BC-13864)
+
+Phase 7 attaches senders per an operator-selected **sender-match mode**. Resolve it once, here, before enumerating (step 2):
+
+1. **From the flag or a resume.** If `--sender-match` was provided, use it — already IV-12-validated to one of `identity` / `esp` / `both` / `all`. On a **resume**, read `sender_match_mode` from the metadata breadcrumb instead of re-prompting.
+2. **From the operator.** Otherwise prompt via `AskUserQuestion` (no silent default — the operator must choose):
+
+   > Which senders should attach to each campaign?
+   >
+   > - `identity` — only this run's `{sending_identity}` brand senders (redirect-safe) (Recommended)
+   > - `esp` — only senders whose ESP matches each campaign's recipient ESP
+   > - `both` — identity ∩ ESP (brand senders that also match the cell's ESP)
+   > - `all` — every connected sender ⚠️ redirect-UNSAFE: an off-brand sender lands the prospect on the wrong site after the redirect cutover
+
+3. **Record it.** Write `sender_match_mode` to metadata *before* any attach so a resumed run re-reads it. `identity` is the redirect-safe default and the only mode whose enumeration is wired in this increment; **`esp` / `both` / `all` HALT here as not-yet-implemented** — the per-mode enumeration paths land in the next increment of BC-13864. This is fail-closed: a not-yet-wired mode never silently falls back to the full workspace pool.
 
 ### Pagination is mandatory
 
@@ -1067,13 +1087,13 @@ Before marking this command shipped, confirm:
 - [ ] All 11 phases named and ordered correctly (PRE-FLIGHT / HOST LOOKUP / VARIABLES / UPLOAD / CAMPAIGN CREATE / ATTACH LEADS / ATTACH SENDERS / SCHEDULE / SEQUENCE / PREVIEW / ACTIVATE).
 - [ ] Every mutating phase (3/4/5/6/7/8/9/11) has an explicit semantic "USER CONFIRM" gate, and Phase 10 Mode 2 (`--test-send`) has its own intent gate (10b) before the real test-send.
 - [ ] Phases 4 and 6 use **one semantic gate + minimal per-chunk/per-campaign turn-structure prompts** rather than re-prompting semantic approval per loop iteration (BC-2707 turn-structure preserved without gate fatigue).
-- [ ] Phase 7 ATTACH SENDERS filters senders to the run's sending identity (`tag_ids=[identity]`, BC-13864), documents the paginated `while True` pattern AND post-attach count verification; splitting the identity-matched pool (and attaching off-identity senders) is explicitly forbidden.
+- [ ] Phase 7 ATTACH SENDERS resolves an operator-selected sender-match mode (`--sender-match` / Phase 7 prompt; `identity` is the redirect-safe default) and, for the `identity` mode, filters senders to the run's sending identity (`tag_ids=[identity]`, BC-13864), documents the paginated `while True` pattern AND post-attach count verification; splitting the identity-matched pool (and attaching off-identity senders) is explicitly forbidden.
 - [ ] Phase 4 UPLOAD uses the two-call MCP confirmation gate (references BC-2707 precedent).
 - [ ] Phase 11 ACTIVATE requires double-confirm (operator-intent + MCP two-call).
 - [ ] Phase 9 SEQUENCE enforces: step 1 `wait_in_days >= 1`, step 2 `wait_in_days >= 3`, field name `wait_in_days` (not `wait_days`), field name `email_subject` (not `subject`), 2-step max.
 - [ ] Phase 1 PRE-FLIGHT validation checklist includes variable check, messaging sanity, lead spot check, workspace guard, unique-per-lead auto-toggle at <500.
-- [ ] All 4 required args + 9 flags documented (`--no-host-lookup`, `--no-sequence`, `--activate`, `--preview`, `--reference`, `--entity`, `--identity`, `--test-send`, `--test-send-sender`); `argument-hint` frontmatter lists all 9.
-- [ ] § Input validation section present with IV-1..IV-11 covering CSV-path safety (IV-1), path confinement (IV-2), dogfood path detection (IV-3), domain regex filter (IV-4), --test-send validation (IV-5), SOQL email regex (IV-6), metadata-no-credentials (IV-7), --campaign-name validation + write-path confinement (IV-8), sidecar CSV formula-injection neutralization (IV-9), CSV Liquid-metacharacter rejection (IV-10), and --identity value validation (IV-11).
+- [ ] All 4 required args + 10 flags documented (`--no-host-lookup`, `--no-sequence`, `--activate`, `--preview`, `--reference`, `--entity`, `--identity`, `--sender-match`, `--test-send`, `--test-send-sender`); `argument-hint` frontmatter lists all 10.
+- [ ] § Input validation section present with IV-1..IV-12 covering CSV-path safety (IV-1), path confinement (IV-2), dogfood path detection (IV-3), domain regex filter (IV-4), --test-send validation (IV-5), SOQL email regex (IV-6), metadata-no-credentials (IV-7), --campaign-name validation + write-path confinement (IV-8), sidecar CSV formula-injection neutralization (IV-9), CSV Liquid-metacharacter rejection (IV-10), --identity value validation (IV-11), and --sender-match value validation (IV-12).
 - [ ] Error recovery documented per phase (partial state + resume procedure).
 - [ ] Launch metadata write path `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json` documented.
 - [ ] Dogfood transcript (test campaign on `emailbison-personal`, 5–10 leads) attached to BC-5826 as a comment — activated or draft-only. Phase 10 Mode 1 (local render) MUST succeed with all 5 sanity checks passing. Phase 10 Mode 2 (`--test-send`) is optional and only validated if the flag was passed.
