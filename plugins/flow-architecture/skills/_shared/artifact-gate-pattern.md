@@ -49,6 +49,13 @@ Cross-file integrity per Q29 sub-decision 3 (`:261`) plus Q29 amendment 2 (`cros
 
 Arithmetic: 9 + 22 + 6 = 37 distinct gate types (multiplied by N flows for per-flow gates).
 
+### CI-runner resolution gates (2 — continuous-CI only)
+
+Two deterministic cross-doc *resolution* gates enforced by the continuous CI runner (`scripts/run_fda_ci_audit.py`, the headless surface the consumer `fda-audit` required check invokes) but NOT emitted as discrete per-flow rows by the interactive `/flow:audit` evaluator — so they sit outside the 37-gate Phase-B/C count and outside the `--gate` universe:
+
+- `link-resolution` — every body `](<path>.md)` link in any story / journey doc resolves on disk (the BC-13710 broken-cross-reference class; frontmatter + `http(s)`/`mailto` links excluded).
+- `persona-exists` — every NON-EMPTY story-doc `personas:` slug resolves to `docs/product/personas/<slug>.md`. The deterministic FLOOR of the 3-layer persona system (existence here → LLM persona-depth via `quality-reviewer doc_kind: persona_doc` → author via `flow-persona-author`); BC-12573 shipped the lint, **BC-14036 activated it fleet-wide** in the CI runner once every consumer was migrated clean. Honest-empty (`personas: []` / absent / null) passes — presence, not non-emptiness (ADR-029); `personas:` is behavioral persona-doc slugs ONLY and an RBAC/access overload is an off-canon FAIL, not a carve (ADR-041). Single-sourced from `scripts/lib/flow_persona_lint.py` (the SAME definition the `validate.sh` fixture vslice locks).
+
 ## Hard vs soft classification
 
 Per Q29 sub-decision 4 (`:267`):
