@@ -149,6 +149,7 @@ The file at `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json` is
 {
   "schema_version": "1.0",
   "entity": "brite-nites",
+  "sending_identity": "nites",
   "campaign_name_base": "denver-downtown-lighting",
   "workspace": "emailbison-b2b",
   "copy_artifact_path": "docs/campaigns/nites/copy-denver-downtown-lighting-2026-04-20.json",
@@ -165,6 +166,7 @@ The file at `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json` is
   "lead_ids_by_bucket": {"professional|Google": [14706, 14707, 14708], "professional|Microsoft": [14709], "professional|Other": [14710, 14711]},
   "campaign_ids": {"professional|Google": 5551, "professional|Microsoft": 5552, "professional|Other": 5553},
   "plain_text_applied": true,
+  "identity_tag_id": 102,
   "sender_ids_attached": [101, 102, 103],
   "sender_attach_counts": {"professional|Google": 3, "professional|Microsoft": 3, "professional|Other": 3},
   "schedule_template_id": 3,
@@ -192,6 +194,7 @@ The worked example uses a single email-type (`professional`) only because the op
 - Phase 1 step 3 / step 10: `workspace_mismatch: {expected: "<id>", actual: "<id>"} | null`
 - Phase 1 step 7 / step 10: `sender_resolution_method: "artifact-default" | "marketing-context" | "salesforce" | "operator-prompt"`
 - Phase 1 step 9 / step 10: `unique_per_lead_enabled: <bool>`
+- Phase 1 step 10: `sending_identity: "labs" | "supply" | "nites"` (the Brite sending identity, chosen via `--identity` or operator prompt; tagged onto every campaign in Phase 5 step 9. Always written — absent only on a pre-Phase-1 abort. Independent of `entity`.)
 - Phase 2 step 4b (F12 skip-empty, post-gate): `skipped_cells: [<cell-label>, ...]` keyed by `{email_type}|{esp}` (same shape as `segments` keys).
 - Phase 2 IV-4 (Input validation): `invalid_domain_rows: [<row-number>, ...]`
 - Phase 2 step 1 (malformed-email handling): `invalid_email_rows: [<row-number>, ...]`
@@ -200,6 +203,7 @@ The worked example uses a single email-type (`professional`) only because the op
 - Phase 5 step 3: `existing_campaign_matches: [<id>, ...]` (campaign IDs returned by `list_campaigns(search="{base}")` before User gate 5; empty list is the happy path)
 - Phase 5 step 5: `reused_existing_ids: <bool>` (true if operator selected "Reuse existing IDs" at User gate 5; false on fresh creates)
 - Phase 5 step 8 / step 10: `plain_text_applied: <bool>` (true only if step 8 PATCH loop completed for ALL campaigns; false if partial)
+- Phase 5 step 9 / step 10: `identity_tag_id: <int>` (the per-workspace EB tag id for the chosen `sending_identity`, resolved + attached to every campaign in step 9; ids differ per instance — never hardcoded. Absent if the run didn't reach Phase 5.)
 - Phase 5 step 10 + Phase 11 step 4: `activated_per_campaign: {<bucket>: <ISO-8601> | null, ...}` — keys initialized at Phase 5 (one per bucket in `campaign_ids`); values flip from `null` to ISO-8601 timestamp at the moment each campaign's resume call returns. Global `activated` flips to `true` only when every entry is non-null.
 - Phase 6 step 7: `lead_attach_counts: {<bucket>: <count>, ...}` keyed by `{email_type}|{esp}` (same shape as `segments`).
 - Phase 6 step 7: `lead_ids_by_bucket: {<bucket>: [<lead_id>, ...], ...}` — per-bucket lead IDs from the bucket map built in Phase 6 step 2; the resume primitive for re-running Phase 6 from metadata alone (without re-doing Phase 2 MX lookups + CSV-row joins).
