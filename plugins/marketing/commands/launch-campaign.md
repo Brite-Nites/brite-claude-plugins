@@ -232,7 +232,11 @@ The worked example uses a single email-type (`professional`) only because the op
 **Steps:**
 
 1. **CSV schema validation.** Read the first line of `--csv` via `Bash`: `head -1 "{csv}"`. Confirm it contains `email`, `first_name`, `company_domain` (case-insensitive). Halt with a clear error if any required column is missing. Report optional columns found (`last_name`, `job_title`, `company_name`) — absent-but-referenced-in-copy columns are flagged in step 4.
-2. **Row count.** `wc -l "{csv}"` minus 1 for header. Store as `lead_count` for metadata.
+2. **Row count + input cleaning (BC-14044).** `wc -l "{csv}"` minus 1 for header = the raw row count. Then clean the list in two read-only passes (local CSV only, no EB calls) before any phase consumes it. Stash every dropped row in scratch state tagged with a `skip_reason`; dropped rows route to the skipped-contacts file (Phase 2 step 4c shared writer — see (2d) for the `--no-host-lookup` fallback). See `CONTEXT.md` § Marketing for **input-list dedup** vs the unrelated same-sounding concepts (unique-per-lead, the Phase 5 campaign-name guard, the Phase 6 cross-campaign skip).
+   - **(2a) Input-list dedup.** Collapse rows whose `email` matches case-insensitively (`.strip().lower()`) to the FIRST occurrence; drop the rest (`skip_reason: duplicate`). Load-bearing because EB's `POST /api/leads/multiple` silently keeps only the first of a within-batch repeat (HTTP 201, dropped rows vanish from the response — `email-bison.md` § Known gotchas, verified BC-7667) — doing it client-side makes the drop visible and keeps the Phase 4 step 9 + Phase 6 count checks honest. If a dropped row's other fields differ from the kept row (e.g. different `company` / `title` / custom-variable values), record the (kept-row, dropped-row) pair for the User-gate-1 conflict display — the one case where keep-first could discard the better record.
+   - **(2b) Deliverability filter.** Only when the CSV has an `email_deliverable` column (no-op if absent — many lists won't have it). Drop rows whose value lowercases to `false` / `no` / `0` (`skip_reason: undeliverable`) — known-undeliverable addresses bounce and degrade domain reputation (standard pre-send filter; Instantly auto-removes invalid on import). BLANK values are KEPT (blank = unchecked, not known-bad) and counted for the gate-1 summary. Never drop blanks.
+   - **(2c) Adjusted count.** `lead_count` = raw count − dropped (2a + 2b). Every downstream phase (Phase 4 chunking + step 9 reconciliation, Phase 6 attach counts) uses this cleaned count, NOT the raw row count.
+   - **(2d) Skipped-contacts file write.** The 2a + 2b dropped rows are written by the consolidated Phase 2 step 4c writer (alongside role/personal skips), POST-gate-1 so an operator keep-override (User gate 1) is reflected. **`--no-host-lookup` fallback:** that flag skips Phase 2, so when it is set, write the dropped rows to the skipped-contacts file at the end of Phase 1 instead — the operator always gets the record (BC-14044). Apply IV-8 (path confinement) + IV-9 (formula-injection neutralization) at whichever write fires. `skipped_leads_csv_path` is set whenever any row was dropped (here or in Phase 2), else `null`.
 3. **Workspace detection and cross-mapping flag (F2).** Load the copy artifact at `--copy-artifact` via `Read`. Extract `entity`. Map entity → expected workspace:
    - `brite-nites` → `emailbison-b2b` (workspace 55, `send.outbase.so`)
    - `brite-labs` → `emailbison-b2b` (workspace 55; Labs also runs b2b outreach)
@@ -278,7 +282,14 @@ The worked example uses a single email-type (`professional`) only because the op
 
 **User gate 1 (single end-of-Phase-1 gate, F8).** Ask via `AskUserQuestion`. Render the pre-flight summary; if a `workspace_mismatch` flag was recorded in step 3, fold its acknowledgment into the same prompt (do NOT ask twice):
 
-> Pre-flight complete. Lead count: {N}. Workspace: {workspace}. Entity: {entity}. Sending identity: {sending_identity}. Variables OK: {count-passed}/{count-total}. Sanity checklist: all passed.
+> Pre-flight complete. Lead count: {N} (after cleaning). Workspace: {workspace}. Entity: {entity}. Sending identity: {sending_identity}. Variables OK: {count-passed}/{count-total}. Sanity checklist: all passed.
+>
+> Input cleaning (BC-14044): {D} duplicate row(s) collapsed (kept first) · {U} undeliverable dropped · {B} kept without a deliverability check. {IF any row dropped}Skipped rows → `{skipped_leads_csv_path}`.{END IF}
+> {IF differing-duplicate conflicts recorded in step 2a:}
+> ⚠️ {K} duplicate email(s) had DIFFERENT details across rows — keeping the FIRST of each:
+>   • `{email}` — kept row {i} (`{field}`="{a}"), dropped row {j} (`{field}`="{b}")
+> Reply with an alternate keep (e.g. "keep row {j} for {email}") to override before upload; an unqualified proceed keeps the first.
+> {END IF}
 >
 > {IF workspace_mismatch recorded:}
 > ⚠️ Cross-mapping detected: entity `{entity}` normally routes to `{expected-workspace}`, but `--workspace {actual-workspace}` was explicit. Legitimate for dogfood / staging; flag for prod / real outreach. Metadata write path: `{metadata-path}` (dogfood path selected if CSV is under `.claude/worktrees/`).
@@ -288,6 +299,8 @@ The worked example uses a single email-type (`professional`) only because the op
 >
 > - Yes, proceed (acknowledges cross-mapping if flagged above)
 > - Abort
+
+**Gate-1 keep-override (BC-14044).** If the operator's response names an alternate keep for a differing-duplicate conflict ("keep row {j} for {email}"), swap which row is kept vs. dropped in the cleaned lead set AND in the skipped-contacts file before Phase 4; an unqualified "Yes, proceed" keeps the first of every conflict. This is the only re-litigated decision — non-differing duplicates and undeliverable drops are final. The override changes only which of the two same-email rows survives; it never un-drops a duplicate (the email still uploads exactly once).
 
 **If Phase 1 fails:** the metadata JSON may or may not exist. If it does, it contains only the inputs — no EB state has changed. Fix the input (CSV, copy artifact, or marketing-context) and re-run.
 
@@ -365,11 +378,11 @@ Without `--no-host-lookup` Phase 2 always runs and produces the multiplicative s
      - `Include personal addresses too` → skip leads tagged `role` only (enum: `include_personal`)
      - `Include all` → skip nothing (enum: `include_all`)
    - **(4b) Skip empty cells (F12).** With the surviving (post-filter) lead set, drop any cell in the 9-cell grid that has **0 leads** — do NOT create an empty campaign. Example: post-filter under `include_role` resolves to `(professional, Google): 84, (professional, Microsoft): 31, (professional, Other): 12, (role, Google): 3, (role, Microsoft): 0, (role, Other): 0` → create 4 campaigns (the 4 non-empty cells), skip the 2 empty role cells entirely. Record the skipped cells in scratch state so the metadata `segments` map reflects the actual (pruned) plan. If ALL cells are empty (either no leads survived the email-type filter, or every surviving lead's domain failed DNS), halt — the campaign has zero deliverable leads and Phase 3 cannot proceed.
-   - **(4c) Sidecar CSV write for skipped leads (only if non-empty).** If the skipped-lead set is non-empty, write it to a sidecar CSV. Apply IV-8 (re-validate `--campaign-name` regex + realpath-confine the resolved path to the chosen write directory) and IV-9 (formula-injection neutralization on each cell value) before writing. Path convention mirrors the metadata JSON's dual-path rule from § Launch metadata schema "Dogfood write path" note:
+   - **(4c) Consolidated skipped-contacts file write (only if non-empty).** This is the single skipped-contacts writer for the run. Write the **consolidated** skipped set: this phase's role/personal rows PLUS the Phase 1 step 2 stashed rows (`duplicate` + `undeliverable`) carried in scratch state. (Under `--no-host-lookup` Phase 2 does not run, so Phase 1 step 2d writes the file itself with just its rows — same path + same IV-8/IV-9 treatment; this writer covers the normal path.) Apply IV-8 (re-validate `--campaign-name` regex + realpath-confine the resolved path to the chosen write directory) and IV-9 (formula-injection neutralization on each cell value) before writing. Path convention mirrors the metadata JSON's dual-path rule from § Launch metadata schema "Dogfood write path" note:
      - **Production path:** `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
      - **Dogfood path:** `.claude/worktrees/<detected-worktree>/dogfood/{campaign-name}-{YYYY-MM-DD}-skipped.csv`
 
-     CSV columns: original CSV columns verbatim (preserve order, then apply IV-9 per-cell) + one new trailing column `skip_reason` with values `role_address` or `personal_domain`. If a lead matches both lists (tiebreak case), `skip_reason` is `personal_domain` per the personal-beats-role rule. If the skipped set is empty, no file is created; `skipped_leads_csv_path` is `null`.
+     CSV columns: original CSV columns verbatim (preserve order, then apply IV-9 per-cell) + one new trailing column `skip_reason`. Values: `role_address`, `personal_domain` (this phase); `duplicate`, `undeliverable` (Phase 1 step 2, BC-14044); `liquid-metacharacter` (IV-10); `workspace_collision` (Phase 4, appended on a 422). If a lead matches both role + personal lists (tiebreak), `skip_reason` is `personal_domain` per the personal-beats-role rule. If the consolidated skipped set is empty, no file is created; `skipped_leads_csv_path` is `null`.
    - **(4d) Append to metadata JSON.** Set `segmented: true`, `segments: {<only non-empty post-filter cells, keyed by "{email_type}|{esp}", value {email_type, esp, count}>}`, `email_type_filter_applied: "<enum>"` (use the enum value from 4a, NOT the prose label), `skipped_leads_csv_path: <path>|null`, `last_completed_phase: 2`.
 
 **User gate 2.** Ask via `AskUserQuestion`:
