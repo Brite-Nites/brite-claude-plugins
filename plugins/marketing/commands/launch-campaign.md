@@ -782,14 +782,14 @@ Pagination applies at two points: (a) enumerating senders before attach — once
 
    **Per-bucket (`esp` / `both`):**
 
-   > Attach each cell's ESP-matched pool to its campaign (`sender_match_mode={sender_match_mode}`, counts above)? Each campaign gets only the senders on its recipients' ESP{ — and the `{sending_identity}` identity, for `both`}. Per-cell counts differ by design. Proceed?
+   > Attach each cell's ESP-matched pool to its campaign (`sender_match_mode={sender_match_mode}`, counts above)? Each campaign gets only the senders on its recipients' ESP — *for `both`, each pool is also ∩ the `{sending_identity}` identity (ESP **and** brand); for `esp`, ESP only — NOT identity-scoped, so off-brand senders can attach*. Per-cell counts differ by design. Proceed?
    >
    > *(If step 2i found cells with no ESP-matched senders, list each with its resolution — never silent:)*
    > ⚠️ Cells with no ESP-matched senders (resolved per step 2i):
    > - `{cell}` — **fell back to identity-only ({M} `{sending_identity}` senders)** ✅ redirect-safe, WILL send (`both` mode)
    > - `{cell}` — **NO senders at all — will NOT send** (empty `esp` cell, or a `both` cell whose identity fallback was also empty) unless you abort and fix coverage (or attach manually later)
    >
-   > - Yes — attach each cell's matched pool{, apply the identity fallback for the `both` cells shown, and leave the no-sender cells unsent} (Recommended)
+   > - Yes — attach each cell's matched pool *(and, for any cells listed above: apply the `both` identity fallback, and leave the no-sender cells unsent)* (Recommended)
    > - Abort
 6. **Execute attach per campaign.** For each campaign ID in `campaign_ids`, call `attach_sender_emails_to_campaign`:
    - **Uniform (`identity` / `all`):** `{"sender_email_ids": [<all enumerated sender IDs from step 2>]}` — the same pool for every campaign.
