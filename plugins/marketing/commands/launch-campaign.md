@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 description: Turn an enriched lead CSV + email-copywriting JSON artifact into an activated Email Bison campaign via an 11-phase flow with user confirmation gates at every mutating step. Consumes the BC-5825 copy artifact and the BC-2718 campaign-orchestration defaults. Default path creates campaigns in draft state; pass --activate to transition them to queued (starts real sending).
-argument-hint: --csv <path> --workspace <emailbison-b2b|emailbison-personal> --copy-artifact <path> --campaign-name <base> [--entity <brite-nites|brite-labs>] [--identity <labs|supply|nites>] [--no-host-lookup] [--no-sequence] [--preview] [--activate] [--reference <campaign-id>] [--test-send <email>] [--test-send-sender <id>]
+argument-hint: --csv <path> --workspace <emailbison-b2b|emailbison-personal> --copy-artifact <path> --campaign-name <base> [--entity <brite-nites|brite-labs>] [--identity <labs|supply|nites>] [--sender-match <identity|esp|both|all>] [--no-host-lookup] [--no-sequence] [--preview] [--activate] [--reference <campaign-id>] [--test-send <email>] [--test-send-sender <id>]
 allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep, Bash, AskUserQuestion, Skill
 ---
 
@@ -109,6 +109,8 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 
 **IV-11. `--identity` value validation (Phase 1 pre-flight).** If `--identity` is provided, it MUST be exactly one of `labs`, `supply`, or `nites` (lowercase). Reject any other value with a clear error — no auto-correction; the operator resubmits. This is the Brite sending identity that Phase 5 tags onto every campaign created this run, so an invalid value must fail closed before any EB campaign is created or tagged. When `--identity` is absent, it is resolved by operator prompt at Phase 1 step 10 — this check only validates an explicitly-supplied value.
 
+**IV-12. `--sender-match` value validation (Phase 1 pre-flight).** If `--sender-match` is provided, it MUST be exactly one of `identity`, `esp`, `both`, or `all` (lowercase). Reject any other value with a clear error — no auto-correction; the operator resubmits. This selects which connected senders Phase 7 attaches to each campaign (`identity` = the run's brand senders only, the redirect-safe default; `esp` = senders whose ESP matches each campaign's recipient ESP; `both` = identity ∩ ESP; `all` = every connected sender, redirect-*unsafe*). An invalid value must fail closed before any EB campaign is created. When `--sender-match` is absent, the mode is resolved by operator prompt at Phase 7 — this check only validates an explicitly-supplied value. **Incompatible with `--no-host-lookup`:** that flag produces a single combined campaign with no recipient-ESP split, so `esp` and `both` (which match senders to each cell's ESP) have no meaning. Reject `--no-host-lookup --sender-match esp|both` here at pre-flight — only `identity` and `all` are valid with `--no-host-lookup`.
+
 ---
 
 ## Argument parsing and defaults
@@ -128,13 +130,14 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 | `--test-send-sender <id>` | no | first attached | Override the sender mailbox used for `--test-send`. Default: first attached sender from Phase 7. |
 | `--reference <campaign-id>` | no | — | Clone variables + naming + sender plan + schedule from an existing campaign. Pre-fills Phase 3/5/7/8 defaults — user gates still fire. |
 | `--identity <id>` | no | prompt | `labs`, `supply`, or `nites` — the Brite sending identity tagged onto every campaign this run creates (Phase 5). Validated by IV-11. If omitted, Phase 1 prompts for it. Independent of `--entity` (do not derive one from the other). |
+| `--sender-match <id>` | no | prompt | `identity`, `esp`, `both`, or `all` — which connected senders Phase 7 attaches per campaign. `identity` (redirect-safe default): the run's identity senders only. `esp`: senders whose ESP matches each campaign's recipient ESP. `both`: identity ∩ ESP. `all`: every connected sender (legacy, redirect-*unsafe* — warned at the Phase 7 prompt). Validated by IV-12 — under `--no-host-lookup` only `identity` / `all` apply (no ESP split to match). If omitted, Phase 7 prompts for it. |
 
 **Non-goals** (explicit — do NOT do these):
 
 - Do NOT generate copy — that's BC-5825 email-copywriting. This command CONSUMES the copy artifact.
 - Do NOT design sequences — that's BC-2718 campaign-orchestration. This command APPLIES the sequence as given.
 - Do NOT handle reply routing — that's BC-2720 reply-processing.
-- Do NOT split senders across multiple campaigns — invariant violation, explicitly forbidden in Phase 7 (Revgrowth 10 rule).
+- Do NOT ration a single sender pool across campaigns to concentrate volume — invariant violation, explicitly forbidden in Phase 7 (Revgrowth 10 rule). Neither scoping the pool to the run's sending identity (BC-13864) nor the per-bucket modes giving each cell its own ESP-matched pool is a "split" — each campaign still gets its *whole* matched pool; only the rationing of one pool across campaigns is forbidden.
 - Do NOT skip the two-call MCP gate on Phase 4 UPLOAD or Phase 11 ACTIVATE — these are load-bearing safety mechanisms.
 - Do NOT default to `--activate`. Campaigns are created in draft unless the flag is explicit.
 - Do NOT treat "preview" as an EB server-side render. Email Bison has no standalone preview endpoint — Phase 10's default mode is a client-side local render of the copy artifact, and the optional `--test-send` mode delivers a real test email. Neither is a non-sending server-side preview in the way the term typically implies. BC-5826 X17 dogfood confirmed (F13) that an EB preview endpoint does not exist; do not search for one.
@@ -207,6 +210,11 @@ The worked example uses a single email-type (`professional`) only because the op
 - Phase 5 step 10 + Phase 11 step 4: `activated_per_campaign: {<bucket>: <ISO-8601> | null, ...}` — keys initialized at Phase 5 (one per bucket in `campaign_ids`); values flip from `null` to ISO-8601 timestamp at the moment each campaign's resume call returns. Global `activated` flips to `true` only when every entry is non-null.
 - Phase 6 step 7: `lead_attach_counts: {<bucket>: <count>, ...}` keyed by `{email_type}|{esp}` (same shape as `segments`).
 - Phase 6 step 7: `lead_ids_by_bucket: {<bucket>: [<lead_id>, ...], ...}` — per-bucket lead IDs from the bucket map built in Phase 6 step 2; the resume primitive for re-running Phase 6 from metadata alone (without re-doing Phase 2 MX lookups + CSV-row joins).
+- Phase 7 mode-selection: `sender_match_mode: "identity" | "esp" | "both" | "all"` (the operator-selected sender-match mode, resolved via `--sender-match` or the Phase 7 prompt; recorded before any attach so a resumed run re-reads it instead of re-prompting. Absent if the run didn't reach Phase 7.)
+- Phase 7 step 2e: `esp_tag_ids: {"Google": <int>, "Outlook": <int>}` (the per-workspace EB tag ids for the Google / Microsoft-"Outlook" ESPs, resolved for the per-bucket `esp` / `both` modes; ids differ per instance — never hardcoded. Present only for `esp` / `both` runs; absent for `identity` / `all`.)
+- Phase 7 step 2i: `sender_match_fallbacks: [<cell>, ...]` (per-bucket cells where an empty `both`-cell fell back to identity-only, keyed `{email_type}|{esp}`; `[]` when none) and `sender_unsent_cells: [<cell>, ...]` (empty `esp` cells — and `both` cells whose identity fallback was also empty — left sender-less per the gate-7 confirmation; `[]` when none). Both surfaced + confirmed at User gate 7, never silent.
+- Phase 7 step 8: `sender_ids_attached` — **shape depends on `sender_match_mode`**: a flat list `[<id>, ...]` for the uniform modes (`identity`, `all`, the same pool on every campaign — this is the shape in the worked example above), but a per-cell map `{<bucket>: [<id>, ...], ...}` keyed `{email_type}|{esp}` for the per-bucket modes (`esp`, `both`, where each cell's set differs). Consumers MUST branch on `sender_match_mode` (or on `Array.isArray`) before reading it.
+- Phase 7 step 7: `sender_verify_mode: "scalar" | "paginated"` (which post-attach verification path step 7 used — scalar-count happy path, or the paginated fetch+classify fallback when `get_campaign` exposes no scalar count field).
 - Phase 8 step 7: `schedule_template_id: <id>` (renamed from `schedule_id`) + `campaign_schedule_ids: {<bucket>: <cloned_schedule_id>, ...}` — the source template ID applied plus the per-campaign cloned schedule entity IDs returned by `create_schedule_from_template`. Round-2 of BC-5906 confirmed each apply creates a NEW schedule entity (clone), not a reference to the template.
 - Phase 10 Mode 1 step 8: `preview_method: "local-render" | "local-render + test-send"`, `preview_lead_email: "<email>"`
 - Phase 10 Mode 2 step 6: `test_send_recipient: "<email>"`, `test_send_at: "<ISO-8601>"`
@@ -650,13 +658,37 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 ## Phase 7 — ATTACH SENDERS (CRITICAL INVARIANT)
 
-**Purpose.** Attach every connected sender inbox to every campaign. This is the single most consequential phase of the flow, and the invariant it enforces is load-bearing for deliverability.
+**Purpose.** Attach this run's sender pool — scoped by the operator-selected `sender_match_mode` — to every campaign. This is the single most consequential phase of the flow, and the invariant it enforces is load-bearing for deliverability.
+
+**Scope (BC-13864).** Sender attach is an **operator-selected step**: a Phase 7 prompt (or the `--sender-match` flag) picks one of four modes — `identity` (the run's brand senders only, the redirect-safe default), `esp` (senders matching each campaign's recipient ESP), `both` (identity ∩ ESP), or `all` (every connected sender, redirect-*unsafe*). All four are wired: the two **uniform** modes — `identity` (verified `tag_ids=[identity]`) and `all` (every connected sender, no filter) — attach the same pool to every campaign; the two **per-bucket** modes — `esp` and `both` — apply a *different* filter to each campaign cell via the three-way Google / Microsoft / SMTP mapping (step 2). Empty per-bucket cells are never silent: surfaced + confirmed at User gate 7, with `both` falling back to identity-only for that cell (redirect-safe). ⚠️ That `both`→identity fallback is flagged **provisional** — see step 2i.
 
 ### The invariant
 
-> **Attach ALL connected senders to ALL campaigns. Never split senders across campaigns.**
+> **Attach ALL of this run's identity-matched senders to ALL campaigns. Never split that pool across campaigns.** *(This is the `identity` mode — the redirect-safe default; `esp` / `both` / `all` vary it as the paragraphs below detail.)*
 
-Why: sender warmup and reputation are per-inbox, not per-campaign. Splitting the sender pool across per-cell campaigns concentrates volume on a subset of inboxes, which burns reputation unevenly and produces asymmetric deliverability across campaigns for no analytical benefit. Revgrowth 10's upstream `launch.py` encodes this as an explicit rule; Brite inherits it verbatim. **Any deviation from this invariant is a hard failure and must be surfaced to the operator — the command does not offer a split-sender flag.**
+The pool is scoped to the run's sending identity (`tag_ids=[identity]`, BC-13864): an identity-mismatched sender — say a Nites inbox on a Supply campaign — lands the prospect on the wrong brand's site after the redirect cutover, which is the forcing function for this whole change. **Within the identity-matched pool the even-spread rule still holds:** sender warmup and reputation are per-inbox, not per-campaign, so every campaign gets the *whole* identity pool — splitting it across per-cell campaigns concentrates volume on a subset of inboxes, burning reputation unevenly for no analytical benefit. The only split is *across* identities (different brands) — and, in the per-bucket modes, *across* ESPs (each cell draws senders on its recipients' ESP, step 2) — by design. Revgrowth 10's upstream `launch.py` encodes the even-spread rule; Brite inherits it, now scoped per identity. **In the identity-scoped modes (`identity`, `both`) any deviation — rationing a pool across campaigns, OR attaching an off-identity sender — is a hard failure surfaced to the operator; the command offers no split-sender flag.** (`all` and the ESP axis of `esp` relax the identity rule by design — see the next two paragraphs.)
+
+**Per-bucket modes (`esp` / `both`) draw a different pool per cell.** When the operator selects `esp` or `both`, each campaign cell (Google / Microsoft / Other) gets the senders that match *its* recipients' ESP — so the cells legitimately hold different pools with different counts. This is **not** the forbidden split: the forbidden split rations *one* pool across same-cell campaigns to concentrate volume; per-bucket modes give each cell its *whole* matching pool, and the even-spread rule still holds within a cell. `esp` carries no identity guarantee (an ESP-matched sender may be any brand); `both` is identity ∩ ESP and keeps the off-identity-sender = hard-failure rule per cell.
+
+**`all` mode opts out of identity scoping.** When the operator selects `all`, the pool is *every* connected sender — not identity-scoped — a deliberate, redirect-*unsafe* choice surfaced with a warning at both the mode prompt and gate 7. The even-spread rule still holds: that full pool attaches *whole* to every campaign, never split across them. The "off-identity sender = hard failure" rule above is specific to the identity-scoped modes; in `all` mode off-identity senders are the explicit, operator-selected result, not a violation.
+
+### Sender-match mode (BC-13864)
+
+Phase 7 attaches senders per an operator-selected **sender-match mode**. Resolve it once, here, before enumerating (step 2):
+
+1. **From the flag or a resume.** If `--sender-match` was provided, use it — already IV-12-validated to one of `identity` / `esp` / `both` / `all`. On a **resume**, read `sender_match_mode` from the metadata breadcrumb instead of re-prompting.
+2. **From the operator.** Otherwise prompt via `AskUserQuestion` (no silent default — the operator must choose):
+
+   > Which senders should attach to each campaign?
+   >
+   > - `identity` — only this run's `{sending_identity}` brand senders (redirect-safe) (Recommended)
+   > - `esp` — only senders whose ESP matches each campaign's recipient ESP
+   > - `both` — identity ∩ ESP (brand senders that also match the cell's ESP)
+   > - `all` — every connected sender ⚠️ redirect-UNSAFE: an off-brand sender lands the prospect on the wrong site after the redirect cutover
+
+   **Under `--no-host-lookup`** (one combined campaign, no ESP split) offer **only `identity` / `all`** — omit `esp` / `both`, which have no cell ESP to match. (An explicit `--sender-match esp|both` combined with `--no-host-lookup` was already rejected at IV-12 pre-flight, so any flag value reaching here under `--no-host-lookup` is `identity` or `all`.)
+
+3. **Record it.** Write `sender_match_mode` to metadata *before* any attach so a resumed run re-reads it. All four modes are wired in the steps below: the **uniform** modes (`identity`, `all`) enumerate one pool attached to every campaign; the **per-bucket** modes (`esp`, `both`) enumerate a different pool per campaign cell via step 2's three-way ESP mapping.
 
 ### Pagination is mandatory
 
@@ -670,50 +702,118 @@ Workspaces can have 500+ connected senders. `list_sender_emails` is cursor-pagin
 senders = []
 cursor = None
 while True:
-    response = list_sender_emails(cursor=cursor, filter={"status": "connected"})
+    response = list_sender_emails(cursor=cursor, filter={"status": "connected", "tag_ids": [identity_tag_id]})  # filter is mode-dependent — see step 2 (identity: tag_ids=[identity_tag_id]; all: status only; esp/both: per-cell ESP filter)
     senders.extend(response.data)
     cursor = response.next_cursor
     if not cursor:
         break
 ```
 
-Pagination applies at two points: (a) enumerating senders before attach, (b) re-querying post-attach for verification. Both loops must exhaust the cursor — never truncate after the first page.
+Pagination applies at two points: (a) enumerating senders before attach — once for the uniform modes, once **per cell** for the per-bucket modes (each cell runs its own filtered loop) — and (b) re-querying post-attach for verification. Both loops must exhaust the cursor — never truncate after the first page.
 
 ### Steps
 
 1. **Ground-truth the tool names.** `search_api_spec` with queries `list sender emails`, `attach sender emails`. Per `email-bison.md` § Common workflows the names are `list_sender_emails` (GET) and `attach_sender_emails_to_campaign` (POST `/api/campaigns/{id}/attach-sender-emails`). Request body: `{"sender_email_ids": [1, 2, 3]}`.
-2. **Enumerate connected senders.** Run the `while True` pagination loop against `list_sender_emails` with filter `?status=connected` (lowercase). EB's status filter is case-sensitive in a non-obvious way: `?status=Connected` (matching the response `status: "Connected"` data field) returns 422 (Sx-11, BC-5906) — operators copying from response payloads will hit a 422 with no diagnostic. Always pass the lowercase form. Exhaust the cursor. Record the full list. If the workspace returns zero connected senders, HALT — no campaign can send without a sender, and silently proceeding would create campaigns that queue forever.
-3. **With `--reference <campaign-id>` set:** call the reference campaign's `get_campaign` (or equivalent sender-list endpoint) to fetch its attached sender IDs. Pre-fill the gate to show "reference campaign had these senders attached — they are a subset of the current connected list." The invariant still applies — we still attach ALL connected senders from this workspace, not just the reference's subset. `--reference` pre-fills the display, not the attach payload.
-4. **Render the attach plan.** Show the operator:
+2. **Enumerate this run's connected senders.** Page `list_sender_emails`, fail-closed. How many pools, and what filter each uses, depends on `sender_match_mode`: the **uniform** modes (`identity`, `all`) enumerate **one** pool attached to every campaign; the **per-bucket** modes (`esp`, `both`) enumerate **one pool per campaign cell**, each with that cell's ESP filter.
 
-   > Sender pool for workspace `{workspace}`: {N-senders} connected senders.
+   **Uniform modes (`identity` / `all`):**
+   a. **`identity` mode — resolve + hard-guard the identity tag id (fail closed).** Reuse the per-workspace `identity_tag_id` already resolved before any campaign was created (Phase 1 step 10 / the Phase 5 identity pre-check, BC-13863) — on a resume, read it from the metadata breadcrumb; never re-resolve or hardcode it. **Assert it is a resolved positive integer.** If it is null/unresolved (e.g. corrupt or hand-edited metadata), re-run the Phase 5 pre-check; if it is *still* unresolved, **HALT — never call `list_sender_emails` with an empty or missing `tag_ids[]`**, because an empty tag filter returns the full workspace pool and would silently attach off-identity senders. *(`all` mode needs no tag id — it deliberately wants the full pool — so it skips this sub-step.)*
+   b. **Enumerate.**
+      - **`identity`:** run the `while True` loop against `list_sender_emails` with filter `?status=connected` (lowercase) **plus `tag_ids[]=<identity_tag_id>`**; ground-truth the exact tag-filter param shape via `search_api_spec` once. EB's status filter is case-sensitive: `?status=Connected` returns 422 (Sx-11, BC-5906) — always pass the lowercase form. Exhaust the cursor; record the full list.
+      - **`all`:** run the same loop with `?status=connected` (lowercase) **only — no tag filter**, returning every connected sender in the workspace. The off-identity senders this includes are intentional (the redirect-*unsafe* legacy pool the operator opted into at the mode prompt), not a fail-open. Exhaust the cursor.
+   c. **Verify the filter actually applied (don't trust it) — `identity` mode only.** Each returned sender carries a `tags[]` array — confirm every one includes `identity_tag_id`. If any returned sender lacks it, the server-side `tag_ids[]` filter was silently ignored (Sx-5 — EB accepts and no-ops unsupported params), so the list is the full unfiltered pool; **HALT** rather than attach. This is what makes the identity filter *verified*, not merely *trusted* — step 7's count check is self-referential (it compares the attach against this enumeration) and cannot catch this fail-open on its own. **`all` skips this cross-check:** it asserts no tag membership (the full connected pool *is* the intended result), so step 7's count check alone verifies the attach.
+   d. **Zero-pool HALT.** If the enumerated pool is empty, **HALT** — surface the mode + workspace; no campaign can send without a sender, and silently proceeding would create campaigns that queue forever. For `identity` this means zero senders carry the identity tag (stricter than the old global zero-sender check: a workspace with hundreds of connected senders can still have zero for *this* identity); for `all` it means zero connected senders at all.
+
+   **Per-bucket modes (`esp` / `both`):**
+   e. **Resolve the ESP tag ids (fail closed).** `esp`/`both` match on recipient ESP, so resolve the workspace's `Google` and `Outlook` tag ids — **EB names Microsoft "Outlook"** — the same way the Phase 5 pre-check resolved the identity tag: `search_api_spec` + `call_api` to list the workspace tags once, match the labels `Google` / `Outlook`. Per-instance, never hardcode (commercial and personal differ). **HALT if either is absent** — ESP matching is impossible without them. For `both`, also **resolve + hard-guard `identity_tag_id` here** — the Per-bucket branch does **not** execute sub-step (a), so (a)'s positive-integer assertion must run at this entry point, not be assumed: **assert `identity_tag_id` is a resolved positive integer**; if null/unresolved (corrupt or hand-edited metadata, or a Phase 5 failure), re-run the Phase 5 pre-check; if *still* unresolved, **HALT — never build a `tag_ids=[identity, <esp>]` filter with a null or missing identity id**, because EB silently dropping the null entry would return the full ESP-matched pool with no identity scoping (the exact fail-open this change prevents, and which 2h's membership check can't cleanly catch when the id it checks against is itself null). On a **resume**, reuse `esp_tag_ids` from the metadata breadcrumb if present; if absent (a crash before step 8 persisted them), just re-resolve here — resolution is deterministic and side-effect-free.
+   f. **Build each cell's filter (three-way Google / Microsoft / SMTP).** Each `campaign_ids` key is `{email_type}|{esp}` with esp ∈ {`Google`, `Microsoft`, `Other`}. Map the cell's esp component to a `list_sender_emails` filter (all also pass `?status=connected` lowercase; multiple `tag_ids` = **AND/intersection**, verified):
+
+      | Cell ESP | `esp` filter | `both` filter (identity ∩ ESP) |
+      |---|---|---|
+      | `Google` | `tag_ids=[Google]` | `tag_ids=[identity, Google]` |
+      | `Microsoft` | `tag_ids=[Outlook]` | `tag_ids=[identity, Outlook]` |
+      | `Other` (SMTP) | `excluded_tag_ids=[Google, Outlook]` | `tag_ids=[identity]` + `excluded_tag_ids=[Google, Outlook]` |
+
+      `Other` = any ESP that is neither Google nor Microsoft, expressed as the exclusion of both — so an **untagged** sender (no ESP tag at all) also falls into the `Other` cell by construction. Ground-truth the exact `tag_ids[]` / `excluded_tag_ids[]` param shapes via `search_api_spec` once. **If `excluded_tag_ids` is unsupported** (the `Other` cell depends on it), **HALT** — do not fall back to an unfiltered `status=connected` query, which would silently attach Google/Outlook senders to the SMTP cell.
+   g. **Enumerate per cell.** For each cell in `campaign_ids`, run the `while True` loop with *that cell's* filter from (f). Exhaust the cursor; record the cell's list keyed by the cell. **Dedupe by filter:** cells that share an identical filter (e.g. `professional|Google` and `role|Google` both query `tag_ids=[Google]`) enumerate the same pool — run the paginated loop once per distinct filter and reuse the result across those cells, rather than re-paging at 52-pages-per-pool.
+   h. **Verify the filter applied, per cell (don't trust it — Sx-5).** Inspect each returned sender's `tags[]`:
+      - **`Google` / `Microsoft` cells:** every sender must carry the expected positive tag — `esp`: the ESP tag; `both`: the identity tag **and** the ESP tag. Any miss means the `tag_ids[]` filter was silently ignored → **HALT**.
+      - **`Other` (SMTP) cells:** every sender must carry **neither** `Google` nor `Outlook` (this verifies `excluded_tag_ids` applied — a *negative* check, load-bearing precisely because EB no-ops unsupported params, so a silently-ignored exclusion would return Google/Outlook senders); for `both`, every sender must **also** carry the identity tag. Any violation → **HALT**.
+   i. **Empty-cell handling (never silent — surfaced + confirmed at User gate 7).** If a cell's pool from (g) is empty:
+      - **`both` mode → fall back to identity-only for that cell.** Re-enumerate that cell with `tag_ids=[identity_tag_id]` alone (drop the ESP filter), **verify the fallback pool the same way:** every returned sender's `tags[]` must include `identity_tag_id`, else the `tag_ids[]` filter silently no-oped (Sx-5) → **HALT**. (2c's "`identity` mode only" header scopes the *uniform* branch; this tag-membership check applies to any `tag_ids=[identity_tag_id]` query, so it is mandatory here in the `both` fallback too.) Then **make that identity pool the cell's recorded pool — it *replaces* the empty (g) entry, so every downstream reference to "that cell's pool" (steps 6, 7, 8) resolves to the fallback list and its count, not the empty ESP-filtered one.** Redirect-safe, and it keeps the cell's already-attached leads moving rather than stranding them. Record the cell in `sender_match_fallbacks` (step 8). Never applied silently: it is shown and confirmed at gate 7.
+      - **`esp` mode → no fallback** (esp is not identity-scoped, so there is no brand pool to fall back to). Record the cell in `sender_unsent_cells` (step 8); surface it at gate 7, where the operator either aborts (to fix sender coverage / switch modes) or proceeds leaving that cell sender-less — it will not send until senders are attached out-of-band.
+      - **If a `both` cell's identity fallback pool is *also* empty,** treat it as the `esp` case (no senders at all → `sender_unsent_cells`, surfaced at gate 7).
+      - **Whole-launch floor.** If *every* per-bucket cell ends up empty (all land in `sender_unsent_cells`, none has senders even after the `both` fallback), **HALT** — the per-bucket analogue of the uniform zero-pool HALT (2d); a 100%-unsent launch would create only campaigns that queue forever, so it never reaches gate 7 as a "proceed" option.
+
+      > ⚠️ **Provisional (BC-13864).** The `both`→identity fallback is flagged provisional. Small / ESP-lopsided brands trigger empty `both` cells often — e.g. Nites inboxes cluster in *different* ESPs per instance (commercial Google + SMTP, personal Outlook) — so a Nites `both` launch hits empty cells frequently and quietly degrades toward identity-mode coverage. If that causes operator confusion or cross-ESP deliverability issues from the fallen-back cells, revisit. Alternatives parked: drop the cell, hard-HALT the launch, or a smarter per-cell fallback.
+3. **With `--reference <campaign-id>` set:** call the reference campaign's `get_campaign` (or equivalent sender-list endpoint) to fetch its attached sender IDs. Pre-fill the gate to show "reference campaign had these senders attached — this run attaches its own sender pool per `sender_match_mode` (step 2), which may differ." The invariant still applies — we still attach ALL of this run's enumerated senders (step 2), not just the reference's subset. `--reference` pre-fills the display, not the attach payload.
+4. **Render the attach plan.** The shape depends on `sender_match_mode`.
+
+   **Uniform (`identity` / `all`)** — one pool, same count to every campaign:
+
+   > Sender pool for workspace `{workspace}`: {N-senders} connected senders — `sender_match_mode={sender_match_mode}` (`identity` → carrying the `{sending_identity}` tag; `all` → every connected sender, no filter).
    >
-   > Attach plan (per-campaign count must match):
+   > Attach plan (per-campaign count must match — same pool to every campaign):
    > - `{campaign_ids["professional|Google"]}` ← {N-senders} senders
    > - `{campaign_ids["professional|Microsoft"]}` ← {N-senders} senders
    > - `{campaign_ids["professional|Other"]}` ← {N-senders} senders
    > - `{campaign_ids["role|Google"]}` ← {N-senders} senders
    >
    > Sender list preview (first 5): sender@brite.co, ops@brite.co, intro@brite.co, …
-5. **User gate 7.** Ask via `AskUserQuestion`:
 
-   > Attach ALL {N-senders} senders to ALL {N-campaigns} campaigns? This is the sender invariant — splitting is forbidden. Proceed?
+   **Per-bucket (`esp` / `both`)** — a different pool per cell; counts legitimately differ:
+
+   > Sender pools for workspace `{workspace}` — `sender_match_mode={sender_match_mode}`, three-way ESP match (`both` also ∩ `{sending_identity}`):
+   > - `{campaign_ids["professional|Google"]}` (Google) ← {N_google} senders
+   > - `{campaign_ids["professional|Microsoft"]}` (Outlook) ← {N_microsoft} senders
+   > - `{campaign_ids["professional|Other"]}` (SMTP, excl. Google/Outlook) ← {N_other} senders
+   > - `{campaign_ids["role|Google"]}` (Google) ← {N_google} senders
    >
-   > - Yes, attach full pool to every campaign (Recommended)
+   > Per-cell counts differ by design. Sender preview per cell (first 3 each): …
+5. **User gate 7.** Ask via `AskUserQuestion` — the prompt depends on `sender_match_mode`.
+
+   **Uniform (`identity` / `all`):**
+
+   > Attach ALL {N-senders} senders (`sender_match_mode={sender_match_mode}`) to ALL {N-campaigns} campaigns? Every campaign gets the same pool — splitting it across campaigns is forbidden. Proceed?
+   > *(For `all`: ⚠️ this attaches every connected sender, off-brand ones included — redirect-UNSAFE; you selected this at the mode prompt.)*
+   >
+   > - Yes, attach the full pool to every campaign (Recommended)
    > - Abort
-6. **Execute attach per campaign.** For each campaign ID in `campaign_ids`:
-   - Call `attach_sender_emails_to_campaign` with `{"sender_email_ids": [<all connected IDs>]}`.
+
+   **Per-bucket (`esp` / `both`):**
+
+   > Attach each cell's ESP-matched pool to its campaign (`sender_match_mode={sender_match_mode}`, counts above)? Each campaign gets only the senders on its recipients' ESP — *for `both`, each pool is also ∩ the `{sending_identity}` identity (ESP **and** brand); for `esp`, ESP only — NOT identity-scoped, so off-brand senders can attach*. Per-cell counts differ by design. Proceed?
+   >
+   > *(If step 2i found cells with no ESP-matched senders, list each with its resolution — never silent:)*
+   > ⚠️ Cells with no ESP-matched senders (resolved per step 2i):
+   > - `{cell}` — **fell back to identity-only ({M} `{sending_identity}` senders)** ✅ redirect-safe, WILL send (`both` mode)
+   > - `{cell}` — **NO senders at all — will NOT send** (empty `esp` cell, or a `both` cell whose identity fallback was also empty) unless you abort and fix coverage (or attach manually later)
+   >
+   > - Yes — attach each cell's matched pool *(and, for any cells listed above: apply the `both` identity fallback, and leave the no-sender cells unsent)* (Recommended)
+   > - Abort
+6. **Execute attach per campaign.** For each campaign ID in `campaign_ids`, call `attach_sender_emails_to_campaign`:
+   - **Uniform (`identity` / `all`):** `{"sender_email_ids": [<all enumerated sender IDs from step 2>]}` — the same pool for every campaign.
+   - **Per-bucket (`esp` / `both`):** `{"sender_email_ids": [<that cell's effective pool — step 2g, or its 2i identity fallback>]}` — each campaign gets its own cell's matched set, so the payload differs per campaign. **Skip cells recorded in `sender_unsent_cells`** — make no attach call for them (they are intentionally sender-less per the gate-7 confirmation; attaching an empty list is undefined).
    - If the vendor returns a confirmation-gated response (unlikely for sender attach, but verify), follow the two-call pattern.
-7. **Post-attach verification (count-scalar first; paginate on mismatch).** The invariant enforcement step. For each campaign ID:
-   - **Scalar check first** — call `get_campaign` and read the `attached_senders_count` (or equivalent count field returned without paginating). Compare to the pre-attach connected-sender count. The 99% case (clean attach, no drift) returns a count match and validates without paginating anything — 1 MCP call per campaign instead of the full sender-list pagination.
-   - **If count scalar is absent OR mismatches** — THEN re-query the campaign's full attached-sender list via `get_campaign` + the `while True` pagination loop, diff the sender ID set against the pre-attach enumeration, and identify the specific missing/extra sender IDs. Pagination runs only when diagnostic detail is actually needed.
-   - **If count mismatches by even one sender, HALT.** Surface the campaign ID, the expected count, the actual count, and the specific missing/extra sender IDs. Do not advance `last_completed_phase`.
-   - **Ground-truth fallback** — if `get_campaign`'s schema doesn't expose a scalar count field this session (verify via `search_api_spec` once up-front), fall back to pagination-first on every campaign. Record the chosen verification mode in metadata: `sender_verify_mode: "scalar" | "paginated"`.
-8. **Append to metadata JSON.** Set `sender_ids_attached: [<full list>]`, `sender_attach_counts: {"professional|Google": N, "professional|Microsoft": N, "professional|Other": N, "role|Google": N}` (one entry per cell in `campaign_ids`; example shows 4-cell from the gate-2 `include_role` path). All values MUST be equal (that's the invariant — sender pool is the same for every campaign). `last_completed_phase: 7`.
+   - **Resume note:** a resumed run re-runs Phase 7 from step 1 and re-attaches every campaign. If `attach_sender_emails_to_campaign` is append-style, an already-attached campaign then shows duplicate senders — surfaced as "extra" at step 7 → HALT for manual reconciliation, not a silent double-send. Verify replace-vs-append semantics via `search_api_spec` and prefer a replace call if EB offers one.
+7. **Post-attach verification (count-scalar first; fetch + classify on mismatch).** The invariant enforcement step. **First, for any per-bucket cell in `sender_unsent_cells`:** step 6 attached nothing, so the expected count is **0** — a *fresh* campaign verifies trivially (0 == 0, no fetch). But a *reused* campaign (Phase 5 reuse branch) may still carry N pre-existing senders, so the cell the operator confirmed sender-less at gate 7 would in fact send — **HALT** with the specific message "cell `{cell}`'s reused campaign carries N leftover senders but was confirmed sender-less — detach via EB UI or abort", **not** the generic missing/extra classifier below. Never silently skip a reused unsent cell. Then, for each remaining campaign ID:
+   - **Scalar check first** — call `get_campaign` and read the `attached_senders_count` (or equivalent count field returned without paginating). Compare to the campaign's step-2 enumerated count — for uniform modes that's the single pool count; for per-bucket modes it's *that cell's* effective enumerated count (step 2g, or the 2i fallback count for cells in `sender_match_fallbacks`). **In `identity` mode a match verifies identity-membership by construction:** step 6 attaches exactly step 2's list and step 2c already confirmed every id in it carries the identity tag; a fresh campaign starts empty, and any off-identity sender lingering on a *reused* campaign would push the count *above* N into the mismatch path below — so on either path equal counts mean the attached set *is* the identity set, no off-identity sender possible. **In `all` mode** equal counts simply confirm the attach landed — there is no membership to verify (the operator opted into the full pool), so the scalar check is the whole verification. **In the per-bucket modes (`esp` / `both`)** the same scalar check runs per cell, comparing each campaign's count to *that cell's* step-2g count (counts differ across cells — there is no cross-cell equality to assert); per-cell membership is already guaranteed by the 2h verify (`both` = identity ∩ ESP — or identity-only for a cell that fell back per 2i; `esp` = ESP only, no identity guarantee), so the scalar count confirms the attach landed. **(Why count-only suffices for `esp`, mirroring `identity`: 2h verified every enumerated sender matches the cell's ESP filter *before* attach, step 6 attaches exactly that set onto an empty campaign, so an equal count means the attached set *is* the ESP-verified set; an off-ESP leftover on a reused campaign pushes the count past N into the mismatch path.)** This is the 99% path: 1 MCP call per campaign, no pagination, no per-id fetch.
+   - **On count mismatch (or absent scalar) — fetch the full attached set, classify, then HALT.** Re-query the campaign's full attached-sender list (`get_campaign` + the `while True` loop) and diff it against the campaign's step-2 enumerated list (the single pool for uniform modes; *that cell's* effective list for per-bucket modes — step 2g, or its 2i fallback for cells in `sender_match_fallbacks`). Classify the diff *before* halting:
+     - **Extra senders not in the step-2 list.** In `identity` mode these are **off-identity** — almost always a *reused* pre-BC-13864 campaign (Phase 5's "Reuse existing IDs" branch) still carrying full-pool senders, which Phase 5 step 9b's tag-only check doesn't catch and an *append*-style attach leaves in place; they violate the identity invariant. In `esp` / `both` they are **off-cell** — a sender that doesn't match this cell's ESP filter (and, for `both`, may also be off-identity); **for a cell that fell back to identity-only per 2i the cell is identity-scoped (no ESP filter), so an extra there is *off-identity*, not off-ESP — label it as a reused-campaign identity leak, not a phantom ESP mismatch.** Same reused-campaign cause, same fix. (In `all` mode there is no off-identity class — every connected sender is in-pool by definition — so an "extra" can only be a sender pre-attached on a *reused* campaign that is no longer in the connected enumeration; HALT to surface the discrepancy.)
+     - **Missing step-2 senders** = a vendor-side silent drop at high pool sizes (all modes).
+     **HALT** and surface the campaign id with the specific extra (off-identity / off-cell) and missing sender ids + the classification; do not advance `last_completed_phase`. (This is where the off-identity / off-cell protection actually executes: a *replace*-style attach yields exactly the matched set and passes at the scalar step, while an *append* surfaces the leftovers here as extras — correct either way.)
+   - **Ground-truth fallback** — if `get_campaign`'s schema doesn't expose a scalar count field this session (verify via `search_api_spec` once up-front), fall back to pagination-first on every campaign (fetch + classify as above). Record the chosen verification mode in metadata: `sender_verify_mode: "scalar" | "paginated"`.
+8. **Append to metadata JSON.** `sender_attach_counts: {"professional|Google": N, ...}` — one entry per cell in `campaign_ids`. The shape of `sender_ids_attached` and the count invariant depend on the mode:
+   - **Uniform (`identity`, `all`):** `sender_ids_attached: [<full enumerated list from step 2>]` (one flat list). All `sender_attach_counts` values MUST be equal — every campaign gets the same pool.
+   - **Per-bucket (`esp`, `both`):** `sender_ids_attached: {"professional|Google": [<that cell's IDs>], ...}` (a per-cell map — the sets differ by cell). `sender_attach_counts` values legitimately differ across cells; equality is **not** asserted. Also record `esp_tag_ids: {"Google": <id>, "Outlook": <id>}` (resolved in step 2e) so a resumed run reuses them instead of re-resolving. Plus the empty-cell outcomes from step 2i: `sender_match_fallbacks: [<cell>, ...]` (the `both` cells that fell back to identity-only) and `sender_unsent_cells: [<cell>, ...]` (empty `esp` cells — and `both` cells whose identity fallback was also empty — left sender-less per the gate-7 confirmation); both default to `[]`.
+
+   `last_completed_phase: 7`.
 
 ### Forbidden patterns (hard failures)
 
-- Splitting senders across campaigns (e.g., senders 1–10 to `Professional|Google`, 11–20 to `Role|Microsoft`). Explicit anti-pattern — never shipped, never offered as an option.
+- Rationing a single pool across campaigns to concentrate volume (e.g. a uniform mode's pool, or one per-bucket cell's pool, sliced senders 1–10 / 11–20 across campaigns). Explicit anti-pattern — never shipped, never offered as an option. (Per-bucket modes giving *different* cells *different* full pools is not this — each cell still gets its whole matched pool.)
+- **In `identity` mode**, attaching a sender that does not carry the run's identity tag. Step 2 filters to the identity and step 2c verifies it; the pool must never be widened back to the full workspace. *(In `all` mode this is not a violation — the full connected pool, off-identity senders included, is the explicit, operator-selected, redirect-unsafe result.)*
+- **In per-bucket modes**, attaching a sender to a cell whose ESP it doesn't match — a `Google`/`Outlook`-tagged sender on the `Other` (SMTP) cell, or the wrong ESP tag on a Google/Microsoft cell. The per-cell filter (step 2f) + the 2h verify prevent it; a mismatched-ESP sender degrades deliverability. For `both`, additionally attaching a sender outside the cell's identity ∩ ESP set. **Exception — the step 2i `both` fallback:** when an empty `both` cell falls back to identity-only (recorded in `sender_match_fallbacks`), that cell's effective pool is identity-scoped, *not* ESP-scoped — so an ESP mismatch inside a fallen-back cell (e.g. a `Google`/`Outlook`-tagged sender on a fallen-back SMTP cell) is the authorized, gate-7-confirmed outcome, **not** a violation; the rule above applies only to cells still on their step-2f ESP filter.
 - Truncating the pagination loop after the first page of `list_sender_emails`. The `while True` loop must exhaust the cursor.
 - Skipping post-attach verification because the attach call returned 200. The vendor occasionally drops senders silently at high pool sizes; verification is the only authoritative check.
 
@@ -1058,13 +1158,13 @@ Before marking this command shipped, confirm:
 - [ ] All 11 phases named and ordered correctly (PRE-FLIGHT / HOST LOOKUP / VARIABLES / UPLOAD / CAMPAIGN CREATE / ATTACH LEADS / ATTACH SENDERS / SCHEDULE / SEQUENCE / PREVIEW / ACTIVATE).
 - [ ] Every mutating phase (3/4/5/6/7/8/9/11) has an explicit semantic "USER CONFIRM" gate, and Phase 10 Mode 2 (`--test-send`) has its own intent gate (10b) before the real test-send.
 - [ ] Phases 4 and 6 use **one semantic gate + minimal per-chunk/per-campaign turn-structure prompts** rather than re-prompting semantic approval per loop iteration (BC-2707 turn-structure preserved without gate fatigue).
-- [ ] Phase 7 ATTACH SENDERS documents the paginated `while True` pattern AND post-attach count verification; sender-split pattern is explicitly forbidden.
+- [ ] Phase 7 ATTACH SENDERS resolves an operator-selected sender-match mode (`--sender-match` / Phase 7 prompt; `identity` is the redirect-safe default). Uniform modes attach one pool to every campaign (`identity`: `tag_ids=[identity]` + per-sender tag cross-check; `all`: every connected sender, count-only); per-bucket modes (`esp`/`both`) attach a different pool per campaign cell via the three-way Google/Outlook/SMTP `tag_ids`/`excluded_tag_ids` mapping (AND-intersection), with per-cell membership verification (positive tags on Google/Microsoft cells, negative Google/Outlook exclusion on SMTP cells). Documents the paginated `while True` pattern AND post-attach count verification; rationing a pool across campaigns — and, in `identity`/`both`, attaching off-identity senders — is explicitly forbidden.
 - [ ] Phase 4 UPLOAD uses the two-call MCP confirmation gate (references BC-2707 precedent).
 - [ ] Phase 11 ACTIVATE requires double-confirm (operator-intent + MCP two-call).
 - [ ] Phase 9 SEQUENCE enforces: step 1 `wait_in_days >= 1`, step 2 `wait_in_days >= 3`, field name `wait_in_days` (not `wait_days`), field name `email_subject` (not `subject`), 2-step max.
 - [ ] Phase 1 PRE-FLIGHT validation checklist includes variable check, messaging sanity, lead spot check, workspace guard, unique-per-lead auto-toggle at <500.
-- [ ] All 4 required args + 9 flags documented (`--no-host-lookup`, `--no-sequence`, `--activate`, `--preview`, `--reference`, `--entity`, `--identity`, `--test-send`, `--test-send-sender`); `argument-hint` frontmatter lists all 9.
-- [ ] § Input validation section present with IV-1..IV-11 covering CSV-path safety (IV-1), path confinement (IV-2), dogfood path detection (IV-3), domain regex filter (IV-4), --test-send validation (IV-5), SOQL email regex (IV-6), metadata-no-credentials (IV-7), --campaign-name validation + write-path confinement (IV-8), sidecar CSV formula-injection neutralization (IV-9), CSV Liquid-metacharacter rejection (IV-10), and --identity value validation (IV-11).
+- [ ] All 4 required args + 10 flags documented (`--no-host-lookup`, `--no-sequence`, `--activate`, `--preview`, `--reference`, `--entity`, `--identity`, `--sender-match`, `--test-send`, `--test-send-sender`); `argument-hint` frontmatter lists all 10.
+- [ ] § Input validation section present with IV-1..IV-12 covering CSV-path safety (IV-1), path confinement (IV-2), dogfood path detection (IV-3), domain regex filter (IV-4), --test-send validation (IV-5), SOQL email regex (IV-6), metadata-no-credentials (IV-7), --campaign-name validation + write-path confinement (IV-8), sidecar CSV formula-injection neutralization (IV-9), CSV Liquid-metacharacter rejection (IV-10), --identity value validation (IV-11), and --sender-match value validation (IV-12).
 - [ ] Error recovery documented per phase (partial state + resume procedure).
 - [ ] Launch metadata write path `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}.json` documented.
 - [ ] Dogfood transcript (test campaign on `emailbison-personal`, 5–10 leads) attached to BC-5826 as a comment — activated or draft-only. Phase 10 Mode 1 (local render) MUST succeed with all 5 sanity checks passing. Phase 10 Mode 2 (`--test-send`) is optional and only validated if the flag was passed.
