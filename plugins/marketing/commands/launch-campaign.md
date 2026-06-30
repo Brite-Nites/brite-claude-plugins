@@ -109,7 +109,7 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 
 **IV-11. `--identity` value validation (Phase 1 pre-flight).** If `--identity` is provided, it MUST be exactly one of `labs`, `supply`, or `nites` (lowercase). Reject any other value with a clear error — no auto-correction; the operator resubmits. This is the Brite sending identity that Phase 5 tags onto every campaign created this run, so an invalid value must fail closed before any EB campaign is created or tagged. When `--identity` is absent, it is resolved by operator prompt at Phase 1 step 10 — this check only validates an explicitly-supplied value.
 
-**IV-12. `--sender-match` value validation (Phase 1 pre-flight).** If `--sender-match` is provided, it MUST be exactly one of `identity`, `esp`, `both`, or `all` (lowercase). Reject any other value with a clear error — no auto-correction; the operator resubmits. This selects which connected senders Phase 7 attaches to each campaign (`identity` = the run's brand senders only, the redirect-safe default; `esp` = senders whose ESP matches each campaign's recipient ESP; `both` = identity ∩ ESP; `all` = every connected sender, redirect-*unsafe*). An invalid value must fail closed before any EB campaign is created. When `--sender-match` is absent, the mode is resolved by operator prompt at Phase 7 — this check only validates an explicitly-supplied value.
+**IV-12. `--sender-match` value validation (Phase 1 pre-flight).** If `--sender-match` is provided, it MUST be exactly one of `identity`, `esp`, `both`, or `all` (lowercase). Reject any other value with a clear error — no auto-correction; the operator resubmits. This selects which connected senders Phase 7 attaches to each campaign (`identity` = the run's brand senders only, the redirect-safe default; `esp` = senders whose ESP matches each campaign's recipient ESP; `both` = identity ∩ ESP; `all` = every connected sender, redirect-*unsafe*). An invalid value must fail closed before any EB campaign is created. When `--sender-match` is absent, the mode is resolved by operator prompt at Phase 7 — this check only validates an explicitly-supplied value. **Incompatible with `--no-host-lookup`:** that flag produces a single combined campaign with no recipient-ESP split, so `esp` and `both` (which match senders to each cell's ESP) have no meaning. Reject `--no-host-lookup --sender-match esp|both` here at pre-flight — only `identity` and `all` are valid with `--no-host-lookup`.
 
 ---
 
@@ -130,7 +130,7 @@ This is fail-closed: the row never reaches Phase 4 UPLOAD, so EB never sees the 
 | `--test-send-sender <id>` | no | first attached | Override the sender mailbox used for `--test-send`. Default: first attached sender from Phase 7. |
 | `--reference <campaign-id>` | no | — | Clone variables + naming + sender plan + schedule from an existing campaign. Pre-fills Phase 3/5/7/8 defaults — user gates still fire. |
 | `--identity <id>` | no | prompt | `labs`, `supply`, or `nites` — the Brite sending identity tagged onto every campaign this run creates (Phase 5). Validated by IV-11. If omitted, Phase 1 prompts for it. Independent of `--entity` (do not derive one from the other). |
-| `--sender-match <id>` | no | prompt | `identity`, `esp`, `both`, or `all` — which connected senders Phase 7 attaches per campaign. `identity` (redirect-safe default): the run's identity senders only. `esp`: senders whose ESP matches each campaign's recipient ESP. `both`: identity ∩ ESP. `all`: every connected sender (legacy, redirect-*unsafe* — warned at the Phase 7 prompt). Validated by IV-12. If omitted, Phase 7 prompts for it. |
+| `--sender-match <id>` | no | prompt | `identity`, `esp`, `both`, or `all` — which connected senders Phase 7 attaches per campaign. `identity` (redirect-safe default): the run's identity senders only. `esp`: senders whose ESP matches each campaign's recipient ESP. `both`: identity ∩ ESP. `all`: every connected sender (legacy, redirect-*unsafe* — warned at the Phase 7 prompt). Validated by IV-12 — under `--no-host-lookup` only `identity` / `all` apply (no ESP split to match). If omitted, Phase 7 prompts for it. |
 
 **Non-goals** (explicit — do NOT do these):
 
@@ -683,6 +683,8 @@ Phase 7 attaches senders per an operator-selected **sender-match mode**. Resolve
    > - `esp` — only senders whose ESP matches each campaign's recipient ESP
    > - `both` — identity ∩ ESP (brand senders that also match the cell's ESP)
    > - `all` — every connected sender ⚠️ redirect-UNSAFE: an off-brand sender lands the prospect on the wrong site after the redirect cutover
+
+   **Under `--no-host-lookup`** (one combined campaign, no ESP split) offer **only `identity` / `all`** — omit `esp` / `both`, which have no cell ESP to match. (An explicit `--sender-match esp|both` combined with `--no-host-lookup` was already rejected at IV-12 pre-flight, so any flag value reaching here under `--no-host-lookup` is `identity` or `all`.)
 
 3. **Record it.** Write `sender_match_mode` to metadata *before* any attach so a resumed run re-reads it. All four modes are wired in the steps below: the **uniform** modes (`identity`, `all`) enumerate one pool attached to every campaign; the **per-bucket** modes (`esp`, `both`) enumerate a different pool per campaign cell via step 2's three-way ESP mapping.
 
