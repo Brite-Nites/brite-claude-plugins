@@ -643,7 +643,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 **Steps:**
 
 1. **Ground-truth the tool name.** `search_api_spec` with query `attach leads` or `import leads to campaign`. Per `email-bison.md` § Common workflows the name is `import_leads_to_campaign` with path `POST /api/campaigns/{id}/leads/attach-leads`.
-2. **Bucket the lead IDs by (email-type × ESP) cell.** From the CSV + Phase 2 cell assignments, build a map `{"{email_type}|{esp}" → [lead_id, lead_id, ...]}` keyed identically to metadata's `segments` and `campaign_ids`. Each lead belongs to exactly one cell.
+2. **Bucket the lead IDs by (email-type × ESP) cell.** From the **uploaded** lead set (Phase 4's returned lead IDs — NOT the raw CSV rows) joined to each lead's Phase 2 cell assignment, build a map `{"{email_type}|{esp}" → [lead_id, lead_id, ...]}` keyed identically to metadata's `segments` and `campaign_ids`. Each uploaded lead belongs to exactly one cell. Rows set aside in Phase 1 step 2 (`duplicate` / `undeliverable`) or Phase 4 step 7d (`workspace_collision`) have no lead ID and are absent here by construction (BC-14044), so the per-campaign counts reconcile at step 6.
 3. **Show attach plan.** Render per-campaign counts:
 
    > Attach plan:
