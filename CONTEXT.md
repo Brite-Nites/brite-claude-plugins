@@ -193,3 +193,34 @@ _Avoid_: "break-glass" (jargon/idiom — superseded; see the naming convention i
 **config-gated guardrail**:
 A revops guidance/guard mechanism (status line, advisory nudge, pre-flight) that reads a repo-local pipeline config and stays silent where it is absent — so the portable `revops` plugin carries the *capability* while a repo's config *activates* it ([ADR-026](docs/decisions/026-revops-promotion-topology.md)).
 _Avoid_: hardcoding brite-salesforce branch names into revops — that breaks portability ([ADR-007](docs/decisions/007-revops-plugin-design.md) §3.1).
+
+### Marketing / launch-campaign
+
+> Email-duplicate vocabulary for `/marketing:launch-campaign`. "Dedup"/"duplicate"
+> already names several unrelated things in the upload flow; these two fix the
+> email-level cases so they never get conflated (BC-14044).
+
+**Input-list dedup**:
+Collapsing repeated email addresses *within a single input CSV* to one lead
+before upload — case-insensitive, first occurrence kept, the rest set aside to
+the skipped-contacts file. A pre-flight pass (Phase 1) that exists because
+EmailBison's `POST /api/leads/multiple` silently keeps only the first of a
+within-batch repeat (HTTP 201, no error, the dropped rows vanish from the
+response) — so the drop happens regardless; doing it client-side makes it visible
+and keeps lead-count reconciliation honest.
+_Avoid_: confusing it with **Workspace collision** (that's against EB's *existing*
+leads, not your file); with **unique-per-lead** (varies merge values, removes
+nobody); with the Phase 5 campaign-name duplicate guard (duplicate campaign
+*names*); or with the Phase 6 cross-campaign / parallel-send skip (a lead already
+in *another campaign*).
+
+**Workspace collision**:
+An input email that *already exists as a lead in the target EB workspace*.
+`POST /api/leads/multiple` is atomic and non-upserting, so a single collision
+returns HTTP 422 and rejects the whole chunk (verified BC-11072). Handled
+reactively (Phase 4): on the 422 the command identifies the colliding emails,
+sets them aside (skipped-contacts file, reason `workspace_collision`), and asks
+before re-uploading the remainder.
+_Avoid_: calling it "duplicate" unqualified — it is specifically
+*already-in-workspace*, distinct from **Input-list dedup**'s within-file case;
+and don't assume EB skips or upserts the collision — it hard-fails the whole batch.
