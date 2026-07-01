@@ -531,7 +531,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    > 3. ...
 5. **User gate 4 (semantic approval — once, covers all chunks).** Ask via `AskUserQuestion`:
 
-   > About to create **{lead_count} leads in {M} chunks of ≤500** in workspace `{workspace}`. Sample (3 leads from chunk 1) shown above. Each chunk will vendor-gate with a minimal turn-structure prompt; semantic approval lives here.
+   > About to create **{lead_count} leads in {M} chunks of ≤500** in workspace `{workspace}`. Sample (3 leads from chunk 1) shown above. Each chunk fires a minimal turn-structure prompt; semantic approval lives here.
    >
    > - Yes, create all {lead_count} leads across {M} chunks
    > - Abort the upload
@@ -550,7 +550,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
       Operator rapid-fire affirmatives are expected. The prompt exists solely to create the user turn required before the chunk's single real `call_api`.
    c. **Execute — the single real call.** On "Continue", invoke `bulk_create_leads` via `call_api` — the one and only API request for this chunk (no `confirmation` field; see § Tool tier map). On HTTP 201, capture the returned lead IDs and loop to the next chunk. On **HTTP 422**, go to (d) — do NOT HALT.
    d. **Workspace-collision recovery (BC-14044) — on HTTP 422 only.** A 422 means ≥1 email in this chunk already exists as a workspace lead (`/api/leads/multiple` is atomic + non-upserting — the whole chunk rejected, nothing created; Sx-8, BC-11072). `call_api` strips the body to `{error: "HTTP 422 Error"}` with no per-row detail, so identify the collisions client-side:
-      i. **Build the workspace existing-email set (once per Phase 4, cached).** Paginate `list_leads` (`per_page=100`, loop until exhausted) for the target workspace; collect `email.strip().lower()` into a set. A later chunk's 422 reuses the cached set — never re-page per chunk. Cost is paid ONLY on a real 422 (the rare / re-run case), never on a clean launch.
+      i. **Build the workspace existing-email set (once per Phase 4, cached).** Paginate `list_leads` (loop until exhausted — EB ignores `per_page` and hard-caps the page size at 15, so this is ~1,029 GETs at ~15,400 leads, incurred on every 422 incl. the re-run case) for the target workspace; collect `email.strip().lower()` into a set. This reactive scan is a backstop — the opt-in proactive single-workspace exclusion pre-pass in **BC-16147** filters before upload to avoid the 422 (and this scan) entirely. A later chunk's 422 reuses the cached set — never re-page per chunk. Cost is paid ONLY on a real 422 (the rare / re-run case), never on a clean launch.
       ii. **Diff.** Intersect this chunk's lowercased emails with the set → the colliding emails. **If the intersection is empty**, the cache may be stale — a lead created since it was built (by another process, or by an earlier chunk of this very run), which the once-cached set wouldn't contain — so **refresh the set once** (re-paginate `list_leads`, replacing the cache) and re-diff. Only if the intersection is STILL empty after the refresh is the 422 a genuine non-collision (e.g. a malformed row) → HALT with the chunk's lead-row range and the stripped error; do NOT resubmit blindly. A stale cache must never convert a recoverable collision into a false HALT.
       iii. **Set aside.** Append the colliding rows to the consolidated skipped-contacts file (`skip_reason: workspace_collision`; same Phase 2 step 4c columns + IV-8 / IV-9 treatment). If the file did not yet exist — a clean list whose first skip is here — this creates it, so **update `skipped_leads_csv_path` in metadata to the file path** (Phase 2 step 4d may have recorded `null` when there were no earlier skips; a written file must never be left with an unrecorded path). Record the collision count in scratch state for step 9 + step 10 (`workspace_collisions_skipped`).
       iv. **User gate 4b (semantic — resubmit confirm, never silent).** Ask via `AskUserQuestion`: "{k} of the {n} leads in chunk {i} already exist in `{workspace}` (set aside in the skipped-contacts file). Upload the remaining {n−k}?" Options: "Yes, upload the {n−k} clean leads" / "Abort remaining chunks". This is a genuine semantic gate — the send set changes — NOT a turn-structure prompt. **Never auto-resubmit** (decision-locked, BC-14044).
@@ -636,7 +636,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
 
 **Two-call gate applies — agent-side** (Sx-9, BC-5906; turn-structure per BC-2707). `import_leads_to_campaign` is listed as vendor-gated in `email-bison.md § MCP confirmation gates`, but per § Tool tier map this command invokes it via `call_api` against `/api/campaigns/{id}/leads/attach-leads`, which has NO `confirmation` field at the API level. The load-bearing safeguard is the agent-side `AskUserQuestion` turn that must precede the single real `call_api` — same shape as Phase 4. The `allow_parallel_sending` branch below IS a real semantic vendor gate (verified BC-6545, 2026-05-04 — attach returns HTTP 422 on lead-already-in-any-campaign conflict; through `call_api` the response body is stripped to `{error: HTTP 422 Error}` per the Sx-8 wrapper limitation, but `allow_parallel_sending: true` in the body succeeds when added), so it stays as-written.
 
-**Gate cadence for multi-campaign attach (same pattern as Phase 4).** User gate 6 is the **semantic operator-intent gate** and fires ONCE for the full per-campaign batch. Per-campaign vendor gates fire a **minimal turn-structure prompt** — not a semantic re-approval. Rapid-fire affirmatives per campaign are expected; the prompt's only job is to create the user turn required by BC-2707's turn-structure contract.
+**Gate cadence for multi-campaign attach (same pattern as Phase 4).** User gate 6 is the **semantic operator-intent gate** and fires ONCE for the full per-campaign batch. Per-campaign turn-structure prompts fire — **minimal**, not a semantic re-approval. Rapid-fire affirmatives per campaign are expected; the prompt's only job is to create the user turn required by BC-2707's turn-structure contract.
 
 **`allow_parallel_sending` alert** per `email-bison.md` § Known gotchas: if any lead being attached is already in another campaign (regardless of campaign status — verified BC-6545, 2026-05-04 against draft campaigns), the tool refuses with HTTP 422. **Never auto-enable parallel sending.** Surface the conflict to the operator via `AskUserQuestion` — relay the prompt body verbatim if the path surfaces it; through `call_api` the body is stripped (Sx-8 wrapper limitation), so present the operator-side diagnostic per step 5d below. Parallel sending can over-contact a prospect across campaigns and is a deliverability risk. This is a genuine semantic gate (not turn-structure filler) because the decision materially changes who gets emailed.
 
@@ -654,7 +654,7 @@ The turn-structure prompt IS an `AskUserQuestion` — it must be, to create a re
    > Total: 130 leads attached across 4 campaigns.
 4. **User gate 6 (semantic approval — once, covers all campaigns).** Ask via `AskUserQuestion`:
 
-   > Attach {total} leads to {N} campaigns per the plan above? Per-campaign vendor gates fire with minimal turn-structure prompts after this one semantic approval.
+   > Attach {total} leads to {N} campaigns per the plan above? Per-campaign minimal turn-structure prompts fire after this one semantic approval.
    >
    > - Yes, proceed with attach across all {N} campaigns
    > - Abort
@@ -1083,11 +1083,11 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
    > Metadata will update `activated_per_campaign[<bucket>]` per campaign as each resume call succeeds. Global `activated: true` flips only when every campaign activates; partial success leaves it `false` with per-campaign timestamps recording exactly which ones ran.
 3. **User gate 11a — operator intent.** Ask via `AskUserQuestion`:
 
-   > Activate all {N} campaigns now? Each campaign gates separately at the vendor level too.
+   > Activate all {N} campaigns now? Each campaign gates separately too.
    >
-   > - Yes, proceed to vendor gates
+   > - Yes, proceed to the per-campaign gates
    > - Abort
-4. **Per-campaign vendor gate loop.** For each campaign in the bucket map:
+4. **Per-campaign turn-structure gate loop.** For each campaign in the bucket map:
    - **Compose the per-campaign resume prompt** (no API call). The operator-facing description comes from the wrapper-tool's `discover_tools` prose, which describes the resume-campaign action (typically: "This will transition campaign {id} from Draft to Queued and begin sending emails."). Per Sx-9 `PATCH /api/campaigns/{id}/resume` has no dry-run and no `confirmation` parameter — the actual resume fires once, in the bullet below, after the operator's turn. Render that description verbatim in the gate to preserve BC-2707 turn structure.
    - **User gate 11b — vendor confirmation.** Relay the vendor prompt verbatim via `AskUserQuestion`:
 
@@ -1136,7 +1136,7 @@ The two gates are layered — the operator says "yes" twice per campaign, in two
 - Firing the `resume_campaign` `call_api` in the same turn as the operator-intent gate (11a) or the per-campaign prompt (11b), without a real operator turn before it. Defense-in-depth against same-turn auto-confirm per BC-2707 — the gate is operator turn structure, not a vendor `confirmation` parameter (see § Tool tier map).
 - Skipping the operator-intent gate (11a) even when "yes" was implicit from the `--activate` flag being passed. The flag authorizes the phase to run; it does not authorize skipping the intent gate.
 - Continuing the loop after an operator abort. The phase halts on the first abort — other campaigns wait for a future run.
-- Auto-confirming the vendor gate because the vendor prompt text is predictable. The gate is the *structure*, not the text.
+- Auto-confirming the turn-structure gate because the vendor prompt text is predictable. The gate is the *structure*, not the text.
 
 **If Phase 11 fails mid-loop:** some campaigns are activated, others are still in Draft. Metadata records the state. Operator re-runs with `--activate` and the command picks up at the first un-activated campaign — but note that re-running from scratch still executes Phases 1–10 as no-ops (all state detection-gated); this is intentional and keeps the re-run idempotent.
 
