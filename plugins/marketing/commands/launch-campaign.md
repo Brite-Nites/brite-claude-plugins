@@ -53,7 +53,7 @@ Every tool named in phases 3–11 that isn't in the core tier list above — e.g
 
 1. `search_api_spec` with a query describing the operation (e.g., `bulk create leads`, `attach sender emails`). Confirms the live endpoint path + HTTP method + request body shape this session.
 2. `call_api` with the confirmed path + method + body. This is the mutating call.
-3. When the phase specifies a two-call vendor confirmation gate (per BC-2707), steps 1–2 execute twice: first without `confirmation`, then — after a real operator turn on `AskUserQuestion` — with `confirmation: true`.
+3. The two-call gate BC-2707 requires is a real operator turn *before* the mutating `call_api` (step 2) — **not** a second API call. For every extended-tier tool this command actually invokes (`bulk_create_leads`, `import_leads_to_campaign`, `resume_campaign`), step 2 fires **exactly once**, only after an `AskUserQuestion` turn: these endpoints have no `confirmation` parameter and no dry-run (see the **Vendor confirmation gates via `call_api`** note below), so issuing the request a second time would double-apply the mutation. A literal second `call_api` with `confirmation: true` applies **only** to a hypothetical tool that genuinely advertises a `confirmation` parameter — none of this command's do.
 
 Tool names in phase narratives are conceptual labels for the operation, not directly-callable function names. When a phase says "call `bulk_create_leads`," read that as "invoke the ground-truthed bulk-create-leads endpoint via `call_api` following the pattern above."
 
