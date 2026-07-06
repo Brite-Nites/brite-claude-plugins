@@ -10,7 +10,7 @@
 | Engine searched, found nobody (or only-dropped) | **22 companies** | (in results file, `contacts: []`, `error: null`) |
 | Outstanding errors | **0** | — |
 
-> **Operator drop 2026-06-15:** O.C. Tanner Jewelers (`octannerjewelers.com`) — its only hit was `scott.sperry@octanner.com`, an off-domain O.C. Tanner *corporate* address, not the boutique. Reclassified to found-zero; dropped contact preserved in the entry's `dropped_contacts` field for audit.
+> [removed — person-level data lives out-of-repo]
 
 **Addable to campaigns:** **84** deliverable + in-domain (Tier 1, across 56 companies), up to **89** after confirming the 5 domain-mismatch contacts below. 3 undeliverable are dropped.
 
@@ -18,13 +18,13 @@ The 29-company resume queue (`enrichment-REMAINING.jsonl`) is fully processed: 2
 
 ## ⚠️ Review-before-upload flags (in `regional-contacts-found.csv`, `flag` column)
 Emails whose domain ≠ company domain (`DOMAIN-MISMATCH-review`) — verify each is the right person/brand before sending:
-- **pintoranch.com → `walter@nestle.com`** — `DOMAIN-MISMATCH-review; undeliverable`. **DROP** (wrong domain, undeliverable; pre-existing junk).
-- **yafasignedjewels.com → `yafa@shaminabas.com`, `maurice@yafajewelry.com`** — both off-domain (related Moradof brands; likely legit, confirm).
-- **mr.studio → `hillary@informseattle.com`** — off-domain (Inform Interiors / Seattle; confirm relationship).
-- **shopatcurio.com → `danielle@curiovibe.com`** — off-domain (CURIO / "curiovibe"; likely same owner, confirm).
-- **the1916company.com → `danny@govbergwatches.com`** — off-domain but expected (Govberg = the company's former name); likely fine.
+- [removed — person-level data lives out-of-repo]
+- [removed — person-level data lives out-of-repo]
+- [removed — person-level data lives out-of-repo]
+- [removed — person-level data lives out-of-repo]
+- [removed — person-level data lives out-of-repo]
 
-Dropped (no longer in the file): `scott.sperry@octanner.com` (O.C. Tanner corporate, operator-dropped 2026-06-15). Undeliverable (deliverable=False), drop before upload: `nancy.yoder@` + `tomyoder@kemosabe.com`, plus the Pinto Ranch row above.
+[removed — person-level data lives out-of-repo]
 
 ## 22 found-zero companies = manual scrape candidates
 Engine had no usable hit — re-running bulk_enrich won't help. Candidates for the staff-page → ED-extract → web-recovery method (beat Clay on Historic Sites):
@@ -36,7 +36,7 @@ Operator decision: add the 83 verified Tier-1 leads into the **existing** active
 - Path: `POST /api/leads/create-or-update/multiple` (`existing_lead_behavior:"patch"`) → `POST /api/campaigns/{id}/leads/attach-leads` (omit `allow_parallel_sending` so in-sequence leads aren't double-sent). Email→ID maps in `_raw/enrich-resume-2026-06-15/upload/ids-*.json`.
 
 **Landed: 78 unique regional leads** — SMTP 19 + Microsoft 31 + Google 28.
-- **Overlap dedupe (rule A = skip same *person* only):** removed 1 same-person dup (`crawfordb@stanleykorshak.com`, the existing lead is `crawford@`); 4 exact-email already-present (`jasmin@cultgaia`, `joan@`/`ellen@joanshepp`, `monelle@hudsongracesf`) left as-is; **14 same-company-different-person KEPT** (Gorsuch, Kemo Sabe, Concepts, de Boulle, The Webster, Bailey's on 138; Stio, Provident, Kith on 139) → those brands now have >1 contact in-sequence.
+- [removed — person-level data lives out-of-repo]
 - Existing-member snapshot at upload time: `_raw/enrich-resume-2026-06-15/existing-members.jsonl` (593 rows across the 3 campaigns).
 - Excluded: 5 domain-mismatch (review), 3 undeliverable, 6 unverified-deliverability.
 

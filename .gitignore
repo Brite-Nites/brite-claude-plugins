@@ -63,6 +63,12 @@ docs/campaigns/brite-labs/tam/**/*.zip
 docs/campaigns/brite-labs/tam/**/*.xlsx
 docs/campaigns/brite-labs/tam/**/_*
 
+# Person-level contact exports (names/emails/mobiles) must never be tracked —
+# repo is public. Company-level lists (accounts, segments) remain tracked per
+# the PR #511 policy. Enriched contact rows live in the CRM / EB, not git.
+docs/campaigns/**/lists/*contacts*.csv
+docs/campaigns/**/*contacts-found*.csv
+
 # Local agent config — shows up untracked in every repo; never campaign data.
 /.codex/
 /AGENTS.md
