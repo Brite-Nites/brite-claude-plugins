@@ -14,7 +14,7 @@ set -euo pipefail
 # Environment:
 #   EVALS=1              Required. Safety guard against accidental runs.
 #   EVALS_PLUGIN_DIR     Plugin directory to test (default: plugins/workflows)
-#   EVALS_MODEL          Model to use (default: claude-sonnet-4-6)
+#   EVALS_MODEL          Model to use (default: claude-sonnet-5)
 #   EVALS_TRIALS         Trials per test for non-determinism (default: 1)
 #   EVALS_TIMEOUT        Timeout per invocation in seconds (default: 120)
 #   EVALS_RESULTS_DIR    Directory for results JSON (default: tests/evals)
@@ -29,7 +29,7 @@ if [ ! -f "$_default_fixture" ]; then
   _default_fixture="$REPO_ROOT/tests/fixtures/behavioral-registry.json"
 fi
 FIXTURE="${EVALS_FIXTURE:-$_default_fixture}"
-MODEL="${EVALS_MODEL:-claude-sonnet-4-6}"
+MODEL="${EVALS_MODEL:-claude-sonnet-5}"
 TRIALS="${EVALS_TRIALS:-1}"
 TIMEOUT="${EVALS_TIMEOUT:-120}"
 RESULTS_DIR="${EVALS_RESULTS_DIR:-$REPO_ROOT/tests/evals}"
@@ -63,7 +63,7 @@ usage() {
   printf "Environment:\n"
   printf "  EVALS=1           Required safety guard\n"
   printf "  EVALS_PLUGIN_DIR  Plugin directory (default: plugins/workflows)\n"
-  printf "  EVALS_MODEL       Model override (default: claude-sonnet-4-6)\n"
+  printf "  EVALS_MODEL       Model override (default: claude-sonnet-5)\n"
   printf "  EVALS_TRIALS      Trials per test (default: 1)\n"
   printf "  EVALS_TIMEOUT     Timeout per invocation in seconds (default: 120)\n"
   exit 0

@@ -19,7 +19,7 @@ on:
 
 env:
   EVALS: "1"
-  EVALS_MODEL: "claude-sonnet-4-6"
+  EVALS_MODEL: "claude-sonnet-5"
 
 jobs:
   behavioral:
