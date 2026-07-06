@@ -2,7 +2,7 @@
 name: {skill-name}
 description: {trigger phrases that activate this skill. If ported from upstream, keep the original description and add Brite-relevant triggers. Avoid vague triggers that collide with other skills.}
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_emailbison-b2b__*, Read, Write, Glob, Grep
+allowed-tools: mcp__emailbison-b2b__*, Read, Write, Glob, Grep
 metadata:
   version: 0.1.0
   upstream: {coreyhaines31/marketingskills — if ported; omit this key entirely if net-new}
@@ -23,9 +23,9 @@ To use:
   2. Replace every {placeholder} and instructional HTML comment with real content.
   3. Edit `allowed-tools` to list ONLY the servers this skill actually calls. The default
      scaffolding shows one Email Bison server; the other adopted servers (add as needed) are:
-       - mcp__plugin_marketing_emailbison-personal__*   (personal.outbase.so workspace)
+       - mcp__emailbison-personal__*   (personal.outbase.so workspace)
        - mcp__plugin_marketing_salesforce__*            (Salesforce MCP — CRM runtime)
-       - mcp__plugin_marketing_github__*                (GitHub MCP — cross-repo file reads)
+     Namespace rule: Email Bison is a USER-level MCP (repo-root `.mcp.json`) → SHORT form `mcp__emailbison-{b2b,personal}__*`, NO `plugin_marketing_` prefix (the plugin-scoped form silent-fails per the CLAUDE.md gotcha). Servers in `plugins/marketing/.mcp.json` (salesforce, spider, aiark, discolike, gbrain-team, enrichment) DO carry the `mcp__plugin_marketing_<server>__*` prefix. Cross-repo file reads use the `gh` CLI, not an MCP.
      Do NOT list servers the skill will not call — that violates pattern guide anti-pattern #4.
   4. Delete this entire comment block and any "tool-calling skills only" sections your skill
      does not need.
@@ -153,7 +153,7 @@ MCP Tool Reference section guidance:
   - Group by workflow (import, configure, analyze, clean up), NOT by server. A skill author
     thinks in tasks; don't make them cross-reference server groupings.
   - Name tools by their bare semantic name (e.g. `create_campaign`, not the full
-    `mcp__plugin_marketing_emailbison-b2b__create_campaign` — the `allowed-tools` frontmatter
+    `mcp__emailbison-b2b__create_campaign` — the `allowed-tools` frontmatter
     already establishes the server prefix).
   - Every mutating workflow must start with an availability check (ADR 2c degradation policy):
     a lightweight read-only tool call. On failure, stop.

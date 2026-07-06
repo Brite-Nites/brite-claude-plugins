@@ -72,7 +72,7 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 | Enable warmup on a sender (gated) + read warmup state | `emailbison-{b2b,personal}` (`enable_warmup`, `list_warmup_stats`, `get_warmup_details`) | Active workspace | `email-bison.md` §MCP confirmation gates; §Common workflows → Warmup health check |
 | Create custom variables for merge fields | `emailbison-{b2b,personal}` (`create_custom_variable`, `list_custom_variables`) | Active workspace | `email-bison.md` §Common workflows → optional prerequisite |
 
-**Wildcard form per ADR 2c** — `allowed-tools` uses `mcp__plugin_marketing_emailbison-{b2b,personal}__*` because the launch workflow spans campaigns, leads, senders, schedules, sequences, warmup, and variables (7 of 16 categories). Narrower cherry-picking would require enumerating ~20 tool names and updating the list every time the vendor adds one (the server is still in Beta — see `email-bison.md` §Known gotchas).
+**Wildcard form** — `allowed-tools` uses the short form `mcp__emailbison-{b2b,personal}__*` (Email Bison registers at **user level**, so its namespace carries no `plugin_marketing_` prefix — the plugin-scoped form silent-fails per the CLAUDE.md gotcha) because the launch workflow spans campaigns, leads, senders, schedules, sequences, warmup, and variables (7 of 16 categories). Narrower cherry-picking would require enumerating ~20 tool names and updating the list every time the vendor adds one (the server is still in Beta — see `email-bison.md` §Known gotchas).
 
 ### Architectural rules that apply
 
