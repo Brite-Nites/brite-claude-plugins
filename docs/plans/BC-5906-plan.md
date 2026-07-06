@@ -10,7 +10,7 @@ target-pr: docs/dogfood + transcript artifact only — no command-spec changes i
 
 > **Note (2026-05-05, BC-6654):** segmentation references in this plan reflect the pre-multiplicative ESP-axis spec. The current spec uses (email-type × ESP) cell segmentation per BC-6514 (`docs/designs/BC-6514-segmentation-axis-decision.md`); the metadata schema, naming convention, and `--no-segment` flag all changed. This plan is preserved as historical execution record.
 
-Issue 1 of 5 in the Marketing Plugin v0.1 — GTM Workflows (Revgrowth) MVP critical path. Validates `/marketing:launch-campaign` Phases 3–9 against the live `emailbison-personal` workspace by actually creating real EB state (custom variables, leads, campaigns, sender attaches, schedule, sequences) — Phase 11 stays off, no real emails sent. Surfaces reality-vs-spec gaps for hypotheses F14–F31 (paper-walked in BC-5826 round-1, never live-validated).
+Issue 1 of 5 in the Marketing Plugin: GTM Workflows MVP critical path. Validates `/marketing:launch-campaign` Phases 3–9 against the live `emailbison-personal` workspace by actually creating real EB state (custom variables, leads, campaigns, sender attaches, schedule, sequences) — Phase 11 stays off, no real emails sent. Surfaces reality-vs-spec gaps for hypotheses F14–F31 (paper-walked in BC-5826 round-1, never live-validated).
 
 ---
 
@@ -235,7 +235,7 @@ Expected campaign output (per round-1 ESP distribution):
 
 **Steps:**
 1. Walk the F14–F31 findings table. For every row with status `refuted` or `needs-more-work`:
-   - File a Linear issue in project "Brite Skill Packs" (team Brite Company).
+   - File a Linear issue in project "Brite Plugin Marketplace" (team Brite Company).
    - Title format: `BC-5906 follow-up: <short-description-of-finding>`.
    - Body: cite F-number, paste the verbatim evidence quote from the transcript, propose specific spec change in `plugins/marketing/commands/launch-campaign.md`, link back to BC-5906.
    - Priority: Medium for spec-correctness; High if the finding blocks production launch (e.g., F27 zero-templates).

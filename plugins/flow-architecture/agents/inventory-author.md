@@ -2,7 +2,7 @@
 name: inventory-author
 description: Author master-flow-inventory rows for a Brite product build — one row per discovered or proposed sub-flow per BriteBase inventory schema. Read-only. Returns markdown, not JSON.
 model: sonnet
-tools: Read, Glob, Grep, WebSearch, WebFetch, mcp__plugin_flow-architecture_gbrain-team__query, mcp__plugin_flow-architecture_gbrain-team__get_page, mcp__plugin_flow-architecture_gbrain-team__list_pages
+tools: Read, Glob, Grep, WebSearch, WebFetch
 ---
 
 _Spec: Q21 (memory:463) bullet 1 (memory:469) + Q30.2 file-location (memory:289) + Q32 tool-scoping (memory:355). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._

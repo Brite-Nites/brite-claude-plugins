@@ -93,46 +93,6 @@ children_field_present() {
   ' "$doc"
 }
 
-# story_frame_present <doc> — the `story-job-story-regex` gate is FRAME-AGNOSTIC
-# and LINE-FORM-AGNOSTIC (T0-4 / BC-11988). A story doc satisfies it when its
-# `## Job story` section carries EITHER the human job-story frame markers
-# (**When** + **I want to** + **so I can**) OR the constraint-spec frame markers
-# used for non-human / infrastructure actors (**Given** + **MUST** + **so that**),
-# per rubric dimension D11.
-#
-# The check is SECTION-SCOPED (markers may span multiple lines), not a single
-# self-contained-line regex: the canonical brite-base GOLD job story spreads its
-# three clauses across three blockquoted lines (`> **When** ..\n> **I want to**
-# ..\n> **so I can** ..`), which a single-line `^> .*When.*I want to.*so I can`
-# regex would FAIL — the original gate never matched the hand-written gold. The
-# single-line form (one blockquote line carrying all three markers) still passes,
-# since all three markers are then present in the section. Cosmetic blockquote /
-# capitalization differences are tolerated (grep -i); the gate enforces the
-# semantic FRAME, not line breaks. Gate ID unchanged (Q29 gate-stack stability).
-story_frame_present() {
-  local doc="$1" region
-  # The frame always sits between the title and `## Acceptance criteria` — under a
-  # `## Job story` heading in brite-base / brite-sites docs, or directly beneath
-  # the `# Title` blockquote in the leaner audit fixtures. Scope to that region
-  # (everything up to the first `## Acceptance` heading) so the check is robust to
-  # both structures; if there is no `## Acceptance` heading, fall back to the whole
-  # doc. The frame markers never appear in the front-matter, summary, or ACs.
-  region="$(awk '/^## Acceptance/{exit} {print}' "$doc")"
-  # Human job-story frame: all three bold markers present in the region.
-  if printf '%s' "$region" | grep -qiE '\*\*When\*\*' \
-     && printf '%s' "$region" | grep -qiE '\*\*I want to\*\*' \
-     && printf '%s' "$region" | grep -qiE '\*\*so I can\*\*'; then
-    return 0
-  fi
-  # Constraint-spec frame: Given + MUST + so that.
-  if printf '%s' "$region" | grep -qiE '\*\*Given\*\*' \
-     && printf '%s' "$region" | grep -qiE '\*\*MUST\*\*' \
-     && printf '%s' "$region" | grep -qiE '\*\*so that\*\*'; then
-    return 0
-  fi
-  return 1
-}
-
 # === Phase B-equivalent gate runner (filesystem-only checks) =================
 # Mirrors `commands/audit.md` § Phase B for the gates that don't require Linear
 # MCP. Per-flow + per-domain + cross-cutting filesystem checks only.
@@ -220,7 +180,7 @@ PY
           emit_gate FAIL story-front-matter-populated "$scope"
         fi
 
-        if story_frame_present "$doc"; then
+        if grep -qE '^> \*\*When\*\*.*\*\*I want to\*\*.*\*\*so I can\*\*' "$doc"; then
           emit_gate PASS story-job-story-regex "$scope"
         else
           emit_gate FAIL story-job-story-regex "$scope"
@@ -323,7 +283,7 @@ except Exception:
 # === Tests ====================================================================
 
 # ── Section 1: fixture shape preflight ──────────────────────────────────────
-section "1/5" "Fixture shape preflight"
+section "1/4" "Fixture shape preflight"
 if [ -d "$CLEAN_FIXTURE" ]; then pass "clean fixture directory present"; else fail "clean fixture missing: $CLEAN_FIXTURE"; fi
 if [ -d "$BROKEN_FIXTURE" ]; then pass "broken fixture directory present"; else fail "broken fixture missing: $BROKEN_FIXTURE"; fi
 if [ -f "$SCRIPT_DIR/run-audit-smoke.sh" ]; then pass "run-audit-smoke.sh present (AC #2)"; else fail "run-audit-smoke.sh missing"; fi
@@ -353,7 +313,7 @@ do
 done
 
 # ── Section 2: clean fixture — Phase B gate runner ─────────────────────────
-section "2/5" "Phase B gates against clean fixture (expect ALL pass, 0 UNCATEGORIZED-GATE-FAIL)"
+section "2/4" "Phase B gates against clean fixture (expect ALL pass, 0 UNCATEGORIZED-GATE-FAIL)"
 GATE_REPORT="$(mktemp)"
 trap 'rm -f "$GATE_REPORT"' EXIT
 # $GATE_REPORT is intentionally reused across both fixture runs (Sections 2 + 3);
@@ -372,7 +332,7 @@ else
 fi
 
 # ── Section 3: broken fixture — Phase B gate runner ─────────────────────────
-section "3/5" "Phase B gates against broken fixture (expect 3 named fails, 0 UNCATEGORIZED-GATE-FAIL)"
+section "3/4" "Phase B gates against broken fixture (expect 3 named fails, 0 UNCATEGORIZED-GATE-FAIL)"
 run_phase_b_gates "$BROKEN_FIXTURE"
 BROKEN_UNCAT="$(awk -F'\t' '$1 == "UNCATEGORIZED-GATE-FAIL"' "$GATE_REPORT" | wc -l | tr -d ' ')"
 
@@ -409,42 +369,8 @@ else
   awk -F'\t' '$1 == "FAIL" {printf "    | %s\t%s\t%s\n",$2,$3,$4}' "$GATE_REPORT"
 fi
 
-# ── Section 4: story-job-story-regex gate is frame- + line-form-agnostic ──────
-# The gate must PASS the human job-story frame AND the non-human constraint-spec
-# frame, in BOTH the single-line and the canonical brite-base GOLD multi-line
-# blockquoted form, and FAIL a doc carrying neither. Locks the T0-4 broadening so
-# a future edit cannot silently narrow it back to (a) job-story-only — which
-# would fail every crawler/sitemap/cron/CDN flow authored per D11 — or (b)
-# single-line-only — which would fail the multi-line GOLD format every brite-base
-# / brite-sites story doc actually uses.
-section "4/5" "story-job-story-regex gate accepts both frames in single- and multi-line form"
-FRAME_TMP="$(mktemp -d)"
-trap 'rm -f "$GATE_REPORT"; rm -rf "$FRAME_TMP"' EXIT
-
-# Single-line forms.
-printf '## Job story\n\n%s\n' '> **When** an admin opens the page, **I want to** edit it, **so I can** publish.' > "$FRAME_TMP/jobstory-1line.md"
-printf '## Job story\n\n%s\n' '> **Given** a request resolves to a domain, the system **MUST** serve a sitemap, **so that** the page set is crawl-discoverable.' > "$FRAME_TMP/constraint-1line.md"
-# Canonical GOLD multi-line blockquoted forms.
-printf '## Job story\n\n%s\n%s\n%s\n' '> **When** an admin opens the page,' '> **I want to** edit its content blocks,' '> **so I can** publish the change before the next crawl.' > "$FRAME_TMP/jobstory-multi.md"
-printf '## Job story\n\n%s\n%s\n%s\n' '> **Given** a request resolves to a published domain,' '> the system **MUST** serve a sitemap enumerating that domain'"'"'s pages,' '> **so that** the page set is crawl-discoverable per domain.' > "$FRAME_TMP/constraint-multi.md"
-# Neither frame — and a decoy crawler mention OUTSIDE any frame marker.
-printf '## Job story\n\n%s\n' '> This sub-flow renders a page for a crawler. No frame sentence here.' > "$FRAME_TMP/frameless.md"
-
-for variant in jobstory-1line constraint-1line jobstory-multi constraint-multi; do
-  if story_frame_present "$FRAME_TMP/$variant.md"; then
-    pass "gate accepts $variant"
-  else
-    fail "gate rejected a valid frame: $variant"
-  fi
-done
-if story_frame_present "$FRAME_TMP/frameless.md"; then
-  fail "gate accepted a doc with neither frame (gate is now vacuous)"
-else
-  pass "gate still rejects a doc carrying neither frame (decoy crawler mention ignored)"
-fi
-
-# ── Section 5: skip-with-reason for Phase A / C / LLM-runner ────────────────
-section "5/5" "Phase A / C / LLM-runner gates (skipped per vslice-greenfield precedent)"
+# ── Section 4: skip-with-reason for Phase A / C / LLM-runner ────────────────
+section "4/4" "Phase A / C / LLM-runner gates (skipped per vslice-greenfield precedent)"
 skip "Phase A verify-docs.sh per-doc stdout parsing" \
      "fixture ships a stub verifier exit-0; deep parsing belongs to verify-docs.sh's own harness"
 skip "Phase C Linear MCP state checks" \

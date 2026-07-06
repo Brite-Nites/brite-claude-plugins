@@ -2,7 +2,7 @@
 
 Single-file reference at `plugins/marketing/references/vertical-playbooks/hotels-resorts.md`. R-7 of the email-copywriting preset roadmap. Fresh research required; hotels structurally differ from zoos.
 
-**Issue:** [BC-5921](https://linear.app/brite-nites/issue/BC-5921) · **Priority:** High · **Milestone:** Marketing Plugin v0.1 — GTM Workflows (Revgrowth) · **Parent roadmap:** `docs/designs/email-copywriting-preset-roadmap.md`
+**Issue:** [BC-5921](https://linear.app/brite-nites/issue/BC-5921) · **Priority:** High · **Milestone:** Marketing Plugin: GTM Workflows · **Parent roadmap:** `docs/designs/email-copywriting-preset-roadmap.md`
 
 **Peer precedent:** BC-5920 zoos.md (PR #184, 240 lines, 9 sections, 25 inline citations). Use as structural template; do not reuse offer candidates or ICP priors blindly — hotel context is different.
 

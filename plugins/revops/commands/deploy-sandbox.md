@@ -36,48 +36,6 @@ or, if `--reconcile` was passed:
 
 ---
 
-## Phase 0.5 — Recent-deploy detector
-
-Narrate: `Phase 0.5: Checking for recent deploys...`
-
-Query the Tooling API for recent DeployRequest records so the operator knows whether a teammate already deployed recently. The shared-sandbox drift accumulator makes this especially valuable — multiple devs deploying to `brite-sandbox` without coordination is the common case, not the rare one (see [BC-11037](https://linear.app/brite-nites/issue/BC-11037)).
-
-Run:
-
-```bash
-sf data query --use-tooling-api --target-org brite-sandbox --json \
-  --query "SELECT Id, CreatedBy.Name, CreatedDate, Status, NumberComponentsTotal
-           FROM DeployRequest
-           WHERE CreatedDate = LAST_N_HOURS:24
-           ORDER BY CreatedDate DESC
-           LIMIT 5"
-```
-
-Parse the JSON response. Read `result.records` (an array of DeployRequest rows).
-
-- **Non-empty result set** — format the records as an operator-readable table:
-
-  ```
-  Recent sandbox deploys in the last 24h:
-    - {Id} | {CreatedDate} | {CreatedBy.Name} | {Status} ({NumberComponentsTotal} components)
-    - ...
-  ```
-
-  Then ask via `AskUserQuestion`:
-
-  - Question: `Recent deploys detected (see above). Have you coordinated with the prior deployer?`
-  - Options:
-    - `Yes — coordinated` — proceed to Phase 1.
-    - `No — sync with teammate first` — **halt** cleanly. Print: *"Stopped before pre-flight. Coordinate with the prior deployer and re-run `/revops:deploy-sandbox` when ready."* Exit.
-
-- **Empty result set** (`result.records` is empty or `result.totalSize === 0`) — narrate: *"No sandbox deploys in last 24h — proceeding."* Skip the gate and continue to Phase 1.
-
-- **Query failure** (`status !== 0` or unexpected shape) — do **not** halt the deploy over an advisory check. Print the raw JSON and narrate: *"Recent-deploy check failed (Tooling API query error). Proceeding — verify manually in Setup → Deployment Status if needed."* Continue to Phase 1.
-
-Narrate: `Phase 0.5: Recent-deploy check done`
-
----
-
 ## Phase 1 — Pre-flight
 
 Narrate: `Phase 1/6: Pre-flight checks...`

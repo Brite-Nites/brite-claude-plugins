@@ -76,7 +76,7 @@ Remove or avoid adding:
 - **Standard language conventions** — Claude already knows TypeScript, Python, Go, etc.
 - **Code style rules** — use linters/formatters instead (ESLint, Prettier, Ruff)
 - **Things Claude can infer from reading code** — patterns visible in existing files
-- **Detailed API documentation** — link to vendor docs instead
+- **Detailed API documentation** — link to docs or use context7 MCP instead
 - **File-by-file codebase descriptions** — Claude can read the code itself
 - **Long tutorials or explanations** — extract to `docs/` with `@import`
 - **Information that changes frequently** — it will go stale quickly

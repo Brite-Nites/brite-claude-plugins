@@ -8,22 +8,16 @@
   },
   "plugins": [
     {
-      "name": "brite-core",
-      "source": "./plugins/core",
-      "description": "Layer-2 core plugin \u2014 cross-cutting brain-first hooks (SessionStart + SubagentStart JSON envelope), centralized security/quality hooks, and team-gbrain MCP registration. Strongly recommended for all Brite team members.",
-      "version": "0.1.0"
-    },
-    {
       "name": "workflows",
       "source": "./plugins/workflows",
       "description": "Process + Org plugin \u2014 structured workflow methodology with Linear integration",
-      "version": "3.32.0"
+      "version": "3.30.0"
     },
     {
       "name": "marketing",
       "source": "./plugins/marketing",
       "description": "Marketing domain plugin \u2014 brand-aware marketing skills ported from coreyhaines31/marketingskills",
-      "version": "0.10.0"
+      "version": "0.6.0"
     },
     {
       "name": "cadence",
@@ -35,13 +29,13 @@
       "name": "revops",
       "source": "./plugins/revops",
       "description": "Revenue operations plugin \u2014 Salesforce dev + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
-      "version": "0.5.4"
+      "version": "0.5.1"
     },
     {
       "name": "flow-architecture",
       "source": "./plugins/flow-architecture",
       "description": "Flow-Driven Architecture plugin \u2014 scaffolds Linear domain milestones, 5-discipline child issues, and repo flow docs for UI-bearing Brite product builds. Implements CDR-023.",
-      "version": "1.2.8"
+      "version": "1.2.3"
     }
   ]
 }

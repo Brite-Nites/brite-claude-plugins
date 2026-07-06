@@ -121,49 +121,26 @@ assert_exit "V1 current tree validates clean" 0 "$rc"
 
 printf "\n== validate.sh detects tier alias injected into a plugin ==\n"
 
-# Seed a tier alias into a type:prompt hook using an atomic write
+# Seed a tier alias into the first type:prompt hook using an atomic write
 # (tempfile in the target's dir, then os.replace). Path via sys.argv.
-#
-# Robustness: if no existing type:prompt hook is found (e.g. post-BC-11889
-# workflows has none), inject a synthetic one. The test's intent is to
-# verify validate.sh catches tier aliases in any prompt hook — that intent
-# holds whether the prompt-hook is pre-existing or synthetic.
 python3 - "$HOOKS" <<'PY'
 import json, os, sys, tempfile
 from pathlib import Path
 path = sys.argv[1]
 with open(path, encoding="utf-8") as f:
     data = json.load(f)
-
-seeded = False
 for handlers in data.get("hooks", {}).values():
     for handler in handlers:
         for hook in handler.get("hooks", []):
             if hook.get("type") == "prompt":
                 hook["model"] = "haiku"
-                seeded = True
                 break
-        if seeded:
-            break
-    if seeded:
+        else:
+            continue
         break
-
-if not seeded:
-    # No existing prompt hook in this plugin's hooks.json — inject a
-    # synthetic one so the V2-full assertion has something for lint_hooks.py
-    # to flag. Append to PreToolUse[0].hooks (creating the matcher entry if
-    # the array is empty).
-    pretooluse = data.setdefault("hooks", {}).setdefault("PreToolUse", [])
-    if not pretooluse:
-        pretooluse.append({"matcher": "Bash", "hooks": []})
-    pretooluse[0].setdefault("hooks", []).append({
-        "type": "prompt",
-        "prompt": "tier-alias regression test (BC-11889) — synthetic prompt hook injected by scripts/test-hook-model-lint.sh; trap restores file on exit",
-        "model": "haiku",
-        "timeout": 10,
-        "statusMessage": "test-injected hook (BC-11889)"
-    })
-
+    else:
+        continue
+    break
 target_dir = os.path.dirname(path) or "."
 fd, tmp = tempfile.mkstemp(dir=target_dir, prefix=".hooks.", suffix=".tmp")
 try:

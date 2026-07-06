@@ -145,7 +145,7 @@ build_accept_base() {
   local dir="$1"
   mkdir -p "$dir"
   cat > "$dir/_manifest.yaml" <<'YAML'
-schema_version: 2
+schema_version: 1
 verticals:
   - alpha
   - bravo
@@ -312,7 +312,7 @@ run_k() {
   local dir
   dir="$(mkdir_scenario K)"
   cat > "$dir/_manifest.yaml" <<'YAML'
-schema_version: 2
+schema_version: 1
 verticals:
   - bravo
   - alpha
@@ -326,7 +326,7 @@ run_l() {
   local dir
   dir="$(mkdir_scenario L)"
   cat > "$dir/_manifest.yaml" <<'YAML'
-schema_version: 2
+schema_version: 1
 verticals:
   - alpha
   - bravo
@@ -852,7 +852,7 @@ run_ak() {
   dir="$(mkdir_scenario AK)"
   # Drop bravo from manifest while leaving bravo.yaml on disk.
   cat > "$dir/_manifest.yaml" <<'YAML'
-schema_version: 2
+schema_version: 1
 verticals:
   - alpha
 YAML
@@ -866,7 +866,7 @@ run_al() {
   dir="$(mkdir_scenario AL)"
   rm "$dir/alpha.yaml" "$dir/bravo.yaml"
   cat > "$dir/_manifest.yaml" <<'YAML'
-schema_version: 2
+schema_version: 1
 verticals: []
 YAML
   invoke_lint "$dir"
@@ -1011,7 +1011,7 @@ run_au() {
   # confusing manifest-mismatch message.
   mkdir "$dir/charlie.yaml"
   cat > "$dir/_manifest.yaml" <<'YAML'
-schema_version: 2
+schema_version: 1
 verticals:
   - alpha
   - bravo

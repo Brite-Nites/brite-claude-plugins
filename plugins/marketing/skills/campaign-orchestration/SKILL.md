@@ -2,7 +2,7 @@
 name: campaign-orchestration
 description: Designs outbound email sequences and orchestrates end-to-end campaign launches in Email Bison. Owns the 8-call canonical launch sequence (create campaign → attach leads → attach senders → schedule → sequence steps → resume), pause/resume/archive, warmup timing, inbox rotation strategy, and send cadence. Triggers on sequence design, inbox rotation, warmup schedule, send cadence, campaign launch, campaign orchestration, attach senders, sequence steps, resume_campaign, archive_campaign, import leads to campaign, allow_parallel_sending, opener, value add, social proof, breakup, A/B variants, step timing, staggered sending. Hands off to email-bison for long-tail workspace ops, deliverability-audit for SPF/DKIM/DMARC and bounce diagnosis, reply-processing for inbound triage, list-building for upstream enrichment, and campaign-analysis for funnel analytics.
 user-invocable: true
-allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep, mcp__plugin_marketing_gbrain-team__query, mcp__plugin_marketing_gbrain-team__get_page, mcp__plugin_marketing_gbrain-team__list_pages
+allowed-tools: mcp__emailbison-b2b__*, mcp__emailbison-personal__*, Read, Write, Glob, Grep
 metadata:
   version: 0.1.0
   category: Outbound Lead Gen

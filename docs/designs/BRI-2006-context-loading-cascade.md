@@ -3,8 +3,6 @@
 **Issue**: BRI-2006 — Define context loading cascade architecture
 **Date**: 2026-03-16
 
-> **Status update (2026-05-27, BC-11891):** Context7 was removed and ADR-001 marked Withdrawn. The Context7-sourced tiers (CDR INDEX, org-level precedent search) are currently unavailable; their callers degrade with skip-and-narrate. The rest of the cascade (Tier 1+2 — CLAUDE.md, auto-memory, design doc, plan file, etc.) is unaffected.
-
 ### Problem
 Context loading logic is scattered across 4+ skills with no unified reference. An implementer building a new skill has no single source for "what should my skill load and when?" — leading to inconsistent context loading and risk of bloating early stages with Tier 3 content.
 

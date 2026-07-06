@@ -158,7 +158,7 @@ status: ratified
 
 **Rationale (Marketing):**
 
-> Sarah + Kells + Holden ratified. Part (a): `brite-salesforce/docs/runbooks/sf-prod-auth-rotation.md` (PR #249) is canonical re-auth path; plan-campaign + create-sf-campaign soft-fail error messages will cite it directly. Part (b): Option B chosen for monitoring. Three reasons aligned to lead:
+> Sarah + Kells + Holden ratified. Part (a): `brite-salesforce/docs/runbooks/sf-prod-jwt-auth-rotation.md` (PR #249) is canonical re-auth path; plan-campaign + create-sf-campaign soft-fail error messages will cite it directly. Part (b): Option B chosen for monitoring. Three reasons aligned to lead:
 >
 > 1. The BC-10303 + BC-10653 pattern is silent + recurring (both within ~30 days, different auth surfaces, same failure mode); Option C (accept-as-is) is what's been happening and the evidence says it's not sustainable.
 > 2. `/revops:doctor` already exists with 9 read-only SF health checks (BC-10660 / PR #341); adding a JWT-validity probe is additive, not new tooling.

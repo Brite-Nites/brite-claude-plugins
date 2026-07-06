@@ -2,7 +2,7 @@
 
 **Linear:** [BC-5919](https://linear.app/brite-nites/issue/BC-5919/update-email-copywritingskillmd-with-cross-links-to-new-references)
 **Branch:** `holden/bc-5919-skill-cross-links`
-**Milestone:** Marketing Plugin v0.1 — GTM Workflows (Revgrowth) (R-3 of email-copywriting preset roadmap)
+**Milestone:** Marketing Plugin: GTM Workflows (R-3 of email-copywriting preset roadmap)
 **Blockers:** BC-5917 ✅ (PR #175), BC-5918 ✅ (PR #177), BC-5879 (superseded)
 **Blocks:** BC-5920, BC-5921, BC-5922, BC-5923, BC-5926, BC-5929, BC-5930
 

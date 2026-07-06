@@ -2,7 +2,7 @@
 title: Marketing Plugin GTM Workflows — MVP dogfood checklist
 created: 2026-04-26
 context: BC-5906 / BC-5950 / BC-2717 / BC-5832 / BC-5831 — the 5-issue MVP set
-milestone: Marketing Plugin v0.1 — GTM Workflows (Revgrowth)
+milestone: Marketing Plugin: GTM Workflows
 exit-criterion: BC-6002 (full lifecycle dogfood — comes after MVP)
 mvp-vertical: Hotels & Resorts
 ---

@@ -7,8 +7,6 @@ originSessionId: 3178b23f-ec01-4bdf-ae82-811c5e31fca0
 
 After Phase 3 sign-off (BC-6578, 2026-05-06, decision: scale), the user opened a multi-session design interview to turn Brite's Flow-Driven Architecture (FDA) into a Claude Code plugin called `flow-architecture`. Style is one-question-per-turn with recommended answer + reasoning + honest pushback per question. Locks through Q12 + Q22-Q28 + meta-Q autoplan-recurrence captured below.
 
-> **Status update (2026-05-27, BC-11891):** Context7 was removed from the workflows plugin and ADR-001 marked Withdrawn. Q-lock entries below (notably Q32 and Q50) reference Context7 as an inherited/available MCP — those references describe the prior plugin state and are preserved as historical audit trail. Workflows now registers 3 MCPs (sequential-thinking, linear-server, gbrain-team); FDA's `.mcp.json` is still empty `{}` per the cadence precedent — that part of the lock is unchanged.
-
 ## Critical clarifications (foundational — read first)
 
 **The "5" only applies to discipline children.** Three quantities in FDA are commonly conflated; only one is fixed:
@@ -2623,99 +2621,3 @@ Q58 follows the Q56 / Q57 new-Q-lock precedent (a fresh Q-number for a scope dec
 ### Audit trail
 
 Q58 authored 2026-05-22 by orchestrator session-start synthesizing the BC-11029 handoff prompt + brite-roster PR #8 reference impl read + `commands/retrofit-project.md` Phase 1 structural analysis. Triggered by BC-11029 scoping (filed 2026-05-21). Sibling BCs to file post-ship: (a) `/flow:start-project` templates-scaffold parity; (b) brite-roster swap to plugin-provided scripts (low priority — current code works); (c) brite-base swap to plugin-provided scripts (defer until ≥2 more dogfood iterations). Companion artifacts: `plugins/flow-architecture/templates/README.md` (consumer-facing install + Option C migration plan) + `tests/run-verify-docs-ecosystem-vslice.sh` (harness asserting template fidelity) + BC-6956 description amendment (layer-boundary note: BC-6956 = plugin-internal helpers under `plugins/flow-architecture/scripts/`; BC-11029 = project-side toolchain templates under `plugins/flow-architecture/templates/`).
-
-### Q58 amendment 1 — `/flow:start-project` parity + recipe-block expansion (2026-05-26, [BC-11089](https://linear.app/brite-nites/issue/BC-11089))
-
-**What changed.** Two orchestrator-level changes close the Q58 § Out-of-scope gap (a) and fold in the BC-11029 final-review P3 #3:
-
-1. **`/flow:start-project` gains the templates-scaffold step.** The same 5-step recipe (resolve org slug → build arrays → idempotency check → copy+substitute+chmod → emit confirmation) now appears in `commands/start-project.md` Phase 1, byte-identical to `commands/retrofit-project.md` Phase 1. Greenfield projects bootstrapping via `/flow:start-project` no longer skip the verify-docs ecosystem. The `--overwrite-scripts` flag, failure semantics, and trust-boundary discipline are identical across both orchestrators.
-
-2. **Recipe-block expansion in both orchestrators.** The `cp` + `mkdir -p` + `chmod +x` loops and the `SRC_PATHS` / `TARGET_PATHS` array construction are now explicit inline bash in both `start-project.md` and `retrofit-project.md` (previously elided as prose in retrofit-project.md). This keeps the orchestrator-LLM from needing to synthesize the mechanical recipe from narrative paragraphs at runtime.
-
-**What did NOT change.** Q58's core decisions (Option A for v1.2, Option C as planned end-state, Q29.7 consumer-ownership semantics, idempotency design, placeholder substitution set, sub-decision 1 schema discipline, sub-decision 2 reversibility, sub-decision 3 migration trigger) are all unchanged. The amendment extends coverage to a second orchestrator surface; it does not alter the recipe itself.
-
-**Regression prevention.** [BC-11091](https://linear.app/brite-nites/issue/BC-11091)'s `tests/run-verify-docs-ecosystem-integration-vslice.sh` gains §9 — a contract-sync check against `start-project.md` mirroring §8's check against `retrofit-project.md`. The same 24 assertions (9 template refs + 4 placeholders + 7 primitives + 4 esc() metachar handlers) are verified in both files. Regression-validated: mutate start-project recipe → test FAILS; revert → test PASSES.
-
-**Audit trail.** Q58 amendment 1 authored 2026-05-26 by executor session implementing [BC-11089](https://linear.app/brite-nites/issue/BC-11089). Closes the gap called out in Q58 § Out-of-scope item (a). Plugin version 1.2.3 → 1.2.4 (patch — additive parity, no breaking change).
-
-## Q59 — `/flow:deprecate-legacy` orchestrator: Phase 5 legacy-milestone retirement codified as a two-pass command (LOCKED 2026-05-26, per [BC-10219](https://linear.app/brite-nites/issue/BC-10219))
-
-Phase 5 of the FDA lifecycle — retiring legacy milestones after a project's retrofit is complete — was previously a manual process (precedent: [BC-6580](https://linear.app/brite-nites/issue/BC-6580) BriteBase). Q59 codifies the 4 per-milestone sub-steps into a repeatable orchestrator command at `commands/deprecate-legacy.md`.
-
-### The 5 design decisions
-
-**Sub-decision 1 — Two-pass execution model.**
-
-Mirrors Q14.6's filesystem-artifact gate pattern. Pass 1 generates a review doc (`docs/plans/<project-slug>-deprecate-legacy.md`) with a per-milestone disposition table; operator reviews + edits + bumps `last_reviewed: TBD` to ISO-8601. Pass 2 (on re-invocation) detects `last_reviewed != TBD`, enforces the pre-comms gate, then executes the serial per-milestone disposition. The two-pass split ensures:
-
-- Operator review of every disposition (re-home / close-as-obsolete / scoping-needed) before any mutation.
-- A filesystem artifact (not a chat-ack) as the review-completion signal — the same unambiguous check that Q14.6 established.
-- Resumability across sessions (review doc tracks per-milestone progress markers).
-
-**Sub-decision 2 — Pre-comms 24h gate.**
-
-Before Pass 2 executes, the review doc must contain a `## Pre-comms posted at <ISO-8601>` header that is ≥24 hours old. Rationale: legacy milestones are shared team context; teammates working in or referencing those milestones need advance notice before their issues move or close. The 24h window mirrors the BC-6580 manual precedent where a Slack announcement preceded the deprecation by ~1 business day.
-
-The gate is enforced mechanically (ISO-8601 timestamp delta ≥ 24h) rather than via chat acknowledgment. This prevents accidental same-day execution and creates an audit trail of when the team was notified.
-
-**Sub-decision 3 — `flow-legacy-cross-reference` stays user-invocable (approach a).**
-
-The existing skill at `skills/flow-legacy-cross-reference/SKILL.md` had `user-invocable: false` + `disable-model-invocation: true`. Q59 lifts both flags, making the skill user-invocable. Two consumers:
-
-- `/flow:retrofit-project` (existing) — dispatches the skill at Phase 3 for annotation per Q9 additive-only contract.
-- `/flow:deprecate-legacy` (new) — invokes the 3-tier mapping cascade (Sections 1-6) at Pass 1 for disposition mapping.
-
-The annotation logic (Sections 1-6) is the shared reuse surface. The re-home/close/archive steps in `/flow:deprecate-legacy` are new to that command and NOT part of the skill. The simpler approach (a) was chosen over approach (b) — extracting into `_shared/` — because only the mapping cascade is reused, not a separable "shared module" with its own lifecycle.
-
-**Sub-decision 4 — Cadence linear-housekeeping NOT extended.**
-
-The cadence plugin's batch-mutation framework (`linear-housekeeping/SKILL.md`) is intentionally NOT extended with `milestone-archive` / `milestone-rehome` mutation types. Three reasons:
-
-1. Cross-plugin coupling: flow-architecture → cadence dependency direction is novel and unjustified for a single use case.
-2. Self-contained batch logic: `/flow:deprecate-legacy` already has AskUserQuestion gates at each milestone boundary and its own preview/approve/execute cycle.
-3. Low reuse frequency: milestone deprecation is a once-per-retrofit lifecycle event, not a weekly cadence operation.
-
-If a future use case requires milestone mutations from cadence (e.g., bulk milestone renames during sprint planning), a Q-lock amendment can add the types at that time. The decision is conservative — adding coupling is easy; removing it is not.
-
-**Sub-decision 5 — Q9 scope widening for Phase 5 controlled mutations.**
-
-Q9 (memory:64) established: "Retrofit is additive-only with cross-reference annotations." The annotation step (sub-step c in `/flow:deprecate-legacy`) honors Q9 — it extends the existing `## FDA migration` appendix within the Q14 markers. But sub-steps a (re-home issues) and b (close-as-obsolete) are MUTATIONS that go beyond Q9's additive-only scope.
-
-Q59 explicitly widens the Phase 5 contract: controlled mutations on legacy milestones are permitted WHEN:
-
-- The project's FDA retrofit is complete (breadcrumb at `status: completed`).
-- An operator has reviewed and approved each milestone's disposition (Pass 1 review doc gate).
-- The team has been notified (pre-comms 24h gate).
-- Each milestone is individually confirmed (per-milestone AskUserQuestion gate).
-
-The widening is scoped to `/flow:deprecate-legacy` only. Other FDA commands continue to honor Q9's additive-only contract for legacy milestones.
-
-### Per-milestone sub-step ordering (LOCKED)
-
-For each legacy milestone, execute in this exact order:
-
-1. **Re-home open issues** — `save_issue` + `save_comment` per issue to move to FDA domain milestone.
-2. **Close-as-obsolete** — `save_issue` (state → Canceled) + `save_comment` per remaining issue.
-3. **Annotate milestone** — extend `## FDA migration` appendix within Q14 markers (marker-based idempotent rewrite).
-4. **Archive hand-off** — `AskUserQuestion` gate (Linear MCP doesn't expose milestone archive API).
-
-Ordering rationale: issues must be re-homed/closed BEFORE annotation (so the annotation accurately reflects the final state); annotation BEFORE archive (so the appendix is written while the milestone is still accessible).
-
-### Review doc schema (LOCKED)
-
-Front-matter fields: `generated_by`, `generated_at`, `last_reviewed`.
-
-Disposition table required columns: `Legacy Milestone`, `Mapped FDA Domain(s)`, `Open Issues`, `Closed Issues`, `Proposed Disposition`, `Source Signal`.
-
-Valid disposition values: `re-home`, `close-as-obsolete`, `scoping-needed`.
-
-Progress markers (inline in disposition table during Pass 2): `[DONE]`, `[SKIPPED]`, `[ERROR: <reason>]`, `[PENDING]`.
-
-### Version + milestone
-
-- **Plugin version:** 1.2.4 → 1.2.5 (patch — new command, additive).
-- **Milestone:** [BC-10219](https://linear.app/brite-nites/issue/BC-10219) in v1.2 milestone. Closes the v1.2 scope entirely.
-
-### Audit trail
-
-Q59 authored 2026-05-26 by executor session implementing [BC-10219](https://linear.app/brite-nites/issue/BC-10219). Triggered by v1.2 milestone scope (Q57 deferred `/flow:deprecate-legacy` from v1.1 to v1.2). Precedent: [BC-6580](https://linear.app/brite-nites/issue/BC-6580) (BriteBase manual Phase 5 deprecation, Done). Companion: [BC-10234](https://linear.app/brite-nites/issue/BC-10234) (brite-base FDA-shape sweep — depends on this BC for tooling-assisted mode).

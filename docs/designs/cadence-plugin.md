@@ -191,7 +191,7 @@ Subsequent Context paragraphs introduce each strategic track with a transitional
 
 ## 2. Linear Query Recipes
 
-Every recipe below was run live against the Brite Skill Packs / Brite GTM / Salesforce Implementation projects during this issue. First-5-row samples and failure modes are pasted inline.
+Every recipe below was run live against the Brite Plugin Marketplace / Brite GTM / Salesforce Implementation projects during this issue. First-5-row samples and failure modes are pasted inline.
 
 ### 2.1 Primitives
 

@@ -188,7 +188,7 @@ Linear sub-issue comments are the human-readable mirror — each comment capture
 
 ### Linear project structure
 
-A separate Linear project, "Brite GTM" (`brite-gtm-fa8fc238ef28` per brite-gtm repo references), holds the campaign portfolio. This is distinct from the existing "Brite Skill Packs" project (which holds plugin engineering work).
+A separate Linear project, "Brite GTM" (`brite-gtm-fa8fc238ef28` per brite-gtm repo references), holds the campaign portfolio. This is distinct from the existing "Brite Plugin Marketplace" project (which holds plugin engineering work).
 
 Labels applied per milestone at scaffold time:
 - `slug:{slug}` (universal anchor for search)

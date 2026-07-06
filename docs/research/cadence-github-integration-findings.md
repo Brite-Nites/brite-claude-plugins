@@ -60,7 +60,7 @@ Status column is the Linear `status.type` at query time. Repo match uses live `g
 Many of these almost certainly map to projects beyond page 2 of the pagination — not filed as holes. Listed for completeness and to confirm the Brite portfolio is repo-heavy.
 
 ```
-brite-claude-plugins (this repo; maps to "Brite Skill Packs")
+brite-claude-plugins (this repo; maps to "Brite Plugin Marketplace")
 handbook
 brite-data-platform
 email-infrastructure-orchestration-platform

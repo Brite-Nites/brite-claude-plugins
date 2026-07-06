@@ -57,7 +57,7 @@
 
 ### Task 7 — File Active-tier Nites follow-up issue (if not exists)
 - **Check:** Query Linear `list_issues` with `query: "Active-tier Nites preset"` or similar to confirm no existing issue covers the displaced work.
-- **If missing:** `save_issue` with title "Fan out Active-tier Nites preset library (displaced from BC-5879)", project "Brite Skill Packs", team "Brite Company", priority Medium, labels `skill`, milestone "Marketing Plugin v0.1 — GTM Workflows (Revgrowth)", description referencing the 2026-04-21 pivot + the 5 Nites verticals (HOAs, Landscape Lighting, Landscape Architects, Builders & Developers, Universities) + 10 target files (5 × 2 preset types). Capture the new issue ID for the manifest reference.
+- **If missing:** `save_issue` with title "Fan out Active-tier Nites preset library (displaced from BC-5879)", project "Brite Plugin Marketplace", team "Brite Company", priority Medium, labels `skill`, milestone "Marketing Plugin: GTM Workflows", description referencing the 2026-04-21 pivot + the 5 Nites verticals (HOAs, Landscape Lighting, Landscape Architects, Builders & Developers, Universities) + 10 target files (5 × 2 preset types). Capture the new issue ID for the manifest reference.
 - **If exists:** Use its ID for the manifest reference.
 
 ### Task 8 — `./scripts/validate.sh`

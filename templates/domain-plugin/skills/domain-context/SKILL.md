@@ -40,13 +40,16 @@ generated_by: {{SKILL_NAME}}
 
 Context-skills query two tiers of Systems of Record to enrich the context doc:
 
-### Tier 1 — Handbook (universal, currently unavailable)
+### Tier 1 — Handbook (Universal, query first)
 
-The Brite Handbook (company-wide knowledge: brand guidelines, ICP definitions, coding standards, competitive positioning, org structure) was previously queryable as a universal SoR via Context7. **Context7 was removed (BC-11891); ADR-001 is Withdrawn.** No replacement is wired yet — a future gbrain-based integration is anticipated. For now, skip Tier 1 and proceed to Tier 2.
+The Brite Handbook on Context7 (`/brite-nites/handbook`) is a universal SoR available to all context-skills. It provides company-wide knowledge: brand guidelines, ICP definitions, coding standards, competitive positioning, org structure.
 
-When the handbook query path is restored, this section will document the new mechanism (likely `resolve` → `query` style against gbrain).
+1. Call `resolve-library-id("brite-nites handbook")` to get the Context7 library ID
+2. Call `query-docs` with domain-relevant topics (see spec § Handbook Query Pattern for recommended topics per domain)
+3. Extract relevant context for this domain and project
+4. If Context7 is unavailable, log a warning and continue without handbook context
 
-### Tier 2 — Domain MCP (query first today; query second when Tier 1 returns)
+### Tier 2 — Domain MCP (query second, if available)
 
 If a domain-specific MCP tool is available (see spec for trait-to-SoR mapping), query it for live data:
 

@@ -91,7 +91,10 @@ objective-criteria: null
 preconditions:
   - "Design doc exists if brainstorming criteria were met (glob docs/designs/<issue-id>-*.md)"
   - "Issue ID available from session-start or $ARGUMENTS"
-optional-inputs: []
+optional-inputs:
+  - source: "CDR INDEX via Context7 (handbook-library from ## Company Context)"
+    condition: "## Company Context exists in CLAUDE.md and Context7 is available"
+    on-unavailable: "Skip CDR check, log reason, proceed"
 output-artifacts:
   - path: "docs/plans/<issue-id>-plan.md"
     type: file
@@ -674,6 +677,7 @@ command: session-start
 prereqs:
   - "Linear MCP — list projects (1 result) confirms auth"
   - "Sequential-thinking MCP — trivial thought confirms running"
+  - "Context7 MCP — resolve-library-id('react') confirms running (non-blocking)"
 steps:
   - id: 0
     name: "Verify Prerequisites"
@@ -1789,9 +1793,9 @@ error-handling:
   - failure-point: "Issue ID missing"
     action: escalate
     detail: "Ask developer for issue ID"
-  - failure-point: "CDR INDEX unavailable"
+  - failure-point: "CDR INDEX unavailable (no Company Context, Context7 down, or no results)"
     action: skip
-    detail: "CDR retrieval mechanism is not currently wired — check is always skipped. Log in Decision Log format and proceed with planning without CDR awareness."
+    detail: "Log reason in Decision Log format, proceed with planning without CDR awareness"
   - failure-point: "Plan file cannot be read for task count"
     action: degrade
     detail: "Fall back to counting tasks from plan text in context window, note discrepancy"
@@ -1870,9 +1874,9 @@ error-handling:
   - failure-point: "No execution traces in conversation"
     action: skip
     detail: "Phase 2 skipped: No execution traces found — skipping trace extraction"
-  - failure-point: "CDR cross-reference unavailable"
+  - failure-point: "Context7 MCP unavailable for CDR cross-reference"
     action: degrade
-    detail: "CDR retrieval mechanism is not currently wired — cross-reference always skipped. Traces written without CDR lookup."
+    detail: "CDR cross-reference skipped; traces written without CDR lookup"
   - failure-point: "Linear MCP unavailable for promotion flagging"
     action: degrade
     detail: "Promotion candidates logged in report but not created as Linear issues"
@@ -1914,6 +1918,12 @@ error-handling:
   - failure-point: "Sequential-thinking MCP unavailable"
     action: STOP
     detail: "Cannot reach sequential-thinking. Run /workflows:smoke-test to diagnose."
+  - failure-point: "Context7 MCP unavailable (Step 0)"
+    action: degrade
+    detail: "WARN — library docs and handbook context unavailable. Continue session."
+  - failure-point: "Handbook not found on Context7 (Step 0)"
+    action: degrade
+    detail: "WARN — handbook not indexed. Company context interview skips handbook validation."
   - failure-point: "Working directory dirty (Step 1)"
     action: escalate
     detail: "Warn and ask how to proceed"
@@ -2110,9 +2120,9 @@ error-handling:
   - failure-point: "Brownfield: existing CLAUDE.md conflicts with detected conventions"
     action: escalate
     detail: "Present both sources side-by-side via AskUserQuestion. Ask user which is current. Use their answer for doc pre-fill."
-  - failure-point: "Brownfield: CDR reconciliation unavailable"
+  - failure-point: "Brownfield: Context7 unavailable for CDR reconciliation"
     action: skip
-    detail: "Skip CDR reconciliation. Note: 'Company decision record check skipped — retrieval mechanism unavailable.'"
+    detail: "Skip CDR reconciliation. Note: 'Company decision record check skipped — Context7 unavailable.'"
   - failure-point: "Brownfield: README unreadable or binary"
     action: skip
     detail: "Skip README import. Note: 'README could not be parsed. Proceeding without README context.'"
@@ -2145,19 +2155,22 @@ stages:
 
   - stage: brainstorm
     skill: brainstorming/SKILL.md
-    what-loads: "Linear issue, CLAUDE.md, auto-memory, relevant source code, project-level precedent INDEX search"
-    how: "Read + Linear MCP + Read INDEX"
-    tier: [1, 2]
+    what-loads: "Linear issue, CLAUDE.md, auto-memory, relevant source code, precedent INDEX search"
+    how: "Read + Linear MCP + Read INDEX + Context7 MCP"
+    tier: [1, 2, 3]
     status: implemented
-    note: "Org-level precedent search via the handbook is currently unavailable (BC-11891)."
+    implemented:
+      - what: "Precedent search results from INDEX + Context7"
+        issue: BC-1961
+        tier: 3
 
   - stage: plan
     skill: writing-plans/SKILL.md
-    what-loads: "Design doc, Linear issue, source code, test patterns"
-    how: "Read"
-    tier: [1, 2]
+    what-loads: "Design doc, Linear issue, CDR INDEX via Context7 (Tier 3 on-demand), source code, test patterns"
+    how: "Read + Context7 MCP"
+    tier: [1, 2, 3]
     status: implemented
-    note: "The CDR INDEX (formerly Tier 3 via Context7) is currently unavailable; the check is always skipped (BC-11891)."
+    note: "CDR INDEX is the only Tier 3 load; queried on-demand, not pre-loaded"
 
   - stage: execute
     skill: executing-plans/SKILL.md
@@ -2325,8 +2338,8 @@ offloading-strategy:
     - "Build & test commands (Tier 1, always injected per-task)"
 
   in-filesystem:
-    - "Full CDR documents — historically loaded on-demand via Context7; currently unavailable (BC-11891)"
-    - "Precedent search results — implemented (BC-1961), INDEX at docs/precedents/INDEX.md (org-level search currently unavailable per BC-11891)"
+    - "Full CDR documents — loaded on-demand via Context7 during plan stage"
+    - "Precedent search results — implemented (BC-1961), INDEX at docs/precedents/INDEX.md + org-level via Context7"
     - "Design docs — loaded per-task by executing-plans parent agent"
     - "Domain context docs — @imported at session-start (Tier 2), not inlined"
     - "Architecture Decision Records — @imported via CLAUDE.md, not inlined"
@@ -2334,9 +2347,9 @@ offloading-strategy:
 
 progressive-disclosure:
   - pattern: "CDR INDEX → full CDR"
-    status: unavailable
-    issue: BC-11891
-    description: "CDR INDEX retrieval mechanism is not currently wired (Context7 was removed per BC-11891). The writing-plans skill always skips the CDR check until a replacement is in place."
+    status: implemented
+    issue: BRI-1939
+    description: "writing-plans queries CDR INDEX via Context7; lazy-loads full CDR only on conflict"
 
   - pattern: "Precedent INDEX → full trace"
     status: implemented

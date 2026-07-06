@@ -1,15 +1,3 @@
 #!/usr/bin/env bash
-# Resolve the worktree root. The primary checkout of this repo is bare
-# (core.bare=true; all work happens in worktrees), so a push issued from the
-# bare root has no worktree and `git rev-parse --show-toplevel` fails. Ref-only
-# pushes from there (e.g. branch deletions) have nothing to validate — skip
-# cleanly rather than collapsing to an absolute "/scripts/validate.sh" path and
-# aborting the push (BC-11951). Worktree pushes still run the full gate.
-toplevel="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-if [ -z "$toplevel" ]; then
-  echo "pre-push: no worktree resolved (bare repo root); skipping plugin validation." >&2
-  exit 0
-fi
-
 echo "Running plugin validation before push..."
-exec "$toplevel/scripts/validate.sh"
+"$(git rev-parse --show-toplevel)/scripts/validate.sh"

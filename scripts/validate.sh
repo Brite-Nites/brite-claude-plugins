@@ -258,167 +258,6 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 2b''''' — flow-architecture orchestrator-recipe integration test (BC-11091)
-# ══════════════════════════════════════════════════════════════════════
-# Runs plugins/flow-architecture/tests/run-verify-docs-ecosystem-integration-vslice.sh —
-# asserts the /flow:retrofit-project Phase 1 templates-scaffold recipe end-to-end
-# against a fixture project: 9 files land + placeholders substituted + chmod +x
-# on .sh files + idempotency-with-flag re-writes + idempotency-without-flag
-# halts + verify-docs.sh --no-linear exits 0 on the substituted fixture.
-# Sits ON TOP of Section 2b'' (template fidelity) — exercises the recipe-
-# execution path which template-fidelity alone cannot catch. Pass count is
-# auto-derived from the harness's RESULT contract line. The §7 verify-docs
-# pipeline is gated on npm install of fixture devDependencies (tsx + gray-
-# matter); a missing npm install path SKIPs rather than FAILs since §1-6
-# already cover the recipe-regression surface.
-section "2b'''''. flow-architecture orchestrator-recipe integration test (BC-11091)"
-
-fda_recipe_test="$REPO_ROOT/plugins/flow-architecture/tests/run-verify-docs-ecosystem-integration-vslice.sh"
-
-if [ ! -f "$fda_recipe_test" ]; then
-  warn "plugins/flow-architecture/tests/run-verify-docs-ecosystem-integration-vslice.sh not found — skipped"
-else
-  if fda_recipe_out=$(bash "$fda_recipe_test" 2>&1); then
-    fda_recipe_pass_count=$(printf '%s\n' "$fda_recipe_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
-    pass "flow-architecture orchestrator-recipe integration test (${fda_recipe_pass_count:-?} assertions)"
-  else
-    fail "flow-architecture orchestrator-recipe integration test failed — run plugins/flow-architecture/tests/run-verify-docs-ecosystem-integration-vslice.sh for details"
-    printf '%s\n' "$fda_recipe_out" | tail -30 | sed 's/^/    /' >&2
-  fi
-fi
-
-# Section 2b'''''' — flow-architecture deprecate-legacy contract tests (BC-10219)
-# ══════════════════════════════════════════════════════════════════════
-# Runs plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh —
-# 57 assertions locking two-pass detection, pre-comms gate, sub-step ordering,
-# AskUserQuestion gates, review doc schema, and Q59 cross-reference integration.
-section "2b''''''. flow-architecture deprecate-legacy contract tests (BC-10219)"
-
-fda_deprecate_test="$REPO_ROOT/plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh"
-
-if [ ! -f "$fda_deprecate_test" ]; then
-  warn "plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh not found — skipped"
-else
-  if fda_deprecate_out=$(bash "$fda_deprecate_test" 2>&1); then
-    fda_deprecate_pass_count=$(printf '%s\n' "$fda_deprecate_out" | sed -n 's/^Results: \([0-9]*\) PASS.*/\1/p')
-    pass "flow-architecture deprecate-legacy contract tests (${fda_deprecate_pass_count:-?} assertions)"
-  else
-    fail "flow-architecture deprecate-legacy contract tests failed — run plugins/flow-architecture/tests/test-deprecate-legacy-contracts.sh for details"
-    printf '%s\n' "$fda_deprecate_out" | tail -30 | sed 's/^/    /' >&2
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
-# Section 2b''''''' — flow-architecture story-doc quality vslice (BC-11985)
-# ══════════════════════════════════════════════════════════════════════
-# Runs plugins/flow-architecture/tests/run-story-quality-vslice.sh — the
-# regression lock for the story-doc-author quality rewrite (BC-11985/BC-11986).
-# Greps fixture story docs and FAILS on any of four quality defects: (a) job-story
-# When/I want to/so I can grammar collapse (verb-less "so I can <noun>" or
-# "I want to a/the <noun>"), (b) circular boilerplate AC ("the outcome
-# described in" / "holds true"), (c) fewer than 3 Gherkin Scenario blocks,
-# (d) a generic project-wide default persona repeated verbatim (T0-2/A-2 seed).
-# A GOOD BriteBase-grade fixture passes all four; each BAD fixture trips exactly
-# its named defect. Pass count auto-derived from the harness's RESULT line.
-section "2b'''''''. flow-architecture story-doc quality vslice (BC-11985)"
-
-fda_story_quality_test="$REPO_ROOT/plugins/flow-architecture/tests/run-story-quality-vslice.sh"
-
-if [ ! -f "$fda_story_quality_test" ]; then
-  warn "plugins/flow-architecture/tests/run-story-quality-vslice.sh not found — skipped"
-else
-  if fda_story_quality_out=$(bash "$fda_story_quality_test" 2>&1); then
-    fda_story_quality_pass_count=$(printf '%s\n' "$fda_story_quality_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
-    pass "flow-architecture story-doc quality vslice (${fda_story_quality_pass_count:-?} assertions)"
-  else
-    fail "flow-architecture story-doc quality vslice failed — run plugins/flow-architecture/tests/run-story-quality-vslice.sh for details"
-    printf '%s\n' "$fda_story_quality_out" | tail -30 | sed 's/^/    /' >&2
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
-# Section 2b'''''''' — flow-architecture WS-A reusable doc-lint vslice (BC-11983)
-# ══════════════════════════════════════════════════════════════════════
-# Runs plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh — the
-# regression lock for the reusable, multi-line-aware story-doc lint lib
-# (scripts/lib/flow_doc_lint.sh) used by WS-E remediation to lint any consumer
-# repo's flows. Asserts lint_story_doc returns the right verdict on the shared
-# synthetic-story-quality fixtures: GOOD (human job-story + constraint-spec +
-# human-mentions-infra) → PASS; each BAD fixture → its named defect (A-1 GRAMMAR
-# / A-3 BOILERPLATE / FEW_SCENARIOS / A-2 GENERIC_PERSONA / D11 FRAME_MISMATCH).
-# Pass count auto-derived from the harness's RESULT line.
-section "2b''''''''. flow-architecture WS-A doc-lint vslice (BC-11983)"
-
-fda_doclint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh"
-
-if [ ! -f "$fda_doclint_test" ]; then
-  warn "plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh not found — skipped"
-else
-  if fda_doclint_out=$(bash "$fda_doclint_test" 2>&1); then
-    fda_doclint_pass_count=$(printf '%s\n' "$fda_doclint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
-    pass "flow-architecture WS-A doc-lint vslice (${fda_doclint_pass_count:-?} assertions)"
-  else
-    fail "flow-architecture WS-A doc-lint vslice failed — run plugins/flow-architecture/tests/run-flow-doc-lint-vslice.sh for details"
-    printf '%s\n' "$fda_doclint_out" | tail -30 | sed 's/^/    /' >&2
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
-# Section 2b''''''''' — flow-architecture WS-A inventory lints (BC-11983)
-# ══════════════════════════════════════════════════════════════════════
-# Runs plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh — the
-# regression lock for the inventory lints (scripts/lib/flow_inventory_lint.sh):
-# A-8 inventory ↔ doc two-identifier consistency (orphan docs / orphan rows /
-# UPPERCASE-vs-kebab scheme mix, handling both Q20-amendment-2 schemes) and A-9
-# flow-ID immutability (a removed/renamed flow-ID is the FK-fragility breach;
-# `-a`/`-b` splits and [DEPRECATED]-but-present IDs are allowed). Fixtures built
-# in a temp dir. Pass count auto-derived from the harness's RESULT line.
-section "2b'''''''''. flow-architecture WS-A inventory lints (BC-11983)"
-
-fda_invlint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh"
-
-if [ ! -f "$fda_invlint_test" ]; then
-  warn "plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh not found — skipped"
-else
-  if fda_invlint_out=$(bash "$fda_invlint_test" 2>&1); then
-    fda_invlint_pass_count=$(printf '%s\n' "$fda_invlint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
-    pass "flow-architecture WS-A inventory lints vslice (${fda_invlint_pass_count:-?} assertions)"
-  else
-    fail "flow-architecture WS-A inventory lints vslice failed — run plugins/flow-architecture/tests/run-flow-inventory-lint-vslice.sh for details"
-    printf '%s\n' "$fda_invlint_out" | tail -30 | sed 's/^/    /' >&2
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
-# Section 2b'''''''''' — flow-architecture WS-A Linear-graph lints (BC-11983)
-# ══════════════════════════════════════════════════════════════════════
-# Runs plugins/flow-architecture/tests/run-flow-linear-lint-vslice.sh — the
-# regression lock for the Linear-graph lints (scripts/lib/flow_linear_lint.py):
-# A-4 label↔title-prefix contamination (a [Discipline] child carrying a
-# contradictory type:* label, e.g. brite-supply's 33 [Design]→type:eng), A-5
-# blockedBy-wiring (story-doc ## Cross-domain dependencies ↔ Linear blockedBy —
-# reuses the BC-10729 bidirectional predicate), A-6 child-milestone-inheritance
-# (NO_MILESTONE + child≠parent), and A-7 duplicate-discipline-child. Unlike the
-# doc/inventory lints these consume a Linear-state JSON snapshot (synthetic
-# fixtures here; live MCP→JSON at WS-E / /flow:audit Phase C per the fixtures
-# README serialize contract). Pass count auto-derived from the harness's RESULT line.
-section "2b''''''''''. flow-architecture WS-A Linear-graph lints (BC-11983)"
-
-fda_lglint_test="$REPO_ROOT/plugins/flow-architecture/tests/run-flow-linear-lint-vslice.sh"
-
-if [ ! -f "$fda_lglint_test" ]; then
-  warn "plugins/flow-architecture/tests/run-flow-linear-lint-vslice.sh not found — skipped"
-else
-  if fda_lglint_out=$(bash "$fda_lglint_test" 2>&1); then
-    fda_lglint_pass_count=$(printf '%s\n' "$fda_lglint_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
-    pass "flow-architecture WS-A Linear-graph lints vslice (${fda_lglint_pass_count:-?} assertions)"
-  else
-    fail "flow-architecture WS-A Linear-graph lints vslice failed — run plugins/flow-architecture/tests/run-flow-linear-lint-vslice.sh for details"
-    printf '%s\n' "$fda_lglint_out" | tail -30 | sed 's/^/    /' >&2
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
 # Section 2c — Pre-commit Guardrail Regression (BC-8712 follow-up)
 # ══════════════════════════════════════════════════════════════════════
 # Runs scripts/test_pre_commit_bump.sh against scripts/pre-commit.sh in a
@@ -446,73 +285,6 @@ else
   else
     fail "pre-commit hook regression failed — run scripts/test_pre_commit_bump.sh for details"
     printf '%s\n' "$precommit_out" | tail -25 | sed 's/^/    /' >&2
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
-# Section 2c' — Pre-push Hook Bare-Root Regression (BC-11951)
-# Runs scripts/test-pre-push-hook.sh against .githooks/pre-push in a hermetic
-# sandbox. Asserts the hook skips cleanly from a bare-repo root (no worktree)
-# instead of aborting the push, and still runs validate.sh from a worktree.
-# ══════════════════════════════════════════════════════════════════════
-section "2c'. Pre-push Hook Bare-Root Regression"
-
-prepush_test="$REPO_ROOT/scripts/test-pre-push-hook.sh"
-prepush_hook="$REPO_ROOT/.githooks/pre-push"
-
-if [ ! -f "$prepush_test" ]; then
-  warn "scripts/test-pre-push-hook.sh not found — pre-push regression check skipped"
-elif [ ! -f "$prepush_hook" ]; then
-  warn ".githooks/pre-push not found — pre-push regression check skipped"
-else
-  if prepush_out=$(bash "$prepush_test" "$prepush_hook" 2>&1); then
-    pass "pre-push hook bare-root regression (test-pre-push-hook.sh)"
-  else
-    printf '%s\n' "$prepush_out" | sed 's/^/      /'
-    fail "pre-push hook regression failed — run scripts/test-pre-push-hook.sh for details"
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
-# Section 2d — Security Hook Regex Regression (BC-11889)
-# ══════════════════════════════════════════════════════════════════════
-# Thin regex-only smoke test for the surviving PreToolUse regex hooks.
-# Replaces the BC-11117 classifier harness retired with its Haiku layer.
-section "2d. Security Hook Regex Regression"
-
-hooks_test="$REPO_ROOT/scripts/test-hooks.sh"
-
-if [ ! -f "$hooks_test" ]; then
-  warn "scripts/test-hooks.sh not found — hook regex regression check skipped"
-else
-  if hooks_out=$(bash "$hooks_test" 2>&1); then
-    pass_count=$(printf '%s\n' "$hooks_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
-    pass "security hook regex regression (${pass_count:-?} scenarios)"
-  else
-    fail "security hook regex regression failed — run scripts/test-hooks.sh for details"
-    printf '%s\n' "$hooks_out" | tail -25 | sed 's/^/    /' >&2
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
-# Section 2d' — Pre-commit Advisory Hook (BC-11890)
-# ══════════════════════════════════════════════════════════════════════
-# Hermetic execution test for the PreToolUse Bash quality hook after its
-# block → warn demotion: must always emit {"ok":true} (never block) and
-# surface failing-linter output on stderr behind an advisory banner.
-section "2d'. Pre-commit Advisory Hook"
-
-advisory_test="$REPO_ROOT/scripts/test_precommit_advisory.sh"
-
-if [ ! -f "$advisory_test" ]; then
-  warn "scripts/test_precommit_advisory.sh not found — advisory hook check skipped"
-else
-  if advisory_out=$(bash "$advisory_test" 2>&1); then
-    pass_count=$(printf '%s\n' "$advisory_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
-    pass "pre-commit advisory hook (${pass_count:-?} scenarios)"
-  else
-    fail "pre-commit advisory hook failed — run scripts/test_precommit_advisory.sh for details"
-    printf '%s\n' "$advisory_out" | tail -25 | sed 's/^/    /' >&2
   fi
 fi
 
@@ -660,23 +432,15 @@ for key in path_keys:
     print(f'{\"PASS\" if exists else \"FAIL\"}:{key} -> {ref} ({resolved})')
 " 2>&1)
 
-    # A plugin may legitimately declare neither commands nor skills (e.g. a
-    # hooks+MCP-only plugin like brite-core), in which case path_output is
-    # empty. Guard against the empty here-string yielding one blank iteration
-    # (which would emit a spurious "  does not exist" FAIL).
-    if [ -n "$path_output" ]; then
-      while IFS= read -r line; do
-        status="${line%%:*}"
-        msg="${line#*:}"
-        if [ "$status" = "PASS" ]; then
-          pass "$msg"
-        else
-          fail "$msg does not exist"
-        fi
-      done <<< "$path_output"
-    else
-      pass "no commands/skills path references to validate"
-    fi
+    while IFS= read -r line; do
+      status="${line%%:*}"
+      msg="${line#*:}"
+      if [ "$status" = "PASS" ]; then
+        pass "$msg"
+      else
+        fail "$msg does not exist"
+      fi
+    done <<< "$path_output"
   fi
 
   # ── Directory Existence ───────────────────────────────────────────
@@ -1577,41 +1341,6 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 15a-bc-8726 — icp-refinement-review helper harness (BC-8726)
-# ──────────────────────────────────────────────────────────────────────
-# Runs plugins/marketing/scripts/test_icp_refinement_review.sh against an
-# isolated tmpdir per scenario. Covers scan / apply / emit-handbook against
-# the discoveries.json schema BC-8722 ships. No live-lint step here — the
-# slash command's runtime contract is end-to-end driven through the test
-# harness, and the mutated files would re-pass Section 15a-discoveries on
-# the next validate.sh anyway.
-# ══════════════════════════════════════════════════════════════════════
-section "ICP Refinement Review Helper"
-
-icp_helper="$REPO_ROOT/plugins/marketing/scripts/icp_refinement_review.py"
-icp_tests="$REPO_ROOT/plugins/marketing/scripts/test_icp_refinement_review.sh"
-
-if [ ! -f "$icp_helper" ]; then
-  warn "icp_refinement_review.py not found — harness skipped"
-elif [ ! -f "$icp_tests" ]; then
-  warn "test_icp_refinement_review.sh not found — harness skipped"
-else
-  if icp_tests_output=$(bash "$icp_tests" "$icp_helper" 2>&1); then
-    icp_tests_pass=$(printf '%s\n' "$icp_tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$icp_tests_pass" ]; then
-      pass "icp_refinement_review regression harness — $icp_tests_pass scenarios"
-    else
-      pass "icp_refinement_review regression harness — passed (count unparsed)"
-    fi
-  else
-    fail "icp_refinement_review regression harness failed:"
-    while IFS= read -r line; do
-      [ -n "$line" ] && printf "          %s\n" "$line"
-    done <<< "$icp_tests_output"
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-8719 — Entity-slug short-form lint (BC-8719 / O15)
 # ──────────────────────────────────────────────────────────────────────
 # Per BC-8719, the canonical campaign filesystem layout is short-form
@@ -1692,84 +1421,6 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Section 15a-bc-8728 — Shared utilities + offer-performance harnesses (BC-8728)
-# ──────────────────────────────────────────────────────────────────────
-# Runs plugins/marketing/scripts/test_shared_utilities.sh (canonicals_reader,
-# slug_parts, manifest_loader) AND test_offer_performance.sh (8-scenario
-# regression harness). Rule-of-Three extraction + new command surface.
-# ══════════════════════════════════════════════════════════════════════
-section "15a-bc-8728. Shared utilities regression harness (BC-8728)"
-
-su_harness="$REPO_ROOT/plugins/marketing/scripts/test_shared_utilities.sh"
-
-if [ ! -f "$su_harness" ]; then
-  warn "plugins/marketing/scripts/test_shared_utilities.sh not found — shared utilities harness skipped"
-else
-  if su_harness_out=$(bash "$su_harness" 2>&1); then
-    su_pass_count=$(printf '%s\n' "$su_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$su_pass_count" ]; then
-      pass "shared utilities regression harness (${su_pass_count} assertions)"
-    else
-      pass "shared utilities regression harness — passed (count unparsed)"
-    fi
-  else
-    fail "shared utilities regression harness failed:"
-    printf '%s\n' "$su_harness_out" | tail -30 | sed 's/^/          /' >&2
-  fi
-fi
-
-section "15a-bc-8728b. Offer-performance regression harness (BC-8728)"
-
-op_harness="$REPO_ROOT/plugins/marketing/scripts/test_offer_performance.sh"
-op_helper="$REPO_ROOT/plugins/marketing/scripts/offer_performance.py"
-
-if [ ! -f "$op_helper" ]; then
-  warn "plugins/marketing/scripts/offer_performance.py not found — offer-performance harness skipped"
-elif [ ! -f "$op_harness" ]; then
-  warn "plugins/marketing/scripts/test_offer_performance.sh not found — offer-performance harness skipped"
-else
-  if op_harness_out=$(bash "$op_harness" "$op_helper" 2>&1); then
-    op_pass_count=$(printf '%s\n' "$op_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$op_pass_count" ]; then
-      pass "offer-performance regression harness (${op_pass_count} assertions)"
-    else
-      pass "offer-performance regression harness — passed (count unparsed)"
-    fi
-  else
-    fail "offer-performance regression harness failed:"
-    printf '%s\n' "$op_harness_out" | tail -30 | sed 's/^/          /' >&2
-  fi
-fi
-
-# Section 15a-bc-8725 — Canonicals bootstrap harness (BC-8725)
-# ──────────────────────────────────────────────────────────────────────
-# Runs plugins/marketing/scripts/test_canonicals_bootstrap.sh (vertical,
-# offer, persona subcommands against tempdir fixtures).
-# ══════════════════════════════════════════════════════════════════════
-section "15a-bc-8725. Canonicals bootstrap regression harness (BC-8725)"
-
-cb_harness="$REPO_ROOT/plugins/marketing/scripts/test_canonicals_bootstrap.sh"
-cb_helper="$REPO_ROOT/plugins/marketing/scripts/canonicals_bootstrap.py"
-
-if [ ! -f "$cb_helper" ]; then
-  warn "plugins/marketing/scripts/canonicals_bootstrap.py not found — bootstrap harness skipped"
-elif [ ! -f "$cb_harness" ]; then
-  warn "plugins/marketing/scripts/test_canonicals_bootstrap.sh not found — bootstrap harness skipped"
-else
-  if cb_harness_out=$(bash "$cb_harness" "$cb_helper" 2>&1); then
-    cb_pass_count=$(printf '%s\n' "$cb_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$cb_pass_count" ]; then
-      pass "canonicals bootstrap regression harness (${cb_pass_count} assertions)"
-    else
-      pass "canonicals bootstrap regression harness — passed (count unparsed)"
-    fi
-  else
-    fail "canonicals bootstrap regression harness failed:"
-    printf '%s\n' "$cb_harness_out" | tail -30 | sed 's/^/          /' >&2
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
 # Section 15b — Plugin install-status (cross-check with claude CLI)
 # ══════════════════════════════════════════════════════════════════════
 section "Plugin install-status (marketplace.json vs 'claude plugin list')"
@@ -1820,39 +1471,6 @@ PY
         fi
       done <<< "$plugins_tsv"
     fi
-  fi
-fi
-
-# ══════════════════════════════════════════════════════════════════════
-# Section 15z — Agent-skills config drift (BC-11934)
-# ══════════════════════════════════════════════════════════════════════
-# WARN when docs/agents/ config and the CLAUDE.md '## Agent skills' block
-# drift out of sync. Advisory only (never errors) — mirrors check-guardrails.sh
-# C2. Logic + unit tests live in scripts/_lib/agent_skills_drift.sh and
-# scripts/test_agent_skills_drift.sh (run via test_* harness convention).
-section "Agent-skills config drift"
-# shellcheck source=/dev/null
-. "$REPO_ROOT/scripts/_lib/agent_skills_drift.sh"
-_drift_found=0
-while IFS= read -r _msg; do
-  warn "$_msg"
-  _drift_found=1
-done < <(detect_agent_skills_drift "$REPO_ROOT/CLAUDE.md" "$REPO_ROOT/docs/agents")
-[ "$_drift_found" -eq 0 ] && pass "agent-skills config and CLAUDE.md block are in sync"
-
-# Run the drift-detector's fixture unit tests (mirrors Section 2b' pattern).
-# Pass count auto-derived from the harness's RESULT contract line.
-section "Agent-skills drift unit tests"
-drift_test="$REPO_ROOT/scripts/test_agent_skills_drift.sh"
-if [ ! -f "$drift_test" ]; then
-  warn "scripts/test_agent_skills_drift.sh not found — skipped"
-else
-  if drift_test_out=$(bash "$drift_test" 2>&1); then
-    drift_pass_count=$(printf '%s\n' "$drift_test_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
-    pass "agent-skills drift unit tests (${drift_pass_count:-?} assertions)"
-  else
-    fail "agent-skills drift unit tests failed — run scripts/test_agent_skills_drift.sh for details"
-    printf '%s\n' "$drift_test_out" | tail -25 | sed 's/^/    /' >&2
   fi
 fi
 

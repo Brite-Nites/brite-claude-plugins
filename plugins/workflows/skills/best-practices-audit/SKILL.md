@@ -81,7 +81,7 @@ Detailed documentation should be extracted to `docs/` and referenced via `@impor
 - Sections over ~10 lines that are domain-specific → extract to `docs/`
 - Architecture docs inline → extract to `docs/architecture.md`
 - Convention details inline → extract to `docs/conventions.md`
-- API documentation inline → extract or link to vendor docs
+- API documentation inline → extract or use context7 instead
 
 ### 4. Auto-Exclude Patterns
 
@@ -91,7 +91,7 @@ Flag and suggest removal of:
 |---------|-----|
 | Standard language conventions | Claude already knows these |
 | "Write clean code" / "Follow best practices" | Self-evident |
-| Detailed API documentation | Link to vendor docs |
+| Detailed API documentation | Link to docs or use context7 |
 | File-by-file codebase descriptions | Claude can read the code |
 | Long explanations or tutorials | Extract to docs/ |
 | Information that changes frequently | Will go stale quickly |

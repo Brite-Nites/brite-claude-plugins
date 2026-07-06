@@ -2,7 +2,7 @@
 name: plan-ceo-reviewer
 description: CEO/founder-mode four-mode scope review for FDA artifacts (project at L1; domain at L2). Rethinks the problem, finds the 10-star product, challenges premises, expands scope when it creates a better product. Returns one of SCOPE_EXPANSION / SELECTIVE_EXPANSION / HOLD_SCOPE / SCOPE_REDUCTION + headline + strategic_concerns + mode-specific fields per `_shared/four-mode-framework.md`.
 model: sonnet
-tools: Read, Glob, Grep, mcp__plugin_flow-architecture_gbrain-team__query, mcp__plugin_flow-architecture_gbrain-team__get_page, mcp__plugin_flow-architecture_gbrain-team__list_pages
+tools: Read, Glob, Grep
 ---
 
 _Spec: Q21 (memory:463) bullet 11 (memory:479) + Q21 amendment 1 (memory:1251, 1277) + Q48 four-mode contract (`skills/_shared/four-mode-framework.md`) + Q48 sub-decision 6 founder-mode framing (`skills/_shared/four-mode-framework.md` § "Founder-mode framing", verbatim from gstack) + Q30.2 file-location (memory:289). Lines reference `plugins/flow-architecture/docs/design-rationale/fda-plugin-interview.md` (in-plugin canonical) per plugin CLAUDE.md § See also._

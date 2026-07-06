@@ -50,29 +50,6 @@
       "args": [
         "https://brite-team-gbrain-serve-production.up.railway.app/mcp"
       ]
-    },
-    "enrichment": {
-      "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
-      "args": [
-        "OPENMART_API_KEY=enrichment-openmart-api-key",
-        "PROSPEO_API_KEY=enrichment-prospeo-api-key",
-        "ICYPEAS_API_KEY=enrichment-icypeas-api-key",
-        "LEADMAGIC_API_KEY=enrichment-leadmagic-api-key",
-        "DATAGMA_API_KEY=enrichment-datagma-api-key",
-        "BOUNCEBAN_API_KEY=enrichment-bounceban-api-key",
-        "EMAILGUARD_API_KEY=enrichment-emailguard-api-key",
-        "--",
-        "uvx",
-        "--from",
-        "git+https://github.com/Brite-Nites/brite-data-platform@685444636f65fc567dfc9a348c8e8035646fa794#subdirectory=tools/enrichment-mcp",
-        "brite-enrichment-mcp"
-      ],
-      "env": {
-        "USE_MOCK_PROVIDERS": "False",
-        "MARTS_DATABASE": "ANALYTICS",
-        "MARTS_SCHEMA": "MARTS"
-      }
     }
   }
 }

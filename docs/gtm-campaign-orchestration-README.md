@@ -2,7 +2,7 @@
 
 **Status**: ✅ **MILESTONE CLOSED 2026-05-27.** V3 M2 ratified 2026-05-22 (see `docs/v3-ratification-outcome-2026-05-22.md`); **all 25 build BCs shipped** (BC-8713 through BC-8735 + BC-8752); plus 6 post-V3/dogfood additions (BC-10510, BC-10511, BC-10653, BC-10654, BC-11098 all Done + deferred BC-10512); milestone progress @ 94.35% — the single open item is BC-10512, deferred-by-design per Rule of Two (extract σ3 username-resolution to shared ref; waits for 3rd σ3 SF-write surface).
 **Doc lifecycle**: CLOSED — this README is now a historical record. BC-10512 will be picked up when its trigger condition is met (3rd σ3 SF-write surface).
-**Last updated**: 2026-05-27 (milestone closed; all build BCs Done; BC-11098 Done; PR #334 merged)
+**Last updated**: 2026-05-27 (milestone closed; BC-8724 + BC-8735 Linear status corrected; BC-11098 marked Done; PR #334 merged)
 **README version**: v1.3 (milestone close-out)
 **Audience**: anyone trying to understand "what is this work, what was decided, and how do I act on it."
 **TL;DR**: Brite had three parallel "campaign" systems with three different definitions. This design unifies them into a 3-layer architecture (Handbook = HOW / Linear = orchestration / Plugin = WHAT, with Salesforce as portfolio reporting surface), locks ~30 architectural decisions, and breaks implementation into 25 atomic Linear issues across 9 tiers. Critical path: ~5-6 weeks at single-developer pace.
@@ -70,7 +70,7 @@ Before this design, three separate "campaign" systems ran in parallel with three
 
    ┌──────────────────────────────────────────────────────────────────────┐
    │  LINEAR = ORCHESTRATION / WORK / DRILL-DOWN                          │
-   │  "Brite GTM" project (separate from "Brite Skill Packs")            │
+   │  "Brite GTM" project (separate from "Brite Plugin Marketplace")     │
    │                                                                      │
    │  Milestones (one per campaign = Vertical × Persona × Offer × Month) │
    │  Sub-issues (8 standard + 2 optional per milestone — D4 template)   │
@@ -1088,7 +1088,9 @@ V3 decision determines whether 5 BCs ship as-designed or degrade to M3 (see §5 
 
 #### M2 vs M3 — what V3 ratification ships (or drops)
 
-V3 ratification (BC-8729) determines the outcome. The decision shapes what 5 BCs ship.
+**OUTCOME (2026-05-22): M2 RATIFIED.** All 8 packet items ratified by Sarah Cullen + Kells Nixon + Holden Halford with zero modifications. Full outcome in `docs/v3-ratification-outcome-2026-05-22.md`. The M2 column below is what shipped; the M3 column is historical context for the fork that didn't happen.
+
+V3 ratification (BC-8729) determined the outcome.
 
 ```
    M2 (Marketing RATIFIES the packet)        M3 (Marketing REJECTS the packet)
@@ -1232,7 +1234,7 @@ Audience: external partners / new hires / anyone outside the Brite engineering o
 | **σ3** | Token label for the Salesforce-orchestration sub-decision from the design session's O11 question. See [ADR-015](decisions/015-gtm-sigma3-sf-campaign-sync.md). |
 | **M2 / M3** | Outcomes of V3 Marketing ratification. M2 ships portfolio-snapshot + Pipeline-by-Offer-Family Dashboard + 4 handbook PRs. M3 drops those 5 BCs; SF Performance Dashboard + Coverage view still ship. See [§5 M2/M3 callout](#5-what-was-decided). |
 | **V3** | Validation gate from the design session — Marketing buy-in (Sarah Cullen + Kells) on the canonicals + vocab + framework docs + portfolio-snapshot packet, against a populated dogfood (BC-8729). |
-| **Brite GTM project** | The Linear project that holds campaign milestones (separate from "Brite Skill Packs" — Layer C — which holds plugin engineering work; renamed from "Brite Plugin Marketplace" 2026-05-27). Per D2 / ADR-013 + O7. Provisioned by BC-8712 Task 0. |
+| **Brite GTM project** | The Linear project that holds campaign milestones (separate from "Brite Plugin Marketplace" which holds plugin engineering work). Per D2 / ADR-013 + O7. Provisioned by BC-8712 Task 0. |
 | **brite-gtm repo** | Sibling git repo at `/Users/holdenhalford/projects/work/brite-nites/brite-gtm/`. Holds the pre-Linear ideation queue (`docs/campaign-portfolio.md` with 🟢🟡⚪ candidates) per O7. NOT the same as the Linear "Brite GTM" project. |
 | **Tier** | Grouping concept from the implementation plan — 9 tiers across the 23 BCs (Tier 1 = SF metadata foundation; Tier 9 = optional sibling commands). See [§7](#7-the-23-linear-issues). |
 | **plugin version bump** | CLAUDE.md gotcha: when any plugin file under `plugins/{name}/{commands,skills,hooks,agents}/**` changes, the matching `plugin.json` + `marketplace.json` entry MUST be version-bumped in the same commit. BC-6000 precedent — 4 stale-cache sessions lost. |
@@ -1241,13 +1243,13 @@ Audience: external partners / new hires / anyone outside the Brite engineering o
 
 ---
 
-## 7. The 25 Linear issues
+## 7. The 23 Linear issues
 
-All issues in the **Brite Skill Packs** project (team Brite Company; renamed from "Brite Plugin Marketplace" 2026-05-27).
+All issues in the **Brite Plugin Marketplace** project (team Brite Company).
 
 ### By tier
 
-Status legend: `[done]` = shipped + Linear Done; `[deferred]` = intentionally held; `[wip]` = in flight; `[blocked]` = blocked by upstream; blank = backlog.
+Status legend: `[done]` = shipped + Linear Done; `[wip]` = in flight; `[blocked]` = blocked by upstream; blank = backlog. Per §12 maintenance protocol, update this column when a BC closes.
 
 | Status | BC | Task | Title (abbreviated) | Tier | Complexity |
 |---|---|---|---|---|---|
@@ -1275,7 +1277,7 @@ Status legend: `[done]` = shipped + Linear Done; `[deferred]` = intentionally he
 | [done] | [BC-8735](https://linear.app/brite-nites/issue/BC-8735) | T8-U | Handbook PR — how-we-operate cadence rows | 8 | S |
 | [done] | [BC-8728](https://linear.app/brite-nites/issue/BC-8728) | T9-V | `/marketing:offer-performance` (deferrable — but shipped post-Rule-of-Three trigger 2026-05-26) | 9 | M |
 | [done] | [BC-8725](https://linear.app/brite-nites/issue/BC-8725) | T9-W | new-vertical/offer/persona commands (deferrable — but shipped 2026-05-26, dogfood-promoted) | 9 | M |
-| [done] | [BC-8726](https://linear.app/brite-nites/issue/BC-8726) | T9-X | icp-refinement-review command (deferrable — but shipped 2026-05-26) | 9 | M |
+| [done] | [BC-8726](https://linear.app/brite-nites/issue/BC-8726) | T9-X | icp-refinement-review command (deferrable) | 9 | M |
 
 ### Post-V3 / dogfood additions to milestone (not in original 25)
 
@@ -1434,7 +1436,7 @@ Read these sections if you are:
 1. **All decisions in §5 are LOCKED.** Do NOT re-litigate without explicit user direction.
 2. **Read `docs/designs/gtm-campaign-orchestration-design.md` Section 7.8** end-to-end for the full O6 chain.
 3. **Memory files**: `project_gtm_campaign_architecture.md` (architecture summary), `project_marketing_vocabulary.md` (vocab canon), `session_2026_05_11_gtm_campaign_design.md` (full trajectory).
-4. **Linear**: `mcp__plugin_workflows_linear-server__list_issues team:"Brite Company" project:"Brite Skill Packs" query:"GTM"` returns all 23 BCs.
+4. **Linear**: `mcp__plugin_workflows_linear-server__list_issues team:"Brite Company" project:"Brite Plugin Marketplace" query:"GTM"` returns all 23 BCs.
 5. **If a user push-back surfaces** that genuinely needs re-opening a locked decision, surface explicitly (per feedback memory) — never silently drift.
 
 ---
@@ -1466,9 +1468,9 @@ Every doc + memory + Linear artifact, with one-line description.
 
 ### Linear
 
-- **Project**: Brite Skill Packs (team Brite Company; renamed from "Brite Plugin Marketplace" 2026-05-27)
+- **Project**: Brite Plugin Marketplace (team Brite Company)
 - **Issues**: BC-8712 through BC-8735 + BC-8752 (23 total)
-- **URL**: https://linear.app/brite-nites/project/brite-skill-packs-402b57908532
+- **URL**: https://linear.app/brite-nites/project/brite-plugin-marketplace
 
 ### External
 

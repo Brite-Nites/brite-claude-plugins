@@ -394,7 +394,7 @@ Conditional operators: `==`, `!=`, `contains` (substring; case-sensitive), `or`,
 - `list-building` (`plugins/marketing/skills/list-building/`, BC-2717) — Workflow 2 cross-workspace exclusion (dual `list_leads` against both b2b + personal workspaces) for Sources 2 + 3; emits `enriched_leads.csv` for `launch-campaign` / `campaign-orchestration` to consume
 - `campaign-analysis` (BC-2721) — pulls reply / open / bounce analytics
 
-**Upstream integration (feeds into Email Bison):** Brite enrichment engine (`brite-data-platform`, custom Python CLI — see [WIP §1 Layer 1](../../../../docs/research/outbound-pipeline-findings.md#layer-1-list-building--enrichment)). Exposed to skills via the [Brite Enrichment MCP](brite-enrichment.md) (`enrichment` server, 3-tool scaffold — BC-5537); full surface deferred to BC-5538.
+**Upstream integration (feeds into Email Bison):** Brite enrichment engine (`brite-data-platform`, custom Python CLI — see [WIP §1 Layer 1](../../../../docs/research/outbound-pipeline-findings.md#layer-1-list-building--enrichment)). No MCP server exists for the enrichment engine.
 
 **Downstream integration (consumes Email Bison events):** OutboundSync webhooks → Salesforce Contacts → Master Inbox classification → Front for BDR handoff ([WIP §1 Layers 2–5](../../../../docs/research/outbound-pipeline-findings.md#layer-2-sending--sequencing)).
 

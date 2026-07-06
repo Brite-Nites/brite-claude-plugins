@@ -18,18 +18,10 @@ set -euo pipefail
 # CI wiring: clone-drift-check job in .github/workflows/validate-plugin.yml
 # runs with continue-on-error: true so substantive drift surfaces as a red
 # advisory check without blocking merge.
-#
-# Upstream-ref override: set UPSTREAM_REF env var to override the default
-# `origin/main` comparison target. Useful when the BC-7060 regression test
-# (`tests/test-clone-drift.sh`) needs to exercise the classifier against a
-# branch's HEAD blob (i.e., when a PR's intent is to modify the upstream file
-# itself and origin/main is therefore stale).
 # ──────────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
-
-UPSTREAM_REF="${UPSTREAM_REF:-origin/main}"
 
 errors=0
 warnings=0
@@ -52,18 +44,17 @@ CLONES=(session-start review ship)
 # this comment's literal phrase.
 HEADER_MARKER="<!-- Cloned from workflows"
 
-section "FDA clone-drift check vs workflows (ref: ${UPSTREAM_REF})"
+section "FDA clone-drift check vs workflows v3.29.4"
 
 # Refresh origin/main so blob lookups resolve. Best-effort; CI checkout with
 # fetch-depth: 0 already has it. Local runs without network keep working
-# against the previously-fetched origin/main. Skip the fetch when the test
-# harness overrides UPSTREAM_REF to a local ref like HEAD.
-if [ "$UPSTREAM_REF" = "origin/main" ] && ! git rev-parse origin/main >/dev/null 2>&1; then
+# against the previously-fetched origin/main.
+if ! git rev-parse origin/main >/dev/null 2>&1; then
   git fetch --depth=1 origin main >/dev/null 2>&1 || true
 fi
 
-if ! git rev-parse "$UPSTREAM_REF" >/dev/null 2>&1; then
-  fail "$UPSTREAM_REF not reachable; cannot resolve upstream blob SHAs"
+if ! git rev-parse origin/main >/dev/null 2>&1; then
+  fail "origin/main not reachable; cannot resolve upstream blob SHAs"
   printf "\n\033[1msummary:\033[0m pass=%d warn=%d fail=%d\n" "$passes" "$warnings" "$errors"
   exit 1
 fi
@@ -97,9 +88,9 @@ for name in "${CLONES[@]}"; do
   # diff-classify branch with an empty numstat (false "could not compute diff").
   recorded_sha="$(printf '%s' "$recorded_sha" | tr 'A-Z' 'a-z')"
 
-  current_sha="$(git rev-parse "${UPSTREAM_REF}:${upstream_path}" 2>/dev/null || true)"
+  current_sha="$(git rev-parse "origin/main:${upstream_path}" 2>/dev/null || true)"
   if [ -z "$current_sha" ]; then
-    fail "${name}: upstream file missing on ${UPSTREAM_REF} at $upstream_path"
+    fail "${name}: upstream file missing on origin/main at $upstream_path"
     continue
   fi
 

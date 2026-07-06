@@ -1,8 +1,8 @@
-# Marketing Plugin v0.0 — Skill Ports (Corey Haines) — Issue Enrichment & Re-tier Plan
+# Marketing Skills Plugin — Issue Enrichment & Re-tier Plan
 
-**Scope:** Rethink, enrich, and re-prioritize all Linear issues in the Marketing Plugin v0.0 — Skill Ports (Corey Haines) milestone so they are agent-executable.
+**Scope:** Rethink, enrich, and re-prioritize all Linear issues in the Marketing Skills Plugin milestone so they are agent-executable.
 **Upstream:** [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills) (MIT licensed)
-**Milestone:** Marketing Plugin v0.0 — Skill Ports (Corey Haines) (Linear)
+**Milestone:** Marketing Skills Plugin (Linear)
 
 ---
 
@@ -273,7 +273,7 @@ Produce a summary showing:
 
 ### Task 4.2: Update memory
 
-Save a memory entry updating the Marketing Plugin v0.0 — Skill Ports (Corey Haines) status to reflect the enrichment work.
+Save a memory entry updating the Marketing Skills Plugin status to reflect the enrichment work.
 
 ### 🔲 CHECKPOINT: Final review with Holden. Confirm all work is complete.
 

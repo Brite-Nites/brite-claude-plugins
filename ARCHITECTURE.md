@@ -228,17 +228,18 @@ flowchart LR
 
 ## Hook Execution
 
-The `workflows` plugin uses **regex-only command hooks** for security gating — deterministic, instant, no LLM latency. The previous Haiku-prompt fallback layer was retired in BC-11889 (workflows v3.31.0) after sustained false-positive cost on every Bash/Write/Edit call. The `revops` plugin retains its own Haiku-backed guardrails per its README; this section describes `workflows` only.
+Hooks use a **two-layer security architecture**: deterministic regex command hooks run first (fast, no LLM), then haiku prompt hooks as fallback for anything the regex misses.
 
-| Event | Matcher | Type | What It Checks |
-|-------|---------|------|----------------|
-| `PreToolUse` | `Bash` | command | Blocks `rm -rf`, `git push --force`/`-f`, `DROP TABLE/DATABASE`, `chmod 777`, piped downloads (`curl\|bash`, `wget\|sh`) |
-| `PreToolUse` | `Bash` | command | Pre-commit quality: intercepts `git commit`, runs ESLint/tsc/ruff on staged files |
-| `PreToolUse` | `Write\|Edit` | command | Blocks common secret patterns (`sk-`, `sk-proj-`, `AKIA`, `gh[ps]_`, `sk_live/test_`, PEM private keys, Slack `xox[abprs]-`, Google `AIza`) |
-| `PostToolUse` | `Write\|Edit` | command | Auto-lint: ESLint (JS/TS) or Ruff (Python) if installed |
-| `SessionStart` | `startup` | command | Loads Brite session context (env + key commands) and initializes telemetry |
+| Event | Matcher | Layer | Type | What It Checks |
+|-------|---------|-------|------|----------------|
+| `PreToolUse` | `Bash` | 1 (regex) | command | Blocks `rm -rf`, `--force`, `DROP`, `chmod 777`, piped downloads |
+| `PreToolUse` | `Bash` | 2 (fallback) | prompt | Haiku evaluates anything not caught by regex |
+| `PreToolUse` | `Write\|Edit` | 1 (regex) | command | Blocks `sk-proj-`, `AKIA`, `ghp_`, `sk_live/test` patterns |
+| `PreToolUse` | `Write\|Edit` | 2 (fallback) | prompt | Haiku evaluates anything not caught by regex |
+| `PostToolUse` | `Write\|Edit` | — | command | Auto-lint: ESLint (JS/TS) or Ruff (Python) if installed |
+| `SessionStart` | `startup` | — | prompt | Reminds Claude of Brite conventions |
 
-**Why regex-only?** The Haiku prompt-hook layer ran on every Bash and every Write/Edit (~1–10s latency each), produced false positives, and the exception list had to be hand-maintained. The regex layer catches the load-bearing destructive/secret-leak patterns at zero latency. Defense-in-depth is preserved via the pre-commit quality hook, PostToolUse auto-linter, downstream CI, and the regression harness at `scripts/test-hooks.sh` (wired into `validate.sh` §2d).
+**Why two layers?** Regex command hooks are deterministic and instant — they catch known-bad patterns without LLM latency or cost. The haiku prompt hook catches novel threats the regex misses.
 
 **Why command (not prompt) for the linter?** Linting is deterministic — no LLM judgment needed. A shell command is faster and more reliable.
 
@@ -304,7 +305,7 @@ These prevent duplication — skills reference them rather than embedding their 
 |----------|-----------|
 | Single plugin in marketplace | Simplicity — one bundle, one plugin. Add more plugins later if needed. |
 | Description-based skill routing | Claude's native matching; no custom router needed. Descriptions must be distinct enough to avoid conflicts. |
-| Regex-only security hooks | Zero LLM latency on every Bash/Write/Edit; behavior is auditable and deterministic. Haiku-prompt layer retired BC-11889. |
+| Haiku for security hooks | Fast (< 10s), cheap, sufficient for pattern matching. Doesn't block developer flow. |
 | Opus for orchestrator agents | Complex multi-step coordination and reasoning. Worth the cost for plan quality. |
 | Sonnet for CLAUDE.md generation | Structured output from clear templates. Opus would be overkill. |
 | No build process | Plugin is pure markdown/JSON. No compilation, no dependencies, no lock files. |

@@ -51,7 +51,7 @@ Minimum path to "launch a campaign end-to-end with reusable tooling."
 
 ### 1.1 NEW: Port marketing references from Revgrowth1/ai-gtm-workflows
 
-**Priority:** High · **Milestone:** Marketing Plugin v0.0 — Skill Ports (Corey Haines) · **Labels:** `infrastructure`, `content` · **Type:** Content port (no skill/command)
+**Priority:** High · **Milestone:** Marketing Skills Plugin · **Labels:** `infrastructure`, `content` · **Type:** Content port (no skill/command)
 
 **Goal:** Land `plugins/marketing/references/` with 4 foundational content documents that account-research, situation-mining, creative-angles, tam-mapping, and campaign-debrief all depend on.
 
@@ -77,7 +77,7 @@ Minimum path to "launch a campaign end-to-end with reusable tooling."
 
 ### 1.2 NEW: Create marketing skill — situation-mining
 
-**Priority:** High · **Milestone:** Marketing Plugin v0.0 — Skill Ports (Corey Haines) · **Labels:** `skill` · **Depends on:** 1.1 (references)
+**Priority:** High · **Milestone:** Marketing Skills Plugin · **Labels:** `skill` · **Depends on:** 1.1 (references)
 
 **Goal:** Gather public data on a prospect + infer worldview + generate 3-4 diagnostic messaging angles. The "diagnostic over promotional" philosophical anchor of Brite outbound.
 
@@ -112,7 +112,7 @@ Glob
 
 ### 1.3 NEW: Create marketing skill — email-copywriting
 
-**Priority:** High · **Milestone:** Marketing Plugin v0.0 — Skill Ports (Corey Haines) · **Labels:** `skill` · **Depends on:** 1.2 (situation-mining), BC-2718 (done, context for sequence mechanics)
+**Priority:** High · **Milestone:** Marketing Skills Plugin · **Labels:** `skill` · **Depends on:** 1.2 (situation-mining), BC-2718 (done, context for sequence mechanics)
 
 **Goal:** Generate Email Bison-formatted subject + body for step 1 + step 2 from a situation-mine output + offer tier selection + optional GTM messaging pillars.
 
@@ -164,7 +164,7 @@ Consumed directly by `/marketing:launch-campaign` command.
 
 ### 1.4 NEW: Build /marketing:launch-campaign command
 
-**Priority:** High · **Milestone:** Marketing Plugin v0.0 — Skill Ports (Corey Haines) · **Labels:** `command`, `infrastructure` · **Depends on:** 1.3 (email-copywriting artifact), BC-2707 (done, gate-semantics precedent)
+**Priority:** High · **Milestone:** Marketing Skills Plugin · **Labels:** `command`, `infrastructure` · **Depends on:** 1.3 (email-copywriting artifact), BC-2707 (done, gate-semantics precedent)
 
 **Goal:** The missing glue between BC-2718 (platform config) and "emails actually send." Command (not skill) because it mutates external state, orchestrates a procedural flow, and needs explicit user confirmation at each gate.
 
@@ -502,7 +502,7 @@ Glob
 6. Create Tier 3.1 icp-scoring, Tier 3.2 tam-mapping, Tier 3.3 gtm-strategy
 7. Update Tier 3.4 BC-2717
 
-**Milestone:** All go into "Marketing Plugin v0.0 — Skill Ports (Corey Haines)" for simplicity. User can re-milestone later if bundle size becomes unwieldy.
+**Milestone:** All go into "Marketing Skills Plugin" for simplicity. User can re-milestone later if bundle size becomes unwieldy.
 
 **Attribution:** every new issue that ports Revgrowth content cites upstream in its description: `Source: Revgrowth1/ai-gtm-workflows (MIT) workflow NN` + commit SHA.
 

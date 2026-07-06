@@ -50,9 +50,6 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _shared import manifest_loader
-
 # ── Module-level constants ────────────────────────────────────────────────
 
 SCHEMA_VERSION = 1
@@ -252,7 +249,9 @@ def discover_files(campaigns_dir: Path) -> list[Path]:
     one regular file per campaign run; a symlinked discoveries.json could
     redirect the linter at content outside the campaigns tree.
     """
-    return manifest_loader.glob_campaign_files(campaigns_dir, "discoveries.json")
+    if not campaigns_dir.is_dir():
+        return []
+    return sorted(campaigns_dir.glob("*/*/discoveries.json"))
 
 
 def main(argv: list[str] | None = None) -> int:

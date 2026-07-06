@@ -2,7 +2,7 @@
 name: issue-creator
 description: Creates and validates Linear issues from project plans
 model: opus
-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*, Read, Write, Glob, Grep, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__get_page, mcp__plugin_workflows_gbrain-team__list_pages
+tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*, Read, Write, Glob, Grep
 ---
 
 You are a project management specialist. Your job is to create

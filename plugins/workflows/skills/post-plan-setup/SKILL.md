@@ -2,7 +2,7 @@
 name: post-plan-setup
 description: Runs the full post-plan workflow. Refine plan, create Linear issues, setup CLAUDE.md. Use after /plan-project produces a v1 plan. Pauses between phases for optional review.
 user-invocable: true
-allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*, Read, Write, Bash(find:*), Bash(cat:*), Bash(ls:*), Glob, Grep, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__get_page, mcp__plugin_workflows_gbrain-team__list_pages
+allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*, Read, Write, Bash(find:*), Bash(cat:*), Bash(ls:*), Glob, Grep
 agent: post-plan-orchestrator
 ---
 

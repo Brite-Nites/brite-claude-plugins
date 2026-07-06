@@ -1,12 +1,13 @@
 ---
 name: flow-legacy-cross-reference
-description: Retrofit sub-skill for the flow-architecture plugin (implements CDR-023). NEVER invoked from greenfield. Satisfies Q9's additive-only "cross-reference annotations" lock by appending an HTML-comment-bracketed `## FDA migration` section to every legacy Linear milestone description, mapping it to one or more FDA domains. Three-tier mapping cascade (flow-ID histogram -> title-fuzzy -> LLM semantic), marker-based idempotency, two-pass execution (generate review doc -> user edits + bumps `last_reviewed` -> re-invoke executes). Reusable from both `/flow:retrofit-project` (Phase 3 annotation) and `/flow:deprecate-legacy` (Phase 5 disposition mapping). End-to-end wall for M=27 legacy milestones: ~14s Tier 1 batched-body reads (Tier-1 budget assumes Linear MCP's `list_issues({milestone})` filter is reliable — see Section 1 caveat) + ~5-15s Tier 3 LLM fall-throughs (when 5-10 milestones don't hit Tier 2) + ~40.5s Pass 2 writes (3 calls/milestone) ≈ **~60-70s** when filter behaves; significantly more if the milestone-filter gotcha forces a per-child `get_issue` fallback.
-user-invocable: true
+description: Retrofit-only sub-skill for the flow-architecture plugin (implements CDR-023). NEVER invoked from greenfield. Satisfies Q9's additive-only "cross-reference annotations" lock by appending an HTML-comment-bracketed `## FDA migration` section to every legacy Linear milestone description, mapping it to one or more FDA domains. Three-tier mapping cascade (flow-ID histogram -> title-fuzzy -> LLM semantic), marker-based idempotency, two-pass execution (generate review doc -> user edits + bumps `last_reviewed` -> re-invoke executes). End-to-end wall for M=27 legacy milestones: ~14s Tier 1 batched-body reads (Tier-1 budget assumes Linear MCP's `list_issues({milestone})` filter is reliable — see Section 1 caveat) + ~5-15s Tier 3 LLM fall-throughs (when 5-10 milestones don't hit Tier 2) + ~40.5s Pass 2 writes (3 calls/milestone) ≈ **~60-70s** when filter behaves; significantly more if the milestone-filter gotcha forces a per-child `get_issue` fallback.
+user-invocable: false
+disable-model-invocation: true
 allowed-tools: mcp__plugin_workflows_linear-server__list_milestones, mcp__plugin_workflows_linear-server__get_milestone, mcp__plugin_workflows_linear-server__save_milestone, mcp__plugin_workflows_linear-server__list_issues, mcp__plugin_workflows_linear-server__get_issue, Agent, AskUserQuestion, Bash, Read, Write
 license: MIT
 metadata:
   version: "0.1.0"
-  q-locks: "Q9, Q14, Q59"
+  q-locks: "Q9, Q14"
   related-locks: "memory:94-106 (Q14 6 sub-decisions); Q13.5 retry pattern (memory:90); Q22 milestone schema"
 ---
 
@@ -14,11 +15,11 @@ metadata:
 
 Retrofit-only sub-skill. Walks the consumer project's existing Linear milestones, proposes 1-N FDA domain mappings per milestone, lets the user review the proposal in a markdown file, then writes an HTML-comment-bracketed `## FDA migration` appendix to each milestone's description.
 
-**This skill MUST NOT be invoked from greenfield.** It satisfies Q9's additive-only contract for retrofits — legacy work stays in its legacy milestones; the appendix is a cross-reference annotation, not a state migration. The dispatching orchestrator (`/flow:retrofit-project` or `/flow:deprecate-legacy`) is responsible for the upstream check; this skill assumes retrofit mode.
+**This skill MUST NOT be invoked from greenfield.** It satisfies Q9's additive-only contract for retrofits — legacy work stays in its legacy milestones; the appendix is a cross-reference annotation, not a state migration. The dispatching orchestrator (`/flow:retrofit-project`) is responsible for the upstream check; this skill assumes retrofit mode.
 
-This skill is **user-invocable** (Q59 amendment lifts the former Q7 model-invocation restriction). Two consumers: `/flow:retrofit-project` (Phase 3 — annotation only per Q9) and `/flow:deprecate-legacy` (Pass 1 — disposition mapping via the 3-tier cascade). The annotation logic (Sections 1-6) is the shared reuse surface; the re-home/close/archive steps in `/flow:deprecate-legacy` are new to that command and NOT part of this skill.
+This skill is **NOT user-invocable** (`disable-model-invocation: true`, per Q7).
 
-The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q14 (memory:94-106) + Q59 (deprecate-legacy scope widening). Q9 (the additive-only lock) and Q22 (milestone schema) are upstream constraints this skill honors.
+The full design rationale lives in `docs/design-rationale/fda-plugin-interview.md` Q14 (memory:94-106). Q9 (the additive-only lock) and Q22 (milestone schema) are upstream constraints this skill honors.
 
 ---
 
@@ -174,5 +175,3 @@ Brand Hub retrofit, M=27 legacy milestones:
 - `memory/gotcha_linear_markdown_mangling.md` --- Prosemirror mangling patterns this skill spot-checks against.
 - `skills/flow-linear-scaffold/SKILL.md` --- sibling sub-skill that creates net-new FDA milestones; runs after this skill in retrofit mode.
 - `skills/flow-preflight/SKILL.md` --- preceding sub-skill; preamble's `MODE=retrofit` gates this skill's invocation.
-- `docs/design-rationale/fda-plugin-interview.md` Q59 --- deprecate-legacy scope widening + user-invocable lift.
-- `commands/deprecate-legacy.md` --- Phase 5 orchestrator; second consumer of this skill's mapping cascade.

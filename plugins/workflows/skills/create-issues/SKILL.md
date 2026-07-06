@@ -2,7 +2,7 @@
 name: create-issues
 description: Creates Linear issues from a refined project plan. Validates issues were created correctly with sufficient context for agent execution. Use after /refine-plan.
 user-invocable: false
-allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*, Read, Write, Glob, Grep, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__get_page, mcp__plugin_workflows_gbrain-team__list_pages
+allowed-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*, Read, Write, Glob, Grep
 agent: issue-creator
 context: fork
 ---

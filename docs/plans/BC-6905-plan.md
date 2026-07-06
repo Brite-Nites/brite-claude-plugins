@@ -367,7 +367,7 @@ This task is necessarily partly user-driven because it touches Claude Code's MCP
 
      <If NO-GO:> **Follow-up issue filed**: BC-XXXX — <title> (alternative-approach issue capturing the blocker.)
      ```
-2. **If NO-GO**: file the alternative-approach issue via `mcp__plugin_workflows_linear-server__save_issue` BEFORE posting the comment, so the comment can reference it. Issue should: name the specific NO-GO blocker; propose 2–3 alternative directions (e.g., 1Password switch, CLI-only-no-MCP-wrap, OAuth migration); set `priority: 2` (High); link `relatedTo: [BC-6905]`; set `team: "Brite Company"`, project: "Brite Skill Packs".
+2. **If NO-GO**: file the alternative-approach issue via `mcp__plugin_workflows_linear-server__save_issue` BEFORE posting the comment, so the comment can reference it. Issue should: name the specific NO-GO blocker; propose 2–3 alternative directions (e.g., 1Password switch, CLI-only-no-MCP-wrap, OAuth migration); set `priority: 2` (High); link `relatedTo: [BC-6905]`; set `team: "Brite Company"`, project: "Brite Plugin Marketplace".
 3. **Bitwarden cleanup decision** (user choice — ask via AskUserQuestion):
    - **Keep** the `tam-map-spider-api-key` item: BC-6906 will reuse it as one of the 7 canonical items.
    - **Delete** the spike item: BC-6906 will provision fresh items.

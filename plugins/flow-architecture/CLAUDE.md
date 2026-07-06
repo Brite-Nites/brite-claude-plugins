@@ -22,7 +22,7 @@ Drift-tolerant per Q55 sub-decision 4 — categorical prose for commands and sub
 
 Slash commands organized by role. The directory `commands/` and `plugin.json` are the source of truth.
 
-- **Orchestrators** — multi-phase runs with user-confirmation gates between phases. Examples: `/flow:start-project` (greenfield), `/flow:retrofit-project`, `/flow:add-domain`, `/flow:add-sub-flow`, `/flow:deprecate-legacy` (Phase 5 post-retrofit milestone retirement).
+- **Orchestrators** — multi-phase runs with user-confirmation gates between phases. Examples: `/flow:start-project` (greenfield), `/flow:retrofit-project`, `/flow:add-domain`, `/flow:add-sub-flow`.
 - **Utilities** — single-purpose commands with no user-gates between internal steps. Examples: `/flow:audit`, `/flow:office-hours` (project-intent interview with internal L1-review phase).
 - **Reflect** — `/flow:retro` (per-domain retrospective; output target is the completed domain milestone per Q44 sub-decision 7 call signature `issue_id: <milestone_id>`).
 - **L4 plan-X suite** — one per discipline, dispatched on-demand from `/flow:session-start`. Examples: `/flow:plan-story`, `/flow:plan-eng`, `/flow:plan-design`, `/flow:plan-qa`, `/flow:plan-docs`.
@@ -30,7 +30,7 @@ Slash commands organized by role. The directory `commands/` and `plugin.json` ar
 
 ### Sub-skill orchestration MAP (categorical prose)
 
-Sub-skills are **not user-invocable** — they declare `disable-model-invocation: true` per Q7 lock and are called by orchestrators. **Exception:** `flow-legacy-cross-reference` is user-invocable per Q59 amendment (reusable from both `/flow:retrofit-project` and `/flow:deprecate-legacy`). Source of truth is `skills/<name>/SKILL.md`.
+Sub-skills are **not user-invocable** — they declare `disable-model-invocation: true` per Q7 lock and are called by orchestrators. Source of truth is `skills/<name>/SKILL.md`.
 
 - **Preflight** — `flow-preflight` (Q12 + Q36 embedded bootstrap). Mode classification (`greenfield | retrofit | incremental-add | resume`); writes `.flow/config.json` on first successful run.
 - **Inventory** — `flow-inventory-interview` (Q19 greenfield Socratic), `flow-inventory-codebase-scan` (Q11 retrofit code-signal mining), `flow-inventory-add` (Q20 incremental).
@@ -53,8 +53,7 @@ Rows = named agents; columns = L-scope (Q54), primary invoker, return-shape. Sou
 | `plan-docs-reviewer` | L3, L4 | four-mode | `flow-linear-scaffold` (L3); `/flow:plan-docs` (L4) |
 | `story-doc-author` | n/a | story-doc markdown | `flow-doc-author` |
 | `journey-doc-author` | n/a | journey-doc markdown | `flow-journey-author` |
-| `fidelity-reviewer` | L3 (per-issue) | issue-fidelity verdict (STRUCTURE) | `flow-linear-scaffold` Q13.3 |
-| `quality-reviewer` | n/a (per-doc) | substance verdict `{result, per_dimension, findings, cosmetic_ignored}` (PASS/CONCERNS) | WS-B substance gate, sibling to `fidelity-reviewer`; B-3 wires it into `flow-doc-author`/`flow-journey-author`; B-2 eval + WS-E adversarial review consume it |
+| `fidelity-reviewer` | L3 (per-issue) | issue-fidelity verdict | `flow-linear-scaffold` Q13.3 |
 | `inventory-author` / `codebase-inferrer` | n/a | inventory rows | inventory sub-skills |
 
 Reviewer agents share the `_shared/four-mode-framework.md` contract; the L4 plan-X invocations consume `four-mode` for the per-discipline plan-section content per Q43 sub-decision 5.
@@ -64,7 +63,7 @@ Reviewer agents share the `_shared/four-mode-framework.md` contract; the L4 plan
 The flow-architecture plugin **requires** the `workflows` plugin to be installed alongside it. The dependency is structural and load-bearing — not advisory.
 
 - **MCP reuse (Q30.4 + Q32):** all Linear access goes through `mcp__plugin_workflows_linear-server__*`. FDA's own `.mcp.json` is empty `{}` per the cadence precedent. Registering a duplicate Linear server breaks tool routing (per [BC-5810](https://linear.app/brite-nites/issue/BC-5810) § 4 and [BC-5811](https://linear.app/brite-nites/issue/BC-5811) § 4.2).
-- **Three-channel reuse mechanism (Q50 sub-decisions 4-6):** (1) **REUSE** — workflows tools called transparently from FDA sub-skills (Linear MCP, sequential-thinking); (2) **CLONE** — three workflows command bodies copied into `commands/{session-start,review,ship}.md` with locked FDA-swap axes per Q51 / Q52 / Q53; (3) **TRANSITIVE REUSE** (per Q50 amendment 2) — cloned commands invoke workflows skills and agents the cloned body already references (`/workflows:diff-triage`, the workflows review agents, etc.); those callees are not re-implemented in FDA.
+- **Three-channel reuse mechanism (Q50 sub-decisions 4-6):** (1) **REUSE** — workflows tools called transparently from FDA sub-skills (Linear MCP, sequential-thinking, Context7); (2) **CLONE** — three workflows command bodies copied into `commands/{session-start,review,ship}.md` with locked FDA-swap axes per Q51 / Q52 / Q53; (3) **TRANSITIVE REUSE** (per Q50 amendment 2) — cloned commands invoke workflows skills and agents the cloned body already references (`/workflows:diff-triage`, the workflows review agents, etc.); those callees are not re-implemented in FDA.
 - **No modifications to workflows from this plugin.** If a workflows-side change is needed, edit the workflows plugin directly and bump its version. FDA never mutates `../workflows/`.
 
 Relative path note: this file lives at `plugins/flow-architecture/CLAUDE.md`; `../workflows/` resolves to the sibling plugin per Q30.2 directory placement.
@@ -74,7 +73,7 @@ Relative path note: this file lives at `plugins/flow-architecture/CLAUDE.md`; `.
 **MCPs (Q32):**
 
 - **Required** — `mcp__plugin_workflows_linear-server__*` (provided transitively by the workflows plugin).
-- **Available but not depended on** — `mcp__plugin_workflows_sequential-thinking__*`. FDA does not register it; it remains usable through the workflows registration.
+- **Available but not depended on** — `mcp__plugin_workflows_sequential-thinking__*`, `mcp__plugin_workflows_context7__*`. FDA does not register either; both remain usable through the workflows registration.
 
 **External CLIs (Q32):**
 
@@ -136,7 +135,7 @@ The mode taxonomy is **orthogonal** to the L-scope axis: L-scope decides when re
 Several command pairs have overlapping vocabulary but distinct purposes. Mixing them up causes subtle scope creep in future Q-locks.
 
 - **`/flow:audit` vs `/flow:review` (Q52 sub-decision 4; cross-cutting requirement #5).** `/flow:audit` runs FDA-process-compliance gates (filesystem-existence + Linear-state checks against the 36-gate stack post-Q29 amendment 2). `/flow:review` runs code-review agents on a diff (P1/P2/P3 findings classification, simplification pass). Distinct purposes. `/flow:audit` auto-invokes before `/flow:ship`; `/flow:review` is invoked when the user wants diff-level review. A `--audit-preflight` flag for `/flow:review` is a v1.1 candidate (parking lot #48) if Brand Hub dogfood reveals demand for bundled coverage.
-- **Orchestrators vs utilities vs cloned commands.** Orchestrators (`/flow:start-project`, `/flow:retrofit-project`, `/flow:add-domain`, `/flow:add-sub-flow`, `/flow:deprecate-legacy`) are multi-phase + multi-gate. Most own the breadcrumb; `/flow:deprecate-legacy` uses the review doc (`docs/plans/<slug>-deprecate-legacy.md`) as its progress substrate instead per Q59. Utilities (`/flow:audit`, `/flow:office-hours`, `/flow:retro`) are single-purpose. Cloned commands (`/flow:session-start`, `/flow:review`, `/flow:ship`) preserve workflows structure with FDA-swap axes — they are **not** orchestrators and do not write the breadcrumb.
+- **Orchestrators vs utilities vs cloned commands.** Orchestrators (`/flow:start-project`, `/flow:retrofit-project`, `/flow:add-domain`, `/flow:add-sub-flow`) are multi-phase + multi-gate and own the breadcrumb. Utilities (`/flow:audit`, `/flow:office-hours`, `/flow:retro`) are single-purpose. Cloned commands (`/flow:session-start`, `/flow:review`, `/flow:ship`) preserve workflows structure with FDA-swap axes — they are **not** orchestrators and do not write the breadcrumb.
 - **`/flow:office-hours` vs `/flow:retro`.** Office-hours is a **project-scoped** intent interview (Q42 — output is `intent.md`); retro is a **per-domain** retrospective (Q44 — output target is the completed domain milestone, with filesystem-canonical `docs/retros/<domain>-<YYYY-MM-DD>.md` mirrored by a Q46 `retro-summary` comment on the milestone). Different scope, different output target, different cadence (office-hours fires once or rarely; retro fires per domain shipped — typically alongside `/flow:ship` completion).
 - **`flow-sandbox-scaffold` vs hand-off agents.** `flow-sandbox-scaffold` (Q17) is a sub-skill that bootstraps the sandbox harness during scaffold. Hand-off agents (`story-doc-author`, `journey-doc-author`) are review-style agents that **produce** doc markdown for an authoring sub-skill to write. Same shape, different layer.
 

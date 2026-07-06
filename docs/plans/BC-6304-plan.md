@@ -185,7 +185,7 @@ This pattern is **stronger** than a skill-level "ask the user" step — when inv
 
 ### Task 8 — File follow-up Linear ticket (post-merge)
 
-After the PR merges, create a Linear ticket in the Brite Skill Packs project with:
+After the PR merges, create a Linear ticket in the Brite Plugin Marketplace project with:
 
 - **Title (draft):** "Investigate wrapper-tool invocation path for `resume_campaign` / `import_leads_to_campaign` / `bulk_create_leads` to restore vendor-side confirmation gates"
 - **Priority:** Low (or whatever Holden assigns) — labeling fix already de-risks the immediate failure mode.

@@ -3,7 +3,7 @@
 **Created**: 2026-05-12 (initial 22) + 2026-05-13 (T2-FA audit-fix BC-8752) + 2026-05-14 (milestone assignment to all 25)
 **Source plan**: [`docs/project-plan-refined.md`](./project-plan-refined.md)
 **Master entry point**: [`docs/gtm-campaign-orchestration-README.md`](./gtm-campaign-orchestration-README.md)
-**Linear project**: [Brite Skill Packs](https://linear.app/brite-nites/project/brite-skill-packs-402b57908532)
+**Linear project**: [Brite Plugin Marketplace](https://linear.app/brite-nites/project/brite-plugin-marketplace-402b57908532)
 **Milestone**: `GTM Campaign Orchestration v1.0` (id `bcd40909-aa7c-43d7-88e8-6c40b59c5a1f`)
 **Team**: Brite Company (prefix `BC-`)
 **Total issues created**: 25 (Task 0 + 23 BCs T1-A through T9-X + T2-FA audit-fix BC-8752; BC-8736 created in error as duplicate of BC-8752 and canceled with `duplicateOf` link)
@@ -97,7 +97,7 @@ Each issue carries its complexity label (`S` / `M` / `L`) only. The plan's `tier
 
 ## Validation
 
-- All 25 issues created in team **Brite Company**, project **Brite Skill Packs**, milestone **GTM Campaign Orchestration v1.0** — confirmed via Linear save_issue response + 2026-05-14 independent audit.
+- All 25 issues created in team **Brite Company**, project **Brite Plugin Marketplace**, milestone **GTM Campaign Orchestration v1.0** — confirmed via Linear save_issue response + 2026-05-14 independent audit.
 - Each issue body contains the required Context / Implementation Steps / Validation Criteria / Dependencies sections.
 - Dependencies wired via `blockedBy` (append-only) at issue-create time; no post-create patching required.
 - Source plan file (`docs/project-plan-refined.md`) updated with:
@@ -107,7 +107,7 @@ Each issue carries its complexity label (`S` / `M` / `L`) only. The plan's `tier
 
 ## Special handling notes
 
-- **Parent/sub-issue relationships**: This skill defaults to using `blockedBy` rather than `parentId` because the GTM plan tasks are coordinate siblings under one project (Brite Skill Packs), not parent-shell + children. No `parentId` was set on any issue.
+- **Parent/sub-issue relationships**: This skill defaults to using `blockedBy` rather than `parentId` because the GTM plan tasks are coordinate siblings under one project (Brite Plugin Marketplace), not parent-shell + children. No `parentId` was set on any issue.
 - **No tier labels created**: Workspace does not have a `tier-1` / `tier-2` etc. label family. Tier context is preserved in title prefix + body header. If desired, those labels can be added later as a workspace housekeeping step.
 - **Linear project for downstream campaigns** (mentioned in refined plan): the "Brite GTM" project where actual campaign milestones get scaffolded by `/marketing:plan-campaign` (T4-I). That project is referenced inside issue bodies but is NOT the project these 22 platform-build issues live in.
 - **Priority encoding choice**: priorities reflect dependency-graph position, not business urgency. Higher priority = sooner unblocked. Adjust manually if business urgency differs (e.g., T9-V/W/X might be raised if a strategic push reorders the tier 9 backlog).

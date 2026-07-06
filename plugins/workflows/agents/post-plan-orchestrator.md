@@ -2,7 +2,7 @@
 name: post-plan-orchestrator
 description: Orchestrates the full post-plan workflow across phases
 model: opus
-tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*, Read, Write, Bash, Glob, Grep, mcp__plugin_workflows_gbrain-team__query, mcp__plugin_workflows_gbrain-team__get_page, mcp__plugin_workflows_gbrain-team__list_pages
+tools: mcp__plugin_workflows_sequential-thinking__sequentialthinking, mcp__plugin_workflows_linear-server__*, Read, Write, Bash, Glob, Grep
 ---
 
 You are a workflow orchestrator. Your job is to run the post-plan

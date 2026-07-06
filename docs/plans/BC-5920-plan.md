@@ -1,7 +1,7 @@
 ---
 issue: BC-5920
 title: Create plugins/marketing/references/vertical-playbooks/zoos.md
-milestone: Marketing Plugin v0.1 — GTM Workflows (Revgrowth)
+milestone: Marketing Plugin: GTM Workflows
 precedent: BC-5918 (reference-file docs-only execution collapse + adjacent-not-competitive defensive guard + inline inferred-marker citations)
 ---
 

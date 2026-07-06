@@ -187,7 +187,7 @@ Gather environment details automatically:
 
 **Title**: [classification]: [short description]
 **Team**: Brite Company
-**Project**: Brite Skill Packs
+**Project**: Brite Plugin Marketplace
 **Priority**: [severity → priority mapping from Step 2b]
 **Labels**: Bug
 
@@ -241,7 +241,7 @@ Create the issue using `save_issue` with:
 
 - `title`: "[classification]: [short description]" (e.g., "wrong-skill: brainstorming fired for trivial rename")
 - `team`: "Brite Company"
-- `project`: "Brite Skill Packs"
+- `project`: "Brite Plugin Marketplace"
 - `priority`: Mapped from severity (Critical→1, High→2, Medium→3, Low→4)
 - `labels`: `["Bug"]`
 - `description`: The full formatted markdown from the preview (classification, trigger, actual/expected, proposed test case, environment, additional context)

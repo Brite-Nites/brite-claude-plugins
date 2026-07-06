@@ -2,10 +2,8 @@
 
 **Issue:** BC-1966
 **Date:** 2026-03-19
-**Status:** Accepted (with caveat — see "Status update" below)
+**Status:** Accepted
 **Blocks:** BC-1724 (Marketing), BC-1725 (Engineering), BC-1726 (Design), BC-1727 (Sales), BC-1728 (Product), Symphony daemon
-
-> **Status update (2026-05-27, BC-11891):** Context7 was removed from this repo and ADR-001 marked Withdrawn. The "Tier 1 — Handbook (Context7)" SoR described below is currently unavailable; only Tier 2 (domain MCP) tiers remain operative. A future ADR will document the gbrain-based replacement. Treat Context7 references in this doc as historical design intent until then.
 
 ---
 

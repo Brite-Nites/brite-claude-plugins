@@ -6,7 +6,7 @@
 
 ## Issue ID mapping
 
-All 20 issues filed in Linear (team: Brite Company, milestone: Marketing Plugin v0.1 — GTM Workflows (Revgrowth)).
+All 20 issues filed in Linear (team: Brite Company, milestone: Marketing Plugin: GTM Workflows).
 
 | Roadmap ID | Linear ID | Status |
 |---|---|---|

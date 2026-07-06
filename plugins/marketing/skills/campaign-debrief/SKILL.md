@@ -280,7 +280,7 @@ Each rule below cites its source so a reader can trace the claim.
 | Experiment Verdict | message-market-fit | post-batch | during campaign |
 | Campaign Verdict | campaign-debrief | post-campaign | after campaign closes |
 
-This skill owns the **Campaign Verdict** (Gate 3, post-campaign — `SCALE` / `ITERATE` / `PAUSE` / `KILL`). The §3 vocabulary mapping table above translates token-by-token across `campaign-analysis` / `message-market-fit` / `campaign-debrief`; see [handbook/marketing/frameworks/verdicts-cross-reference.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/verdicts-cross-reference.md) for the canonical cross-vocabulary reference.
+This skill owns the **Campaign Verdict** (Gate 3, post-campaign — `SCALE` / `ITERATE` / `PAUSE` / `KILL`). The §3 vocabulary mapping table above translates token-by-token across `campaign-analysis` / `message-market-fit` / `campaign-debrief`; the handbook framework doc `marketing/frameworks/verdicts-cross-reference.md` (BC-8733) carries the canonical cross-vocabulary reference once shipped.
 
 ---
 

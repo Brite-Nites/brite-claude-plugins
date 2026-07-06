@@ -27,7 +27,7 @@ Fire between FDA orchestrator phases. Per Q29 sub-decision 1 (`:242`) plus Q29 a
 
 Aggregated from Q24 templates' Done-means / Verify sections per Q29 sub-decision 2 (`:252`):
 
-- [Story] — 5 checks (file exists, front-matter populated, story-frame regex match — job-story `When/I want to/so I can` for human actors OR constraint-spec `Given/MUST/so that` for non-human/infra actors per rubric D11 (BC-11988), 3-5 Gherkin scenarios, `verify-docs.sh` passes for the doc).
+- [Story] — 5 checks (file exists, front-matter populated, job-story regex match, 3-5 Gherkin scenarios, `verify-docs.sh` passes for the doc).
 - [Eng] — 4 checks (Linear child `state.type == "completed"`, `npm run build && npm run lint && npm test` pass on `main`, sandbox URL HTTP 200, story-doc `children.engineering` populated).
 - [Design] — 3 checks (Linear child completed, `figma:` URL with node ID matches `figma\.com/file/.*\?node-id=`, story-doc `children.design` populated).
 - [QA] — 5 checks (story-doc `qa_status: signed-off`, valid `qa_last_signed_off` ISO-8601, history table row with `signed-off`, structured QA-run comment on the Linear QA child, story-doc `children.qa` populated).

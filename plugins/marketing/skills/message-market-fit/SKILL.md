@@ -173,15 +173,45 @@ Use DIAGNOSE when performance is flat across **≥ 2 batches**. The 5-step order
 
 ### MSPA Matrix Format
 
-See [handbook/marketing/frameworks/mspa-flywheel.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/mspa-flywheel.md) for the canonical matrix schema, barbell allocation rules, and mode definitions. The matrix has 7 columns (Market / Segment / Persona / Angle / Batch / Verdict / Notes). One row per (segment × persona × angle) triplet within a market. Verdict column uses the five fixed experiment verdict tokens only.
+Canonical schema. Every mode references this table — MAP creates it, ITERATE appends to it, DIAGNOSE reads from it.
+
+```markdown
+| Market | Segment | Persona | Angle | Batch | Verdict | Notes |
+|---|---|---|---|---|---|---|
+| {market name} | {segment descriptor} | {persona title + seniority} | {one-sentence directional claim} | {batch-N or "safe"} | {SUPER WORKS / KIND OF WORKS / DOESN'T WORK / DEFERRED / PENDING} | {transferable insight or followup} |
+```
+
+Rules:
+
+- **One row per (segment × persona × angle) triplet within a market.** Adding a new angle for the same segment-persona pair creates a new row — do not collapse multiple angles into one cell.
+- **Verdict is `PENDING`** for unrun experiments (a MAP batch that hasn't fired yet, or a new row added to the matrix but not scheduled). Once the experiment runs and ITERATE classifies it, Verdict becomes one of the four fixed labels: `SUPER WORKS`, `KIND OF WORKS`, `DOESN'T WORK`, or `DEFERRED`. No prose substitutes — §8 Anti-Slop will refuse "promising" or "mediocre."
+- **Notes is free-form** but should name the batch (e.g., `batch-3`) and the transferable insight when known — what carries to the next batch, not a restatement of the experiment setup.
 
 ### Barbell Allocation (80/20)
 
-See [handbook/marketing/frameworks/mspa-flywheel.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/mspa-flywheel.md) for the canonical barbell allocation rules. 80% safe / 20% experiment. 5 experiments × 600 contacts = 3,000 experiment contacts → 12,000 safe contacts to preserve the ratio. Never stop the experiment side (Kellen's Law #6).
+Rules:
+
+- **80%** of total outbound volume runs on the **safe side** — proven winners graduated from prior ITERATE's SUPER WORKS classifications, or (on a first MAP run, before any ITERATE cycle) the standard `outbound-playbook` path.
+- **20%** of total outbound volume runs on the **experiment side** — the current MAP first batch or the current ITERATE next-batch design.
+- **Never stop the experiment side**, even when the safe side is producing pipeline comfortably. Kellen's Law #6 is the anchor — the moment the experiment side goes quiet is the moment the system stops learning, and the safe side will decay without the replenishment stream ITERATE produces.
+- **Volume math.** With 5 experiments × 600 contacts = **3,000 experiment contacts**, the safe side runs at **12,000 contacts** to preserve the 80/20 ratio (3k / 15k total = 20%). Operators who under-run the safe side silently break the barbell — if the experiment budget is 3k, the safe budget is 12k, full stop.
 
 ### 10 Kellen's Laws
 
-See [handbook/marketing/frameworks/kellens-laws.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/kellens-laws.md) for the canonical definition. The 10 laws are the guardrail layer — each governs a specific MAP / ITERATE / DIAGNOSE mechanic. §8 Anti-Slop re-states each law as a `Do not X` rule so validation can gate on them verbatim.
+The guardrail layer. Each law governs a specific mode mechanic (MAP / ITERATE / DIAGNOSE) and is re-stated in §8 as a `Do not X` rule so validation can gate on it verbatim.
+
+1. **Resonance beats personalization.** A generic angle that resonates beats a deeply-personalized angle that lands flat. Personalization is table stakes; resonance is signal.
+2. **Identity beats information.** Prospects respond to "this is for people like me" faster than "this is the information you need." The angle speaks to identity before it speaks to facts.
+3. **Groups are cultural, not demographic.** A segment that clusters on job title + company size is a filter, not a group. Real groups share worldview, language, and aversions. DIAGNOSE Step 2's signal rides this law.
+4. **The things that work and the things you wanted to work are not synonymous.** The skill refuses to retrofit a narrative over unwanted-but-real results. Evidence dictates the matrix update, not the operator's prior. The §1 opener cites this verbatim.
+5. **Silence is data.** A 0% reply rate is not "campaign failed" — it is a signal that the hypothesis was wrong. Record silence in the matrix Notes column with a specific inference (what the silence tells you, not just that it happened).
+6. **Never stop the experiment side.** Even when the safe side is producing pipeline, the 20% experiment allocation runs every batch. See `### Barbell Allocation (80/20)` above.
+7. **Qualitative beats quantitative for early-stage testing.** At 600-contact scale, 5 on-thesis replies are more informative than 5,000 opens. Read the replies; do not chase the percentages. ITERATE Step 2 is the mechanism.
+8. **Wrong-and-specific is worse than wrong-and-general.** A confidently-wrong specific claim burns the prospect's trust and closes the conversation. A generally-wrong claim the prospect can correct invites a conversation — and the correction is information.
+9. **The best campaigns look nothing like what you planned.** Every MAP batch reserves one yolo slot. Every ITERATE next-batch design preserves one wild card. No batch is yolo-free.
+10. **Outbound is how we discover, validate, and invalidate hypotheses.** The system's purpose is discovery, not persuasion. A "no" is as valuable as a "yes" if it invalidates a hypothesis cleanly.
+
+§8 Anti-Slop will re-state each law as a `Do not X` guardrail so validation can gate on them verbatim.
 
 ---
 
@@ -264,7 +294,7 @@ Four file templates, all under `docs/campaigns/{entity}/` where `{entity}` is th
 | Experiment Verdict | message-market-fit | post-batch | during campaign |
 | Campaign Verdict | campaign-debrief | post-campaign | after campaign closes |
 
-This skill owns the **Experiment Verdict** (Gate 2, post-batch — `SUPER WORKS` / `KIND OF WORKS` / `DOESN'T WORK` / `DEFERRED` / `PENDING`). The matrix `Verdict` column header is preserved for column-width per ADR-018. see [handbook/marketing/frameworks/verdicts-cross-reference.md](https://github.com/Brite-Nites/handbook/blob/main/marketing/frameworks/verdicts-cross-reference.md) for the canonical cross-vocabulary reference.
+This skill owns the **Experiment Verdict** (Gate 2, post-batch — `SUPER WORKS` / `KIND OF WORKS` / `DOESN'T WORK` / `DEFERRED` / `PENDING`). The matrix `Verdict` column header is preserved for column-width per ADR-018. The handbook framework doc `marketing/frameworks/verdicts-cross-reference.md` (BC-8733) carries the canonical cross-vocabulary token-by-token translation.
 
 ---
 

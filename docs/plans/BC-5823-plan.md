@@ -1,6 +1,6 @@
 # BC-5823 Plan — Port marketing references from Revgrowth1/ai-gtm-workflows
 
-**Linear:** BC-5823 · **Milestone:** Marketing Plugin v0.1 — GTM Workflows (Revgrowth) · **Branch:** `holden/bc-5823-port-marketing-references`
+**Linear:** BC-5823 · **Milestone:** Marketing Plugin: GTM Workflows · **Branch:** `holden/bc-5823-port-marketing-references`
 **Upstream:** [Revgrowth1/ai-gtm-workflows](https://github.com/Revgrowth1/ai-gtm-workflows) (MIT) @ `03b30e166d3f8ed0eb9864cd2a78dda719558826`
 **Design doc:** `docs/plans/marketing-gtm-expansion.md` §1.1
 

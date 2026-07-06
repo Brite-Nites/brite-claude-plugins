@@ -2,7 +2,7 @@
 name: account-research
 description: Thin orchestrator that dispatches a validated company fact sheet by mode. Serves BDRs, RevOps, and marketing operators doing pre-outreach research who need structured company and people facts without inference, angle generation, or copy. Twelve modes cover 9 single-process invocations (profiles, competitors, growth, hiring, reviews, news, negativity, founders, c-suite) plus 3 composites (full, deep, people), each dispatching to one or more `find-*.md` process files under `plugins/marketing/references/research-processes/`. Triggers on research, research [company], deep research, find info on, company research, people research. Account-research outputs FACTS grouped by dimension (who, what, where, when); situation-mining outputs INFERRED WORLDVIEWS plus angle hypotheses; creative-angles Deep Mode extracts signal clusters into scored angles. Hands off to situation-mining (worldview inference) and creative-angles Deep Mode (signal-cluster extraction); receives from user invocation or situation-mining's fact-gathering subroutine. Adapted from Revgrowth1/ai-gtm-workflows workflow 01 (MIT).
 user-invocable: true
-allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob, mcp__plugin_marketing_gbrain-team__query, mcp__plugin_marketing_gbrain-team__get_page, mcp__plugin_marketing_gbrain-team__list_pages
+allowed-tools: mcp__plugin_marketing_salesforce__*, WebSearch, WebFetch, Read, Write, Glob
 metadata:
   version: 0.1.0
   upstream: Revgrowth1/ai-gtm-workflows

@@ -1,6 +1,6 @@
 # Flow-Doc Quality Rubric — Substance Spine
 
-Reference contract for the FDA `quality-reviewer` agent and for the two author agents (`story-doc-author`, `journey-doc-author`) that should write *to* this bar. It judges what a doc **says**, not that its sections exist — front-matter fields and section order are the fidelity-reviewer's job (`fidelity-reviewer`, Q13.3). Do not re-check structure here.
+Reference contract for the FDA quality-reviewer agent and for the two author agents (`story-doc-author`, `journey-doc-author`) that should write *to* this bar. It judges what a doc **says**, not that its sections exist — front-matter fields and section order are the fidelity-reviewer's job (`fidelity-reviewer`, Q13.3). Do not re-check structure here.
 
 This file is **principles**, not a shape to copy. It is calibrated against general JTBD and PRD practice plus shipped-app norms (the Mobbin corpus that informs the app-type profiles); BriteBase is one lived witness, not the template. Any app type can produce a high-scoring doc. App-specific tightening lives in the companion `app-type-profiles.md` — apply the profile that matches the project's app type **on top of** this spine, never instead of it.
 
@@ -15,24 +15,6 @@ The rubric is gameability-resistant by construction. The failure mode each dimen
 - **Score 3+ to pass** on 1–5 dimensions. A 1–2 is a **P1 finding** (blocks).
 - A **concern** is a P2 (note it, don't block). A **fail** is a P1.
 - Cite the specific clause or scenario that earns the score. A bare number is not a review.
-
-### Evidence the dimension needs — withhold Pass when you don't have it
-
-Most dimensions are **single-doc-judgeable**: everything you need to score them is in the doc text under review. A reviewer holding only the doc can score these honestly: **D1, D2, D3, D4, D5, D8, D11, J1, J3, J5, J6, J7, J8**.
-
-Some dimensions are **corpus-dependent** — they cannot be settled from the doc text alone, because the failure mode lives outside it:
-
-| Dimension | Evidence required outside the doc |
-|---|---|
-| D6 (boundary owner validity) | the inventory / cross-reference graph — does the named owner resolve to a real flow ID? |
-| D7, J2 (persona copy-paste) | sibling story / journey docs — is this persona byte-reused elsewhere? |
-| D9 over-decomposition | sibling flow titles in `master-flow-inventory.md` — are there 5+ near-identical siblings? |
-| D10 (fabrication) | the codebase — does the cited path / symbol / column resolve? |
-| J4 (cross-domain stitching seams) | the adjacent-domain docs / inventory — do named upstream/downstream domains exist? |
-
-**Rule.** Any pass/concern/fail dimension that requires evidence outside the doc under review **defaults to CONCERN, not PASS, unless the reviewer was actually given that evidence and cites it.** A bare PASS on an unverifiable dimension is itself a P2 review defect — it converts a fail-capable contract into a rubber stamp, which is exactly the gameability hole the rubric exists to close. A fabricated identifier reads identically to a real one in markdown (see D10); a thin clone reads like a clean atomic flow in isolation (see D9). If you cannot grep the codebase, cannot see the siblings, or cannot resolve owners against the inventory, say so in the finding and withhold the Pass. Do not infer Pass from the doc looking complete.
-
-The single-doc-judgeable dimensions are the model: each names a signal observable in the doc text itself. Hold the corpus-dependent dimensions to the same standard — *judgeable from stated evidence, else withhold Pass.*
 
 ---
 
@@ -57,37 +39,33 @@ The single-doc-judgeable dimensions are the model: each names a signal observabl
 
 ## D2 — AC testability
 
-**Definition.** Each scenario names exact field names, enum values, function names, or verbatim error strings when code corroborates them; otherwise asserts observable behavior in domain terms. A scenario is testable if an engineer can write the test from the AC alone **without re-reading the source.**
+**Definition.** Each scenario names exact field names, enum values, function names, or verbatim error strings when code corroborates them; otherwise asserts observable behavior in domain terms. A scenario is testable if an engineer can write the test from the AC alone without re-reading the source.
 
 **Good signal.** "Given a Sent quote with 3 applications, 2 options, full line-item breakdown / When the salesperson clicks Generate PDF / Then a PDF artifact is created and stored in private blob storage / And the PDF matches the proposal-view content 1:1 (cover, scope summary, applications, line items, totals, T&Cs)." Concrete inputs, concrete observable outputs.
 
-**Failure mode it catches.** Circular boilerplate — "Then the outcome described in 'So I can…' holds true," identical across every scenario, lets anything pass. Also catches the tier just above it: generic-but-non-circular ACs ("When the user acts / Then the system behaves correctly") that are not copied from the job story but still force a test author to read the source to write the test. Also catches scenarios referencing implementation internals not confirmed in code (fabricated identifiers; see D10).
+**Failure mode it catches.** Circular boilerplate — "Then the outcome described in 'So I can…' holds true," identical across every scenario, lets anything pass. Also catches scenarios referencing implementation internals not confirmed in code (fabricated identifiers; see D10).
 
-**How to judge (1–5).** The pass floor (3) must enforce the Definition's "without re-reading the source" standard — an AC that forces source-reading does **not** pass.
+**How to judge (1–5).**
 - 5 — every scenario has specific inputs + observable outputs; enums and function names match confirmed source; negative and boundary cases use concrete data.
-- 4 — most scenarios concrete and test-writable from the AC alone; one or two loose ("the error is shown") but recoverable. **This is the pass floor for any flow where code corroboration is available** — a code-backed flow that omits the confirmed field/symbol/error names that exist caps at 3.
-- 3 — scenarios name actors and actions with enough observable specificity that a test author can write the test from domain terms without the source, but they stop short of the concrete inputs/outputs a 4 carries (no code to cite, or code uncited). A 3 passes only when source-reading is *not* required to write the test.
-- 2 — scenarios name actors and actions but omit field values or expected outputs such that a test author would read source to fill gaps; or predominantly abstract.
+- 4 — most scenarios concrete; one or two loose ("the error is shown") but recoverable.
+- 3 — scenarios name actors and actions but omit field values or expected outputs; a test author would read source to fill gaps.
+- 2 — predominantly abstract or circular ("the system behaves correctly").
 - 1 — no scenarios, or every scenario copies the job-story clause.
 
 ---
 
 ## D3 — Edge and negative coverage
 
-**Definition.** The **substantive** scenario set runs 4–6 total; negative, permission, tenant-boundary, and cross-entity cases outnumber happy-path scenarios. Where the domain has multi-tenancy, permissions, or a state machine, at least one scenario of each present type appears. A substantive scenario is a happy-path or a real negative/boundary case with concrete inputs and observable outputs — **not** a NOT_BUILT or degraded-behavior placeholder (those satisfy D4, not D3; see below).
+**Definition.** The scenario set runs 4–6 total; negative, permission, tenant-boundary, and cross-entity cases outnumber happy-path scenarios. Where the domain has multi-tenancy, permissions, or a state machine, at least one scenario of each present type appears.
 
 **Good signal.** A login flow with bad-credentials-without-enumeration, empty-submission client rejection, already-signed-in redirect, session persistence. The happy path is one of four, not the only one.
 
-**Failure mode it catches.** Happy-path tunneling — two or three affirmative scenarios, no rejection test, no tenant or permission boundary. Also catches **gap-padding**: a doc with one happy path plus three "this feature is not yet available" placeholders technically shows four "scenarios" and dresses one absence as a "negative," while the genuinely exploitable behaviors (real validation / permission / tenant rejections) stay unspecified. NOT_BUILT placeholders count toward D4, never toward the D3 minimum or the "at least one negative" requirement.
+**Failure mode it catches.** Happy-path tunneling — two or three affirmative scenarios, no rejection test, no tenant or permission boundary. The doc looks complete but leaves the most exploitable and most-frequently-broken behaviors unspecified.
 
 **How to judge (pass / concern / fail).**
-- Pass — 4+ **substantive** scenarios; at least one is a real negative (validation, bad-input, rejection) with concrete inputs/outputs; at least one permission or boundary check if the flow touches auth or tenancy.
-- Concern — 3 substantive scenarios or no real negative case; acceptable only if the domain genuinely has no permission surface (a purely additive utility flow).
-- Fail — only happy paths; or the 4-count is reached only by padding with NOT_BUILT/degraded placeholders; or the flow touches permissions/tenancy but no boundary scenario appears.
-
-**Profile interaction.** Where the active app-type profile demands a boundary-to-happy ratio (e.g., internal-ops / b2b-ecommerce at 2:1), that ratio is computed over **substantive** scenarios only — placeholders never count toward either side of it.
-
-**Domain-conditional.** This dimension's named classes (permission, tenant, multi-tenancy, state machine) apply *where the domain has them*. A flow with no auth, tenancy, or state surface (e.g., an anonymous marketing-site form) re-aims the negative/edge weight per the active profile — score it against the profile's re-routed edge classes (form-validation states, CRM-integration boundaries, consent), not against a permission boundary that does not exist. Do not false-fail a genuinely permission-free flow for lacking a permission scenario.
+- Pass — 4+ scenarios; at least one negative (validation, bad-input, rejection); at least one permission or boundary check if the flow touches auth or tenancy.
+- Concern — 3 scenarios or no negative case; acceptable only if the domain genuinely has no permission surface (a purely additive utility flow).
+- Fail — only happy paths, or the flow touches permissions/tenancy but no boundary scenario appears.
 
 ---
 
@@ -104,20 +82,18 @@ The single-doc-judgeable dimensions are the model: each names a signal observabl
 - Concern — some gaps noted in prose but no scenario captures the expected degraded behavior.
 - Fail — gaps are absent from the doc despite the flow referencing them.
 
-**Boundary with D3.** A NOT_BUILT/degraded scenario satisfies D4. It does **not** count toward D3's substantive-scenario minimum or toward D3's "at least one negative" requirement. A doc may pass D4 on its gap notes and still fail D3 for lacking real negative coverage.
-
 ---
 
 ## D5 — Honest status annotation
 
-**Definition.** The front-matter `status` carries an inline qualifier when partially true — when the engine ships but the UI doesn't, or a field exists but no surface exposes it. A bare `BUILT` on a flow with significant missing surface is a lie; a bare `NOT_STARTED` on a fully-implemented schema misrepresents the work remaining. (Layer language — schema / API / UI / permissions — applies where the app *has* those layers; a static marketing page's "status" is whether the surface and its CRM write ship, not a four-layer stack.)
+**Definition.** The front-matter `status` carries an inline qualifier when partially true — when the engine ships but the UI doesn't, or a field exists but no surface exposes it. A bare `BUILT` on a flow with significant missing surface is a lie; a bare `NOT_STARTED` on a fully-implemented schema misrepresents the work remaining.
 
 **Good signal.** `status: NOT_STARTED` with `# GET /api/invoices ships + getInvoices query exists; no /invoices route under (app) — office staff cannot reach the list outside the admin`. The comment makes the distinction legible.
 
 **Failure mode it catches.** Status inflation — `BUILT` when only the API layer exists, concealing a build gap from stakeholders who prioritize by status. Also catches deflation (IN_PROGRESS on a shipped flow, causing wasted sprint overhead).
 
 **How to judge (pass / concern / fail).**
-- Pass — status matches observable state; when partial, an inline qualifier names which layer (or, for layerless app types, which surface) ships and which doesn't.
+- Pass — status matches observable state; when partial, an inline qualifier names which layer ships and which doesn't.
 - Concern — status is technically defensible but omits nuance a reviewer would want.
 - Fail — status contradicts the narrative or AC content, or is bare when the narrative reveals a partial build.
 
@@ -129,29 +105,29 @@ The single-doc-judgeable dimensions are the model: each names a signal observabl
 
 **Good signal.** "Capturing applications during the survey. Owned by SURV; APPT ends at the appointment-detail page's 'Add Application' affordance, which opens the SURV-owned ApplicationFormDialog." The boundary is pinned to a UI affordance and an owner.
 
-**Failure mode it catches.** Boundary drift — out-of-scope items as vague aspirations ("no analytics" / "no bulk operations") with no named owner. Future authors then duplicate or contradict the boundary when writing the adjacent domain's doc. Also catches a plausible-looking but **non-existent owner** ("Owned by SURV-99"): naming an owner is text-judgeable, but owner *validity* is not — a named owner that cannot be resolved against `master-flow-inventory.md` is a fabrication finding (cross-link D10).
+**Failure mode it catches.** Boundary drift — out-of-scope items as vague aspirations ("no analytics" / "no bulk operations") with no named owner. Future authors then duplicate or contradict the boundary when writing the adjacent domain's doc.
 
-**How to judge (pass / concern / fail).** Owner-naming is single-doc-judgeable; owner *validity* is corpus-dependent.
-- Pass — every out-of-scope item names the owning flow ID or domain; adjacent-domain seams name specific downstream triggers; **and** every named owner resolves against the inventory (when the inventory is available to you).
-- Concern — most items named but one or two vague; identifiable domain but not a specific flow ID. **Also Concern (not Pass)** when owners are named but the inventory is not available to confirm they resolve — withhold the Pass per the evidence rule rather than assume validity.
-- Fail — generic out-of-scope language with no ownership; no cross-references section, or it is empty; or a named owner is confirmed non-existent in the inventory.
+**How to judge (pass / concern / fail).**
+- Pass — every out-of-scope item names the owning flow ID or domain; adjacent-domain seams name specific downstream triggers.
+- Concern — most items named but one or two vague; identifiable domain but not a specific flow ID.
+- Fail — generic out-of-scope language with no ownership; no cross-references section, or it is empty.
 
 ---
 
 ## D7 — Behavioral persona
 
-**Definition.** The actor section describes posture, working context, and tolerances — what the person is physically doing, what device they hold, what failure they cannot absorb — not demographics. A behavioral persona predicts how the user reacts to edge cases, and it is **specific to this domain's surfaces**: it could not be pasted unchanged into an unrelated domain's doc.
+**Definition.** The actor section describes posture, working context, and tolerances — what the person is physically doing, what device they hold, what failure they cannot absorb — not demographics. A behavioral persona predicts how the user reacts to edge cases.
 
-**Good signal.** "The salesperson's working device is a phone or tablet held one-handed in a truck cab or on a front porch; their second device is the office desktop at end of day. They are scoped to their own appointments." This generates testable device constraints and scope expectations. (Non-BriteBase witness: for a marketing-site capture flow, "an evaluator arriving from a paid-search ad comparing three vendors, ten minutes to decide, will abandon if pricing isn't findable above the fold" — intent, urgency, and the intolerance are all domain-specific.)
+**Good signal.** "The salesperson's working device is a phone or tablet held one-handed in a truck cab or on a front porch; their second device is the office desktop at end of day. They are scoped to their own appointments." This generates testable device constraints and scope expectations.
 
-**Failure mode it catches.** Demographic copy-paste — a single generic block ("Commercial buyer / Newsletter subscriber") repeated across unrelated domains, predicting nothing. Also catches role-only descriptions ("office_staff is the anchor role") that state permission level without explaining behavior. Cross-doc byte-identity is the defining failure but is invisible to a single-doc reviewer; anchor the score on **domain-specificity** instead.
+**Failure mode it catches.** Demographic copy-paste — a single generic block ("Commercial buyer / Newsletter subscriber") repeated across unrelated domains, predicting nothing. Also catches role-only descriptions ("office_staff is the anchor role") that state permission level without explaining behavior.
 
-**How to judge (1–5).** Score on whether the persona names a behavior unique to *this* domain's surfaces — that is single-doc-judgeable. Cross-doc reuse is corpus-dependent; treat suspected reuse as a CONCERN-trigger, not a silent Pass.
-- 5 — device context, timing/mindset, and what the persona cannot tolerate; predicts testable constraints; clearly tied to this domain's specific surfaces.
+**How to judge (1–5).**
+- 5 — device context, timing/mindset, and what the persona cannot tolerate; predicts testable constraints.
 - 4 — device or working context, but no tolerances or mindset.
 - 3 — beyond role name but stays abstract ("manages the schedule").
-- 2 — role name plus permission level only; **or** a persona generic enough that it could plausibly appear unchanged in another domain's doc — cap at 2 and flag for cross-doc comparison regardless of cosmetic device/timing words ("uses a laptop" does not lift a generic block out of the cap). Do not award 3–4 to a dressed-up generic persona on the strength of one device word.
-- 1 — confirmed copy-pasted from another doc (when you can see the sibling), or absent.
+- 2 — role name plus permission level only.
+- 1 — copy-pasted from another doc, or absent.
 
 ---
 
@@ -172,18 +148,16 @@ The single-doc-judgeable dimensions are the model: each names a signal observabl
 
 ## D9 — Decomposition grain
 
-**Definition.** The flow addresses exactly one actor performing one action against one data surface in one context. Splitting by actor, trigger, or distinct discipline assignment is correct decomposition. **Under-decomposition** fuses unrelated actors or triggers into one doc (visible inside this doc). **Over-decomposition** clones near-identical docs for one shared pattern (visible only across the sibling set).
+**Definition.** The flow addresses exactly one actor performing one action against one data surface in one context. Splitting by actor, trigger, or distinct discipline assignment is correct decomposition. Under-decomposition fuses unrelated actors or triggers; over-decomposition clones near-identical docs for one shared pattern.
 
 **Good signal.** Separate flows for "View appointment list" (read path, one surface), "Filter appointments" (filter-chip interaction, distinct trigger axis), "Create appointment" (write path, different mutation). Each is teachable to one discipline team.
 
-**Failure mode it catches.** Under-decomposition — one flow owning "view, filter, create, edit, delete," untestable as a unit. Over-decomposition — six near-identical "Add [Entity] Application" flows sharing one pattern, generating redundant docs (the named teardown defects: Profile C's 6 PIM entity sub-flows producing 30 children; Profile D's each-matrix-dimension-as-a-flow). Both inflate the inventory without adding signal — but they are caught by different evidence.
+**Failure mode it catches.** Under-decomposition — one flow owning "view, filter, create, edit, delete," untestable as a unit. Over-decomposition — six near-identical "Add [Entity] Application" flows sharing one pattern, generating redundant docs. Both inflate the inventory without adding signal.
 
-**How to judge — under-decomposition (per-doc, single-doc-judgeable, pass / concern / fail).**
-- Pass — this doc maps to one atomic actor-action pair; it does not fuse multiple triggers/actors.
+**How to judge (pass / concern / fail).**
+- Pass — maps to one atomic actor-action pair; splitting further or merging with a sibling would not improve clarity.
 - Concern — handles two actor perspectives on the same surface (acceptable if the behavioral difference is documented in AC scenarios, not just implied).
-- Fail — conflates multiple triggers/actors without differentiating them.
-
-**How to judge — over-decomposition (corpus/inventory-scoped, requires sibling titles).** This **cannot be scored from a single doc** — a thin clone looks like a clean atomic flow in isolation. Compare against sibling flow titles in `master-flow-inventory.md`: **Fail if 5+ flows share a title stem with no AC-level behavioral differentiator.** If the inventory is **not** available to you, you cannot score over-decomposition — record it as deferred/CONCERN with a note that it needs the inventory, and **never** silently Pass D9 on over-decomposition grounds. A per-doc Pass on D9 attests only to the under-decomposition half.
+- Fail — conflates multiple triggers/actors without differentiating them, or is one of 5+ near-identical siblings with no distinguishing behavior.
 
 ---
 
@@ -195,10 +169,10 @@ The single-doc-judgeable dimensions are the model: each names a signal observabl
 
 **Failure mode it catches.** Fabricated identifiers — a doc cites `createAppointmentFlow()` or `appointmentService.ts:42` when neither exists. The reader trusts it, the engineer follows it, it is wrong. Invented identifiers look identical to real ones in markdown, so they slip past any review that doesn't `grep` the claim.
 
-**How to judge (pass / concern / fail).** This is corpus-dependent — settling it requires grepping the codebase, which a doc-text-only reviewer cannot do.
-- Pass — every cited path/symbol resolves to real code or is explicitly marked TBD, **and you verified the resolutions against the codebase**. If you were not given codebase access, you cannot award Pass — record CONCERN noting that identifier resolution was not verifiable, per the evidence rule.
-- Concern — one or two identifiers unverifiable but the claim is qualified ("exact column is TBD — capture on the [Eng] child"); **or** the codebase was unavailable to confirm any cited identifier.
-- Fail — one or more identifiers stated as confirmed fact but not found in the codebase (when you checked).
+**How to judge (pass / concern / fail).**
+- Pass — every cited path/symbol resolves to real code or is explicitly marked TBD.
+- Concern — one or two identifiers unverifiable but the claim is qualified ("exact column is TBD — capture on the [Eng] child").
+- Fail — one or more identifiers stated as confirmed fact but not found in the codebase.
 
 ---
 
@@ -223,35 +197,35 @@ Journey docs sit one layer above story docs: they narrate the arc a persona live
 
 ## J1 — Domain substrate clarity
 
-**Definition.** The preamble identifies what the domain owns (primary entity, key fields, and a state machine **if the domain has one**), what it does not own (upstream triggers and downstream consumers named by domain code), and the scope boundary separating this domain from the next. State-machine enumeration is required *where a state machine exists*; a domain with no lifecycle (e.g., a stateless content or capture domain) substitutes the closest substrate it does own (entity + key fields + the boundary), and is not penalized for lacking transitions it doesn't have.
+**Definition.** The preamble identifies what the domain owns (primary entity, key fields, state machine if any), what it does not own (upstream triggers and downstream consumers named by domain code), and the scope boundary separating this domain from the next.
 
 **Good signal.** "APPT is the appointment-lifecycle domain bracketing the property visit — it owns scheduling, salesperson assignment, status transitions, outcome capture, but stops short of on-site data capture (SURV territory). The unit of work is one SalesAppointment row tied to one Property and one Client, with a five-state lifecycle (scheduled → in_progress → completed | cancelled | no_show)." Entity, fields, state machine, and boundary in one paragraph.
 
 **Failure mode it catches.** Substrate opacity — narrating the user experience without revealing the data model. Eng and QA cannot reason about the domain and end up re-reading source instead of using the journey as a reference.
 
 **How to judge (1–5).**
-- 5 — primary entity with key fields; state machine enumerated (or, for a stateless domain, the owned substrate made explicit and the absence of a lifecycle stated); upstream and downstream named by code; scope boundary explicit.
-- 4 — entity and state machine (where present) named; upstream/downstream named but not pinned to codes.
-- 3 — entity named; fields implied by narrative not enumerated; no substrate summary.
-- 2 — functional terms only ("manages invoices"); no entity or substrate.
+- 5 — primary entity with key fields; state machine enumerated; upstream and downstream named by code; scope boundary explicit.
+- 4 — entity and state machine present; upstream/downstream named but not pinned to codes.
+- 3 — entity named; fields implied by narrative not enumerated; no state-machine summary.
+- 2 — functional terms only ("manages invoices"); no entity or state machine.
 - 1 — no substrate; the narrative assumes the reader knows what data exists.
 
 ---
 
 ## J2 — Behavioral persona (journey scope)
 
-**Definition.** Each anchoring persona carries working context (device, moment in the workday, physical/mental state), scope shape (what they see vs don't), and the failure they cannot absorb — not role plus permission level. As with D7, a journey persona is **specific to this domain's surfaces**: it could not be pasted unchanged into the adjacent domain's journey.
+**Definition.** Each anchoring persona carries working context (device, moment in the workday, physical/mental state), scope shape (what they see vs don't), and the failure they cannot absorb — not role plus permission level.
 
 **Good signal.** "The office_staff is the dispatcher/scheduler. They handle the inbound call that creates the lead (CLI territory), book the first appointment, and own daily-schedule mechanics — reassigning when someone calls in sick, chasing no-shows, fielding reschedules. Full access: all appointments in the tenant, including the salesperson filter chip. Desktop, treating the list as a Kanban-adjacent workboard." Context, scope, device, and intolerance (ambiguity over slot ownership) all present.
 
-**Failure mode it catches.** Persona copy-paste — a generic block reused across journeys with no behavioral differentiation. A persona that reads identically in the APPT and QUO journeys tells reviewers nothing about either domain. Cross-doc identity is corpus-dependent (invisible per-journey); anchor on domain-specificity.
+**Failure mode it catches.** Persona copy-paste — a generic block reused across journeys with no behavioral differentiation. A persona that reads identically in the APPT and QUO journeys tells reviewers nothing about either domain.
 
-**How to judge (1–5).** Cross-journey byte-reuse is corpus-dependent; score on domain-specificity, which is single-doc-judgeable.
+**How to judge (1–5).**
 - 5 — working context (device, moment, state), scope shape, and intolerance, all specific to this domain's surfaces.
 - 4 — working context and scope; intolerance implied not stated.
 - 3 — beyond role+permission but abstract; no device or moment.
-- 2 — role name + permission level only; **or** a persona generic enough to appear unchanged in another journey — cap at 2 and flag for cross-doc comparison regardless of cosmetic device/timing words.
-- 1 — confirmed copy-pasted from another journey (when you can see the sibling), or absent.
+- 2 — role name + permission level only.
+- 1 — copy-pasted from another journey, or absent.
 
 ---
 
@@ -278,18 +252,18 @@ Journey docs sit one layer above story docs: they narrate the arc a persona live
 
 **Good signal.** "Part of the canonical Sales → Quote → Acceptance scenario spanning APPT → SURV → QUO → QLIFE → CPUB." And: "The 'Create Quote' link on a completed appointment opens /sales/quotes/new with clientId, propertyId, seasonYear pre-filled as URL params."
 
-**Failure mode it catches.** Island journey — a domain described in isolation, no mention of how data enters or where it goes. Adjacent domains listed as "related" with no handoff mechanism. The multi-domain reviewer can't tell where domain A's test responsibility ends and B's begins. Also catches a named upstream/downstream domain that does not exist in the inventory — owner validity here is corpus-dependent, same class as D6.
+**Failure mode it catches.** Island journey — a domain described in isolation, no mention of how data enters or where it goes. Adjacent domains listed as "related" with no handoff mechanism. The multi-domain reviewer can't tell where domain A's test responsibility ends and B's begins.
 
-**How to judge (pass / concern / fail).** Naming the seam is single-doc-judgeable; confirming the named adjacent domains exist is corpus-dependent.
-- Pass — upstream trigger named with a specific handoff mechanism; downstream consumer named with specific data or UI link; cross-scenario journey name stated if applicable; named adjacent domains resolve against the inventory when it is available to you.
-- Concern — domains named but handoff mechanisms vague ("feeds into QUO"); **or** seams are specific but the inventory is unavailable to confirm the named domains exist (withhold Pass per the evidence rule).
-- Fail — no upstream/downstream named; the cross-references list domain codes without explaining the seam; or a named adjacent domain is confirmed absent from the inventory.
+**How to judge (pass / concern / fail).**
+- Pass — upstream trigger named with a specific handoff mechanism; downstream consumer named with specific data or UI link; cross-scenario journey name stated if applicable.
+- Concern — domains named but handoff mechanisms vague ("feeds into QUO").
+- Fail — no upstream/downstream named, or the cross-references list domain codes without explaining the seam.
 
 ---
 
 ## J5 — Status honesty at domain scale
 
-**Definition.** The domain-level status (front-matter `status` and preamble) reflects the aggregate build state — which layers are built (schema, API, UI, permissions, *where the app has them*), which partial, which NOT_STARTED. When the journey includes NOT_STARTED flows, the narrative describes what the user experiences today in their absence, not what they will experience when those flows ship.
+**Definition.** The domain-level status (front-matter `status` and preamble) reflects the aggregate build state — which layers are built (schema, API, UI, permissions), which partial, which NOT_STARTED. When the journey includes NOT_STARTED flows, the narrative describes what the user experiences today in their absence, not what they will experience when those flows ship.
 
 **Good signal.** "Three Phase-1 flows ship today as wishlist placeholders: APPT-13 (smart scheduling), APPT-14 (auto-confirmation SMS), APPT-15 (Google Calendar sync). None are wired. Their absence is the dominant pain point — the office_staff *is* the SMS, the routing logic, and the calendar bridge."
 
@@ -304,14 +278,14 @@ Journey docs sit one layer above story docs: they narrate the arc a persona live
 
 ## J6 — Decision points are explicit
 
-**Definition.** The journey captures meaningful branching logic — where the user's experience diverges by role, data state, or input — as named decision points with the condition stated. This is the domain-level map of "where behavior forks," distinct from story-doc AC scenarios. (Applies *where the domain has forks*: a server-enforced state machine, a role-based behavior difference, an input-driven branch. A genuinely branch-free domain has no decision points to surface and is not penalized for their absence — but most non-trivial domains have at least one.)
+**Definition.** The journey captures meaningful branching logic — where the user's experience diverges by role, data state, or input — as named decision points with the condition stated. This is the domain-level map of "where behavior forks," distinct from story-doc AC scenarios.
 
 **Good signal.** "Status-transition validity. VALID_TRANSITIONS enforces the lifecycle server-side. The matrix is a strict tree: scheduled is the only start state; completed / cancelled / no_show are terminal; no un-completing or un-cancelling." Condition, enforcement layer, and user consequence all named.
 
 **Failure mode it catches.** Hidden fork — a domain with a meaningful state machine or role-based behavior difference never surfaced. A new team member cannot predict what the system does at the branch and must read source. Costly for QA, who needs the fork map to write test cases.
 
 **How to judge (pass / concern / fail).**
-- Pass — all meaningful forks named as decision points with condition + enforcement layer + user consequence (or, for a branch-free domain, an explicit statement that behavior does not fork).
+- Pass — all meaningful forks named as decision points with condition + enforcement layer + user consequence.
 - Concern — major forks mentioned in narrative but not collected into a decision-points section; a careful reader can infer them.
 - Fail — a state machine or significant role-based difference is never mentioned; branching is implicit.
 
@@ -351,9 +325,7 @@ Journey docs sit one layer above story docs: they narrate the arc a persona live
 
 ## References
 
-- `app-type-profiles.md` (sibling) — the four app-type profile modifiers + how to select one. Profiles **re-route** spine dimensions for the app type *before* the spine verdict is finalized; where a profile and the spine disagree on a threshold or an edge class, the profile-adjusted verdict is the one of record.
+- `app-type-profiles.md` (sibling) — the four app-type profile modifiers + how to select one.
 - `four-mode-framework.md` (sibling) — the scope-axis outcome contract reviewer agents return; this rubric judges doc substance, that file judges scope recommendation.
-- `app-classifier-pattern.md` (sibling) — the inventory-time classifier whose `app category` signal (`SaaS / CRM / ops / agency / marketplace / installation`) feeds profile selection.
+- `app-classifier-pattern.md` (sibling) — the inventory-time classifier whose app-category signal feeds profile selection.
 - JTBD job-story frame (When / I want / so I can) and PRD acceptance-criteria practice are the governing external sources. BriteBase examples here are one calibration witness, not the required shape.
-</content>
-</invoke>

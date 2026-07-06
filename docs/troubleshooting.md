@@ -37,7 +37,7 @@ Common issues and solutions when developing or using the Brite Claude Plugins.
 
    If a tool name doesn't match the regex, the hook won't fire.
 
-3. **Timeout** — Security regex hooks have a 5-second timeout, the pre-commit quality hook has 60 seconds, and the PostToolUse linter has 30 seconds. If a check takes longer, it silently times out (typically because a linter is processing a very large file).
+3. **Timeout** — Security hooks have a 10-second timeout, the linter has 30 seconds. If the check takes longer, it silently times out. This can happen if haiku is slow or the linter processes a large file.
 
 4. **Linter not installed** — The PostToolUse linter hook checks for `npx` (ESLint) and `ruff` (Python). If neither is installed, the hook exits silently (by design — `|| true`). Install the relevant linter:
    ```bash
@@ -45,7 +45,7 @@ Common issues and solutions when developing or using the Brite Claude Plugins.
    pip install ruff              # For Python files
    ```
 
-5. **No prompt-type hooks in workflows plugin** — Since BC-11889 (workflows v3.31.0), all `workflows` PreToolUse hooks are `type: "command"` (regex-based, deterministic, no LLM call). The `revops` plugin retains its own Haiku-backed guardrails; if you see `Hook evaluator API error: ... model (haiku/sonnet/opus) ...`, the offending hook is in revops, not workflows.
+5. **Haiku unavailable** — PreToolUse prompt hooks use the `haiku` model. If haiku is unavailable or rate-limited, prompt-type hooks may fail silently. (Note: SessionStart uses a `command` type hook, not haiku.)
 
 ## MCP Server Issues
 
@@ -64,6 +64,15 @@ Common issues and solutions when developing or using the Brite Claude Plugins.
 - **Not authenticated**: The Linear MCP server at `https://mcp.linear.app/mcp` requires OAuth. You'll be prompted to authorize on first use. If authorization expired, re-authorize in Claude Code settings.
 - **Wrong URL**: The server URL is `https://mcp.linear.app/mcp` (not `.dev`). This was corrected in v1.0.0.
 - **Network issues**: The server uses HTTP transport. Ensure you can reach `mcp.linear.app` from your network.
+
+### context7
+
+**Symptom:** Context7 MCP tools fail, return auth errors, or resolve-library-id returns empty results.
+
+- **Not authenticated**: The Context7 MCP server at `https://mcp.context7.com/mcp` requires OAuth. You'll be prompted to authorize on first use. If authorization expired, re-authorize in Claude Code settings.
+- **Rate limited**: If you dismiss the OAuth prompt, Context7 falls back to anonymous access (60 req/hr shared globally). Authenticate to get your plan's full quota.
+- **Handbook not found**: The Brite Handbook is indexed at `/brite-nites/handbook`. If `resolve-library-id` can't find it, confirm with an org admin that the handbook is indexed on Context7.
+- **Network issues**: The server uses HTTP transport. Ensure you can reach `mcp.context7.com` from your network.
 
 ## Plugin Not Loading
 

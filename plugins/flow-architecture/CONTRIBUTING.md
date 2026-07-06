@@ -10,7 +10,7 @@ For session bootstrap, paste the bridging prompt at `docs/design-rationale/00-re
 
 ## Linear scope
 
-All FDA plugin work tracks under milestone **Flow-Driven Architecture Plugin v1.0** in the Brite Skill Packs project (Layer C; renamed from "Brite Plugin Marketplace" 2026-05-27). Issues carry the `flow-architecture` label plus a categorical (`skill` / `agent` / `command` / `infrastructure` / `documentation`) and a size (`size-S` / `size-M` / `size-L`). Parent issues have no size.
+All FDA plugin work tracks under milestone **Flow-Driven Architecture Plugin v1.0** in the Brite Plugin Marketplace project. Issues carry the `flow-architecture` label plus a categorical (`skill` / `agent` / `command` / `infrastructure` / `documentation`) and a size (`size-S` / `size-M` / `size-L`). Parent issues have no size.
 
 ## Cross-cutting discipline
 

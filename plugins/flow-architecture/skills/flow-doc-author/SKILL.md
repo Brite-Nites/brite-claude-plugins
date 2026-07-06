@@ -81,7 +81,7 @@ One `Agent(general-purpose, run_in_background: true)` per sub-flow. Skill collec
 
 - Skeleton with `TBD` markers for narrative fields.
 - Q27 template path (incl. Q27 amendment 1 mod 4 `## Cross-domain dependencies` section).
-- Persona doc(s) for the personas that act in THIS sub-flow specifically — resolved from the sub-flow's inventory `personas` field (Section 1 substitution table), not the project-wide persona set. For each role named in that field, resolve `docs/product/personas/<role>.md`; if the standalone doc is absent, fall back to that role's persona block in the parent journey's per-phase persona lines (or the intent.md `## Target users` cross-link). Embed the resolved subset in `partial_state` so each agent gets the individuated persona(s) for its flow, never a single project-wide default.
+- Persona doc(s) for the assigned personas.
 - Journey doc (if already authored --- in greenfield this skill runs before journey-author, so usually unavailable).
 - Inventory row.
 - Code-evidence summary (if status > NOT_STARTED --- Section 7).

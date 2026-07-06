@@ -164,9 +164,6 @@ MCP Tool Reference section guidance:
         Salesforce integration guide).
       - GitHub MCP: a low-cost repo-metadata read (e.g. `get_repository`) pending integration
         guide publication.
-      - Brite Enrichment (`enrichment` server): `check_enrichment_health` (read-only, $0 — no
-        provider calls; reports `ok` + `snowflake_reachable` + `providers_configured`). See the
-        [Brite Enrichment integration guide](../../tools/integrations/brite-enrichment.md).
   - Link to the integration guide at the top of each workflow block for deeper reference — it
     holds the canonical workflow recipes.
   - For each workflow, note any Email Bison limits (e.g. `bulk_create_leads` max 500 leads per

@@ -4,14 +4,14 @@ Issues and PRDs for this repo live in **Linear**, not GitHub Issues — even tho
 has a GitHub remote (`Brite-Nites/brite-claude-plugins`). Don't run `gh issue …` for issue work.
 
 - **Team:** Brite Company (issue prefix `BC-`, *not* `BRI-`)
-- **Project:** Brite Skill Packs (default; sibling projects in the same team — *Brite Orchestration Layer*, *Brite Knowledge Layer*, *Brite Runtime & Harness* — per the 2026-05-27 4-layer re-org)
+- **Project:** Brite Plugin Marketplace
 - **Access:** the Linear MCP server bundled with the `workflows` plugin
   (`mcp__plugin_workflows_linear-server__*`)
 
 ## Conventions
 
 - **Create an issue**: `save_issue` with `title`, `description` (markdown body), `team: "Brite Company"`,
-  and `project: "Brite Skill Packs"`. Set `labels` for triage state (see `triage-labels.md`).
+  and `project: "Brite Plugin Marketplace"`. Set `labels` for triage state (see `triage-labels.md`).
 - **Read an issue**: `get_issue(<BC-NNNN>)`; `list_comments(<issue>)` for the discussion thread.
 - **List issues**: `list_issues` filtered by `team`, `project`, `assignee`, `state`, or `label`.
 - **Comment**: `save_comment(<issue>, body)`.
@@ -21,7 +21,7 @@ has a GitHub remote (`Brite-Nites/brite-claude-plugins`). Don't run `gh issue �
 
 ## When a skill says "publish to the issue tracker"
 
-Create a Linear issue with `save_issue` in the Brite Company team / Brite Skill Packs project.
+Create a Linear issue with `save_issue` in the Brite Company team / Brite Plugin Marketplace project.
 
 ## When a skill says "fetch the relevant ticket"
 

@@ -1,12 +1,5 @@
 {
   "mcpServers": {
-    "gbrain-team": {
-      "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gbrain-team-broker.sh",
-      "args": [
-        "https://brite-team-gbrain-serve-production.up.railway.app/mcp"
-      ]
-    },
     "salesforce": {
       "type": "stdio",
       "command": "npx",
