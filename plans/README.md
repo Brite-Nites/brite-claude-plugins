@@ -20,13 +20,13 @@ session.
 
 ## Execution order & status
 
-| Plan | Title | Priority | Effort | Depends on | Status |
-|------|-------|----------|--------|------------|--------|
-| 001 | Remove committed prospect PII + gitignore guard | P1 | M | — | TODO |
-| 002 | Single verification entrypoint (validate.sh ⇔ CI parity + RESULT hardening) | P1 | S | — | TODO |
-| 003 | Execute the 26 orphaned Python tests in CI | P1 | M | 002 | TODO |
-| 004 | Pin CI supply chain + cap eval-artifact retention | P2 | S | — | TODO |
-| 005 | Version/metadata truth sweep (README/ARCHITECTURE/manifests/release.sh) | P2 | M | — | TODO |
+| Plan | Title | Priority | Effort | Depends on | Linear | Status |
+|------|-------|----------|--------|------------|--------|--------|
+| 001 | Remove committed prospect PII + gitignore guard | P1 | M | — | BC-16286 | TODO |
+| 002 | Single verification entrypoint (validate.sh ⇔ CI parity + RESULT hardening) | P1 | S | — | BC-16287 | TODO |
+| 003 | Execute the 26 orphaned Python tests in CI | P1 | M | 002 | BC-16289 | TODO |
+| 004 | Pin CI supply chain + cap eval-artifact retention | P2 | S | — | BC-16291 | TODO |
+| 005 | Version/metadata truth sweep (README/ARCHITECTURE/manifests/release.sh) | P2 | M | — | BC-16293 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -64,11 +64,11 @@ From the audit report (full detail in the session transcript / audit summary):
 
 ## Findings awaiting a maintainer decision (not plannable as-is)
 
-- **DIR-2** Release process: `release.sh` cannot run against diverged per-plugin
+- **DIR-2** (→ BC-16297) Release process: `release.sh` cannot run against diverged per-plugin
   versions (CHANGELOG frozen at 3.29.0 / 2026-03-28). Decide: build per-plugin
   release tooling (BC-1728) or formally retire the bundle release + delete
   VERSION/release.sh. Plan 005 makes the docs honest either way.
-- **SEC-01 residuals** (after plan 001): git-history purge vs accept-as-burned
+- **SEC-01 residuals** (→ BC-16295, after plan 001): git-history purge vs accept-as-burned
   for the PII file; and whether this repo should be public at all.
 - **SEC-04 residual** (after plan 004): redact model transcripts in
   behavioral-test artifacts vs accept 14-day exposure window.
