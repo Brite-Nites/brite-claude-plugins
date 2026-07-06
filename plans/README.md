@@ -24,7 +24,7 @@ session.
 |------|-------|----------|--------|------------|--------|--------|
 | 001 | Remove committed prospect PII + gitignore guard | P1 | M | — | BC-16286 | DONE — PR 522 (reviewer-verified, unmerged) |
 | 002 | Single verification entrypoint (validate.sh ⇔ CI parity + RESULT hardening) | P1 | S | — | BC-16287 | DONE — PR 524 MERGED (squash efaf13f9); plan amended: 3 harnesses not 4 |
-| 003 | Execute the 26 orphaned Python tests in CI | P1 | M | 002 | BC-16289 | DONE — PR 525 (reviewer-verified, unmerged); surfaced 2 prod bugs → BC-16682 (apex scoring, security), BC-16683 (stale registry) |
+| 003 | Execute the 26 orphaned Python tests in CI | P1 | M | 002 | BC-16289 | DONE — PR 525 (unmerged); CI-fixed 2× (CI=true env-detect + sf-CLI-absent skips); surfaced 2 prod bugs → BC-16682 (apex scoring, SECURITY), BC-16683 (stale registry) |
 | 004 | Pin CI supply chain + cap eval-artifact retention | P2 | S | — | BC-16291 | TODO |
 | 005 | Version/metadata truth sweep (README/ARCHITECTURE/manifests/release.sh) | P2 | M | — | BC-16293 | TODO |
 
