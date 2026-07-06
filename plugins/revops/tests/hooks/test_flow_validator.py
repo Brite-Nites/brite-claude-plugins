@@ -1,6 +1,8 @@
 """Tests for sf-flow post-tool-validate.py validator."""
 from __future__ import annotations
 
+import shutil
+
 import pytest
 
 from tests.hooks.conftest import (
@@ -45,6 +47,15 @@ class TestFlowBadFile:
                 f"Good flow ({good_score[0]}) should score higher than bad ({bad_score[0]})"
             )
 
+    # The missing-description check runs through the `sf` CLI code analyzer;
+    # without `sf` the validator reports "code analyzer not available" and the
+    # assertion can't hold. Skip when `sf` is absent (e.g. the pytest CI job)
+    # so this runs where the CLI exists and skips cleanly where it doesn't.
+    # (BC-16289 CI reconciliation.)
+    @pytest.mark.skipif(
+        shutil.which("sf") is None,
+        reason="requires the Salesforce `sf` CLI code analyzer (not installed in the pytest CI job)",
+    )
     def test_bad_flow_detects_missing_description(self):
         result = run_validator(VALIDATOR, str(FLOWS_DIR / "Bad_Flow.flow-meta.xml"), timeout=45)
         output = result.stdout.lower()

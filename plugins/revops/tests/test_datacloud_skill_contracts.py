@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from tests.datacloud_test_utils import (
     DATACLOUD_SKILLS,
     EXPECTED_COMMANDS,
@@ -12,6 +14,14 @@ from tests.datacloud_test_utils import (
     ROOT,
     skill_text,
     split_frontmatter,
+)
+
+pytestmark = pytest.mark.skip(
+    reason=(
+        "quarantined: skills/sf-datacloud* does not exist in this repo "
+        "(not among the 14 SF skills retained per ADR-007 §3.5's upstream "
+        "filter) — see docs/python-test-quarantine.md"
+    )
 )
 
 

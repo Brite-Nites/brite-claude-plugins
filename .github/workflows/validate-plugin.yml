@@ -56,6 +56,35 @@ jobs:
       - name: Run clone-drift classifier regression (BC-7060)
         run: bash plugins/flow-architecture/tests/test-clone-drift.sh
 
+  python-units:
+    # BC-16289 — executes the 26 previously-orphaned test_*.py files
+    # (.github/dependabot.yml used to state plainly that Brite CI never
+    # invoked pytest). Mirrors vslice-greenfield's shape (needs: validate,
+    # dedicated job rather than a validate-job step) but is BLOCKING — no
+    # continue-on-error — since the suite includes contract tests for the
+    # revops PreToolUse validators (soql/security/naming/dispatcher/
+    # llm-pattern) that gate Salesforce operations.
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 10
+    permissions:
+      contents: read  # least-privilege — the suites only read in-repo files
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pytest
+        run: python3 -m pip install pytest
+
+      - name: Run Python unit suites (revops/marketing/workflows)
+        run: bash scripts/test-python-units.sh
+        env:
+          # This job installs pytest above, so a missing pytest here is a real
+          # break → hard-fail. (Do NOT rely on CI=true for this: GitHub sets
+          # CI=true in every job, including `validate`, which runs this wrapper
+          # via validate.sh §2j WITHOUT installing pytest — keying on CI there
+          # would fail that job spuriously. See test-python-units.sh guard.)
+          REQUIRE_PYTEST: "true"
+
   vslice-inventory-only-rescaffold:
     # BC-9971 v-slice for the inventory-only-domain re-scaffold classifier
     # (flow-classify-domain-state.sh) — exercises the four classification

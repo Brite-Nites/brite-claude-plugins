@@ -965,6 +965,42 @@ done
 [ "$wf_ran" -eq 1 ] || warn "no plugins/workflows/tests/test-*.sh found — skipped"
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2j — Python unit suites (pytest) (BC-16289)
+# ══════════════════════════════════════════════════════════════════════
+# Delegates to scripts/test-python-units.sh, which runs the pytest suites for
+# revops/marketing/workflows (the 26 previously-orphaned test_*.py files —
+# .github/dependabot.yml used to state plainly that Brite CI never invoked
+# pytest). Pass count parsed from the harness's `RESULT pass=N fail=M` line,
+# same contract as the other test-*.sh harnesses (Section 2e/2f-2h). A
+# missing local pytest install surfaces as `warn`, not `pass` — CI installs
+# pytest itself in the `python-units` job, so its absence there is a hard
+# failure, not an advisory skip.
+section "2j. Python unit suites (pytest)"
+
+python_units_test="$REPO_ROOT/scripts/test-python-units.sh"
+
+if [ ! -f "$python_units_test" ]; then
+  warn "scripts/test-python-units.sh not found — python unit suites skipped"
+else
+  if python_units_out=$(bash "$python_units_test" 2>&1); then
+    if printf '%s\n' "$python_units_out" | grep -q '^SKIP: pytest not installed'; then
+      warn "python unit suites (pytest) — pytest not installed locally, skipped (run: python3 -m pip install pytest)"
+    else
+      python_units_pass_count=$(printf '%s\n' "$python_units_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+      if [ -n "$python_units_pass_count" ] && [ "$python_units_pass_count" -gt 0 ]; then
+        pass "python unit suites (pytest) — $python_units_pass_count tests passed"
+      else
+        fail "python unit suites (pytest) — RESULT line missing or pass=0 (harness ran no assertions)"
+        printf '%s\n' "$python_units_out" | tail -25 | sed 's/^/    /' >&2
+      fi
+    fi
+  else
+    fail "python unit suites (pytest) failed — run scripts/test-python-units.sh for details"
+    printf '%s\n' "$python_units_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
 # ══════════════════════════════════════════════════════════════════════
 
