@@ -880,6 +880,66 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Sections 2f-2h — CI-parity harness delegates (BC-16287)
+# ══════════════════════════════════════════════════════════════════════
+# CI's `validate` job used to run these three harnesses as separate steps; they
+# now run INSIDE validate.sh so a green local `bash scripts/validate.sh` implies
+# a green CI `validate` job (the documented local gate + pre-push hook mirror CI).
+# Each mirrors the section-2d shape (warn-if-missing, run, fail with tail -25 on
+# nonzero) and parses the harness's `Total: N  Passed: M` summary for the count.
+# NOTE: scripts/test-hook-model-lint.sh is deliberately NOT delegated here — it
+# invokes validate.sh itself (recursion); the rule it meta-tests already runs
+# in-gate via scripts/_lib/lint_hooks.py, so it stays a standalone CI step.
+
+section "2f. Skill trigger matching"
+
+skill_triggers_test="$REPO_ROOT/scripts/test-skill-triggers.sh"
+
+if [ ! -f "$skill_triggers_test" ]; then
+  warn "scripts/test-skill-triggers.sh not found — skill trigger matching check skipped"
+else
+  if skill_triggers_out=$(bash "$skill_triggers_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$skill_triggers_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "skill trigger matching (${pass_count:-?} scenarios)"
+  else
+    fail "skill trigger matching failed — run scripts/test-skill-triggers.sh for details"
+    printf '%s\n' "$skill_triggers_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+section "2g. Cross-skill contracts (workflows)"
+
+contracts_test="$REPO_ROOT/scripts/test-contracts.sh"
+
+if [ ! -f "$contracts_test" ]; then
+  warn "scripts/test-contracts.sh not found — cross-skill contracts check skipped"
+else
+  if contracts_out=$(bash "$contracts_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$contracts_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "cross-skill contracts (${pass_count:-?} checks)"
+  else
+    fail "cross-skill contracts failed — run scripts/test-contracts.sh for details"
+    printf '%s\n' "$contracts_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+section "2h. End-to-end scenarios (workflows)"
+
+scenarios_test="$REPO_ROOT/scripts/test-scenarios.sh"
+
+if [ ! -f "$scenarios_test" ]; then
+  warn "scripts/test-scenarios.sh not found — end-to-end scenarios check skipped"
+else
+  if scenarios_out=$(bash "$scenarios_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$scenarios_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "end-to-end scenarios (${pass_count:-?} scenarios)"
+  else
+    fail "end-to-end scenarios failed — run scripts/test-scenarios.sh for details"
+    printf '%s\n' "$scenarios_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2e — workflows helper-script unit tests (BC-12248)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/workflows/tests/test-*.sh — bash unit tests for workflows
@@ -1895,10 +1955,10 @@ else
       # Parse the harness's machine-readable RESULT line so the count stays
       # in sync as scenarios are added/removed (matches Section 2c pattern).
       tests_pass_count=$(printf '%s\n' "$tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$tests_pass_count" ]; then
+      if [ -n "$tests_pass_count" ] && [ "$tests_pass_count" -gt 0 ]; then
         pass "lint_canonicals regression harness — $tests_pass_count scenarios"
       else
-        pass "lint_canonicals regression harness — passed (count unparsed)"
+        fail "lint_canonicals regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "Canonicals lint regression harness failed:"
@@ -1948,10 +2008,10 @@ else
       # Parse the harness's machine-readable RESULT line so the count stays
       # in sync as scenarios are added/removed (matches Section 2c + 15a).
       disc_tests_pass=$(printf '%s\n' "$disc_tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$disc_tests_pass" ]; then
+      if [ -n "$disc_tests_pass" ] && [ "$disc_tests_pass" -gt 0 ]; then
         pass "lint_discoveries regression harness — $disc_tests_pass scenarios"
       else
-        pass "lint_discoveries regression harness — passed (count unparsed)"
+        fail "lint_discoveries regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "Discoveries lint regression harness failed:"
@@ -1986,10 +2046,10 @@ elif [ ! -f "$icp_tests" ]; then
 else
   if icp_tests_output=$(bash "$icp_tests" "$icp_helper" 2>&1); then
     icp_tests_pass=$(printf '%s\n' "$icp_tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$icp_tests_pass" ]; then
+    if [ -n "$icp_tests_pass" ] && [ "$icp_tests_pass" -gt 0 ]; then
       pass "icp_refinement_review regression harness — $icp_tests_pass scenarios"
     else
-      pass "icp_refinement_review regression harness — passed (count unparsed)"
+      fail "icp_refinement_review regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "icp_refinement_review regression harness failed:"
@@ -2068,10 +2128,10 @@ elif [ ! -f "$ps_harness" ]; then
 else
   if ps_harness_out=$(bash "$ps_harness" "$ps_helper" 2>&1); then
     ps_pass_count=$(printf '%s\n' "$ps_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$ps_pass_count" ]; then
+    if [ -n "$ps_pass_count" ] && [ "$ps_pass_count" -gt 0 ]; then
       pass "portfolio-snapshot regression harness (${ps_pass_count} assertions)"
     else
-      pass "portfolio-snapshot regression harness — passed (count unparsed)"
+      fail "portfolio-snapshot regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "portfolio-snapshot regression harness failed:"
@@ -2102,10 +2162,10 @@ elif [ ! -f "$bm_harness" ]; then
 else
   if bm_harness_out=$(bash "$bm_harness" "$bm_helper" 2>&1); then
     bm_pass_count=$(printf '%s\n' "$bm_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$bm_pass_count" ]; then
+    if [ -n "$bm_pass_count" ] && [ "$bm_pass_count" -gt 0 ]; then
       pass "plan-campaign builder regression harness (${bm_pass_count} assertions)"
     else
-      pass "plan-campaign builder regression harness — passed (count unparsed)"
+      fail "plan-campaign builder regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "plan-campaign builder regression harness failed:"
@@ -2136,10 +2196,10 @@ if [ ! -f "$eval_harness" ]; then
 else
   if eval_harness_out=$(bash "$eval_harness" 2>&1); then
     eval_pass_count=$(printf '%s\n' "$eval_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$eval_pass_count" ]; then
+    if [ -n "$eval_pass_count" ] && [ "$eval_pass_count" -gt 0 ]; then
       pass "behavioral-eval harness + plan-campaign eval (${eval_pass_count} assertions)"
     else
-      pass "behavioral-eval harness — passed (count unparsed)"
+      fail "behavioral-eval harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "behavioral-eval harness failed:"
@@ -2314,10 +2374,10 @@ if [ ! -f "$su_harness" ]; then
 else
   if su_harness_out=$(bash "$su_harness" 2>&1); then
     su_pass_count=$(printf '%s\n' "$su_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$su_pass_count" ]; then
+    if [ -n "$su_pass_count" ] && [ "$su_pass_count" -gt 0 ]; then
       pass "shared utilities regression harness (${su_pass_count} assertions)"
     else
-      pass "shared utilities regression harness — passed (count unparsed)"
+      fail "shared utilities regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "shared utilities regression harness failed:"
@@ -2337,10 +2397,10 @@ elif [ ! -f "$op_harness" ]; then
 else
   if op_harness_out=$(bash "$op_harness" "$op_helper" 2>&1); then
     op_pass_count=$(printf '%s\n' "$op_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$op_pass_count" ]; then
+    if [ -n "$op_pass_count" ] && [ "$op_pass_count" -gt 0 ]; then
       pass "offer-performance regression harness (${op_pass_count} assertions)"
     else
-      pass "offer-performance regression harness — passed (count unparsed)"
+      fail "offer-performance regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "offer-performance regression harness failed:"
@@ -2365,10 +2425,10 @@ elif [ ! -f "$cb_harness" ]; then
 else
   if cb_harness_out=$(bash "$cb_harness" "$cb_helper" 2>&1); then
     cb_pass_count=$(printf '%s\n' "$cb_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$cb_pass_count" ]; then
+    if [ -n "$cb_pass_count" ] && [ "$cb_pass_count" -gt 0 ]; then
       pass "canonicals bootstrap regression harness (${cb_pass_count} assertions)"
     else
-      pass "canonicals bootstrap regression harness — passed (count unparsed)"
+      fail "canonicals bootstrap regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "canonicals bootstrap regression harness failed:"
@@ -2396,10 +2456,10 @@ elif [ ! -f "$ic_harness" ]; then
 else
   if ic_harness_out=$(bash "$ic_harness" "$ic_helper" 2>&1); then
     ic_pass_count=$(printf '%s\n' "$ic_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$ic_pass_count" ]; then
+    if [ -n "$ic_pass_count" ] && [ "$ic_pass_count" -gt 0 ]; then
       pass "import-campaign regression harness (${ic_pass_count} assertions)"
     else
-      pass "import-campaign regression harness — passed (count unparsed)"
+      fail "import-campaign regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "import-campaign regression harness failed:"
@@ -2433,10 +2493,10 @@ elif [ ! -f "$vto_harness" ]; then
 else
   if vto_harness_out=$(bash "$vto_harness" "$vto_helper" 2>&1); then
     vto_pass_count=$(printf '%s\n' "$vto_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$vto_pass_count" ]; then
+    if [ -n "$vto_pass_count" ] && [ "$vto_pass_count" -gt 0 ]; then
       pass "revops --target-org guard behavioral eval (${vto_pass_count} assertions)"
     else
-      pass "revops --target-org guard behavioral eval — passed (count unparsed)"
+      fail "revops --target-org guard behavioral eval — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "revops --target-org guard behavioral eval failed:"
@@ -2471,10 +2531,10 @@ elif [ ! -f "$csf_harness" ]; then
 else
   if csf_harness_out=$(bash "$csf_harness" "$csf_helper" 2>&1); then
     csf_pass_count=$(printf '%s\n' "$csf_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$csf_pass_count" ]; then
+    if [ -n "$csf_pass_count" ] && [ "$csf_pass_count" -gt 0 ]; then
       pass "create-sf-campaign builder unit suite (${csf_pass_count} assertions)"
     else
-      pass "create-sf-campaign builder unit suite — passed (count unparsed)"
+      fail "create-sf-campaign builder unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "create-sf-campaign builder unit suite failed:"
@@ -2511,10 +2571,10 @@ elif [ ! -f "$usu_harness" ]; then
 else
   if usu_harness_out=$(bash "$usu_harness" "$usu_helper" 2>&1); then
     usu_pass_count=$(printf '%s\n' "$usu_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$usu_pass_count" ]; then
+    if [ -n "$usu_pass_count" ] && [ "$usu_pass_count" -gt 0 ]; then
       pass "update-sf-campaign-status builder unit suite (${usu_pass_count} assertions)"
     else
-      pass "update-sf-campaign-status builder unit suite — passed (count unparsed)"
+      fail "update-sf-campaign-status builder unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "update-sf-campaign-status builder unit suite failed:"
@@ -2550,10 +2610,10 @@ elif [ ! -f "$no_harness" ]; then
 else
   if no_harness_out=$(bash "$no_harness" "$no_helper" 2>&1); then
     no_pass_count=$(printf '%s\n' "$no_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$no_pass_count" ]; then
+    if [ -n "$no_pass_count" ] && [ "$no_pass_count" -gt 0 ]; then
       pass "canonicals-family emit builder unit suite (${no_pass_count} assertions)"
     else
-      pass "canonicals-family emit builder unit suite — passed (count unparsed)"
+      fail "canonicals-family emit builder unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "canonicals-family emit builder unit suite failed:"
@@ -2595,10 +2655,10 @@ for wf_stem in build_raise_ticket_payload build_report_issue_payload build_retro
   else
     if wf_harness_out=$(bash "$wf_harness" "$wf_helper" 2>&1); then
       wf_pass_count=$(printf '%s\n' "$wf_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$wf_pass_count" ]; then
+      if [ -n "$wf_pass_count" ] && [ "$wf_pass_count" -gt 0 ]; then
         pass "$wf_stem unit suite (${wf_pass_count} assertions)"
       else
-        pass "$wf_stem unit suite — passed (count unparsed)"
+        fail "$wf_stem unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "$wf_stem unit suite failed:"
@@ -2642,10 +2702,10 @@ for d_stem in build_flywheel_metrics build_audit_trail build_promotion_candidate
   else
     if d_harness_out=$(bash "$d_harness" "$d_helper" 2>&1); then
       d_pass_count=$(printf '%s\n' "$d_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$d_pass_count" ]; then
+      if [ -n "$d_pass_count" ] && [ "$d_pass_count" -gt 0 ]; then
         pass "$d_stem unit suite (${d_pass_count} assertions)"
       else
-        pass "$d_stem unit suite — passed (count unparsed)"
+        fail "$d_stem unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "$d_stem unit suite failed:"
@@ -2680,10 +2740,10 @@ for e_stem in build_audit_report build_plan_section; do
   else
     if e_harness_out=$(bash "$e_harness" "$e_helper" 2>&1); then
       e_pass_count=$(printf '%s\n' "$e_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$e_pass_count" ]; then
+      if [ -n "$e_pass_count" ] && [ "$e_pass_count" -gt 0 ]; then
         pass "$e_stem unit suite (${e_pass_count} assertions)"
       else
-        pass "$e_stem unit suite — passed (count unparsed)"
+        fail "$e_stem unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "$e_stem unit suite failed:"
@@ -2724,10 +2784,10 @@ elif [ ! -f "$ci_harness" ]; then
 else
   if ci_harness_out=$(bash "$ci_harness" "$ci_helper" 2>&1); then
     ci_pass_count=$(printf '%s\n' "$ci_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$ci_pass_count" ]; then
+    if [ -n "$ci_pass_count" ] && [ "$ci_pass_count" -gt 0 ]; then
       pass "capture-idea builder unit suite (${ci_pass_count} assertions)"
     else
-      pass "capture-idea builder unit suite — passed (count unparsed)"
+      fail "capture-idea builder unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "capture-idea builder unit suite failed:"
