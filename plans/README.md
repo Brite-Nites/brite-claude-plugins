@@ -24,8 +24,8 @@ session.
 |------|-------|----------|--------|------------|--------|--------|
 | 001 | Remove committed prospect PII + gitignore guard | P1 | M | — | BC-16286 | DONE — PR 522 (reviewer-verified, unmerged) |
 | 002 | Single verification entrypoint (validate.sh ⇔ CI parity + RESULT hardening) | P1 | S | — | BC-16287 | DONE — PR 524 MERGED (squash efaf13f9); plan amended: 3 harnesses not 4 |
-| 003 | Execute the 26 orphaned Python tests in CI | P1 | M | 002 | BC-16289 | DONE — PR 525 MERGED (squash c99df8ae); 370 tests now gated in CI; surfaced BC-16682 (apex scoring, SECURITY), BC-16683 (stale registry) |
-| 004 | Pin CI supply chain + cap eval-artifact retention | P2 | S | — | BC-16291 | TODO |
+| 003 | Execute the 26 orphaned Python tests in CI | P1 | M | 002 | BC-16289 | DONE — PR 525 MERGED (squash c99df8ae); 370 tests now gated in CI; surfaced BC-16682 (apex scoring, SECURITY → RESOLVED PR 526 squash 45fe2913), BC-16683 (stale registry → rescoped: marker+re-scope, NOT prune — active Data Cloud registry contract) |
+| 004 | Pin CI supply chain + cap eval-artifact retention | P2 | S | — | BC-16291 | DONE — PR 527 MERGED (squash 1bdabd48); pin all 3 workflows + enforcement lint (validate.sh §15a-bc-16291) + retention 90→14 + EVALS_MODEL→claude-sonnet-5 |
 | 005 | Version/metadata truth sweep (README/ARCHITECTURE/manifests/release.sh) | P2 | M | — | BC-16293 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
