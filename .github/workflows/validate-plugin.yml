@@ -20,23 +20,19 @@ jobs:
           python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
           echo "marketplace.json is valid"
 
+      # scripts/validate.sh §2d/2f-2h now own the four harness checks that used
+      # to run as separate steps here (test-hooks.sh, test-skill-triggers.sh,
+      # test-contracts.sh, test-scenarios.sh) — single source of truth so a
+      # green local `bash scripts/validate.sh` implies a green CI `validate`
+      # job (BC-16287).
       - name: Validate all plugins
         run: bash scripts/validate.sh  # discovers plugins/*/ via marketplace.json
 
-      - name: Test security hook regexes
-        run: bash scripts/test-hooks.sh
-
+      # meta-test of the validate.sh hook-lint gate — invokes validate.sh
+      # itself, so it must stay OUTSIDE the gate (recursion); the rule it tests
+      # runs in-gate via scripts/_lib/lint_hooks.py
       - name: Test hook model tier-alias lint
         run: bash scripts/test-hook-model-lint.sh
-
-      - name: Test skill trigger matching
-        run: bash scripts/test-skill-triggers.sh  # discovers all plugins/*/skills/_shared/trigger-registry.json
-
-      - name: Test cross-skill contracts
-        run: bash scripts/test-contracts.sh  # workflows-only by design (cross-skill handoffs)
-
-      - name: Test end-to-end scenarios
-        run: bash scripts/test-scenarios.sh  # workflows-only by design (project-start PRD scenarios)
 
   vslice-greenfield:
     # BC-7057 v-slice integration test: exercises FDA helper-script Phase 1 surface
