@@ -22,7 +22,7 @@ session.
 
 | Plan | Title | Priority | Effort | Depends on | Linear | Status |
 |------|-------|----------|--------|------------|--------|--------|
-| 001 | Remove committed prospect PII + gitignore guard | P1 | M | — | BC-16286 | TODO |
+| 001 | Remove committed prospect PII + gitignore guard | P1 | M | — | BC-16286 | DONE — PR 522 (reviewer-verified, unmerged) |
 | 002 | Single verification entrypoint (validate.sh ⇔ CI parity + RESULT hardening) | P1 | S | — | BC-16287 | TODO |
 | 003 | Execute the 26 orphaned Python tests in CI | P1 | M | 002 | BC-16289 | TODO |
 | 004 | Pin CI supply chain + cap eval-artifact retention | P2 | S | — | BC-16291 | TODO |
