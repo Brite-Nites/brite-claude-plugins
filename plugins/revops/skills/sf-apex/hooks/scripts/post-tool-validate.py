@@ -42,6 +42,68 @@ SHARED_DIR = os.path.join(SKILLS_ROOT, "shared")
 if os.path.isdir(SHARED_DIR):
     sys.path.insert(0, SHARED_DIR)
 
+# ═══════════════════════════════════════════════════════════════════
+# BC-16682: PHASE 1.5 (LLM pattern validator) and PHASE 2.5 (live query
+# plan) APPEND findings to custom_issues for display, but historically
+# never fed them back into the score — a hallucinated-Apex file (Java
+# ArrayList/HashMap, hallucinated methods, etc.) could score identical
+# to clean code. These weights deduct ONLY those appended, non-rubric
+# findings (identified by issue['source'] in ('llm-validator',
+# 'live-query-plan')) from final_score. They are orthogonal to the
+# Code Analyzer (CA) deductions applied in PHASE 3 above — CA deducts
+# for PMD/regex/sfge rule violations and only runs when `sf` + Code
+# Analyzer are installed, whereas this deducts for LLM-pattern and
+# live-SOQL-plan findings that PHASE 1's custom_score never counted —
+# so there is no double-count with either custom_score or CA's
+# ca_deductions.
+# ═══════════════════════════════════════════════════════════════════
+APPENDED_FINDING_WEIGHTS = {
+    'CRITICAL': 20,
+    'HIGH': 15,
+    'WARNING': 8,
+    'INFO': 0,
+}
+
+# Rating thresholds mirroring validate_apex.ApexValidator.validate()'s
+# absolute-score thresholds (81/68/54/40, defined against its 90-point
+# max_score). validate_apex.py has no standalone helper for this
+# mapping — it's inlined directly in validate() — so we replicate its
+# exact thresholds + labels here (scaled proportionally if final_max
+# ever differs from validate_apex's reference max of 90).
+APEX_RATING_REFERENCE_MAX = 90
+APEX_RATING_THRESHOLDS = [
+    (81, '⭐⭐⭐⭐⭐ Excellent', 5),
+    (68, '⭐⭐⭐⭐ Very Good', 4),
+    (54, '⭐⭐⭐ Good', 3),
+    (40, '⭐⭐ Needs Work', 2),
+    (0, '⭐ Critical Issues', 1),
+]
+
+
+def calculate_apex_rating(score, max_score):
+    """
+    Recompute the Apex rating string + stars from a (possibly
+    deduction-adjusted) score, using validate_apex.ApexValidator's own
+    thresholds and labels (BC-16682), so display honesty holds even
+    after the PHASE 3.5 deduction below lowers final_score under the
+    PHASE-1 custom_score/rating.
+
+    Args:
+        score: the score to rate (e.g. final_score after deductions)
+        max_score: the max the score is out of (e.g. final_max)
+
+    Returns:
+        (rating_string, rating_stars) tuple
+    """
+    if max_score <= 0:
+        label, stars = APEX_RATING_THRESHOLDS[-1][1], APEX_RATING_THRESHOLDS[-1][2]
+        return label, stars
+    scale = max_score / APEX_RATING_REFERENCE_MAX
+    for threshold, label, stars in APEX_RATING_THRESHOLDS:
+        if score >= threshold * scale:
+            return label, stars
+    return APEX_RATING_THRESHOLDS[-1][1], APEX_RATING_THRESHOLDS[-1][2]
+
 
 def validate_apex_with_ca(file_path: str) -> dict:
     """
@@ -174,7 +236,8 @@ def validate_apex_with_ca(file_path: str) -> dict:
                             'severity': 'WARNING',
                             'line': query_info.line,
                             'message': f'Non-selective SOQL (cost: {plan_result.relative_cost:.1f}, op: {plan_result.leading_operation})',
-                            'fix': 'Add indexed fields to WHERE clause or reduce result set'
+                            'fix': 'Add indexed fields to WHERE clause or reduce result set',
+                            'source': 'live-query-plan'
                         })
 
         except ImportError:
@@ -213,19 +276,28 @@ def validate_apex_with_ca(file_path: str) -> dict:
                 # Fallback to custom score only
                 pass
 
-        # Calculate rating stars from custom score if not set
-        if rating_stars == 0:
-            pct = (final_score / final_max * 100) if final_max > 0 else 0
-            if pct >= 90:
-                rating_stars = 5
-            elif pct >= 75:
-                rating_stars = 4
-            elif pct >= 60:
-                rating_stars = 3
-            elif pct >= 45:
-                rating_stars = 2
-            else:
-                rating_stars = 1
+        # ═══════════════════════════════════════════════════════════════════
+        # PHASE 3.5: Deduct appended LLM-pattern / live-query-plan findings
+        # (BC-16682) — see APPENDED_FINDING_WEIGHTS comment above for why
+        # this doesn't double-count PHASE-1 rubric issues or CA deductions.
+        # ═══════════════════════════════════════════════════════════════════
+        appended_findings_deduction = 0
+        for issue in custom_issues:
+            if issue.get('source') not in ('llm-validator', 'live-query-plan'):
+                continue
+            severity = str(issue.get('severity', 'WARNING')).upper()
+            appended_findings_deduction += APPENDED_FINDING_WEIGHTS.get(
+                severity, APPENDED_FINDING_WEIGHTS['WARNING']
+            )
+
+        if appended_findings_deduction > 0:
+            final_score = max(0, final_score - appended_findings_deduction)
+            ca_deductions += appended_findings_deduction
+
+        # Recompute rating stars AND rating string from final_score (BC-16682).
+        # Always recompute (not just when unset) so a downgraded final_score
+        # never keeps a stale "Excellent" rating from PHASE 1 or the CA merge.
+        rating, rating_stars = calculate_apex_rating(final_score, final_max)
 
         # ═══════════════════════════════════════════════════════════════════
         # PHASE 4: Format output
