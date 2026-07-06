@@ -13,18 +13,21 @@ set -euo pipefail
 # imports `from tests.hooks.conftest import ...`), so each suite MUST be run
 # from inside its own plugin directory, not from the repo root.
 #
-# Local dev without pytest installed: prints `SKIP: pytest not installed` and
-# exits 0 (advisory-only — don't block a bare-checkout dev loop on it). In CI
-# (CI=true), a missing pytest is a hard failure — exit 1 — since the CI job's
-# first step is `python3 -m pip install pytest`, so its absence there means
-# something is actually broken.
+# pytest missing → prints `SKIP: pytest not installed` and exits 0 (advisory —
+# don't block a bare-checkout dev loop, and don't block validate.sh §2j which
+# runs this wrapper in the CI `validate` job that does NOT install pytest).
+# The dedicated `python-units` CI job — the one that DOES install pytest and is
+# the blocking source of truth — sets REQUIRE_PYTEST=true, which turns a missing
+# pytest there into a hard failure (exit 1). NOTE: do NOT gate on `CI=true` —
+# GitHub Actions sets CI=true in EVERY job, including `validate` (which runs
+# this via §2j without pytest), so keying on CI would fail that job spuriously.
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # ── pytest availability guard ──────────────────────────────────────────
 if ! python3 -m pytest --version >/dev/null 2>&1; then
-  if [ "${CI:-}" = "true" ]; then
-    echo "ERROR: pytest not installed in CI — run: python3 -m pip install pytest" >&2
+  if [ "${REQUIRE_PYTEST:-}" = "true" ]; then
+    echo "ERROR: pytest required here but not installed — run: python3 -m pip install pytest" >&2
     exit 1
   fi
   echo "SKIP: pytest not installed (run: python3 -m pip install pytest)"

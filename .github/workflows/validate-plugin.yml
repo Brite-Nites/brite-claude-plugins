@@ -78,7 +78,12 @@ jobs:
       - name: Run Python unit suites (revops/marketing/workflows)
         run: bash scripts/test-python-units.sh
         env:
-          CI: "true"
+          # This job installs pytest above, so a missing pytest here is a real
+          # break → hard-fail. (Do NOT rely on CI=true for this: GitHub sets
+          # CI=true in every job, including `validate`, which runs this wrapper
+          # via validate.sh §2j WITHOUT installing pytest — keying on CI there
+          # would fail that job spuriously. See test-python-units.sh guard.)
+          REQUIRE_PYTEST: "true"
 
   vslice-inventory-only-rescaffold:
     # BC-9971 v-slice for the inventory-only-domain re-scaffold classifier
