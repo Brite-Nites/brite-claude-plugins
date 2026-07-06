@@ -74,7 +74,7 @@ EVALS=1 EVALS_TRIALS=5 bash scripts/test-behavioral.sh
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `EVALS` | (none) | Must be `1` to run. Safety guard. |
-| `EVALS_MODEL` | `claude-sonnet-4-6` | Model for test invocations |
+| `EVALS_MODEL` | `claude-sonnet-5` | Model for test invocations |
 | `EVALS_TRIALS` | `1` | Trials per test (use 5 for reliable results) |
 | `EVALS_TIMEOUT` | `120` | Timeout per invocation in seconds |
 

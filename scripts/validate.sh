@@ -2957,6 +2957,48 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-16291 — CI supply-chain pin guard (BC-16291 / audit plan 004)
+# ──────────────────────────────────────────────────────────────────────
+# The two secret-bearing workflows (behavioral-tests.yml → ANTHROPIC_API_KEY;
+# jwt-validity-probe.yml → prod Salesforce token + LINEAR_API_KEY) run third-
+# party actions + `npm install -g` CLIs; on a PUBLIC repo a moved tag or a
+# poisoned "latest" npm release would run arbitrary code next to those secrets.
+# This guard fails on any `uses: owner/repo@<non-SHA>` or any unpinned
+# `npm install -g` across ALL .github/workflows/*.yml, so the pin convention set
+# here can't erode by copy-paste (the plan's "reviewers should reject unpinned
+# uses" made physical). First the self-test (synthetic fixtures lock the SHA/npm
+# detection + rc discipline), then the lint against the real workflow tree.
+# Missing files FAIL (not warn-skip): a mandatory gate that silently passes when
+# its harness is deleted is the BC-12589 trap.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-16291. CI supply-chain pin guard (BC-16291)"
+
+wfpin_lint="$REPO_ROOT/scripts/_lib/lint_workflow_pins.py"
+wfpin_selftest="$REPO_ROOT/scripts/_lib/test_lint_workflow_pins.sh"
+
+if [ ! -f "$wfpin_lint" ]; then
+  fail "scripts/_lib/lint_workflow_pins.py not found — CI supply-chain pin guard cannot run (BC-16291)"
+elif [ ! -f "$wfpin_selftest" ]; then
+  fail "scripts/_lib/test_lint_workflow_pins.sh not found — pin guard self-test cannot run (BC-16291)"
+else
+  # (1) self-test — synthetic fixtures prove the SHA-pin / npm-pin / rc logic.
+  if wfpin_st_out=$(bash "$wfpin_selftest" "$wfpin_lint" 2>&1); then
+    wfpin_st_count=$(printf '%s\n' "$wfpin_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    pass "CI supply-chain pin guard self-test (${wfpin_st_count:-?} assertions)"
+  else
+    fail "CI supply-chain pin guard self-test failed:"
+    printf '%s\n' "$wfpin_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  # (2) the gate — run the lint against the real .github/workflows/ tree.
+  if wfpin_lint_out=$(python3 "$wfpin_lint" 2>&1); then
+    pass "CI supply-chain pin guard (all actions + npm globals pinned)"
+  else
+    fail "CI supply-chain pin guard found unpinned references:"
+    printf '%s\n' "$wfpin_lint_out" | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12698 — cross-PR ADR-number collision guard CORE (BC-12698)
 # ──────────────────────────────────────────────────────────────────────
 # The §15a-bc-12617 guard above catches a duplicate ADR number within ONE PR's

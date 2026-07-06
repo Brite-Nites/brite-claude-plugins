@@ -27,7 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install sf CLI
-        run: npm install -g @salesforce/cli
+        # Pinned deliberately — Dependabot does not track `npm install -g`; bump on review.
+        run: npm install -g @salesforce/cli@2.141.6
 
       - name: Authenticate to brite-prod
         run: |

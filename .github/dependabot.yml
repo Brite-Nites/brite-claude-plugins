@@ -22,3 +22,10 @@ updates:
     open-pull-requests-limit: 0
     ignore:
       - dependency-name: "*"
+
+  # Third-party Actions are SHA-pinned with a `# vN` comment (BC-16291 / audit
+  # plan 004); Dependabot reads that comment to open bump PRs against the pin.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
