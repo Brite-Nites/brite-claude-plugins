@@ -62,7 +62,7 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 | Schedule templates and variable management | `emailbison-{b2b,personal}` (schedules + variables categories) | Active workspace | `email-bison.md` §Tool inventory |
 | Pull quick stats (not full analytics — hand off to `campaign-analysis` for depth) | `emailbison-{b2b,personal}` (`get_campaign_stats`, `get_leads_analytics`, `get_workspace_stats`) | Active workspace | `email-bison.md` §Common workflows |
 
-**Wildcard form per ADR 2c** — `allowed-tools` uses `mcp__plugin_marketing_emailbison-{b2b,personal}__*` because the skill exercises tools across most of the 141-tool surface. Narrower cherry-picking would require enumerating dozens of tool names and updating the list every time the vendor adds one.
+**Wildcard form** — `allowed-tools` uses the short form `mcp__emailbison-{b2b,personal}__*` (Email Bison registers at **user level**, so its namespace carries no `plugin_marketing_` prefix — the plugin-scoped form silent-fails per the CLAUDE.md gotcha) because the skill exercises tools across most of the 141-tool surface. Narrower cherry-picking would require enumerating dozens of tool names and updating the list every time the vendor adds one.
 
 ### Architectural rules that apply
 
