@@ -82,11 +82,19 @@ assertions.
   `bash scripts/validate.sh`, `bash scripts/test-hooks.sh`,
   `bash scripts/test-hook-model-lint.sh`, `bash scripts/test-skill-triggers.sh`,
   `bash scripts/test-contracts.sh`, `bash scripts/test-scenarios.sh`.
-- The four missing harnesses exist at `scripts/test-hook-model-lint.sh`,
+- AMENDED 2026-07-05 after executor STOP (round 1): of the four missing
+  harnesses, only THREE are plain exit-code harnesses wireable as sections:
   `scripts/test-skill-triggers.sh` (self-discovers
   `plugins/*/skills/_shared/trigger-registry.json`), `scripts/test-contracts.sh`
   (workflows-only by design), `scripts/test-scenarios.sh` (workflows-only by
-  design). Each exits nonzero on failure (that's what CI relies on).
+  design) — grep-verified: none invoke validate.sh.
+  `scripts/test-hook-model-lint.sh` is EXCLUDED: it is the META-TEST of the
+  hook-lint gate — it invokes `scripts/validate.sh` itself at lines 117 and 179
+  (wiring it in = infinite mutual recursion) and it temporarily mutates the
+  real `plugins/workflows/hooks/hooks.json` during its seeded-alias check. The
+  RULE it meta-tests is already enforced inside validate.sh (line ~1393 runs
+  `scripts/_lib/lint_hooks.py` per plugin), so local⇔CI parity for the rule
+  already holds; the meta-test stays a CI-only step by design.
 - Full validate.sh currently takes ~3m03s; the four harnesses add whatever they
   cost in CI today (they're already in every CI run, so total CI time is
   unchanged if CI is deduplicated — see Step 4).
@@ -130,23 +138,21 @@ assertions.
 
 ## Steps
 
-### Step 1: Add four delegate sections to validate.sh
+### Step 1 (AMENDED): Add three delegate sections to validate.sh
 
 Insert after section 2d' ("Pre-commit Advisory Hook", ends before section 2e
-"workflows helper-script unit tests" around line 890) four new sections named
-`2d''`-style or `2f`-style (match the file's existing naming spirit; suggested:
-`2f. Hook model tier-alias lint`, `2g. Skill trigger matching`,
-`2h. Cross-skill contracts (workflows)`, `2i. End-to-end scenarios (workflows)`).
+"workflows helper-script unit tests" around line 890) three new sections
+(suggested: `2f. Skill trigger matching`, `2g. Cross-skill contracts
+(workflows)`, `2h. End-to-end scenarios (workflows)`).
 Each section copies the section-2d shape exactly (warn-if-missing, run, fail
 with tail -25 on nonzero), pointing at the respective script:
-`scripts/test-hook-model-lint.sh`, `scripts/test-skill-triggers.sh`,
-`scripts/test-contracts.sh`, `scripts/test-scenarios.sh`. Don't parse a count
-for these four unless the harness emits the `RESULT pass=` contract line —
-check each harness's output format first (`bash <harness> | tail -3`) and only
-add a count-parse for ones that emit it.
+`scripts/test-skill-triggers.sh`, `scripts/test-contracts.sh`,
+`scripts/test-scenarios.sh`. All three emit a `Total: N  Passed: M` summary
+line parsable by the section-2d sed pattern (verified: 41/41, 87/87, 225/225).
+Do NOT wire `scripts/test-hook-model-lint.sh` (see amended Current state).
 
 **Verify**: `bash -n scripts/validate.sh` → silent. `bash scripts/validate.sh`
-→ exit 0 and the four new section headers appear in output.
+→ exit 0 and the three new section headers appear in output.
 
 ### Step 2: Prove the new sections can fail
 
@@ -194,13 +200,14 @@ condition (report which).
 
 ### Step 4: Deduplicate the CI step list
 
-In `.github/workflows/validate-plugin.yml` `validate` job, the five explicit
-harness steps (`test-hooks.sh`, `test-hook-model-lint.sh`,
-`test-skill-triggers.sh`, `test-contracts.sh`, `test-scenarios.sh`) are now
-redundant with validate.sh. Remove those five steps, keeping the
-marketplace fast-fail step and the `bash scripts/validate.sh` step (and all
-other jobs untouched). Add a YAML comment noting validate.sh §2d/2f-2i now own
-them (single source of truth).
+In `.github/workflows/validate-plugin.yml` `validate` job, FOUR of the five
+explicit harness steps (`test-hooks.sh`, `test-skill-triggers.sh`,
+`test-contracts.sh`, `test-scenarios.sh`) are now redundant with validate.sh.
+Remove those four steps, keeping the marketplace fast-fail step, the
+`bash scripts/validate.sh` step, AND the `test-hook-model-lint.sh` step (the
+gate's meta-test cannot run inside the gate it tests — add a YAML comment
+saying exactly that). Add a comment noting validate.sh §2d/2f-2h now own the
+removed four (single source of truth).
 
 **Verify**: `python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/validate-plugin.yml'))"`
 → silent (if pyyaml is unavailable, use `ruby -ryaml -e "YAML.load_file(...)"`
@@ -219,10 +226,10 @@ to fail). No new test files. Machine verification is the Done criteria below.
 ## Done criteria
 
 - [ ] `bash scripts/validate.sh` exits 0 on the unmodified tree
-- [ ] The four harnesses each appear as a section in validate.sh output
+- [ ] The three wireable harnesses each appear as a section in validate.sh output; test-hook-model-lint.sh remains a CI step with the meta-test comment
 - [ ] Injected failure test (Step 2) demonstrated exit 1, then reverted
 - [ ] `grep -c "count unparsed" scripts/validate.sh` → 0
-- [ ] CI workflow `validate` job no longer lists the five harness steps individually
+- [ ] CI workflow `validate` job lists exactly two harness-related steps: validate.sh and test-hook-model-lint.sh
 - [ ] No files outside the in-scope list modified (`git status`)
 - [ ] `plans/README.md` status row updated
 
