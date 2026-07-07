@@ -322,19 +322,18 @@ Add entries to the `[Unreleased]` section of `CHANGELOG.md` as you go. Follow [K
 
 ### Cutting a release
 
-Run the release script from `main`:
+> **`VERSION` and `scripts/release.sh` are legacy.** The root `VERSION` file froze at
+> 3.29.0 (2026-03-28) when per-plugin versions diverged — it does **not** track the
+> workflows plugin (currently well past 3.29.0). `scripts/release.sh` predates the
+> per-plugin model and currently cannot run against diverged versions. Per-plugin
+> release tooling is tracked by BC-1728.
 
-```bash
-scripts/release.sh minor "Release Name"    # or: major, patch
-```
-
-This bumps version in `VERSION`, `plugin.json`, and `marketplace.json`, moves `[Unreleased]` entries under the new version heading, commits, and creates a git tag. Then push:
-
-```bash
-git push && git push --tags
-```
-
-Each plugin has its own version in `plugin.json` and `marketplace.json`. `scripts/validate.sh` checks that each plugin's versions match across these two files. The `VERSION` file tracks the workflows plugin version. Per-plugin release support is tracked by BC-1728.
+In practice, each plugin versions independently. When you change anything under a
+plugin's `hooks/`, `skills/`, `commands/`, or `agents/`, bump that plugin's version in
+**both** its `plugin.json` and its `.claude-plugin/marketplace.json` entry, in the same
+commit — `scripts/validate.sh` §2b enforces that the two stay equal (and that
+`homepage`/`repository`/`description` stay consistent). Add `[Unreleased]` entries to
+`CHANGELOG.md` as you go, following [Keep a Changelog](https://keepachangelog.com/).
 
 ## Skill Routing Updates
 

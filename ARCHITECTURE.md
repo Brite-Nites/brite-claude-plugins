@@ -8,7 +8,7 @@ How the Brite Claude Plugins bundle is structured, how it executes, and why it's
 graph TD
     MP["marketplace.json<br/>(plugin registry)"] --> PJ["plugin.json<br/>(metadata + paths)"]
     PJ --> CMD["commands/<br/>24 slash commands"]
-    PJ --> SKL["skills/<br/>22 auto-invoked skills"]
+    PJ --> SKL["skills/<br/>24 auto-invoked skills"]
     PJ --> AGT["agents/<br/>12 specialized agents"]
     PJ --> HK["hooks/hooks.json<br/>3 event hooks"]
     PJ --> MCP[".mcp.json<br/>2 MCP servers"]
