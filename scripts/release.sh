@@ -74,8 +74,11 @@ if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 pass "Current version: $CURRENT_VERSION"
 
-# Cache plugin.json paths (reused for version check, update, and git add)
-mapfile -t PLUGIN_JSONS < <(find "$REPO_ROOT/plugins" -name "plugin.json" -path "*/.claude-plugin/*")
+# Cache plugin.json paths (reused for version check, update, and git add).
+# `mapfile` is bash-4-only; macOS stock bash is 3.2, so read into the array
+# with the repo's standard while-read idiom (see validate.sh / pre-commit.sh).
+PLUGIN_JSONS=()
+while IFS= read -r p; do PLUGIN_JSONS+=("$p"); done < <(find "$REPO_ROOT/plugins" -name "plugin.json" -path "*/.claude-plugin/*")
 
 # Check version consistency across files (single python3 call)
 version_check=$(python3 - "$MARKETPLACE" "$CURRENT_VERSION" "${PLUGIN_JSONS[@]}" <<'PYEOF'

@@ -4,10 +4,10 @@
   "author": {
     "name": "Brite"
   },
-  "homepage": "https://github.com/brite-nites/brite-claude-plugins",
-  "repository": "https://github.com/brite-nites/brite-claude-plugins",
+  "homepage": "https://github.com/Brite-Nites/brite-claude-plugins",
+  "repository": "https://github.com/Brite-Nites/brite-claude-plugins",
   "license": "MIT",
-  "version": "3.41.1",
+  "version": "3.41.2",
   "keywords": [
     "claude-code",
     "plugin",
