@@ -12,7 +12,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — all steps are read-only validators
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Validate marketplace.json (fast-fail)
         run: |
@@ -48,7 +48,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — harness scripts only read in-repo files
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run v-slice greenfield harness
         run: bash plugins/flow-architecture/tests/run-greenfield-vslice.sh
@@ -70,7 +70,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — the suites only read in-repo files
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install pytest
         run: python3 -m pip install pytest
@@ -97,7 +97,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — harness only reads fixture + script
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run BC-9971 inventory-only-rescaffold harness
         run: bash plugins/flow-architecture/tests/run-inventory-only-rescaffold-vslice.sh
@@ -116,7 +116,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — script only reads fixture files
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run /flow:audit smoke test (BC-7059)
         run: bash plugins/flow-architecture/tests/run-audit-smoke.sh
@@ -136,7 +136,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — harness only reads fixture + scripts
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run mode-classifier eval (BC-7061)
         run: bash plugins/flow-architecture/tests/run-mode-classifier-eval.sh
@@ -161,7 +161,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — script only reads in-repo files
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0  # need full history for blob SHA lookups across refs
 
@@ -194,7 +194,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — script only reads in-repo files
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0  # need full history for blob SHA lookups + base diff
 
@@ -224,7 +224,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — the gate only reads in-repo files + a git diff
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0  # need origin/main as the diff base for the changed-command set
 
@@ -287,7 +287,7 @@ jobs:
       contents: read        # read the in-repo guard scripts
       pull-requests: read   # gh pr list + gh api pulls/*/files across the open PRs
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Surface cross-PR ADR-number collisions (advisory)
         run: bash scripts/ci/cross-pr-adr-guard.sh
