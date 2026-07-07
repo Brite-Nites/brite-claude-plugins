@@ -229,7 +229,8 @@
       "priority": "high",
       "description": "Deep persona design for Agentforce -- 12-attribute framework, brand input, archetype presets, Agent Builder & Agent Script encoding",
       "triggerWhen": "user designs agent personas, defines agent personality/identity, creates persona documents, encodes persona into Agent Builder fields or Agent Script, translates brand guidelines to agent voice, or asks about agent tone/voice/register",
-      "doNotTriggerWhen": "building agent metadata (use sf-ai-agentforce), testing agents (use sf-ai-agentforce-testing), or Agent Script DSL (use sf-ai-agentscript)"
+      "doNotTriggerWhen": "building agent metadata (use sf-ai-agentforce), testing agents (use sf-ai-agentforce-testing), or Agent Script DSL (use sf-ai-agentscript)",
+      "absent_reason": "not-ported"
     },
     "sf-ai-agentforce": {
       "keywords": [
@@ -255,7 +256,8 @@
       "priority": "medium",
       "description": "Standard Agentforce platform skill for Setup UI agent building, PromptTemplate, Models API, and GenAi metadata",
       "triggerWhen": "user configures agents in Agent Builder, creates topics/actions, writes PromptTemplates, or touches .genAiFunction/.genAiPlugin/.promptTemplate metadata XML",
-      "doNotTriggerWhen": "Agent Script DSL .agent files (use sf-ai-agentscript), agent testing (use sf-ai-agentforce-testing), or persona design (use sf-ai-agentforce-persona)"
+      "doNotTriggerWhen": "Agent Script DSL .agent files (use sf-ai-agentscript), agent testing (use sf-ai-agentforce-testing), or persona design (use sf-ai-agentforce-persona)",
+      "absent_reason": "not-ported"
     },
     "sf-metadata": {
       "keywords": [
@@ -357,7 +359,8 @@
       "priority": "high",
       "description": "Vlocity Build DataPack deployment orchestration for export, deploy, retry, and migration workflows",
       "triggerWhen": "user deploys or validates OmniStudio/Vlocity DataPacks with vlocity packDeploy/packRetry/packExport, manages DataPack migration workflows, or troubleshoots DataPack deployment failures",
-      "doNotTriggerWhen": "deploying Salesforce metadata with sf project deploy (use sf-deploy), authoring OmniStudio assets (use sf-industry-commoncore-*), or writing Apex/LWC business logic"
+      "doNotTriggerWhen": "deploying Salesforce metadata with sf project deploy (use sf-deploy), authoring OmniStudio assets (use sf-industry-commoncore-*), or writing Apex/LWC business logic",
+      "absent_reason": "not-ported"
     },
     "sf-testing": {
       "keywords": [
@@ -489,7 +492,8 @@
       "priority": "medium",
       "description": "Public list-price Flex Credit estimation for Agentforce and Data Cloud workloads",
       "triggerWhen": "user needs cost projections, scenario planning, budget sizing, or architecture tradeoff analysis for Agentforce prompts/actions, Data Cloud meters, or monthly Flex Credit usage",
-      "doNotTriggerWhen": "the user is implementing Builder metadata or .agent files, provisioning live Data Cloud assets, or asking for exact contract-specific commercial pricing"
+      "doNotTriggerWhen": "the user is implementing Builder metadata or .agent files, provisioning live Data Cloud assets, or asking for exact contract-specific commercial pricing",
+      "absent_reason": "not-ported"
     },
     "sf-datacloud": {
       "keywords": [
@@ -515,7 +519,8 @@
       "priority": "high",
       "description": "Cross-phase Salesforce Data Cloud orchestration using the external community sf data360 runtime",
       "triggerWhen": "user needs a multi-phase Data Cloud workflow, manages data spaces or data kits, troubleshoots Data Cloud across phases, or explicitly references `sf data360` at a broad product level",
-      "doNotTriggerWhen": "the task is isolated to a single Data Cloud phase, standard CRM SOQL, Apex-only work, or STDM/session tracing/parquet telemetry (use sf-ai-agentforce-observability)"
+      "doNotTriggerWhen": "the task is isolated to a single Data Cloud phase, standard CRM SOQL, Apex-only work, or STDM/session tracing/parquet telemetry (use sf-ai-agentforce-observability)",
+      "absent_reason": "runtime-installable"
     },
     "sf-datacloud-connect": {
       "keywords": [
@@ -551,7 +556,8 @@
       "priority": "medium",
       "description": "Data Cloud connections, connectors, and source discovery",
       "triggerWhen": "user manages Data Cloud connections, connectors, source metadata, uploaded connector schemas, or tests a connection",
-      "doNotTriggerWhen": "the task is about data streams, DLOs, DMOs, SQL/search, or STDM/session tracing"
+      "doNotTriggerWhen": "the task is about data streams, DLOs, DMOs, SQL/search, or STDM/session tracing",
+      "absent_reason": "runtime-installable"
     },
     "sf-datacloud-prepare": {
       "keywords": [
@@ -586,7 +592,8 @@
       "priority": "medium",
       "description": "Data Cloud ingestion, streams, DLOs, transforms, Document AI, and unstructured refresh workflows",
       "triggerWhen": "user creates or manages Data Cloud streams, DLOs, transforms, DocAI workflows, unstructured rescans, or Ingestion API send-data flows after connector setup",
-      "doNotTriggerWhen": "the task is connector-only setup, harmonization, or pure query/search work"
+      "doNotTriggerWhen": "the task is connector-only setup, harmonization, or pure query/search work",
+      "absent_reason": "runtime-installable"
     },
     "sf-datacloud-harmonize": {
       "keywords": [
@@ -610,7 +617,8 @@
       "priority": "high",
       "description": "Data Cloud DMOs, mappings, identity resolution, unified profiles, and data graphs",
       "triggerWhen": "user works with Data Cloud DMOs, mappings, identity resolution, unified profiles, data graphs, or universal ID lookup",
-      "doNotTriggerWhen": "the task is only about streams/DLOs, segment design, SQL/search, or STDM/session tracing"
+      "doNotTriggerWhen": "the task is only about streams/DLOs, segment design, SQL/search, or STDM/session tracing",
+      "absent_reason": "runtime-installable"
     },
     "sf-datacloud-segment": {
       "keywords": [
@@ -633,7 +641,8 @@
       "priority": "medium",
       "description": "Data Cloud segments, calculated insights, and audience troubleshooting",
       "triggerWhen": "user creates or publishes Data Cloud segments, manages calculated insights, or troubleshoots audience logic",
-      "doNotTriggerWhen": "the task is activation delivery, pure query/search work, or STDM/session tracing"
+      "doNotTriggerWhen": "the task is activation delivery, pure query/search work, or STDM/session tracing",
+      "absent_reason": "runtime-installable"
     },
     "sf-datacloud-act": {
       "keywords": [
@@ -655,7 +664,8 @@
       "priority": "medium",
       "description": "Data Cloud activations, activation targets, and data actions",
       "triggerWhen": "user manages Data Cloud activations, activation targets, data actions, or downstream delivery setup",
-      "doNotTriggerWhen": "the task is segment design, search/query work, or STDM/session tracing"
+      "doNotTriggerWhen": "the task is segment design, search/query work, or STDM/session tracing",
+      "absent_reason": "runtime-installable"
     },
     "sf-datacloud-retrieve": {
       "keywords": [
@@ -684,7 +694,8 @@
       "priority": "high",
       "description": "Data Cloud SQL, async query, search-index, vector-search, hybrid-search, and metadata introspection workflows",
       "triggerWhen": "user runs Data Cloud SQL, describe, async queries, vector search, hybrid search, search-index workflows, or metadata introspection",
-      "doNotTriggerWhen": "the task is CRM SOQL-only, segment design, or STDM/session tracing/parquet analysis"
+      "doNotTriggerWhen": "the task is CRM SOQL-only, segment design, or STDM/session tracing/parquet analysis",
+      "absent_reason": "runtime-installable"
     },
     "sf-docs": {
       "keywords": [
@@ -914,7 +925,8 @@
       "priority": "low",
       "description": "Visual mockups and image generation",
       "triggerWhen": "user asks for PNG/SVG output, UI mockups, wireframes, visual ERDs, or says 'generate image' / 'create mockup'",
-      "doNotTriggerWhen": "text-based Mermaid diagrams (use sf-diagram-mermaid), or non-visual documentation tasks"
+      "doNotTriggerWhen": "text-based Mermaid diagrams (use sf-diagram-mermaid), or non-visual documentation tasks",
+      "absent_reason": "not-ported"
     },
     "sf-ai-agentforce-testing": {
       "keywords": [
@@ -942,7 +954,8 @@
       "priority": "low",
       "description": "Agentforce agent test automation",
       "triggerWhen": "user tests Agentforce agents, runs sf agent test commands, creates test specs, validates topic routing, or analyzes agent test coverage",
-      "doNotTriggerWhen": "Apex unit tests (use sf-testing), building agents (use sf-ai-agentforce), or Agent Script DSL (use sf-ai-agentscript)"
+      "doNotTriggerWhen": "Apex unit tests (use sf-testing), building agents (use sf-ai-agentforce), or Agent Script DSL (use sf-ai-agentscript)",
+      "absent_reason": "not-ported"
     },
     "sf-ai-agentscript": {
       "keywords": [
@@ -972,7 +985,8 @@
       "priority": "high",
       "description": "Agent Script DSL for deterministic Agentforce agents",
       "triggerWhen": "user writes or edits .agent files, builds FSM-based agents, uses Agent Script CLI (sf agent generate/publish), or asks about deterministic agent patterns",
-      "doNotTriggerWhen": "Setup UI agent building (use sf-ai-agentforce), agent testing (use sf-ai-agentforce-testing), or persona design (use sf-ai-agentforce-persona)"
+      "doNotTriggerWhen": "Setup UI agent building (use sf-ai-agentforce), agent testing (use sf-ai-agentforce-testing), or persona design (use sf-ai-agentforce-persona)",
+      "absent_reason": "not-ported"
     },
     "sf-permissions": {
       "keywords": [
@@ -1030,7 +1044,8 @@
       "priority": "medium",
       "description": "Extract and analyze Agentforce session tracing data from Data Cloud",
       "triggerWhen": "user extracts STDM data from Data Cloud, analyzes agent session traces, debugs agent conversations via telemetry, or works with .parquet files from Agentforce",
-      "doNotTriggerWhen": "testing agents (use sf-ai-agentforce-testing), Apex debug logs (use sf-debug), or building agents (use sf-ai-agentforce)"
+      "doNotTriggerWhen": "testing agents (use sf-ai-agentforce-testing), Apex debug logs (use sf-debug), or building agents (use sf-ai-agentforce)",
+      "absent_reason": "not-ported"
     },
     "sf-industry-commoncore-omnistudio-analyze": {
       "keywords": [
@@ -1060,7 +1075,8 @@
       "priority": "high",
       "description": "Cross-cutting OmniStudio analysis for namespace detection, dependency mapping, and impact analysis",
       "triggerWhen": "user asks about OmniStudio dependencies, wants namespace detection (Core vs vlocity_cmt vs vlocity_ins), needs impact analysis across OmniStudio components, or requests dependency diagrams",
-      "doNotTriggerWhen": "authoring OmniScripts (use sf-industry-commoncore-omniscript), building FlexCards (use sf-industry-commoncore-flexcard), creating Integration Procedures (use sf-industry-commoncore-integration-procedure), or configuring Data Mappers (use sf-industry-commoncore-datamapper)"
+      "doNotTriggerWhen": "authoring OmniScripts (use sf-industry-commoncore-omniscript), building FlexCards (use sf-industry-commoncore-flexcard), creating Integration Procedures (use sf-industry-commoncore-integration-procedure), or configuring Data Mappers (use sf-industry-commoncore-datamapper)",
+      "absent_reason": "not-ported"
     },
     "sf-industry-commoncore-datamapper": {
       "keywords": [
@@ -1090,7 +1106,8 @@
       "priority": "medium",
       "description": "OmniStudio Data Mapper (formerly DataRaptor) creation and validation with 100-point scoring",
       "triggerWhen": "user creates Data Mappers, configures field mappings, works with OmniDataTransform metadata, or asks about DataRaptor/Data Mapper patterns",
-      "doNotTriggerWhen": "building Integration Procedures (use sf-industry-commoncore-integration-procedure), authoring OmniScripts (use sf-industry-commoncore-omniscript), or analyzing cross-component dependencies (use sf-industry-commoncore-omnistudio-analyze)"
+      "doNotTriggerWhen": "building Integration Procedures (use sf-industry-commoncore-integration-procedure), authoring OmniScripts (use sf-industry-commoncore-omniscript), or analyzing cross-component dependencies (use sf-industry-commoncore-omnistudio-analyze)",
+      "absent_reason": "not-ported"
     },
     "sf-industry-commoncore-integration-procedure": {
       "keywords": [
@@ -1119,7 +1136,8 @@
       "priority": "medium",
       "description": "OmniStudio Integration Procedure creation and validation with 110-point scoring",
       "triggerWhen": "user creates Integration Procedures, adds DataRaptor steps, configures Remote Actions, or reviews existing IP configurations",
-      "doNotTriggerWhen": "building OmniScripts (use sf-industry-commoncore-omniscript), creating Data Mappers directly (use sf-industry-commoncore-datamapper), or analyzing cross-component dependencies (use sf-industry-commoncore-omnistudio-analyze)"
+      "doNotTriggerWhen": "building OmniScripts (use sf-industry-commoncore-omniscript), creating Data Mappers directly (use sf-industry-commoncore-datamapper), or analyzing cross-component dependencies (use sf-industry-commoncore-omnistudio-analyze)",
+      "absent_reason": "not-ported"
     },
     "sf-industry-commoncore-callable-apex": {
       "keywords": [
@@ -1149,7 +1167,8 @@
       "priority": "medium",
       "description": "Salesforce Industries Common Core callable Apex generation and review for System.Callable and legacy Open Interface migrations",
       "triggerWhen": "user creates or reviews System.Callable classes, migrates VlocityOpenInterface / VlocityOpenInterface2, or builds Industries callable extensions used by OmniStudio, Integration Procedures, or DataRaptors",
-      "doNotTriggerWhen": "generic Apex classes/triggers (use sf-apex), building Integration Procedures (use sf-industry-commoncore-integration-procedure), authoring OmniScripts (use sf-industry-commoncore-omniscript), configuring Data Mappers (use sf-industry-commoncore-datamapper), or analyzing namespace/dependency issues (use sf-industry-commoncore-omnistudio-analyze)"
+      "doNotTriggerWhen": "generic Apex classes/triggers (use sf-apex), building Integration Procedures (use sf-industry-commoncore-integration-procedure), authoring OmniScripts (use sf-industry-commoncore-omniscript), configuring Data Mappers (use sf-industry-commoncore-datamapper), or analyzing namespace/dependency issues (use sf-industry-commoncore-omnistudio-analyze)",
+      "absent_reason": "not-ported"
     },
     "sf-industry-commoncore-omniscript": {
       "keywords": [
@@ -1177,7 +1196,8 @@
       "priority": "medium",
       "description": "OmniStudio OmniScript creation and validation with 120-point scoring",
       "triggerWhen": "user creates OmniScripts, designs step flows, configures element types, or reviews existing OmniScript configurations",
-      "doNotTriggerWhen": "building FlexCards (use sf-industry-commoncore-flexcard), creating Integration Procedures directly (use sf-industry-commoncore-integration-procedure), or analyzing dependencies (use sf-industry-commoncore-omnistudio-analyze)"
+      "doNotTriggerWhen": "building FlexCards (use sf-industry-commoncore-flexcard), creating Integration Procedures directly (use sf-industry-commoncore-integration-procedure), or analyzing dependencies (use sf-industry-commoncore-omnistudio-analyze)",
+      "absent_reason": "not-ported"
     },
     "sf-industry-commoncore-flexcard": {
       "keywords": [
@@ -1205,7 +1225,8 @@
       "priority": "medium",
       "description": "OmniStudio FlexCard creation and validation with 130-point scoring",
       "triggerWhen": "user creates FlexCards, configures data sources, designs card layouts, or asks about OmniUiCard metadata",
-      "doNotTriggerWhen": "building OmniScripts (use sf-industry-commoncore-omniscript), creating Integration Procedures (use sf-industry-commoncore-integration-procedure), or analyzing dependencies (use sf-industry-commoncore-omnistudio-analyze)"
+      "doNotTriggerWhen": "building OmniScripts (use sf-industry-commoncore-omniscript), creating Integration Procedures (use sf-industry-commoncore-integration-procedure), or analyzing dependencies (use sf-industry-commoncore-omnistudio-analyze)",
+      "absent_reason": "not-ported"
     },
     "sf-industry-cme-epc-model": {
       "keywords": [
@@ -1241,7 +1262,8 @@
       "priority": "high",
       "description": "Salesforce Industries CME EPC product modeling for Product2 catalog items, attributes, and offer bundles",
       "triggerWhen": "user creates or updates EPC Product2 records, configures attributes and defaults, builds offer bundles via ProductChildItem relationships, or edits EPC DataPack JSON in vlocity/Product2",
-      "doNotTriggerWhen": "building OmniScripts/FlexCards/Integration Procedures (use sf-industry-commoncore-*), implementing Apex business logic (use sf-apex), or deployment troubleshooting (use sf-deploy)"
+      "doNotTriggerWhen": "building OmniScripts/FlexCards/Integration Procedures (use sf-industry-commoncore-*), implementing Apex business logic (use sf-apex), or deployment troubleshooting (use sf-deploy)",
+      "absent_reason": "not-ported"
     }
   }
 }

@@ -1,7 +1,7 @@
 # 007. RevOps Plugin Design Decisions
 
-**Status:** Accepted (2026-04-19); **amended 2026-06-02** — §3.3 + §3.4 reconciled to as-built (7 commands, 2 MCP servers); original locked decisions unchanged.
-**Date:** 2026-04-19 / amended 2026-06-02
+**Status:** Accepted (2026-04-19); **amended 2026-06-02** — §3.3 + §3.4 reconciled to as-built (7 commands, 2 MCP servers); **amended 2026-07-07** — §3.5 clarified: `skills-registry.json` is a superset with runtime-install packs, not a strict on-disk manifest (BC-16683); original locked decisions unchanged.
+**Date:** 2026-04-19 / amended 2026-06-02 / amended 2026-07-07
 
 ## Context
 
@@ -55,6 +55,13 @@ Claude Code project-scope precedence means the three MCP instances (marketing na
 **Defer (1):** sf-diagram-mermaid — installed unmodified, no Brite customization issue filed yet. The plugin ships 14 skill directories total (13 customized + this one).
 
 **Skip (22 skills + 7 agents):** Data Cloud family (7), Agentforce AI family (5), Industries (7), Vlocity (1), sf-flex-estimator, sf-diagram-nanobananapro, all 7 consulting agents. None apply to Brite's stack.
+
+**Amendment 2026-07-07 (BC-16683) — `skills-registry.json` is a superset, not a strict manifest.** The "Skip (22)" bullet above conflates two distinct classes. `plugins/revops/shared/hooks/skills-registry.json` deliberately retains all 36 upstream entries; the 22 with no on-disk `SKILL.md` split as:
+
+- **Runtime-installable (7):** the Data Cloud family (`sf-datacloud`, `-connect`, `-prepare`, `-harmonize`, `-segment`, `-act`, `-retrieve`). These are *not* skipped in the "never ported" sense — they are installed on demand via `tools/install.py --with-datacloud-runtime` (community `sf data360` CLI), and their full trigger metadata + `background_operations` rules are load-bearing for the active `tests/test_datacloud_registry_contracts.py`. They stay in the registry so the packs remain discoverable and installable.
+- **Not-ported (15):** Agentforce AI family (5, incl. `sf-ai-agentscript`), Industries (7), Vlocity (1), `sf-flex-estimator`, `sf-diagram-nanobananapro`. Genuinely out of scope per the original §3.5 skip; retained only as registry entries. The deeper "delete these families entirely" question is deferred to the revops owner (out of BC-16683).
+
+Each absent entry now carries an explicit `absent_reason` marker (`"runtime-installable"` | `"not-ported"`). The previously-quarantined `test_registry_does_not_reference_missing_sf_skill_directories` is re-scoped to fail only on *unmarked* absent `sf-*` entries — genuine silent drift (a renamed/deleted on-disk skill whose registry entry lingers, or a bogus marker value used to mute the check) — and un-quarantined. The registry is therefore a **superset with runtime-install packs**, not a strict on-disk manifest.
 
 ### 3.6 Naming convention: keep upstream skill names
 
