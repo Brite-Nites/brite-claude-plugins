@@ -150,6 +150,47 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-readme — README plugin coverage (BC-16384)
+# ══════════════════════════════════════════════════════════════════════
+# Every plugin registered in .claude-plugin/marketplace.json must be named in
+# README.md — the front door otherwise silently omits a shipped plugin (the
+# 2026-07-05 audit found brite-core absent from the README + install snippet).
+# Name-presence check, not content parsing. Self-test first (synthetic fixtures
+# lock present/absent/empty-name/unreadable), then the real tree. Missing files
+# FAIL (not warn-skip) — the BC-12589 trap.
+section "2b-readme. README plugin coverage (BC-16384)"
+
+readme_lint="$REPO_ROOT/scripts/_lib/lint_readme_plugin_coverage.py"
+readme_selftest="$REPO_ROOT/scripts/_lib/test_lint_readme_plugin_coverage.sh"
+
+if [ ! -f "$readme_lint" ]; then
+  fail "scripts/_lib/lint_readme_plugin_coverage.py not found — README coverage check cannot run (BC-16384)"
+elif [ ! -f "$readme_selftest" ]; then
+  fail "scripts/_lib/test_lint_readme_plugin_coverage.sh not found — README coverage self-test cannot run (BC-16384)"
+else
+  if readme_st_out=$(bash "$readme_selftest" "$readme_lint" 2>&1); then
+    readme_st_count=$(printf '%s\n' "$readme_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -z "$readme_st_count" ] || [ "$readme_st_count" -eq 0 ]; then
+      fail "README-coverage self-test ran no assertions (RESULT missing or pass=0)"
+    else
+      pass "README-coverage self-test (${readme_st_count} assertions)"
+    fi
+  else
+    fail "README-coverage self-test failed:"
+    printf '%s\n' "$readme_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  readme_result=$(python3 "$readme_lint" "$MARKETPLACE" "$REPO_ROOT/README.md" 2>&1)
+  # Gate on the success token, not the absence of MISSING: — an uncaught lint
+  # exception exits nonzero with a traceback (not starting with MISSING:) and
+  # must FAIL, not be mistaken for a pass.
+  if [[ "$readme_result" == "OK" ]]; then
+    pass "Every marketplace plugin appears in README.md"
+  else
+    fail "README plugin coverage: ${readme_result#MISSING:}"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b' — flow-architecture helper-script unit tests (BC-10728)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/test-helper-scripts.sh — bash unit
