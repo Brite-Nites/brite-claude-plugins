@@ -128,7 +128,11 @@ elif [ ! -f "$ver_selftest" ]; then
 else
   if ver_st_out=$(bash "$ver_selftest" "$ver_lint" 2>&1); then
     ver_st_count=$(printf '%s\n' "$ver_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    pass "Version-consistency self-test (${ver_st_count:-?} assertions)"
+    if [ -z "$ver_st_count" ] || [ "$ver_st_count" -eq 0 ]; then
+      fail "Version-consistency self-test ran no assertions (RESULT missing or pass=0)"
+    else
+      pass "Version-consistency self-test (${ver_st_count} assertions)"
+    fi
   else
     fail "Version-consistency self-test failed:"
     printf '%s\n' "$ver_st_out" | tail -30 | sed 's/^/          /' >&2

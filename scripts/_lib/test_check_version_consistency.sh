@@ -12,7 +12,7 @@ fi
 
 pass=0
 fail=0
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d)" || { echo "FAIL: mktemp -d failed" >&2; exit 2; }
 trap 'rm -rf "$tmp"' EXIT
 
 # $1 = label, $2 = expected rc, $3 = actual rc
