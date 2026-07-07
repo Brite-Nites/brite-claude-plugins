@@ -100,5 +100,21 @@ mkfix2 "$tmp/rpmis" \
   '{"name":"b","version":"1.0.0","repository":"https://example/two"}'
 run2 "$tmp/rpmis"; check "repository differs across plugins fails" 1 "$?"
 
+# L — one plugin declares a homepage, the other omits it → clean (rc 0).
+# Locks the intended-lenient behavior: only URLs that are PRESENT are compared,
+# so an absent field is never treated as a divergent value.
+mkfix2 "$tmp/hppartial" \
+  '{"plugins":[{"name":"a","version":"1.0.0"},{"name":"b","version":"1.0.0"}]}' \
+  '{"name":"a","version":"1.0.0","homepage":"https://example/same"}' \
+  '{"name":"b","version":"1.0.0"}'
+run2 "$tmp/hppartial"; check "homepage present+absent passes (lenient)" 0 "$?"
+
+# M — repository consistent across plugins → clean (rc 0) [mirrors J for repository]
+mkfix2 "$tmp/rpok" \
+  '{"plugins":[{"name":"a","version":"1.0.0"},{"name":"b","version":"1.0.0"}]}' \
+  '{"name":"a","version":"1.0.0","repository":"https://example/same"}' \
+  '{"name":"b","version":"1.0.0","repository":"https://example/same"}'
+run2 "$tmp/rpok"; check "repository consistent across plugins passes" 0 "$?"
+
 printf 'RESULT pass=%s fail=%s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
