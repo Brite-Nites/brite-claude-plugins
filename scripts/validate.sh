@@ -111,47 +111,42 @@ for pdir in "$REPO_ROOT"/plugins/*/; do
   fi
 done
 
-# Check each plugin.json version against its marketplace entry version
-ver_result=$(python3 - "$MARKETPLACE" "${pj_paths[@]}" <<'PYEOF'
-import json, sys
+# The check itself is the extracted, self-tested scripts/_lib/check_version_consistency.py
+# (BC-16373): a MISSING/EMPTY `version` on either side — or a plugin.json with no
+# marketplace entry — is a HARD ERROR, not a silent skip. The pre-BC-16373 inline guard
+# compared only when both sides were truthy (`pj_ver and mp_ver and pj_ver != mp_ver`), so
+# a blank version silently defeated the plugin-cache-invalidation guarantee. Self-test
+# first (synthetic fixtures lock the empty/missing/mismatch/no-entry cases), then the real
+# tree. Missing files FAIL (not warn-skip) — the BC-12589 trap.
+ver_lint="$REPO_ROOT/scripts/_lib/check_version_consistency.py"
+ver_selftest="$REPO_ROOT/scripts/_lib/test_check_version_consistency.sh"
 
-marketplace_path = sys.argv[1]
-plugin_paths = sys.argv[2:]
-errors = []
-
-# Build marketplace version lookup by plugin name
-mp_versions = {}
-try:
-    with open(marketplace_path) as f:
-        data = json.load(f)
-    for entry in data.get('plugins', []):
-        mp_versions[entry.get('name', '')] = entry.get('version', '')
-except (FileNotFoundError, json.JSONDecodeError):
-    pass
-
-for path in plugin_paths:
-    try:
-        with open(path) as f:
-            pj = json.load(f)
-        pj_name = pj.get('name', '')
-        pj_ver = pj.get('version', '')
-        mp_ver = mp_versions.get(pj_name, '')
-        if pj_ver and mp_ver and pj_ver != mp_ver:
-            errors.append(f'{pj_name}: plugin.json={pj_ver} marketplace={mp_ver}')
-    except (FileNotFoundError, json.JSONDecodeError):
-        errors.append(f'{path}=UNREADABLE')
-
-if errors:
-    print('MISMATCH:' + ', '.join(errors))
-else:
-    print('OK')
-PYEOF
-)
-
-if [[ "$ver_result" == MISMATCH:* ]]; then
-  fail "Version mismatch: ${ver_result#MISMATCH:}"
+if [ ! -f "$ver_lint" ]; then
+  fail "scripts/_lib/check_version_consistency.py not found — version-consistency check cannot run (BC-16373)"
+elif [ ! -f "$ver_selftest" ]; then
+  fail "scripts/_lib/test_check_version_consistency.sh not found — version-consistency self-test cannot run (BC-16373)"
 else
-  pass "Version consistent across plugins"
+  if ver_st_out=$(bash "$ver_selftest" "$ver_lint" 2>&1); then
+    ver_st_count=$(printf '%s\n' "$ver_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -z "$ver_st_count" ] || [ "$ver_st_count" -eq 0 ]; then
+      fail "Version-consistency self-test ran no assertions (RESULT missing or pass=0)"
+    else
+      pass "Version-consistency self-test (${ver_st_count} assertions)"
+    fi
+  else
+    fail "Version-consistency self-test failed:"
+    printf '%s\n' "$ver_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  if [ "${#pj_paths[@]}" -gt 0 ]; then
+    ver_result=$(python3 "$ver_lint" "$MARKETPLACE" "${pj_paths[@]}" 2>&1)
+  else
+    ver_result="MISMATCH:no plugin.json files found under plugins/*/"
+  fi
+  if [[ "$ver_result" == MISMATCH:* ]]; then
+    fail "Version consistency: ${ver_result#MISMATCH:}"
+  else
+    pass "Version consistent across plugins"
+  fi
 fi
 
 # ══════════════════════════════════════════════════════════════════════
