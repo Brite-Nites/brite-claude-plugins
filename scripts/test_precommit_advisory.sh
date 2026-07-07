@@ -19,6 +19,14 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOOKS_JSON="${1:-$REPO_ROOT/plugins/workflows/hooks/hooks.json}"
 
+# BC-16371 regression guard: snapshot the repo working tree up front so the
+# end-of-run assertion can prove this harness leaks nothing into it. Six fixture
+# files (bad.js/py/ts, stub package.json/tsconfig.json/pyproject.toml) once leaked
+# to repo root from a non-hermetic ancestor of this harness. All fabrication now
+# happens under mktemp -d below; comparing before/after (not asserting absolute
+# cleanliness) keeps this valid even when the dev has unrelated staged changes.
+repo_status_before="$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null || true)"
+
 pass_count=0
 fail_count=0
 total=0
@@ -187,6 +195,21 @@ FAKE_ESLINT_EXIT=0 FAKE_TSC_EXIT=0 FAKE_RUFF_EXIT=0 run_hook '{"command":"git co
 out="$(cat "$tmproot/out")"; err="$(cat "$tmproot/err")"
 if [ "$out" = '{"ok":true}' ]; then pass 'multi-pass: stdout is {"ok":true}'; else fail "multi-pass: stdout was '$out'"; fi
 if [ -z "$err" ]; then pass "multi-pass: stderr empty (all 3 arms pass → no advisory)"; else fail "multi-pass: stderr not empty: '$err'"; fi
+
+# ── Regression guard (BC-16371): the harness must not dirty the repo tree ─────
+# If a future edit reintroduces the non-hermetic fixture fabrication, the repo's
+# `git status --porcelain` will change and this assertion catches it. Scope: this
+# targets the actual regression class — TRACKED-file leaks at repo root (the six
+# historical fixtures were not gitignored). Leaks into gitignored paths are out of
+# scope by design (no `--ignored`), so transient `__pycache__`/cache artifacts
+# never false-fail the guard.
+repo_status_after="$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null || true)"
+if [ "$repo_status_after" = "$repo_status_before" ]; then
+  pass "hermetic: harness left the repo working tree unchanged (no leaked fixtures)"
+else
+  fail "hermetic: harness changed the repo working tree — fixtures leaked:"
+  diff <(printf '%s\n' "$repo_status_before") <(printf '%s\n' "$repo_status_after") | sed 's/^/          /' >&2
+fi
 
 printf "\n  Total: %d  Passed: %d  Failed: %d\n" "$total" "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then
