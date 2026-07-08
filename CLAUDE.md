@@ -17,8 +17,9 @@ Sibling projects (same team, same prefix, same initiative — created 2026-05-27
 ./scripts/validate.sh                              # Validate all plugins (CI-equivalent)
 ./scripts/check-guardrails.sh --claude-md CLAUDE.md # Enforce CLAUDE.md size + anti-slop
 ./scripts/dev-setup.sh                             # Symlink plugin for live editing
-./scripts/release.sh <major|minor|patch> [name]    # Cut a release
 ```
+
+Plugins version independently (per-PR bumps in `plugin.json` + `marketplace.json`); there is no bundle release step — see [CONTRIBUTING.md](CONTRIBUTING.md#versioning).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full script reference, `plugin.json` schema, frontmatter rules, and CI checks.
 

@@ -4,6 +4,8 @@ All notable changes to the Brite Claude Plugins bundle will be documented in thi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+> **Frozen (2026-07-08) — historical record.** The single-version bundle release was retired (BC-16297 / BC-16819) once per-plugin versions diverged (`VERSION` froze at 3.29.0, 2026-03-28). Plugins now version independently in `plugin.json` + `.claude-plugin/marketplace.json` on every PR, and per-change notes live in PR descriptions + git history. This file is no longer updated; the `[Unreleased]` backlog below is preserved as the record of the bundle era.
+
 ## [Unreleased]
 
 ### Removed
