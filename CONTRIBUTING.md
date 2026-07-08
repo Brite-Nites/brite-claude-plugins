@@ -322,18 +322,17 @@ Add entries to the `[Unreleased]` section of `CHANGELOG.md` as you go. Follow [K
 
 ### Cutting a release
 
-> **`VERSION` and `scripts/release.sh` are legacy.** The root `VERSION` file froze at
-> 3.29.0 (2026-03-28) when per-plugin versions diverged — it does **not** track the
-> workflows plugin (currently well past 3.29.0). `scripts/release.sh` predates the
-> per-plugin model and currently cannot run against diverged versions. Per-plugin
-> release tooling is tracked by BC-1728.
+> **There is no bundle release step.** The root `VERSION` file and `scripts/release.sh`
+> were **retired** (BC-16297 / BC-16819): the single-version bundle model broke once
+> plugins diverged (`VERSION` froze at 3.29.0, 2026-03-28), and the fleet already ships
+> per-plugin. `CHANGELOG.md` is frozen as a historical record of the bundle era.
 
-In practice, each plugin versions independently. When you change anything under a
-plugin's `hooks/`, `skills/`, `commands/`, or `agents/`, bump that plugin's version in
-**both** its `plugin.json` and its `.claude-plugin/marketplace.json` entry, in the same
-commit — `scripts/validate.sh` §2b enforces that the two stay equal (and that
-`homepage`/`repository`/`description` stay consistent). Add `[Unreleased]` entries to
-`CHANGELOG.md` as you go, following [Keep a Changelog](https://keepachangelog.com/).
+Each plugin versions independently. When you change anything under a plugin's
+`hooks/`, `skills/`, `commands/`, or `agents/`, bump that plugin's version in **both**
+its `plugin.json` and its `.claude-plugin/marketplace.json` entry, in the same commit —
+`scripts/validate.sh` §2b enforces that the two stay equal (and that
+`homepage`/`repository`/`description` stay consistent). Record notable changes in the PR
+description; the marketplace entry's version + git history are the release record.
 
 ## Skill Routing Updates
 
