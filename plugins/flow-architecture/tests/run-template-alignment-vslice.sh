@@ -226,12 +226,13 @@ for cmd_label in "start-project:$START_CMD" "retrofit-project:$RETROFIT_CMD"; do
     "\$REPO_ROOT/docs/templates/job-story.md" "$cmd"
   assert_grep "$label TARGET array writes \$REPO_ROOT/docs/templates/persona.md" \
     "\$REPO_ROOT/docs/templates/persona.md" "$cmd"
-  assert_grep "$label orchestrator prose states the seeded-template count (currently 12)" \
-    "Build the 12 template-source" "$cmd"
+  assert_grep "$label orchestrator prose states the seeded-template count (currently 13)" \
+    "Build the 13 template-source" "$cmd"
   # Lock the confirmation-line count too — it must move in lockstep with the array
-  # count (the stale-"9" drift class already hit once, fixed in 63ae7a0e).
-  assert_grep "$label confirmation line states 12 files + docs/templates/" \
-    "12 files written under scripts/ + docs/templates/" "$cmd"
+  # count (the stale-"9" drift class already hit once, fixed in 63ae7a0e; 12→13 for
+  # the BC-16783 precommit-flow-index.sh helper).
+  assert_grep "$label confirmation line states 13 files + docs/templates/" \
+    "13 files written under scripts/ + docs/templates/" "$cmd"
 done
 
 # ── Summary ──────────────────────────────────────────────────────────

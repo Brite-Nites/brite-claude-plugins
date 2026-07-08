@@ -207,6 +207,8 @@ Per-flow footprint: STUB ≈ ~5s; WRAP ≈ ~10-30s; EXTRACT ≈ ~30-90s + user g
 
 8. **Idempotency / no-op detection / 0 gates.** Diff-aware: skill computes would-be-output, diffs against current INDEX.md (excluding `generated_at` field). If only `generated_at` would change → skill prints `"INDEX.md unchanged; skipping write to avoid timestamp churn."` and exits without writing. Avoids the "every regen produces a one-line timestamp diff" PR-noise problem; makes pre-commit-hook usage practical (parking lot). 0 synchronous gates per filesystem-write pattern.
 
+   > **[Q60 amendment, 2026-07-08, [BC-16783](https://linear.app/brite-nites/issue/BC-16783)]:** the parked "pre-commit-hook usage" is now shipped — see **Q60**. Two clarifications the implementation settled: (1) the idempotency signature keys on **`last_reviewed`** (the field the regenerator actually emits, alongside `generated: true`), not the `generated_at` name used in this pre-implementation entry; (2) the deterministic `scripts/regenerate-flow-index.sh` (not the sub-skill) carries the no-op detection, which is what makes the pre-commit hook churn-free.
+
 **Q19 — `flow-inventory-interview` internals (LOCKED 2026-05-06).** Greenfield Socratic inventory generator. Output: `docs/product/master-flow-inventory.md` populated with proposed domains + flows. Triggered by `/flow:start-project` or standalone `/flow:inventory` when `flow-preflight` mode classifier returns `greenfield`. **Per-run footprint:** ~5-15 min Phase 1 interview (user-paced) + ~10-30s Phase 2 pattern-catalog generation + ~5s Phase 4 synthesis + user-paced Phase 5 review ≈ ~10-30 min end-to-end (mostly user time). **Critical relationship to Q11:** shares Phases 0/1/2/5 verbatim via `_shared/app-classifier-pattern.md` shared utility; differs in skipping Phase 3 (no code) + Phase 4 status taxonomy + heavier Phase 1 interview. Seven sub-decisions:
 
 1. **Phase sequence — 5 phases.** Phase 0 (PROJECT-INTENT.md priority filter) → Phase 1 (app-classifier interview, shared) → Phase 2 (pattern-driven candidate generation, shared) → **[skip Phase 3 — no codebase to scan]** → Phase 4 (greenfield synthesis) → Phase 5 (user confirmation, shared). Skill explicitly logs the Phase 3 skip with rationale `"Greenfield mode: no codebase to scan; proceeding to synthesis from interview + pattern signals."` for audit trail.
@@ -433,6 +435,8 @@ Schema-evolution discipline reinforced: Q29 amendment 1 follows Q31 amendments 1
 7. **LICENSE + README.** MIT (workflows pattern; cadence omits but workflows ships one — adopting workflows convention for clarity). README.md covers overview + install + V1 surface command list + dev guide pointer to CLAUDE.md (Q55).
 
 8. **Hooks — none for v1.** Workflows has `hooks/`; cadence doesn't; FDA doesn't need them in v1. Future v1.1+ candidates parked: pre-commit hook to run `flow-regen-index` (already in parking lot from Q18.8); post-merge hook to refresh INDEX.md after PR merge.
+
+   > **[Q60 amendment, 2026-07-08, [BC-16783](https://linear.app/brite-nites/issue/BC-16783)]:** the parked **pre-commit** hook matured in the v1.2 cycle — see **Q60**. It ships as a git *pre-commit* helper (a consumer-repo git hook), distinct from the plugin `hooks/` slot this sub-decision was originally about (both were parked here). The **post-merge** variant remains parked.
 
 9. **Versioning + repo placement.** 0.1.0 → 1.0.0 on dogfood pass; semver during iteration; placement at `Brite-Nites/brite-claude-plugins/plugins/flow-architecture/`.
 
@@ -2793,3 +2797,40 @@ Progress markers (inline in disposition table during Pass 2): `[DONE]`, `[SKIPPE
 ### Audit trail
 
 Q59 authored 2026-05-26 by executor session implementing [BC-10219](https://linear.app/brite-nites/issue/BC-10219). Triggered by v1.2 milestone scope (Q57 deferred `/flow:deprecate-legacy` from v1.1 to v1.2). Precedent: [BC-6580](https://linear.app/brite-nites/issue/BC-6580) (BriteBase manual Phase 5 deprecation, Done). Companion: [BC-10234](https://linear.app/brite-nites/issue/BC-10234) (brite-base FDA-shape sweep — depends on this BC for tooling-assisted mode).
+
+## Q60 — Pre-commit flow-INDEX auto-regen ships as a sourceable helper wired by the scaffold (LOCKED 2026-07-08, per [BC-16783](https://linear.app/brite-nites/issue/BC-16783))
+
+Matures the pre-commit-hook idea parked at **Q18.8** ("makes pre-commit-hook usage practical (parking lot)") and **Q30.8 sub-decision 8** ("Hooks — none for v1 … Future v1.1+ candidates parked: pre-commit hook to run the flow-index regenerator"). Follows the Q56/Q57/Q58 precedent of a fresh Q-number for a post-v1.0 scope decision the original gate did not anticipate, rather than a bare amendment — but back-annotates both parking-lot entries (schema-discipline amendment pattern).
+
+**Trigger.** Surfaced during the [BC-16754](https://linear.app/brite-nites/issue/BC-16754) AGENTS.md sweep: `fleet-command`'s `docs/product/flows/INDEX.md` went stale (a story's `status` advanced with no regen), which **red-lit its `docs` CI check and blocked every fleet PR** until manually regenerated (`fleet-command` PR #17). PR #18 then inlined an auto-regen block directly into fleet's `scripts/pre-commit.sh` as a working reference. Q60 lifts that one-off into the plugin as an extracted, sourceable helper.
+
+**Severity framing.** DX / latency, **not correctness** — CI's `verify-docs` drift gate already catches this everywhere. The hook moves detection from "PR turns red + manual regen" to "the commit self-corrects."
+
+### The 7 design decisions
+
+**Sub-decision 1 — Sourceable helper, not a full `pre-commit.sh`.** The plugin ships `templates/scripts/precommit-flow-index.sh` — a small, guarded, sourceable helper — NOT a complete `pre-commit.sh` that would clobber a consumer's hand-authored hook. This is the Q29.7 consumer-owned-pre-commit split honored in the hook layer (see § Q29.7 reconciliation below).
+
+**Sub-decision 2 — Trigger covers the regenerator's FULL input set.** `regenerate-flow-index.mts` reads INDEX inputs from BOTH `FLOWS_DIR = docs/product/flows` AND `INVENTORY_PATH = docs/product/master-flow-inventory.md` (inventory drives domain section order + `## CODE — Display` headers + "(NOT IN INVENTORY)" orphan sections). The helper therefore triggers when a staged file is a story doc under `docs/product/flows/**.md` **OR** `master-flow-inventory.md`, excluding `INDEX.md` / `INDEX-archive.md` / `README.md` (mirroring the `.mts` skip-set) to avoid self-retrigger. **This deliberately corrects `fleet-command` PR #18, whose inlined block triggered on `flows/**.md` only** and silently missed INDEX-affecting inventory edits. Do NOT port fleet's regex — the trigger is re-derived from the current `.mts` input set and regression-locked by `tests/run-precommit-flow-index-vslice.sh` (case B2 + the escaped-regex fidelity assertion).
+
+**Sub-decision 3 — Fail-open, always; CI is the authoritative backstop.** Every failure path — `tsx` not installed (`npx --no-install tsx`), regenerator error, missing regenerator — warns and exits 0. A pre-commit hook must never block a commit for this. This is safe **by design** because CI's `verify-docs.sh` runs the SAME `regenerate-flow-index.sh --check`, so a skipped local regen is caught downstream. Hook-write and CI-check share one script → they cannot drift.
+
+**Sub-decision 4 — Deterministic script, not the regen skill.** The helper calls `scripts/regenerate-flow-index.sh` (fast, no LLM), never the agent-invoked regen sub-skill. The idempotent `last_reviewed` signature (`bodySignature` drops `last_reviewed`; `decideOutput` re-preserves it when the table body is unchanged) lives on that script path, so a no-op commit produces **no `last_reviewed` churn** — resolving the exact "every regen = one-line timestamp diff = PR noise" concern that got the idea parked at Q18.8. (Q18.8's prose named this field `generated_at`; the implemented regenerator emits `last_reviewed` + `generated: true` — see the Q18.8 back-annotation.)
+
+**Sub-decision 5 — Scaffold wiring: create-when-absent, inject-when-present, never clobber.** `/flow:start-project` and `/flow:retrofit-project` Phase 1 templates-scaffold gain the helper in the copy manifest (12 → 13 files) plus a best-effort, **non-aborting** hook-wiring step: if `scripts/pre-commit.sh` exists, inject one idempotent `bash scripts/precommit-flow-index.sh || true` line; if it does not, create the consumer's first `scripts/pre-commit.sh` sourcing the helper; then add a `prepare` npm script (fleet-command precedent) that installs the tracked hook into `.git/hooks/pre-commit` on `npm install`, added only when no `prepare` already exists. Wiring failure never aborts a scaffold (consistent with the fail-open framing).
+
+**Sub-decision 6 — Both orchestrators; parity with Q58 amendment 1.** The wiring lands in `start-project` AND `retrofit-project` in the same PR (Q58 amendment 1 established the both-orchestrators parity expectation for templates-scaffold changes). The orchestrator-side injection prose is dogfood-tested, not unit-tested (Q58 § harness stance); the helper's own logic is unit-tested by the new vslice.
+
+**Sub-decision 7 — Backfill is in-scope as a sibling sweep (not deferred).** Unlike Q58 (which deferred consumer swaps to post-ship sibling BCs), BC-16783 executes the full sweep: the plugin PR, then the 8 existing consumer repos lacking auto-regen (`brand-hub`, `brite-base`, `brite-labs-site`, `brite-lseo`, `brite-pim`, `brite-roster`, `brite-sites`, `brite-supply-react`), then reconciling `fleet-command`'s inlined PR-#18 block to source the shared helper (and thereby inherit the inventory-trigger fix). Each consumer change is a separate per-repo PR; the plugin PR ships the canonical helper first so backfills copy rather than hand-author.
+
+### Q29.7 reconciliation
+
+Q29.7 locks the pre-commit hook as consumer-project-owned. Q60 PRESERVES that: the shipped helper is consumer-owned + consumer-editable after copy (like `verify-docs.sh`), and the wiring **never overwrites a hand-authored hook** — it only injects one line into an existing hook or creates the first hook when none exists. The reconciling distinction: Q29.7 forbids *clobbering* a hand-authored hook; it does not forbid *creating the first hook when none exists*. That create-when-absent boundary is the one surprising choice here and is recorded explicitly.
+
+### Version + milestone
+
+- **Plugin version:** 1.2.33 → 1.2.34 (patch — additive helper + additive scaffold behavior; no breaking change to existing scaffolds).
+- **Milestone:** [BC-16783](https://linear.app/brite-nites/issue/BC-16783). Post-merge INDEX-refresh hook variant remains parked (Q30.8 sub-decision 8).
+
+### Audit trail
+
+Q60 authored 2026-07-08 by executor session implementing [BC-16783](https://linear.app/brite-nites/issue/BC-16783), after a `/grill-with-docs` pass that settled scope (full sweep), the create-when-absent hook-wiring model, and the two-input trigger correction against the current `regenerate-flow-index.mts`. Reference implementation: `fleet-command` PR #18 (`8aef784`, merged 2026-07-07) — extracted here as the sourceable helper, with the inventory-trigger gap fixed. Surfaced by [BC-16754](https://linear.app/brite-nites/issue/BC-16754); templates/scaffold origin [BC-11029](https://linear.app/brite-nites/issue/BC-11029) (Q58).

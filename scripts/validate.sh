@@ -311,7 +311,7 @@ fi
 # Section 2b'' — flow-architecture verify-docs ecosystem vslice (BC-11029, Q58)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-verify-docs-ecosystem-vslice.sh —
-# asserts the 10 template files under plugins/flow-architecture/templates/
+# asserts the 11 template files under plugins/flow-architecture/templates/
 # exist with required preamble, no brite-roster/brite-nites string leaks
 # into templates, and no <PLACEHOLDER> strings appear outside templates/.
 # See Q58 § Sub-decision 1 for the schema-discipline contract.
@@ -328,6 +328,31 @@ else
   else
     fail "flow-architecture verify-docs ecosystem vslice failed — run plugins/flow-architecture/tests/run-verify-docs-ecosystem-vslice.sh for details"
     printf '%s\n' "$fda_ecosystem_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-precommit — flow-architecture pre-commit flow-INDEX helper vslice (BC-16783, Q60)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-precommit-flow-index-vslice.sh —
+# asserts templates/scripts/precommit-flow-index.sh calls the DETERMINISTIC
+# regenerator (not the skill), triggers on BOTH flows/**.md AND
+# master-flow-inventory.md (the fleet-#18 gap), excludes INDEX.md from
+# self-trigger, fails open on missing-tsx / regen-error, and produces no
+# last_reviewed churn on a no-op run. RESULT-line contract (pass=N).
+section "2b-precommit. flow-architecture pre-commit flow-INDEX helper vslice (BC-16783, Q60)"
+
+fda_precommit_test="$REPO_ROOT/plugins/flow-architecture/tests/run-precommit-flow-index-vslice.sh"
+
+if [ ! -f "$fda_precommit_test" ]; then
+  warn "plugins/flow-architecture/tests/run-precommit-flow-index-vslice.sh not found — skipped"
+else
+  if fda_precommit_out=$(bash "$fda_precommit_test" 2>&1); then
+    fda_precommit_pass_count=$(printf '%s\n' "$fda_precommit_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture pre-commit flow-INDEX helper vslice (${fda_precommit_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture pre-commit flow-INDEX helper vslice failed — run plugins/flow-architecture/tests/run-precommit-flow-index-vslice.sh for details"
+    printf '%s\n' "$fda_precommit_out" | tail -30 | sed 's/^/    /' >&2
   fi
 fi
 
