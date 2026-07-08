@@ -34,7 +34,7 @@ Run these outside Claude, from a regular terminal or CI.
 | T0.1 Structural validation | `bash scripts/validate.sh` | 0 errors, 0 warnings |
 | T0.2 Hook regex tests | `bash scripts/test-hooks.sh` | 37/37 pass |
 | T0.3 Prerequisites check | `bash scripts/check-prereqs.sh` | All PASS (or explained SKIPs) |
-| T0.4 Command registration | `bash scripts/test-plugin-load.sh` | All 24 commands found |
+| T0.4 Command registration | `bash scripts/probe-plugin-load.sh` | All 24 commands found |
 | T0.5 CI workflow | Push to branch, check GitHub Actions | All steps green |
 | T0.6 Scenario validation | `bash scripts/test-scenarios.sh` | 225/225 pass (60 scenarios + 12 FP regressions + 6 express mode, 7 categories) |
 
