@@ -529,7 +529,7 @@ def rule_r4_nested_refs(path: Path, text: str) -> list[Finding]:
 
 
 # ── R8 — MCP-invoking skill must declare allowed-tools (GATE — skills only, BC-16387) ──
-# ADR-035: a SKILL that invokes an MCP tool in its body but declares no `allowed-tools`
+# ADR-042: a SKILL that invokes an MCP tool in its body but declares no `allowed-tools`
 # inherits UNRESTRICTED tool access — a least-privilege gap (sharpest for skills that
 # could deploy/mutate). The mandate is PRESENCE (declare *some* allowed-tools), not
 # coverage of the exact tools used (a stronger check deferred to a follow-up, with the
