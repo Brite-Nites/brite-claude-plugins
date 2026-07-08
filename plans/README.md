@@ -64,14 +64,23 @@ From the audit report (full detail in the session transcript / audit summary):
 
 ## Findings awaiting a maintainer decision (not plannable as-is)
 
-- **DIR-2** (→ BC-16297) Release process: `release.sh` cannot run against diverged per-plugin
-  versions (CHANGELOG frozen at 3.29.0 / 2026-03-28). Decide: build per-plugin
-  release tooling (BC-1728) or formally retire the bundle release + delete
-  VERSION/release.sh. Plan 005 makes the docs honest either way.
-- **SEC-01 residuals** (→ BC-16295, after plan 001): git-history purge vs accept-as-burned
-  for the PII file; and whether this repo should be public at all.
-- **SEC-04 residual** (after plan 004): redact model transcripts in
-  behavioral-test artifacts vs accept 14-day exposure window.
+**All 4 DECIDE tickets resolved 2026-07-08 (Holden + agent) — decisions recorded on each ticket:**
+
+- **DIR-2** (→ BC-16297) Release process — **RESOLVED: retire the bundle release.** Per-PR
+  per-plugin bumps are the de-facto process; `release.sh` + `VERSION` are vestigial.
+  Execution filed as **BC-16819** (delete release.sh + VERSION, resolve CHANGELOG, close BC-1728).
+- **SEC-01 residuals** (→ BC-16295) — **RESOLVED: stay public + accept-as-burned.** No history
+  purge (a purge here is the disruptive option — rewrites history, breaks ~45 worktrees +
+  ~130 open PRs, imperfect vs forks/caches; the CSV was public long enough to assume harvested).
+  Exposure documented on the ticket.
+- **allowed-tools contract** (→ BC-16387) — **RESOLVED: build the contract.** Mandate
+  `allowed-tools` for tool-invoking skills (revops 1/14 = drift), exempt pure-reference skills,
+  grandfather via an ADR-034-style debt file. BC-16387 re-labeled `ready-for-agent` (carries the build).
+- **docs session-exhaust** (→ BC-16388) — **RESOLVED: delete from HEAD (git = archive) + convention.**
+  Remove docs/plans ×134 / docs/dogfood / docs/audits/001-* / root dogfood; keep docs/precedents/ +
+  docs/decisions/. BC-16388 re-labeled `ready-for-agent` (carries the execution).
+- **SEC-04 residual** (after plan 004) — STILL OPEN (not one of the 4 DECIDE tickets): redact
+  model transcripts in behavioral-test artifacts vs accept the 14-day exposure window.
 
 ## Findings considered and rejected
 
