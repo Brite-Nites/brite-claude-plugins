@@ -206,12 +206,13 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
 
 1. **Resolve LINEAR_ORG_SLUG.** Call `mcp__plugin_workflows_linear-server__get_project({id: <LINEAR_PROJECT_ID>})` and parse `LINEAR_ORG_SLUG` from the `url` field (`https://linear.app/<slug>/project/...`). The MCP response is the trust boundary — Linear-derived strings (`LINEAR_PROJECT_NAME`, `LINEAR_ORG_SLUG`) MUST NOT cross into shell as `$VAR` inside a double-quoted argument (a backtick or `$(...)` in a malicious project name would execute on the developer's machine at sed-time). Step 4 below builds the sed script via a single-quoted python heredoc, mirroring the protection pattern the breadcrumb write uses below.
 
-2. **Build the 12 template-source → target-path parallel arrays** (bash 3.2 compatible — no associative arrays):
+2. **Build the 13 template-source → target-path parallel arrays** (bash 3.2 compatible — no associative arrays):
 
    ```bash
    SRC_PATHS=(
      "$CLAUDE_PLUGIN_ROOT/templates/scripts/verify-docs.sh"
      "$CLAUDE_PLUGIN_ROOT/templates/scripts/regenerate-flow-index.sh"
+     "$CLAUDE_PLUGIN_ROOT/templates/scripts/precommit-flow-index.sh"
      "$CLAUDE_PLUGIN_ROOT/templates/scripts/regenerate-flow-index.mts"
      "$CLAUDE_PLUGIN_ROOT/templates/scripts/verify-linear-references.mts"
      "$CLAUDE_PLUGIN_ROOT/templates/scripts/normalize-fda-frontmatter.mjs"
@@ -226,6 +227,7 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
    TARGET_PATHS=(
      "$REPO_ROOT/scripts/verify-docs.sh"
      "$REPO_ROOT/scripts/regenerate-flow-index.sh"
+     "$REPO_ROOT/scripts/precommit-flow-index.sh"
      "$REPO_ROOT/scripts/regenerate-flow-index.mts"
      "$REPO_ROOT/scripts/verify-linear-references.mts"
      "$REPO_ROOT/scripts/normalize-fda-frontmatter.mjs"
@@ -239,9 +241,9 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
    )
    ```
 
-   The `.flow/config.json` template is schema-reference only and is NOT copied — `flow-preflight` Section 4.4 owns the runtime `.flow/config.json` write per Q12.4 lock. That schema-reference file stays plugin-side; only the 12 above land in the consumer project. (The three `docs/templates/*.md` entries carry no `<LINEAR_*>`/`<PROJECT_NAME>`/`<EXPECTED_FDA_ISSUE_COUNT>` placeholders at all — the journey template's former `linear_project_id: <LINEAR_PROJECT_ID>` line, once the sed pass's one substituted token, was dropped per ADR-033 (project-id state lives in `.flow/config.json`, read at regen time) — so the sed pass leaves every authoring placeholder — `<DOMAIN>`, `<DOMAIN-NN>`, `<role>`, `<slug>` — intact for the doc-author agents to fill.)
+   The `.flow/config.json` template is schema-reference only and is NOT copied — `flow-preflight` Section 4.4 owns the runtime `.flow/config.json` write per Q12.4 lock. That schema-reference file stays plugin-side; only the 13 above land in the consumer project. (`precommit-flow-index.sh` (BC-16783) — like the `regenerate-flow-index.sh` wrapper — carries no placeholders, so the sed pass no-ops over it. The three `docs/templates/*.md` entries carry no `<LINEAR_*>`/`<PROJECT_NAME>`/`<EXPECTED_FDA_ISSUE_COUNT>` placeholders at all — the journey template's former `linear_project_id: <LINEAR_PROJECT_ID>` line, once the sed pass's one substituted token, was dropped per ADR-033 (project-id state lives in `.flow/config.json`, read at regen time) — so the sed pass leaves every authoring placeholder — `<DOMAIN>`, `<DOMAIN-NN>`, `<role>`, `<slug>` — intact for the doc-author agents to fill.)
 
-3. **Idempotency check** (default behavior — no `--overwrite-scripts`): probe each of the 12 target paths via `test -f`. If ANY exists, surface the conflict list and HALT Phase 1. Recovery semantics differ from Q36.5's atomic-rename (which guarantees absent-or-complete): templates-scaffold's per-file loop CAN leave partial state on crash. That partial state is recoverable but NOT atomic — the next re-run halts on this idempotency check before any further mutation, surfacing the conflict to the operator. See § Failure semantics below.
+3. **Idempotency check** (default behavior — no `--overwrite-scripts`): probe each of the 13 target paths via `test -f`. If ANY exists, surface the conflict list and HALT Phase 1. Recovery semantics differ from Q36.5's atomic-rename (which guarantees absent-or-complete): templates-scaffold's per-file loop CAN leave partial state on crash. That partial state is recoverable but NOT atomic — the next re-run halts on this idempotency check before any further mutation, surfacing the conflict to the operator. See § Failure semantics below.
 
    ```bash
    if [ "${FLOW_OVERWRITE_SCRIPTS:-false}" != "true" ]; then
@@ -305,19 +307,67 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
    done
    rm -f "$SED_SCRIPT"
 
-   # chmod +x the two .sh files. The .mjs + .mts files are invoked via
+   # chmod +x the three .sh files. The .mjs + .mts files are invoked via
    # npx tsx and don't require the executable bit.
    chmod +x "$REPO_ROOT/scripts/verify-docs.sh"
    chmod +x "$REPO_ROOT/scripts/regenerate-flow-index.sh"
+   chmod +x "$REPO_ROOT/scripts/precommit-flow-index.sh"
    ```
 
    Trust boundary discipline: Linear-derived strings enter the python source via env-vars (passed as discrete process-environment entries, never spliced into a shell expression), get escaped for sed-replacement-string metacharacters (`\`, `&`, `|`), then land in the sed script file as literal-text replacements. No path from MCP response → shell command line; no command-substitution surface.
 
-5. **Emit confirmation line:** `"Templates scaffolded: 12 files written under scripts/ + docs/templates/ + .flow/scaffold-log/. Required dev dependencies: gray-matter + tsx (add to package.json if absent). Run \`bash scripts/verify-docs.sh --no-linear\` to verify."`
+5. **Emit confirmation line:** `"Templates scaffolded: 13 files written under scripts/ + docs/templates/ + .flow/scaffold-log/. Required dev dependencies: gray-matter + tsx (add to package.json if absent). Run \`bash scripts/verify-docs.sh --no-linear\` to verify, and \`npm install\` (or \`npm run prepare\`) to activate the flow-INDEX pre-commit hook."`
+
+**Pre-commit hook wiring (BC-16783, Q60).** After the templates copy succeeds, wire the flow-INDEX auto-regen into the consumer's git pre-commit hook so `docs/product/flows/INDEX.md` self-corrects at commit time instead of drifting until CI catches it. This step is **best-effort and fail-open — a failure here NEVER aborts Phase 1** (the copied helper + CI's `verify-docs` drift gate still stand). It respects the consumer-owned-pre-commit split (Q29.7): **never clobber a hand-authored hook** — inject one line when a hook exists, create the first hook only when none does.
+
+   ```bash
+   HOOK="$REPO_ROOT/scripts/pre-commit.sh"
+   SOURCE_LINE='bash scripts/precommit-flow-index.sh || true'
+   if [ -f "$HOOK" ]; then
+     # Existing consumer hook — inject ONE idempotent line; never rewrite the file.
+     if ! grep -qF 'scripts/precommit-flow-index.sh' "$HOOK"; then
+       printf '\n# Flow INDEX auto-regen (BC-16783) — keep docs/product/flows/INDEX.md in sync\n%s\n' "$SOURCE_LINE" >> "$HOOK"
+     fi
+   else
+     # No hook yet (the common case) — create the consumer's FIRST pre-commit.sh
+     # sourcing the helper. Creation-when-absent, NOT clobbering (Q29.7-safe).
+     {
+       printf '#!/usr/bin/env bash\n'
+       printf '# Pre-commit hook (created by /flow scaffold, BC-16783). Consumer-owned — edit freely.\n'
+       printf 'set -euo pipefail\n\n'
+       printf '# Flow INDEX auto-regen — keep docs/product/flows/INDEX.md in sync\n'
+       printf '%s\n' "$SOURCE_LINE"
+     } > "$HOOK"
+     chmod +x "$HOOK"
+   fi
+
+   # Install the tracked hook on `npm install` via a `prepare` script (fleet-command
+   # precedent). Add it ONLY when package.json exists and has no `prepare` already —
+   # never overwrite a consumer's existing prepare (husky etc.); document the one-liner instead.
+   if [ -f "$REPO_ROOT/package.json" ]; then
+     PKG="$REPO_ROOT/package.json" python3 <<'PY'
+   import json, os
+   p = os.environ["PKG"]
+   with open(p) as f:
+       data = json.load(f)
+   scripts = data.setdefault("scripts", {})
+   if "prepare" not in scripts:
+       scripts["prepare"] = "[ -d .git ] && cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit || true"
+       with open(p, "w") as f:
+           json.dump(data, f, indent=2)
+           f.write("\n")
+       print("added prepare script (installs scripts/pre-commit.sh on npm install)")
+   else:
+       print("package.json already has a prepare script — left as-is; wire scripts/pre-commit.sh manually (see FDA-TEMPLATES-README.md)")
+   PY
+   fi
+   ```
+
+   The hook activates once the developer runs `npm install` (or `npm run prepare`). When no Node/`package.json` is present, or a `prepare` already exists, the helper file still ships — the consumer wires the one-liner by hand per `scripts/FDA-TEMPLATES-README.md`. Either way the feature degrades to "no auto-regen, CI still gates," never to a broken commit.
 
 **`--overwrite-scripts` flag.** Orchestrator-level flag; default off. When set, step 3's idempotency check is bypassed and step 4 runs unconditionally — every target path is overwritten with the freshly-substituted template. Use this when consumer's `scripts/verify-docs.sh` has fallen out of sync with the canonical template and the consumer wants the latest. Hand-edits in target files are LOST when this flag is set — there is no per-file diff prompt. Re-runs without the flag preserve existing copies.
 
-**Failure semantics (templates scaffold):** any failure in steps 1-4 aborts Phase 1 before the terminal breadcrumb write. The 12-file `cp` + sed + chmod loop is NOT atomic — a crash between file 3 and file 4 leaves a partial filesystem state. This differs from Q36.5's atomic-rename invariant for `.flow/config.json` (absent-or-complete); templates-scaffold's recovery contract is fail-loud-on-next-run: the next re-run halts on the per-file `test -f` idempotency check before mutating anything further. The operator recovers by either `rm`-ing the partially-copied files OR passing `--overwrite-scripts` to replace them en masse. No silent partial state — every partial state surfaces at the next invocation's idempotency check.
+**Failure semantics (templates scaffold):** any failure in steps 1-4 aborts Phase 1 before the terminal breadcrumb write. The 13-file `cp` + sed + chmod loop is NOT atomic — a crash between file 3 and file 4 leaves a partial filesystem state. This differs from Q36.5's atomic-rename invariant for `.flow/config.json` (absent-or-complete); templates-scaffold's recovery contract is fail-loud-on-next-run: the next re-run halts on the per-file `test -f` idempotency check before mutating anything further. The operator recovers by either `rm`-ing the partially-copied files OR passing `--overwrite-scripts` to replace them en masse. No silent partial state — every partial state surfaces at the next invocation's idempotency check.
 
 **Initial breadcrumb write:** at end of Phase 1, write the breadcrumb with `run_started_at` (ISO-8601 now), `current_phase: 2`, `completed_phases: ["1"]`, `status: in_flight`, empty `domains: []`.
 
