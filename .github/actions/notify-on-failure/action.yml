@@ -1,0 +1,74 @@
+name: Notify on failure
+description: >
+  Reusable failure-routing step for scheduled/critical workflows. Opens (or
+  updates) a deduplicated GitHub issue naming the failed workflow + run URL, so
+  a red scheduled run reaches a human instead of dying silently in the Actions
+  tab. Optionally also posts to Slack when a webhook is provided. Needs no
+  secret in its default (issue) mode — GITHUB_TOKEN is automatic.
+# Org-audit 2026-07-06 failure-routing pack. Proposal for human review — not installed.
+
+inputs:
+  workflow-name:
+    description: Human name of the failing workflow (for the issue title / Slack text).
+    required: true
+  run-url:
+    description: URL of the failed run.
+    required: false
+    default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  owner-handle:
+    description: "@handle or team to ping in the issue body (the 'named owner' the audit asks for)."
+    required: false
+    default: ""
+  slack-webhook:
+    description: Optional Slack incoming-webhook URL. When set, also posts to Slack. Leave empty to use issue-only mode.
+    required: false
+    default: ""
+  labels:
+    description: Comma-separated labels applied to the tracking issue.
+    required: false
+    default: "cron-failure,ops"
+
+runs:
+  using: composite
+  steps:
+    # Deduplicated GitHub issue — zero-secret default. Reopens/comments on an
+    # existing open issue for this workflow rather than spamming a new one each run.
+    - name: Open or update failure issue
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7
+      with:
+        script: |
+          const wf = ${{ toJSON(inputs.workflow-name) }};
+          const runUrl = ${{ toJSON(inputs.run-url) }};
+          const owner = ${{ toJSON(inputs.owner-handle) }};
+          const marker = `<!-- cron-failure:${wf} -->`;
+          const title = `⚠️ Scheduled workflow failing: ${wf}`;
+          const body = `${marker}\n**${wf}** failed.\nRun: ${runUrl}\n${owner ? `Owner: ${owner}\n` : ""}\n_Auto-filed by the failure-routing step. Close when the underlying failure is resolved; it will reopen on the next red run._`;
+          const labels = ${{ toJSON(inputs.labels) }}.split(",").map(s => s.trim()).filter(Boolean);
+          const existing = await github.rest.issues.listForRepo({
+            owner: context.repo.owner, repo: context.repo.repo,
+            state: "open", labels: labels[0], per_page: 100,
+          });
+          const hit = existing.data.find(i => (i.body || "").includes(marker));
+          if (hit) {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: hit.number, body: `Failed again — run: ${runUrl}`,
+            });
+          } else {
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title, body, labels,
+            });
+          }
+
+    - name: Post to Slack (only if a webhook is configured)
+      if: inputs.slack-webhook != ''
+      shell: bash
+      env:
+        SLACK_WEBHOOK: ${{ inputs.slack-webhook }}
+        WF: ${{ inputs.workflow-name }}
+        RUN_URL: ${{ inputs.run-url }}
+      run: |
+        payload="$(jq -nc --arg t "⚠️ Scheduled workflow failed: ${WF}. Run: ${RUN_URL}" '{text: $t}')"
+        curl -sS --fail-with-body -X POST -H 'Content-type: application/json' \
+          --data "$payload" "$SLACK_WEBHOOK" || echo "::warning::Slack post failed; the GitHub issue was still filed."
