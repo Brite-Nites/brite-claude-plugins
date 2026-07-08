@@ -222,6 +222,14 @@ Stdio MCPs and CLI scripts read credentials from OS environment variables — th
 
 Architecture Decision Records live in `docs/decisions/NNN-kebab-title.md`. They are imported into CLAUDE.md via individual `@` imports (directory imports are not supported). The `/workflows:architecture-decision` command generates ADRs and auto-appends the import. `/workflows:project-start` generates ADRs for all major tech decisions made during the interview.
 
+## Documentation retention
+
+`docs/` is a **curated** tree — keep it navigable. The durable, queried records are `docs/decisions/` (ADRs), `docs/precedents/`, `docs/guides/`, and the top-level `README.md` / `ARCHITECTURE.md` / `CLAUDE.md`; these are **never** pruned. Raw, point-in-time **session exhaust** does **not** live in `docs/`:
+
+- Write throwaway per-session artifacts (scratch plans, dogfood runs, API dumps) to a gitignored `.local/` (already ignored), or omit them — **git history is the archive** for anything you need later.
+- Do **not** accrete per-issue `docs/plans/BC-*.md` plan files or `docs/dogfood/` rounds. (BC-16388 pruned the historical backlog; git retains it.)
+- When you must land a point-in-time report (an audit, a research note), give it a stable name and treat it as a historical snapshot that will not be updated.
+
 ## Branch Conventions
 
 Branch from `main`. Use these prefixes:
