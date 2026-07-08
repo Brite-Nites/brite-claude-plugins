@@ -66,10 +66,10 @@ Test whether a phrase matches a specific skill:
 
 ```bash
 # Ad-hoc phrase + registry test cases
-scripts/test-single-trigger.sh brainstorming "let's explore design alternatives"
+scripts/probe-single-trigger.sh brainstorming "let's explore design alternatives"
 
 # Registry test cases only
-scripts/test-single-trigger.sh brainstorming
+scripts/probe-single-trigger.sh brainstorming
 ```
 
 Shows match/no-match with details (which keyword matched, negative keyword blocks, precedence).
@@ -79,7 +79,7 @@ Shows match/no-match with details (which keyword matched, negative keyword block
 1. **Start dev mode** — `scripts/dev-setup.sh` (once)
 2. **Edit** a skill, command, or agent
 3. **Validate** — `scripts/validate-single.sh <name>`
-4. **Test triggers** — `scripts/test-single-trigger.sh <skill> "test phrase"` (if skill has trigger keywords)
+4. **Test triggers** — `scripts/probe-single-trigger.sh <skill> "test phrase"` (if skill has trigger keywords)
 5. **Full validation** — `scripts/validate.sh` (before commit)
 6. **Test interactively** — restart Claude Code and test the skill manually
 7. **End dev mode** — `scripts/dev-teardown.sh` (when done)

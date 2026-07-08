@@ -7,8 +7,8 @@ Extend quality infrastructure, CI pipeline, and documentation to support the mar
 ## Research Findings
 
 Scripts already multi-plugin ready: `validate.sh`, `gen-skill-docs.py`, `release.sh`, `test-contracts.sh` (by design).
-Scripts needing updates: `telemetry-log.sh`, `test-behavioral.sh`, `test-skill-triggers.sh`, `test-single-trigger.sh`, `validate-single.sh`.
-Partially ready: CI workflow (`validate-plugin.yml`), `test-plugin-load.sh`, `dev-validate.sh`.
+Scripts needing updates: `telemetry-log.sh`, `test-behavioral.sh`, `test-skill-triggers.sh`, `probe-single-trigger.sh`, `validate-single.sh`.
+Partially ready: CI workflow (`validate-plugin.yml`), `probe-plugin-load.sh`, `dev-validate.sh`.
 
 ## Tasks
 
@@ -25,13 +25,13 @@ Partially ready: CI workflow (`validate-plugin.yml`), `test-plugin-load.sh`, `de
 - **Verify**: Run with `plugins/marketing/` as argument — should complete without error (0 evals found is OK)
 
 ### Task 3: Parameterize trigger test scripts for multi-plugin
-- **Files**: `scripts/test-skill-triggers.sh`, `scripts/test-single-trigger.sh`
+- **Files**: `scripts/test-skill-triggers.sh`, `scripts/probe-single-trigger.sh`
 - **What**: Replace hardcoded `plugins/workflows/skills/_shared/trigger-registry.json` with per-plugin discovery
 - **How**: Accept plugin dir parameter or discover all `plugins/*/skills/_shared/trigger-registry.json`; skip plugins without a trigger registry gracefully
 - **Verify**: Run script — should test workflows triggers and skip marketing (no trigger registry)
 
 ### Task 4: Fix remaining quality scripts for multi-plugin
-- **Files**: `scripts/test-health-scores.sh`, `scripts/dev-validate.sh`, `scripts/validate-single.sh`, `scripts/test-scenarios.sh`, `scripts/test-plugin-load.sh`
+- **Files**: `scripts/test-health-scores.sh`, `scripts/dev-validate.sh`, `scripts/validate-single.sh`, `scripts/test-scenarios.sh`, `scripts/probe-plugin-load.sh`
 - **What**: Audit each for hardcoded `plugins/workflows/` paths. Fix where appropriate; leave as-is where workflows-specific is intentional (e.g., test-scenarios.sh tests project-start which is workflows-only)
 - **How**: For each script, read → identify hardcoded paths → determine if multi-plugin or intentionally workflows-only → fix or add comment
 - **Verify**: Each fixed script runs without error against the marketing plugin

@@ -179,14 +179,102 @@ else
     fail "README-coverage self-test failed:"
     printf '%s\n' "$readme_st_out" | tail -30 | sed 's/^/          /' >&2
   fi
-  readme_result=$(python3 "$readme_lint" "$MARKETPLACE" "$REPO_ROOT/README.md" 2>&1)
-  # Gate on the success token, not the absence of MISSING: — an uncaught lint
-  # exception exits nonzero with a traceback (not starting with MISSING:) and
-  # must FAIL, not be mistaken for a pass.
-  if [[ "$readme_result" == "OK" ]]; then
+  # Wrap the substitution in `if` — a bare `x=$(...)` whose command exits nonzero
+  # aborts validate.sh under `set -euo pipefail` (skipping every later section).
+  # Exit-code gating is also crash-safe: an uncaught lint exception exits nonzero
+  # → the fail branch, not mistaken for a pass. (BC-16381 review — sibling fix.)
+  if readme_result=$(python3 "$readme_lint" "$MARKETPLACE" "$REPO_ROOT/README.md" 2>&1); then
     pass "Every marketplace plugin appears in README.md"
   else
     fail "README plugin coverage: ${readme_result#MISSING:}"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-coresize — brite-core context-size invariants (BC-11749/BC-16381)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/core/tests/test_size_cap.sh — the brite-core invariants that
+# protect every subagent's context budget (SessionStart/SubagentStart envelope
+# size caps). Was orphaned (no runner referenced it); wired here per BC-16381.
+# Exit-code contract (prints `PASS:` lines + exits 0); count is best-effort.
+section "2b-coresize. brite-core context-size invariants (BC-11749)"
+
+size_cap_test="$REPO_ROOT/plugins/core/tests/test_size_cap.sh"
+if [ ! -f "$size_cap_test" ]; then
+  fail "plugins/core/tests/test_size_cap.sh not found — brite-core size-cap invariant test missing (BC-16381)"
+else
+  if sc_out=$(bash "$size_cap_test" 2>&1); then
+    sc_count=$(printf '%s\n' "$sc_out" | grep -c '^PASS:' || true)
+    pass "brite-core context-size invariants (${sc_count} checks)"
+  else
+    fail "brite-core context-size invariants failed:"
+    printf '%s\n' "$sc_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-migrate — marketing manifest v1→v2 migration regression (BC-11852/BC-16381)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/marketing/scripts/test_migrate_manifest_v1_to_v2.sh — the
+# regression harness for migrate_manifest_v1_to_v2.py (a live migration script).
+# Was orphaned; wired here per BC-16381. RESULT-line contract (pass=N).
+section "2b-migrate. marketing manifest v1→v2 migration regression (BC-11852)"
+
+migrate_test="$REPO_ROOT/plugins/marketing/scripts/test_migrate_manifest_v1_to_v2.sh"
+if [ ! -f "$migrate_test" ]; then
+  fail "plugins/marketing/scripts/test_migrate_manifest_v1_to_v2.sh not found (BC-16381)"
+else
+  if mig_out=$(bash "$migrate_test" 2>&1); then
+    mig_count=$(printf '%s\n' "$mig_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$mig_count" ] && [ "$mig_count" -gt 0 ]; then
+      pass "marketing manifest v1→v2 migration regression (${mig_count} assertions)"
+    else
+      fail "marketing manifest migration harness ran no assertions (RESULT missing or pass=0)"
+    fi
+  else
+    fail "marketing manifest v1→v2 migration regression failed:"
+    printf '%s\n' "$mig_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-unwired — unwired-test meta-lint (BC-16381)
+# ══════════════════════════════════════════════════════════════════════
+# A test that no runner executes is worse than no test — it rots silently. This
+# meta-lint fails when a test_*.sh / test-*.sh / test_*.py under scripts/ or
+# plugins/*/{tests,scripts}/ is not executed by validate.sh or a workflow (via
+# literal reference, a test-*.sh glob-loop, a test_$stem.sh loop, or — for .py —
+# pytest discovery under a test-python-units.sh-listed plugin's tests/). Self-test
+# first (synthetic wired/unwired fixtures), then the real tree. Gates on the `OK`
+# token so a lint crash FAILS. Missing files FAIL — the BC-12589 trap.
+section "2b-unwired. unwired-test meta-lint (BC-16381)"
+
+unwired_lint="$REPO_ROOT/scripts/_lib/lint_unwired_tests.py"
+unwired_selftest="$REPO_ROOT/scripts/_lib/test_lint_unwired_tests.sh"
+if [ ! -f "$unwired_lint" ]; then
+  fail "scripts/_lib/lint_unwired_tests.py not found — unwired-test meta-lint cannot run (BC-16381)"
+elif [ ! -f "$unwired_selftest" ]; then
+  fail "scripts/_lib/test_lint_unwired_tests.sh not found — unwired-test meta-lint self-test cannot run (BC-16381)"
+else
+  if uw_st_out=$(bash "$unwired_selftest" "$unwired_lint" 2>&1); then
+    uw_st_count=$(printf '%s\n' "$uw_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -z "$uw_st_count" ] || [ "$uw_st_count" -eq 0 ]; then
+      fail "unwired-test meta-lint self-test ran no assertions (RESULT missing or pass=0)"
+    else
+      pass "unwired-test meta-lint self-test (${uw_st_count} assertions)"
+    fi
+  else
+    fail "unwired-test meta-lint self-test failed:"
+    printf '%s\n' "$uw_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  # Wrap the substitution in `if` — a bare `x=$(...)` whose command exits nonzero
+  # aborts validate.sh under `set -euo pipefail` (skipping every later section),
+  # and the lint exits nonzero precisely when it finds an orphan. Exit-code gating
+  # also fails on an uncaught lint crash (nonzero) — crash-safe.
+  if uw_result=$(python3 "$unwired_lint" "$REPO_ROOT" 2>&1); then
+    pass "no unwired test harnesses (every test_* file is run by a runner)"
+  else
+    fail "unwired test harness(es) — wire into validate.sh or rename out of the test namespace: ${uw_result#UNWIRED:}"
   fi
 fi
 

@@ -6,8 +6,8 @@ set -euo pipefail
 # Must run OUTSIDE a Claude session (from terminal or CI).
 #
 # Usage:
-#   bash scripts/test-plugin-load.sh                     # default: plugins/workflows
-#   bash scripts/test-plugin-load.sh plugins/my-plugin   # test a specific plugin
+#   bash scripts/probe-plugin-load.sh                     # default: plugins/workflows
+#   bash scripts/probe-plugin-load.sh plugins/my-plugin   # test a specific plugin
 # ─────────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

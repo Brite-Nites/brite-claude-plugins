@@ -3,8 +3,8 @@ set -euo pipefail
 
 # ── Test Single Trigger — Test trigger matching for one skill ────────
 # Usage:
-#   scripts/test-single-trigger.sh <skill-name> <phrase>
-#   scripts/test-single-trigger.sh <skill-name>           # runs registry test cases only
+#   scripts/probe-single-trigger.sh <skill-name> <phrase>
+#   scripts/probe-single-trigger.sh <skill-name>           # runs registry test cases only
 #
 # Tests whether a given phrase matches a specific skill in the trigger
 # registry, and also runs any registry test cases involving that skill.

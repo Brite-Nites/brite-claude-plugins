@@ -17,9 +17,9 @@ The Brite plugin has **304 structural tests** across 4 automated scripts, plus a
 | `scripts/test-hooks.sh` | 37 | Security regex matching | <1s, $0 |
 | `scripts/test-skill-triggers.sh` | 40 | Keyword trigger matching | <1s, $0 |
 | `scripts/test-scenarios.sh` | 225 | Trait→artifact mapping | <2s, $0 |
-| `scripts/test-plugin-load.sh` | 21 | CLI integration (`claude -p`) | ~30s, ~$0.05 |
+| `scripts/probe-plugin-load.sh` | 21 | CLI integration (`claude -p`) | ~30s, ~$0.05 |
 
-**Bridge pattern:** `test-plugin-load.sh` (line 92) already invokes `claude -p` as a subprocess:
+**Bridge pattern:** `probe-plugin-load.sh` (line 92) already invokes `claude -p` as a subprocess:
 ```bash
 output=$(claude --plugin-dir "$PLUGIN_DIR" -p \
   "List every slash command available that starts with /$plugin_name:. ..." \
@@ -176,7 +176,7 @@ Prompts written to temp files (avoids shell escaping). Streams NDJSON for real-t
 
 ### 2.7 Custom Bash (Extend Existing)
 
-**What:** Write `scripts/test-behavioral.sh` following the same `pass()`/`fail()`/`section()` pattern as existing scripts. Extend the `claude -p` invocation from `test-plugin-load.sh`.
+**What:** Write `scripts/test-behavioral.sh` following the same `pass()`/`fail()`/`section()` pattern as existing scripts. Extend the `claude -p` invocation from `probe-plugin-load.sh`.
 
 **How it works:**
 ```bash
@@ -554,5 +554,5 @@ Planning-phase research did not include Skillgrade (Minko Gechev), which launche
 | pytest-aitest | github.com/sbroenne/pytest-aitest | Semantic assertions (reference only) |
 | Brite instruction-audit-methodology | docs/research/instruction-audit-methodology.md | 3-tier detection model, defect taxonomy |
 | Brite testing-guide | docs/testing-guide.md | 6-layer test model, existing coverage map |
-| Brite test-plugin-load.sh | scripts/test-plugin-load.sh | Existing `claude -p` subprocess pattern |
+| Brite probe-plugin-load.sh | scripts/probe-plugin-load.sh | Existing `claude -p` subprocess pattern |
 | Brite trigger-registry.json | plugins/workflows/skills/_shared/trigger-registry.json | 40 existing keyword tests, skill definitions |

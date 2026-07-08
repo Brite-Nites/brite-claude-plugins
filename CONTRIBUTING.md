@@ -286,7 +286,7 @@ For a fast edit-validate-test loop, see [`docs/dev-guide.md`](docs/dev-guide.md)
 
 - `scripts/dev-setup.sh` / `scripts/dev-teardown.sh` — symlink plugin for live editing
 - `scripts/validate-single.sh <name>` — validate one skill/command/agent (~1s)
-- `scripts/test-single-trigger.sh <skill> "phrase"` — test trigger matching for one skill
+- `scripts/probe-single-trigger.sh <skill> "phrase"` — test trigger matching for one skill
 
 ### Automated validation
 
