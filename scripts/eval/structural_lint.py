@@ -4,7 +4,8 @@
 A deterministic, stdlib-only checker. Two public entry points, both returning the
 SAME ``Finding`` shape:
 
-  * ``lint_spec(path)``       — R1 (commands only) + R2–R6 over a command/SKILL.md spec.
+  * ``lint_spec(path)``       — R1 (commands only) + R2–R6 over a command/SKILL.md
+                                spec + R8 (skills only).
   * ``lint_evals_json(path)`` — R7 over an ``evals/evals.json`` file.
 
 Each ``Finding`` is ``{rule_id, severity, message, file, line?}``. This is the
@@ -527,9 +528,129 @@ def rule_r4_nested_refs(path: Path, text: str) -> list[Finding]:
     return out
 
 
+# ── R8 — MCP-invoking skill must declare allowed-tools (GATE — skills only, BC-16387) ──
+# ADR-035: a SKILL that invokes an MCP tool in its body but declares no `allowed-tools`
+# inherits UNRESTRICTED tool access — a least-privilege gap (sharpest for skills that
+# could deploy/mutate). The mandate is PRESENCE (declare *some* allowed-tools), not
+# coverage of the exact tools used (a stronger check deferred to a follow-up, with the
+# .mcp.json cross-check). SKILLS ONLY, mirroring R4's enforcement model: the changed-set
+# diff-gate is commands-only (COMMAND_GLOB) and never sees skills, so R8 is enforced
+# solely full-surface by eval_gate --structural (ADR-034). Commands are DEFERRED — many
+# are orchestrators that name mcp__ tools when specifying subagent dispatch rather than
+# invoking them directly, a per-command triage of its own (the 16-command follow-up).
+#
+# The trigger is a body reference to a fully-qualified mcp__ tool name (the SAME name
+# shape R5 validates). HIGH-PRECISION, PARTIAL-RECALL by design: a full mcp__ path in a
+# body is an unambiguous invocation, but the skill-tool-integration guide prescribes
+# BARE semantic tool names in bodies (`list_teams`, not the mcp__ path) — and a bare name
+# is indistinguishable from prose without a per-server tool inventory, so R8 cannot detect
+# that pattern (a documented recall gap; catching it would be hopelessly false-positive).
+# Detecting invocation from static text also can't distinguish a real call from a
+# documentation MENTION, so — like R1 — a non-silent `# lint:no-mcp-invocation <reason>`
+# marker downgrades the gate to advisory (routed through the ONE canonical parse_marker).
+# The current skill surface is clean (0 findings): the 12 skills that DO name full mcp__
+# paths in their bodies all already declare allowed-tools, so R8 ships with no structural-
+# debt rows and its value is forward-only — it blocks a FUTURE MCP-wired skill (following
+# that full-path pattern) that ships without allowed-tools.
+# The left-boundary lookbehind stops a `mcp__ns__tool` shape glued into a longer word,
+# a URL, or a dotted path (e.g. `dumpmcp__x__y`, `.../docs/mcp__x__y`, `a.mcp__x__y`) from
+# matching. The excluded class `[\w./:-]` mirrors R6's path-prefix lookbehind exactly —
+# no real tool reference is preceded by a word char / `.` / `/` / `:` / `-`, while the
+# forms that DO carry an invocation (backtick, space, `(`, list `- `) still match.
+MCP_INVOKE_RE = re.compile(r"(?<![\w./:-])mcp__[A-Za-z0-9_-]+__(?:[A-Za-z0-9_]+|\*)")
+R8_OVERRIDE_TOKEN = "lint:no-mcp-invocation"
+
+
+def _declares_allowed_tools(fm: str) -> bool:
+    """True when frontmatter declares a non-empty ``allowed-tools`` — in EITHER the repo's
+    canonical single-line comma form (``allowed-tools: a, b``) OR a YAML block sequence
+    (``allowed-tools:`` then indented ``- a`` / ``- b`` lines).
+
+    ``fm_value`` reads only the same-line value, so a block sequence leaves it empty.
+    Without this, a skill that HAS declared its tools as a block array would trip a
+    false-positive R8 gate whose message wrongly claims it declared none. The block form
+    is non-canonical (validate.sh's skill check wants a comma string), but that is a
+    FORMAT concern orthogonal to R8's least-privilege PRESENCE check — R8 must not block
+    a skill that genuinely declared its tools.
+    """
+    if (fm_value(fm, "allowed-tools") or "").strip():
+        return True
+    lines = fm.splitlines()
+    for i, line in enumerate(lines):
+        if re.match(r"^allowed-tools:[ \t]*$", line):
+            for nxt in lines[i + 1 :]:
+                if nxt.strip() == "":
+                    continue  # skip blank lines between key and first item
+                return re.match(r"^[ \t]+-[ \t]+\S", nxt) is not None
+            return False
+    return False
+
+
+def _mcp_body_hit(text: str) -> tuple[int, str] | None:
+    """First (line_no, matched mcp__ token) in the spec BODY (frontmatter excluded).
+
+    Scans the body only: an `allowed-tools:` DECLARATION in the frontmatter naturally
+    contains mcp__ names, and a skill that declares it is exactly the compliant case —
+    the caller short-circuits on allowed-tools before reaching here, but restricting the
+    scan to the body also keeps the reported line pointing at a real invocation site.
+    """
+    lines = text.splitlines()
+    _, body_start = split_frontmatter(text)
+    for idx in range(body_start, len(lines) + 1):
+        m = MCP_INVOKE_RE.search(lines[idx - 1])
+        if m:
+            return idx, m.group(0)
+    return None
+
+
+def rule_r8_allowed_tools_required(path: Path, text: str) -> list[Finding]:
+    fm, _ = split_frontmatter(text)
+    if _declares_allowed_tools(fm):
+        return []  # declares allowed-tools → least-privilege satisfied (presence mandate)
+    hit = _mcp_body_hit(text)
+    if hit is None:
+        return []  # no MCP invocation in body → exempt (knowledge / reference skill)
+    line, snippet = hit
+    rel = _rel(path)
+    reason = parse_marker(text, R8_OVERRIDE_TOKEN)
+    if reason is None:
+        return [
+            Finding(
+                "R8-allowed-tools-required", SEV_GATE,
+                f"skill body invokes MCP tool '{snippet}' but declares no allowed-tools "
+                "(add a least-privilege allowed-tools, or a `# lint:no-mcp-invocation <reason>` "
+                "override if this is a documentation mention, not an invocation)",
+                rel, line,
+            )
+        ]
+    if reason == "":
+        # An empty marker is a silent-bypass attempt — it does NOT suppress R8.
+        return [
+            Finding(
+                "R8-allowed-tools-required", SEV_GATE,
+                f"skill body invokes MCP tool '{snippet}' but declares no allowed-tools "
+                "(a `# lint:no-mcp-invocation` marker is present but has no reason, so it is ignored)",
+                rel, line,
+            ),
+            Finding(
+                "R8-override-missing-reason", SEV_ADVISORY,
+                "`# lint:no-mcp-invocation` marker has no <reason>; an empty marker does not suppress the gate",
+                rel, line,
+            ),
+        ]
+    # Valid override: downgrade gate → advisory and record the reason (non-silent).
+    return [
+        Finding(
+            "R8-allowed-tools-required", SEV_ADVISORY,
+            f"allowed-tools override accepted: {reason}",
+            rel, line,
+        )
+    ]
+
+
 # ── Rule registry ─────────────────────────────────────────────────────────────
-# Each rule is a function (path, text) -> list[Finding]. R1 is command-only; the
-# advisory structural rules run on every spec (commands + skills).
+# Each rule is a function (path, text) -> list[Finding]. R1 is command-only; R8 is
+# skill-only; the other structural rules run on every spec (commands + skills).
 SPEC_RULES_ALL: list = [
     rule_r2_body_too_long,
     rule_r3_description,
@@ -538,6 +659,7 @@ SPEC_RULES_ALL: list = [
     rule_r6_hardcoded_paths,
 ]
 SPEC_RULES_COMMAND_ONLY: list = [rule_r1_side_effecting]  # command files only
+SPEC_RULES_SKILL_ONLY: list = [rule_r8_allowed_tools_required]  # SKILL.md files only
 
 
 def lint_spec(path: str | Path) -> list[Finding]:
@@ -549,6 +671,9 @@ def lint_spec(path: str | Path) -> list[Finding]:
         findings.extend(rule(p, text))
     if spec_kind(p) == "command":
         for rule in SPEC_RULES_COMMAND_ONLY:
+            findings.extend(rule(p, text))
+    else:  # SKILL.md
+        for rule in SPEC_RULES_SKILL_ONLY:
             findings.extend(rule(p, text))
     return findings
 
