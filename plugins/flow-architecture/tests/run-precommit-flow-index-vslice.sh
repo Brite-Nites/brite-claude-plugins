@@ -229,6 +229,19 @@ else
   fail "regen-fail: EXIT=$EXIT staged=$(staged_has_index "$R" && echo y || echo n) stderr='${STDERR}'"
 fi
 
+# B8 — staged DELETION of a story doc must trigger regen (delete-only commit).
+# Guards against the --diff-filter=d regression: a removed flow must drop its
+# INDEX row, else CI's verify-docs fails on the stale row.
+section "B8" "staged story-doc deletion → regen fires"
+R="$(new_repo)"; mk_stub_regen "$R" change; mk_fake_npx "$R" 0
+git -C "$R" rm -q docs/product/flows/DEMO/DEMO-01.md   # stage a deletion (DEMO-01 is committed by new_repo)
+run_helper "$R"
+if [ "${EXIT}" -eq 0 ] && [ -f "$R/.regen-ran" ] && staged_has_index "$R"; then
+  pass "story-doc deletion triggers regen + stages INDEX (delete-only commit covered)"
+else
+  fail "delete-only: EXIT=$EXIT regen_ran=$([ -f "$R/.regen-ran" ] && echo y || echo n) staged=$(staged_has_index "$R" && echo y || echo n)"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────
 printf '\n'
 printf '─────────────────────────────────────────────\n'

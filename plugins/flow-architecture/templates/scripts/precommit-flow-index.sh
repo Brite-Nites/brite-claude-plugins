@@ -31,8 +31,11 @@ set -u
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$repo_root" 2>/dev/null || exit 0
 
-# Staged additions/copies/modifications (exclude deletions).
-staged=$(git diff --cached --name-only --diff-filter=d 2>/dev/null) || exit 0
+# All staged paths, INCLUDING deletions: a deleted story doc must still trigger a
+# regen so its row is dropped from the INDEX — otherwise CI's verify-docs fails on
+# the stale row for a delete-only commit. We only read the path list (never the file
+# contents), so a deletion in the list is harmless.
+staged=$(git diff --cached --name-only 2>/dev/null) || exit 0
 [ -n "$staged" ] || exit 0
 
 # Keep only INDEX-affecting inputs; drop the generated INDEX + non-indexed basenames

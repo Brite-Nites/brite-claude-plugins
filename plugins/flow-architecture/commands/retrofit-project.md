@@ -418,7 +418,7 @@ flow-preflight runs its 5 environment checks (Section 1), FDA-artifact discovery
        data = json.load(f)
    scripts = data.setdefault("scripts", {})
    if "prepare" not in scripts:
-       scripts["prepare"] = "[ -d .git ] && cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit || true"
+       scripts["prepare"] = "hp=$(git rev-parse --git-path hooks/pre-commit 2>/dev/null) || exit 0; [ -n \"$hp\" ] || exit 0; if [ -e \"$hp\" ] && ! grep -q precommit-flow-index \"$hp\" 2>/dev/null; then echo 'flow-index: existing pre-commit hook — not overwriting'; exit 0; fi; mkdir -p \"$(dirname \"$hp\")\" && cp scripts/pre-commit.sh \"$hp\" && chmod +x \"$hp\" || true"
        with open(p, "w") as f:
            json.dump(data, f, indent=2)
            f.write("\n")
