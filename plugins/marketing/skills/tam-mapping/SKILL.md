@@ -76,13 +76,13 @@ Read in priority order (per [ADR-008](../../../../docs/decisions/008-tam-mapping
 1. `--enrichment-provider <id>` flag if passed.
 2. `${user_config.enrichment_provider}` from plugin.json `userConfig` if explicitly set.
 3. **Auto-detect** (when both above are unset):
-   1. Check for brite-enrichment CLI at `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` → use `brite_cli`.
-   2. Else fall through to `blitz_waterfall`.
+   1. Check for brite-enrichment MCP registration (`mcp__plugin_marketing_enrichment__bulk_enrich` reachable in-session) → use `brite_mcp`.
+   2. Else check for brite-enrichment CLI at `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` → use `brite_cli`; else fall through to `blitz_waterfall`.
 4. `skip` is never auto-selected; it must be passed explicitly.
 
-`brite_mcp` is a **selectable opt-in** during the choice-now-default-later interim (BC-6170 → activated by BC-13165) — it is **not** auto-selected even when the brite-enrichment MCP is registered. Reach it via the `--enrichment-provider brite_mcp` flag or `${user_config.enrichment_provider}`; it **is** granted in this skill's `allowed-tools` (`mcp__plugin_marketing_enrichment__bulk_enrich`), so an explicit opt-in routes the candidate list through the bulk door. If the brite-enrichment MCP server is unreachable in-session, it falls through to `blitz_waterfall`. **The `allowed-tools` grant and the `.mcp.json` server-SHA pin are a config-invariant pair — keep them in lockstep: rolling the pin back to a SHA without `bulk_enrich` silently disables the opt-in (it degrades to the fall-through, not an error).** The auto-detect **default-flip** (moving `brite_mcp` to the front of this cascade) remains deferred pending an engine-maturity sign-off — see ADR-008 Future Work.
+`brite_mcp` is the **auto-detect default** since the ADR-008 default-flip (executed 2026-07-09, BC-16888; opt-in lineage BC-6170 → BC-13165) — auto-detect selects it whenever the brite-enrichment MCP is registered, routing the whole candidate list through the bulk door (`mcp__plugin_marketing_enrichment__bulk_enrich`, granted in this skill's `allowed-tools`). If the brite-enrichment MCP server is unreachable in-session, it falls through to `blitz_waterfall` (logged) — the fail-open safety net is unchanged. **The `allowed-tools` grant and the `.mcp.json` server-SHA pin are a config-invariant pair — keep them in lockstep: rolling the pin back to a SHA without `bulk_enrich` silently disables the default (it degrades to the fall-through, not an error).**
 
-The resolved provider is logged at skill invocation so the user sees which path ran (e.g., `[tam-mapping] enrichment_provider=blitz_waterfall (auto-detected; $BRITE_DATA_PLATFORM unset → brite_cli unavailable)`). See the canonical 4-row enum table in [§3 Phase 5](#phase-5--enrichment-hand-off-pluggable) for per-value implementation and fallback messages.
+The resolved provider is logged at skill invocation so the user sees which path ran (e.g., `[tam-mapping] enrichment_provider=brite_mcp (auto-detected; brite-enrichment MCP registered)` or, on fall-through, `[tam-mapping] enrichment_provider=blitz_waterfall (auto-detected; brite-enrichment MCP not registered, $BRITE_DATA_PLATFORM unset → brite_cli unavailable)`). See the canonical 4-row enum table in [§3 Phase 5](#phase-5--enrichment-hand-off-pluggable) for per-value implementation and fallback messages.
 
 ### Resume detection
 
@@ -297,9 +297,9 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 
 | `enrichment_provider` | Implementation | Status |
 |---|---|---|
-| `blitz_waterfall` | Shells to `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input> --out enriched.jsonl` (BlitzAPI 5 req/s serialized, Prospeo fallback max 20 workers) | **Default. Production-ready.** |
+| `blitz_waterfall` | Shells to `plugins/marketing/scripts/bw-run.sh BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python plugins/marketing/scripts/tam-map/enrich_waterfall.py --in <input> --out enriched.jsonl` (BlitzAPI 5 req/s serialized, Prospeo fallback max 20 workers) | **Auto-detect fallback (step 3). Production-ready.** |
 | `brite_cli` | Shells to `services/enrichment/cli.py` in brite-data-platform | Pending repo wiring; falls through to `blitz_waterfall` if repo missing locally |
-| `brite_mcp` | Routes the whole candidate list through the `bulk_enrich` bulk door (`mcp__plugin_marketing_enrichment__bulk_enrich` → REST `/enrich/batch`, per [ADR-017](https://github.com/Brite-Nites/brite-data-platform/blob/main/docs/decisions/017-bulk-enrichment-door.md)) — **never** a per-company loop of single `enrich_contacts` calls. | **Selectable (opt-in); granted in `allowed-tools` (BC-13165).** Selecting it routes the whole list through the bulk door. If `bulk_enrich` is unavailable in-session (the brite-enrichment MCP server failed to register/spawn), `brite_mcp` logs `brite_mcp selected but bulk_enrich unavailable in-session (MCP server not reachable) — using blitz_waterfall` and falls through to `blitz_waterfall`. Still **not** the auto-detect default — that default-flip is deferred pending an engine-maturity sign-off (ADR-008 Future Work). |
+| `brite_mcp` | Routes the whole candidate list through the `bulk_enrich` bulk door (`mcp__plugin_marketing_enrichment__bulk_enrich` → REST `/enrich/batch`, per [ADR-017](https://github.com/Brite-Nites/brite-data-platform/blob/main/docs/decisions/017-bulk-enrichment-door.md)) — **never** a per-company loop of single `enrich_contacts` calls. | **Auto-detect default (step 1) since the ADR-008 default-flip (BC-16888); granted in `allowed-tools` (BC-13165).** Selecting or auto-detecting it routes the whole list through the bulk door. If `bulk_enrich` is unavailable in-session (the brite-enrichment MCP server failed to register/spawn), `brite_mcp` logs `brite_mcp selected but bulk_enrich unavailable in-session (MCP server not reachable) — using blitz_waterfall` and falls through to `blitz_waterfall`. |
 | `skip` | No enrichment — pass through unenriched | Opt-in for testing or for handing off to BC-2717 list-building (which has its own enrichment pre-flight) |
 
 **Pre-flight (all providers):**
@@ -400,8 +400,8 @@ Organized by phase + reason:
 | Phase 4.5 — workspace 1 exclusion | `mcp__emailbison-b2b__list_leads` | Email Bison b2b workspace | ADR 2a (sole sequencer) |
 | Phase 4.5 — workspace 2 exclusion | `mcp__emailbison-personal__list_leads` | Email Bison personal workspace | ADR 2a — two-workspace requirement (per BC-5832 scope) |
 | Phase 4.5 — SF exclusion | `mcp__plugin_marketing_salesforce__run_soql_query` | brite-salesforce (production org) | ADR 2a (CRM SoR) |
-| Phase 5 — enrichment (default) | `Bash` → `enrich_waterfall.py` | BlitzAPI + Prospeo | ADR-008 default `blitz_waterfall` |
-| Phase 5 — enrichment (opt-in `brite_mcp`) | `mcp__plugin_marketing_enrichment__bulk_enrich` | brite-enrichment | ADR-008 + ADR-017 (bulk door) |
+| Phase 5 — enrichment (fall-through) | `Bash` → `enrich_waterfall.py` | BlitzAPI + Prospeo | ADR-008 fall-through `blitz_waterfall` |
+| Phase 5 — enrichment (auto-detect default `brite_mcp`, BC-16888) | `mcp__plugin_marketing_enrichment__bulk_enrich` | brite-enrichment | ADR-008 + ADR-017 (bulk door) |
 | Phase 6 — SMTP verify (Labs) | `Bash` → `verify_smtp.py` | MillionVerifier | tam-map upstream |
 | Phase 7 — tier delegation (Labs) | invoke `icp-scoring` skill | n/a (in-plugin delegation) | BC-5831 + tam-map-port-policy.md §4 |
 | Cross-repo handbook reads | `Bash` → `gh api repos/Brite-Nites/handbook/contents/...` | Brite-Nites/handbook (private repo) | `reference_handbook_access.md` |
@@ -451,7 +451,7 @@ See [§3 Phase 4.5](#phase-45--exclusion-mandatory--never-skipped) for the full 
 
 ### Workflow 3 — Phase 5 enrichment (provider-routed via Bash)
 
-1. Resolve `enrichment_provider` per §Before Starting (priority: `--enrichment-provider` flag → `${user_config.enrichment_provider}` → `blitz_waterfall`).
+1. Resolve `enrichment_provider` per §Before Starting (priority: `--enrichment-provider` flag → `${user_config.enrichment_provider}` → auto-detect probe chain `brite_mcp` → `brite_cli` → `blitz_waterfall`).
 2. Switch on enum per [§3 Phase 5 enum table](#phase-5--enrichment-hand-off-pluggable). The table is the canonical source for each provider's invocation, fallback message, and status.
 3. **Cost gate** before invocation (see §3 Phase 5 — verbatim string + `AskUserQuestion` if > $20).
 
