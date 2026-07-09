@@ -318,10 +318,10 @@ if [ -n "$DELETED" ]; then
   printf '%s\n' "$DELETED" | sed 's/^/  /'
 fi
 
-ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
-
-# shellcheck disable=SC2086  # word-splitting is intentional here
-sf project deploy start $ARGS --dry-run --target-org brite-sandbox --json
+# Array form (not word-split) so the argv expands under zsh too — the Bash tool runs zsh (BC-16872).
+ARGS=()
+while IFS= read -r p; do [ -n "$p" ] && ARGS+=(--source-dir "$p"); done <<< "$COALESCED"
+sf project deploy start "${ARGS[@]}" --dry-run --target-org brite-sandbox --json
 ```
 
 If any deletions were surfaced above, decide before continuing: do they belong in this deploy via `destructiveChanges.xml`? If yes, fold the destructive manifest in and re-run. If no (e.g., the file was moved/renamed and the new path is in the deploy set), continue.
@@ -402,10 +402,10 @@ COALESCED=$(printf '%s\n' "$CHANGED" | awk -F/ '
   { print $0 }
 ' | sort -u)
 
-ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
-
-# shellcheck disable=SC2086  # word-splitting is intentional here
-sf project deploy start $ARGS --target-org brite-sandbox --json
+# Array form so the argv expands under zsh too (BC-16872; see Phase 2 note).
+ARGS=()
+while IFS= read -r p; do [ -n "$p" ] && ARGS+=(--source-dir "$p"); done <<< "$COALESCED"
+sf project deploy start "${ARGS[@]}" --target-org brite-sandbox --json
 ```
 
 Parse the JSON (same `status === 0` check as Phase 2):
