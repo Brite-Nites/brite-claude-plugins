@@ -40,7 +40,7 @@ The `/flow:retrofit-project` orchestrator, during Phase 1 (preflight + bootstrap
 
 It is deliberately **fail-open**: if `tsx` isn't installed, or the regenerator errors, it warns and lets the commit through — CI runs the same `regenerate-flow-index.sh --check` and remains the authoritative backstop. It's also idempotent — a no-op run produces no `last_reviewed` churn, so it won't add one-line timestamp diffs.
 
-**How the scaffold wires it.** `/flow:start-project` and `/flow:retrofit-project` inject a single line into your `scripts/pre-commit.sh` (or create that hook if you don't have one — it never overwrites a hand-authored hook, per Q29.7) and add a `prepare` npm script that installs the hook into `.git/hooks/pre-commit` on `npm install`. Run `npm install` (or `npm run prepare`) once to activate it.
+**How the scaffold wires it.** `/flow:start-project` and `/flow:retrofit-project` inject a single line into your `scripts/pre-commit.sh` (or create that hook if you don't have one — it never overwrites a hand-authored hook, per Q29.7) and add a `prepare` npm script that installs the hook into `.git/hooks/pre-commit` on `npm install`. The installer is non-clobbering — it skips installation if `.git/hooks/pre-commit` already exists and isn't the managed hook, so your own local hook is left untouched. Run `npm install` (or `npm run prepare`) once to activate it.
 
 **Wiring it by hand** (if you have no `package.json`, already use a `prepare` script, or manage hooks yourself): add this line to whatever runs at pre-commit —
 
