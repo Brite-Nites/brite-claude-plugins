@@ -52,8 +52,7 @@ Read in priority order (per [ADR-008](../../../../docs/decisions/008-tam-mapping
 2. `${user_config.enrichment_provider}` from plugin.json `userConfig` if explicitly set.
 3. **Auto-detect** (when both above are unset):
    1. Check for brite-enrichment MCP registration (`mcp__plugin_marketing_enrichment__bulk_enrich` reachable in-session) → use `brite_mcp`.
-   2. Else check for brite-enrichment CLI at `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` → use `brite_cli`.
-   3. Else fall through to `blitz_waterfall`.
+   2. Else check for brite-enrichment CLI at `$BRITE_DATA_PLATFORM/services/enrichment/cli.py` → use `brite_cli`; else fall through to `blitz_waterfall`.
 4. `skip` is never auto-selected; it must be passed explicitly.
 
 `brite_mcp` is the **auto-detect default** since the ADR-008 default-flip (executed 2026-07-09, BC-16888; opt-in lineage BC-6170 → BC-13165) — auto-detect selects it whenever the brite-enrichment MCP is registered, routing the whole candidate list through the bulk door (`mcp__plugin_marketing_enrichment__bulk_enrich`, granted in this skill's `allowed-tools`). If the brite-enrichment MCP server is unreachable in-session, it falls through to `blitz_waterfall` (logged) — the fail-open safety net is unchanged. **The `allowed-tools` grant and the `.mcp.json` server-SHA pin are a config-invariant pair — keep them in lockstep: rolling the pin back to a SHA without `bulk_enrich` silently disables the default (it degrades to the fall-through, not an error).**
