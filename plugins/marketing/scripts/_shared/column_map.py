@@ -87,6 +87,15 @@ _PROJECTION: Dict[str, str] = {
 #: / `contact name` stay resolved — only the bare, overloaded token is held.)
 _AMBIGUOUS_TOKENS = frozenset({"name"})
 
+#: Header tokens the vendored table resolves to a field, but which THIS plugin's
+#: inputs use for something else — so we force them to "ignored" rather than
+#: accept the vendored mapping. `role` maps to TITLE upstream, but the Labs
+#: retail lists use `role` as a role-address flag (is this info@/sales@), not a
+#: job title. Title is optional and unused by the pre-load, so dropping a
+#: genuine title here costs nothing, while a mis-mapped flag in the title field
+#: would be silent junk. Same spirit as `name`, lower stakes.
+_IGNORE_TOKENS = frozenset({"role"})
+
 
 def _normalize(header: str) -> str:
     """Fold a header to its comparison form: lowercase, alphanumerics only.
@@ -168,6 +177,9 @@ def resolve(headers: Sequence[str]) -> Resolution:
         norm = _normalize(header)
         if norm in _AMBIGUOUS_TOKENS:
             plausible.append(header)
+            continue
+        if norm in _IGNORE_TOKENS:
+            ignored.append(header)
             continue
         canon = _CANON_INDEX.get(norm)
         if canon is None:

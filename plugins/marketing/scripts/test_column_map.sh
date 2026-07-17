@@ -50,20 +50,18 @@ for header in ["Organization", "Organisation", "Org Name", "Account Name",
     check(f"vendored: {header!r} -> company", r.resolved.get(COMPANY), header)
 
 # --- real file: local-retail Utah upload ------------------------------------
-# NOTE (behavior change): the vendored table maps `role` -> title. This file has
-# BOTH `title` and `role`, so they now COLLIDE and the operator is asked which
-# is the job title. Everything else still resolves.
+# Maps cleanly, zero questions. `role` here is a role-address flag (not a job
+# title), so it is a documented ignore-deviation — `title` resolves from the
+# `title` column and `role` is set aside rather than colliding with it.
 LOCAL_RETAIL = "company,city,industry,domain,title,first_name,last_name,email,esp,accept_all,role,bb_score".split(",")
 r = resolve(LOCAL_RETAIL)
+check("local-retail: no questions", r.needs_operator, False)
 check("local-retail: company", r.resolved.get(COMPANY), "company")
 check("local-retail: domain", r.resolved.get(DOMAIN), "domain")
 check("local-retail: email", r.resolved.get(EMAIL), "email")
-title_qs = [a for a in r.ambiguities if a.field == TITLE]
-check("local-retail: title/role collision raised", len(title_qs), 1)
-check("local-retail: collision reason", title_qs[0].reason, "collision")
-check("local-retail: both title headers offered",
-      sorted(title_qs[0].candidates), ["role", "title"])
-# city/industry are recognised-but-unused → ignored, NOT offered as candidates.
+check("local-retail: title resolves from `title`, not `role`", r.resolved.get(TITLE), "title")
+truthy("local-retail: `role` set aside (ignore-deviation)", "role" in r.unmapped)
+# city/industry are recognised-but-unused → ignored.
 truthy("local-retail: `city` in unmapped", "city" in r.unmapped)
 truthy("local-retail: `esp` in unmapped (unknown)", "esp" in r.unmapped)
 
