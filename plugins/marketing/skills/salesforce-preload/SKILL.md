@@ -46,7 +46,7 @@ python3 -c "import sys; sys.path.insert(0, '${CLAUDE_PLUGIN_ROOT}/scripts'); \
 from _shared.column_map import resolve; print(resolve(HEADERS))"
 ```
 
-Lead lists come from Apollo, Serper, Clay, and hand-built rosters; no two spell their headers alike. Recognised headers resolve automatically. For each returned ambiguity, ask the operator **once**, via `AskUserQuestion`, with three sample values from that column attached — a question answerable at a glance:
+Lead lists come from Apollo, Serper, Clay, and hand-built rosters; no two spell their headers alike. The alias coverage is the Brite data platform's own header table, vendored (`_shared/lead_column_aliases.py`, provenance-stamped) rather than re-invented — it is authority-independent reference data. Two documented deviations for this plugin's inputs: bare `name` is held as an operator question (Labs venue lists use it for the business, not a person), and `role` is ignored (the retail lists use it as a role-address flag, not a job title). Recognised headers resolve automatically. For each returned ambiguity, ask the operator **once**, via `AskUserQuestion`, with three sample values from that column attached — a question answerable at a glance:
 
 > Column `name` — could be the business or the person.
 > First values: `Sunrise of Bellevue`, `Brookdale Meridian`, `The Gardens at Town Square`
@@ -83,7 +83,10 @@ The `>1` row still uploads: the contact already exists, so OutboundSync will mat
 SELECT Id, Name, Website FROM Account WHERE Name IN (...)
 ```
 
-**Normalization is whitespace + case only.** Lowercase, collapse internal runs of whitespace, trim. **Do not strip legal suffixes** (`Inc`, `LLC`, `Ltd`, `GmbH`). Two reasons, and they agree: the org's own `NameAddressNormalizer` is whitespace-only and never re-cases (ADR-028), so a loader that normalized harder would diverge from the 6,602 existing Marketing-Admin-owned Accounts; and stripping suffixes demonstrably *causes* false merges — `Garage Rex AG`, `Garage Rex GmbH`, and `Garage Rey AG` are three different companies, and the legal form is often the only thing distinguishing them.
+**Normalization is whitespace + case only.** Lowercase, collapse internal runs of whitespace, trim. **Do not strip legal suffixes** (`Inc`, `LLC`, `Ltd`, `GmbH`). Two reasons:
+
+1. **Match the way the org actually stores names.** The org's own `NameAddressNormalizer` writes Account names whitespace-only and never re-cases (ADR-028), so all 6,602 existing Marketing-Admin-owned Accounts were deduped on that basis. A loader that normalized *harder* would find "matches" the org treats as distinct — and its standard duplicate rule (Fuzzy: Company, which *does* strip suffixes) is set to **Allow**, meaning the org has already decided to tolerate `Acme Inc.` and `Acme LLC` side by side. Conform to how the system of record actually behaves: whitespace-only. (Salesforce normalization is not one rule — it is method-dependent; the whitespace-only *exact* form is the one that matches the org's stored state.)
+2. **The settled favor-a-duplicate rule (Q5) breaks the tie toward less-aggressive matching.** Stripping suffixes finds *more* matches, some of them wrong (`Acme Inc.` → an existing `Acme LLC` that is a different legal entity). Whitespace-only finds fewer, safer matches and creates a tolerated duplicate when unsure — which is exactly the risk preference Q5 chose. A stray duplicate is cheap; a wrong merge reparents children irreversibly.
 
 Normalization is for **matching only**. Write the original value — the Account trigger collapses whitespace itself.
 
