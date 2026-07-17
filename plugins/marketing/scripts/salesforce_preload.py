@@ -11,7 +11,9 @@ to prose:
     no person and NEVER a placeholder
   - company_match_key — the conservative key for "does this business already
     have an Account?" (never strips suffixes; favors a duplicate over a merge)
-  - (a later step appends: the disposition classifier)
+  - classify_rows    — the integration step: buckets each lead (net-new /
+    matched / multiple / needs-review), derives the surviving EB set and the
+    review sidecar, and holds unrepresentable rows out of BOTH SF and the campaign
 
 Nothing here touches the network or the filesystem; the skill feeds it values
 and acts on what it returns.
@@ -20,7 +22,8 @@ and acts on what it returns.
 from __future__ import annotations
 
 import re
-from typing import NamedTuple, Optional
+from collections import Counter
+from typing import Dict, List, Mapping, NamedTuple, Optional, Sequence
 
 # Salesforce standard-field length caps — truncate defensively so an over-long
 # value can never fail the write.
@@ -233,3 +236,160 @@ def company_match_key(name: Optional[str]) -> str:
     no-company case).
     """
     return _WHITESPACE_RE.sub(" ", (name or "").strip()).lower()
+
+
+# --- disposition classifier --------------------------------------------------
+#
+# The integration step: given the mapped lead rows plus what Salesforce returned,
+# decide each row's fate. Four dispositions, and the unifying test throughout is
+# the scope doc's: "would emailing this row recreate the gmail-Account failure?"
+#
+#   NET_NEW           create a Contact (+ match or create its Account). Uploads.
+#   MATCHED           the Contact already exists (1 on this email) — leave it
+#                     entirely alone, do not touch stage/status. Uploads.
+#   MULTIPLE_CONTACTS >1 Contact on this email — skip the SF write, flag for a
+#                     dedup TODO. The contact already exists so OutboundSync
+#                     matches it (no gmail risk) — so the row STILL uploads.
+#   NEEDS_REVIEW      held from BOTH Salesforce AND the EB upload, because
+#                     emailing it WOULD recreate the failure. Reasons:
+#                       no_email          — nothing to match or send to
+#                       no_company        — cannot build/parent an Account
+#                       no_contact_method — no website and no phone (would need
+#                         the Account_Contact_Method_Required VR bypass; the
+#                         operator chose to enrich these first, not depend on it)
+#
+# The needs-review company/contact-method checks apply ONLY to net-new rows: if a
+# Contact already exists (matched/multiple), OutboundSync matches it and no
+# Account is created, so a missing company or website is harmless there.
+#
+# Precondition: input rows are already deduplicated by email (launch-campaign
+# Phase 1 does this) — the classifier does not dedup within the batch.
+
+NET_NEW = "net_new"
+MATCHED = "matched"
+MULTIPLE_CONTACTS = "multiple_contacts"
+NEEDS_REVIEW = "needs_review"
+
+#: Company values that cannot anchor an Account. Compared lowercased.
+_JUNK_COMPANY = frozenset({
+    "", "-", "--", "---", ".", "n/a", "na", "none", "null", "nil",
+    "unknown", "unknown prospect", "no name",
+})
+
+
+def _is_usable_company(company: str) -> bool:
+    return company.strip().lower() not in _JUNK_COMPANY
+
+
+class RowPlan(NamedTuple):
+    """One row's disposition and, for a net-new row, its resolved write payload."""
+
+    row: Mapping[str, str]        # the original mapped row (for the sidecar + write)
+    email: str                    # normalized (lower, trimmed)
+    disposition: str
+    reason: str = ""              # set only for needs_review
+    uploads_to_eb: bool = True    # False iff needs_review
+    # net-new payload (empty/default for every other disposition):
+    contact_first: str = ""
+    contact_last: str = ""
+    is_person: bool = False
+    account_key: str = ""
+    account_matched: bool = False  # True → parent to an existing Account
+    account_id: str = ""           # the existing Account Id when account_matched
+    website: str = ""
+    phone: str = ""
+
+
+class PreloadPlan(NamedTuple):
+    """The whole plan: every row's disposition, the two derived sets, and counts."""
+
+    rows: List[RowPlan]            # every row, in input order
+    eb_rows: List[RowPlan]         # the surviving set that proceeds to the EB upload
+    sidecar_rows: List[RowPlan]    # rows the operator should see (needs_review + multiple)
+    counts: Dict[str, int]
+
+
+def classify_rows(
+    rows: Sequence[Mapping[str, str]],
+    contacts_by_email: Mapping[str, int],
+    accounts_by_key: Mapping[str, str],
+) -> PreloadPlan:
+    """Bucket each mapped lead row against the Salesforce lookups.
+
+    - `contacts_by_email`: normalized-email → count of existing Contacts on it.
+    - `accounts_by_key`: `company_match_key(name)` → existing Account Id, for the
+      candidate Accounts Salesforce returned.
+
+    Returns a `PreloadPlan`. The caller writes the net-new records, leaves matched
+    ones alone, writes `sidecar_rows` to the review CSV, and uploads `eb_rows`.
+    A held (needs_review) row is never in `eb_rows` — that is the invariant that
+    keeps a row we could not safely represent out of the campaign.
+    """
+    results: List[RowPlan] = []
+
+    for row in rows:
+        email = (row.get("email") or "").strip().lower()
+        company = (row.get("company") or "").strip()
+
+        if not email:
+            results.append(RowPlan(row=row, email="", disposition=NEEDS_REVIEW,
+                                   reason="no_email", uploads_to_eb=False))
+            continue
+
+        count = contacts_by_email.get(email, 0)
+        if count == 1:
+            results.append(RowPlan(row=row, email=email, disposition=MATCHED))
+            continue
+        if count > 1:
+            results.append(RowPlan(row=row, email=email, disposition=MULTIPLE_CONTACTS))
+            continue
+
+        # count == 0 → net-new candidate: we would CREATE it, so it must be
+        # representable without recreating the failure.
+        if not _is_usable_company(company):
+            results.append(RowPlan(row=row, email=email, disposition=NEEDS_REVIEW,
+                                   reason="no_company", uploads_to_eb=False))
+            continue
+
+        website = resolve_website(row.get("domain")) or ""
+        phone = (row.get("phone") or "").strip()
+        if not website and not phone:
+            results.append(RowPlan(row=row, email=email, disposition=NEEDS_REVIEW,
+                                   reason="no_contact_method", uploads_to_eb=False))
+            continue
+
+        name = resolve_name(row.get("first_name"), row.get("last_name"),
+                            row.get("full_name"), company)
+        key = company_match_key(company)
+        account_id = accounts_by_key.get(key, "")
+        results.append(RowPlan(
+            row=row, email=email, disposition=NET_NEW,
+            contact_first=name.first_name, contact_last=name.last_name, is_person=name.is_person,
+            account_key=key, account_matched=bool(account_id), account_id=account_id,
+            website=website, phone=phone,
+        ))
+
+    by_disp = Counter(rp.disposition for rp in results)
+    review_by_reason = Counter(rp.reason for rp in results if rp.disposition == NEEDS_REVIEW)
+    # Companies are counted DISTINCT by match key — many contacts can share one.
+    matched_keys = {rp.account_key for rp in results if rp.disposition == NET_NEW and rp.account_matched}
+    new_keys = {rp.account_key for rp in results if rp.disposition == NET_NEW and not rp.account_matched}
+
+    eb_rows = [rp for rp in results if rp.uploads_to_eb]
+    sidecar_rows = [rp for rp in results if rp.disposition in (NEEDS_REVIEW, MULTIPLE_CONTACTS)]
+
+    counts = {
+        "total": len(results),
+        "net_new": by_disp[NET_NEW],
+        "matched": by_disp[MATCHED],
+        "multiple_contacts": by_disp[MULTIPLE_CONTACTS],
+        "needs_review": by_disp[NEEDS_REVIEW],
+        "accounts_matched": len(matched_keys),
+        "accounts_new": len(new_keys),
+        "review_no_email": review_by_reason["no_email"],
+        "review_no_company": review_by_reason["no_company"],
+        "review_no_contact_method": review_by_reason["no_contact_method"],
+        "eb_upload": len(eb_rows),
+    }
+
+    return PreloadPlan(rows=results, eb_rows=eb_rows, sidecar_rows=sidecar_rows, counts=counts)

@@ -11,7 +11,8 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from salesforce_preload import (
-    FREE_EMAIL_DOMAINS, company_match_key, resolve_name, resolve_website,
+    FREE_EMAIL_DOMAINS, MATCHED, MULTIPLE_CONTACTS, NEEDS_REVIEW, NET_NEW,
+    classify_rows, company_match_key, resolve_name, resolve_website,
 )
 
 _pass = _fail = 0
@@ -172,6 +173,82 @@ distinct("ampersand vs word", "A&B Corp", "AB Corp")
 check("None -> empty key", company_match_key(None), "")
 check("empty -> empty key", company_match_key(""), "")
 check("whitespace -> empty key", company_match_key("   "), "")
+
+# --- disposition classifier -------------------------------------------------
+def R(**kw):
+    return kw  # a mapped lead row
+
+# A representative batch exercising every bucket at once.
+rows = [
+    R(email="joe@gmail.com",   company="Dubyk Winery",   domain="dubykwinery.com", first_name="Joe", last_name="Dubyk"),  # net-new, new account
+    R(email="amy@gmail.com",   company="Dubyk Winery",   domain="dubykwinery.com", first_name="Amy", last_name="Lee"),    # net-new, SAME account
+    R(email="sue@gmail.com",   company="Sunrise Cellars", domain="sunrisecellars.com"),                                    # net-new, matched existing account
+    R(email="bob@gmail.com",   company="Existing Co",    domain="existingco.com"),                                        # matched contact — leave alone
+    R(email="dup@gmail.com",   company="Twice Co",       domain="twiceco.com"),                                           # multiple contacts — flag, still upload
+    R(email="nocomp@gmail.com", company="",               domain="whatever.com"),                                          # needs-review: no company
+    R(email="nomethod@gmail.com", company="No Reach LLC", domain="", phone=""),                                            # needs-review: no contact method
+    R(email="",                company="Ghost Co",       domain="ghostco.com"),                                           # needs-review: no email
+]
+contacts_by_email = {"bob@gmail.com": 1, "dup@gmail.com": 3}
+accounts_by_key = {company_match_key("Sunrise Cellars"): "001AAA"}  # this company already has an Account
+
+plan = classify_rows(rows, contacts_by_email, accounts_by_key)
+disp = {rp.email: rp.disposition for rp in plan.rows if rp.email}
+
+check("classify: net-new (new account)", disp.get("joe@gmail.com"), NET_NEW)
+check("classify: matched contact", disp.get("bob@gmail.com"), MATCHED)
+check("classify: multiple contacts", disp.get("dup@gmail.com"), MULTIPLE_CONTACTS)
+check("classify: no-company -> needs_review", disp.get("nocomp@gmail.com"), NEEDS_REVIEW)
+check("classify: no-contact-method -> needs_review", disp.get("nomethod@gmail.com"), NEEDS_REVIEW)
+
+# counts
+c = plan.counts
+check("counts: net_new = 3", c["net_new"], 3)
+check("counts: matched = 1", c["matched"], 1)
+check("counts: multiple = 1", c["multiple_contacts"], 1)
+check("counts: needs_review = 3", c["needs_review"], 3)
+check("counts: review no_company = 1", c["review_no_company"], 1)
+check("counts: review no_contact_method = 1", c["review_no_contact_method"], 1)
+check("counts: review no_email = 1", c["review_no_email"], 1)
+# Two net-new contacts share "Dubyk Winery" (new) → ONE new account, not two.
+check("counts: accounts_new distinct = 1", c["accounts_new"], 1)
+check("counts: accounts_matched = 1", c["accounts_matched"], 1)
+
+# --- THE load-bearing invariant: held rows never reach the EB set -----------
+eb_emails = {rp.email for rp in plan.eb_rows}
+check("eb set excludes no-company", "nocomp@gmail.com" not in eb_emails, True)
+check("eb set excludes no-contact-method", "nomethod@gmail.com" not in eb_emails, True)
+check("eb set excludes no-email (empty)", all(rp.reason != "no_email" for rp in plan.eb_rows), True)
+# net-new, matched, AND multiple all DO upload (the multiple row still sends)
+check("eb set includes net-new", "joe@gmail.com" in eb_emails, True)
+check("eb set includes matched", "bob@gmail.com" in eb_emails, True)
+check("eb set includes multiple (still uploads)", "dup@gmail.com" in eb_emails, True)
+check("eb count = total - needs_review", c["eb_upload"], c["total"] - c["needs_review"])
+# every held row carries a reason; no uploads_to_eb row is needs_review
+check("no needs_review row uploads", any(rp.uploads_to_eb and rp.disposition == NEEDS_REVIEW for rp in plan.rows), False)
+
+# sidecar = needs_review + multiple (what the operator should look at)
+sidecar_emails = {rp.email for rp in plan.sidecar_rows if rp.email}
+check("sidecar includes the flagged multiple row", "dup@gmail.com" in sidecar_emails, True)
+check("sidecar includes held rows", "nocomp@gmail.com" in sidecar_emails, True)
+check("sidecar excludes clean net-new", "joe@gmail.com" not in sidecar_emails, True)
+
+# --- net-new payload correctness --------------------------------------------
+joe = next(rp for rp in plan.rows if rp.email == "joe@gmail.com")
+check("net-new payload: person name", (joe.contact_first, joe.contact_last), ("Joe", "Dubyk"))
+check("net-new payload: website cleaned, not free-email", joe.website, "dubykwinery.com")
+check("net-new payload: account not matched (new)", joe.account_matched, False)
+sue = next(rp for rp in plan.rows if rp.email == "sue@gmail.com")
+check("net-new payload: account matched to existing", sue.account_matched, True)
+check("net-new payload: matched account id", sue.account_id, "001AAA")
+# a matched-contact row carries NO net-new payload (we leave it alone)
+bob = next(rp for rp in plan.rows if rp.email == "bob@gmail.com")
+check("matched row writes nothing", (bob.contact_last, bob.account_key, bob.website), ("", "", ""))
+
+# --- a no-website row with a phone is NOT held (phone is a contact method) ---
+plan2 = classify_rows([R(email="p@gmail.com", company="Phone Co", domain="", phone="801-555-1212")], {}, {})
+check("phone alone → net-new, not held", plan2.rows[0].disposition, NET_NEW)
+check("phone alone → phone carried", plan2.rows[0].phone, "801-555-1212")
 
 print(f"\nRESULT pass={_pass} fail={_fail}")
 sys.exit(1 if _fail else 0)
