@@ -10,9 +10,28 @@ python3 - "$SCRIPT_DIR" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1])
 
-from salesforce_preload import FREE_EMAIL_DOMAINS, resolve_name, resolve_website
+from salesforce_preload import (
+    FREE_EMAIL_DOMAINS, company_match_key, resolve_name, resolve_website,
+)
 
 _pass = _fail = 0
+
+
+def same(name, a, b):
+    """Assert two company names produce the SAME match key (would match)."""
+    check(name, company_match_key(a), company_match_key(b))
+
+
+def distinct(name, a, b):
+    """Assert two company names produce DIFFERENT keys (would NOT match)."""
+    global _pass, _fail
+    ka, kb = company_match_key(a), company_match_key(b)
+    if ka != kb:
+        _pass += 1
+        print(f"  ok   {name}")
+    else:
+        _fail += 1
+        print(f"  FAIL {name}\n         both normalized to {ka!r} (should differ)")
 
 
 def check(name, got, want):
@@ -129,6 +148,30 @@ check("first over 40 chars truncated", len(resolve_name("B" * 60, "Smith", None,
 d = resolve_name("joe", "dubyk", None, "dubyk winery LLC")
 check("person casing preserved", (d.first_name, d.last_name), ("joe", "dubyk"))
 check("company casing preserved", resolve_name("", "", None, "dubyk winery LLC").last_name, "dubyk winery LLC")
+
+# --- company match key: bridges pure noise (WOULD match) --------------------
+same("case-insensitive", "Dubyk Winery", "DUBYK WINERY")
+same("mixed case", "Dubyk Winery", "dubyk winery")
+same("double space collapsed", "Dubyk  Winery", "Dubyk Winery")
+same("leading/trailing trimmed", "  Dubyk Winery  ", "Dubyk Winery")
+same("tab vs space", "Dubyk\tWinery", "Dubyk Winery")
+same("case + space together", "  DUBYK   WINERY ", "dubyk winery")
+
+# --- company match key: does NOT bridge words (would NOT match) --------------
+# The deliberate conservatism — favor a duplicate over a wrong merge.
+distinct("suffix Inc not stripped", "Acme Inc", "Acme")
+distinct("Inc vs LLC stay distinct", "Acme Inc", "Acme LLC")
+distinct("suffix word kept", "Dubyk Winery Inc", "Dubyk Winery")
+distinct("leading The kept", "The Winery", "Winery")
+distinct("different company", "Dubyk Winery", "Sunrise Cellars")
+# punctuation is NOT bridged → a duplicate, not a merge (accepted trade)
+distinct("comma before suffix -> duplicate not merge", "Acme, Inc.", "Acme Inc")
+distinct("ampersand vs word", "A&B Corp", "AB Corp")
+
+# --- empty / missing --------------------------------------------------------
+check("None -> empty key", company_match_key(None), "")
+check("empty -> empty key", company_match_key(""), "")
+check("whitespace -> empty key", company_match_key("   "), "")
 
 print(f"\nRESULT pass={_pass} fail={_fail}")
 sys.exit(1 if _fail else 0)

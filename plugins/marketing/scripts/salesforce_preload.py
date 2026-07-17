@@ -9,8 +9,9 @@ to prose:
     is NEVER a free-email domain
   - resolve_name     — the Contact name, with company-in-LastName when there is
     no person and NEVER a placeholder
-  - (later steps append: the company-name match key, and the disposition
-    classifier)
+  - company_match_key — the conservative key for "does this business already
+    have an Account?" (never strips suffixes; favors a duplicate over a merge)
+  - (a later step appends: the disposition classifier)
 
 Nothing here touches the network or the filesystem; the skill feeds it values
 and acts on what it returns.
@@ -198,3 +199,37 @@ def resolve_name(
 
     # No usable person → the company goes in the required LastName, blank first.
     return NameDecision(first_name="", last_name=company_c[:_LAST_NAME_MAX], is_person=False)
+
+
+# --- company match key -------------------------------------------------------
+#
+# The key used to decide "does this business already have an Account?". It is
+# deliberately the LEAST aggressive normalization that still bridges pure noise:
+# lowercase + collapse whitespace + trim. It does NOT strip legal suffixes and
+# does NOT remove punctuation. Two consequences, both intended:
+#
+#   - `Acme Inc` and `Acme LLC` get DIFFERENT keys → they are treated as
+#     different companies. Good: the legal form can be the only thing separating
+#     two real entities, and the settled rule is favor-a-duplicate-over-a-wrong-
+#     merge — so when a token differs we do NOT match.
+#   - `Acme, Inc.` and `Acme Inc` also get different keys (the comma) → a
+#     duplicate, not a merge. That is the accepted trade: a stray duplicate is
+#     cheap and remediable; a wrong merge reparents children irreversibly.
+#
+# This mirrors how the org itself behaves — its NameAddressNormalizer collapses
+# whitespace and never re-cases, and its fuzzy dup rule is set to Allow, so the
+# org already tolerates suffix/punctuation-variant Accounts as distinct. The key
+# is applied to BOTH sides (the lead's company and each candidate Account.Name)
+# and matched by equality; it is never written to an Account.
+
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def company_match_key(name: Optional[str]) -> str:
+    """Normalize a company name to its match key: lowercase, single-spaced, trimmed.
+
+    Returns "" for a missing/blank name (an empty key never matches a real
+    Account — a nameless company cannot be resolved and is the classifier's
+    no-company case).
+    """
+    return _WHITESPACE_RE.sub(" ", (name or "").strip()).lower()
