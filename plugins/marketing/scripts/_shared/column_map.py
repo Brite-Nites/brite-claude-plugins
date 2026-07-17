@@ -1,26 +1,36 @@
-"""Resolve lead-CSV headers onto the canonical field vocabulary (BC-17213).
+"""Resolve lead-CSV headers onto the fields the Salesforce pre-load needs (BC-17213).
 
-Lead lists arrive from many sources — Apollo exports, Serper scrapes, Clay
-waterfalls, hand-built rosters — and no two spell their headers the same way.
-The same concept appears as `Company Name`, `company_name`, `company`, or just
-`name`. A fixed column contract does not survive that, so this module maps
-whatever headers a file actually has onto the canonical fields its consumers
-need.
+Lead lists arrive from Apollo, Serper, Clay, and hand-built rosters, and no two
+spell their headers alike — `Company Name` / `company_name` / `company` /
+`Organization` all mean the same thing. This module maps whatever headers a
+file has onto a small canonical vocabulary.
 
-Two consumers share this vocabulary: the Salesforce pre-load (which needs
-`company` and a contact method to build a real Account) and the Email Bison
-upload (which needs `title`). Mapping once, here, keeps them from each reaching
-into the raw CSV with their own hardcoded guesses.
+WHAT IS REUSED VS. LOCAL (per the reuse-vs-duplicate research, 2026-07-17):
 
-The rule this module exists to enforce: **recognised headers resolve
-automatically; everything else is handed back to the operator, never guessed.**
-A wrong guess writes the wrong company name into Salesforce, and a wrong
-company name is a wrong Account — the one error the matching design spends all
-its effort avoiding. Silence is cheaper than a confident mistake.
+  - The header-alias table is REFERENCE DATA and is authority-independent —
+    "Organization" means company no matter who reads the file. So we do NOT
+    hand-maintain our own; we vendor the Brite data platform's table
+    (`lead_column_aliases.py`) verbatim and PROJECT it onto our fields.
 
-Pure and stdlib-only: `resolve(headers, samples)` takes what it is given and
-returns a decision. It reads no files and asks no questions; the caller does
-the I/O and owns the operator turn.
+  - The use-case-specific glue is LOCAL and lives here: which fields the
+    pre-load requires, how it treats an ambiguous `name` column, and the
+    contact-method rule. This is the part that must NOT be shared, because it
+    is shaped to Salesforce, not to the data platform's enrichment ingest.
+
+The one deliberate DEVIATION from the vendored table: it maps bare `name` to a
+person's full name (correct for people lists). But this plugin's Labs lists —
+senior-living communities, retail storefronts, wineries — use `name` for the
+BUSINESS. Silently reading it as a person would wreck the common case, so bare
+`name` is held back as an operator question instead. Every other spelling
+resolves per the vendored table.
+
+The rule this module enforces: recognised headers resolve automatically;
+anything genuinely ambiguous is handed back to the operator with sample values,
+never guessed. A wrong guess writes the wrong company into Salesforce, and a
+wrong company is a wrong Account.
+
+Pure and stdlib-only: `resolve(headers)` returns a decision; the caller owns
+the I/O and the operator turn.
 """
 
 from __future__ import annotations
@@ -28,75 +38,102 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Mapping, NamedTuple, Sequence
 
-# --- canonical fields -------------------------------------------------------
+from _shared.lead_column_aliases import VENDORED_ALIASES
+
+# --- canonical fields (this plugin's vocabulary) ----------------------------
 
 EMAIL = "email"
 FIRST_NAME = "first_name"
 LAST_NAME = "last_name"
+FULL_NAME = "full_name"
 COMPANY = "company"
 DOMAIN = "domain"
 PHONE = "phone"
 TITLE = "title"
 
-#: Fields the Salesforce pre-load cannot proceed without at all.
-#: `email` is the Contact match key; `company` is the Account name AND the
-#: LastName fallback when a row carries no person (never a placeholder).
+#: The pre-load cannot proceed without these. `email` is the Contact match key;
+#: `company` is the Account name AND the LastName fallback when a row carries no
+#: person (never a placeholder).
 REQUIRED = (EMAIL, COMPANY)
 
-#: At least ONE of these must resolve, or every row fails Salesforce's
-#: `Account_Contact_Method_Required` rule ("New accounts must have at least a
-#: Phone or Website") and the whole run lands in needs-review. Not required
-#: individually — the per-row cascade tries domain first, then phone.
+#: At least ONE must resolve, or every row fails Salesforce's
+#: `Account_Contact_Method_Required` rule and lands in needs-review. Not
+#: required individually — the per-row cascade tries domain first, then phone.
 CONTACT_METHOD = (DOMAIN, PHONE)
 
-#: Header aliases, keyed by normalized form. Built from the real lead files in
-#: docs/campaigns/ plus the column contract launch-campaign already documents.
-#: Add to these freely; every addition is a header we stop asking about.
-_ALIASES: Dict[str, str] = {}
+#: The data platform's canonical keys → this plugin's fields. Keys absent here
+#: (SENIORITY, INDUSTRY, PERSONAL_EMAIL, ICP_FIT, …) are recognised-but-ignored:
+#: known to be something the pre-load doesn't use, so never offered as a
+#: company candidate. Note PERSONAL_EMAIL is deliberately NOT projected to
+#: EMAIL — it is a different address and mapping it would retarget the campaign.
+_PROJECTION: Dict[str, str] = {
+    "FIRST_NAME": FIRST_NAME,
+    "LAST_NAME": LAST_NAME,
+    "FULL_NAME": FULL_NAME,
+    "COMPANY_NAME": COMPANY,
+    "DOMAIN": DOMAIN,
+    "COMPANY_WEBSITE": DOMAIN,  # a website is a domain source for the Account
+    "EMAIL": EMAIL,
+    "WORK_EMAIL": EMAIL,        # both are usable; both present → collision → ask
+    "PHONE": PHONE,
+    "COMPANY_PHONE": PHONE,     # the Account's contact-method fallback
+    "TITLE": TITLE,
+}
 
-
-def _register(field: str, *aliases: str) -> None:
-    for alias in aliases:
-        _ALIASES[_normalize(alias)] = field
+#: Header tokens the vendored table resolves, but which THIS plugin's inputs use
+#: differently and must therefore hand back to the operator. Bare `name` is the
+#: business in Labs venue lists but a person in people lists — genuinely
+#: ambiguous here, so never auto-resolved. (Explicit `full name` / `person name`
+#: / `contact name` stay resolved — only the bare, overloaded token is held.)
+_AMBIGUOUS_TOKENS = frozenset({"name"})
 
 
 def _normalize(header: str) -> str:
     """Fold a header to its comparison form: lowercase, alphanumerics only.
 
-    Collapses the spelling variants that differ only in punctuation, so
-    `Company Name`, `company_name`, and `company-name` all land on the same
-    key. Deliberately does NOT stem or fuzzy-match — `company` and `name` stay
-    distinct, because they mean different things.
+    Collapses spelling variants that differ only in punctuation, so
+    `Company Name`, `company_name`, and `company-name` all land on one key.
+    Deliberately does NOT stem or fuzzy-match.
     """
     return re.sub(r"[^a-z0-9]+", "", header.strip().lower())
 
 
-_register(EMAIL, "email", "email address", "e-mail", "work email", "business email", "primary email")
-# NOT "personal email": Apollo exports carry both `Email` and `Personal Email`,
-# and they are different addresses. Mapping the personal one would silently
-# retarget the campaign.
-_register(FIRST_NAME, "first name", "firstname", "fname", "given name")
-_register(LAST_NAME, "last name", "lastname", "lname", "surname", "family name")
-_register(COMPANY, "company", "company name", "organization", "organisation",
-          "business name", "account name", "employer")
-_register(DOMAIN, "domain", "company domain", "website", "company website",
-          "url", "web url", "website url", "homepage")
-_register(PHONE, "phone", "phone number", "company phone", "company phone number",
-          "telephone", "tel", "mobile", "mobile number", "mobile phone")
-_register(TITLE, "title", "job title", "position", "job position")
-# NOT "role": in the local-retail upload files `role` is a role-address boolean
-# (is this info@/sales@?), not a job title. Mapping it would be nonsense.
+def _build_index() -> Dict[str, str]:
+    """Index the vendored table under this module's normalization.
+
+    The vendored table enumerates space- and underscore- forms as separate
+    keys; folding them under `_normalize` collapses each pair to one lookup and
+    adds punctuation robustness (`company-name`) the vendored table lacks. Fails
+    loudly if two upstream keys ever collapse to one normalized form with
+    conflicting canonical values — that would be silent data loss, so it must
+    break the build instead.
+    """
+    index: Dict[str, str] = {}
+    for raw_key, canon in VENDORED_ALIASES.items():
+        norm = _normalize(raw_key)
+        prior = index.get(norm)
+        if prior is not None and prior != canon:
+            raise ValueError(
+                f"vendored alias collision under normalization: {norm!r} maps to "
+                f"both {prior!r} and {canon!r} — refresh introduced an ambiguity"
+            )
+        index[norm] = canon
+    return index
+
+
+#: normalized header -> the data platform's canonical key (ALL of them, projected or not).
+_CANON_INDEX = _build_index()
 
 
 class Ambiguity(NamedTuple):
     """One thing the operator must resolve before the run can proceed."""
 
     field: str
-    #: Why we're asking. One of "unresolved" (nothing matched a required
-    #: field) or "collision" (several headers matched the same field).
+    #: "unresolved" (nothing matched a required field) or "collision" (several
+    #: headers matched the same field).
     reason: str
-    #: Headers the operator can choose between, each with sample values so the
-    #: question is answerable at a glance rather than by opening the file.
+    #: Headers the operator can choose between. Recognised-but-unused columns
+    #: (city, seniority, …) are excluded — only plausible candidates appear.
     candidates: List[str]
 
 
@@ -107,8 +144,8 @@ class Resolution(NamedTuple):
     resolved: Dict[str, str]
     #: Questions for the operator. Empty means the file mapped cleanly.
     ambiguities: List[Ambiguity]
-    #: Headers we recognised nothing in. Reported for transparency, never
-    #: guessed at; a lead file legitimately carries many columns we don't want.
+    #: Every header not resolved to a canonical field — recognised-but-unused
+    #: AND unknown. Reported for transparency, never guessed at.
     unmapped: List[str]
 
     @property
@@ -121,18 +158,24 @@ def resolve(headers: Sequence[str]) -> Resolution:
 
     Returns what resolved cleanly, what the operator must decide, and what was
     ignored. Never raises on a bad file — an unusable file comes back as
-    ambiguities for the caller to surface, because "which column is the
-    company?" is a better error than a stack trace.
+    ambiguities for the caller to surface.
     """
     claims: Dict[str, List[str]] = {}
-    unmapped: List[str] = []
+    plausible: List[str] = []   # unknown or ambiguous → could be a missing required field
+    ignored: List[str] = []     # recognised, but not a field the pre-load uses
 
     for header in headers:
-        field = _ALIASES.get(_normalize(header))
-        if field is None:
-            unmapped.append(header)
+        norm = _normalize(header)
+        if norm in _AMBIGUOUS_TOKENS:
+            plausible.append(header)
+            continue
+        canon = _CANON_INDEX.get(norm)
+        if canon is None:
+            plausible.append(header)          # unknown header
+        elif canon in _PROJECTION:
+            claims.setdefault(_PROJECTION[canon], []).append(header)
         else:
-            claims.setdefault(field, []).append(header)
+            ignored.append(header)            # recognised but unused (seniority, city, …)
 
     resolved: Dict[str, str] = {}
     ambiguities: List[Ambiguity] = []
@@ -141,26 +184,21 @@ def resolve(headers: Sequence[str]) -> Resolution:
         if len(matched) == 1:
             resolved[field] = matched[0]
         else:
-            # Several headers claim one field — e.g. an Apollo export carrying
-            # both `Company Website` and `Company Domain`. They are genuinely
-            # different values (one has a protocol, one doesn't), so picking
-            # one by position would be a coin flip on which lands in Salesforce.
+            # Several headers claim one field — e.g. `Company Website` AND
+            # `Company Domain` both project to `domain`, and they are genuinely
+            # different values. Picking by position is a coin flip on what lands
+            # in Salesforce, so ask.
             ambiguities.append(Ambiguity(field=field, reason="collision", candidates=list(matched)))
 
     for field in REQUIRED:
         if field not in resolved and field not in claims:
-            # Nothing matched. The operator picks from what's left — this is
-            # the `name` case, where a senior-living roster calls the business
-            # `name` and we cannot tell it from a person's name by header alone.
-            ambiguities.append(Ambiguity(field=field, reason="unresolved", candidates=list(unmapped)))
+            ambiguities.append(Ambiguity(field=field, reason="unresolved", candidates=list(plausible)))
 
     if not any(f in claims for f in CONTACT_METHOD):
-        ambiguities.append(
-            Ambiguity(field=DOMAIN, reason="unresolved", candidates=list(unmapped))
-        )
+        ambiguities.append(Ambiguity(field=DOMAIN, reason="unresolved", candidates=list(plausible)))
 
     ambiguities.sort(key=lambda a: (a.field, a.reason))
-    return Resolution(resolved=resolved, ambiguities=ambiguities, unmapped=unmapped)
+    return Resolution(resolved=resolved, ambiguities=ambiguities, unmapped=ignored + plausible)
 
 
 def samples_for(header: str, rows: Sequence[Mapping[str, str]], limit: int = 3) -> List[str]:
@@ -183,9 +221,8 @@ def samples_for(header: str, rows: Sequence[Mapping[str, str]], limit: int = 3) 
 def apply(resolution: Resolution, decisions: Mapping[str, str]) -> Dict[str, str]:
     """Fold the operator's answers into the resolved map.
 
-    `decisions` is field -> chosen header. A field mapped to the empty string
-    is the operator saying "ignore this one", and is dropped rather than
-    recorded as a header named "".
+    `decisions` is field -> chosen header. A field mapped to the empty string is
+    the operator saying "ignore this one".
     """
     merged = dict(resolution.resolved)
     for field, header in decisions.items():

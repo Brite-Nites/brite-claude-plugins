@@ -3,8 +3,12 @@
 #
 # The cases are the REAL headers from the lead files in docs/campaigns/ — an
 # Apollo export, a senior-living roster, a Serper scrape, the local-retail
-# upload. A mapper that passes on invented headers and fails on Corinne's
+# upload. A mapper that passes on invented headers and fails on the operator's
 # actual files would be worse than useless.
+#
+# As of BC-17213 the alias coverage comes from the VENDORED data-platform table
+# (_shared/lead_column_aliases.py); this module projects it onto the pre-load's
+# fields and keeps `name` deliberately ambiguous. These tests pin both.
 #
 # Emits `RESULT pass=N fail=M` for validate.sh to grep.
 
@@ -17,7 +21,7 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from _shared.column_map import (
-    COMPANY, DOMAIN, EMAIL, FIRST_NAME, LAST_NAME, PHONE, TITLE,
+    COMPANY, DOMAIN, EMAIL, FIRST_NAME, FULL_NAME, LAST_NAME, PHONE, TITLE,
     apply, resolve, samples_for,
 )
 
@@ -38,23 +42,34 @@ def truthy(name, cond):
     check(name, bool(cond), True)
 
 
+# --- vendored-table coverage we did NOT have before -------------------------
+# These spellings come free from adopting the data platform's table.
+for header in ["Organization", "Organisation", "Org Name", "Account Name",
+               "Business Name", "Place Name", "companyname"]:
+    r = resolve(["email", "domain", header])
+    check(f"vendored: {header!r} -> company", r.resolved.get(COMPANY), header)
+
 # --- real file: local-retail Utah upload ------------------------------------
-# The happy path. Every column recognised, operator asked nothing.
+# NOTE (behavior change): the vendored table maps `role` -> title. This file has
+# BOTH `title` and `role`, so they now COLLIDE and the operator is asked which
+# is the job title. Everything else still resolves.
 LOCAL_RETAIL = "company,city,industry,domain,title,first_name,last_name,email,esp,accept_all,role,bb_score".split(",")
 r = resolve(LOCAL_RETAIL)
-check("local-retail: no questions", r.needs_operator, False)
 check("local-retail: company", r.resolved.get(COMPANY), "company")
 check("local-retail: domain", r.resolved.get(DOMAIN), "domain")
 check("local-retail: email", r.resolved.get(EMAIL), "email")
-check("local-retail: title", r.resolved.get(TITLE), "title")
-# `role` here is a role-address boolean, NOT a job title. Mapping it to title
-# would put "TRUE" in the contact's job title.
-truthy("local-retail: `role` left unmapped", "role" in r.unmapped)
-truthy("local-retail: `bb_score` left unmapped", "bb_score" in r.unmapped)
+title_qs = [a for a in r.ambiguities if a.field == TITLE]
+check("local-retail: title/role collision raised", len(title_qs), 1)
+check("local-retail: collision reason", title_qs[0].reason, "collision")
+check("local-retail: both title headers offered",
+      sorted(title_qs[0].candidates), ["role", "title"])
+# city/industry are recognised-but-unused → ignored, NOT offered as candidates.
+truthy("local-retail: `city` in unmapped", "city" in r.unmapped)
+truthy("local-retail: `esp` in unmapped (unknown)", "esp" in r.unmapped)
 
 # --- real file: senior-living roster ----------------------------------------
-# The case that motivated the whole design: the business is called `name`, and
-# no header tells you whether that's a company or a person.
+# The case that motivated the design: the business is called `name`, and no
+# header tells you whether that's a company or a person.
 SENIOR_LIVING = ("tier,lux_score,lux_why,name,city,state,zip,territory,addr,phone,email,admin,"
                  "beds,operator,lux_operator,brand_tier,ftype,is_ccrc,extra,median_home_value,"
                  "median_hh_income,rankings,n_rankings,website,sources").split(",")
@@ -68,11 +83,14 @@ check("senior-living: exactly one company question", len(company_qs), 1)
 check("senior-living: reason is unresolved", company_qs[0].reason, "unresolved")
 truthy("senior-living: `name` offered as a candidate", "name" in company_qs[0].candidates)
 truthy("senior-living: `admin` offered too", "admin" in company_qs[0].candidates)
-# Never silently guess `name` -> company.
+# Noise reduction: recognised-but-unused columns are NOT offered as candidates.
+truthy("senior-living: `city` NOT a candidate", "city" not in company_qs[0].candidates)
+truthy("senior-living: `zip` NOT a candidate", "zip" not in company_qs[0].candidates)
+# Never silently guess `name` -> company (or -> person).
 truthy("senior-living: company NOT auto-resolved", COMPANY not in r.resolved)
+truthy("senior-living: `name` not silently read as a person", FULL_NAME not in r.resolved)
 
 # --- real file: Apollo export -----------------------------------------------
-# Carries two headers for the same concept, twice over.
 APOLLO = ("First Name,Last Name,Company Name,Company Website,Email,Mobile Number,Personal Email,"
           "Full Name,LinkedIn,Title,Industry,Company Phone Number,Company Domain").split(",")
 r = resolve(APOLLO)
@@ -80,23 +98,22 @@ check("apollo: Company Name -> company", r.resolved.get(COMPANY), "Company Name"
 check("apollo: First Name -> first_name", r.resolved.get(FIRST_NAME), "First Name")
 check("apollo: Last Name -> last_name", r.resolved.get(LAST_NAME), "Last Name")
 check("apollo: Title -> title", r.resolved.get(TITLE), "Title")
-# `Company Website` and `Company Domain` are different values (protocol, www).
-# Picking one by position is a coin flip on what lands in Salesforce.
+# `Full Name` now resolves (vendored table) instead of being dropped.
+check("apollo: Full Name -> full_name", r.resolved.get(FULL_NAME), "Full Name")
+# `Company Website` and `Company Domain` both project to `domain` → collision.
 domain_qs = [a for a in r.ambiguities if a.field == DOMAIN]
 check("apollo: domain collision raised", len(domain_qs), 1)
-check("apollo: collision reason", domain_qs[0].reason, "collision")
 check("apollo: both domain headers offered",
       sorted(domain_qs[0].candidates), ["Company Domain", "Company Website"])
+# `Mobile Number` (person phone) and `Company Phone Number` both project to phone.
 phone_qs = [a for a in r.ambiguities if a.field == PHONE]
 check("apollo: phone collision raised", len(phone_qs), 1)
-# `Personal Email` is a DIFFERENT address from `Email`. Mapping it would
-# silently retarget the campaign.
+# `Personal Email` is a DIFFERENT address; NOT projected to email.
 check("apollo: Email wins, not Personal Email", r.resolved.get(EMAIL), "Email")
 truthy("apollo: `Personal Email` left unmapped", "Personal Email" in r.unmapped)
-truthy("apollo: `Full Name` left unmapped", "Full Name" in r.unmapped)
 
 # --- real file: multi-property apartments -----------------------------------
-# Has no email column at all — `public_emails` is something else.
+# Has no usable email column — `public_emails` is not an email header.
 APARTMENTS = ("company_name,domain,qualification,nmhc_owner_rank,ceo,city,state,phone,"
               "employees,revenue_range,company_linkedin,public_emails").split(",")
 r = resolve(APARTMENTS)
@@ -104,7 +121,8 @@ check("apartments: company_name -> company", r.resolved.get(COMPANY), "company_n
 check("apartments: domain", r.resolved.get(DOMAIN), "domain")
 email_qs = [a for a in r.ambiguities if a.field == EMAIL]
 check("apartments: asks about email", len(email_qs), 1)
-truthy("apartments: `public_emails` NOT auto-mapped", "public_emails" in r.unmapped)
+truthy("apartments: `public_emails` offered as email candidate", "public_emails" in email_qs[0].candidates)
+truthy("apartments: `employees` NOT a candidate (recognised-unused)", "employees" not in email_qs[0].candidates)
 
 # --- real file: Serper scrape -----------------------------------------------
 SERPER = "domain,company_name,state,city,district,industry,email,phone,address,zip,source".split(",")
@@ -113,7 +131,6 @@ check("serper: no questions", r.needs_operator, False)
 check("serper: company_name -> company", r.resolved.get(COMPANY), "company_name")
 
 # --- launch-campaign's own documented contract ------------------------------
-# The column names Phase 1 currently demands must keep working.
 LAUNCH_CONTRACT = "email,first_name,last_name,job_title,company_name,company_domain".split(",")
 r = resolve(LAUNCH_CONTRACT)
 check("launch contract: no questions", r.needs_operator, False)
@@ -126,15 +143,12 @@ for spelling in ("Company Name", "company_name", "company-name", "COMPANY NAME",
     check(f"normalize: {spelling!r} -> company", r.resolved.get(COMPANY), spelling)
 # Folding punctuation must not collapse distinct concepts.
 r = resolve(["email", "domain", "company", "name"])
-check("normalize: `company` and `name` stay distinct", r.resolved.get(COMPANY), "company")
+check("normalize: `company` resolves, `name` does not", r.resolved.get(COMPANY), "company")
 truthy("normalize: `name` stays unmapped when `company` exists", "name" in r.unmapped)
 
 # --- contact method ---------------------------------------------------------
-# Neither domain nor phone: every row would fail Salesforce's
-# Account_Contact_Method_Required and land in needs-review. Say so up front.
 r = resolve(["email", "company", "first_name"])
 truthy("no contact method: raises a question", r.needs_operator)
-# Either one alone is enough — the per-row cascade handles the rest.
 r = resolve(["email", "company", "phone"])
 check("phone alone satisfies contact method", r.needs_operator, False)
 r = resolve(["email", "company", "website"])
