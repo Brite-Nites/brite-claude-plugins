@@ -88,7 +88,7 @@ SELECT Id, Name, Website FROM Account WHERE Name IN (...)
 1. **Match the way the org actually stores names.** The org's own `NameAddressNormalizer` writes Account names whitespace-only and never re-cases (ADR-028), so all 6,602 existing Marketing-Admin-owned Accounts were deduped on that basis. A loader that normalized *harder* would find "matches" the org treats as distinct — and its standard duplicate rule (Fuzzy: Company, which *does* strip suffixes) is set to **Allow**, meaning the org has already decided to tolerate `Acme Inc.` and `Acme LLC` side by side. Conform to how the system of record actually behaves: whitespace-only. (Salesforce normalization is not one rule — it is method-dependent; the whitespace-only *exact* form is the one that matches the org's stored state.)
 2. **The settled favor-a-duplicate rule (Q5) breaks the tie toward less-aggressive matching.** Stripping suffixes finds *more* matches, some of them wrong (`Acme Inc.` → an existing `Acme LLC` that is a different legal entity). Whitespace-only finds fewer, safer matches and creates a tolerated duplicate when unsure — which is exactly the risk preference Q5 chose. A stray duplicate is cheap; a wrong merge reparents children irreversibly.
 
-Normalization is for **matching only**. Write the original value — the Account trigger collapses whitespace itself.
+This normalization is `company_match_key` in the deterministic core — apply it to both the lead's company and each returned `Account.Name`, and match by equality. Normalization is for **matching only**. Write the original value — the Account trigger collapses whitespace itself.
 
 **When an Account match is uncertain, create new.** Favor a duplicate over a wrong merge: a stray duplicate is cheap and remediable, while a wrong merge reparents children irreversibly (restoring from the Recycle Bin returns an empty shell — Salesforce restores only lookup relationships that have not been replaced). No fuzzy matching, ever.
 
@@ -96,7 +96,7 @@ Normalization is for **matching only**. Write the original value — the Account
 
 ### Phase 3 — Plan and gate
 
-Render the full plan, then gate. Nothing has been written yet — say so explicitly:
+`classify_rows` produces the plan: pass it the mapped rows, `contacts_by_email`, and `accounts_by_key`, and render its `counts`. Render the full plan, then gate. Nothing has been written yet — say so explicitly:
 
 ```
 Checked 1,104 rows against Salesforce (read-only)
@@ -136,22 +136,22 @@ Order matters: **Accounts first** (Contacts need the `AccountId`), then Contacts
 | --- | --- | --- |
 | Identity | FirstName, LastName, Email | Name = company (original casing) |
 | Link | AccountId | — |
-| Contact method | — | Website ← domain (never a free-email one), else Phone |
+| Contact method | — | Website ← `resolve_website(domain)` (never a free-email one), else Phone |
 | Seed (**net-new only**) | `Lifecycle_Stage__c = Cold_Prospect`, `Lead_Status__c = New` | — |
 | Owner | Marketing Admin | Marketing Admin |
 | **Never touch** | `OSLastCampaignId__c`, CampaignMember, `Segment__c`, `Referral_Source__c` | — |
 
-**Name convention.** Real FirstName/LastName when present. When absent — or junk (`-`, `last_name`, `Unknown`, or equal to the company) — **FirstName blank, LastName = the company name**. Blank FirstName signals "generic business inbox, no person yet". Reject only when there is no company at all. **Never write a placeholder.** (Note the migration transform's `|| "Unknown"` fallback — mirror its structure, never that line.)
+**Name convention** — computed by `resolve_name(first, last, full, company)`. Real FirstName/LastName when present. When absent — or junk (`-`, `last_name`, `Unknown`, or equal to the company) — **FirstName blank, LastName = the company name**. Blank FirstName signals "generic business inbox, no person yet". Reject only when there is no company at all. **Never write a placeholder.** (Note the migration transform's `|| "Unknown"` fallback — mirror its structure, never that line.)
 
 **The seed is floor-only, at creation only** (ADR-037). On a **matched** Contact, do not touch `Lifecycle_Stage__c` or `Lead_Status__c` at all — resetting an advanced contact (an `MQL`) back to the floor is a backward write, which the forward-only watermark forbids. Both values are also the picklist defaults, so an omitted field lands on the floor anyway; set them explicitly so the floor is deterministic rather than incidental. Race-safe because the reply pipeline is upgrade-only and its stage whitelist already accepts `Cold_Prospect` as an input.
 
 ### Phase 5 — Report
 
-Write the needs-review sidecar: **original CSV columns verbatim, in order, plus a trailing `preload_status` column.** Apply the caller's IV-9 formula-injection neutralization (prepend `'` to any cell starting `=`, `+`, `-`, `@`, tab, CR) — the operator opens this in a spreadsheet.
+Write the sidecar from `plan.sidecar_rows` (the needs-review **and** flagged-multiple rows): **original CSV columns verbatim, in order, plus a trailing `preload_status` column** set to each row's `reason` (or `multiple_contacts` for the flagged disposition; `write_failed` is added at write time). Apply the caller's IV-9 formula-injection neutralization (prepend `'` to any cell starting `=`, `+`, `-`, `@`, tab, CR) — the operator opens this in a spreadsheet.
 
 Path: `docs/campaigns/{short_entity}/{campaign-name}-{YYYY-MM-DD}-preload-review.csv`. **A written file must never have an unrecorded path** — return it to the caller alongside the counts.
 
-`preload_status` values: `no_company` · `no_contact_method` · `multiple_contacts` · `write_failed`.
+`preload_status` values: `no_email` · `no_company` · `no_contact_method` · `multiple_contacts` · `write_failed`.
 
 Report created/matched/held **and** the reconciliation gap. Planned 967, created 964 → say both numbers. A preview cannot predict a lock or a validation rule, so the gap is expected; hiding it is not.
 
@@ -166,7 +166,28 @@ Report created/matched/held **and** the reconciliation gap. Planned 967, created
 | Dedup reads | `mcp__plugin_marketing_salesforce__run_soql_query` |
 | Writes | `sf data import bulk` / `sf data bulk results` via `Bash` |
 | Column resolution | `${CLAUDE_PLUGIN_ROOT}/scripts/_shared/column_map.py` |
+| Website / name / match-key / bucketing | `${CLAUDE_PLUGIN_ROOT}/scripts/salesforce_preload.py` |
 | Gates + column questions | `AskUserQuestion` |
+
+### Deterministic core — `scripts/salesforce_preload.py`
+
+The decisions that must be exactly right every time are extracted into a pure,
+stdlib-only, unit-tested module (harness: `scripts/test_salesforce_preload.sh`).
+The skill does the live SOQL/`sf` I/O and the operator turns; it delegates the
+logic to these, rather than re-deriving it in prose:
+
+| Phase | Call | Guarantee |
+| --- | --- | --- |
+| 2 (Accounts) | `company_match_key(name)` | the whitespace+case-only match key; never strips suffixes |
+| 3 (Plan) | `classify_rows(rows, contacts_by_email, accounts_by_key)` → `PreloadPlan` | buckets every row; `eb_rows` never contains a needs-review row |
+| 4 (Website) | `resolve_website(domain)` | never returns a free-email domain |
+| 4 (Name) | `resolve_name(first, last, full, company)` | company-in-LastName fallback; never a placeholder |
+
+The skill runs the Phase-2 SOQL, builds `contacts_by_email` (normalized email →
+count) and `accounts_by_key` (`company_match_key(Account.Name)` → Id), passes
+them to `classify_rows`, and drives Phase 3–5 off the returned `PreloadPlan`
+(`counts` for the gate, `eb_rows` as the surviving set, `sidecar_rows` for the
+review CSV, and each net-new row's payload for the write).
 
 The marketing Salesforce MCP registers the `data` toolset only — `run_soql_query`, `get_username`, `resume_tool_operation`. **There is no SF write tool available to this plugin**; that is why writes shell out.
 
@@ -216,21 +237,28 @@ sf org display --target-org "<target-org>" --json
 
 ## Behavioral Tests
 
-### Tier 1 — Free assertions
+### Tier 1 — Deterministic core (pinned by harnesses)
 
-1. `--instance` absent → HALT, no queries issued.
-2. `--instance commercial` → skip with a one-line note, zero writes.
-3. A file whose company column is `name` → exactly one operator question, `name` among the candidates, no auto-resolution.
-4. A row with no company → `no_company`, held from Salesforce **and** the campaign.
-5. A row with >1 contact on its email → flagged, untouched in SF, **still in the returned lead set**.
-6. A matched Contact at `MQL` → stage and status unchanged after the run.
-7. `--dry-run` → plan rendered, zero writes.
+The logic below is unit-tested and gated in CI — `scripts/test_column_map.sh`
+(column resolution) and `scripts/test_salesforce_preload.sh` (website, name,
+match key, bucketing), both run by `validate.sh`. These are assertions, not
+prose promises:
 
-### Tier 2 — Tool-assisted
+1. A file whose company column is `name` → exactly one operator question, `name` among the candidates, no auto-resolution *(column_map)*.
+2. A free-email domain (`gmail.com`, `www.gmail.com`, `joe@gmail.com`) never becomes a website *(resolve_website)*.
+3. A no-person / junk-name row → FirstName blank, LastName = company; never a placeholder *(resolve_name)*.
+4. `Acme Inc` / `Acme LLC` / `Acme, Inc.` → distinct match keys (favor a duplicate over a wrong merge) *(company_match_key)*.
+5. A no-company or no-contact-method row → needs-review, and **never in `eb_rows`** *(classify_rows)*.
+6. A >1-contact row → flagged, no SF write, **still in `eb_rows`** *(classify_rows)*.
 
-8. Net-new Contact lands with `Cold_Prospect`/`New`, owned by Marketing Admin, parented to a non-free-email Account.
-9. A no-person row lands with blank FirstName and LastName = the company; no `Unknown` anywhere in the org after the run.
-10. Zero Accounts with a `FreeEmailDomains` name or website exist after the run.
-11. Re-run over the same file → zero new records.
-12. Planned vs created counts both reported when they differ.
+### Tier 2 — Live-org behavior (manual / staged run)
+
+These need the real org and are verified on the canary + a small test run:
+
+7. `--instance` absent → HALT, no queries issued; `--instance commercial` → skip, zero writes.
+8. `--dry-run` → plan rendered, zero writes.
+9. Net-new Contact lands with `Cold_Prospect`/`New`, owned by Marketing Admin, parented to a non-free-email Account.
+10. A matched Contact at `MQL` → stage and status unchanged after the run.
+11. Zero Accounts with a `FreeEmailDomains` name or website exist after the run; no `Unknown` LastName anywhere.
+12. Re-run over the same file → zero new records; planned vs created counts both reported when they differ.
 13. **The point of the whole skill:** after the EB send, OutboundSync attaches activity to the pre-loaded Contact and creates **no** new Account.
