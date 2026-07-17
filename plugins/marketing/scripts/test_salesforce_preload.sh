@@ -10,7 +10,7 @@ python3 - "$SCRIPT_DIR" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1])
 
-from salesforce_preload import FREE_EMAIL_DOMAINS, resolve_website
+from salesforce_preload import FREE_EMAIL_DOMAINS, resolve_name, resolve_website
 
 _pass = _fail = 0
 
@@ -61,6 +61,74 @@ check("empty -> None", resolve_website(""), None)
 check("whitespace -> None", resolve_website("   "), None)
 check("scheme only -> None", resolve_website("https://"), None)
 check("bare www -> None", resolve_website("www."), None)
+
+# --- name convention: real person ------------------------------------------
+d = resolve_name("Joe", "Dubyk", None, "Dubyk Winery")
+check("person: first", d.first_name, "Joe")
+check("person: last", d.last_name, "Dubyk")
+check("person: is_person", d.is_person, True)
+
+# first name only, no surname → falls to company path (no valid person)
+d = resolve_name("Joe", "", None, "Dubyk Winery")
+check("lone first name → company path first blank", d.first_name, "")
+check("lone first name → company in last", d.last_name, "Dubyk Winery")
+check("lone first name → not a person", d.is_person, False)
+
+# full name split when first/last absent
+d = resolve_name(None, None, "Joe Dubyk", "Dubyk Winery")
+check("full name split: first", d.first_name, "Joe")
+check("full name split: last", d.last_name, "Dubyk")
+check("full name split: is_person", d.is_person, True)
+d = resolve_name(None, None, "Mary Jane Watson", "Acme")
+check("full name multi-token: first", d.first_name, "Mary")
+check("full name multi-token: last", d.last_name, "Jane Watson")
+# single-token full name has no surname → company path
+d = resolve_name(None, None, "Cher", "Cher's Boutique")
+check("single-token full name → company path", d.last_name, "Cher's Boutique")
+check("single-token full name → not a person", d.is_person, False)
+
+# --- name convention: no person → company in LastName -----------------------
+d = resolve_name("", "", None, "Dubyk Winery")
+check("no person: first blank", d.first_name, "")
+check("no person: company in last", d.last_name, "Dubyk Winery")
+check("no person: is_person False", d.is_person, False)
+
+# --- name convention: NEVER a placeholder -----------------------------------
+for junk in ["-", "last_name", "Unknown", "n/a", "None", "NULL", "unknown prospect"]:
+    d = resolve_name("", junk, None, "Dubyk Winery")
+    check(f"junk last {junk!r} → company, not placeholder", d.last_name, "Dubyk Winery")
+    check(f"junk last {junk!r} → never the placeholder itself", d.last_name.lower() == junk.lower(), False)
+
+# name field stuffed with the company (OutboundSync/old-script pattern)
+d = resolve_name("Dubyk Winery", "Dubyk Winery", None, "Dubyk Winery")
+check("name==company: first blanked", d.first_name, "")
+check("name==company: company in last (once)", d.last_name, "Dubyk Winery")
+check("name==company: not a person", d.is_person, False)
+
+# junk first but real last → keep the person, blank the junk first
+d = resolve_name("-", "Dubyk", None, "Dubyk Winery")
+check("junk first, real last: first blanked", d.first_name, "")
+check("junk first, real last: last kept", d.last_name, "Dubyk")
+check("junk first, real last: is_person", d.is_person, True)
+
+# --- no company at all → blank last (classifier routes to needs-review) ------
+d = resolve_name("", "", None, "")
+check("no person, no company: blank last", d.last_name, "")
+check("no person, no company: not a person", d.is_person, False)
+# a real person with no company still gets a valid name (classifier holds the row)
+d = resolve_name("Joe", "Dubyk", None, "")
+check("person, no company: still a valid person name", (d.first_name, d.last_name, d.is_person),
+      ("Joe", "Dubyk", True))
+
+# --- length caps (SF FirstName 40 / LastName 80) ----------------------------
+long_co = "A" * 100
+check("company over 80 chars truncated", len(resolve_name("", "", None, long_co).last_name), 80)
+check("first over 40 chars truncated", len(resolve_name("B" * 60, "Smith", None, "X").first_name), 40)
+
+# --- casing preserved (SF trigger re-cases; we stay faithful) ---------------
+d = resolve_name("joe", "dubyk", None, "dubyk winery LLC")
+check("person casing preserved", (d.first_name, d.last_name), ("joe", "dubyk"))
+check("company casing preserved", resolve_name("", "", None, "dubyk winery LLC").last_name, "dubyk winery LLC")
 
 print(f"\nRESULT pass={_pass} fail={_fail}")
 sys.exit(1 if _fail else 0)

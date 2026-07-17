@@ -6,9 +6,11 @@ decisions that must be exactly right every time and would be dangerous to leave
 to prose:
 
   - resolve_website  — what goes in Account.Website, and the hard guarantee it
-    is NEVER a free-email domain (this step)
-  - (later steps append: the name convention, the company-name match key, and
-    the disposition classifier)
+    is NEVER a free-email domain
+  - resolve_name     — the Contact name, with company-in-LastName when there is
+    no person and NEVER a placeholder
+  - (later steps append: the company-name match key, and the disposition
+    classifier)
 
 Nothing here touches the network or the filesystem; the skill feeds it values
 and acts on what it returns.
@@ -17,7 +19,12 @@ and acts on what it returns.
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import NamedTuple, Optional
+
+# Salesforce standard-field length caps — truncate defensively so an over-long
+# value can never fail the write.
+_FIRST_NAME_MAX = 40
+_LAST_NAME_MAX = 80
 
 # --- free-email domains ------------------------------------------------------
 #
@@ -94,3 +101,100 @@ def resolve_website(domain_value: Optional[str]) -> Optional[str]:
     if value in FREE_EMAIL_DOMAINS:
         return None
     return value
+
+
+# --- name convention ---------------------------------------------------------
+#
+# Salesforce requires a LastName; FirstName is optional. The convention (Q6):
+# use a real first/last name when there is one; otherwise put the COMPANY in the
+# required LastName with a blank FirstName (which reads as "a business inbox, no
+# person yet"). NEVER write a placeholder like `-`, `Unknown`, or `last_name` —
+# that placeholder pollution is exactly what this convention exists to end.
+#
+# This helper only decides the NAME. Whether a row with no company should be
+# held back is the disposition classifier's job (a later step) — so a real
+# person with no company still gets a valid person name here; it is the
+# classifier that routes the no-company row to needs-review.
+
+#: Values that are not real names — treated as absent. Compared lowercased.
+_JUNK_NAMES = frozenset({
+    "", "-", "--", "---", ".", "n/a", "na", "none", "null", "nil",
+    "unknown", "unknown prospect", "no name", "noname",
+    "first_name", "firstname", "first name",
+    "last_name", "lastname", "last name",
+})
+
+
+class NameDecision(NamedTuple):
+    """The name to write on a Contact.
+
+    - `is_person=True`  → a real person: `last_name` is a genuine surname,
+      `first_name` may be blank or real.
+    - `is_person=False` → no usable person: `first_name` is blank and
+      `last_name` is the company (or blank only when there is no company at all,
+      which the disposition classifier routes to needs-review).
+
+    `last_name` is never a placeholder and never junk.
+    """
+
+    first_name: str
+    last_name: str
+    is_person: bool
+
+
+def _clean(value: Optional[str]) -> str:
+    return (value or "").strip()
+
+
+def _is_junk_name(value: str, company: str) -> bool:
+    """A name value is junk if it is a known placeholder or just the company.
+
+    The "equals the company" case matters: OutboundSync and the old upload
+    script stuff the company into the name field, so a `last_name` that equals
+    the company is not a real surname — it is the company wearing a person's
+    slot, and must fall through to the company path (blank first, company last).
+    """
+    low = value.strip().lower()
+    return low in _JUNK_NAMES or (bool(company) and low == company.strip().lower())
+
+
+def resolve_name(
+    first: Optional[str],
+    last: Optional[str],
+    full: Optional[str],
+    company: Optional[str],
+) -> NameDecision:
+    """Decide the Contact name from a lead's mapped fields.
+
+    Order: a real first/last (junk blanked out); else split a full name that has
+    a surname; else the company in LastName with a blank FirstName. The result's
+    `last_name` is always either a real surname, the company, or blank — never a
+    placeholder.
+    """
+    company_c = _clean(company)
+
+    first_c = _clean(first)
+    last_c = _clean(last)
+    if _is_junk_name(first_c, company_c):
+        first_c = ""
+    if _is_junk_name(last_c, company_c):
+        last_c = ""
+
+    # No usable surname yet, but a full name might carry one.
+    if not last_c and full:
+        full_c = _clean(full)
+        if not _is_junk_name(full_c, company_c):
+            parts = full_c.split(None, 1)  # "Mary Jane Watson" -> ["Mary", "Jane Watson"]
+            if len(parts) >= 2:
+                first_c = first_c or parts[0]
+                last_c = parts[1]
+
+    if last_c:  # a usable surname → a real person
+        return NameDecision(
+            first_name=first_c[:_FIRST_NAME_MAX],
+            last_name=last_c[:_LAST_NAME_MAX],
+            is_person=True,
+        )
+
+    # No usable person → the company goes in the required LastName, blank first.
+    return NameDecision(first_name="", last_name=company_c[:_LAST_NAME_MAX], is_person=False)
