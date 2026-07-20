@@ -90,7 +90,7 @@ SELECT Id, Name, Website FROM Account WHERE Name IN (...)
 
 This normalization is `company_match_key` in the deterministic core — apply it to both the lead's company and each returned `Account.Name`, and match by equality. Normalization is for **matching only**. Write the original value — the Account trigger collapses whitespace itself.
 
-**When an Account match is uncertain, create new.** Favor a duplicate over a wrong merge: a stray duplicate is cheap and remediable, while a wrong merge reparents children irreversibly (restoring from the Recycle Bin returns an empty shell — Salesforce restores only lookup relationships that have not been replaced). No fuzzy matching, ever.
+**When an Account match is uncertain, create new.** Favor a duplicate over a wrong merge: a stray duplicate is cheap and remediable, while a wrong merge reparents children irreversibly (restoring from the Recycle Bin returns an empty shell — Salesforce restores only lookup relationships that have not been replaced). **A normalized name that matches more than one existing Account is uncertain by definition** — attaching to an arbitrary one of them is itself the wrong merge — so build `accounts_by_key` as a name-key → *list* of Account Ids and let `classify_rows` attach only on an exact single match; two-or-more creates new. No fuzzy matching, ever.
 
 > **Note (BC-17213, open):** Salesforce's own standard Account rule never matches on name alone — every clause conjoins Name with a location or phone, and Website matches at threshold 100. Since a company domain is present on essentially every lead, **domain-first matching is likely stronger than name-first.** That is a change to a settled decision (scope doc Q5) and is recorded on the ticket, not taken here.
 
@@ -102,7 +102,7 @@ This normalization is `company_match_key` in the deterministic core — apply it
 Checked 1,104 rows against Salesforce (read-only)
 
 Contacts   net-new 967 · matched 128 · multiple-match 6 (flagged, untouched)
-Companies  matched 212 · net-new 611
+Companies  matched 212 · net-new 611 · ambiguous 2 (multiple same-name Accounts → created new)
 Needs review — held from Salesforce AND the campaign:
   no business name 3 · no website and no phone 0
 
@@ -126,9 +126,9 @@ Order matters: **Accounts first** (Contacts need the `AccountId`), then Contacts
 
 **Salesforce has no dry-run and Bulk API has no rollback.** The Phase-3 plan *is* the preview, and it is built from read-only queries, not a rehearsal. Insert is recoverable only via the success file — there is no server-side "records created by job X" query, and bulk job results are purged after 7 days. **Archive the results file before doing anything else with it.**
 
-1. **Canary.** Write the first `--canary` rows, chosen for coverage rather than sample size: at minimum one net-new-with-person, one company-in-LastName row, one new Account, one matched Account. Verify, then continue. Salesforce publishes no canary size — its guidance is only "use a small test file first" — and a coverage-selected handful exercises more failure paths than a percentage of a homogeneous list.
-2. **Load.** `sf data import bulk --sobject Account --file <csv> --target-org <org> --wait 30 --json`, then the same for Contact.
-3. **Read the real counts.** `sf data bulk results --job-id <id> --target-org <org> --json`. **Never gate on job state or exit code**: a job reports `Completed` with a 100% failure rate, partial failures exit non-zero with no `result.jobInfo`, and DML commits per 200-record chunk — so `Failed` does not mean nothing happened. Count from the row-level `Success` field or the count is a guess.
+1. **Split the write set once, then canary.** Build the Account and Contact write files from the plan, then **hold out** the first `--canary` rows — chosen for coverage rather than sample size: at minimum one net-new-with-person, one company-in-LastName row, one new Account, one matched Account. Write **only** that canary batch and verify it. Salesforce publishes no canary size — its guidance is only "use a small test file first" — and a coverage-selected handful exercises more failure paths than a percentage of a homogeneous list.
+2. **Load the remainder — never the whole file again.** After the canary verifies, load the write set **minus the canary rows already written**: `sf data import bulk --sobject Account --file <remainder-csv> --target-org <org> --wait 30 --json`, then the same for Contact. Re-loading the full file would re-create the canary records as duplicates — a bulk insert does **no** existence check, and the Phase-2 dedup snapshot predates the canary write, so those rows still look net-new. Reconcile the created counts across **both** batches (canary + remainder).
+3. **Read the real counts.** `sf data bulk results --job-id <id> --target-org <org> --json` for every batch. **Never gate on job state or exit code**: a job reports `Completed` with a 100% failure rate, partial failures exit non-zero with no `result.jobInfo`, and DML commits per 200-record chunk — so `Failed` does not mean nothing happened. Count from the row-level `Success` field or the count is a guess.
 
 **Field set.**
 
@@ -184,10 +184,13 @@ logic to these, rather than re-deriving it in prose:
 | 4 (Name) | `resolve_name(first, last, full, company)` | company-in-LastName fallback; never a placeholder |
 
 The skill runs the Phase-2 SOQL, builds `contacts_by_email` (normalized email →
-count) and `accounts_by_key` (`company_match_key(Account.Name)` → Id), passes
-them to `classify_rows`, and drives Phase 3–5 off the returned `PreloadPlan`
-(`counts` for the gate, `eb_rows` as the surviving set, `sidecar_rows` for the
-review CSV, and each net-new row's payload for the write).
+count) and `accounts_by_key` (`company_match_key(Account.Name)` → the **list** of
+Account Ids sharing that key — never collapse it to one; a key with two or more is
+ambiguous and `classify_rows` creates new rather than attach to an arbitrary one,
+per Q5), passes them to `classify_rows`, and drives Phase 3–5 off the returned
+`PreloadPlan` (`counts` for the gate — including `accounts_ambiguous` — `eb_rows`
+as the surviving set, `sidecar_rows` for the review CSV, and each net-new row's
+payload for the write).
 
 The marketing Salesforce MCP registers the `data` toolset only — `run_soql_query`, `get_username`, `resume_tool_operation`. **There is no SF write tool available to this plugin**; that is why writes shell out.
 
@@ -247,7 +250,7 @@ prose promises:
 1. A file whose company column is `name` → exactly one operator question, `name` among the candidates, no auto-resolution *(column_map)*.
 2. A free-email domain (`gmail.com`, `www.gmail.com`, `joe@gmail.com`) never becomes a website *(resolve_website)*.
 3. A no-person / junk-name row → FirstName blank, LastName = company; never a placeholder *(resolve_name)*.
-4. `Acme Inc` / `Acme LLC` / `Acme, Inc.` → distinct match keys (favor a duplicate over a wrong merge) *(company_match_key)*.
+4. `Acme Inc` / `Acme LLC` / `Acme, Inc.` → distinct match keys; and a name that matches **two-or-more** existing Accounts creates new rather than attach to an arbitrary one — favor a duplicate over a wrong merge *(company_match_key, classify_rows)*.
 5. A no-company or no-contact-method row → needs-review, and **never in `eb_rows`** *(classify_rows)*.
 6. A >1-contact row → flagged, no SF write, **still in `eb_rows`** *(classify_rows)*.
 

@@ -96,8 +96,10 @@ def resolve_website(domain_value: Optional[str]) -> Optional[str]:
         value = value.rsplit("@", 1)[1]
 
     value = _WWW_RE.sub("", value)
-    value = value.split("/", 1)[0]      # drop any path/query/fragment
-    value = value.split("?", 1)[0]
+    value = value.split("/", 1)[0]      # drop any path
+    value = value.split("?", 1)[0]      # drop any query
+    value = value.split("#", 1)[0]      # drop a bare #fragment (no leading slash)
+    value = value.split(":", 1)[0]      # drop a :port (scheme was already stripped)
     value = value.strip().strip(".")    # tidy stray leading/trailing dots
 
     if not value:
@@ -304,6 +306,7 @@ class RowPlan(NamedTuple):
     account_key: str = ""
     account_matched: bool = False  # True → parent to an existing Account
     account_id: str = ""           # the existing Account Id when account_matched
+    account_ambiguous: bool = False  # True → key hit >1 Account; created new (Q5)
     website: str = ""
     phone: str = ""
 
@@ -320,13 +323,15 @@ class PreloadPlan(NamedTuple):
 def classify_rows(
     rows: Sequence[Mapping[str, str]],
     contacts_by_email: Mapping[str, int],
-    accounts_by_key: Mapping[str, str],
+    accounts_by_key: Mapping[str, Sequence[str]],
 ) -> PreloadPlan:
     """Bucket each mapped lead row against the Salesforce lookups.
 
     - `contacts_by_email`: normalized-email → count of existing Contacts on it.
-    - `accounts_by_key`: `company_match_key(name)` → existing Account Id, for the
-      candidate Accounts Salesforce returned.
+    - `accounts_by_key`: `company_match_key(name)` → the list of existing Account
+      Ids whose name normalizes to that key, for the candidate Accounts Salesforce
+      returned. A key with >1 Id is ambiguous — we attach only on an exact single
+      match and create new otherwise (Q5: favor a duplicate over a wrong merge).
 
     Returns a `PreloadPlan`. The caller writes the net-new records, leaves matched
     ones alone, writes `sidecar_rows` to the review CSV, and uploads `eb_rows`.
@@ -369,11 +374,19 @@ def classify_rows(
         name = resolve_name(row.get("first_name"), row.get("last_name"),
                             row.get("full_name"), company)
         key = company_match_key(company)
-        account_id = accounts_by_key.get(key, "")
+        # Attach to an existing Account ONLY when the normalized name matches
+        # EXACTLY ONE. Two-or-more candidates is an ambiguous key — attaching to
+        # an arbitrary one is the wrong merge Q5 forbids, so create new instead
+        # (favor a duplicate over a wrong merge). Zero candidates → create new.
+        candidates = accounts_by_key.get(key, ())
+        matched = len(candidates) == 1
+        ambiguous = len(candidates) > 1
         results.append(RowPlan(
             row=row, email=email, disposition=NET_NEW,
             contact_first=name.first_name, contact_last=name.last_name, is_person=name.is_person,
-            account_key=key, account_matched=bool(account_id), account_id=account_id,
+            account_key=key, account_matched=matched,
+            account_id=candidates[0] if matched else "",
+            account_ambiguous=ambiguous,
             website=website, phone=phone,
         ))
 
@@ -382,6 +395,7 @@ def classify_rows(
     # Companies are counted DISTINCT by match key — many contacts can share one.
     matched_keys = {rp.account_key for rp in results if rp.disposition == NET_NEW and rp.account_matched}
     new_keys = {rp.account_key for rp in results if rp.disposition == NET_NEW and not rp.account_matched}
+    ambiguous_keys = {rp.account_key for rp in results if rp.disposition == NET_NEW and rp.account_ambiguous}
 
     eb_rows = [rp for rp in results if rp.uploads_to_eb]
     sidecar_rows = [rp for rp in results if rp.disposition in (NEEDS_REVIEW, MULTIPLE_CONTACTS)]
@@ -394,6 +408,7 @@ def classify_rows(
         "needs_review": by_disp[NEEDS_REVIEW],
         "accounts_matched": len(matched_keys),
         "accounts_new": len(new_keys),
+        "accounts_ambiguous": len(ambiguous_keys),
         "review_no_email": review_by_reason["no_email"],
         "review_no_company": review_by_reason["no_company"],
         "review_no_contact_method": review_by_reason["no_contact_method"],

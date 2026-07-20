@@ -75,6 +75,14 @@ check("corporate email -> company domain", resolve_website("joe@dubykwinery.com"
 check("subdomain preserved", resolve_website("shop.dubykwinery.com"), "shop.dubykwinery.com")
 check("multi-label domain preserved", resolve_website("www.brewery.co.uk"), "brewery.co.uk")
 
+# --- :port and #fragment must NOT let a free-email domain slip past ----------
+# (BC-17213 Greptile: these forms bypassed the block-list before the fix.)
+check("free-email with :port → blocked", resolve_website("gmail.com:8080"), None)
+check("free-email with #fragment → blocked", resolve_website("gmail.com#inbox"), None)
+check("free-email scheme+port+path → blocked", resolve_website("https://gmail.com:443/mail"), None)
+check("real domain drops :port", resolve_website("acme.com:8080"), "acme.com")
+check("real domain drops #fragment", resolve_website("acme.com#team"), "acme.com")
+
 # --- missing / empty -> None (blank website, not an error) ------------------
 check("None -> None", resolve_website(None), None)
 check("empty -> None", resolve_website(""), None)
@@ -198,7 +206,7 @@ rows = [
     R(email="",                company="Ghost Co",       domain="ghostco.com"),                                           # needs-review: no email
 ]
 contacts_by_email = {"bob@gmail.com": 1, "dup@gmail.com": 3}
-accounts_by_key = {company_match_key("Sunrise Cellars"): "001AAA"}  # this company already has an Account
+accounts_by_key = {company_match_key("Sunrise Cellars"): ["001AAA"]}  # this company already has an Account
 
 plan = classify_rows(rows, contacts_by_email, accounts_by_key)
 disp = {rp.email: rp.disposition for rp in plan.rows if rp.email}
@@ -266,6 +274,26 @@ check("junk-company header token → needs_review, not net_new", plan3.rows[0].d
 check("junk-company header token → reason no_company", plan3.rows[0].reason, "no_company")
 check("junk-company header token → held out of eb_rows",
       any(rp.email == "hdr@gmail.com" for rp in plan3.eb_rows), False)
+
+# --- an ambiguous Account key (2+ existing) → create new, never a wrong merge --
+# (BC-17213 Greptile: same-normalized-name collisions were silently reduced to
+# one arbitrary Id; Q5 says an uncertain match creates new.)
+amb_key = company_match_key("Ambi Co")
+plan4 = classify_rows([R(email="a@gmail.com", company="Ambi Co", domain="ambico.com")],
+                      {}, {amb_key: ["001AAA", "001BBB"]})
+r4 = plan4.rows[0]
+check("ambiguous account → net_new", r4.disposition, NET_NEW)
+check("ambiguous account → not matched (create new)", r4.account_matched, False)
+check("ambiguous account → no account_id attached", r4.account_id, "")
+check("ambiguous account → flagged ambiguous", r4.account_ambiguous, True)
+check("ambiguous account → counted, creates a new account", plan4.counts["accounts_ambiguous"], 1)
+check("ambiguous account → still counted as a new account", plan4.counts["accounts_new"], 1)
+# exactly-one match still attaches, and is not flagged ambiguous
+plan5 = classify_rows([R(email="s@gmail.com", company="Single Co", domain="singleco.com")],
+                      {}, {company_match_key("Single Co"): ["001CCC"]})
+check("single match → attached", plan5.rows[0].account_matched, True)
+check("single match → id carried", plan5.rows[0].account_id, "001CCC")
+check("single match → not ambiguous", plan5.rows[0].account_ambiguous, False)
 
 print(f"\nRESULT pass={_pass} fail={_fail}")
 sys.exit(1 if _fail else 0)
