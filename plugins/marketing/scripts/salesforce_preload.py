@@ -176,6 +176,12 @@ def resolve_name(
     placeholder.
     """
     company_c = _clean(company)
+    # A junk company (a header token like "last_name", or a placeholder like
+    # "Unknown") is not a real business — blank it so it can never land in the
+    # required LastName. The classifier holds such rows for review; blanking here
+    # keeps this function's "never a placeholder" guarantee true even in isolation.
+    if company_c.lower() in _JUNK_NAMES:
+        company_c = ""
 
     first_c = _clean(first)
     last_c = _clean(last)
@@ -270,11 +276,13 @@ MATCHED = "matched"
 MULTIPLE_CONTACTS = "multiple_contacts"
 NEEDS_REVIEW = "needs_review"
 
-#: Company values that cannot anchor an Account. Compared lowercased.
-_JUNK_COMPANY = frozenset({
-    "", "-", "--", "---", ".", "n/a", "na", "none", "null", "nil",
-    "unknown", "unknown prospect", "no name",
-})
+#: Company values that cannot anchor an Account — identical to `_JUNK_NAMES` by
+#: derivation so the two sets can never drift apart. A company cell holding a
+#: header token like "last_name" or a placeholder like "Unknown" is not a real
+#: business; it must be held for review, never written as an Account/LastName.
+#: (BC-17213 review — the two sets had silently diverged, letting a header-token
+#: company slip through as net-new.)
+_JUNK_COMPANY = _JUNK_NAMES
 
 
 def _is_usable_company(company: str) -> bool:

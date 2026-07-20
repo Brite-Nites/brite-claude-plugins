@@ -131,6 +131,14 @@ check("junk first, real last: first blanked", d.first_name, "")
 check("junk first, real last: last kept", d.last_name, "Dubyk")
 check("junk first, real last: is_person", d.is_person, True)
 
+# junk in the COMPANY field must never become a LastName placeholder. The
+# classifier normally holds these rows, but resolve_name refuses in isolation
+# too (BC-17213 review — the guarantee must hold even when called directly).
+for junk in ["last_name", "Unknown", "first_name", "noname", "n/a", "None", "-"]:
+    d = resolve_name("", "", None, junk)
+    check(f"junk company {junk!r} → blank last (no placeholder)", d.last_name, "")
+    check(f"junk company {junk!r} → not a person", d.is_person, False)
+
 # --- no company at all → blank last (classifier routes to needs-review) ------
 d = resolve_name("", "", None, "")
 check("no person, no company: blank last", d.last_name, "")
@@ -249,6 +257,15 @@ check("matched row writes nothing", (bob.contact_last, bob.account_key, bob.webs
 plan2 = classify_rows([R(email="p@gmail.com", company="Phone Co", domain="", phone="801-555-1212")], {}, {})
 check("phone alone → net-new, not held", plan2.rows[0].disposition, NET_NEW)
 check("phone alone → phone carried", plan2.rows[0].phone, "801-555-1212")
+
+# --- a net-new row whose COMPANY is a junk header token is HELD, not created --
+# (BC-17213 review: _JUNK_COMPANY had drifted from _JUNK_NAMES, so "last_name"
+# as a company slipped through as a NET_NEW row and would have been written.)
+plan3 = classify_rows([R(email="hdr@gmail.com", company="last_name", domain="acme.com")], {}, {})
+check("junk-company header token → needs_review, not net_new", plan3.rows[0].disposition, NEEDS_REVIEW)
+check("junk-company header token → reason no_company", plan3.rows[0].reason, "no_company")
+check("junk-company header token → held out of eb_rows",
+      any(rp.email == "hdr@gmail.com" for rp in plan3.eb_rows), False)
 
 print(f"\nRESULT pass={_pass} fail={_fail}")
 sys.exit(1 if _fail else 0)
