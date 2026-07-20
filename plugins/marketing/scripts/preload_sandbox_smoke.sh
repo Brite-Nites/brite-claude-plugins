@@ -75,7 +75,10 @@ cleanup() {
 trap cleanup EXIT
 
 jqid() { python3 -c "import json,sys; print(json.load(sys.stdin).get('result',{}).get('id',''))" 2>/dev/null; }
-field() { python3 -c "import json,sys; r=json.load(sys.stdin)['result']['records']; print(r[0].get('$1','') if r else '')" 2>/dev/null; }
+field() { python3 -c "import json,sys
+r=json.load(sys.stdin)['result']['records']
+v=r[0].get('$1') if r else None
+print('' if v is None else v)" 2>/dev/null; }
 
 # --- hard production guard ---------------------------------------------------
 echo "=== Salesforce pre-load sandbox smoke test ==="
