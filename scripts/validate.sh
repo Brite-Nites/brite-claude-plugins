@@ -2570,6 +2570,46 @@ else
   fi
 fi
 
+section "15a-bc-17213. Lead-CSV column mapper harness (BC-17213)"
+
+cm_harness="$REPO_ROOT/plugins/marketing/scripts/test_column_map.sh"
+
+if [ ! -f "$cm_harness" ]; then
+  warn "plugins/marketing/scripts/test_column_map.sh not found — column mapper harness skipped"
+else
+  if cm_harness_out=$(bash "$cm_harness" 2>&1); then
+    cm_pass_count=$(printf '%s\n' "$cm_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$cm_pass_count" ]; then
+      pass "lead-CSV column mapper harness (${cm_pass_count} assertions)"
+    else
+      pass "lead-CSV column mapper harness — passed (count unparsed)"
+    fi
+  else
+    fail "lead-CSV column mapper harness failed:"
+    printf '%s\n' "$cm_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+section "15a-bc-17213b. Salesforce-preload core harness (BC-17213)"
+
+sp_harness="$REPO_ROOT/plugins/marketing/scripts/test_salesforce_preload.sh"
+
+if [ ! -f "$sp_harness" ]; then
+  warn "plugins/marketing/scripts/test_salesforce_preload.sh not found — preload core harness skipped"
+else
+  if sp_harness_out=$(bash "$sp_harness" 2>&1); then
+    sp_pass_count=$(printf '%s\n' "$sp_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$sp_pass_count" ]; then
+      pass "salesforce-preload core harness (${sp_pass_count} assertions)"
+    else
+      pass "salesforce-preload core harness — passed (count unparsed)"
+    fi
+  else
+    fail "salesforce-preload core harness failed:"
+    printf '%s\n' "$sp_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
 section "15a-bc-8728b. Offer-performance regression harness (BC-8728)"
 
 op_harness="$REPO_ROOT/plugins/marketing/scripts/test_offer_performance.sh"
