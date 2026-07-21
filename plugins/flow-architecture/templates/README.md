@@ -1,6 +1,6 @@
 ---
 flow_index: skip
-last_reviewed: 2026-05-22
+last_reviewed: 2026-07-08
 ---
 
 # flow-architecture/templates/
@@ -15,6 +15,7 @@ templates/
 │   ├── verify-docs.sh                    # Umbrella runner (build/lint/test, links, orphans, FM, INDEX drift, freshness, Linear refs)
 │   ├── regenerate-flow-index.sh          # Thin shell wrapper around the .mts
 │   ├── regenerate-flow-index.mts         # Regenerates docs/product/flows/INDEX.md from front-matter
+│   ├── precommit-flow-index.sh           # Pre-commit auto-regen of INDEX.md (BC-16783) — sourced from your pre-commit hook
 │   ├── verify-linear-references.mts      # Confirms every doc's Linear ref resolves (opt-in, requires LINEAR_API_KEY)
 │   ├── normalize-fda-frontmatter.mjs     # TODO-skeleton one-shot frontmatter normalizer (populate data tables before use)
 │   └── lib/
@@ -33,6 +34,22 @@ The `/flow:retrofit-project` orchestrator, during Phase 1 (preflight + bootstrap
 
 **You own the scripts after they land.** Edit them, replace them, add to them. The plugin will NOT overwrite the copies in your project on subsequent `/flow:retrofit-project` runs — unless you pass `--overwrite-scripts`. See § Idempotency below.
 
+## Pre-commit auto-regen of the flow INDEX (BC-16783)
+
+`scripts/precommit-flow-index.sh` keeps `docs/product/flows/INDEX.md` in sync **at commit time** so it never drifts until CI's `verify-docs` drift gate turns a PR red. When a commit stages a story doc under `docs/product/flows/` **or** `docs/product/master-flow-inventory.md` (both feed the INDEX), the helper regenerates the INDEX and stages it into the same commit.
+
+It is deliberately **fail-open**: if `tsx` isn't installed, or the regenerator errors, it warns and lets the commit through — CI runs the same `regenerate-flow-index.sh --check` and remains the authoritative backstop. It's also idempotent — a no-op run produces no `last_reviewed` churn, so it won't add one-line timestamp diffs.
+
+**How the scaffold wires it.** `/flow:start-project` and `/flow:retrofit-project` inject a single line into your `scripts/pre-commit.sh` (or create that hook if you don't have one — it never overwrites a hand-authored hook, per Q29.7) and add a `prepare` npm script that installs the hook into `.git/hooks/pre-commit` on `npm install`. The installer is non-clobbering — it skips installation if `.git/hooks/pre-commit` already exists and isn't the managed hook, so your own local hook is left untouched. Run `npm install` (or `npm run prepare`) once to activate it.
+
+**Wiring it by hand** (if you have no `package.json`, already use a `prepare` script, or manage hooks yourself): add this line to whatever runs at pre-commit —
+
+```bash
+bash scripts/precommit-flow-index.sh || true
+```
+
+The `|| true` guarantees the helper can never block a commit even if edited later.
+
 ## Placeholders substituted at scaffold time
 
 The orchestrator runs a sed-substitution pass against the copied files before `chmod +x`'ing the shell scripts:
@@ -47,7 +64,7 @@ The orchestrator runs a sed-substitution pass against the copied files before `c
 
 ## Idempotency
 
-Default behavior (no flag): if any of the 9 target paths already exists in your project, the orchestrator HALTS and prints the conflict list. Re-run with `--overwrite-scripts` to replace ALL 9 files atomically.
+Default behavior (no flag): if any of the 13 target paths already exists in your project, the orchestrator HALTS and prints the conflict list. Re-run with `--overwrite-scripts` to replace ALL 13 files atomically.
 
 This is intentional — the templates are starting points, not authoritative replacements. If you've customized your `scripts/verify-docs.sh` and re-run retrofit, the orchestrator will not silently erase your changes.
 

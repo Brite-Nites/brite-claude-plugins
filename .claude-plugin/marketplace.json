@@ -11,13 +11,13 @@
       "name": "brite-core",
       "source": "./plugins/core",
       "description": "Layer-2 core plugin \u2014 cross-cutting brain-first hooks (SessionStart + SubagentStart JSON envelope), centralized security/quality hooks, and team-gbrain MCP registration. Strongly recommended for all Brite team members.",
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
       "name": "workflows",
       "source": "./plugins/workflows",
       "description": "Process + Org plugin \u2014 structured workflow methodology with Linear integration",
-      "version": "3.41.1"
+      "version": "3.41.2"
     },
     {
       "name": "marketing",
@@ -29,19 +29,19 @@
       "name": "cadence",
       "source": "./plugins/cadence",
       "description": "Weekly planning cadence plugin \u2014 audit, scope, housekeep, narrate, ops",
-      "version": "0.6.1"
+      "version": "0.6.2"
     },
     {
       "name": "revops",
       "source": "./plugins/revops",
-      "description": "Revenue operations plugin \u2014 Salesforce dev + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
-      "version": "0.5.13"
+      "description": "Revenue operations plugin \u2014 Salesforce development + CRM data skills with Brite customizations on top of Jaganpro/sf-skills (MIT)",
+      "version": "0.5.17"
     },
     {
       "name": "flow-architecture",
       "source": "./plugins/flow-architecture",
-      "description": "Flow-Driven Architecture plugin \u2014 scaffolds Linear domain milestones, 5-discipline child issues, and repo flow docs for UI-bearing Brite product builds. Implements CDR-023.",
-      "version": "1.2.32"
+      "description": "Flow-Driven Architecture plugin \u2014 scaffolds Linear domain milestones, 5-discipline child issues, and repo flow docs (intent.md / journeys / flows / INDEX.md) for UI-bearing Brite product builds. Implements CDR-023 (handbook).",
+      "version": "1.2.35"
     }
   ]
 }

@@ -111,47 +111,171 @@ for pdir in "$REPO_ROOT"/plugins/*/; do
   fi
 done
 
-# Check each plugin.json version against its marketplace entry version
-ver_result=$(python3 - "$MARKETPLACE" "${pj_paths[@]}" <<'PYEOF'
-import json, sys
+# The check itself is the extracted, self-tested scripts/_lib/check_version_consistency.py
+# (BC-16373): a MISSING/EMPTY `version` on either side — or a plugin.json with no
+# marketplace entry — is a HARD ERROR, not a silent skip. The pre-BC-16373 inline guard
+# compared only when both sides were truthy (`pj_ver and mp_ver and pj_ver != mp_ver`), so
+# a blank version silently defeated the plugin-cache-invalidation guarantee. Self-test
+# first (synthetic fixtures lock the empty/missing/mismatch/no-entry cases), then the real
+# tree. Missing files FAIL (not warn-skip) — the BC-12589 trap.
+ver_lint="$REPO_ROOT/scripts/_lib/check_version_consistency.py"
+ver_selftest="$REPO_ROOT/scripts/_lib/test_check_version_consistency.sh"
 
-marketplace_path = sys.argv[1]
-plugin_paths = sys.argv[2:]
-errors = []
-
-# Build marketplace version lookup by plugin name
-mp_versions = {}
-try:
-    with open(marketplace_path) as f:
-        data = json.load(f)
-    for entry in data.get('plugins', []):
-        mp_versions[entry.get('name', '')] = entry.get('version', '')
-except (FileNotFoundError, json.JSONDecodeError):
-    pass
-
-for path in plugin_paths:
-    try:
-        with open(path) as f:
-            pj = json.load(f)
-        pj_name = pj.get('name', '')
-        pj_ver = pj.get('version', '')
-        mp_ver = mp_versions.get(pj_name, '')
-        if pj_ver and mp_ver and pj_ver != mp_ver:
-            errors.append(f'{pj_name}: plugin.json={pj_ver} marketplace={mp_ver}')
-    except (FileNotFoundError, json.JSONDecodeError):
-        errors.append(f'{path}=UNREADABLE')
-
-if errors:
-    print('MISMATCH:' + ', '.join(errors))
-else:
-    print('OK')
-PYEOF
-)
-
-if [[ "$ver_result" == MISMATCH:* ]]; then
-  fail "Version mismatch: ${ver_result#MISMATCH:}"
+if [ ! -f "$ver_lint" ]; then
+  fail "scripts/_lib/check_version_consistency.py not found — version-consistency check cannot run (BC-16373)"
+elif [ ! -f "$ver_selftest" ]; then
+  fail "scripts/_lib/test_check_version_consistency.sh not found — version-consistency self-test cannot run (BC-16373)"
 else
-  pass "Version consistent across plugins"
+  if ver_st_out=$(bash "$ver_selftest" "$ver_lint" 2>&1); then
+    ver_st_count=$(printf '%s\n' "$ver_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -z "$ver_st_count" ] || [ "$ver_st_count" -eq 0 ]; then
+      fail "Version-consistency self-test ran no assertions (RESULT missing or pass=0)"
+    else
+      pass "Version-consistency self-test (${ver_st_count} assertions)"
+    fi
+  else
+    fail "Version-consistency self-test failed:"
+    printf '%s\n' "$ver_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  if [ "${#pj_paths[@]}" -gt 0 ]; then
+    ver_result=$(python3 "$ver_lint" "$MARKETPLACE" "${pj_paths[@]}" 2>&1)
+  else
+    ver_result="MISMATCH:no plugin.json files found under plugins/*/"
+  fi
+  if [[ "$ver_result" == MISMATCH:* ]]; then
+    fail "Version consistency: ${ver_result#MISMATCH:}"
+  else
+    pass "Version consistent across plugins"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-readme — README plugin coverage (BC-16384)
+# ══════════════════════════════════════════════════════════════════════
+# Every plugin registered in .claude-plugin/marketplace.json must be named in
+# README.md — the front door otherwise silently omits a shipped plugin (the
+# 2026-07-05 audit found brite-core absent from the README + install snippet).
+# Name-presence check, not content parsing. Self-test first (synthetic fixtures
+# lock present/absent/empty-name/unreadable), then the real tree. Missing files
+# FAIL (not warn-skip) — the BC-12589 trap.
+section "2b-readme. README plugin coverage (BC-16384)"
+
+readme_lint="$REPO_ROOT/scripts/_lib/lint_readme_plugin_coverage.py"
+readme_selftest="$REPO_ROOT/scripts/_lib/test_lint_readme_plugin_coverage.sh"
+
+if [ ! -f "$readme_lint" ]; then
+  fail "scripts/_lib/lint_readme_plugin_coverage.py not found — README coverage check cannot run (BC-16384)"
+elif [ ! -f "$readme_selftest" ]; then
+  fail "scripts/_lib/test_lint_readme_plugin_coverage.sh not found — README coverage self-test cannot run (BC-16384)"
+else
+  if readme_st_out=$(bash "$readme_selftest" "$readme_lint" 2>&1); then
+    readme_st_count=$(printf '%s\n' "$readme_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -z "$readme_st_count" ] || [ "$readme_st_count" -eq 0 ]; then
+      fail "README-coverage self-test ran no assertions (RESULT missing or pass=0)"
+    else
+      pass "README-coverage self-test (${readme_st_count} assertions)"
+    fi
+  else
+    fail "README-coverage self-test failed:"
+    printf '%s\n' "$readme_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  # Wrap the substitution in `if` — a bare `x=$(...)` whose command exits nonzero
+  # aborts validate.sh under `set -euo pipefail` (skipping every later section).
+  # Exit-code gating is also crash-safe: an uncaught lint exception exits nonzero
+  # → the fail branch, not mistaken for a pass. (BC-16381 review — sibling fix.)
+  if readme_result=$(python3 "$readme_lint" "$MARKETPLACE" "$REPO_ROOT/README.md" 2>&1); then
+    pass "Every marketplace plugin appears in README.md"
+  else
+    fail "README plugin coverage: ${readme_result#MISSING:}"
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-coresize — brite-core context-size invariants (BC-11749/BC-16381)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/core/tests/test_size_cap.sh — the brite-core invariants that
+# protect every subagent's context budget (SessionStart/SubagentStart envelope
+# size caps). Was orphaned (no runner referenced it); wired here per BC-16381.
+# Exit-code contract (prints `PASS:` lines + exits 0); count is best-effort.
+section "2b-coresize. brite-core context-size invariants (BC-11749)"
+
+size_cap_test="$REPO_ROOT/plugins/core/tests/test_size_cap.sh"
+if [ ! -f "$size_cap_test" ]; then
+  fail "plugins/core/tests/test_size_cap.sh not found — brite-core size-cap invariant test missing (BC-16381)"
+else
+  if sc_out=$(bash "$size_cap_test" 2>&1); then
+    sc_count=$(printf '%s\n' "$sc_out" | grep -c '^PASS:' || true)
+    pass "brite-core context-size invariants (${sc_count} checks)"
+  else
+    fail "brite-core context-size invariants failed:"
+    printf '%s\n' "$sc_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-migrate — marketing manifest v1→v2 migration regression (BC-11852/BC-16381)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/marketing/scripts/test_migrate_manifest_v1_to_v2.sh — the
+# regression harness for migrate_manifest_v1_to_v2.py (a live migration script).
+# Was orphaned; wired here per BC-16381. RESULT-line contract (pass=N).
+section "2b-migrate. marketing manifest v1→v2 migration regression (BC-11852)"
+
+migrate_test="$REPO_ROOT/plugins/marketing/scripts/test_migrate_manifest_v1_to_v2.sh"
+if [ ! -f "$migrate_test" ]; then
+  fail "plugins/marketing/scripts/test_migrate_manifest_v1_to_v2.sh not found (BC-16381)"
+else
+  if mig_out=$(bash "$migrate_test" 2>&1); then
+    mig_count=$(printf '%s\n' "$mig_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$mig_count" ] && [ "$mig_count" -gt 0 ]; then
+      pass "marketing manifest v1→v2 migration regression (${mig_count} assertions)"
+    else
+      fail "marketing manifest migration harness ran no assertions (RESULT missing or pass=0)"
+    fi
+  else
+    fail "marketing manifest v1→v2 migration regression failed:"
+    printf '%s\n' "$mig_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-unwired — unwired-test meta-lint (BC-16381)
+# ══════════════════════════════════════════════════════════════════════
+# A test that no runner executes is worse than no test — it rots silently. This
+# meta-lint fails when a test_*.sh / test-*.sh / test_*.py under scripts/ or
+# plugins/*/{tests,scripts}/ is not executed by validate.sh or a workflow (via
+# literal reference, a test-*.sh glob-loop, a test_$stem.sh loop, or — for .py —
+# pytest discovery under a test-python-units.sh-listed plugin's tests/). Self-test
+# first (synthetic wired/unwired fixtures), then the real tree. Gates on the `OK`
+# token so a lint crash FAILS. Missing files FAIL — the BC-12589 trap.
+section "2b-unwired. unwired-test meta-lint (BC-16381)"
+
+unwired_lint="$REPO_ROOT/scripts/_lib/lint_unwired_tests.py"
+unwired_selftest="$REPO_ROOT/scripts/_lib/test_lint_unwired_tests.sh"
+if [ ! -f "$unwired_lint" ]; then
+  fail "scripts/_lib/lint_unwired_tests.py not found — unwired-test meta-lint cannot run (BC-16381)"
+elif [ ! -f "$unwired_selftest" ]; then
+  fail "scripts/_lib/test_lint_unwired_tests.sh not found — unwired-test meta-lint self-test cannot run (BC-16381)"
+else
+  if uw_st_out=$(bash "$unwired_selftest" "$unwired_lint" 2>&1); then
+    uw_st_count=$(printf '%s\n' "$uw_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -z "$uw_st_count" ] || [ "$uw_st_count" -eq 0 ]; then
+      fail "unwired-test meta-lint self-test ran no assertions (RESULT missing or pass=0)"
+    else
+      pass "unwired-test meta-lint self-test (${uw_st_count} assertions)"
+    fi
+  else
+    fail "unwired-test meta-lint self-test failed:"
+    printf '%s\n' "$uw_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  # Wrap the substitution in `if` — a bare `x=$(...)` whose command exits nonzero
+  # aborts validate.sh under `set -euo pipefail` (skipping every later section),
+  # and the lint exits nonzero precisely when it finds an orphan. Exit-code gating
+  # also fails on an uncaught lint crash (nonzero) — crash-safe.
+  if uw_result=$(python3 "$unwired_lint" "$REPO_ROOT" 2>&1); then
+    pass "no unwired test harnesses (every test_* file is run by a runner)"
+  else
+    fail "unwired test harness(es) — wire into validate.sh or rename out of the test namespace: ${uw_result#UNWIRED:}"
+  fi
 fi
 
 # ══════════════════════════════════════════════════════════════════════
@@ -187,7 +311,7 @@ fi
 # Section 2b'' — flow-architecture verify-docs ecosystem vslice (BC-11029, Q58)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/flow-architecture/tests/run-verify-docs-ecosystem-vslice.sh —
-# asserts the 10 template files under plugins/flow-architecture/templates/
+# asserts the 11 template files under plugins/flow-architecture/templates/
 # exist with required preamble, no brite-roster/brite-nites string leaks
 # into templates, and no <PLACEHOLDER> strings appear outside templates/.
 # See Q58 § Sub-decision 1 for the schema-discipline contract.
@@ -204,6 +328,31 @@ else
   else
     fail "flow-architecture verify-docs ecosystem vslice failed — run plugins/flow-architecture/tests/run-verify-docs-ecosystem-vslice.sh for details"
     printf '%s\n' "$fda_ecosystem_out" | tail -30 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2b-precommit — flow-architecture pre-commit flow-INDEX helper vslice (BC-16783, Q60)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/flow-architecture/tests/run-precommit-flow-index-vslice.sh —
+# asserts templates/scripts/precommit-flow-index.sh calls the DETERMINISTIC
+# regenerator (not the skill), triggers on BOTH flows/**.md AND
+# master-flow-inventory.md (the fleet-#18 gap), excludes INDEX.md from
+# self-trigger, fails open on missing-tsx / regen-error, and produces no
+# last_reviewed churn on a no-op run. RESULT-line contract (pass=N).
+section "2b-precommit. flow-architecture pre-commit flow-INDEX helper vslice (BC-16783, Q60)"
+
+fda_precommit_test="$REPO_ROOT/plugins/flow-architecture/tests/run-precommit-flow-index-vslice.sh"
+
+if [ ! -f "$fda_precommit_test" ]; then
+  warn "plugins/flow-architecture/tests/run-precommit-flow-index-vslice.sh not found — skipped"
+else
+  if fda_precommit_out=$(bash "$fda_precommit_test" 2>&1); then
+    fda_precommit_pass_count=$(printf '%s\n' "$fda_precommit_out" | sed -n 's/^RESULT pass=\([0-9]*\).*/\1/p')
+    pass "flow-architecture pre-commit flow-INDEX helper vslice (${fda_precommit_pass_count:-?} assertions)"
+  else
+    fail "flow-architecture pre-commit flow-INDEX helper vslice failed — run plugins/flow-architecture/tests/run-precommit-flow-index-vslice.sh for details"
+    printf '%s\n' "$fda_precommit_out" | tail -30 | sed 's/^/    /' >&2
   fi
 fi
 
@@ -880,6 +1029,66 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Sections 2f-2h — CI-parity harness delegates (BC-16287)
+# ══════════════════════════════════════════════════════════════════════
+# CI's `validate` job used to run these three harnesses as separate steps; they
+# now run INSIDE validate.sh so a green local `bash scripts/validate.sh` implies
+# a green CI `validate` job (the documented local gate + pre-push hook mirror CI).
+# Each mirrors the section-2d shape (warn-if-missing, run, fail with tail -25 on
+# nonzero) and parses the harness's `Total: N  Passed: M` summary for the count.
+# NOTE: scripts/test-hook-model-lint.sh is deliberately NOT delegated here — it
+# invokes validate.sh itself (recursion); the rule it meta-tests already runs
+# in-gate via scripts/_lib/lint_hooks.py, so it stays a standalone CI step.
+
+section "2f. Skill trigger matching"
+
+skill_triggers_test="$REPO_ROOT/scripts/test-skill-triggers.sh"
+
+if [ ! -f "$skill_triggers_test" ]; then
+  warn "scripts/test-skill-triggers.sh not found — skill trigger matching check skipped"
+else
+  if skill_triggers_out=$(bash "$skill_triggers_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$skill_triggers_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "skill trigger matching (${pass_count:-?} scenarios)"
+  else
+    fail "skill trigger matching failed — run scripts/test-skill-triggers.sh for details"
+    printf '%s\n' "$skill_triggers_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+section "2g. Cross-skill contracts (workflows)"
+
+contracts_test="$REPO_ROOT/scripts/test-contracts.sh"
+
+if [ ! -f "$contracts_test" ]; then
+  warn "scripts/test-contracts.sh not found — cross-skill contracts check skipped"
+else
+  if contracts_out=$(bash "$contracts_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$contracts_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "cross-skill contracts (${pass_count:-?} checks)"
+  else
+    fail "cross-skill contracts failed — run scripts/test-contracts.sh for details"
+    printf '%s\n' "$contracts_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+section "2h. End-to-end scenarios (workflows)"
+
+scenarios_test="$REPO_ROOT/scripts/test-scenarios.sh"
+
+if [ ! -f "$scenarios_test" ]; then
+  warn "scripts/test-scenarios.sh not found — end-to-end scenarios check skipped"
+else
+  if scenarios_out=$(bash "$scenarios_test" 2>&1); then
+    pass_count=$(printf '%s\n' "$scenarios_out" | sed -n 's/^  Total: \([0-9]*\)  Passed: \([0-9]*\).*/\2\/\1/p' | tail -1)
+    pass "end-to-end scenarios (${pass_count:-?} scenarios)"
+  else
+    fail "end-to-end scenarios failed — run scripts/test-scenarios.sh for details"
+    printf '%s\n' "$scenarios_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2e — workflows helper-script unit tests (BC-12248)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/workflows/tests/test-*.sh — bash unit tests for workflows
@@ -903,6 +1112,42 @@ for wf_test in "$REPO_ROOT"/plugins/workflows/tests/test-*.sh; do
   fi
 done
 [ "$wf_ran" -eq 1 ] || warn "no plugins/workflows/tests/test-*.sh found — skipped"
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 2j — Python unit suites (pytest) (BC-16289)
+# ══════════════════════════════════════════════════════════════════════
+# Delegates to scripts/test-python-units.sh, which runs the pytest suites for
+# revops/marketing/workflows (the 26 previously-orphaned test_*.py files —
+# .github/dependabot.yml used to state plainly that Brite CI never invoked
+# pytest). Pass count parsed from the harness's `RESULT pass=N fail=M` line,
+# same contract as the other test-*.sh harnesses (Section 2e/2f-2h). A
+# missing local pytest install surfaces as `warn`, not `pass` — CI installs
+# pytest itself in the `python-units` job, so its absence there is a hard
+# failure, not an advisory skip.
+section "2j. Python unit suites (pytest)"
+
+python_units_test="$REPO_ROOT/scripts/test-python-units.sh"
+
+if [ ! -f "$python_units_test" ]; then
+  warn "scripts/test-python-units.sh not found — python unit suites skipped"
+else
+  if python_units_out=$(bash "$python_units_test" 2>&1); then
+    if printf '%s\n' "$python_units_out" | grep -q '^SKIP: pytest not installed'; then
+      warn "python unit suites (pytest) — pytest not installed locally, skipped (run: python3 -m pip install pytest)"
+    else
+      python_units_pass_count=$(printf '%s\n' "$python_units_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+      if [ -n "$python_units_pass_count" ] && [ "$python_units_pass_count" -gt 0 ]; then
+        pass "python unit suites (pytest) — $python_units_pass_count tests passed"
+      else
+        fail "python unit suites (pytest) — RESULT line missing or pass=0 (harness ran no assertions)"
+        printf '%s\n' "$python_units_out" | tail -25 | sed 's/^/    /' >&2
+      fi
+    fi
+  else
+    fail "python unit suites (pytest) failed — run scripts/test-python-units.sh for details"
+    printf '%s\n' "$python_units_out" | tail -25 | sed 's/^/    /' >&2
+  fi
+fi
 
 # ══════════════════════════════════════════════════════════════════════
 # Discover plugins from marketplace.json
@@ -1895,10 +2140,10 @@ else
       # Parse the harness's machine-readable RESULT line so the count stays
       # in sync as scenarios are added/removed (matches Section 2c pattern).
       tests_pass_count=$(printf '%s\n' "$tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$tests_pass_count" ]; then
+      if [ -n "$tests_pass_count" ] && [ "$tests_pass_count" -gt 0 ]; then
         pass "lint_canonicals regression harness — $tests_pass_count scenarios"
       else
-        pass "lint_canonicals regression harness — passed (count unparsed)"
+        fail "lint_canonicals regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "Canonicals lint regression harness failed:"
@@ -1948,10 +2193,10 @@ else
       # Parse the harness's machine-readable RESULT line so the count stays
       # in sync as scenarios are added/removed (matches Section 2c + 15a).
       disc_tests_pass=$(printf '%s\n' "$disc_tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$disc_tests_pass" ]; then
+      if [ -n "$disc_tests_pass" ] && [ "$disc_tests_pass" -gt 0 ]; then
         pass "lint_discoveries regression harness — $disc_tests_pass scenarios"
       else
-        pass "lint_discoveries regression harness — passed (count unparsed)"
+        fail "lint_discoveries regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "Discoveries lint regression harness failed:"
@@ -1986,10 +2231,10 @@ elif [ ! -f "$icp_tests" ]; then
 else
   if icp_tests_output=$(bash "$icp_tests" "$icp_helper" 2>&1); then
     icp_tests_pass=$(printf '%s\n' "$icp_tests_output" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$icp_tests_pass" ]; then
+    if [ -n "$icp_tests_pass" ] && [ "$icp_tests_pass" -gt 0 ]; then
       pass "icp_refinement_review regression harness — $icp_tests_pass scenarios"
     else
-      pass "icp_refinement_review regression harness — passed (count unparsed)"
+      fail "icp_refinement_review regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "icp_refinement_review regression harness failed:"
@@ -2068,10 +2313,10 @@ elif [ ! -f "$ps_harness" ]; then
 else
   if ps_harness_out=$(bash "$ps_harness" "$ps_helper" 2>&1); then
     ps_pass_count=$(printf '%s\n' "$ps_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$ps_pass_count" ]; then
+    if [ -n "$ps_pass_count" ] && [ "$ps_pass_count" -gt 0 ]; then
       pass "portfolio-snapshot regression harness (${ps_pass_count} assertions)"
     else
-      pass "portfolio-snapshot regression harness — passed (count unparsed)"
+      fail "portfolio-snapshot regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "portfolio-snapshot regression harness failed:"
@@ -2102,10 +2347,10 @@ elif [ ! -f "$bm_harness" ]; then
 else
   if bm_harness_out=$(bash "$bm_harness" "$bm_helper" 2>&1); then
     bm_pass_count=$(printf '%s\n' "$bm_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$bm_pass_count" ]; then
+    if [ -n "$bm_pass_count" ] && [ "$bm_pass_count" -gt 0 ]; then
       pass "plan-campaign builder regression harness (${bm_pass_count} assertions)"
     else
-      pass "plan-campaign builder regression harness — passed (count unparsed)"
+      fail "plan-campaign builder regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "plan-campaign builder regression harness failed:"
@@ -2136,10 +2381,10 @@ if [ ! -f "$eval_harness" ]; then
 else
   if eval_harness_out=$(bash "$eval_harness" 2>&1); then
     eval_pass_count=$(printf '%s\n' "$eval_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$eval_pass_count" ]; then
+    if [ -n "$eval_pass_count" ] && [ "$eval_pass_count" -gt 0 ]; then
       pass "behavioral-eval harness + plan-campaign eval (${eval_pass_count} assertions)"
     else
-      pass "behavioral-eval harness — passed (count unparsed)"
+      fail "behavioral-eval harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "behavioral-eval harness failed:"
@@ -2314,10 +2559,10 @@ if [ ! -f "$su_harness" ]; then
 else
   if su_harness_out=$(bash "$su_harness" 2>&1); then
     su_pass_count=$(printf '%s\n' "$su_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$su_pass_count" ]; then
+    if [ -n "$su_pass_count" ] && [ "$su_pass_count" -gt 0 ]; then
       pass "shared utilities regression harness (${su_pass_count} assertions)"
     else
-      pass "shared utilities regression harness — passed (count unparsed)"
+      fail "shared utilities regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "shared utilities regression harness failed:"
@@ -2377,10 +2622,10 @@ elif [ ! -f "$op_harness" ]; then
 else
   if op_harness_out=$(bash "$op_harness" "$op_helper" 2>&1); then
     op_pass_count=$(printf '%s\n' "$op_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$op_pass_count" ]; then
+    if [ -n "$op_pass_count" ] && [ "$op_pass_count" -gt 0 ]; then
       pass "offer-performance regression harness (${op_pass_count} assertions)"
     else
-      pass "offer-performance regression harness — passed (count unparsed)"
+      fail "offer-performance regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "offer-performance regression harness failed:"
@@ -2405,10 +2650,10 @@ elif [ ! -f "$cb_harness" ]; then
 else
   if cb_harness_out=$(bash "$cb_harness" "$cb_helper" 2>&1); then
     cb_pass_count=$(printf '%s\n' "$cb_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$cb_pass_count" ]; then
+    if [ -n "$cb_pass_count" ] && [ "$cb_pass_count" -gt 0 ]; then
       pass "canonicals bootstrap regression harness (${cb_pass_count} assertions)"
     else
-      pass "canonicals bootstrap regression harness — passed (count unparsed)"
+      fail "canonicals bootstrap regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "canonicals bootstrap regression harness failed:"
@@ -2436,10 +2681,10 @@ elif [ ! -f "$ic_harness" ]; then
 else
   if ic_harness_out=$(bash "$ic_harness" "$ic_helper" 2>&1); then
     ic_pass_count=$(printf '%s\n' "$ic_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$ic_pass_count" ]; then
+    if [ -n "$ic_pass_count" ] && [ "$ic_pass_count" -gt 0 ]; then
       pass "import-campaign regression harness (${ic_pass_count} assertions)"
     else
-      pass "import-campaign regression harness — passed (count unparsed)"
+      fail "import-campaign regression harness — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "import-campaign regression harness failed:"
@@ -2473,10 +2718,10 @@ elif [ ! -f "$vto_harness" ]; then
 else
   if vto_harness_out=$(bash "$vto_harness" "$vto_helper" 2>&1); then
     vto_pass_count=$(printf '%s\n' "$vto_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$vto_pass_count" ]; then
+    if [ -n "$vto_pass_count" ] && [ "$vto_pass_count" -gt 0 ]; then
       pass "revops --target-org guard behavioral eval (${vto_pass_count} assertions)"
     else
-      pass "revops --target-org guard behavioral eval — passed (count unparsed)"
+      fail "revops --target-org guard behavioral eval — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "revops --target-org guard behavioral eval failed:"
@@ -2511,10 +2756,10 @@ elif [ ! -f "$csf_harness" ]; then
 else
   if csf_harness_out=$(bash "$csf_harness" "$csf_helper" 2>&1); then
     csf_pass_count=$(printf '%s\n' "$csf_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$csf_pass_count" ]; then
+    if [ -n "$csf_pass_count" ] && [ "$csf_pass_count" -gt 0 ]; then
       pass "create-sf-campaign builder unit suite (${csf_pass_count} assertions)"
     else
-      pass "create-sf-campaign builder unit suite — passed (count unparsed)"
+      fail "create-sf-campaign builder unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "create-sf-campaign builder unit suite failed:"
@@ -2551,10 +2796,10 @@ elif [ ! -f "$usu_harness" ]; then
 else
   if usu_harness_out=$(bash "$usu_harness" "$usu_helper" 2>&1); then
     usu_pass_count=$(printf '%s\n' "$usu_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$usu_pass_count" ]; then
+    if [ -n "$usu_pass_count" ] && [ "$usu_pass_count" -gt 0 ]; then
       pass "update-sf-campaign-status builder unit suite (${usu_pass_count} assertions)"
     else
-      pass "update-sf-campaign-status builder unit suite — passed (count unparsed)"
+      fail "update-sf-campaign-status builder unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "update-sf-campaign-status builder unit suite failed:"
@@ -2590,10 +2835,10 @@ elif [ ! -f "$no_harness" ]; then
 else
   if no_harness_out=$(bash "$no_harness" "$no_helper" 2>&1); then
     no_pass_count=$(printf '%s\n' "$no_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$no_pass_count" ]; then
+    if [ -n "$no_pass_count" ] && [ "$no_pass_count" -gt 0 ]; then
       pass "canonicals-family emit builder unit suite (${no_pass_count} assertions)"
     else
-      pass "canonicals-family emit builder unit suite — passed (count unparsed)"
+      fail "canonicals-family emit builder unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "canonicals-family emit builder unit suite failed:"
@@ -2635,10 +2880,10 @@ for wf_stem in build_raise_ticket_payload build_report_issue_payload build_retro
   else
     if wf_harness_out=$(bash "$wf_harness" "$wf_helper" 2>&1); then
       wf_pass_count=$(printf '%s\n' "$wf_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$wf_pass_count" ]; then
+      if [ -n "$wf_pass_count" ] && [ "$wf_pass_count" -gt 0 ]; then
         pass "$wf_stem unit suite (${wf_pass_count} assertions)"
       else
-        pass "$wf_stem unit suite — passed (count unparsed)"
+        fail "$wf_stem unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "$wf_stem unit suite failed:"
@@ -2682,10 +2927,10 @@ for d_stem in build_flywheel_metrics build_audit_trail build_promotion_candidate
   else
     if d_harness_out=$(bash "$d_harness" "$d_helper" 2>&1); then
       d_pass_count=$(printf '%s\n' "$d_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$d_pass_count" ]; then
+      if [ -n "$d_pass_count" ] && [ "$d_pass_count" -gt 0 ]; then
         pass "$d_stem unit suite (${d_pass_count} assertions)"
       else
-        pass "$d_stem unit suite — passed (count unparsed)"
+        fail "$d_stem unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "$d_stem unit suite failed:"
@@ -2720,10 +2965,10 @@ for e_stem in build_audit_report build_plan_section; do
   else
     if e_harness_out=$(bash "$e_harness" "$e_helper" 2>&1); then
       e_pass_count=$(printf '%s\n' "$e_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-      if [ -n "$e_pass_count" ]; then
+      if [ -n "$e_pass_count" ] && [ "$e_pass_count" -gt 0 ]; then
         pass "$e_stem unit suite (${e_pass_count} assertions)"
       else
-        pass "$e_stem unit suite — passed (count unparsed)"
+        fail "$e_stem unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
       fi
     else
       fail "$e_stem unit suite failed:"
@@ -2764,10 +3009,10 @@ elif [ ! -f "$ci_harness" ]; then
 else
   if ci_harness_out=$(bash "$ci_harness" "$ci_helper" 2>&1); then
     ci_pass_count=$(printf '%s\n' "$ci_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
-    if [ -n "$ci_pass_count" ]; then
+    if [ -n "$ci_pass_count" ] && [ "$ci_pass_count" -gt 0 ]; then
       pass "capture-idea builder unit suite (${ci_pass_count} assertions)"
     else
-      pass "capture-idea builder unit suite — passed (count unparsed)"
+      fail "capture-idea builder unit suite — RESULT line missing or pass=0 (harness ran no assertions)"
     fi
   else
     fail "capture-idea builder unit suite failed:"
@@ -2897,6 +3142,48 @@ else
   else
     fail "ADR-number duplicate guard found duplicates:"
     printf '%s\n' "$adr_num_lint_out" | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-16291 — CI supply-chain pin guard (BC-16291 / audit plan 004)
+# ──────────────────────────────────────────────────────────────────────
+# The two secret-bearing workflows (behavioral-tests.yml → ANTHROPIC_API_KEY;
+# jwt-validity-probe.yml → prod Salesforce token + LINEAR_API_KEY) run third-
+# party actions + `npm install -g` CLIs; on a PUBLIC repo a moved tag or a
+# poisoned "latest" npm release would run arbitrary code next to those secrets.
+# This guard fails on any `uses: owner/repo@<non-SHA>` or any unpinned
+# `npm install -g` across ALL .github/workflows/*.yml, so the pin convention set
+# here can't erode by copy-paste (the plan's "reviewers should reject unpinned
+# uses" made physical). First the self-test (synthetic fixtures lock the SHA/npm
+# detection + rc discipline), then the lint against the real workflow tree.
+# Missing files FAIL (not warn-skip): a mandatory gate that silently passes when
+# its harness is deleted is the BC-12589 trap.
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-16291. CI supply-chain pin guard (BC-16291)"
+
+wfpin_lint="$REPO_ROOT/scripts/_lib/lint_workflow_pins.py"
+wfpin_selftest="$REPO_ROOT/scripts/_lib/test_lint_workflow_pins.sh"
+
+if [ ! -f "$wfpin_lint" ]; then
+  fail "scripts/_lib/lint_workflow_pins.py not found — CI supply-chain pin guard cannot run (BC-16291)"
+elif [ ! -f "$wfpin_selftest" ]; then
+  fail "scripts/_lib/test_lint_workflow_pins.sh not found — pin guard self-test cannot run (BC-16291)"
+else
+  # (1) self-test — synthetic fixtures prove the SHA-pin / npm-pin / rc logic.
+  if wfpin_st_out=$(bash "$wfpin_selftest" "$wfpin_lint" 2>&1); then
+    wfpin_st_count=$(printf '%s\n' "$wfpin_st_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    pass "CI supply-chain pin guard self-test (${wfpin_st_count:-?} assertions)"
+  else
+    fail "CI supply-chain pin guard self-test failed:"
+    printf '%s\n' "$wfpin_st_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+  # (2) the gate — run the lint against the real .github/workflows/ tree.
+  if wfpin_lint_out=$(python3 "$wfpin_lint" 2>&1); then
+    pass "CI supply-chain pin guard (all actions + npm globals pinned)"
+  else
+    fail "CI supply-chain pin guard found unpinned references:"
+    printf '%s\n' "$wfpin_lint_out" | sed 's/^/          /' >&2
   fi
 fi
 

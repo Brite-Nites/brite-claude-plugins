@@ -12,7 +12,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — all steps are read-only validators
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Validate marketplace.json (fast-fail)
         run: |
@@ -20,23 +20,19 @@ jobs:
           python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
           echo "marketplace.json is valid"
 
+      # scripts/validate.sh §2d/2f-2h now own the four harness checks that used
+      # to run as separate steps here (test-hooks.sh, test-skill-triggers.sh,
+      # test-contracts.sh, test-scenarios.sh) — single source of truth so a
+      # green local `bash scripts/validate.sh` implies a green CI `validate`
+      # job (BC-16287).
       - name: Validate all plugins
         run: bash scripts/validate.sh  # discovers plugins/*/ via marketplace.json
 
-      - name: Test security hook regexes
-        run: bash scripts/test-hooks.sh
-
+      # meta-test of the validate.sh hook-lint gate — invokes validate.sh
+      # itself, so it must stay OUTSIDE the gate (recursion); the rule it tests
+      # runs in-gate via scripts/_lib/lint_hooks.py
       - name: Test hook model tier-alias lint
         run: bash scripts/test-hook-model-lint.sh
-
-      - name: Test skill trigger matching
-        run: bash scripts/test-skill-triggers.sh  # discovers all plugins/*/skills/_shared/trigger-registry.json
-
-      - name: Test cross-skill contracts
-        run: bash scripts/test-contracts.sh  # workflows-only by design (cross-skill handoffs)
-
-      - name: Test end-to-end scenarios
-        run: bash scripts/test-scenarios.sh  # workflows-only by design (project-start PRD scenarios)
 
   vslice-greenfield:
     # BC-7057 v-slice integration test: exercises FDA helper-script Phase 1 surface
@@ -52,13 +48,42 @@ jobs:
     permissions:
       contents: read  # least-privilege — harness scripts only read in-repo files
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run v-slice greenfield harness
         run: bash plugins/flow-architecture/tests/run-greenfield-vslice.sh
 
       - name: Run clone-drift classifier regression (BC-7060)
         run: bash plugins/flow-architecture/tests/test-clone-drift.sh
+
+  python-units:
+    # BC-16289 — executes the 26 previously-orphaned test_*.py files
+    # (.github/dependabot.yml used to state plainly that Brite CI never
+    # invoked pytest). Mirrors vslice-greenfield's shape (needs: validate,
+    # dedicated job rather than a validate-job step) but is BLOCKING — no
+    # continue-on-error — since the suite includes contract tests for the
+    # revops PreToolUse validators (soql/security/naming/dispatcher/
+    # llm-pattern) that gate Salesforce operations.
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 10
+    permissions:
+      contents: read  # least-privilege — the suites only read in-repo files
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install pytest
+        run: python3 -m pip install pytest
+
+      - name: Run Python unit suites (revops/marketing/workflows)
+        run: bash scripts/test-python-units.sh
+        env:
+          # This job installs pytest above, so a missing pytest here is a real
+          # break → hard-fail. (Do NOT rely on CI=true for this: GitHub sets
+          # CI=true in every job, including `validate`, which runs this wrapper
+          # via validate.sh §2j WITHOUT installing pytest — keying on CI there
+          # would fail that job spuriously. See test-python-units.sh guard.)
+          REQUIRE_PYTEST: "true"
 
   vslice-inventory-only-rescaffold:
     # BC-9971 v-slice for the inventory-only-domain re-scaffold classifier
@@ -72,7 +97,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — harness only reads fixture + script
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run BC-9971 inventory-only-rescaffold harness
         run: bash plugins/flow-architecture/tests/run-inventory-only-rescaffold-vslice.sh
@@ -91,7 +116,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — script only reads fixture files
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run /flow:audit smoke test (BC-7059)
         run: bash plugins/flow-architecture/tests/run-audit-smoke.sh
@@ -111,14 +136,14 @@ jobs:
     permissions:
       contents: read  # least-privilege — harness only reads fixture + scripts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run mode-classifier eval (BC-7061)
         run: bash plugins/flow-architecture/tests/run-mode-classifier-eval.sh
 
       - name: Upload mode-classifier eval report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mode-classifier-eval-report
           path: plugins/flow-architecture/tests/mode-classifier-eval-report.md
@@ -136,7 +161,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — script only reads in-repo files
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0  # need full history for blob SHA lookups across refs
 
@@ -169,7 +194,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — script only reads in-repo files
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0  # need full history for blob SHA lookups + base diff
 
@@ -199,7 +224,7 @@ jobs:
     permissions:
       contents: read  # least-privilege — the gate only reads in-repo files + a git diff
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0  # need origin/main as the diff base for the changed-command set
 
@@ -262,7 +287,7 @@ jobs:
       contents: read        # read the in-repo guard scripts
       pull-requests: read   # gh pr list + gh api pulls/*/files across the open PRs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Surface cross-PR ADR-number collisions (advisory)
         run: bash scripts/ci/cross-pr-adr-guard.sh

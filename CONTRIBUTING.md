@@ -222,6 +222,14 @@ Stdio MCPs and CLI scripts read credentials from OS environment variables — th
 
 Architecture Decision Records live in `docs/decisions/NNN-kebab-title.md`. They are imported into CLAUDE.md via individual `@` imports (directory imports are not supported). The `/workflows:architecture-decision` command generates ADRs and auto-appends the import. `/workflows:project-start` generates ADRs for all major tech decisions made during the interview.
 
+## Documentation retention
+
+`docs/` is a **curated** tree — keep it navigable. The durable, queried records are `docs/decisions/` (ADRs), `docs/precedents/`, `docs/guides/`, and the top-level `README.md` / `ARCHITECTURE.md` / `CLAUDE.md`; these are **never** pruned. Raw, point-in-time **session exhaust** does **not** live in `docs/`:
+
+- Write throwaway per-session artifacts (scratch plans, dogfood runs, API dumps) to a gitignored `.local/` (already ignored), or omit them — **git history is the archive** for anything you need later.
+- Do **not** accrete per-issue `docs/plans/BC-*.md` plan files or `docs/dogfood/` rounds. (BC-16388 pruned the historical backlog; git retains it.)
+- When you must land a point-in-time report (an audit, a research note), give it a stable name and treat it as a historical snapshot that will not be updated.
+
 ## Branch Conventions
 
 Branch from `main`. Use these prefixes:
@@ -286,7 +294,7 @@ For a fast edit-validate-test loop, see [`docs/dev-guide.md`](docs/dev-guide.md)
 
 - `scripts/dev-setup.sh` / `scripts/dev-teardown.sh` — symlink plugin for live editing
 - `scripts/validate-single.sh <name>` — validate one skill/command/agent (~1s)
-- `scripts/test-single-trigger.sh <skill> "phrase"` — test trigger matching for one skill
+- `scripts/probe-single-trigger.sh <skill> "phrase"` — test trigger matching for one skill
 
 ### Automated validation
 
@@ -322,19 +330,17 @@ Add entries to the `[Unreleased]` section of `CHANGELOG.md` as you go. Follow [K
 
 ### Cutting a release
 
-Run the release script from `main`:
+> **There is no bundle release step.** The root `VERSION` file and `scripts/release.sh`
+> were **retired** (BC-16297 / BC-16819): the single-version bundle model broke once
+> plugins diverged (`VERSION` froze at 3.29.0, 2026-03-28), and the fleet already ships
+> per-plugin. `CHANGELOG.md` is frozen as a historical record of the bundle era.
 
-```bash
-scripts/release.sh minor "Release Name"    # or: major, patch
-```
-
-This bumps version in `VERSION`, `plugin.json`, and `marketplace.json`, moves `[Unreleased]` entries under the new version heading, commits, and creates a git tag. Then push:
-
-```bash
-git push && git push --tags
-```
-
-Each plugin has its own version in `plugin.json` and `marketplace.json`. `scripts/validate.sh` checks that each plugin's versions match across these two files. The `VERSION` file tracks the workflows plugin version. Per-plugin release support is tracked by BC-1728.
+Each plugin versions independently. When you change anything under a plugin's
+`hooks/`, `skills/`, `commands/`, or `agents/`, bump that plugin's version in **both**
+its `plugin.json` and its `.claude-plugin/marketplace.json` entry, in the same commit —
+`scripts/validate.sh` §2b enforces that the two stay equal (and that
+`homepage`/`repository`/`description` stay consistent). Record notable changes in the PR
+description; the marketplace entry's version + git history are the release record.
 
 ## Skill Routing Updates
 

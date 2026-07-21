@@ -45,7 +45,7 @@ This maps directly to Anthropic's own framing: MCP servers provide connectivity;
 
 ## Frontmatter convention
 
-Every skill that calls MCP tools declares them in `allowed-tools`. Two forms, picked by the server's tool count:
+Every skill that calls MCP tools declares them in `allowed-tools`. This is gate-enforced for skills by **R8** ([ADR-042](../decisions/042-skill-allowed-tools-mcp-coverage.md), `eval_gate.py --structural`): a `SKILL.md` whose body names a full `mcp__…` path but declares no `allowed-tools` blocks. (R8 keys on the full path, so it cannot see a *bare*-semantic-name invoker that omits `allowed-tools` — declare `allowed-tools` regardless; review is the backstop.) Two forms, picked by the server's tool count:
 
 ```yaml
 # Multi-tool server — use wildcard

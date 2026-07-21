@@ -160,6 +160,45 @@ assert_finding    "R7: evals.json without _deprecated marker → advisory" R7-ev
 run "$FIX/evals/marked/evals.json"
 assert_no_finding "R7: evals.json WITH _deprecated marker → no R7" R7-evals-json-undeprecated
 
+# ── R8 — MCP-invoking skill needs allowed-tools (GATE — skills only, BC-16387) ──
+echo "── R8 allowed-tools-required (skills only) ──"
+run "$FIX/skills/r8-missing/SKILL.md"
+assert_finding    "R8: skill invokes MCP w/o allowed-tools → gate (blocking via eval-gate)" R8-allowed-tools-required gate
+
+run "$FIX/skills/r8-declared/SKILL.md"
+assert_no_finding "R8: skill invokes MCP WITH allowed-tools → no R8" R8-allowed-tools-required
+
+run "$FIX/skills/r8-knowledge/SKILL.md"
+assert_no_finding "R8: pure-knowledge skill (no MCP invocation) → no R8" R8-allowed-tools-required
+
+run "$FIX/skills/r8-override/SKILL.md"
+assert_finding    "R8: valid override → R8 downgraded to advisory" R8-allowed-tools-required advisory
+if has_finding R8-allowed-tools-required gate; then
+  echo "  FAIL  R8: valid override must NOT leave a gate finding"; printf '    out: %s\n' "$LAST"; fail=$((fail + 1))
+else
+  echo "  PASS  R8: valid override leaves no gate finding"; pass=$((pass + 1))
+fi
+
+run "$FIX/skills/r8-empty-override/SKILL.md"
+assert_finding    "R8: empty override marker → still gate" R8-allowed-tools-required gate
+assert_finding    "R8: empty override marker → advisory note" R8-override-missing-reason advisory
+
+# Skill-only scope: a COMMAND invoking MCP without allowed-tools must NOT fire R8
+# (the diff-gate is commands-only and never sees skills; R8 is full-surface only,
+# mirroring R4). This proves R8 is registered skill-only, not on SPEC_RULES_ALL.
+run "$FIX/commands/r8-command-scope.md"
+assert_no_finding "R8: command invoking MCP w/o allowed-tools → no R8 (skill-only)" R8-allowed-tools-required
+
+# Block-array allowed-tools is a genuine declaration (fm_value reads only the same line);
+# R8 must treat it as declared, not false-positive "declares no allowed-tools" (review P2).
+run "$FIX/skills/r8-block-array/SKILL.md"
+assert_no_finding "R8: block-array allowed-tools counts as declared → no R8" R8-allowed-tools-required
+
+# A mcp__ shape glued into a larger word/URL is not an invocation (left-boundary
+# lookbehind); it must not trip R8 (review P3).
+run "$FIX/skills/r8-glued-prefix/SKILL.md"
+assert_no_finding "R8: glued mcp__ prefix (in a word/URL) → no R8" R8-allowed-tools-required
+
 # ── findings[] contract + integration ──────────────────────────────────────────
 echo "── findings[] contract + integration ──"
 
@@ -218,7 +257,7 @@ assert_rc "nonexistent/unreadable spec → exit 2 (internal error, not a finding
 
 echo ""
 # Count floor — a silently-skipped block must fail loudly, not drop the count.
-FLOOR=32
+FLOOR=42
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

@@ -3,6 +3,8 @@
 **Status:** Accepted
 **Date:** 2026-03-30
 
+> **Amendment 2026-07-08 (BC-16297 / BC-16819):** the monorepo-marketplace decision stands, but its release tooling changed — `scripts/release.sh` + the root `VERSION` file were **retired**. Independent per-plugin versioning (below) is now done via per-PR bumps in `plugin.json` + `marketplace.json`; there is no bundle release step. The `release.sh` / "needs per-plugin release support (BC-1728)" references below are historical.
+
 ## Context
 
 PRD Section 12, Question 4 (BC-2011):

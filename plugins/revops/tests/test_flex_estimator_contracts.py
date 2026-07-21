@@ -10,6 +10,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = ROOT / "skills" / "sf-flex-estimator"
 
+if not SKILL_DIR.exists():
+    pytest.skip(
+        "quarantined: skills/sf-flex-estimator does not exist in this repo "
+        "(not among the 14 SF skills retained per ADR-007 §3.5's upstream "
+        "filter) — see docs/python-test-quarantine.md",
+        allow_module_level=True,
+    )
+
 
 def _load_module(module_name: str, path: Path):
     spec = importlib.util.spec_from_file_location(module_name, path)

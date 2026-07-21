@@ -17,6 +17,14 @@ AGENTS_DIR = FIXTURES_DIR / "agents"
 # Use a known-good agent from the skill's own assets
 GOOD_AGENT = SKILLS_ROOT / "sf-ai-agentscript" / "assets" / "agents" / "hello-world.agent"
 
+pytestmark = pytest.mark.skip(
+    reason=(
+        "quarantined: skills/sf-ai-agentscript does not exist in this repo "
+        "(not among the 14 SF skills retained per ADR-007 §3.5's upstream "
+        "filter) — see docs/python-test-quarantine.md"
+    )
+)
+
 
 @pytest.mark.hooks
 class TestAgentScriptGoodFile:

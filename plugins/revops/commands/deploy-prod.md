@@ -333,14 +333,12 @@ if [ -n "$DELETED" ]; then
   printf '%s\n' "$DELETED" | sed 's/^/  /'
 fi
 
-# Build --source-dir argv. Force-app paths are whitespace-free in practice
-# (Salesforce metadata API forbids it) and the bash word-split below is
-# acceptable. If a future SF release allowed spaces, this would need to
-# move to a "$@"-array form.
-ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
-
-# shellcheck disable=SC2086  # word-splitting is intentional here
-sf project deploy start $ARGS --dry-run --target-org brite-prod --json
+# Build the --source-dir argv as an ARRAY so it expands correctly under bash AND
+# zsh — the Claude Code Bash tool runs zsh, which does NOT word-split an unquoted
+# $VAR, so the old single-string form reached sf as one bad arg (BC-16872).
+ARGS=()
+while IFS= read -r p; do [ -n "$p" ] && ARGS+=(--source-dir "$p"); done <<< "$COALESCED"
+sf project deploy start "${ARGS[@]}" --dry-run --target-org brite-prod --json
 ```
 
 If any deletions were surfaced above, decide before continuing: do they belong in this deploy via `destructiveChanges.xml`? If yes, fold the destructive manifest into the PR and re-run `/revops:deploy-prod`. If no (e.g., the file was moved/renamed and the new path is in the deploy set), continue.
@@ -428,10 +426,10 @@ COALESCED=$(printf '%s\n' "$CHANGED" | awk -F/ '
   { print $0 }
 ' | sort -u)
 
-ARGS=$(printf '%s\n' "$COALESCED" | sed 's/^/--source-dir /' | tr '\n' ' ')
-
-# shellcheck disable=SC2086  # word-splitting is intentional here
-sf project deploy start $ARGS --target-org brite-prod --json
+# Array form so the argv expands under zsh too (BC-16872; see Phase 2 note).
+ARGS=()
+while IFS= read -r p; do [ -n "$p" ] && ARGS+=(--source-dir "$p"); done <<< "$COALESCED"
+sf project deploy start "${ARGS[@]}" --target-org brite-prod --json
 ```
 
 Parse the JSON (same `status === 0` check as Phase 2):

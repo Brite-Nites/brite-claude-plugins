@@ -2,7 +2,7 @@
 
 A **Process + Org** plugin for Claude Code. Superpowers methodology + compound engineering + Linear integration — structured workflow (brainstorm → plan → worktree → execute → review → compound → audit) with Linear woven into every step.
 
-**Current version:** 3.24.0 | [Changelog](CHANGELOG.md) | [Roadmap](ROADMAP.md)
+**Versions:** per-plugin — see [marketplace.json](.claude-plugin/marketplace.json) | [Changelog](CHANGELOG.md) | [Roadmap](ROADMAP.md)
 
 ## Philosophy
 
@@ -43,28 +43,33 @@ See the [Platform Design Document](docs/designs/brite-agent-platform.md) for the
 
 ## Quick Start
 
-Install the plugin bundle:
+Register the marketplace, then install the plugin you want:
 
 ```bash
-claude plugins add https://github.com/Brite-Nites/brite-claude-plugins
+claude plugin marketplace add Brite-Nites/brite-claude-plugins
+claude plugin install workflows@brite-claude-plugins
 ```
 
-Or manually add to your `.claude/settings.json`:
-
-```json
-{
-  "plugins": [
-    {
-      "source": "https://github.com/Brite-Nites/brite-claude-plugins",
-      "plugins": ["workflows"]
-    }
-  ]
-}
-```
+The other plugins in this repo (`marketing`, `revops`, `cadence`, `flow-architecture`, `brite-core`) install the same way — swap the name before `@`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full install and configuration reference.
 
 Verify installation by typing `/workflows:` in Claude Code — you should see the available commands in the slash menu.
 
+## Plugins in this repo
+
+This is a multi-plugin bundle. `workflows` is the primary Process + Org plugin (its commands are listed below); the others are domain plugins that install the same way. Versions are per-plugin — see [marketplace.json](.claude-plugin/marketplace.json).
+
+| Plugin | Purpose |
+|--------|---------|
+| `workflows` | Process + Org — structured workflow methodology with Linear integration |
+| `marketing` | Brand-aware marketing skills (GTM, campaigns, TAM mapping, outbound) |
+| `revops` | Salesforce development + CRM data skills (Brite customizations on Jaganpro/sf-skills) |
+| `cadence` | Weekly planning cadence — audit, scope, housekeep, narrate |
+| `flow-architecture` | Flow-Driven Architecture — scaffolds Linear domain milestones + repo flow docs |
+| `brite-core` | Cross-cutting brain-first hooks (SessionStart/SubagentStart) + centralized security/quality hooks |
+
 ## Available Commands
+
+The commands below belong to the `workflows` plugin.
 
 **Core workflow (the inner loop):**
 
@@ -98,12 +103,22 @@ Verify installation by typing `/workflows:` in Claude Code — you should see th
 | `/workflows:architecture-decision` | Generate Architecture Decision Records |
 | `/workflows:create-plugin` | Scaffold a new domain plugin from template |
 | `/workflows:smoke-test` | Diagnostic checks on plugin environment |
+| `/workflows:report-issue` | Report the agent tooling itself misbehaving — a skill, command, or hook that misfired (not a Brite product bug) |
 
 **Quality:**
 
 | Command | Description |
 |---------|-------------|
 | `/workflows:fact-check` | Verify factual accuracy of a document against the codebase |
+
+**Compound knowledge & governance:**
+
+| Command | Description |
+|---------|-------------|
+| `/workflows:analytics` | Show plugin usage analytics — command frequency, success rates, and duration trends |
+| `/workflows:audit-trail` | Query the full context picture for any issue — what context was used and its staleness |
+| `/workflows:flywheel-metrics` | Compute and display the 5 compound-knowledge flywheel metrics from decision traces |
+| `/workflows:promote-precedent` | Review and promote flagged decision traces from project precedents to the org handbook |
 
 ## Skill Coverage Matrix
 
@@ -160,12 +175,13 @@ All agents run on Opus. A Haiku-powered diff-triage agent gates trivial diffs.
 
 ## MCP Servers
 
-The plugin configures two MCP servers automatically:
+The `workflows` plugin configures three MCP servers automatically:
 
 | Server | Transport | Purpose |
 |--------|-----------|---------|
 | `sequential-thinking` | stdio | Structured reasoning via `@modelcontextprotocol/server-sequential-thinking` |
 | `linear-server` | HTTP | Linear project management integration |
+| `gbrain-team` | stdio | Team knowledge base — gbrain broker (`scripts/gbrain-team-broker.sh`) to a Railway HTTP endpoint |
 
 The Linear MCP server provides tools for managing issues, projects, milestones, and documentation directly from Claude Code.
 

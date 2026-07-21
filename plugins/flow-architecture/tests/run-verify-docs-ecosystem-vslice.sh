@@ -37,12 +37,13 @@ pass() { printf '  PASS  %s\n' "$1"; PASS=$((PASS + 1)); }
 fail() { printf '  FAIL  %s\n' "$1"; FAIL=$((FAIL + 1)); }
 section() { printf '\n[%s] %s\n' "$1" "$2"; }
 
-# ── §1: All 10 template files exist ─────────────────────────────────
+# ── §1: All 11 template files exist ─────────────────────────────────
 section "1" "templates/ file presence"
 
 EXPECTED_FILES=(
   "scripts/verify-docs.sh"
   "scripts/regenerate-flow-index.sh"
+  "scripts/precommit-flow-index.sh"
   "scripts/regenerate-flow-index.mts"
   "scripts/verify-linear-references.mts"
   "scripts/normalize-fda-frontmatter.mjs"

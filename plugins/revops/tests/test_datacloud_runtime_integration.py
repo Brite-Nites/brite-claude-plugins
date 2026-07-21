@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+
 import pytest
 
 from tests.datacloud_test_utils import (
@@ -12,7 +14,18 @@ from tests.datacloud_test_utils import (
     sf_data360_available,
 )
 
-pytestmark = pytest.mark.integration
+# These integration tests shell out to the Salesforce `sf` CLI (their own
+# runtime-availability probe calls `sf`, which raises FileNotFoundError when the
+# binary is absent — crashing before it can skip). Gate the whole module on `sf`
+# being present so it runs in a local dev env that has the CLI and skips cleanly
+# in the pytest CI job, which does not install `sf`. (BC-16289 CI reconciliation.)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        shutil.which("sf") is None,
+        reason="requires the Salesforce `sf` CLI (not installed in the pytest CI job)",
+    ),
+]
 
 
 
