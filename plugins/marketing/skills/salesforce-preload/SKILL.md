@@ -4,7 +4,7 @@ description: Create Salesforce Contacts under real business Accounts for a clean
 user-invocable: true
 allowed-tools: mcp__plugin_marketing_salesforce__*, Read, Write, Glob, Grep, Bash, AskUserQuestion
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   category: Outbound Lead Gen
 ---
 
@@ -72,8 +72,11 @@ FROM Contact WHERE Email IN ('a@x.com', 'b@y.com', ...)
 | Matches | Disposition | Uploads to EB? |
 | --- | --- | --- |
 | 0 | **net-new** — create it | yes |
-| 1 | **matched** — touch nothing at all | yes |
+| 1, both governed fields null | **matched_seed** — seed the floor (`null → Cold_Prospect/New`) on it by Id | yes |
+| 1, either governed field set | **matched** — touch nothing at all | yes |
 | >1 | **multiple_contacts** — skip the SF write, flag for dedup | **yes** |
+
+**The single-match split (ADR-037 Decision 1/2).** A matched Contact that is `null` on **both** `Lifecycle_Stage__c` **and** `Lead_Status__c` is seeded to the floor — it is otherwise invisible to the BDR queues (which key on status), the exact failure the "leave it null" option is rejected for. This is a forward `null → floor` write, so it does **not** trip `Lead_Status_Forward_Only` (that VR is gated on a non-blank prior value) — **no bypass perm is needed**. If **either** field is already set, the Contact is left entirely untouched: the two axes are assessed **together**, never top up one blank axis. A `Do_Not_Prospect`(stage)+null(status) contact stamped `New` would re-enter the working queue = opt-out breach, so it stays `matched`.
 
 The `>1` row still uploads: the contact already exists, so OutboundSync will match it and there is no gmail-Account risk. The flag is a downstream dedup TODO, not a campaign exclusion. The unifying test throughout: **would emailing this row recreate the failure?** No for multiple-match; yes for no-company.
 
@@ -129,6 +132,9 @@ Order matters: **Accounts first** (Contacts need the `AccountId`), then Contacts
 1. **Split the write set once, then canary.** Build the Account and Contact write files from the plan, then **hold out** the first `--canary` rows — chosen for coverage rather than sample size: at minimum one net-new-with-person, one company-in-LastName row, one new Account, one matched Account. Write **only** that canary batch and verify it. Salesforce publishes no canary size — its guidance is only "use a small test file first" — and a coverage-selected handful exercises more failure paths than a percentage of a homogeneous list.
 2. **Load the remainder — never the whole file again.** After the canary verifies, load the write set **minus the canary rows already written**: `sf data import bulk --sobject Account --file <remainder-csv> --target-org <org> --wait 30 --json`, then the same for Contact. Re-loading the full file would re-create the canary records as duplicates — a bulk insert does **no** existence check, and the Phase-2 dedup snapshot predates the canary write, so those rows still look net-new. Reconcile the created counts across **both** batches (canary + remainder).
 3. **Read the real counts.** `sf data bulk results --job-id <id> --target-org <org> --json` for every batch. **Never gate on job state or exit code**: a job reports `Completed` with a 100% failure rate, partial failures exit non-zero with no `result.jobInfo`, and DML commits per 200-record chunk — so `Failed` does not mean nothing happened. Count from the row-level `Success` field or the count is a guess.
+4. **Seed the matched-both-null Contacts — a separate UPDATE, by Id.** The `matched_seed` rows are **existing** Contacts, not inserts, so they are written independently of the Account/Contact insert batches (no `AccountId` dependency — the Account already exists). Build the update file from each `matched_seed` row's `contact_id`, setting `Lifecycle_Stage__c = Cold_Prospect`, `Lead_Status__c = New` (the `FLOOR_LIFECYCLE_STAGE` / `FLOOR_LEAD_STATUS` constants) — nothing else. Write with `sf data update bulk --sobject Contact --file <seed-csv> --target-org <org> --wait 30 --json` (or `sf data update record` per row for a handful), then reconcile with `sf data bulk results` the same way — row-level `Success`, never job state. This is a forward `null → floor` write and needs no VR bypass.
+
+   **Re-check immediately before this write — close the read→write race.** The Phase-2 read that classified these rows is separated from this UPDATE by the operator gate and the canary, a window in which the reply pipeline or a suppression write can advance or suppress the Contact. Right before writing, **re-query `Lifecycle_Stage__c, Lead_Status__c` for the `matched_seed` Contact Ids and drop any no longer null on both** (same both-blank rule as `classify_rows` / `_is_blank`); seed only the still-both-null set. This closes the window client-side rather than relying on the org's forward-only VR/watermark to bounce a stale backward write — which would otherwise surface as avoidable partial-update failures in the reconcile, or, if a guardrail is ever weaker than assumed, a backward write. If any rows are dropped, report the count alongside the reconciliation gap.
 
 **Field set.**
 
@@ -137,13 +143,18 @@ Order matters: **Accounts first** (Contacts need the `AccountId`), then Contacts
 | Identity | FirstName, LastName, Email | Name = company (original casing) |
 | Link | AccountId | — |
 | Contact method | — | Website ← `resolve_website(domain)` (never a free-email one), else Phone |
-| Seed (**net-new only**) | `Lifecycle_Stage__c = Cold_Prospect`, `Lead_Status__c = New` | — |
+| Seed (**net-new + matched-both-null**) | `Lifecycle_Stage__c = Cold_Prospect`, `Lead_Status__c = New` | — |
 | Owner | Marketing Admin | Marketing Admin |
 | **Never touch** | `OSLastCampaignId__c`, CampaignMember, `Segment__c`, `Referral_Source__c` | — |
 
 **Name convention** — computed by `resolve_name(first, last, full, company)`. Real FirstName/LastName when present. When absent — or junk (`-`, `last_name`, `Unknown`, or equal to the company) — **FirstName blank, LastName = the company name**. Blank FirstName signals "generic business inbox, no person yet". Reject only when there is no company at all. **Never write a placeholder.** (Note the migration transform's `|| "Unknown"` fallback — mirror its structure, never that line.)
 
-**The seed is floor-only, at creation only** (ADR-037). On a **matched** Contact, do not touch `Lifecycle_Stage__c` or `Lead_Status__c` at all — resetting an advanced contact (an `MQL`) back to the floor is a backward write, which the forward-only watermark forbids. Both values are also the picklist defaults, so an omitted field lands on the floor anyway; set them explicitly so the floor is deterministic rather than incidental. Race-safe because the reply pipeline is upgrade-only and its stage whitelist already accepts `Cold_Prospect` as an input.
+**The seed is the floor, written forward-only** (ADR-037). Two write shapes:
+
+- **Net-new** — set the floor at insert. Both values are also the picklist defaults, so an omitted field lands on the floor anyway; set them explicitly so the floor is deterministic rather than incidental.
+- **Matched-both-null** — a matched Contact `null` on **both** governed fields is updated **by Id** to the same floor (`classify_rows` returns disposition `matched_seed` carrying `contact_id`). A forward `null → floor` write: it does not trip `Lead_Status_Forward_Only` and needs no bypass perm.
+
+On any **other** matched Contact — either field already set — do not touch `Lifecycle_Stage__c` or `Lead_Status__c` at all: resetting an advanced contact (an `MQL`) or re-activating a `Do_Not_Prospect` back to the floor is a backward write the forward-only watermark forbids, and stamping `New` on a suppressed contact re-enters the BDR queue (opt-out breach). The two axes are assessed **together** — never top up a single blank axis. Race-safe because the reply pipeline is upgrade-only and its stage whitelist already accepts `Cold_Prospect` as an input.
 
 ### Phase 5 — Report
 
@@ -179,18 +190,21 @@ logic to these, rather than re-deriving it in prose:
 | Phase | Call | Guarantee |
 | --- | --- | --- |
 | 2 (Accounts) | `company_match_key(name)` | the whitespace+case-only match key; never strips suffixes |
-| 3 (Plan) | `classify_rows(rows, contacts_by_email, accounts_by_key)` → `PreloadPlan` | buckets every row; `eb_rows` never contains a needs-review row |
+| 3 (Plan) | `classify_rows(rows, contacts_by_email, accounts_by_key)` → `PreloadPlan` | buckets every row; a matched Contact null on both governed fields → `matched_seed` (carries `contact_id`); `eb_rows` never contains a needs-review row |
 | 4 (Website) | `resolve_website(domain)` | never returns a free-email domain |
 | 4 (Name) | `resolve_name(first, last, full, company)` | company-in-LastName fallback; never a placeholder |
 
 The skill runs the Phase-2 SOQL, builds `contacts_by_email` (normalized email →
-count) and `accounts_by_key` (`company_match_key(Account.Name)` → the **list** of
-Account Ids sharing that key — never collapse it to one; a key with two or more is
-ambiguous and `classify_rows` creates new rather than attach to an arbitrary one,
-per Q5), passes them to `classify_rows`, and drives Phase 3–5 off the returned
-`PreloadPlan` (`counts` for the gate — including `accounts_ambiguous` — `eb_rows`
-as the surviving set, `sidecar_rows` for the review CSV, and each net-new row's
-payload for the write).
+the **list** of matched `MatchedContact` records — each carrying the Contact `Id`
+plus `Lifecycle_Stage__c` and `Lead_Status__c`; its length is the match count, and
+for a single match the field values drive the matched-both-null seed decision) and
+`accounts_by_key` (`company_match_key(Account.Name)` → the **list** of Account Ids
+sharing that key — never collapse it to one; a key with two or more is ambiguous
+and `classify_rows` creates new rather than attach to an arbitrary one, per Q5),
+passes them to `classify_rows`, and drives Phase 3–5 off the returned `PreloadPlan`
+(`counts` for the gate — including `matched_seed` and `accounts_ambiguous` —
+`eb_rows` as the surviving set, `sidecar_rows` for the review CSV, each net-new
+row's payload and each `matched_seed` row's `contact_id` for the write).
 
 The marketing Salesforce MCP registers the `data` toolset only — `run_soql_query`, `get_username`, `resume_tool_operation`. **There is no SF write tool available to this plugin**; that is why writes shell out.
 
@@ -213,7 +227,7 @@ sf org display --target-org "<target-org>" --json
 
 ### Architectural rules that apply
 
-- **ADR-037** — this skill is a *sanctioned writer of the lifecycle floor*: `Cold_Prospect`/`New` on net-new only, never on a matched Contact, never via a trigger. The reply pipeline remains the sole writer of every forward transition.
+- **ADR-037** — this skill is a *sanctioned writer of the lifecycle floor*: `Cold_Prospect`/`New` on net-new **and on a matched Contact null on both governed fields** (Decision 1), never on a matched Contact with either field set (Decision 2 opt-out), never above the floor, never via a trigger. The reply pipeline remains the sole writer of every forward transition.
 - **ADR-025 / ADR-032** — `Lifecycle_Stage__c` is a forward-only watermark; the Contact pre-sale band is pipeline-owned. This skill's carve-out is the floor and nothing above it.
 - **ADR-028 (brite-salesforce)** — in-org normalization is whitespace-only. Match keys normalize harder; written values do not.
 - The build PR owes an **S2 (Cold outbound → Contact-first)** row in `docs/artifacts/lifecycle-conformance.md`.
@@ -228,7 +242,7 @@ sf org display --target-org "<target-org>" --json
 ## Anti-Slop Guardrails
 
 - ❌ Never weaken or bypass the free-email Account guard.
-- ❌ Never overwrite `Lifecycle_Stage__c` / `Lead_Status__c` on a matched Contact.
+- ❌ Never overwrite `Lifecycle_Stage__c` / `Lead_Status__c` on a matched Contact — the ONE exception is the floor seed on a matched Contact null on **both** fields (`null → Cold_Prospect/New`); if either is already set, never touch it.
 - ❌ Never write a placeholder name (`-`, `last_name`, `Unknown`).
 - ❌ Never infer the instance — HALT if unsure.
 - ❌ Never guess a column — ask, with samples.
@@ -236,7 +250,7 @@ sf org display --target-org "<target-org>" --json
 - ❌ Never fuzzy-match. Uncertain Account → create new.
 - ❌ Never trust a bulk job's state or exit code as a success signal.
 - ❌ Never fire a mutating call in the same turn as its proposal.
-- ✅ Idempotent: re-running matches what exists and seeds only net-new, so a second run picks up only repaired rows.
+- ✅ Idempotent: re-running matches what exists and seeds only net-new + matched-both-null; a contact seeded on the first run is now non-null on both fields, so a second run re-seeds nothing already at the floor and picks up only repaired rows.
 
 ## Behavioral Tests
 
@@ -253,15 +267,19 @@ prose promises:
 4. `Acme Inc` / `Acme LLC` / `Acme, Inc.` → distinct match keys; and a name that matches **two-or-more** existing Accounts creates new rather than attach to an arbitrary one — favor a duplicate over a wrong merge *(company_match_key, classify_rows)*.
 5. A no-company or no-contact-method row → needs-review, and **never in `eb_rows`** *(classify_rows)*.
 6. A >1-contact row → flagged, no SF write, **still in `eb_rows`** *(classify_rows)*.
+7. A single matched Contact **null on both** `Lifecycle_Stage__c` and `Lead_Status__c` → `matched_seed`, carries `contact_id`, **still in `eb_rows`**, not in the sidecar *(classify_rows)*.
+8. A single matched Contact with **either** field set — including `Do_Not_Prospect`+null-status — → `matched`, nothing written; the two axes are assessed together, never part-seeded *(classify_rows)*.
 
 ### Tier 2 — Live-org behavior (manual / staged run)
 
 These need the real org and are verified on the canary + a small test run:
 
-7. `--instance` absent → HALT, no queries issued; `--instance commercial` → skip, zero writes.
-8. `--dry-run` → plan rendered, zero writes.
-9. Net-new Contact lands with `Cold_Prospect`/`New`, owned by Marketing Admin, parented to a non-free-email Account.
-10. A matched Contact at `MQL` → stage and status unchanged after the run.
-11. Zero Accounts with a `FreeEmailDomains` name or website exist after the run; no `Unknown` LastName anywhere.
-12. Re-run over the same file → zero new records; planned vs created counts both reported when they differ.
-13. **The point of the whole skill:** after the EB send, OutboundSync attaches activity to the pre-loaded Contact and creates **no** new Account.
+9. `--instance` absent → HALT, no queries issued; `--instance commercial` → skip, zero writes.
+10. `--dry-run` → plan rendered, zero writes.
+11. Net-new Contact lands with `Cold_Prospect`/`New`, owned by Marketing Admin, parented to a non-free-email Account.
+12. A matched Contact at `MQL` → stage and status unchanged after the run.
+13. A matched Contact **null on both** governed fields → seeded to `Cold_Prospect`/`New` (updated by Id) after the run; a `Do_Not_Prospect`+null-status contact is left unchanged.
+14. A `matched_seed` Contact that becomes non-null on either governed field between the Phase-2 read and the write (a concurrent reply/suppression) → dropped by the pre-write re-check, not seeded, and the drop count is reported.
+15. Zero Accounts with a `FreeEmailDomains` name or website exist after the run; no `Unknown` LastName anywhere.
+16. Re-run over the same file → zero new records; planned vs created counts both reported when they differ.
+17. **The point of the whole skill:** after the EB send, OutboundSync attaches activity to the pre-loaded Contact and creates **no** new Account.

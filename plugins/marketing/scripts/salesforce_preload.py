@@ -12,8 +12,9 @@ to prose:
   - company_match_key — the conservative key for "does this business already
     have an Account?" (never strips suffixes; favors a duplicate over a merge)
   - classify_rows    — the integration step: buckets each lead (net-new /
-    matched / multiple / needs-review), derives the surviving EB set and the
-    review sidecar, and holds unrepresentable rows out of BOTH SF and the campaign
+    matched / matched-seed / multiple / needs-review), derives the surviving EB
+    set and the review sidecar, and holds unrepresentable rows out of BOTH SF and
+    the campaign
 
 Nothing here touches the network or the filesystem; the skill feeds it values
 and acts on what it returns.
@@ -249,12 +250,17 @@ def company_match_key(name: Optional[str]) -> str:
 # --- disposition classifier --------------------------------------------------
 #
 # The integration step: given the mapped lead rows plus what Salesforce returned,
-# decide each row's fate. Four dispositions, and the unifying test throughout is
+# decide each row's fate. Five dispositions, and the unifying test throughout is
 # the scope doc's: "would emailing this row recreate the gmail-Account failure?"
 #
 #   NET_NEW           create a Contact (+ match or create its Account). Uploads.
-#   MATCHED           the Contact already exists (1 on this email) — leave it
-#                     entirely alone, do not touch stage/status. Uploads.
+#   MATCHED           the Contact already exists (1 on this email) and is already
+#                     seeded (non-blank on stage or status) — leave it entirely
+#                     alone, do not touch stage/status. Uploads.
+#   MATCHED_SEED      the Contact already exists (1 on this email) and is null on
+#                     BOTH governed fields — seed the floor (null -> Cold_Prospect/
+#                     New) on it by Id. A forward null->floor write the opt-out
+#                     permits (ADR-037 D1/D2). Uploads.
 #   MULTIPLE_CONTACTS >1 Contact on this email — skip the SF write, flag for a
 #                     dedup TODO. The contact already exists so OutboundSync
 #                     matches it (no gmail risk) — so the row STILL uploads.
@@ -275,8 +281,42 @@ def company_match_key(name: Optional[str]) -> str:
 
 NET_NEW = "net_new"
 MATCHED = "matched"
+MATCHED_SEED = "matched_seed"
 MULTIPLE_CONTACTS = "multiple_contacts"
 NEEDS_REVIEW = "needs_review"
+
+# The lifecycle floor (ADR-037 Decision 1). Written on a net-new Contact AND on a
+# matched Contact that is null on BOTH governed fields — never above the floor,
+# never on a matched Contact with either field already set. Exposed as constants
+# so the seed value is deterministic and the skill references it instead of
+# re-hardcoding the strings in prose (where they would drift).
+FLOOR_LIFECYCLE_STAGE = "Cold_Prospect"
+FLOOR_LEAD_STATUS = "New"
+
+
+class MatchedContact(NamedTuple):
+    """One existing Contact matched on a lead's email (a Phase-2 SOQL row).
+
+    Carries the Contact Id (to target a seed UPDATE) and the two governed
+    lifecycle fields, so `classify_rows` can make the matched-both-null decision
+    (ADR-037 D1) instead of seeing only a count. `contacts_by_email` maps a
+    normalized email to the list of these — its length is the match count.
+    """
+
+    contact_id: str = ""
+    lifecycle_stage: Optional[str] = None
+    lead_status: Optional[str] = None
+
+
+def _is_blank(value: Optional[str]) -> bool:
+    """A governed field is 'unseeded' when null or empty/whitespace.
+
+    Both-null is assessed on this predicate over BOTH fields together: a Contact
+    is seed-eligible only when stage AND status are both blank. Every suppression
+    value (`Do_Not_Prospect`, any advanced stage, any set status) is non-blank on
+    at least one axis, so the opt-out holds structurally (ADR-037 D2).
+    """
+    return value is None or value.strip() == ""
 
 #: Company values that cannot anchor an Account — identical to `_JUNK_NAMES` by
 #: derivation so the two sets can never drift apart. A company cell holding a
@@ -292,13 +332,19 @@ def _is_usable_company(company: str) -> bool:
 
 
 class RowPlan(NamedTuple):
-    """One row's disposition and, for a net-new row, its resolved write payload."""
+    """One row's disposition and its resolved write payload.
+
+    A net-new row carries the contact/account creation payload below; a
+    matched-seed row carries only `contact_id` (the existing Contact to seed by
+    Id); every other disposition writes nothing.
+    """
 
     row: Mapping[str, str]        # the original mapped row (for the sidecar + write)
     email: str                    # normalized (lower, trimmed)
     disposition: str
     reason: str = ""              # set only for needs_review
     uploads_to_eb: bool = True    # False iff needs_review
+    contact_id: str = ""          # existing Contact Id — set only for matched_seed
     # net-new payload (empty/default for every other disposition):
     contact_first: str = ""
     contact_last: str = ""
@@ -322,12 +368,15 @@ class PreloadPlan(NamedTuple):
 
 def classify_rows(
     rows: Sequence[Mapping[str, str]],
-    contacts_by_email: Mapping[str, int],
+    contacts_by_email: Mapping[str, Sequence[MatchedContact]],
     accounts_by_key: Mapping[str, Sequence[str]],
 ) -> PreloadPlan:
     """Bucket each mapped lead row against the Salesforce lookups.
 
-    - `contacts_by_email`: normalized-email → count of existing Contacts on it.
+    - `contacts_by_email`: normalized-email → the list of existing `MatchedContact`
+      records on it (from the Phase-2 SOQL). Its length is the match count; for a
+      single match the record's governed-field values drive the ADR-037 matched-
+      both-null seed decision (both blank → seed the floor; either set → leave it).
     - `accounts_by_key`: `company_match_key(name)` → the list of existing Account
       Ids whose name normalizes to that key, for the candidate Accounts Salesforce
       returned. A key with >1 Id is ambiguous — we attach only on an exact single
@@ -349,15 +398,30 @@ def classify_rows(
                                    reason="no_email", uploads_to_eb=False))
             continue
 
-        count = contacts_by_email.get(email, 0)
-        if count == 1:
-            results.append(RowPlan(row=row, email=email, disposition=MATCHED))
+        matches = contacts_by_email.get(email, ())
+        if len(matches) == 1:
+            only = matches[0]
+            # ADR-037 D1/D2: a matched Contact null on BOTH governed fields gets
+            # the floor (a forward null→floor write); if EITHER is already set,
+            # leave it entirely alone (opt-out — the two axes are assessed
+            # together, never top up a single blank axis).
+            # Fail-closed: require a real contact_id before seeding. A both-null
+            # match with no Id would be a seed disposition with no write target —
+            # a permissive default reaching the write branch (the BC-17336
+            # fail-open shape). Without an Id, fall through to MATCHED (untouched)
+            # — the safe direction. Real SOQL always carries an Id; this is defense.
+            if (_is_blank(only.lifecycle_stage) and _is_blank(only.lead_status)
+                    and not _is_blank(only.contact_id)):
+                results.append(RowPlan(row=row, email=email, disposition=MATCHED_SEED,
+                                       contact_id=only.contact_id))
+            else:
+                results.append(RowPlan(row=row, email=email, disposition=MATCHED))
             continue
-        if count > 1:
+        if len(matches) > 1:
             results.append(RowPlan(row=row, email=email, disposition=MULTIPLE_CONTACTS))
             continue
 
-        # count == 0 → net-new candidate: we would CREATE it, so it must be
+        # no match → net-new candidate: we would CREATE it, so it must be
         # representable without recreating the failure.
         if not _is_usable_company(company):
             results.append(RowPlan(row=row, email=email, disposition=NEEDS_REVIEW,
@@ -404,6 +468,7 @@ def classify_rows(
         "total": len(results),
         "net_new": by_disp[NET_NEW],
         "matched": by_disp[MATCHED],
+        "matched_seed": by_disp[MATCHED_SEED],
         "multiple_contacts": by_disp[MULTIPLE_CONTACTS],
         "needs_review": by_disp[NEEDS_REVIEW],
         "accounts_matched": len(matched_keys),
