@@ -405,7 +405,13 @@ def classify_rows(
             # the floor (a forward null→floor write); if EITHER is already set,
             # leave it entirely alone (opt-out — the two axes are assessed
             # together, never top up a single blank axis).
-            if _is_blank(only.lifecycle_stage) and _is_blank(only.lead_status):
+            # Fail-closed: require a real contact_id before seeding. A both-null
+            # match with no Id would be a seed disposition with no write target —
+            # a permissive default reaching the write branch (the BC-17336
+            # fail-open shape). Without an Id, fall through to MATCHED (untouched)
+            # — the safe direction. Real SOQL always carries an Id; this is defense.
+            if (_is_blank(only.lifecycle_stage) and _is_blank(only.lead_status)
+                    and not _is_blank(only.contact_id)):
                 results.append(RowPlan(row=row, email=email, disposition=MATCHED_SEED,
                                        contact_id=only.contact_id))
             else:

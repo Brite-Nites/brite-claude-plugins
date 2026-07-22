@@ -326,6 +326,17 @@ plan_blank = classify_rows(
     {"blank@gmail.com": [MatchedContact("003BLANK", "", "  ")]}, {})
 check("blank-string both-null -> MATCHED_SEED", plan_blank.rows[0].disposition, MATCHED_SEED)
 
+# Fail-closed (BC-17347 review): a both-null match with NO contact Id must NOT
+# seed — an empty write target is a permissive default reaching the write branch
+# (same shape as the BC-17336 fail-open). Falls through to MATCHED (untouched) =
+# the safe direction. Can't arise from real SOQL (Id always present); defensive.
+plan_noid = classify_rows(
+    [R(email="noid@gmail.com", company="NoId Co", domain="noidco.com")],
+    {"noid@gmail.com": [MatchedContact("", None, None)]}, {})
+check("both-null but empty contact_id -> MATCHED (fail-closed, not seeded)",
+      plan_noid.rows[0].disposition, MATCHED)
+check("fail-closed row not counted as matched_seed", plan_noid.counts["matched_seed"], 0)
+
 # --- THE suppression test the acceptance criterion requires (BC-17213) -------
 # A matched Do_Not_Prospect (stage) + null status must be left ENTIRELY
 # untouched: stamping New would re-enter the BDR queue (queues key on status) =
