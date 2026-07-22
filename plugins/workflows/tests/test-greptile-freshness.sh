@@ -6,6 +6,7 @@
 #     --now <iso8601>         current time (injected; defaults to now in prod)
 #     --deadline <iso8601>    trigger + max-wait
 #     --verdict-ts <iso8601>  commented_at of the latest Greptile comment (or empty)
+#     --review-ts <iso8601>   completed_at of the head-SHA Greptile check-run (or empty)
 #     --score <0-5|null>      score from the latest Greptile verdict (or empty)
 #
 # Prints exactly one state:
@@ -117,6 +118,54 @@ section 9 "robust parse — unparseable verdict-ts within window"
 run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
   --verdict-ts "not-a-timestamp" --score 5
 assert_state "garbage-verdict-ts" "PENDING"
+
+# ── BC-16924: --review-ts (head-SHA Greptile check-run completed_at) ─────
+# Greptile edits its summary IN PLACE, so a comment's createdAt (verdict-ts)
+# never advances past the trigger on a re-review. The head-SHA check-run's
+# completed_at DOES advance. Freshness now keys on max(verdict-ts, review-ts),
+# so a fresh review-ts rescues a stale verdict-ts. score still gates PASS/FAIL.
+
+# ── 10. THE BUG: stale verdict-ts (in-place edit) + fresh review-ts + 5 → PASS
+section 10 "in-place edit — stale verdict-ts, fresh review-ts, score 5"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_FRESH" --score 5
+assert_state "stale-verdict+fresh-review+5" "FRESH_PASS"
+
+# ── 11. fresh review-ts, score 3 → FRESH_FAIL ───────────────────────
+section 11 "fresh review-ts, score 3"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_FRESH" --score 3
+assert_state "fresh-review+3" "FRESH_FAIL"
+
+# ── 12. review-ts alone (verdict-ts empty) fresh + 5 → FRESH_PASS ────
+section 12 "review-ts alone (no comment ts), score 5"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "" --review-ts "$TS_FRESH" --score 5
+assert_state "review-only-fresh+5" "FRESH_PASS"
+
+# ── 13. backward compat: verdict-ts fresh, review-ts empty + 5 → FRESH_PASS
+section 13 "legacy path — verdict-ts fresh, review-ts empty"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_FRESH" --review-ts "" --score 5
+assert_state "verdict-only-fresh+5" "FRESH_PASS"
+
+# ── 14. both stale, within window → PENDING ─────────────────────────
+section 14 "both verdict-ts and review-ts stale, within window"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_STALE" --score 5
+assert_state "both-stale" "PENDING"
+
+# ── 15. precedence: fresh review-ts past deadline still FRESH_PASS ──
+section 15 "fresh review-ts arriving past deadline (fresh > timeout)"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_PAST" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_FRESH" --score 5
+assert_state "fresh-review-past-deadline" "FRESH_PASS"
+
+# ── 16. robust: garbage review-ts + stale verdict-ts → PENDING (no crash)
+section 16 "garbage review-ts ignored, verdict-ts stale, within window"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "not-a-timestamp" --score 5
+assert_state "garbage-review-ts" "PENDING"
 
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-12249 greptile-freshness unit tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
