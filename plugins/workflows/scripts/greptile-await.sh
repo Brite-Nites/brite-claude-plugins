@@ -3,6 +3,9 @@
 # or the wait times out. The thin IO/sleep shell that composes:
 #   greptile-verdict.sh   (read the latest verdict)   +
 #   greptile-freshness.sh (classify vs the trigger time, with a deadline)
+# Freshness keys on max(comment createdAt, head-SHA check-run completed_at), so
+# an in-place-edited re-review (Greptile edits its summary rather than reposting)
+# is not misread as stale → false TIMED_OUT (BC-16924).
 #
 # Prints the terminal state on the last line:
 #   FRESH_PASS | FRESH_FAIL | TIMED_OUT
@@ -55,6 +58,25 @@ print(d.isoformat().replace("+00:00", "Z"))
 PY
 )"
 
+# Head-SHA freshness signal (BC-16924). Resolve the PR's repo + HEAD sha ONCE
+# (they don't change during a single wait); the check-run itself is re-read each
+# poll because it completes DURING the wait. If resolution fails, review_ts is
+# empty and freshness degrades to the verdict-ts-only behavior — no regression.
+REPO="$(gh pr view "$PR" --json headRepositoryOwner,headRepository -q '(.headRepositoryOwner.login // "") + "/" + (.headRepository.name // "")' 2>/dev/null || true)"
+HEAD_SHA="$(gh pr view "$PR" --json headRefOid -q .headRefOid 2>/dev/null || true)"
+
+review_ts() {
+  # Latest completed_at among Greptile check-runs on HEAD (empty if none/pending).
+  # An in-progress check-run has a null completed_at → empty → not yet fresh.
+  [ -n "$HEAD_SHA" ] && [ -n "$REPO" ] && [ "$REPO" != "/" ] || { echo ""; return; }
+  gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" --jq '
+    [ .check_runs[]
+      | select((.name // "") | test("greptile"; "i"))
+      | select(.status == "completed")
+      | (.completed_at // "") ]
+    | map(select(. != "")) | sort | last // ""' 2>/dev/null || echo ""
+}
+
 # Defensive backstop so a clock anomaly can't loop forever.
 max_iters=$(( MAX_WAIT / (INTERVAL > 0 ? INTERVAL : 1) + 2 ))
 
@@ -67,7 +89,8 @@ while [ "$i" -lt "$max_iters" ]; do
   IFS="$(printf '\t')" read -r score vts <<EOF
 $(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // "")] | @tsv')
 EOF
-  state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --score "$score")"
+  rts="$(review_ts)"   # head-SHA Greptile check-run completed_at (BC-16924)
+  state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --score "$score")"
   case "$state" in
     FRESH_PASS|FRESH_FAIL|TIMED_OUT)
       printf '%s\n%s\n' "$verdict" "$state"
