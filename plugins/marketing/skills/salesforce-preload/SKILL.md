@@ -134,6 +134,8 @@ Order matters: **Accounts first** (Contacts need the `AccountId`), then Contacts
 3. **Read the real counts.** `sf data bulk results --job-id <id> --target-org <org> --json` for every batch. **Never gate on job state or exit code**: a job reports `Completed` with a 100% failure rate, partial failures exit non-zero with no `result.jobInfo`, and DML commits per 200-record chunk — so `Failed` does not mean nothing happened. Count from the row-level `Success` field or the count is a guess.
 4. **Seed the matched-both-null Contacts — a separate UPDATE, by Id.** The `matched_seed` rows are **existing** Contacts, not inserts, so they are written independently of the Account/Contact insert batches (no `AccountId` dependency — the Account already exists). Build the update file from each `matched_seed` row's `contact_id`, setting `Lifecycle_Stage__c = Cold_Prospect`, `Lead_Status__c = New` (the `FLOOR_LIFECYCLE_STAGE` / `FLOOR_LEAD_STATUS` constants) — nothing else. Write with `sf data update bulk --sobject Contact --file <seed-csv> --target-org <org> --wait 30 --json` (or `sf data update record` per row for a handful), then reconcile with `sf data bulk results` the same way — row-level `Success`, never job state. This is a forward `null → floor` write and needs no VR bypass.
 
+   **Re-check immediately before this write — close the read→write race.** The Phase-2 read that classified these rows is separated from this UPDATE by the operator gate and the canary, a window in which the reply pipeline or a suppression write can advance or suppress the Contact. Right before writing, **re-query `Lifecycle_Stage__c, Lead_Status__c` for the `matched_seed` Contact Ids and drop any no longer null on both** (same both-blank rule as `classify_rows` / `_is_blank`); seed only the still-both-null set. This closes the window client-side rather than relying on the org's forward-only VR/watermark to bounce a stale backward write — which would otherwise surface as avoidable partial-update failures in the reconcile, or, if a guardrail is ever weaker than assumed, a backward write. If any rows are dropped, report the count alongside the reconciliation gap.
+
 **Field set.**
 
 | | Contact | Account |
@@ -277,6 +279,7 @@ These need the real org and are verified on the canary + a small test run:
 11. Net-new Contact lands with `Cold_Prospect`/`New`, owned by Marketing Admin, parented to a non-free-email Account.
 12. A matched Contact at `MQL` → stage and status unchanged after the run.
 13. A matched Contact **null on both** governed fields → seeded to `Cold_Prospect`/`New` (updated by Id) after the run; a `Do_Not_Prospect`+null-status contact is left unchanged.
-14. Zero Accounts with a `FreeEmailDomains` name or website exist after the run; no `Unknown` LastName anywhere.
-15. Re-run over the same file → zero new records; planned vs created counts both reported when they differ.
-16. **The point of the whole skill:** after the EB send, OutboundSync attaches activity to the pre-loaded Contact and creates **no** new Account.
+14. A `matched_seed` Contact that becomes non-null on either governed field between the Phase-2 read and the write (a concurrent reply/suppression) → dropped by the pre-write re-check, not seeded, and the drop count is reported.
+15. Zero Accounts with a `FreeEmailDomains` name or website exist after the run; no `Unknown` LastName anywhere.
+16. Re-run over the same file → zero new records; planned vs created counts both reported when they differ.
+17. **The point of the whole skill:** after the EB send, OutboundSync attaches activity to the pre-loaded Contact and creates **no** new Account.
