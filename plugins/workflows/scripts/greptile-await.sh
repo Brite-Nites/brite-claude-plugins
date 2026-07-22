@@ -62,6 +62,10 @@ PY
 # (they don't change during a single wait); the check-run itself is re-read each
 # poll because it completes DURING the wait. If resolution fails, review_ts is
 # empty and freshness degrades to the verdict-ts-only behavior — no regression.
+# NOTE: uses the PR's HEAD repository — correct for same-repo PRs (the norm here).
+# A fork PR resolves to the fork, whose commit may lack the base-repo Greptile
+# check-run → review_ts empty → verdict-ts-only fallback (no crash). Fork PRs are
+# out of scope for this gate.
 REPO="$(gh pr view "$PR" --json headRepositoryOwner,headRepository -q '(.headRepositoryOwner.login // "") + "/" + (.headRepository.name // "")' 2>/dev/null || true)"
 HEAD_SHA="$(gh pr view "$PR" --json headRefOid -q .headRefOid 2>/dev/null || true)"
 
@@ -69,7 +73,10 @@ review_ts() {
   # Latest completed_at among Greptile check-runs on HEAD (empty if none/pending).
   # An in-progress check-run has a null completed_at → empty → not yet fresh.
   [ -n "$HEAD_SHA" ] && [ -n "$REPO" ] && [ "$REPO" != "/" ] || { echo ""; return; }
-  gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" --jq '
+  # per_page=100 so the Greptile run can't fall off page 1 on a busy HEAD (the
+  # default 30 would silently empty review_ts → revert to the bug). Keep the
+  # case-insensitive name filter (robust if Greptile ever renames the check).
+  gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100" --jq '
     [ .check_runs[]
       | select((.name // "") | test("greptile"; "i"))
       | select(.status == "completed")
@@ -84,12 +91,15 @@ verdict='{"present":false}'
 i=0
 while [ "$i" -lt "$max_iters" ]; do
   i=$((i + 1))
+  # Read the freshness signal (check-run) BEFORE the verdict, so the score
+  # snapshot is at least as fresh as the signal — shrinks the propagation race
+  # between check-run completion and the in-place comment edit (BC-16924 review).
+  rts="$(review_ts)"   # head-SHA Greptile check-run completed_at (BC-16924)
   verdict="$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')"
   # One jq pass extracts both fields (tab-separated) to save a fork per poll.
   IFS="$(printf '\t')" read -r score vts <<EOF
 $(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // "")] | @tsv')
 EOF
-  rts="$(review_ts)"   # head-SHA Greptile check-run completed_at (BC-16924)
   state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --score "$score")"
   case "$state" in
     FRESH_PASS|FRESH_FAIL|TIMED_OUT)
