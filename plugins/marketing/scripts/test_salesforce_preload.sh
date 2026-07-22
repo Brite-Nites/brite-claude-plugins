@@ -11,8 +11,9 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from salesforce_preload import (
-    FREE_EMAIL_DOMAINS, MATCHED, MULTIPLE_CONTACTS, NEEDS_REVIEW, NET_NEW,
-    classify_rows, company_match_key, resolve_name, resolve_website,
+    FREE_EMAIL_DOMAINS, MATCHED, MATCHED_SEED, MULTIPLE_CONTACTS, NEEDS_REVIEW,
+    NET_NEW, MatchedContact, classify_rows, company_match_key, resolve_name,
+    resolve_website,
 )
 
 _pass = _fail = 0
@@ -205,7 +206,13 @@ rows = [
     R(email="nomethod@gmail.com", company="No Reach LLC", domain="", phone=""),                                            # needs-review: no contact method
     R(email="",                company="Ghost Co",       domain="ghostco.com"),                                           # needs-review: no email
 ]
-contacts_by_email = {"bob@gmail.com": 1, "dup@gmail.com": 3}
+# The lookup carries the matched Contacts' field values (BC-17347): a single
+# match at MQL/Working is advanced, so it stays MATCHED (untouched); the >1 case
+# is MULTIPLE regardless of field values.
+contacts_by_email = {
+    "bob@gmail.com": [MatchedContact("003BOB", "MQL", "Working")],
+    "dup@gmail.com": [MatchedContact("003D1"), MatchedContact("003D2"), MatchedContact("003D3")],
+}
 accounts_by_key = {company_match_key("Sunrise Cellars"): ["001AAA"]}  # this company already has an Account
 
 plan = classify_rows(rows, contacts_by_email, accounts_by_key)
@@ -221,6 +228,7 @@ check("classify: no-contact-method -> needs_review", disp.get("nomethod@gmail.co
 c = plan.counts
 check("counts: net_new = 3", c["net_new"], 3)
 check("counts: matched = 1", c["matched"], 1)
+check("counts: matched_seed = 0 (the lone match is advanced)", c["matched_seed"], 0)
 check("counts: multiple = 1", c["multiple_contacts"], 1)
 check("counts: needs_review = 3", c["needs_review"], 3)
 check("counts: review no_company = 1", c["review_no_company"], 1)
@@ -294,6 +302,59 @@ plan5 = classify_rows([R(email="s@gmail.com", company="Single Co", domain="singl
 check("single match → attached", plan5.rows[0].account_matched, True)
 check("single match → id carried", plan5.rows[0].account_id, "001CCC")
 check("single match → not ambiguous", plan5.rows[0].account_ambiguous, False)
+
+# --- matched-both-null seeding (BC-17347, ADR-037 D1/D2) --------------------
+# A single matched Contact that is null on BOTH governed fields is seeded to the
+# floor (null -> Cold_Prospect/New); if EITHER field is non-null it is left
+# entirely untouched (opt-out safety, D2 — assessed together, never per-field).
+# The lone match here is null on both -> MATCHED_SEED, carries its id, uploads.
+plan_seed = classify_rows(
+    [R(email="seed@gmail.com", company="Seed Co", domain="seedco.com")],
+    {"seed@gmail.com": [MatchedContact("003SEED", None, None)]}, {})
+rseed = plan_seed.rows[0]
+check("both-null match -> MATCHED_SEED", rseed.disposition, MATCHED_SEED)
+check("MATCHED_SEED carries the contact id (to target the UPDATE)", rseed.contact_id, "003SEED")
+check("MATCHED_SEED still uploads to EB", rseed.uploads_to_eb, True)
+check("MATCHED_SEED in eb_rows", any(rp.email == "seed@gmail.com" for rp in plan_seed.eb_rows), True)
+check("MATCHED_SEED NOT in sidecar (clean write, not a review row)",
+      any(rp.email == "seed@gmail.com" for rp in plan_seed.sidecar_rows), False)
+check("counts: matched_seed = 1", plan_seed.counts["matched_seed"], 1)
+check("counts: a seeded match is not counted as a plain match", plan_seed.counts["matched"], 0)
+# blank strings (not just None) also read as unseeded
+plan_blank = classify_rows(
+    [R(email="blank@gmail.com", company="Blank Co", domain="blankco.com")],
+    {"blank@gmail.com": [MatchedContact("003BLANK", "", "  ")]}, {})
+check("blank-string both-null -> MATCHED_SEED", plan_blank.rows[0].disposition, MATCHED_SEED)
+
+# --- THE suppression test the acceptance criterion requires (BC-17213) -------
+# A matched Do_Not_Prospect (stage) + null status must be left ENTIRELY
+# untouched: stamping New would re-enter the BDR queue (queues key on status) =
+# opt-out breach. The two axes are assessed TOGETHER (stage non-null -> skip both).
+plan_supp = classify_rows(
+    [R(email="dnp@gmail.com", company="DNP Co", domain="dnpco.com")],
+    {"dnp@gmail.com": [MatchedContact("003DNP", "Do_Not_Prospect", None)]}, {})
+rsupp = plan_supp.rows[0]
+check("suppressed (Do_Not_Prospect + null status) -> MATCHED, not seeded", rsupp.disposition, MATCHED)
+check("suppressed row writes nothing (no contact id carried)", rsupp.contact_id, "")
+check("suppressed row not counted as matched_seed", plan_supp.counts["matched_seed"], 0)
+
+# --- one-axis-null is NOT seeded (never top up a single axis) ----------------
+plan_stage_null = classify_rows(
+    [R(email="a@gmail.com", company="A Co", domain="aco.com")],
+    {"a@gmail.com": [MatchedContact("003A", None, "Working")]}, {})
+check("stage-null / status-set -> MATCHED (no part-seed)", plan_stage_null.rows[0].disposition, MATCHED)
+plan_status_null = classify_rows(
+    [R(email="b@gmail.com", company="B Co", domain="bco.com")],
+    {"b@gmail.com": [MatchedContact("003B", "MQL", None)]}, {})
+check("status-null / stage-set -> MATCHED (no part-seed)", plan_status_null.rows[0].disposition, MATCHED)
+
+# --- >1 match is MULTIPLE even when both-null (dedup first, never seed) -------
+plan_multi_null = classify_rows(
+    [R(email="m@gmail.com", company="M Co", domain="mco.com")],
+    {"m@gmail.com": [MatchedContact("003M1", None, None), MatchedContact("003M2", None, None)]}, {})
+check(">1 both-null match -> MULTIPLE_CONTACTS (not seeded)",
+      plan_multi_null.rows[0].disposition, MULTIPLE_CONTACTS)
+
 
 print(f"\nRESULT pass={_pass} fail={_fail}")
 sys.exit(1 if _fail else 0)
