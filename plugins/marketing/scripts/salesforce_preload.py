@@ -250,7 +250,7 @@ def company_match_key(name: Optional[str]) -> str:
 # --- disposition classifier --------------------------------------------------
 #
 # The integration step: given the mapped lead rows plus what Salesforce returned,
-# decide each row's fate. Four dispositions, and the unifying test throughout is
+# decide each row's fate. Five dispositions, and the unifying test throughout is
 # the scope doc's: "would emailing this row recreate the gmail-Account failure?"
 #
 #   NET_NEW           create a Contact (+ match or create its Account). Uploads.
