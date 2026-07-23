@@ -237,14 +237,17 @@ The worked example uses a single email-type (`professional`) only because the op
 **Steps:**
 
 1. **CSV column resolution (shared mapper — BC-17334).** Resolve the CSV header onto canonical fields through the shared column mapper — do NOT string-match literal header names. This is the single column-resolution convention for the whole command (Phase 2 domain-parse and Phase 4 lead-body build read the map this step records), so launch-campaign accepts the same Apollo / Serper / Clay / hand-built header variants the `salesforce-preload` pre-load already handles.
-   - **Read the header, then resolve** (mirrors `salesforce-preload` SKILL.md § Phase 1 — Map the file). `head -1 "{csv}"` for the header row, then:
+   - **Read the header, then resolve** (mirrors `salesforce-preload` SKILL.md § Phase 1 — Map the file). Parse the header with Python's `csv` module — **never split the line on commas**, or a quoted header like `"Company, Inc"` becomes two bogus columns and every column read after it lands on the wrong field:
 
      ```
-     python3 -c "import sys; sys.path.insert(0, '${CLAUDE_PLUGIN_ROOT}/scripts'); \
-     from _shared.column_map import resolve; print(resolve(HEADERS))"
+     python3 -c "import sys, csv; sys.path.insert(0, '${CLAUDE_PLUGIN_ROOT}/scripts'); \
+     from _shared.column_map import resolve; \
+     headers = next(csv.reader(open(sys.argv[1], newline=''))); \
+     print(headers); print(resolve(headers))" "{csv}"
      ```
 
-     (`HEADERS` = the header row parsed to a Python list of strings.) `resolve()` returns `resolved` (field→header for everything settled cleanly), `ambiguities`, and `unmapped`. The canonical fields this command reads: `email`, `first_name`, `last_name`, `title`, `company`, `domain` (the mapper's `full_name` / `phone` are not used here).
+     `resolve()` returns `resolved` (field→header for everything settled cleanly), `ambiguities`, and `unmapped`. The canonical fields this command reads: `email`, `first_name`, `last_name`, `title`, `company`, `domain` (the mapper's `full_name` / `phone` are not used here).
+   - **Quoted-field rule (applies to every CSV read in this command).** These are company lists — `Stone Ridge, LLC` and `Acme, Inc.` are ordinary values, and the company column often precedes the email column. Always read rows with a real CSV reader that honors quoting (`csv.DictReader`), addressing columns **by resolved header name**. Never `awk -F','` / `cut -d,` / `split(",")` over lead rows: a single quoted comma shifts every field after it, and the symptom is silent — leads don't error, they just carry wrong values.
    - **This command's required set — and where it DIVERGES from the mapper's.** The mapper bakes in the *pre-load's* requiredness (`email` + `company` required; `domain` OR `phone` as the contact method). launch-campaign owns a different set — apply it against `resolved`, and do NOT act on the mapper's own `unresolved` ambiguities (they encode the pre-load's rules, not these):
      - **Required:** `email`, `first_name`, `domain`.
      - **Optional:** `last_name`, `title`, `company`.
@@ -400,16 +403,23 @@ Without `--no-host-lookup` Phase 2 always runs and produces the multiplicative s
    Steps 2–3 below operate on the lead set as a preview pass — they classify ESP for ALL leads (regardless of email-type tag) so gate 2 can show the post-filter 9-cell grid for any of the 4 filter choices the operator might pick. Step 4 (post-gate) is where the chosen filter is actually applied to produce the final per-cell lead lists, including the F12 skip-empty-cells prune (now step 4b) which only runs after the filter is known. The "all cells empty" halt path lives in step 4b — see below.
 
 2. **Resolve ESP per domain via Bash `dig` (F10 — primary path).** Email Bison has no lead-side ESP detection tool today (BC-5826 X17 dogfood confirmed: `search_api_spec` on `host lookup`, `ESP`, `domain detection`, `check-mx-records` returns only sender-side tools). Bash `dig` is the primary — and currently only — path. Extract domains from ALL leads (not yet filtered — gate 2 needs ESP counts under any filter choice the operator might preview), filter invalid ones (per Input validation § IV-4), resolve MX records in **parallel in one Bash invocation**, bucket client-side:
-   - **Extract + filter + resolve in a single Bash call.** Do NOT loop the Bash tool per domain — that turns a 5k-unique-domain 10k-lead CSV into hours of round-trip latency. The ESP domain is parsed from each lead's **email** address (the part after `@`), so use the resolved email column, not a positional guess: let `{email_col}` be the 1-based index of the `resolved_columns["email"]` header (Phase 1 step 1) in the CSV header row, and pass it to `awk` as the field number (`$1` would silently break on any CSV whose email is not the first column). One invocation pipeline:
+   - **Extract + filter + resolve in a single Bash call.** Do NOT loop the Bash tool per domain — that turns a 5k-unique-domain 10k-lead CSV into hours of round-trip latency. The ESP domain is parsed from each lead's **email** address (the part after `@`), read from the `resolved_columns["email"]` column **by name** via `csv.DictReader` — per the quoted-field rule in Phase 1 step 1, never by `awk` field position (a quoted comma in an earlier column, e.g. company `Stone Ridge, LLC`, shifts every field and silently corrupts the email). Pass the resolved header as an argument (never interpolated into the script body). One invocation pipeline:
 
      ```
-     awk -F',' -v c={email_col} 'NR>1 {split($c,a,"@"); print a[2]}' "{csv}" \
+     python3 -c "
+     import csv, sys
+     with open(sys.argv[1], newline='') as f:
+         for row in csv.DictReader(f):
+             parts = (row.get(sys.argv[2]) or '').strip().split('@')
+             if len(parts) == 2 and parts[1]:
+                 print(parts[1].lower())
+     " "{csv}" "{email_header}" \
        | sort -u \
        | grep -E '^[A-Za-z0-9][A-Za-z0-9.-]{0,253}[A-Za-z0-9]$' \
        | xargs -P 20 -I {} sh -c 'printf "%s\t" "$1"; dig MX "$1" +short | tr "\n" "|"; printf "\n"' _ {}
      ```
 
-     `grep -E` enforces IV-4 — any domain that wouldn't pass the regex is dropped before `dig` sees it. `xargs -P 20` resolves 20 domains in parallel; 5k domains complete in ~minutes, not hours. Output shape: one line per domain, `<domain>\t<mx-records-pipe-joined>`. Track domains dropped at the `grep` step by diffing pre- vs. post-filter line counts and record as `invalid_domain_rows` in Phase 2 metadata (map rejected domains back to CSV row numbers during parsing).
+     `{email_header}` is `resolved_columns["email"]`. The `len(parts) == 2` guard drops missing-`@` and multiple-`@` addresses, matching step 1's malformed-email rule (those rows are recorded in `invalid_email_rows`, not silently dropped). `.lower()` normalizes case so `Gmail.com` and `gmail.com` collapse to one `dig`. `grep -E` enforces IV-4 — any domain that wouldn't pass the regex is dropped before `dig` sees it. `xargs -P 20` resolves 20 domains in parallel; 5k domains complete in ~minutes, not hours. Output shape: one line per domain, `<domain>\t<mx-records-pipe-joined>`. Track domains dropped at the `grep` step by diffing pre- vs. post-filter line counts and record as `invalid_domain_rows` in Phase 2 metadata (map rejected domains back to CSV row numbers during parsing).
    - **Bucket by MX pattern** (Revgrowth 10 taxonomy):
      - `Google` — gmail.com, googlemail.com, and MX records matching `aspmx.l.google.com` or `*.googlemail.com`
      - `Microsoft` — outlook.com, hotmail.com, live.com, and MX records matching `*.outlook.com` / `*.protection.outlook.com` / `*.mail.protection.outlook.com`
