@@ -2,23 +2,25 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This repo is **single-context**: one root `CONTEXT.md` (created lazily — see below) and one ADR log.
+This repo is **single-context**: one root `CONTEXT.md` (the domain glossary — it exists) and one ADR log.
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root, if it exists.
+- **`CONTEXT.md`** at the repo root — the domain glossary. It fixes the vocabulary for
+  concepts that recur across plugins (Product, Build Project, Report kind, …).
 - **`docs/decisions/`** — this repo's ADR log (`NNN-slug.md`, e.g. `001-cross-repo-import-solution.md`,
   `010-plugin-secret-config-canon.md`). **Not** `docs/adr/`. Read the ADRs that touch the area you're
   about to work in.
 
-If `CONTEXT.md` doesn't exist, **proceed silently** — don't flag its absence or suggest creating it
-upfront. The producer skill (`/grill-with-docs`) creates it lazily when terms actually get resolved.
+If a referenced doc is ever missing, **proceed silently** — don't flag its absence or suggest
+creating it upfront. The producer skill (`/grill-with-docs`) maintains `CONTEXT.md` as terms
+get resolved.
 
 ## File structure
 
 ```
 /
-├── CONTEXT.md            ← created lazily by /grill-with-docs
+├── CONTEXT.md            ← domain glossary (maintained by /grill-with-docs)
 ├── docs/decisions/       ← ADR log (NNN-slug.md)
 │   ├── 001-cross-repo-import-solution.md
 │   └── 010-plugin-secret-config-canon.md
