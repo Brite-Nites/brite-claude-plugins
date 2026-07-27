@@ -64,9 +64,25 @@ if [ -z "$TOKEN_URL" ]; then
 fi
 
 # --- Fetch OAuth client from Bitwarden --------------------------------------
-BW_ITEM='Brite team gbrain — plugin OAuth client'
-if ! ITEM_JSON="$(bw get item "$BW_ITEM" 2>/dev/null)"; then
-  echo "gbrain-team-broker.sh: \`bw get item\` failed for \`$BW_ITEM\` (Engineering collection)" >&2
+# Resolution order (BC-11758 step 2 — Model-A per-teammate clients):
+#   1. "Brite team gbrain — my client" — the teammate's PERSONAL-vault item (fixed
+#      name; personal vaults are per-user, so no per-user config or $USER mapping
+#      is needed). Holds that teammate's tm-<name> client → tier-scoped reads.
+#   2. "Brite team gbrain — plugin OAuth client" — the legacy SHARED Engineering
+#      item (open-tier-only since the BC-11758 step-1 shrink). The fallback keeps
+#      unmigrated teammates working until their personal client lands; it retires
+#      with the shared client's revocation (proofs + 1 quiet week — brite-team-gbrain
+#      runbook § federation scoping).
+# The two names never collide within one user's view, so `bw get item <name>`
+# stays unambiguous in both steps.
+BW_ITEM_PERSONAL='Brite team gbrain — my client'
+BW_ITEM_SHARED='Brite team gbrain — plugin OAuth client'
+if ITEM_JSON="$(bw get item "$BW_ITEM_PERSONAL" 2>/dev/null)"; then
+  BW_ITEM="$BW_ITEM_PERSONAL"
+elif ITEM_JSON="$(bw get item "$BW_ITEM_SHARED" 2>/dev/null)"; then
+  BW_ITEM="$BW_ITEM_SHARED"
+else
+  echo "gbrain-team-broker.sh: no gbrain client item found — looked for \`$BW_ITEM_PERSONAL\` (personal vault), then \`$BW_ITEM_SHARED\` (Engineering collection)" >&2
   exit 3
 fi
 
