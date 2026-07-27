@@ -64,19 +64,44 @@ if [ -z "$TOKEN_URL" ]; then
 fi
 
 # --- Fetch OAuth client from Bitwarden --------------------------------------
-BW_ITEM='Brite team gbrain — plugin OAuth client'
-if ! ITEM_JSON="$(bw get item "$BW_ITEM" 2>/dev/null)"; then
-  echo "gbrain-team-broker.sh: \`bw get item\` failed for \`$BW_ITEM\` (Engineering collection)" >&2
-  exit 3
-fi
+# Resolution order (BC-11758 step 2 — Model-A per-teammate clients):
+#   1. "Brite team gbrain — my client" — the teammate's PERSONAL-vault item (fixed
+#      name; personal vaults are per-user, so no per-user config or $USER mapping
+#      is needed). Holds that teammate's tm-<name> client → tier-scoped reads.
+#   2. "Brite team gbrain — plugin OAuth client" — the legacy SHARED Engineering
+#      item (open-tier-only since the BC-11758 step-1 shrink). The fallback keeps
+#      unmigrated teammates working until their personal client lands; it retires
+#      with the shared client's revocation (proofs + 1 quiet week — brite-team-gbrain
+#      runbook § federation scoping).
+# The two names never collide within one user's view, so `bw get item <name>`
+# stays unambiguous in both steps.
+BW_ITEM_PERSONAL='Brite team gbrain — my client'
+BW_ITEM_SHARED='Brite team gbrain — plugin OAuth client'
 
-CLIENT_ID="$(printf '%s' "$ITEM_JSON" | jq -r '.login.username // ""')"
-CLIENT_SECRET="$(printf '%s' "$ITEM_JSON" | jq -r '.login.password // ""')"
-if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
-  echo "gbrain-team-broker.sh: \`$BW_ITEM\` missing username (client_id) or password (client_secret)" >&2
+# _load_client_from_item <name>: fetch the item and populate CLIENT_ID/CLIENT_SECRET.
+# Returns nonzero when the item is absent OR malformed (empty username/password), so a
+# retrievable-but-broken personal item falls through to the shared fallback instead of
+# hard-failing the spawn (the teammate is still covered by the migration fallback).
+_load_client_from_item() {
+  local _json
+  _json="$(bw get item "$1" 2>/dev/null)" || return 1
+  CLIENT_ID="$(printf '%s' "$_json" | jq -r '.login.username // ""')"
+  CLIENT_SECRET="$(printf '%s' "$_json" | jq -r '.login.password // ""')"
+  [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ]
+}
+
+if _load_client_from_item "$BW_ITEM_PERSONAL"; then
+  :  # personal (tier-scoped) identity resolved
+elif _load_client_from_item "$BW_ITEM_SHARED"; then
+  # If the personal item exists but is malformed, say so — silent fallback would mask a
+  # half-finished ceremony (saved item, wrong fields) as working-but-wrong-identity.
+  if bw get item "$BW_ITEM_PERSONAL" >/dev/null 2>&1; then
+    echo "gbrain-team-broker.sh: WARNING — \`$BW_ITEM_PERSONAL\` exists but is missing username (client_id) or password (client_secret); using the shared fallback \`$BW_ITEM_SHARED\` (open tier only). Fix the personal item and relaunch." >&2
+  fi
+else
+  echo "gbrain-team-broker.sh: no usable gbrain client item — looked for \`$BW_ITEM_PERSONAL\` (personal vault), then \`$BW_ITEM_SHARED\` (Engineering collection); each needs username=client_id + password=client_secret" >&2
   exit 3
 fi
-unset ITEM_JSON
 
 # --- /token exchange --------------------------------------------------------
 # Use curl's --data-urlencode so client_id/client_secret with special chars
