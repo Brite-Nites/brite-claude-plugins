@@ -14,6 +14,14 @@
       "args": [
         "https://brite-team-gbrain-serve-production.up.railway.app/mcp"
       ]
+    },
+    "gbrain-team-write": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gbrain-team-broker.sh",
+      "args": [
+        "--write",
+        "https://brite-team-gbrain-serve-production.up.railway.app/mcp"
+      ]
     }
   }
 }

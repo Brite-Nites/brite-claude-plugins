@@ -4,10 +4,17 @@
 #
 # At MCP spawn time:
 #   1. Read client_id (.login.username) + client_secret (.login.password) from
-#      the Bitwarden Engineering item "Brite team gbrain — plugin OAuth client".
+#      Bitwarden. Read mode (default) resolves the teammate's personal item,
+#      falling back to the shared Engineering item "Brite team gbrain — plugin
+#      OAuth client". Write mode (--write, BC-12113) resolves ONLY the
+#      Engineering item "Brite team gbrain — write OAuth client" — no fallback:
+#      a write identity must never silently downgrade to a read identity (the
+#      caller's put_page would 403 as working-but-wrong-identity), and the read
+#      items must never be asked for write-scope tokens.
 #   2. POST <serve-host>/token (RFC 6749 client_credentials, client_secret_post
-#      auth method, scope=read) — auth method matches gbrain's oauth-provider
-#      default (see ~/code/gbrain src/core/oauth-provider.ts).
+#      auth method, scope=read — or scope=write under --write) — auth method
+#      matches gbrain's oauth-provider default (see ~/code/gbrain
+#      src/core/oauth-provider.ts).
 #   3. Export the resulting access_token as GBRAIN_TEAM_TOKEN, drop BW_SESSION
 #      (defense-in-depth — mirrors plugins/marketing/scripts/bw-run.sh § exec).
 #   4. exec mcp-remote against <mcp-url>, passing the literal string
@@ -22,8 +29,12 @@
 #   no file I/O        (token lives in env only; never on disk)
 #   no retry           (failure surfaces early in the workflow log)
 #
-# Usage: gbrain-team-broker.sh <mcp-url>
+# Usage: gbrain-team-broker.sh [--write] <mcp-url>
 #   e.g. gbrain-team-broker.sh https://brite-team-gbrain-serve-production.up.railway.app/mcp
+#   Only the workflows plugin's `gbrain-team-write` server passes --write (the
+#   /workflows:{ship,review} save-results path, BC-12113); every `gbrain-team`
+#   server entry stays read mode. The flag exists in all broker copies so the
+#   six per-plugin copies remain byte-identical.
 #
 # Pinned versions:
 #   mcp-remote@0.1.38 (latest as of 2026-05-22). Bump deliberately + record in
@@ -47,8 +58,13 @@ if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
 fi
 
 # --- Arg parse --------------------------------------------------------------
+WRITE_MODE=0
+if [ "${1:-}" = "--write" ]; then
+  WRITE_MODE=1
+  shift
+fi
 if [ $# -lt 1 ] || [ -z "$1" ]; then
-  echo "gbrain-team-broker.sh: usage: $0 <mcp-url>" >&2
+  echo "gbrain-team-broker.sh: usage: $0 [--write] <mcp-url>" >&2
   exit 2
 fi
 MCP_URL="$1"
@@ -77,6 +93,9 @@ fi
 # stays unambiguous in both steps.
 BW_ITEM_PERSONAL='Brite team gbrain — my client'
 BW_ITEM_SHARED='Brite team gbrain — plugin OAuth client'
+# Write mode (BC-12113): the dedicated `write`-scope service client's Engineering
+# item — brite-team-gbrain runbook § OAuth clients, "Bitwarden plan (write client)".
+BW_ITEM_WRITE='Brite team gbrain — write OAuth client'
 
 # _load_client_from_item <name>: fetch the item and populate CLIENT_ID/CLIENT_SECRET.
 # Returns nonzero when the item is absent OR malformed (empty username/password), so a
@@ -90,7 +109,17 @@ _load_client_from_item() {
   [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ]
 }
 
-if _load_client_from_item "$BW_ITEM_PERSONAL"; then
+if [ "$WRITE_MODE" -eq 1 ]; then
+  # No fallback chain in write mode: the read items must never be handed a
+  # write-scope token request, and a silent downgrade to a read identity would
+  # surface later as a confusing put_page 403 instead of failing loudly here.
+  # Absent item = the BC-12113 ceremony hasn't run yet — the server simply stays
+  # down and the save-results prose degrades safely (skip + TODO).
+  if ! _load_client_from_item "$BW_ITEM_WRITE"; then
+    echo "gbrain-team-broker.sh: --write requires the Engineering-collection item \`$BW_ITEM_WRITE\` (username=client_id + password=client_secret); it is absent or malformed — has the BC-12113 register-client ceremony run?" >&2
+    exit 3
+  fi
+elif _load_client_from_item "$BW_ITEM_PERSONAL"; then
   :  # personal (tier-scoped) identity resolved
 elif _load_client_from_item "$BW_ITEM_SHARED"; then
   # If the personal item exists but is malformed, say so — silent fallback would mask a
@@ -108,9 +137,13 @@ fi
 # don't break the form encoding. -sS keeps progress quiet but surfaces errors.
 # Body stays off stderr; we parse via jq so a non-JSON response surfaces as
 # "unknown" rather than echoing the raw body (which could include error data).
+# Scope tracks the mode: the token must carry `write` for put_page
+# (gbrain operations.ts put_page requires write scope; read tokens 403 with
+# insufficient_scope), and read mode keeps requesting the minimal `read`.
+if [ "$WRITE_MODE" -eq 1 ]; then TOKEN_SCOPE="write"; else TOKEN_SCOPE="read"; fi
 if ! TOKEN_RESP="$(curl -sS -X POST "$TOKEN_URL" \
       --data-urlencode "grant_type=client_credentials" \
-      --data-urlencode "scope=read" \
+      --data-urlencode "scope=$TOKEN_SCOPE" \
       --data-urlencode "client_id=$CLIENT_ID" \
       --data-urlencode "client_secret=$CLIENT_SECRET")"; then
   echo "gbrain-team-broker.sh: curl POST $TOKEN_URL failed (network / DNS)" >&2
