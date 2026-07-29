@@ -76,32 +76,53 @@ HEAD_SHA="$(gh pr view "$PR" --json headRefOid -q .headRefOid 2>/dev/null || tru
 # invisible to both createdAt and (when Greptile auto-reviewed the push before
 # the re-review was requested) the head-SHA check-run. Resolved from the PR's
 # BASE repo + number, which is where issue comments live regardless of fork.
+# LIMITATION: this reads ISSUE comments. In the config where Greptile posts its
+# summary as a REVIEW body (see greptile-verdict.sh), edited_ts is always empty
+# and freshness degrades to the two pre-existing signals — REST exposes no edit
+# timestamp for review bodies. Safe degradation, not a regression.
 PR_URL="$(gh pr view "$PR" --json url -q .url 2>/dev/null || true)"
-BASE_PATH="${PR_URL#*://}"          # host/OWNER/REPO/pull/N
-BASE_PATH="${BASE_PATH#*/}"         # OWNER/REPO/pull/N
 BASE_REPO=""
 PR_NUM=""
-case "$BASE_PATH" in
-  */pull/*)
-    BASE_REPO="${BASE_PATH%%/pull/*}"
-    PR_NUM="${BASE_PATH##*/}" ;;
-esac
-case "$PR_NUM" in ''|*[!0-9]*) BASE_REPO=""; PR_NUM="" ;; esac
+TAB="$(printf '\t')"
+if PR_REF="$(bash "$SCRIPT_DIR/greptile-pr-ref.sh" --url "$PR_URL" 2>/dev/null)"; then
+  # Literal-substring case match (quoted pattern) — the documented-safe idiom.
+  case "$PR_REF" in
+    *"$TAB"*)
+      BASE_REPO="${PR_REF%%"$TAB"*}"
+      PR_NUM="${PR_REF##*"$TAB"}" ;;
+  esac
+fi
 # A `+` in an ISO offset (…T20:59:51+00:00) decodes as a space in a query
-# string — percent-encode it. Z-form triggers pass through untouched.
+# string — verified to silently return [] rather than error, so the encoding is
+# load-bearing. Z-form triggers pass through untouched.
 TRIGGER_Q="${TRIGGER//+/%2B}"
 
 edited_ts() {
-  # Latest updated_at among Greptile comments EDITED since the trigger (empty if
-  # none). `since` filters server-side on updated_at, so the response stays small
-  # on a busy PR and can't push the summary off the first page — the classifier
-  # still re-checks the timestamp, so a boundary-equal value is not fresh.
+  # Latest updated_at among Greptile SUMMARY comments edited since the trigger
+  # (empty if none). Two filters, both required:
+  #   `since=` — server-side filter on updated_at (verified against a real
+  #     edited comment), so the response stays small on a busy PR and the
+  #     summary can't fall off page 1. It is inclusive; the classifier's strict
+  #     `>` rejects the boundary.
+  #   body carries a Confidence Score — binds the freshness signal to the same
+  #     object the SCORE is read from. Without it any greptile-authored comment
+  #     edited after the trigger (or an interim edit with no score yet) would
+  #     terminate the wait while the score came from somewhere else.
   [ -n "$BASE_REPO" ] && [ -n "$PR_NUM" ] || { echo ""; return; }
-  gh api "repos/$BASE_REPO/issues/$PR_NUM/comments?since=$TRIGGER_Q&per_page=100" --jq '
+  # `gh api` prints the HTTP error BODY to stdout before exiting nonzero, so a
+  # trailing `|| echo ""` would assign a JSON blob rather than empty. Branch on
+  # exit status instead (the repo's `if x=$(...)` set-e idiom).
+  local out
+  if out="$(gh api "repos/$BASE_REPO/issues/$PR_NUM/comments?since=$TRIGGER_Q&per_page=100" --jq '
     [ .[]
       | select(((.user.login // "") | ascii_downcase) | test("greptile"))
+      | select(((.body // "") | test("(?i)confidence\\s*score")))
       | (.updated_at // "") ]
-    | map(select(. != "")) | sort | last // ""' 2>/dev/null || echo ""
+    | map(select(. != "")) | sort | last // ""' 2>/dev/null)"; then
+    printf '%s\n' "$out"
+  else
+    echo ""
+  fi
 }
 
 review_ts() {
@@ -111,12 +132,19 @@ review_ts() {
   # per_page=100 so the Greptile run can't fall off page 1 on a busy HEAD (the
   # default 30 would silently empty review_ts → revert to the bug). Keep the
   # case-insensitive name filter (robust if Greptile ever renames the check).
-  gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100" --jq '
+  # Same `if out=$(...)` guard as edited_ts: on a bad SHA `gh api` writes the
+  # error body to stdout, which a trailing `|| echo ""` would NOT suppress.
+  local out
+  if out="$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100" --jq '
     [ .check_runs[]
       | select((.name // "") | test("greptile"; "i"))
       | select(.status == "completed")
       | (.completed_at // "") ]
-    | map(select(. != "")) | sort | last // ""' 2>/dev/null || echo ""
+    | map(select(. != "")) | sort | last // ""' 2>/dev/null)"; then
+    printf '%s\n' "$out"
+  else
+    echo ""
+  fi
 }
 
 # Defensive backstop so a clock anomaly can't loop forever.
