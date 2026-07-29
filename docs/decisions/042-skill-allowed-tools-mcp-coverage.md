@@ -87,6 +87,78 @@ deliberately *not* this change: it is a per-plugin pass that carries version bum
 per-command judgment about which tools each genuinely needs. It is tracked separately, and
 the debt rows are the ledger for it.
 
+## Amendment 2026-07-29 (BC-16866) — the revops `sf`-CLI Bash axis, classified
+
+Context above established that revops SF skills invoke **no** MCP tool, so R8 correctly
+does not cover them, and that the genuine least-privilege question for them is a **Bash
+axis**: a skill that runs `sf project deploy` with no `allowed-tools` inherits
+unrestricted tool access. This amendment records the audit that question needed, and
+separates the classification (settled here) from the frontmatter change (deliberately
+not made here — see § Why the frontmatter change is a separate step).
+
+### Method: fenced-code invocation, not raw mentions
+
+The trap the follow-up named is real — `sf-apex` and `sf-soql` *display* `sf` commands in
+examples while being code generators, so any "mentions `sf`" test false-mandates them.
+The criterion used is **`sf` invoked at the start of a line inside a fenced code block**,
+counted separately from raw mentions anywhere in the body. That separation is what makes
+the two classes fall out cleanly rather than by taste.
+
+### Classification of all 14 skills
+
+**`sf`-CLI drivers (5)** — execute `sf` in fenced blocks:
+
+| Skill | fenced `sf` | `sf` verbs | other shell |
+| -- | -- | -- | -- |
+| `sf-deploy` | 18 | `apex`, `data`, `org`, `project` | its own bundled `./scripts/prepare-scratch-deploy.sh` + `references/deploy.sh` |
+| `sf-debug` | 4 | `apex`, `data` | — |
+| `sf-flow` | 3 | `flow` | — |
+| `sf-lwc` | 3 | `lightning` | — |
+| `sf-data` | 1 | `sobject` | `jq` |
+
+**Knowledge / code-generation (9)** — zero fenced `sf` invocations, correctly exempt:
+`sf-apex`, `sf-connected-apps` (already declares `allowed-tools`), `sf-diagram-mermaid`,
+`sf-docs`, `sf-integration`, `sf-metadata`, `sf-permissions`, `sf-soql`, `sf-testing`.
+
+**Flagged for a second look during the hardening pass.** Five of the nine mention `sf` in
+inline backticks inside gotcha/knowledge prose — `sf-testing` ("Live tests via `sf apex
+run test --wait 10 --target-org <alias>`"), `sf-metadata`, `sf-integration`, `sf-apex`,
+`sf-permissions`. The fenced-code criterion reads these as knowledge, which is the
+defensible call, but `sf-testing` is the most plausible misclassification and should be
+confirmed against a real run rather than by re-reading the text.
+
+### Two premises corrected
+
+1. **Restricted `Bash` IS expressible and already precedented here.** The follow-up
+   framed `allowed-tools: Bash(sf:*), Read` as hypothetical. In-tree precedent already
+   exists: `workflows/agent-browser` declares `Bash(agent-browser:*)`, and
+   `workflows/{setup-claude-md, post-plan-setup}` declare `Bash(find:*), Bash(cat:*),
+   Bash(ls:*)`. So a meaningful scoping is available — a bare `Bash` grant, which is what
+   `revops/sf-connected-apps` and every flow-architecture/cadence skill declare, would be
+   presence without least privilege.
+2. **`Read` is required by all five drivers, though only `sf-lwc` says so.** Each leans
+   on bundled `references/*.md` for progressive disclosure — 16 to 38 mentions apiece — so
+   an enumeration derived only from explicit tool names would under-grant and break them.
+
+### Why the frontmatter change is a separate step
+
+**No gate in this repo can verify an `allowed-tools` restriction.** `validate.sh` checks
+its *format* (§ `allowed-tools` format) and R5 checks that MCP names are fully qualified;
+neither can tell whether a declared set is sufficient for what the body actually does. An
+under-enumeration therefore fails at **agent runtime**, silently, on the Salesforce deploy
+path — and `sf-deploy` is the worst case, executing its own bundled shell scripts, so a
+`Bash(sf:*)`-only grant would break it.
+
+That makes the frontmatter edit a dogfood-gated change, not a static one: each driver
+needs one real run against an org after its declaration lands. It is filed as a follow-up
+carrying this enumeration, so that work starts from the audit rather than repeating it.
+This amendment is docs-only and carries no version bump; the frontmatter change will carry
+a revops bump when it lands.
+
+**No lint rule** is proposed, per the follow-up's own reasoning: a static detector for
+"drives the `sf` CLI" is the prose-vs-code trap in rule form. The fenced-code criterion
+above is good enough for a one-time audit by a human reader, and too brittle to gate on.
+
 ## Alternatives considered
 
 | Alternative | Rejected because |
