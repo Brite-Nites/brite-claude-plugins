@@ -7,6 +7,7 @@
 #     --deadline <iso8601>    trigger + max-wait
 #     --verdict-ts <iso8601>  commented_at of the latest Greptile comment (or empty)
 #     --review-ts <iso8601>   completed_at of the head-SHA Greptile check-run (or empty)
+#     --edited-ts <iso8601>   updated_at of the latest edited Greptile comment (or empty)
 #     --score <0-5|null>      score from the latest Greptile verdict (or empty)
 #
 # Prints exactly one state:
@@ -166,6 +167,63 @@ section 16 "garbage review-ts ignored, verdict-ts stale, within window"
 run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
   --verdict-ts "$TS_STALE" --review-ts "not-a-timestamp" --score 5
 assert_state "garbage-review-ts" "PENDING"
+
+# ── BC-12580 / BC-17025: --edited-ts (Greptile comment updated_at) ──────
+# review-ts has its own blind spot: when Greptile auto-reviews the PUSH, its
+# head-SHA check-run completes BEFORE the "@greptile-apps please re-review"
+# trigger, so review-ts reads stale too. The only signal that advances is the
+# comment's own updated_at when Greptile edits its summary in place.
+
+# ── 17. THE BUG: every other signal stale, comment edited after trigger, 5 → PASS
+section 17 "in-place edit — verdict-ts AND review-ts stale, edited-ts fresh, score 5"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_STALE" --edited-ts "$TS_FRESH" --score 5
+assert_state "stale-verdict+stale-review+fresh-edit+5" "FRESH_PASS"
+
+# ── 18. fresh edited-ts, score 3 → FRESH_FAIL (score still gates) ────
+section 18 "fresh edited-ts, score 3"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_STALE" --edited-ts "$TS_FRESH" --score 3
+assert_state "fresh-edit+3" "FRESH_FAIL"
+
+# ── 19. edited-ts alone (no comment ts, no check-run) + 5 → FRESH_PASS ─
+section 19 "edited-ts alone, score 5"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "" --review-ts "" --edited-ts "$TS_FRESH" --score 5
+assert_state "edit-only-fresh+5" "FRESH_PASS"
+
+# ── 20. all three stale → PENDING (fail-safe direction preserved) ────
+section 20 "all three signals stale, within window"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_STALE" --edited-ts "$TS_STALE" --score 5
+assert_state "all-stale" "PENDING"
+
+# ── 21. all three stale, past deadline → TIMED_OUT (genuine no-response) ─
+# BC-12580 AC: a real no-response must still time out within the bound.
+section 21 "all three stale, past deadline"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_PAST" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_STALE" --edited-ts "$TS_STALE" --score 5
+assert_state "all-stale-past-deadline" "TIMED_OUT"
+
+# ── 22. robust: garbage edited-ts ignored → PENDING (no crash) ───────
+section 22 "garbage edited-ts, others stale, within window"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_STALE" --edited-ts "not-a-timestamp" --score 5
+assert_state "garbage-edited-ts" "PENDING"
+
+# ── 23. back-compat: --edited-ts omitted entirely behaves as before ───
+# The flag is appended LAST in the positional contract, so a caller that never
+# passes it (an older skill body, or greptile-await mid-rollout) is unaffected.
+section 23 "edited-ts flag omitted — legacy caller"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_FRESH" --review-ts "" --score 5
+assert_state "no-edited-ts-flag" "FRESH_PASS"
+
+# ── 24. precedence: fresh edit past deadline still FRESH_PASS ────────
+section 24 "fresh edited-ts arriving past deadline (fresh > timeout)"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_PAST" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_STALE" --review-ts "$TS_STALE" --edited-ts "$TS_FRESH" --score 5
+assert_state "fresh-edit-past-deadline" "FRESH_PASS"
 
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-12249 greptile-freshness unit tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
