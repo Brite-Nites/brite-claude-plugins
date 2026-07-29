@@ -163,24 +163,34 @@ review_ts() {
 max_iters=$(( MAX_WAIT / (INTERVAL > 0 ? INTERVAL : 1) + 2 ))
 
 verdict='{"present":false}'
+# The summary comment's id, carried across polls. Greptile edits IN PLACE, so this is
+# stable once known — which lets each poll read the edit timestamp BEFORE the verdict
+# (below) while still keying on the right comment.
+cid=""
 i=0
 while [ "$i" -lt "$max_iters" ]; do
   i=$((i + 1))
   # Read the freshness signal (check-run) BEFORE the verdict, so the score
   # snapshot is at least as fresh as the signal — shrinks the propagation race
   # between check-run completion and the in-place comment edit (BC-16924 review).
-  rts="$(review_ts)"   # head-SHA Greptile check-run completed_at (BC-16924)
+  # BOTH freshness signals are read BEFORE the verdict, so the score snapshot is at
+  # least as fresh as every signal it is paired with (the BC-16924 ordering rule). An
+  # edit landing after these reads is simply not counted this poll — the fail-safe
+  # direction. Reading them AFTER would invert it: a fresh timestamp could be paired
+  # with a pre-edit score, which is the inconsistency Greptile flagged on #559.
+  #
+  # `edited_ts` needs the summary comment's id, which comes from the verdict — hence
+  # `cid` is carried over from the PREVIOUS poll rather than read here. Greptile edits
+  # in place, so the id is stable across the wait. On the first poll `cid` is empty and
+  # the edit signal simply doesn't participate (the other two still do).
+  rts="$(review_ts)"      # head-SHA Greptile check-run completed_at (BC-16924)
+  ets="$(edited_ts "$cid")"  # that comment's updated_at, if edited since the trigger
   verdict="$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')"
   # One jq pass extracts all three fields (tab-separated) to save forks per poll.
+  # `cid` is refreshed here for the NEXT poll's edit read.
   IFS="$(printf '\t')" read -r score vts cid <<EOF
 $(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // ""), (.comment_id // "")] | @tsv')
 EOF
-  # AFTER the verdict, and keyed on the comment the verdict came from (BC-12580):
-  # the edit signal has to describe the same object as the score. If that comment
-  # is edited in the gap between these two reads, the pairing is (fresh edit, one-
-  # poll-stale score) — which yields FRESH_FAIL and another poll, never a spurious
-  # pass, because the gate only re-triggers when the score is already below 5.
-  ets="$(edited_ts "$cid")"
   state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --edited-ts "$ets" --score "$score")"
   case "$state" in
     FRESH_PASS|FRESH_FAIL|TIMED_OUT)
