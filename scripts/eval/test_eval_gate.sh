@@ -253,6 +253,46 @@ gate --repo-root "$synth" --name-status "$(printf 'M\tplugins/foo/commands/fpgra
 assert_rc_and_contains "B10 same-file R2+R3 → still BLOCKS on R3 (retained, filter is surgical)" 1 "R3-description-quality"
 assert_not_contains "B10b same-file R2+R3 → R2 dropped, not a diff-gate block reason" "R2-body-too-long"
 
+# B11 (BC-16865): R8 joined R2 in DEBT_GRANDFATHERED_RULES when it was extended to the
+# command surface. Before that it was skills-only, so its debt rows could only be on
+# skills — invisible to the commands-only diff-gate — and it needed no exclusion. With
+# 16 COMMAND debt rows it reproduces R2's divergence exactly: without the exclusion,
+# editing any grandfathered MCP-invoking command (workflows/ship.md et al) is wedged on
+# a finding the ledger already grandfathers. Caught by Greptile on PR #562.
+mkdir -p "$synth/plugins/foo/commands"
+cat > "$synth/plugins/foo/commands/mcpgrand.md" <<'EOF'
+---
+description: Fetches a Linear issue and renders it. Use when reviewing an issue's context.
+---
+
+# mcp grandfathered
+
+Call `mcp__plugin_workflows_linear-server__get_issue` to load the issue, then render it.
+EOF
+cat >> "$synth/docs/skill-eval-debt.md" <<'EOF'
+| `plugins/foo/commands/mcpgrand.md` | foo | grandfathered | no-eval | 2026-06-14 |
+EOF
+gate --repo-root "$synth" --name-status "$(printf 'M\tplugins/foo/commands/mcpgrand.md')"
+assert_rc_and_contains "B11 grandfathered MCP-invoking command MODIFIED → EXEMPT (R8 not diff-gated)" 0 "EXEMPT plugins/foo/commands/mcpgrand.md"
+assert_not_contains "B11b R8 is NOT a diff-gate block reason" "R8-allowed-tools-required"
+# B11c surgical proof, same shape as B10: co-locate R8 (MCP w/o allowed-tools) and R3
+# (first-person description) on ONE changed command. Only R8 may be dropped.
+cat > "$synth/plugins/foo/commands/mcpfp.md" <<'EOF'
+---
+description: I will fetch a Linear issue for you
+---
+
+# mcp + first person
+
+Call `mcp__plugin_workflows_linear-server__get_issue` to load the issue.
+EOF
+cat >> "$synth/docs/skill-eval-debt.md" <<'EOF'
+| `plugins/foo/commands/mcpfp.md` | foo | grandfathered | no-eval | 2026-06-14 |
+EOF
+gate --repo-root "$synth" --name-status "$(printf 'M\tplugins/foo/commands/mcpfp.md')"
+assert_rc_and_contains "B11c same-file R8+R3 → still BLOCKS on R3 (filter is surgical)" 1 "R3-description-quality"
+assert_not_contains "B11d same-file R8+R3 → R8 dropped, not a diff-gate block reason" "R8-allowed-tools-required"
+
 # ════════════════════════════════════════════════════════════════════════════
 echo "── C. integration against the real repo ──"
 # ════════════════════════════════════════════════════════════════════════════
@@ -483,7 +523,7 @@ assert_rc_and_contains "F11 refA→refB added (no SKILL.md change) → BLOCK on 
 # without aborting, so assert the EXACT total — catches a 1-assertion skip AND forces
 # EXPECTED_INTEGRATION to move in lockstep when integration assertions are added.
 echo ""
-EXPECTED_INTEGRATION=44
+EXPECTED_INTEGRATION=48
 EXPECTED_TOTAL=$((npure_listed + EXPECTED_INTEGRATION))
 if [ "$((pass + fail))" -ne "$EXPECTED_TOTAL" ]; then
   echo "FATAL: $((pass + fail)) assertions ran, expected exactly $EXPECTED_TOTAL ($npure_listed pure + $EXPECTED_INTEGRATION integration) — a block was skipped or added without updating EXPECTED_INTEGRATION" >&2

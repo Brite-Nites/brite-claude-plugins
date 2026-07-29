@@ -160,8 +160,8 @@ assert_finding    "R7: evals.json without _deprecated marker → advisory" R7-ev
 run "$FIX/evals/marked/evals.json"
 assert_no_finding "R7: evals.json WITH _deprecated marker → no R7" R7-evals-json-undeprecated
 
-# ── R8 — MCP-invoking skill needs allowed-tools (GATE — skills only, BC-16387) ──
-echo "── R8 allowed-tools-required (skills only) ──"
+# ── R8 — MCP-invoking spec needs allowed-tools (GATE — BOTH surfaces, BC-16865) ──
+echo "── R8 allowed-tools-required (commands + skills) ──"
 run "$FIX/skills/r8-missing/SKILL.md"
 assert_finding    "R8: skill invokes MCP w/o allowed-tools → gate (blocking via eval-gate)" R8-allowed-tools-required gate
 
@@ -183,11 +183,34 @@ run "$FIX/skills/r8-empty-override/SKILL.md"
 assert_finding    "R8: empty override marker → still gate" R8-allowed-tools-required gate
 assert_finding    "R8: empty override marker → advisory note" R8-override-missing-reason advisory
 
-# Skill-only scope: a COMMAND invoking MCP without allowed-tools must NOT fire R8
-# (the diff-gate is commands-only and never sees skills; R8 is full-surface only,
-# mirroring R4). This proves R8 is registered skill-only, not on SPEC_RULES_ALL.
+# BOTH surfaces (BC-16865): R8 shipped skills-only because ADR-042 deferred the
+# command surface pending a per-command triage. That triage found all 16
+# MCP-referencing commands to be genuine orchestrator invocations — zero subagent
+# tool-specs — so the mandate is identical on both surfaces and R8 moved to
+# SPEC_RULES_ALL. This assertion is the inverse of the skills-only lock it replaces.
 run "$FIX/commands/r8-command-scope.md"
-assert_no_finding "R8: command invoking MCP w/o allowed-tools → no R8 (skill-only)" R8-allowed-tools-required
+assert_finding    "R8: command invokes MCP w/o allowed-tools → gate (both surfaces)" R8-allowed-tools-required gate
+# The message must name the surface it fired on — a command finding that says
+# "skill body invokes…" sends the reader to the wrong file type.
+case "$LAST" in
+  *"command body invokes MCP tool"*)
+    echo "  PASS  R8: finding names the command surface"; pass=$((pass + 1)) ;;
+  *)
+    echo "  FAIL  R8: finding should say 'command body invokes'"; printf '    out: %s\n' "$LAST"; fail=$((fail + 1)) ;;
+esac
+
+# The override works identically on the command surface (same parse_marker path).
+run "$FIX/commands/r8-command-override.md"
+assert_finding    "R8: command with valid override → advisory, not gate" R8-allowed-tools-required advisory
+if has_finding R8-allowed-tools-required gate; then
+  echo "  FAIL  R8: command override must NOT leave a gate finding"; printf '    out: %s\n' "$LAST"; fail=$((fail + 1))
+else
+  echo "  PASS  R8: command override leaves no gate finding"; pass=$((pass + 1))
+fi
+
+# A command that declares allowed-tools is compliant on either surface.
+run "$FIX/commands/r8-command-declared.md"
+assert_no_finding "R8: command invokes MCP WITH allowed-tools → no R8" R8-allowed-tools-required
 
 # Block-array allowed-tools is a genuine declaration (fm_value reads only the same line);
 # R8 must treat it as declared, not false-positive "declares no allowed-tools" (review P2).
@@ -257,7 +280,7 @@ assert_rc "nonexistent/unreadable spec → exit 2 (internal error, not a finding
 
 echo ""
 # Count floor — a silently-skipped block must fail loudly, not drop the count.
-FLOOR=42
+FLOOR=46
 if [ "$pass" -lt "$FLOOR" ]; then
   echo "FATAL: only $pass assertions ran (floor=$FLOOR) — a test block was silently skipped" >&2
   exit 2

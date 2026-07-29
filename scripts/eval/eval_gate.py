@@ -128,6 +128,14 @@ SPEC_ROW_GLOBS = (COMMAND_GLOB, SKILL_GLOB)
 # `baseline` is only meaningful for the body-size rule: it pins the grandfathered
 # body line count so the exemption can't silently absorb further growth.
 BASELINE_RULE = "R2-body-too-long"
+# Rules whose grandfathering lives in `docs/structural-lint-debt.md` for COMMANDS —
+# i.e. rules the diff-gate must not forward, because it cannot read that ledger and
+# would block a grandfathered command with no escape hatch. `--structural` is their
+# sole authority; it runs full-surface on every PR, so nothing goes unenforced.
+# R2 has always been here. R8 joined when BC-16865 extended it to commands: until
+# then its only debt rows would have been on skills, which the commands-only
+# diff-gate never sees (the invariant this set now carries explicitly).
+DEBT_GRANDFATHERED_RULES = frozenset({BASELINE_RULE, "R8-allowed-tools-required"})
 
 # `# eval-waiver: <reason>` — the net-new escape hatch (ADR-028 D1). Parsed by the
 # ONE canonical comment-anchored-marker parser in structural_lint (note #3), so it
@@ -619,20 +627,29 @@ def structural_gate_reasons(cmd_path: str, repo_root: Path) -> list[str]:
     re-detection. Today this is R1 (the disable-model-invocation flag) plus any R3/R5/R6
     a changed command introduces.
 
-    EXCEPT ``BASELINE_RULE`` (R2-body-too-long): R2 is grandfathered-with-baseline via
+    EXCEPT ``DEBT_GRANDFATHERED_RULES``: these are grandfathered per-command via
     docs/structural-lint-debt.md, which ONLY ``--structural`` reads. The diff-gate has
-    no access to those baselines, so it would block every edit to a grandfathered
-    >=500-line command with no escape hatch (BC-13216 fork ①). ``--structural`` runs
+    no access to that ledger, so forwarding them would block every edit to a
+    grandfathered command with no escape hatch (BC-13216 fork ①). ``--structural`` runs
     full-surface on every PR (the REQUIRED eval-gate job + validate.sh §15a Part 3), so
-    it is R2's sole authority — a new >=500-line command and growth past a baseline are
-    both still caught there, no enforcement gap. This exclusion is intentionally
-    R2-only: R3/R5/R6 carry no debt rows (cleaned at their flips), and BC-13217's R4
-    grandfathers SKILLS, which the diff-gate (commands-only via COMMAND_GLOB) never
-    sees — so no other rule has the diff-gate-vs-structural divergence R2 has."""
+    it is their sole authority — a NEW violation has no debt row and is still caught
+    there, no enforcement gap.
+
+    - **R2-body-too-long** (BC-13216): grandfathered-with-baseline; growth past a
+      baseline is caught by ``--structural``.
+    - **R8-allowed-tools-required** (BC-16865): when R8 was skills-only, its debt rows
+      could only be on skills — which the commands-only diff-gate (COMMAND_GLOB) never
+      sees — so it needed no exclusion. Extending R8 to commands gave it 16 COMMAND
+      debt rows, reproducing R2's divergence exactly: without this, editing any of the
+      16 (e.g. workflows/ship.md) blocks the diff-gate on a finding the ledger already
+      grandfathers.
+
+    R3/R5/R6 stay forwarded: they carry no debt rows (cleaned at their flips), so a
+    finding from them on a changed command is always new."""
     return [
         f"structural[{f.rule_id}]: {f.message}"
         for f in lint_spec(repo_root / cmd_path)
-        if f.severity == SEV_GATE and f.rule_id != BASELINE_RULE
+        if f.severity == SEV_GATE and f.rule_id not in DEBT_GRANDFATHERED_RULES
     ]
 
 
