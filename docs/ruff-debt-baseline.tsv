@@ -1,79 +1,110 @@
-# ruff grandfather baseline (BC-16867 / ADR-043) — `count\tpath\tcode`, sorted.
-# Ratchets DOWN only: growth, a new pair, AND an un-updated shrink all FAIL.
+# ruff grandfather baseline (BC-16867 / ADR-043) — `count\tpath\tcode\tmessage`, sorted.
+# Ratchets DOWN only: growth, a new key, AND an un-updated shrink all FAIL.
+# The message is part of the key so a fix-one-add-one swap inside a grandfathered
+# file cannot keep the count equal and slip through.
 # Regenerate: ruff check --isolated --select E9,F --output-format=concise . \
 #   | python3 scripts/_lib/check_ruff_debt.py --write docs/ruff-debt-baseline.tsv
-2	plugins/marketing/scripts/_shared/manifest_loader.py	F401
-1	plugins/marketing/scripts/lint_canonicals.py	F841
-1	plugins/marketing/scripts/portfolio_snapshot.py	F401
-1	plugins/marketing/tests/test_plan_campaign_contracts.py	F841
-1	plugins/revops/shared/code_analyzer/dependency_checker.py	F401
-1	plugins/revops/shared/code_analyzer/formatter.py	F401
-1	plugins/revops/shared/code_analyzer/live_query_plan.py	F401
-1	plugins/revops/shared/code_analyzer/parser.py	F401
-1	plugins/revops/shared/code_analyzer/scanner.py	F401
-1	plugins/revops/shared/code_analyzer/scanner.py	F541
-2	plugins/revops/shared/code_analyzer/score_merger.py	F601
-2	plugins/revops/shared/hooks/scripts/naming_validator.py	F541
-1	plugins/revops/shared/hooks/scripts/soql-schema-check.py	F401
-1	plugins/revops/shared/hooks/scripts/validator-dispatcher.py	F401
-1	plugins/revops/shared/lsp-engine/diagnostics.py	F541
-2	plugins/revops/shared/lsp-engine/lsp-acquire.py	F401
-6	plugins/revops/shared/lsp-engine/lsp-acquire.py	F541
-2	plugins/revops/shared/soql_extractor.py	F401
-2	plugins/revops/skills/sf-apex/hooks/scripts/apex-lsp-validate.py	F401
-2	plugins/revops/skills/sf-apex/hooks/scripts/apex-lsp-validate.py	F841
-4	plugins/revops/skills/sf-apex/hooks/scripts/llm_pattern_validator.py	F401
-1	plugins/revops/skills/sf-apex/hooks/scripts/llm_pattern_validator.py	F541
-3	plugins/revops/skills/sf-apex/hooks/scripts/post-tool-validate.py	F841
-1	plugins/revops/skills/sf-apex/hooks/scripts/prettier-format.py	F401
-2	plugins/revops/skills/sf-apex/hooks/scripts/validate_apex.py	F401
-3	plugins/revops/skills/sf-apex/hooks/scripts/validate_apex.py	F841
-1	plugins/revops/skills/sf-data/hooks/scripts/soql_validator.py	F401
-2	plugins/revops/skills/sf-data/hooks/scripts/validate_data_operation.py	F841
-1	plugins/revops/skills/sf-diagram-mermaid/scripts/mermaid_preview.py	F401
-1	plugins/revops/skills/sf-diagram-mermaid/scripts/mermaid_preview.py	F541
-1	plugins/revops/skills/sf-diagram-mermaid/scripts/mermaid_preview.py	F841
-1	plugins/revops/skills/sf-diagram-mermaid/scripts/query-org-metadata.py	F401
-1	plugins/revops/skills/sf-docs/scripts/extract_help_salesforce.py	F401
-2	plugins/revops/skills/sf-flow/hooks/scripts/post-tool-validate.py	F841
-3	plugins/revops/skills/sf-flow/hooks/scripts/simulate_flow.py	F401
-6	plugins/revops/skills/sf-flow/hooks/scripts/simulate_flow.py	F541
-1	plugins/revops/skills/sf-flow/hooks/scripts/validate_flow.py	F541
-3	plugins/revops/skills/sf-flow/scripts/doc_generator.py	F401
-1	plugins/revops/skills/sf-flow/scripts/doc_generator.py	F541
-1	plugins/revops/skills/sf-integration/hooks/scripts/suggest_credential_setup.py	F401
-1	plugins/revops/skills/sf-integration/hooks/scripts/validate_integration.py	F401
-2	plugins/revops/skills/sf-lwc/hooks/scripts/lwc-lsp-validate.py	F401
-2	plugins/revops/skills/sf-lwc/hooks/scripts/lwc-lsp-validate.py	F841
-1	plugins/revops/skills/sf-lwc/hooks/scripts/template_validator.py	F401
-1	plugins/revops/skills/sf-lwc/hooks/scripts/validate_slds.py	F401
-1	plugins/revops/skills/sf-lwc/hooks/scripts/validate_slds.py	F541
-2	plugins/revops/skills/sf-lwc/hooks/scripts/validate_slds.py	F841
-1	plugins/revops/skills/sf-metadata/hooks/scripts/generate_permission_set.py	F401
-2	plugins/revops/skills/sf-metadata/hooks/scripts/generate_permission_set.py	F541
-1	plugins/revops/skills/sf-metadata/hooks/scripts/generate_permission_set.py	F841
-3	plugins/revops/skills/sf-metadata/hooks/scripts/validate_metadata.py	F401
-1	plugins/revops/skills/sf-metadata/hooks/scripts/validate_metadata.py	F541
-1	plugins/revops/skills/sf-permissions/scripts/__init__.py	F401
-1	plugins/revops/skills/sf-permissions/scripts/cli.py	F401
-2	plugins/revops/skills/sf-permissions/scripts/hierarchy_viewer.py	F541
-1	plugins/revops/skills/sf-permissions/scripts/metadata_fetcher.py	F401
-1	plugins/revops/skills/sf-permissions/scripts/metadata_fetcher.py	F841
-1	plugins/revops/skills/sf-permissions/scripts/permission_detector.py	F401
-1	plugins/revops/skills/sf-permissions/scripts/permission_exporter.py	F401
-6	plugins/revops/skills/sf-permissions/scripts/renderers/__init__.py	F401
-2	plugins/revops/skills/sf-permissions/scripts/renderers/ascii_tree.py	F401
-1	plugins/revops/skills/sf-permissions/scripts/renderers/ascii_tree.py	F541
-1	plugins/revops/skills/sf-permissions/scripts/renderers/mermaid.py	F401
-1	plugins/revops/skills/sf-permissions/scripts/tooling_api.py	F401
-1	plugins/revops/skills/sf-permissions/scripts/tooling_api.py	F841
-2	plugins/revops/skills/sf-soql/hooks/scripts/post-tool-validate.py	F541
-1	plugins/revops/skills/sf-soql/hooks/scripts/post-tool-validate.py	F841
-2	plugins/revops/skills/sf-testing/hooks/scripts/parse-test-results.py	F401
-1	plugins/revops/skills/sf-testing/hooks/scripts/parse-test-results.py	F841
-1	plugins/revops/tests/hooks/conftest.py	F401
-1	plugins/revops/tests/hooks/test_agentscript_validator.py	F401
-1	plugins/revops/tests/test_datacloud_skill_contracts.py	F401
-10	plugins/revops/tools/install.py	F541
-1	plugins/revops/tools/install.py	F841
-1	scripts/gen-skill-docs.py	F541
+1	plugins/marketing/scripts/_shared/manifest_loader.py	F401	`datetime.timezone` imported but unused
+1	plugins/marketing/scripts/_shared/manifest_loader.py	F401	`re` imported but unused
+1	plugins/marketing/scripts/lint_canonicals.py	F841	Local variable `sub_list_key` is assigned to but never used
+1	plugins/marketing/scripts/portfolio_snapshot.py	F401	`os` imported but unused
+1	plugins/marketing/tests/test_plan_campaign_contracts.py	F841	Local variable `body` is assigned to but never used
+1	plugins/revops/shared/code_analyzer/dependency_checker.py	F401	`functools.lru_cache` imported but unused
+1	plugins/revops/shared/code_analyzer/formatter.py	F401	`score_merger.MergedScore` imported but unused
+1	plugins/revops/shared/code_analyzer/live_query_plan.py	F401	`os` imported but unused
+1	plugins/revops/shared/code_analyzer/parser.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/shared/code_analyzer/scanner.py	F401	`dataclasses.field` imported but unused
+1	plugins/revops/shared/code_analyzer/scanner.py	F541	f-string without any placeholders
+1	plugins/revops/shared/code_analyzer/score_merger.py	F601	Dictionary key literal `"AvoidHardcodingId"` repeated
+1	plugins/revops/shared/code_analyzer/score_merger.py	F601	Dictionary key literal `"OperationWithLimitsInLoop"` repeated
+2	plugins/revops/shared/hooks/scripts/naming_validator.py	F541	f-string without any placeholders
+1	plugins/revops/shared/hooks/scripts/soql-schema-check.py	F401	`os` imported but unused
+1	plugins/revops/shared/hooks/scripts/validator-dispatcher.py	F401	`os` imported but unused
+1	plugins/revops/shared/lsp-engine/diagnostics.py	F541	f-string without any placeholders
+1	plugins/revops/shared/lsp-engine/lsp-acquire.py	F401	`os` imported but unused
+1	plugins/revops/shared/lsp-engine/lsp-acquire.py	F401	`time` imported but unused
+6	plugins/revops/shared/lsp-engine/lsp-acquire.py	F541	f-string without any placeholders
+1	plugins/revops/shared/soql_extractor.py	F401	`dataclasses.field` imported but unused
+1	plugins/revops/shared/soql_extractor.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/apex-lsp-validate.py	F401	`typing.List` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/apex-lsp-validate.py	F401	`typing.Optional` imported but unused
+2	plugins/revops/skills/sf-apex/hooks/scripts/apex-lsp-validate.py	F841	Local variable `e` is assigned to but never used
+1	plugins/revops/skills/sf-apex/hooks/scripts/llm_pattern_validator.py	F401	`json` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/llm_pattern_validator.py	F401	`typing.List` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/llm_pattern_validator.py	F401	`typing.Set` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/llm_pattern_validator.py	F401	`typing.Tuple` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/llm_pattern_validator.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-apex/hooks/scripts/post-tool-validate.py	F841	Local variable `deductions` is assigned to but never used
+2	plugins/revops/skills/sf-apex/hooks/scripts/post-tool-validate.py	F841	Local variable `e` is assigned to but never used
+1	plugins/revops/skills/sf-apex/hooks/scripts/prettier-format.py	F401	`shutil` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/validate_apex.py	F401	`typing.List` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/validate_apex.py	F401	`typing.Tuple` imported but unused
+1	plugins/revops/skills/sf-apex/hooks/scripts/validate_apex.py	F841	Local variable `has_catch` is assigned to but never used
+1	plugins/revops/skills/sf-apex/hooks/scripts/validate_apex.py	F841	Local variable `has_try` is assigned to but never used
+1	plugins/revops/skills/sf-apex/hooks/scripts/validate_apex.py	F841	Local variable `method_call_pattern` is assigned to but never used
+1	plugins/revops/skills/sf-data/hooks/scripts/soql_validator.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/skills/sf-data/hooks/scripts/validate_data_operation.py	F841	Local variable `has_edge_cases` is assigned to but never used
+1	plugins/revops/skills/sf-data/hooks/scripts/validate_data_operation.py	F841	Local variable `single_record_pattern` is assigned to but never used
+1	plugins/revops/skills/sf-diagram-mermaid/scripts/mermaid_preview.py	F401	`pathlib.Path` imported but unused
+1	plugins/revops/skills/sf-diagram-mermaid/scripts/mermaid_preview.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-diagram-mermaid/scripts/mermaid_preview.py	F841	Local variable `process` is assigned to but never used
+1	plugins/revops/skills/sf-diagram-mermaid/scripts/query-org-metadata.py	F401	`sys` imported but unused
+1	plugins/revops/skills/sf-docs/scripts/extract_help_salesforce.py	F401	`sys` imported but unused
+1	plugins/revops/skills/sf-flow/hooks/scripts/post-tool-validate.py	F841	Local variable `custom_rating` is assigned to but never used
+1	plugins/revops/skills/sf-flow/hooks/scripts/post-tool-validate.py	F841	Local variable `file_name` is assigned to but never used
+1	plugins/revops/skills/sf-flow/hooks/scripts/simulate_flow.py	F401	`json` imported but unused
+1	plugins/revops/skills/sf-flow/hooks/scripts/simulate_flow.py	F401	`typing.List` imported but unused
+1	plugins/revops/skills/sf-flow/hooks/scripts/simulate_flow.py	F401	`typing.Tuple` imported but unused
+6	plugins/revops/skills/sf-flow/hooks/scripts/simulate_flow.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-flow/hooks/scripts/validate_flow.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-flow/scripts/doc_generator.py	F401	`re` imported but unused
+1	plugins/revops/skills/sf-flow/scripts/doc_generator.py	F401	`typing.List` imported but unused
+1	plugins/revops/skills/sf-flow/scripts/doc_generator.py	F401	`typing.Tuple` imported but unused
+1	plugins/revops/skills/sf-flow/scripts/doc_generator.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-integration/hooks/scripts/suggest_credential_setup.py	F401	`pathlib.Path` imported but unused
+1	plugins/revops/skills/sf-integration/hooks/scripts/validate_integration.py	F401	`pathlib.Path` imported but unused
+1	plugins/revops/skills/sf-lwc/hooks/scripts/lwc-lsp-validate.py	F401	`typing.List` imported but unused
+1	plugins/revops/skills/sf-lwc/hooks/scripts/lwc-lsp-validate.py	F401	`typing.Optional` imported but unused
+2	plugins/revops/skills/sf-lwc/hooks/scripts/lwc-lsp-validate.py	F841	Local variable `e` is assigned to but never used
+1	plugins/revops/skills/sf-lwc/hooks/scripts/template_validator.py	F401	`typing.Set` imported but unused
+1	plugins/revops/skills/sf-lwc/hooks/scripts/validate_slds.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/skills/sf-lwc/hooks/scripts/validate_slds.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-lwc/hooks/scripts/validate_slds.py	F841	Local variable `deprecated_classes` is assigned to but never used
+1	plugins/revops/skills/sf-lwc/hooks/scripts/validate_slds.py	F841	Local variable `selector_pattern` is assigned to but never used
+1	plugins/revops/skills/sf-metadata/hooks/scripts/generate_permission_set.py	F401	`pathlib.Path` imported but unused
+2	plugins/revops/skills/sf-metadata/hooks/scripts/generate_permission_set.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-metadata/hooks/scripts/generate_permission_set.py	F841	Local variable `perm_set_name` is assigned to but never used
+1	plugins/revops/skills/sf-metadata/hooks/scripts/validate_metadata.py	F401	`typing.List` imported but unused
+1	plugins/revops/skills/sf-metadata/hooks/scripts/validate_metadata.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/skills/sf-metadata/hooks/scripts/validate_metadata.py	F401	`typing.Tuple` imported but unused
+1	plugins/revops/skills/sf-metadata/hooks/scripts/validate_metadata.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-permissions/scripts/__init__.py	F401	`.auth.get_sf_connection` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+1	plugins/revops/skills/sf-permissions/scripts/cli.py	F401	`typing.Optional` imported but unused
+2	plugins/revops/skills/sf-permissions/scripts/hierarchy_viewer.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-permissions/scripts/metadata_fetcher.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/skills/sf-permissions/scripts/metadata_fetcher.py	F841	Local variable `tabs` is assigned to but never used
+1	plugins/revops/skills/sf-permissions/scripts/permission_detector.py	F401	`sys` imported but unused
+1	plugins/revops/skills/sf-permissions/scripts/permission_exporter.py	F401	`pathlib.Path` imported but unused
+1	plugins/revops/skills/sf-permissions/scripts/renderers/__init__.py	F401	`.ascii_tree.render_detection_table` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+1	plugins/revops/skills/sf-permissions/scripts/renderers/__init__.py	F401	`.ascii_tree.render_hierarchy_tree` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+1	plugins/revops/skills/sf-permissions/scripts/renderers/__init__.py	F401	`.ascii_tree.render_summary_panel` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+1	plugins/revops/skills/sf-permissions/scripts/renderers/__init__.py	F401	`.ascii_tree.render_user_tree` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+1	plugins/revops/skills/sf-permissions/scripts/renderers/__init__.py	F401	`.mermaid.render_hierarchy_mermaid` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+1	plugins/revops/skills/sf-permissions/scripts/renderers/__init__.py	F401	`.mermaid.render_user_mermaid` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+1	plugins/revops/skills/sf-permissions/scripts/renderers/ascii_tree.py	F401	`rich.text.Text` imported but unused; consider using `importlib.util.find_spec` to test for availability
+1	plugins/revops/skills/sf-permissions/scripts/renderers/ascii_tree.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/skills/sf-permissions/scripts/renderers/ascii_tree.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-permissions/scripts/renderers/mermaid.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/skills/sf-permissions/scripts/tooling_api.py	F401	`typing.Optional` imported but unused
+1	plugins/revops/skills/sf-permissions/scripts/tooling_api.py	F841	Local variable `e` is assigned to but never used
+2	plugins/revops/skills/sf-soql/hooks/scripts/post-tool-validate.py	F541	f-string without any placeholders
+1	plugins/revops/skills/sf-soql/hooks/scripts/post-tool-validate.py	F841	Local variable `e` is assigned to but never used
+1	plugins/revops/skills/sf-testing/hooks/scripts/parse-test-results.py	F401	`datetime.datetime` imported but unused
+1	plugins/revops/skills/sf-testing/hooks/scripts/parse-test-results.py	F401	`pathlib.Path` imported but unused
+1	plugins/revops/skills/sf-testing/hooks/scripts/parse-test-results.py	F841	Local variable `e` is assigned to but never used
+1	plugins/revops/tests/hooks/conftest.py	F401	`pytest` imported but unused
+1	plugins/revops/tests/hooks/test_agentscript_validator.py	F401	`pathlib.Path` imported but unused
+1	plugins/revops/tests/test_datacloud_skill_contracts.py	F401	`pathlib.Path` imported but unused
+10	plugins/revops/tools/install.py	F541	f-string without any placeholders
+1	plugins/revops/tools/install.py	F841	Local variable `ca_count` is assigned to but never used
+1	scripts/gen-skill-docs.py	F541	f-string without any placeholders
