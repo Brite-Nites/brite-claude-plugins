@@ -20,10 +20,20 @@ The MESSAGE is part of the key, not decoration. Keyed on (file, code) alone, a
 fix-one-add-one edit inside a grandfathered file keeps the count equal and passes
 — so `'os' imported but unused` could be swapped for `'hashlib' imported but
 unused` invisibly. Ruff's message names the offending symbol, so including it
-makes that substitution a new key. Line numbers are deliberately NOT in the key:
-they churn on every unrelated edit above the finding. Ruff is pinned in CI, so a
-message-wording change arrives only with a deliberate pin bump, which already
-requires re-running this snapshot.
+makes that substitution a new key. Ruff is pinned in CI, so a message-wording
+change arrives only with a deliberate pin bump, which already requires re-running
+this snapshot.
+
+KNOWN RESIDUAL, deliberately accepted: two findings that share a file, a code AND
+a message are indistinguishable, so one can be RELOCATED within that file without
+tripping the ratchet — e.g. an `f-string without any placeholders` (F541, a
+message that names no symbol) removed at one site and introduced at another. What
+this cannot do is ADD debt: the count is pinned, so the file's total for that
+message can only fall. Closing the gap would mean putting position in the key, and
+both forms cost more than they buy — line numbers churn the baseline on every
+unrelated edit above a finding, and a source-text anchor churns on reformatting.
+This matches the precedent it is modelled on: ADR-034's R2 baseline pins a body's
+LINE COUNT, not which lines, and accepts the same relocation property.
 
 Reads `ruff check --select E9,F --output-format=concise` on stdin so it needs no
 ruff import and stays stdlib-only.
