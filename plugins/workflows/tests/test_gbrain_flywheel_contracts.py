@@ -4,10 +4,11 @@ These artifacts are Claude-orchestrated markdown (slash commands + a subagent),
 not executable code, so — like plugins/marketing/tests/test_plan_campaign_contracts.py
 — these tests verify the markdown's *contract* rather than runtime behavior:
 
-  - WRITE side (BC-11755): /workflows:ship and /workflows:review declare a
-    save-results phase that writes to the team brain via
-    `mcp__plugin_workflows_gbrain-team__put_page` with the documented
-    slug/title/tags/content pattern.
+  - WRITE side (BC-11755, activated BC-12113): /workflows:ship and
+    /workflows:review declare a save-results phase that writes to the team
+    brain via `mcp__plugin_workflows_gbrain-team-write__put_page` — the
+    dedicated write-client MCP server (the read-path `gbrain-team` server
+    stays read-scope) — with the documented slug/title/tags/content pattern.
   - READ side (BC-11754): 5 artifacts declare `gbrain: context_queries`
     frontmatter (gstack manifest schema) AND a context-load prose phase that
     tells the agent to fulfill those queries via the gbrain-team MCP tools.
@@ -51,6 +52,9 @@ READ_ARTIFACTS = {
 }
 
 GBRAIN_TEAM_PREFIX = "mcp__plugin_workflows_gbrain-team__"
+# Save-results writes go through the dedicated write-client server (BC-12113);
+# reads stay on the per-teammate read broker above.
+GBRAIN_TEAM_WRITE_PREFIX = "mcp__plugin_workflows_gbrain-team-write__"
 VALID_KINDS = {"list", "vector", "filesystem"}
 
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
@@ -126,8 +130,10 @@ def section(body: str, heading_keyword: str) -> str:
 def test_ship_declares_save_results_to_releases_slug() -> None:
     """/workflows:ship saves a release page to the team brain at releases/<version>."""
     save = section(body_of(SHIP), "Save-results")
-    assert f"{GBRAIN_TEAM_PREFIX}put_page" in save, \
-        "ship.md Save-results must call mcp__plugin_workflows_gbrain-team__put_page"
+    assert f"{GBRAIN_TEAM_WRITE_PREFIX}put_page" in save, \
+        "ship.md Save-results must call mcp__plugin_workflows_gbrain-team-write__put_page (BC-12113)"
+    assert f"{GBRAIN_TEAM_PREFIX}put_page" not in save, \
+        "ship.md Save-results must not put_page via the read-path gbrain-team server (BC-12113)"
     assert "releases/" in save, \
         "ship.md Save-results must use the releases/<version> slug pattern"
     for field in ("title", "tags", "content"):
@@ -138,8 +144,10 @@ def test_ship_declares_save_results_to_releases_slug() -> None:
 def test_review_declares_save_results_to_reviews_or_learnings_slug() -> None:
     """/workflows:review saves findings at reviews/<pr> (or learnings/<topic>)."""
     save = section(body_of(REVIEW), "Save-results")
-    assert f"{GBRAIN_TEAM_PREFIX}put_page" in save, \
-        "review.md Save-results must call mcp__plugin_workflows_gbrain-team__put_page"
+    assert f"{GBRAIN_TEAM_WRITE_PREFIX}put_page" in save, \
+        "review.md Save-results must call mcp__plugin_workflows_gbrain-team-write__put_page (BC-12113)"
+    assert f"{GBRAIN_TEAM_PREFIX}put_page" not in save, \
+        "review.md Save-results must not put_page via the read-path gbrain-team server (BC-12113)"
     assert "reviews/" in save, \
         "review.md Save-results must use the reviews/<pr-number> slug pattern"
     assert "learnings/" in save, \
@@ -301,16 +309,16 @@ def test_fda_review_has_flywheel() -> None:
     assert_valid_context_queries("flow:review", FDA_REVIEW)
     assert_context_load_prose("flow:review", FDA_REVIEW)
     save = section(body_of(FDA_REVIEW), "Save-results")
-    assert f"{GBRAIN_TEAM_PREFIX}put_page" in save and "reviews/" in save and "learnings/" in save, \
-        "flow:review Save-results must put_page to reviews/ or learnings/"
+    assert f"{GBRAIN_TEAM_WRITE_PREFIX}put_page" in save and "reviews/" in save and "learnings/" in save, \
+        "flow:review Save-results must put_page (write server, BC-12113) to reviews/ or learnings/"
 
 
 def test_fda_ship_has_flywheel() -> None:
     assert_valid_context_queries("flow:ship", FDA_SHIP)
     assert_context_load_prose("flow:ship", FDA_SHIP)
     save = section(body_of(FDA_SHIP), "Save-results")
-    assert f"{GBRAIN_TEAM_PREFIX}put_page" in save and "releases/" in save, \
-        "flow:ship Save-results must put_page to releases/"
+    assert f"{GBRAIN_TEAM_WRITE_PREFIX}put_page" in save and "releases/" in save, \
+        "flow:ship Save-results must put_page (write server, BC-12113) to releases/"
 
 
 def _blob_sha(path: Path) -> str:

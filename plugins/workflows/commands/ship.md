@@ -165,7 +165,7 @@ Narrate: `Step 4/8: Compounding learnings... done`
 
 Narrate: `Step 4b/8: Saving release to team brain...`
 
-The write half of the brain-as-delivery flywheel (pairs with this command's context-load phase): save the release as a team gbrain page so later `/workflows:ship` and `/workflows:review` runs surface it. Use `mcp__plugin_workflows_gbrain-team__put_page` — the OAuth-backed **team** brain MCP, NOT the local/personal `gbrain` CLI (different brain).
+The write half of the brain-as-delivery flywheel (pairs with this command's context-load phase): save the release as a team gbrain page so later `/workflows:ship` and `/workflows:review` runs surface it. Use `mcp__plugin_workflows_gbrain-team-write__put_page` — the dedicated **write**-client team-brain MCP (BC-12113; writes land in the shared `default` namespace every reader federates), NOT the read-path `gbrain-team` server and NOT the local/personal `gbrain` CLI (different brain).
 
 - **slug:** `releases/<version>` (e.g., `releases/v0.5.4`). Derive `<version>` from the tag/VERSION bumped in this ship; if there is none, use `releases/<repo-slug>-pr-<pr-number>`.
 - **type:** `release` — set the page type so the context-load `type: release` filter matches this page.
@@ -175,7 +175,7 @@ The write half of the brain-as-delivery flywheel (pairs with this command's cont
 - **Redact before saving:** never persist secrets, credentials, connection strings, tokens, raw `.env` values, or customer PII into a brain page — cite the location (`config.ts:12 — hardcoded key, redacted`) instead of the value.
 
 ### Throttle / permission handling
-If `put_page` fails — a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`) OR a scope/permission error (`insufficient_scope`, `permission_denied`, `403`) — do NOT fail the ship: log a `TODO: retry releases/<version> save` line and continue. The release already shipped; the brain page is best-effort. **The team-brain client is read-scope only today, so `put_page` no-ops with `insufficient_scope` until write scope is granted (BC-12113) — this save then activates automatically.**
+If `put_page` fails — a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`) OR a scope/permission error (`insufficient_scope`, `permission_denied`, `403`) — do NOT fail the ship: log a `TODO: retry releases/<version> save` line and continue. The release already shipped; the brain page is best-effort. **Treat an unavailable `gbrain-team-write` server / missing `put_page` tool the same way (skip + TODO): the write client is provisioned out-of-band (BC-12113 — a registered `write`-scope OAuth client + the Engineering-collection Bitwarden item), so this save no-ops harmlessly until that ceremony runs and activates automatically once it has.**
 
 ## Step 5: Best Practices Audit
 

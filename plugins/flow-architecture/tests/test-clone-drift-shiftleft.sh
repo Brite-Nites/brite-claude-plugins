@@ -35,13 +35,15 @@ SS_UPSTREAM="plugins/workflows/commands/session-start.md"
 # Baselines re-synced in BC-12947 (Batch F added an eval-waiver marker — and, for
 # ship, disable-model-invocation — to the workflows upstreams, so each clone's
 # recorded Upstream-SHA was bumped to the new upstream blob in the same PR).
+# review + ship re-synced again in BC-12113 (save-results put_page → the dedicated
+# gbrain-team-write server propagated to both upstreams + clones).
 SS_TARGET='Upstream-SHA: 97cdc134d86405a0510b0128abb6f71256e1d3eb'
 REV_CLONE="plugins/flow-architecture/commands/review.md"
 REV_UPSTREAM="plugins/workflows/commands/review.md"
-REV_TARGET='Upstream-SHA: 18a9894a5e4c4ac0756ea0b9f3296dbbd04fc4ad'
+REV_TARGET='Upstream-SHA: c4607b2cf4679f794a84cf2e1e0e004f2e4864a0'
 SHIP_CLONE="plugins/flow-architecture/commands/ship.md"
 SHIP_UPSTREAM="plugins/workflows/commands/ship.md"
-SHIP_TARGET='Upstream-SHA: 1fc40c430f83a81e0d8bf71410bf49a006b42b18'
+SHIP_TARGET='Upstream-SHA: 35fa8c4047c2dbffc6421ad66a86ace4e32afa58'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 # Unique per-invocation output file (portable mktemp template — trailing X's,
 # no suffix, works on both BSD/macOS and GNU/Linux). Avoids a fixed /tmp path

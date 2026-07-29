@@ -26,7 +26,7 @@ gbrain:
 
 <!-- eval-waiver: Cloned review loop: self-verify, diff-triage, simplify agents, dynamic reviewer selection, validation subagents, a P1 fix loop, and a final report; the artifact is an LLM-merged and severity-classified findings report from dispatched agents, and the agent-selection logic is config-driven branching, not a fixed-right-answer decide() separable from the agent narration. Read-only on Linear in v1 (review-summary writeback is a v1.1 parking-lot). -->
 
-<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: 18a9894a5e4c4ac0756ea0b9f3296dbbd04fc4ad. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12947 (eval-waiver marker added to upstream). -->
+<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: c4607b2cf4679f794a84cf2e1e0e004f2e4864a0. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12947 (eval-waiver marker added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
 
 # Review Loop (Phase 5)
 
@@ -398,7 +398,7 @@ If P2s need decisions, ask the developer which to fix and which to accept.
 
 Narrate: `Step 8b/8: Saving review findings to team brain...`
 
-The write half of the brain-as-delivery flywheel (pairs with this command's context-load phase): save the findings so the next review's context-load surfaces them and the "Prior learning applied" loop becomes visible. Use `mcp__plugin_workflows_gbrain-team__put_page` — the OAuth-backed **team** brain MCP, NOT the local/personal `gbrain` CLI (different brain).
+The write half of the brain-as-delivery flywheel (pairs with this command's context-load phase): save the findings so the next review's context-load surfaces them and the "Prior learning applied" loop becomes visible. Use `mcp__plugin_workflows_gbrain-team-write__put_page` — the dedicated **write**-client team-brain MCP (BC-12113; writes land in the shared `default` namespace every reader federates), NOT the read-path `gbrain-team` server and NOT the local/personal `gbrain` CLI (different brain).
 
 - **slug:** `reviews/<pr-number>` (e.g., `reviews/PR-385`) for review-specific findings, OR `learnings/<topic-slug>` (e.g., `learnings/subagentstart-json-envelope`) when the review surfaces a recurring pattern worth promoting.
 - **type:** `review-finding` (or `learning` for a `learnings/` page) — set the page type so the context-load `type: review-finding` filter matches this page.
@@ -408,10 +408,10 @@ The write half of the brain-as-delivery flywheel (pairs with this command's cont
 - **Redact before saving:** never persist secrets, credentials, connection strings, tokens, raw `.env` values, or customer PII into a brain page — cite the location (`config.ts:12 — hardcoded key, redacted`) instead of the value.
 
 ### Entity enrichment
-Skip this on trivial/fast reviews. Otherwise take the **top 5–8 highest-signal** entities named in the findings (projects, technologies — NOT personal names / PII), dedup case-insensitively, then run **one** `mcp__plugin_workflows_gbrain-team__list_pages` to find which already exist. Create stubs at `entities/<entity-slug>` only for the missing ones, under the same throttle budget as the save above (defer on rate-limit). This bound keeps a large review from fanning out into dozens of brain round-trips.
+Skip this on trivial/fast reviews. Otherwise take the **top 5–8 highest-signal** entities named in the findings (projects, technologies — NOT personal names / PII), dedup case-insensitively, then run **one** `mcp__plugin_workflows_gbrain-team__list_pages` to find which already exist. Create stubs at `entities/<entity-slug>` only for the missing ones — via the same `mcp__plugin_workflows_gbrain-team-write__put_page` as the save above — under the same throttle budget (defer on rate-limit). This bound keeps a large review from fanning out into dozens of brain round-trips.
 
 ### Throttle / permission handling
-If `put_page` fails — a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`) OR a scope/permission error (`insufficient_scope`, `permission_denied`, `403`) — do NOT fail the review: log a `TODO: retry reviews/<pr-number> save` line and continue. Findings are already reported; the brain page is best-effort. **The team-brain client is read-scope only today, so `put_page` no-ops with `insufficient_scope` until write scope is granted (BC-12113) — this save then activates automatically.**
+If `put_page` fails — a rate-limit / capacity error (stderr contains `throttle`, `rate limit`, `capacity`, or `busy`) OR a scope/permission error (`insufficient_scope`, `permission_denied`, `403`) — do NOT fail the review: log a `TODO: retry reviews/<pr-number> save` line and continue. Findings are already reported; the brain page is best-effort. **Treat an unavailable `gbrain-team-write` server / missing `put_page` tool the same way (skip + TODO): the write client is provisioned out-of-band (BC-12113 — a registered `write`-scope OAuth client + the Engineering-collection Bitwarden item), so this save no-ops harmlessly until that ceremony runs and activates automatically once it has.**
 
 ## Rules
 
