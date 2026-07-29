@@ -184,13 +184,21 @@ while [ "$i" -lt "$max_iters" ]; do
   # in place, so the id is stable across the wait. On the first poll `cid` is empty and
   # the edit signal simply doesn't participate (the other two still do).
   rts="$(review_ts)"      # head-SHA Greptile check-run completed_at (BC-16924)
-  ets="$(edited_ts "$cid")"  # that comment's updated_at, if edited since the trigger
+  ets_cid="$cid"          # the id `ets` is about (see the id-match guard below)
+  ets="$(edited_ts "$ets_cid")"  # that comment's updated_at, if edited since trigger
   verdict="$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')"
   # One jq pass extracts all three fields (tab-separated) to save forks per poll.
   # `cid` is refreshed here for the NEXT poll's edit read.
   IFS="$(printf '\t')" read -r score vts cid <<EOF
 $(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // ""), (.comment_id // "")] | @tsv')
 EOF
+  # Id-match guard: `ets` was read for the PREVIOUS poll's selected comment. If the
+  # verdict has since selected a DIFFERENT object (Greptile posted a second comment,
+  # or a review body now wins), that edit timestamp no longer describes the object
+  # `score` came from — so drop it rather than pair the two. Freshness then rests on
+  # verdict-ts / review-ts, which already see a newly-posted comment via its
+  # post-trigger createdAt. Cheap, and makes the binding exact under selection churn.
+  [ -n "$ets_cid" ] && [ "$ets_cid" = "$cid" ] || ets=""
   state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --edited-ts "$ets" --score "$score")"
   case "$state" in
     FRESH_PASS|FRESH_FAIL|TIMED_OUT)
