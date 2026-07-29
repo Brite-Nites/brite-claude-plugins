@@ -54,6 +54,6 @@ The verdict helper emits one JSON line: `{"present":true,"score":3,…}`, `{"pre
 
 - **Skip-gracefully is mandatory.** Greptile absent → report + exit 0; never hard-fail a ship.
 - **@-handle.** `@greptile-apps` is the confirmed trigger handle for this org. If it ever changes, the await fails *safe* (`TIMED_OUT` rather than hang) — but update it here, since a wrong handle posts the comment and triggers nothing.
-- The verdict reader keys off the Greptile author and the latest comment by timestamp; the freshness classifier treats a pre-trigger comment as stale, so an old summary never reads as a fresh re-review.
+- The verdict reader keys off the Greptile author and the latest comment by timestamp; the freshness classifier treats a pre-trigger comment as stale, so an old summary never reads as a fresh re-review. Because Greptile re-scores by **editing its summary in place** (the comment keeps its original `createdAt`), freshness is the latest of three signals — comment `createdAt`, the head-SHA check-run's `completed_at`, and the comment's `updated_at` — so an in-place re-score is not misread as no-response.
 - Requires authenticated `gh`, plus `jq` and `python3` (the helpers check and error clearly).
 - `grill-with-docs` is a user-global skill — invoke its behavior; don't vendor a copy.

@@ -3,9 +3,11 @@
 # or the wait times out. The thin IO/sleep shell that composes:
 #   greptile-verdict.sh   (read the latest verdict)   +
 #   greptile-freshness.sh (classify vs the trigger time, with a deadline)
-# Freshness keys on max(comment createdAt, head-SHA check-run completed_at), so
-# an in-place-edited re-review (Greptile edits its summary rather than reposting)
-# is not misread as stale → false TIMED_OUT (BC-16924).
+# Freshness keys on max(comment createdAt, head-SHA check-run completed_at,
+# comment updated_at), so an in-place-edited re-review (Greptile edits its summary
+# rather than reposting) is not misread as stale → false TIMED_OUT (BC-16924 added
+# the check-run signal; BC-12580 / BC-17025 added the comment-edit signal, which
+# also covers the case where the check-run completed BEFORE the trigger).
 #
 # Prints the terminal state on the last line:
 #   FRESH_PASS | FRESH_FAIL | TIMED_OUT
@@ -69,6 +71,39 @@ PY
 REPO="$(gh pr view "$PR" --json headRepositoryOwner,headRepository -q '(.headRepositoryOwner.login // "") + "/" + (.headRepository.name // "")' 2>/dev/null || true)"
 HEAD_SHA="$(gh pr view "$PR" --json headRefOid -q .headRefOid 2>/dev/null || true)"
 
+# Comment-edit freshness signal (BC-12580 / BC-17025). Greptile re-scores by
+# EDITING its summary comment, which bumps only the comment's updated_at —
+# invisible to both createdAt and (when Greptile auto-reviewed the push before
+# the re-review was requested) the head-SHA check-run. Resolved from the PR's
+# BASE repo + number, which is where issue comments live regardless of fork.
+PR_URL="$(gh pr view "$PR" --json url -q .url 2>/dev/null || true)"
+BASE_PATH="${PR_URL#*://}"          # host/OWNER/REPO/pull/N
+BASE_PATH="${BASE_PATH#*/}"         # OWNER/REPO/pull/N
+BASE_REPO=""
+PR_NUM=""
+case "$BASE_PATH" in
+  */pull/*)
+    BASE_REPO="${BASE_PATH%%/pull/*}"
+    PR_NUM="${BASE_PATH##*/}" ;;
+esac
+case "$PR_NUM" in ''|*[!0-9]*) BASE_REPO=""; PR_NUM="" ;; esac
+# A `+` in an ISO offset (…T20:59:51+00:00) decodes as a space in a query
+# string — percent-encode it. Z-form triggers pass through untouched.
+TRIGGER_Q="${TRIGGER//+/%2B}"
+
+edited_ts() {
+  # Latest updated_at among Greptile comments EDITED since the trigger (empty if
+  # none). `since` filters server-side on updated_at, so the response stays small
+  # on a busy PR and can't push the summary off the first page — the classifier
+  # still re-checks the timestamp, so a boundary-equal value is not fresh.
+  [ -n "$BASE_REPO" ] && [ -n "$PR_NUM" ] || { echo ""; return; }
+  gh api "repos/$BASE_REPO/issues/$PR_NUM/comments?since=$TRIGGER_Q&per_page=100" --jq '
+    [ .[]
+      | select(((.user.login // "") | ascii_downcase) | test("greptile"))
+      | (.updated_at // "") ]
+    | map(select(. != "")) | sort | last // ""' 2>/dev/null || echo ""
+}
+
 review_ts() {
   # Latest completed_at among Greptile check-runs on HEAD (empty if none/pending).
   # An in-progress check-run has a null completed_at → empty → not yet fresh.
@@ -95,12 +130,13 @@ while [ "$i" -lt "$max_iters" ]; do
   # snapshot is at least as fresh as the signal — shrinks the propagation race
   # between check-run completion and the in-place comment edit (BC-16924 review).
   rts="$(review_ts)"   # head-SHA Greptile check-run completed_at (BC-16924)
+  ets="$(edited_ts)"   # latest Greptile comment updated_at since trigger (BC-12580)
   verdict="$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')"
   # One jq pass extracts both fields (tab-separated) to save a fork per poll.
   IFS="$(printf '\t')" read -r score vts <<EOF
 $(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // "")] | @tsv')
 EOF
-  state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --score "$score")"
+  state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --edited-ts "$ets" --score "$score")"
   case "$state" in
     FRESH_PASS|FRESH_FAIL|TIMED_OUT)
       printf '%s\n%s\n' "$verdict" "$state"
