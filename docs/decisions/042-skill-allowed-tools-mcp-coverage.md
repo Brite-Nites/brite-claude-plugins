@@ -96,13 +96,31 @@ unrestricted tool access. This amendment records the audit that question needed,
 separates the classification (settled here) from the frontmatter change (deliberately
 not made here — see § Why the frontmatter change is a separate step).
 
-### Method: fenced-code invocation, not raw mentions
+### Method: fenced-code invocation in the SKILL.md body, not raw mentions
 
 The trap the follow-up named is real — `sf-apex` and `sf-soql` *display* `sf` commands in
 examples while being code generators, so any "mentions `sf`" test false-mandates them.
-The criterion used is **`sf` invoked at the start of a line inside a fenced code block**,
-counted separately from raw mentions anywhere in the body. That separation is what makes
-the two classes fall out cleanly rather than by taste.
+The criterion used is **`sf` invoked at the start of a line inside a fenced code block of
+the `SKILL.md` body**, counted separately from raw mentions anywhere in the body.
+
+**Scope limitation, stated because it changes how much the counts prove:** this scans
+`SKILL.md` bodies only, not the bundled `references/*.md` those bodies progressively
+disclose. Scanning the references too finds fenced `sf` invocations in **8 of the 9**
+skills classified as knowledge — `sf-metadata` 87, `sf-soql` 38, `sf-testing` 36,
+`sf-connected-apps` 20, `sf-apex` 19, `sf-integration` 16, `sf-permissions` 6,
+`sf-diagram-mermaid` 5.
+
+That does **not** flip the classification, and the reason matters: those hits concentrate
+in files named `cli-reference.md`, `cli-commands.md`, `field-and-cli-reference.md` —
+lookup tables *documenting* the CLI for a human or for code generation. Treating them as
+invocation is the prose-vs-code trap one level deeper: reference material about a CLI is
+the single most likely place for a command to appear without anyone running it.
+
+What it does mean is that the counts below bound *the skill's own procedure*, not
+everything an agent might encounter while following it — so a classification for any
+skill whose references are CLI-heavy should be confirmed by a run, not by the number.
+`sf-testing` is the sharpest case: 36 fenced invocations across its references,
+25 of them in `references/cli-commands.md`.
 
 ### Classification of all 14 skills
 
@@ -110,7 +128,7 @@ the two classes fall out cleanly rather than by taste.
 
 | Skill | fenced `sf` | `sf` verbs | other shell |
 | -- | -- | -- | -- |
-| `sf-deploy` | 18 | `apex`, `data`, `org`, `project` | its own bundled `./scripts/prepare-scratch-deploy.sh` + `references/deploy.sh` |
+| `sf-deploy` | 18 | `apex`, `data`, `org`, `project` | `references/deploy.sh` (bundled) |
 | `sf-debug` | 4 | `apex`, `data` | — |
 | `sf-flow` | 3 | `flow` | — |
 | `sf-lwc` | 3 | `lightning` | — |
@@ -120,12 +138,14 @@ the two classes fall out cleanly rather than by taste.
 `sf-apex`, `sf-connected-apps` (already declares `allowed-tools`), `sf-diagram-mermaid`,
 `sf-docs`, `sf-integration`, `sf-metadata`, `sf-permissions`, `sf-soql`, `sf-testing`.
 
-**Flagged for a second look during the hardening pass.** Five of the nine mention `sf` in
-inline backticks inside gotcha/knowledge prose — `sf-testing` ("Live tests via `sf apex
-run test --wait 10 --target-org <alias>`"), `sf-metadata`, `sf-integration`, `sf-apex`,
-`sf-permissions`. The fenced-code criterion reads these as knowledge, which is the
-defensible call, but `sf-testing` is the most plausible misclassification and should be
-confirmed against a real run rather than by re-reading the text.
+**Flagged for a second look during the hardening pass.** Five of the nine also mention
+`sf` in inline backticks inside gotcha/knowledge prose — `sf-testing` ("Live tests via
+`sf apex run test --wait 10 --target-org <alias>`"), `sf-metadata`, `sf-integration`,
+`sf-apex`, `sf-permissions` — and, per the scope limitation above, eight of the nine carry
+fenced `sf` in their references. The fenced-SKILL.md criterion reads all nine as
+knowledge, which is the defensible call, but **`sf-testing` is the most plausible
+misclassification** on both signals at once and must be confirmed against a real run
+rather than by re-reading the text.
 
 ### Two premises corrected
 
@@ -146,8 +166,11 @@ confirmed against a real run rather than by re-reading the text.
 its *format* (§ `allowed-tools` format) and R5 checks that MCP names are fully qualified;
 neither can tell whether a declared set is sufficient for what the body actually does. An
 under-enumeration therefore fails at **agent runtime**, silently, on the Salesforce deploy
-path — and `sf-deploy` is the worst case, executing its own bundled shell scripts, so a
-`Bash(sf:*)`-only grant would break it.
+path — and `sf-deploy` is the worst case: 18 invocations across four `sf` verbs plus a
+bundled `references/deploy.sh`, so a `Bash(sf:*)`-only grant would break it. (Its mention
+of `scripts/prepare-scratch-deploy.sh` is **not** a bundled script and not something this
+skill runs — SKILL.md:283 names it as `brite-salesforce/scripts/…`, invoked by that repo's
+GitHub Actions workflow. Out of scope for this skill's grant.)
 
 That makes the frontmatter edit a dogfood-gated change, not a static one: each driver
 needs one real run against an org after its declaration lands. It is filed as a follow-up
