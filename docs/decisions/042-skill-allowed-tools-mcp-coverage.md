@@ -143,9 +143,30 @@ skill whose references are CLI-heavy should be confirmed by a run, not by the nu
 `sf apex run test --wait 10 --target-org <alias>`"), `sf-metadata`, `sf-integration`,
 `sf-apex`, `sf-permissions` — and, per the scope limitation above, eight of the nine carry
 fenced `sf` in their references. The fenced-SKILL.md criterion reads all nine as
-knowledge, which is the defensible call, but **`sf-testing` is the most plausible
-misclassification** on both signals at once and must be confirmed against a real run
-rather than by re-reading the text.
+knowledge, which is the defensible call.
+
+#### `sf-testing` — resolved, and why it needs no declaration
+
+It is the one knowledge skill whose *subject matter* is CLI execution, so it deserves an
+explicit answer rather than a flag. Its `SKILL.md` is structured as **nine numbered
+conventions** under "Brite Test Discipline" (coverage targets, `@TestSetup` static-state
+semantics, Queueable re-entry, `@TestVisible` gates) — a discipline document, not a
+procedure. Both `sf` mentions are descriptive, not imperative: § 8 documents what *CI* does
+("Scratch-org-per-PR validates deploys before merge. Live tests via `sf apex run test …`"),
+and § "When This Skill Owns the Task" lists "`sf apex run test` workflows" as a **routing
+trigger** — the skill's activation criteria, not a step it performs. Its 25 fenced
+invocations live in `references/cli-commands.md`, a lookup table.
+
+So: **knowledge, and it receives no `allowed-tools` declaration.** That is the safe
+resolution by construction, not a deferral — a skill with no declaration is *unrestricted*,
+exactly today's behavior, so it cannot be broken by an under-enumeration. The risk here runs
+one way only: adding a too-narrow declaration to a CLI-adjacent skill breaks it, while
+adding none preserves the status quo. `sf-testing` is therefore **explicitly out of scope
+for the hardening pass** until someone dogfoods it and demonstrates the skill itself
+executing `sf` — which BC-17743 carries as a blocking criterion, not a note.
+
+The same reasoning covers the other four inline-mention skills: no declaration, no
+restriction, no breakage, and no false claim of least privilege where none was applied.
 
 ### Two premises corrected
 
