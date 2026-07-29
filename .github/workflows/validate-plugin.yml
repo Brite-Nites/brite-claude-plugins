@@ -113,6 +113,20 @@ jobs:
       - name: Ruff (E9 + pyflakes; config in root pyproject.toml)
         run: ruff check --output-format=github .
 
+      - name: Ruff debt ratchet (no same-code regressions inside grandfathered files)
+        # per-file-ignores silences a code for a WHOLE file, so the step above
+        # cannot tell a pre-existing F401 from a brand-new one in the same file.
+        # This second pass runs --isolated (ignoring the grandfather) and compares
+        # per-(file, code) counts against the committed baseline, which only
+        # ratchets down — the ADR-034 R2-baseline idiom applied to ruff.
+        run: |
+          # `ruff check` exits 1 whenever findings exist, and 130 legitimately do;
+          # the ratchet script is the arbiter, so capture rather than propagate.
+          ruff check --isolated --select E9,F --output-format=concise . \
+            > "$RUNNER_TEMP/ruff-findings.txt" || true
+          python3 scripts/_lib/check_ruff_debt.py docs/ruff-debt-baseline.tsv \
+            < "$RUNNER_TEMP/ruff-findings.txt"
+
   vslice-inventory-only-rescaffold:
     # BC-9971 v-slice for the inventory-only-domain re-scaffold classifier
     # (flow-classify-domain-state.sh) — exercises the four classification
