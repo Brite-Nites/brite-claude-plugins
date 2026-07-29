@@ -5,7 +5,7 @@ A deterministic, stdlib-only checker. Two public entry points, both returning th
 SAME ``Finding`` shape:
 
   * ``lint_spec(path)``       — R1 (commands only) + R2–R6 over a command/SKILL.md
-                                spec + R8 (skills only).
+                                spec + R8 (both surfaces since BC-16865).
   * ``lint_evals_json(path)`` — R7 over an ``evals/evals.json`` file.
 
 Each ``Finding`` is ``{rule_id, severity, message, file, line?}``. This is the
@@ -443,10 +443,25 @@ def _plugin_root(spec: Path) -> Path | None:
     return None
 
 
-def _resolve_ref(token: str, spec: Path) -> Path | None:
+def _spec_bases(spec: Path) -> tuple[Path, Path | None]:
+    """(skill_dir, plugin_root) — the per-SPEC resolution a token lookup needs.
+
+    Hoisted out of `_resolve_ref` (BC-13306): it depends only on the spec, so doing
+    it per matched token repeated the same `Path.resolve()` (and the `parents` walk
+    in `_plugin_root`, itself another resolve) N times for a spec with N reference
+    tokens. R4 runs blocking + full-surface on every PR, and was ~77% of the scan.
+    """
     spec = spec.resolve()
-    skill_dir = spec.parent
-    proot = _plugin_root(spec)
+    return spec.parent, _plugin_root(spec)
+
+
+def _resolve_ref(token: str, skill_dir: Path, proot: Path | None) -> Path | None:
+    """Resolve ONE reference token against pre-resolved bases from `_spec_bases`.
+
+    Takes the bases rather than the spec so the caller hoists that work out of its
+    token loop. Behavior is otherwise identical — same candidate order, same
+    is_file() gate, same `resolve()` on the returned path.
+    """
     if token.startswith("${CLAUDE_SKILL_DIR}/"):
         cand = skill_dir / token[len("${CLAUDE_SKILL_DIR}/") :]
         return cand.resolve() if cand.is_file() else None
@@ -479,9 +494,11 @@ def _md_refs(text: str, spec: Path) -> list[tuple[str, Path]]:
     refs share a basename."""
     out: list[tuple[str, Path]] = []
     seen: set[Path] = set()
+    # Resolved ONCE per spec, not once per token (BC-13306).
+    skill_dir, proot = _spec_bases(spec)
     for m in MD_PATH_RE.finditer(text):
         token = m.group(0)
-        r = _resolve_ref(token, spec)
+        r = _resolve_ref(token, skill_dir, proot)
         if r is not None and r not in seen and not _is_spec(r):
             seen.add(r)
             out.append((token, r))
@@ -528,7 +545,8 @@ def rule_r4_nested_refs(path: Path, text: str) -> list[Finding]:
     return out
 
 
-# ── R8 — MCP-invoking skill must declare allowed-tools (GATE — skills only, BC-16387) ──
+# ── R8 — MCP-invoking spec must declare allowed-tools (GATE — commands + skills;
+#        BC-16387 shipped it skills-only, BC-16865 extended it to commands) ──
 # ADR-042: a SKILL that invokes an MCP tool in its body but declares no `allowed-tools`
 # inherits UNRESTRICTED tool access — a least-privilege gap (sharpest for skills that
 # could deploy/mutate). The mandate is PRESENCE (declare *some* allowed-tools), not
