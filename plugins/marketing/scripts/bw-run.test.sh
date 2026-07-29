@@ -96,6 +96,11 @@ fi
 SECSTUB
 chmod +x "$STUB_DIR/security"
 export PATH="$STUB_DIR:$PATH"
+# The self-unlock path resolves these two to absolute paths in trusted
+# prefixes (it carries the master password, so it must not trust PATH).
+# Point both at the stubs for testing.
+export BW_RUN_SECURITY_BIN="$STUB_DIR/security"
+export BW_RUN_BW_BIN="$STUB_DIR/bw"
 
 # --- Test harness ----------------------------------------------------------
 TESTS_RUN=0
@@ -527,6 +532,44 @@ rc=$?
 set -e
 assert_eq "$rc" "1" "t19 exit code is 1"
 assert_contains "$(cat "$err_file")" "vault is not unlocked" "t19 stderr keeps stale-session error"
+
+# --- TEST 20: untrusted/unresolvable bw binary -> self-unlock declines ------
+# The self-unlock path must not hand the master password to a binary it can't
+# resolve in a trusted prefix. With the override pointing nowhere, the mint is
+# skipped entirely (no security call) and the wrapper fails closed.
+echo "--- TEST 20: unresolvable bw binary -> no mint, exit 1 ---"
+setup
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+err_file="$STUB_DIR/t20.err"
+set +e
+BW_RUN_BW_BIN="$STUB_DIR/does-not-exist" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t20 exit code is 1"
+t20_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t20_unlock" "0" "t20 no unlock attempted with unresolvable bw"
+t20_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t20_sec" "0" "t20 master password never read when bw is untrusted"
+
+# --- TEST 21: single-attempt contract (ADR-010 § 1) ------------------------
+# Mint succeeds but verification still reports locked. The wrapper must NOT
+# mint a second time from the stale-session branch.
+echo "--- TEST 21: mint succeeds but status still locked -> exactly 1 attempt ---"
+setup
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"   # no after-unlock file: stays locked
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+err_file="$STUB_DIR/t21.err"
+set +e
+env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t21 exit code is 1"
+t21_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t21_unlock" "1" "t21 exactly one mint attempt (no double-unlock)"
+assert_contains "$(cat "$err_file")" "vault is not unlocked" "t21 fails closed with stale-session error"
 
 # --- Summary ---------------------------------------------------------------
 echo ""

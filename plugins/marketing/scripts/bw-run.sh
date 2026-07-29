@@ -25,13 +25,43 @@ fi
 # item keep the original fail-closed behavior byte-for-byte. The minted session
 # lives only in this process's env and is unset before exec like any other.
 # Provision once: security add-generic-password -U -a "$USER" -s bw-master -w
+#
+# This path hands the MASTER password (strictly worse to leak than a session
+# token — a session dies on `bw lock`, the master password does not) to two
+# subprocesses, so both are resolved to absolute paths in trusted prefixes
+# rather than inherited PATH: a shadowed `bw` earlier in PATH would otherwise
+# receive it. Override an unusual bw install with BW_RUN_BW_BIN.
+# BW_RUN_SECURITY_BIN exists so the test suite can point at its stub; in real
+# use the macOS path is fixed and PATH is deliberately not consulted.
+_SECURITY_BIN="${BW_RUN_SECURITY_BIN:-/usr/bin/security}"
+
+_resolve_bw_bin() {
+  if [ -n "${BW_RUN_BW_BIN:-}" ]; then
+    [ -x "$BW_RUN_BW_BIN" ] && printf '%s' "$BW_RUN_BW_BIN" && return 0
+    return 1
+  fi
+  _cand="$(command -v bw 2>/dev/null)" || return 1
+  case "$_cand" in
+    /opt/homebrew/bin/bw|/usr/local/bin/bw|/usr/bin/bw) printf '%s' "$_cand" ;;
+    *) return 1 ;;
+  esac
+}
+
+# At most ONE mint attempt per process (ADR-010 § 1 contract): the absent-session
+# and stale-session branches both call this, and a mint that "succeeds" but still
+# fails verification must not trigger a second attempt.
+_SELF_UNLOCK_TRIED=0
+
 _self_unlock() {
-  command -v security >/dev/null 2>&1 || return 1
-  _bw_master="$(security find-generic-password -s bw-master -w 2>/dev/null)" || return 1
+  [ "$_SELF_UNLOCK_TRIED" = "1" ] && return 1
+  _SELF_UNLOCK_TRIED=1
+  [ -x "$_SECURITY_BIN" ] || return 1
+  _bw_bin="$(_resolve_bw_bin)" || return 1
+  _bw_master="$("$_SECURITY_BIN" find-generic-password -s bw-master -w 2>/dev/null)" || return 1
   if [ -z "$_bw_master" ]; then
     return 1
   fi
-  if ! BW_SESSION="$(BW_PASSWORD="$_bw_master" bw unlock --raw --passwordenv BW_PASSWORD 2>/dev/null)"; then
+  if ! BW_SESSION="$(BW_PASSWORD="$_bw_master" "$_bw_bin" unlock --raw --passwordenv BW_PASSWORD 2>/dev/null)"; then
     _bw_master=""
     return 1
   fi
