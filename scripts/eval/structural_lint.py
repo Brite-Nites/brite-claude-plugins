@@ -547,15 +547,19 @@ def rule_r4_nested_refs(path: Path, text: str) -> list[Finding]:
 
 # ── R8 — MCP-invoking spec must declare allowed-tools (GATE — commands + skills;
 #        BC-16387 shipped it skills-only, BC-16865 extended it to commands) ──
-# ADR-042: a SKILL that invokes an MCP tool in its body but declares no `allowed-tools`
-# inherits UNRESTRICTED tool access — a least-privilege gap (sharpest for skills that
+# ADR-042: a SPEC that invokes an MCP tool in its body but declares no `allowed-tools`
+# inherits UNRESTRICTED tool access — a least-privilege gap (sharpest for specs that
 # could deploy/mutate). The mandate is PRESENCE (declare *some* allowed-tools), not
 # coverage of the exact tools used (a stronger check deferred to a follow-up, with the
-# .mcp.json cross-check). SKILLS ONLY, mirroring R4's enforcement model: the changed-set
-# diff-gate is commands-only (COMMAND_GLOB) and never sees skills, so R8 is enforced
-# solely full-surface by eval_gate --structural (ADR-034). Commands are DEFERRED — many
-# are orchestrators that name mcp__ tools when specifying subagent dispatch rather than
-# invoking them directly, a per-command triage of its own (the 16-command follow-up).
+# .mcp.json cross-check). BOTH SURFACES, and enforced solely full-surface by
+# eval_gate --structural (ADR-034): the changed-set diff-gate is commands-only
+# (COMMAND_GLOB) so it never sees skills, and it deliberately does NOT forward R8 for
+# commands either — R8 carries command debt rows the diff-gate cannot read, so it is
+# listed in eval_gate's DEBT_GRANDFATHERED_RULES alongside R2 (BC-16865).
+# ADR-042 § Amendment 2026-07-29 has the triage that retired the original commands-
+# deferral: all 16 MCP-referencing commands proved to be genuine orchestrator
+# invocations, NOT the expected mix with subagent tool-specs, so no second class
+# existed to separate and the mandate is identical on both surfaces.
 #
 # The trigger is a body reference to a fully-qualified mcp__ tool name (the SAME name
 # shape R5 validates). HIGH-PRECISION, PARTIAL-RECALL by design: a full mcp__ path in a
