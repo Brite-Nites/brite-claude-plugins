@@ -609,15 +609,18 @@ def rule_r8_allowed_tools_required(path: Path, text: str) -> list[Finding]:
         return []  # declares allowed-tools → least-privilege satisfied (presence mandate)
     hit = _mcp_body_hit(text)
     if hit is None:
-        return []  # no MCP invocation in body → exempt (knowledge / reference skill)
+        return []  # no MCP invocation in body → exempt (knowledge / reference spec)
     line, snippet = hit
     rel = _rel(path)
+    # BC-16865: R8 covers commands as well as skills, so the message names the
+    # surface it fired on rather than always saying "skill".
+    kind = spec_kind(path)
     reason = parse_marker(text, R8_OVERRIDE_TOKEN)
     if reason is None:
         return [
             Finding(
                 "R8-allowed-tools-required", SEV_GATE,
-                f"skill body invokes MCP tool '{snippet}' but declares no allowed-tools "
+                f"{kind} body invokes MCP tool '{snippet}' but declares no allowed-tools "
                 "(add a least-privilege allowed-tools, or a `# lint:no-mcp-invocation <reason>` "
                 "override if this is a documentation mention, not an invocation)",
                 rel, line,
@@ -628,7 +631,7 @@ def rule_r8_allowed_tools_required(path: Path, text: str) -> list[Finding]:
         return [
             Finding(
                 "R8-allowed-tools-required", SEV_GATE,
-                f"skill body invokes MCP tool '{snippet}' but declares no allowed-tools "
+                f"{kind} body invokes MCP tool '{snippet}' but declares no allowed-tools "
                 "(a `# lint:no-mcp-invocation` marker is present but has no reason, so it is ignored)",
                 rel, line,
             ),
@@ -649,17 +652,26 @@ def rule_r8_allowed_tools_required(path: Path, text: str) -> list[Finding]:
 
 
 # ── Rule registry ─────────────────────────────────────────────────────────────
-# Each rule is a function (path, text) -> list[Finding]. R1 is command-only; R8 is
-# skill-only; the other structural rules run on every spec (commands + skills).
+# Each rule is a function (path, text) -> list[Finding]. R1 is command-only; every
+# other structural rule runs on both surfaces (commands + skills).
 SPEC_RULES_ALL: list = [
     rule_r2_body_too_long,
     rule_r3_description,
     rule_r4_nested_refs,
     rule_r5_mcp_qualified,
     rule_r6_hardcoded_paths,
+    # R8 shipped skills-only (ADR-042 decision 5 deferred commands pending a
+    # per-command triage). BC-16865 ran that triage: all 16 MCP-referencing
+    # commands turned out to be GENUINE orchestrator invocations — the
+    # "some are only subagent tool-specs" hypothesis found zero instances — so
+    # the least-privilege mandate applies identically on both surfaces.
+    rule_r8_allowed_tools_required,
 ]
 SPEC_RULES_COMMAND_ONLY: list = [rule_r1_side_effecting]  # command files only
-SPEC_RULES_SKILL_ONLY: list = [rule_r8_allowed_tools_required]  # SKILL.md files only
+# Intentionally empty: R8 graduated to SPEC_RULES_ALL in BC-16865. Kept (rather
+# than deleting the list and its dispatch branch) so the next skills-only rule
+# is a one-line append, symmetric with SPEC_RULES_COMMAND_ONLY.
+SPEC_RULES_SKILL_ONLY: list = []  # SKILL.md files only
 
 
 def lint_spec(path: str | Path) -> list[Finding]:

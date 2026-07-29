@@ -46,6 +46,47 @@ So the audit's coverage table measures raw *presence*, which conflates "declares
 - **R8 is high-precision, partial-recall — a documented limitation.** The classifier keys on a full `mcp__…` path in the body, which is an unambiguous invocation. But the skill-tool-integration guide (`docs/guides/skill-tool-integration-pattern.md` § PR checklist) prescribes *bare semantic* tool names in bodies (`list_teams`, not the `mcp__` path); a bare name is indistinguishable from prose without a per-server tool inventory, so R8 cannot detect a bare-name invoker that omits `allowed-tools` (only review catches that). Broadening to bare names would be hopelessly false-positive (words like `query`/`search`/`get_issue` appear in prose). Measured: of 33 skills that declare `allowed-tools`, 12 name full `mcp__` paths in-body (the pattern R8 gates going forward) and 21 use bare names (R8-silent, and correctly so — they already declare `allowed-tools`). R8 gates the detectable pattern; it does not claim total recall.
 - **R8 is enforced by the REQUIRED eval-gate job** (`eval_gate.py --structural`) and `validate.sh §15a`, so a new violation blocks the PR that trips it even in a merge race — the standard ADR-034 trade-off, and the fix is local.
 
+## Amendment 2026-07-29 (BC-16865) — R8 graduates to the command surface
+
+Decision item 5 above deferred commands, on the stated expectation that the 16
+MCP-referencing commands were a mix — "some genuine invocations, some orchestrators
+naming tools only to specify **subagent dispatch**" — and that separating them was a
+per-command triage.
+
+**That triage ran, and the mixed premise did not survive it. All 16 are genuine direct
+invocations; zero are subagent tool-specs.** Every hit reads as an instruction to the
+command itself — `Call mcp__…`, `Use mcp__…`, `Query mcp__…`. The flow-architecture
+orchestrators, the suspected subagent-spec class, are the most explicit of all: they say
+"**the orchestrator** owns the `LINEAR_ISSUE_COUNT` env-var … Call the Linear MCP
+`mcp__plugin_workflows_linear-server__list_issues` … **before dispatching the skill**."
+`cadence/weekly` makes the distinction itself, contrasting its own paginated Linear call
+with the `Agent` fan-out it runs alongside. This is the same shape as the revops premise
+correction in Context above: the deferral was sound, its stated reason was not.
+
+Since there is no second class to separate, the mandate is identical on both surfaces:
+
+1. `rule_r8_allowed_tools_required` moves from `SPEC_RULES_SKILL_ONLY` to
+   `SPEC_RULES_ALL`. The finding message now names the surface it fired on
+   (`command body invokes…` / `skill body invokes…`); a command finding that said
+   "skill" would send the reader to the wrong file type. `SPEC_RULES_SKILL_ONLY` is
+   kept but empty, so the next skills-only rule is a one-line append.
+2. **All 16 current gaps are grandfathered** as `(file, R8-allowed-tools-required)`
+   rows in `docs/structural-lint-debt.md`. Value is forward-only — the 17th
+   MCP-invoking command cannot ship without `allowed-tools`.
+3. **No `# lint:no-mcp-invocation` markers were added to command bodies.** That would
+   edit `plugins/*/commands/**` and force three plugin version bumps (cadence,
+   flow-architecture, workflows) inside a lint change — and the markers would be
+   *wrong*, since every one of these is a real invocation, not a documentation mention.
+   Debt rows carry the exemption instead; the marker path stays for genuine mentions
+   (a command fixture covers it).
+4. **Still no version bump** — `scripts/eval/` + `docs/` only, for the same reason
+   decision item 4 gives.
+
+Actually closing the gaps — adding real least-privilege `allowed-tools` to the 16 — is
+deliberately *not* this change: it is a per-plugin pass that carries version bumps and
+per-command judgment about which tools each genuinely needs. It is tracked separately, and
+the debt rows are the ledger for it.
+
 ## Alternatives considered
 
 | Alternative | Rejected because |
