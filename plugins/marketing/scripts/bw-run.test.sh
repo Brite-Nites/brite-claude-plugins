@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # bw-run.test.sh — pure-bash test suite for bw-run.sh (BC-6906).
-# Stubs `bw` via PATH-prepended temp dir; real `jq` is required on PATH.
-# 11 cases: 5 spec-mandated + 6 review-driven (T-F1 BW_SESSION unset,
-# T-F3 mixed-result batch, T-F4 sequential per-item failure, T-F5 empty
-# EXPORTS, P3-1 missing command after --, P3-8 bad-arg-shape variants).
+# Stubs `bw` AND `security` via PATH-prepended temp dir; real `jq` is
+# required on PATH. 19 cases: 5 spec-mandated + review-driven additions
+# (T-F1 BW_SESSION unset, T-F3 mixed-result batch, T-F4 sequential per-item
+# failure, T-F5 empty EXPORTS, P3-1 missing command after --, P3-8
+# bad-arg-shape variants, BC-6958 micro-fix coverage) + 4 Keychain
+# self-unlock cases (T16–T19). The `security` stub defaults to
+# item-not-found so every pre-self-unlock case keeps its exact behavior
+# regardless of the developer's real Keychain.
 # macOS bash 3.2 portable.
 set -euo pipefail
 
@@ -26,6 +30,9 @@ export STUB_CALL_LOG="$STUB_DIR/calls.log"
 export STUB_STATUS_FILE="$STUB_DIR/status.json"
 export STUB_LIST_FILE="$STUB_DIR/list.json"
 export STUB_GET_DIR="$STUB_DIR/passwords"
+export STUB_KEYCHAIN_FILE="$STUB_DIR/keychain.pw"
+export STUB_UNLOCK_TOKEN_FILE="$STUB_DIR/unlock.token"
+export STUB_STATUS_AFTER_UNLOCK_FILE="$STUB_DIR/status-after-unlock.json"
 mkdir -p "$STUB_GET_DIR"
 
 cat >"$STUB_DIR/bw" <<'BWSTUB'
@@ -34,7 +41,22 @@ cat >"$STUB_DIR/bw" <<'BWSTUB'
 printf '%s\n' "$*" >>"$STUB_CALL_LOG"
 case "$1" in
   status)
-    cat "$STUB_STATUS_FILE"
+    # Dynamic status for self-unlock tests: once an `unlock` call has been
+    # logged, serve the after-unlock status when one is scripted.
+    if [ -f "$STUB_STATUS_AFTER_UNLOCK_FILE" ] && grep -q '^unlock' "$STUB_CALL_LOG"; then
+      cat "$STUB_STATUS_AFTER_UNLOCK_FILE"
+    else
+      cat "$STUB_STATUS_FILE"
+    fi
+    ;;
+  unlock)
+    # `unlock --raw --passwordenv BW_PASSWORD` — scripted self-unlock result.
+    if [ -f "$STUB_UNLOCK_TOKEN_FILE" ]; then
+      cat "$STUB_UNLOCK_TOKEN_FILE"
+    else
+      echo "Invalid master password." >&2
+      exit 1
+    fi
     ;;
   list)
     # `list items --search <prefix>` — emit the scripted JSON array.
@@ -58,6 +80,21 @@ case "$1" in
 esac
 BWSTUB
 chmod +x "$STUB_DIR/bw"
+
+cat >"$STUB_DIR/security" <<'SECSTUB'
+#!/usr/bin/env bash
+# security stub: `find-generic-password -s bw-master -w` — scripted Keychain.
+# Defaults to not-found (exit 44, matching macOS) so tests never consult the
+# developer's real Keychain.
+printf 'security %s\n' "$*" >>"$STUB_CALL_LOG"
+if [ -f "$STUB_KEYCHAIN_FILE" ]; then
+  cat "$STUB_KEYCHAIN_FILE"
+else
+  echo "security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain." >&2
+  exit 44
+fi
+SECSTUB
+chmod +x "$STUB_DIR/security"
 export PATH="$STUB_DIR:$PATH"
 
 # --- Test harness ----------------------------------------------------------
@@ -90,6 +127,7 @@ setup() {
   printf '{"status":"unlocked"}' >"$STUB_STATUS_FILE"
   printf '[]' >"$STUB_LIST_FILE"
   rm -f "$STUB_GET_DIR"/*
+  rm -f "$STUB_KEYCHAIN_FILE" "$STUB_UNLOCK_TOKEN_FILE" "$STUB_STATUS_AFTER_UNLOCK_FILE"
 }
 
 # --- TEST 1: Locked vault -> exit 1 ----------------------------------------
@@ -199,7 +237,9 @@ rc=$?
 set -e
 assert_eq "$rc" "1" "t6 exit code is 1"
 assert_contains "$(cat "$err_file")" "BW_SESSION not set" "t6 stderr names BW_SESSION"
-t6_bw_calls=$(grep -c '^' "$STUB_CALL_LOG" || true)
+# The self-unlock preflight may consult the local Keychain (`security` lines)
+# before failing; the invariant here is zero *bw* subprocess calls.
+t6_bw_calls=$(grep -vc '^security ' "$STUB_CALL_LOG" || true)
 assert_eq "$t6_bw_calls" "0" "t6 no bw calls before exit"
 
 # --- TEST 7 (T-F3): Mixed-result batch (some present, some missing) -> exit 3
@@ -411,6 +451,82 @@ case "$(cat "$out_file")" in
   *) FAIL_MSG=0 ;;
 esac
 assert_eq "$FAIL_MSG" "0" "t15 second-match value is not exported"
+
+# --- TEST 16: Keychain self-unlock when BW_SESSION unset -------------------
+# Opt-in path: no session, but the Keychain item exists and `bw unlock`
+# succeeds -> wrapper mints a session and proceeds to fetch + exec.
+echo "--- TEST 16: keychain self-unlock, BW_SESSION unset -> success ---"
+setup
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
+printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+printf '[{"name":"solo-key","login":{"password":"val-solo"}}]' >"$STUB_LIST_FILE"
+out_file="$STUB_DIR/t16.out"
+set +e
+env -u BW_SESSION bash "$WRAPPER" \
+  KEY1=solo-key \
+  -- bash -c 'env | grep -E "^(KEY1|BW_SESSION)=" | sort' >"$out_file" 2>/dev/null
+rc=$?
+set -e
+assert_eq "$rc" "0" "t16 exit code is 0"
+assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t16 KEY1 exported"
+unlock_calls=$(grep -c '^unlock --raw --passwordenv BW_PASSWORD' "$STUB_CALL_LOG" || true)
+assert_eq "$unlock_calls" "1" "t16 exactly 1 unlock call with --passwordenv"
+sec_calls=$(grep -c '^security find-generic-password -s bw-master -w' "$STUB_CALL_LOG" || true)
+assert_eq "$sec_calls" "1" "t16 keychain consulted once"
+case "$(cat "$out_file")" in
+  *"BW_SESSION="*) T16_LEAK=1 ;;
+  *) T16_LEAK=0 ;;
+esac
+assert_eq "$T16_LEAK" "0" "t16 minted BW_SESSION not visible to wrapped process"
+
+# --- TEST 17: No Keychain item + no session -> original fail-closed --------
+echo "--- TEST 17: no keychain item, BW_SESSION unset -> exit 1 + hint ---"
+setup
+err_file="$STUB_DIR/t17.err"
+set +e
+env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t17 exit code is 1"
+assert_contains "$(cat "$err_file")" "BW_SESSION not set" "t17 stderr keeps original error"
+assert_contains "$(cat "$err_file")" "add-generic-password" "t17 stderr carries provisioning hint"
+
+# --- TEST 18: Stale session + Keychain item -> re-mint and proceed ---------
+echo "--- TEST 18: stale BW_SESSION, keychain present -> re-mint ---"
+setup
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
+printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+printf '[{"name":"solo-key","login":{"password":"val-solo"}}]' >"$STUB_LIST_FILE"
+out_file="$STUB_DIR/t18.out"
+set +e
+BW_SESSION=stale-token bash "$WRAPPER" \
+  KEY1=solo-key \
+  -- bash -c 'env | grep "^KEY1="' >"$out_file" 2>/dev/null
+rc=$?
+set -e
+assert_eq "$rc" "0" "t18 exit code is 0"
+assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t18 KEY1 exported"
+unlock_calls=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$unlock_calls" "1" "t18 exactly 1 re-mint unlock call"
+
+# --- TEST 19: Keychain present but unlock fails -> fail closed -------------
+# Wrong stored master password (bw unlock exits 1). Must land on the
+# original stale-session error, not loop or succeed.
+echo "--- TEST 19: keychain present, unlock fails -> exit 1 ---"
+setup
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
+printf 'wrong-master-pw' >"$STUB_KEYCHAIN_FILE"
+err_file="$STUB_DIR/t19.err"
+set +e
+BW_SESSION=stale-token bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t19 exit code is 1"
+assert_contains "$(cat "$err_file")" "vault is not unlocked" "t19 stderr keeps stale-session error"
 
 # --- Summary ---------------------------------------------------------------
 echo ""

@@ -9,7 +9,9 @@
 # License-equivalence: same repo, no external upstream — production promotion of the spike.
 # Usage: bw-run.sh KEY=item [KEY=item ...] -- cmd args...
 # Non-goals (canon scope discipline — see CONTRIBUTING.md § Plugin secret-config canon):
-#   no caching, no file I/O beyond env-export, no logging, no token refresh, no retry.
+#   no caching, no file I/O beyond env-export, no logging, no retry. The ONE
+#   sanctioned session acquisition is the opt-in macOS Keychain self-unlock in
+#   the preflight below (ADR-010 § 1); no other token refresh.
 #   Expansion proposals must update the canon doc first.
 set -euo pipefail
 
@@ -18,13 +20,40 @@ if ! command -v jq >/dev/null; then
   echo "bw-run.sh: jq is required (\`brew install jq\`)" >&2
   exit 1
 fi
+# Opt-in self-unlock (ADR-010 § 1): when BW_SESSION is absent or stale, mint a
+# fresh session from the macOS Keychain item `bw-master`. Machines without the
+# item keep the original fail-closed behavior byte-for-byte. The minted session
+# lives only in this process's env and is unset before exec like any other.
+# Provision once: security add-generic-password -U -a "$USER" -s bw-master -w
+_self_unlock() {
+  command -v security >/dev/null 2>&1 || return 1
+  _bw_master="$(security find-generic-password -s bw-master -w 2>/dev/null)" || return 1
+  if [ -z "$_bw_master" ]; then
+    return 1
+  fi
+  if ! BW_SESSION="$(BW_PASSWORD="$_bw_master" bw unlock --raw --passwordenv BW_PASSWORD 2>/dev/null)"; then
+    _bw_master=""
+    return 1
+  fi
+  _bw_master=""
+  export BW_SESSION
+}
+
+_UNLOCK_HINT="Run \`bw unlock\` and export BW_SESSION, or provision Keychain self-unlock: security add-generic-password -U -a \"\$USER\" -s bw-master -w"
+
 if [ -z "${BW_SESSION:-}" ]; then
-  echo "bw-run.sh: BW_SESSION not set. Run \`bw unlock\` and export BW_SESSION." >&2
+  _self_unlock || true
+fi
+if [ -z "${BW_SESSION:-}" ]; then
+  echo "bw-run.sh: BW_SESSION not set. $_UNLOCK_HINT" >&2
   exit 1
 fi
 if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
-  echo "bw-run.sh: vault is not unlocked (BW_SESSION may be stale). Run \`bw unlock\` again." >&2
-  exit 1
+  _self_unlock || true
+  if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
+    echo "bw-run.sh: vault is not unlocked (BW_SESSION may be stale). $_UNLOCK_HINT" >&2
+    exit 1
+  fi
 fi
 
 # --- Arg parse: collect KEY=item entries until -- separator -----------------

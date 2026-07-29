@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **ADR-008 default-flip executed (BC-16888)** — `enrichment_provider` auto-detect now resolves `brite_mcp` first when the brite-enrichment MCP is registered (was: opt-in only; auto-detect went `brite_cli` → `blitz_waterfall`). Engine-maturity sign-off recorded as an operator decision (2026-07-08) on BC-16888; the fail-open fall-through to `blitz_waterfall` is unchanged. ADR-008 + `tam-mapping` + `list-building` updated in lockstep (`plugin.json` and `/marketing:tam-map` already described the target order). BC-13096/BC-6322 continue as hardening tracks.
 
 ### Added
+- **bw-run.sh opt-in Keychain self-unlock** — when `BW_SESSION` is absent or stale, the wrapper now mints a session itself from the macOS Keychain item `bw-master` (`bw unlock --raw --passwordenv`); machines without the item keep the original fail-closed behavior byte-for-byte, and error messages gain a provisioning hint. Kills both the vault-lock-mid-session recovery tax and the "MCP spawn fails because the launching shell had no `BW_SESSION`" mode. 4 new test cases (T16–T19) + a PATH-stubbed `security`; ADR-010 § 1 and the CONTRIBUTING canon updated in lockstep.
 - Brite-specific brand content in product-marketing-context skill
 - Social media strategy skill stub
 - Content strategy skill stub
