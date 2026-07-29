@@ -98,27 +98,39 @@ fi
 TRIGGER_Q="${TRIGGER//+/%2B}"
 
 edited_ts() {
-  # Latest updated_at among Greptile SUMMARY comments edited since the trigger
-  # (empty if none). Two filters, both required:
-  #   `since=` — server-side filter on updated_at (verified against a real
-  #     edited comment), so the response stays small on a busy PR and the
-  #     summary can't fall off page 1. It is inclusive; the classifier's strict
-  #     `>` rejects the boundary.
-  #   body carries a Confidence Score — binds the freshness signal to the same
-  #     object the SCORE is read from. Without it any greptile-authored comment
-  #     edited after the trigger (or an interim edit with no score yet) would
-  #     terminate the wait while the score came from somewhere else.
-  [ -n "$BASE_REPO" ] && [ -n "$PR_NUM" ] || { echo ""; return; }
-  # `gh api` prints the HTTP error BODY to stdout before exiting nonzero, so a
-  # trailing `|| echo ""` would assign a JSON blob rather than empty. Branch on
-  # exit status instead (the repo's `if x=$(...)` set-e idiom).
+  # updated_at of THE comment the verdict's score was read from, when that exact
+  # comment was edited since the trigger (empty otherwise).
+  #
+  # Binding to the verdict's own comment id is the point. A max() across all
+  # greptile-authored comments would let one comment's fresh edit terminate the
+  # wait while the score came from a DIFFERENT comment — reporting a verdict that
+  # no single review object ever asserted. REST `node_id` is the same identifier
+  # `greptile-verdict.sh` emits as `comment_id` (both GraphQL node ids), so the
+  # two are joinable exactly.
+  #
+  # `since=` keeps the server-side filter on updated_at (verified against a real
+  # edited comment): the response stays small on a busy PR and the summary can't
+  # fall off page 1. It is inclusive; the classifier's strict `>` rejects the
+  # boundary. A comment absent from the filtered set simply wasn't edited since
+  # the trigger → empty → not fresh.
+  local node_id="${1:-}"
+  [ -n "$BASE_REPO" ] && [ -n "$PR_NUM" ] && [ -n "$node_id" ] || { echo ""; return; }
+  # A verdict sourced from a REVIEW body carries a review node id, which matches
+  # no issue comment → empty → freshness degrades to the two other signals.
+  case "$node_id" in IC_*) ;; *) echo ""; return ;; esac
+  # Piped to real `jq` rather than gh's built-in `--jq`, because the id must be
+  # passed as data via `--arg` (gh's --jq takes no jq flags, and interpolating an
+  # id into the program text would be an injection seam). `set -o pipefail` is on,
+  # so a failing `gh` still fails the substitution → the else branch.
+  #
+  # Branching on exit status matters: `gh api` prints the HTTP error BODY to
+  # stdout before exiting nonzero, so a trailing `|| echo ""` would assign a JSON
+  # blob rather than empty (the repo's `if x=$(...)` set-e idiom).
   local out
-  if out="$(gh api "repos/$BASE_REPO/issues/$PR_NUM/comments?since=$TRIGGER_Q&per_page=100" --jq '
-    [ .[]
-      | select(((.user.login // "") | ascii_downcase) | test("greptile"))
-      | select(((.body // "") | test("(?i)confidence\\s*score")))
-      | (.updated_at // "") ]
-    | map(select(. != "")) | sort | last // ""' 2>/dev/null)"; then
+  if out="$(gh api "repos/$BASE_REPO/issues/$PR_NUM/comments?since=$TRIGGER_Q&per_page=100" 2>/dev/null \
+    | jq -r --arg id "$node_id" '
+      [ .[] | select((.node_id // "") == $id) | (.updated_at // "") ]
+      | map(select(. != "")) | sort | last // ""' 2>/dev/null)"; then
     printf '%s\n' "$out"
   else
     echo ""
@@ -158,12 +170,17 @@ while [ "$i" -lt "$max_iters" ]; do
   # snapshot is at least as fresh as the signal — shrinks the propagation race
   # between check-run completion and the in-place comment edit (BC-16924 review).
   rts="$(review_ts)"   # head-SHA Greptile check-run completed_at (BC-16924)
-  ets="$(edited_ts)"   # latest Greptile comment updated_at since trigger (BC-12580)
   verdict="$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')"
-  # One jq pass extracts both fields (tab-separated) to save a fork per poll.
-  IFS="$(printf '\t')" read -r score vts <<EOF
-$(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // "")] | @tsv')
+  # One jq pass extracts all three fields (tab-separated) to save forks per poll.
+  IFS="$(printf '\t')" read -r score vts cid <<EOF
+$(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // ""), (.comment_id // "")] | @tsv')
 EOF
+  # AFTER the verdict, and keyed on the comment the verdict came from (BC-12580):
+  # the edit signal has to describe the same object as the score. If that comment
+  # is edited in the gap between these two reads, the pairing is (fresh edit, one-
+  # poll-stale score) — which yields FRESH_FAIL and another poll, never a spurious
+  # pass, because the gate only re-triggers when the score is already below 5.
+  ets="$(edited_ts "$cid")"
   state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --edited-ts "$ets" --score "$score")"
   case "$state" in
     FRESH_PASS|FRESH_FAIL|TIMED_OUT)
