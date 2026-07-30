@@ -37,7 +37,7 @@ The eval asserts the artifact's deterministic **STRUCTURE** — that the written
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/canonicals_bootstrap.py" \
-  --canonicals-dir plugins/marketing/data/canonicals \
+  --canonicals-dir "${CLAUDE_PLUGIN_ROOT}/data/canonicals" \
   vertical --slug "<slug>" --display "<display>" \
   --aliases "<aliases>" --playbook-path "<path>" --preview
 ```
@@ -58,7 +58,7 @@ Present the YAML diff preview to the operator via `AskUserQuestion`:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/canonicals_bootstrap.py" \
-  --canonicals-dir plugins/marketing/data/canonicals \
+  --canonicals-dir "${CLAUDE_PLUGIN_ROOT}/data/canonicals" \
   vertical --slug "<slug>" --display "<display>" \
   --aliases "<aliases>" --playbook-path "<path>"
 ```
@@ -71,7 +71,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/canonicals_bootstrap.py" \
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint_canonicals.py" \
-  --canonicals-dir plugins/marketing/data/canonicals
+  --canonicals-dir "${CLAUDE_PLUGIN_ROOT}/data/canonicals"
 ```
 
 2. Extract `handbook_draft` from the helper output. Display to operator:
