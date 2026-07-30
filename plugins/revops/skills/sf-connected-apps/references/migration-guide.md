@@ -328,6 +328,8 @@ sf project retrieve start \
 mkdir -p force-app/main/default/externalClientApps
 mkdir -p force-app/main/default/extlClntAppGlobalOauthSets
 mkdir -p force-app/main/default/extlClntAppOauthSettings
+# Required for JWT bearer — carries pre-authorization (Phase 3, File 4):
+mkdir -p force-app/main/default/extlClntAppOauthPolicies
 # Optional when you source-control security settings:
 mkdir -p force-app/main/default/extlClntAppOauthSecuritySettings
 
@@ -337,4 +339,6 @@ sf project deploy start \
   --target-org $TARGET_ORG
 
 echo "✅ ECA deployed. Retrieve new Consumer Key from Setup."
+echo "   For JWT: confirm .ecaOauthPlcy deployed, then enable JWT Bearer Flow"
+echo "   and upload the certificate in Setup — that step is UI-only."
 ```

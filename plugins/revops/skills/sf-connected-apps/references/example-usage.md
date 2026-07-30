@@ -207,6 +207,13 @@ Migrate our "SalesPortal" Connected App to an External Client App for better sec
    3. SalesPortalECA.ecaOauth-meta.xml
    4. (Optional) SalesPortalECA.ecaOauthSecurity-meta.xml after retrieve-first validation
 
+   Three files suffice here because this is an Authorization Code flow, which has
+   an interactive consent step. A JWT Bearer app additionally REQUIRES
+   SalesPortalECA.ecaOauthPlcy-meta.xml (ExtlClntAppOauthConfigurablePolicies)
+   to set Permitted Users to AdminApprovedPreAuthorized — without it JWT fails
+   with "user is not admin approved to access this app". See migration-guide.md
+   Phase 3 File 4.
+
 🔄 Migration Steps:
    1. ✓ Generate ECA metadata files
    2. □ Deploy ECA to DevHub
