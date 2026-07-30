@@ -36,7 +36,7 @@ The eval asserts the artifact's deterministic **STRUCTURE** — that the written
 2. Run preview via helper:
 
 ```bash
-python3 plugins/marketing/scripts/canonicals_bootstrap.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/canonicals_bootstrap.py" \
   --canonicals-dir plugins/marketing/data/canonicals \
   persona --vertical "<vertical>" --slug "<slug>" --display "<display>" \
   --titles "<titles>" --preview
@@ -57,7 +57,7 @@ Present the YAML diff preview to the operator via `AskUserQuestion`:
 1. Run the helper WITHOUT `--preview`:
 
 ```bash
-python3 plugins/marketing/scripts/canonicals_bootstrap.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/canonicals_bootstrap.py" \
   --canonicals-dir plugins/marketing/data/canonicals \
   persona --vertical "<vertical>" --slug "<slug>" --display "<display>" \
   --titles "<titles>"
@@ -70,7 +70,7 @@ python3 plugins/marketing/scripts/canonicals_bootstrap.py \
 1. Run lint to verify the mutation is clean:
 
 ```bash
-python3 plugins/marketing/scripts/lint_canonicals.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint_canonicals.py" \
   --canonicals-dir plugins/marketing/data/canonicals
 ```
 

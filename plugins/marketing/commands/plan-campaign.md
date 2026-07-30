@@ -214,7 +214,7 @@ On miss, HARD-FAIL. When `personas[]` is empty, render `<empty>` for the list (d
 ERROR: Persona '<--persona>' is not defined for vertical '<--vertical>' in {vertical}.yaml.
 Either correct the slug, OR add it via /marketing:new-persona (BC-8725).
 If BC-8725 is not yet shipped, hand-edit plugins/marketing/data/canonicals/{vertical}.yaml per the schema
-(append to personas[] with slug + display + titles[]) and run `python3 plugins/marketing/scripts/lint_canonicals.py`
+(append to personas[] with slug + display + titles[]) and run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint_canonicals.py"`
 to verify before re-invoking. See BC-8727 friction-log F1.
 Current canonical personas: <comma-separated personas[].slug, OR "<empty — vertical has no personas; Path A required>">
 ```

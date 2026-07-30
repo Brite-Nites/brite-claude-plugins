@@ -193,7 +193,7 @@ linear_tmp="$(mktemp -t portfolio-snapshot-linear.XXXXXX.json)"
 printf '%s' '<phase-4-linear-result-as-json>' > "$linear_tmp"
 
 # Invoke the helper
-python3 plugins/marketing/scripts/portfolio_snapshot.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/portfolio_snapshot.py" \
   --span <monthly|quarterly> \
   --window-start <window_start> \
   --window-end <window_end> \

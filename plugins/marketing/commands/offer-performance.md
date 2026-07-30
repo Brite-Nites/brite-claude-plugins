@@ -68,7 +68,7 @@ For each manifest with an `email_bison.campaign_id`, call `mcp__emailbison-b2b__
 Save Phase 3 + Phase 4 results to temp JSON, then invoke the helper:
 
 ```bash
-python3 plugins/marketing/scripts/offer_performance.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/offer_performance.py" \
   --offer-slug <offer_slug> \
   --campaigns-dir docs/campaigns \
   --canonicals-dir plugins/marketing/data/canonicals \

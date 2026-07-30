@@ -142,9 +142,8 @@ Run this block before Phase 0. Every input that flows into `Bash`, the skill's `
    Then verify CLI scripts on PATH (Labs only):
 
    ```bash
-   REPO=$(git rev-parse --show-toplevel) && \
    for script in icypeas_client.py spider_crawl.py enrich_waterfall.py verify_smtp.py; do
-     python3 "$REPO/plugins/marketing/scripts/tam-map/${script}" --help >/dev/null 2>&1 \
+     python3 "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/${script}" --help >/dev/null 2>&1 \
        && echo "OK: ${script}" \
        || echo "MISSING: ${script}"
    done
@@ -463,7 +462,7 @@ Operator option-pick mapping: "Yes" → invoke skill in step 4 (per BC-2707, the
 1. **Construct invocation (Labs only).** Same flag set as prior phases, with `--stop-at-phase 7`. Skill runs Phase 6 SMTP verify + Phase 7 icp-scoring delegation.
 
 2. **Invoke skill.** Skill runs:
-   - Phase 6 — `Bash` → `python plugins/marketing/scripts/tam-map/verify_smtp.py --in enriched.jsonl --out verified.jsonl`. Catch-all isolation: code 2 rows kept with `catch_all=true` flag.
+   - Phase 6 — `Bash` → `python "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/verify_smtp.py" --in enriched.jsonl --out verified.jsonl`. Catch-all isolation: code 2 rows kept with `catch_all=true` flag.
    - Phase 7 — JSONL→CSV reshape (`verified-flat.csv` with top-level `catch_all` column, free-email rows routed to `personal-contacts.csv`); then delegation to icp-scoring skill via `--rubric abc`.
 
    On exit:
