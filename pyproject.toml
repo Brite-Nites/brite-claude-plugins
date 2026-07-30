@@ -1,0 +1,110 @@
+# Ruff configuration for brite-claude-plugins (BC-16867 — rationale in ADR-043).
+#
+# This file exists ONLY to configure ruff. There is deliberately NO [project] and
+# NO [build-system] table: this repo is a plugin monorepo, not a Python package,
+# and those tables would invite pip/setuptools to try to build it. (The root
+# pyproject.toml that BC-16371 removed was a leaked lint FIXTURE — a stub with a
+# fake project table. This one is real config.)
+#
+# Its presence intentionally re-arms the local Python path in
+# `scripts/pre-commit.sh` and the workflows PreToolUse hook, both of which gate on
+# `[ -f pyproject.toml ]`. The grandfather block below keeps both green on today's
+# tree, so they only ever fire on NEW violations.
+
+[tool.ruff]
+# Floor across the repo — plugins/revops/pyproject.toml declares requires-python
+# ">=3.10". That file keeps its own pytest/black/isort config; ruff config lives
+# here at the root so one gate covers all 162 .py files.
+target-version = "py310"
+
+[tool.ruff.lint]
+# E9 = syntax and IO errors. F = pyflakes: undefined names, unused imports,
+# unused variables, duplicate dict keys. Real-bug rules only.
+#
+# Style, import-order and modernization rules (E/W/I/UP/B/SIM/…) are NOT selected
+# on purpose: they report 1252 findings on this tree versus 130 for E9+F, so
+# adopting them would mean grandfathering ten times the debt and churning nearly
+# every Python file the moment anyone touches it. Widening the set is a
+# deliberate future decision, not a default.
+select = ["E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# GRANDFATHER — 130 pre-existing findings across 54 files, snapshotted 2026-07-29
+# against ruff 0.16.0 (the version pinned in the python-lint CI job). This is what
+# lets the gate go green on day one with zero code edits, and therefore zero
+# plugin version bumps: 51 of the 54 files live under plugins/*/skills/**, where
+# any edit would force a cache-invalidating bump inside what is otherwise a
+# config-only change.
+#
+# Each row silences ONLY the codes that file already violates — a NEW violation of
+# any OTHER selected rule in these same files still blocks. The debt is almost
+# entirely the vendored revops sf-skills tree.
+#
+# LIMITATION, and how it is covered: per-file-ignores is per-(file, code), not
+# per-occurrence, so it cannot distinguish a pre-existing F401 from a brand-new
+# F401 in the SAME file — ruff alone would let that ship silently. The
+# `python-lint` CI job therefore runs a second, --isolated pass and compares
+# per-(file, code) COUNTS against `docs/ruff-debt-baseline.tsv`, which only
+# ratchets down (`scripts/_lib/check_ruff_debt.py`). Growth, a new pair, and an
+# un-updated shrink all fail. Keep the two in sync: an edit here that changes what
+# is suppressed must be reflected there.
+#
+# Burn-down is tracked separately (see the follow-up ticket referenced in ADR-043).
+# After a burn-down, rebuild BOTH this table and the baseline from:
+#   ruff check --isolated --select E9,F --output-format=concise .
+# and to check remaining debt at a glance:
+#   ruff check --isolated --select E9,F --statistics .
+"plugins/marketing/scripts/_shared/manifest_loader.py" = ["F401"]
+"plugins/marketing/scripts/lint_canonicals.py" = ["F841"]
+"plugins/marketing/scripts/portfolio_snapshot.py" = ["F401"]
+"plugins/marketing/tests/test_plan_campaign_contracts.py" = ["F841"]
+"plugins/revops/shared/code_analyzer/dependency_checker.py" = ["F401"]
+"plugins/revops/shared/code_analyzer/formatter.py" = ["F401"]
+"plugins/revops/shared/code_analyzer/live_query_plan.py" = ["F401"]
+"plugins/revops/shared/code_analyzer/parser.py" = ["F401"]
+"plugins/revops/shared/code_analyzer/scanner.py" = ["F401", "F541"]
+"plugins/revops/shared/code_analyzer/score_merger.py" = ["F601"]
+"plugins/revops/shared/hooks/scripts/naming_validator.py" = ["F541"]
+"plugins/revops/shared/hooks/scripts/soql-schema-check.py" = ["F401"]
+"plugins/revops/shared/hooks/scripts/validator-dispatcher.py" = ["F401"]
+"plugins/revops/shared/lsp-engine/diagnostics.py" = ["F541"]
+"plugins/revops/shared/lsp-engine/lsp-acquire.py" = ["F401", "F541"]
+"plugins/revops/shared/soql_extractor.py" = ["F401"]
+"plugins/revops/skills/sf-apex/hooks/scripts/apex-lsp-validate.py" = ["F401", "F841"]
+"plugins/revops/skills/sf-apex/hooks/scripts/llm_pattern_validator.py" = ["F401", "F541"]
+"plugins/revops/skills/sf-apex/hooks/scripts/post-tool-validate.py" = ["F841"]
+"plugins/revops/skills/sf-apex/hooks/scripts/prettier-format.py" = ["F401"]
+"plugins/revops/skills/sf-apex/hooks/scripts/validate_apex.py" = ["F401", "F841"]
+"plugins/revops/skills/sf-data/hooks/scripts/soql_validator.py" = ["F401"]
+"plugins/revops/skills/sf-data/hooks/scripts/validate_data_operation.py" = ["F841"]
+"plugins/revops/skills/sf-diagram-mermaid/scripts/mermaid_preview.py" = ["F401", "F541", "F841"]
+"plugins/revops/skills/sf-diagram-mermaid/scripts/query-org-metadata.py" = ["F401"]
+"plugins/revops/skills/sf-docs/scripts/extract_help_salesforce.py" = ["F401"]
+"plugins/revops/skills/sf-flow/hooks/scripts/post-tool-validate.py" = ["F841"]
+"plugins/revops/skills/sf-flow/hooks/scripts/simulate_flow.py" = ["F401", "F541"]
+"plugins/revops/skills/sf-flow/hooks/scripts/validate_flow.py" = ["F541"]
+"plugins/revops/skills/sf-flow/scripts/doc_generator.py" = ["F401", "F541"]
+"plugins/revops/skills/sf-integration/hooks/scripts/suggest_credential_setup.py" = ["F401"]
+"plugins/revops/skills/sf-integration/hooks/scripts/validate_integration.py" = ["F401"]
+"plugins/revops/skills/sf-lwc/hooks/scripts/lwc-lsp-validate.py" = ["F401", "F841"]
+"plugins/revops/skills/sf-lwc/hooks/scripts/template_validator.py" = ["F401"]
+"plugins/revops/skills/sf-lwc/hooks/scripts/validate_slds.py" = ["F401", "F541", "F841"]
+"plugins/revops/skills/sf-metadata/hooks/scripts/generate_permission_set.py" = ["F401", "F541", "F841"]
+"plugins/revops/skills/sf-metadata/hooks/scripts/validate_metadata.py" = ["F401", "F541"]
+"plugins/revops/skills/sf-permissions/scripts/__init__.py" = ["F401"]
+"plugins/revops/skills/sf-permissions/scripts/cli.py" = ["F401"]
+"plugins/revops/skills/sf-permissions/scripts/hierarchy_viewer.py" = ["F541"]
+"plugins/revops/skills/sf-permissions/scripts/metadata_fetcher.py" = ["F401", "F841"]
+"plugins/revops/skills/sf-permissions/scripts/permission_detector.py" = ["F401"]
+"plugins/revops/skills/sf-permissions/scripts/permission_exporter.py" = ["F401"]
+"plugins/revops/skills/sf-permissions/scripts/renderers/__init__.py" = ["F401"]
+"plugins/revops/skills/sf-permissions/scripts/renderers/ascii_tree.py" = ["F401", "F541"]
+"plugins/revops/skills/sf-permissions/scripts/renderers/mermaid.py" = ["F401"]
+"plugins/revops/skills/sf-permissions/scripts/tooling_api.py" = ["F401", "F841"]
+"plugins/revops/skills/sf-soql/hooks/scripts/post-tool-validate.py" = ["F541", "F841"]
+"plugins/revops/skills/sf-testing/hooks/scripts/parse-test-results.py" = ["F401", "F841"]
+"plugins/revops/tests/hooks/conftest.py" = ["F401"]
+"plugins/revops/tests/hooks/test_agentscript_validator.py" = ["F401"]
+"plugins/revops/tests/test_datacloud_skill_contracts.py" = ["F401"]
+"plugins/revops/tools/install.py" = ["F541", "F841"]
+"scripts/gen-skill-docs.py" = ["F541"]

@@ -85,6 +85,48 @@ jobs:
           # would fail that job spuriously. See test-python-units.sh guard.)
           REQUIRE_PYTEST: "true"
 
+  python-lint:
+    # BC-16867 / ADR-043 — the repo had NO Python lint gate anywhere after
+    # BC-16371 removed the only-local pre-commit ruff (it depended on a leaked
+    # root pyproject.toml stub). Config now lives in the real root
+    # pyproject.toml [tool.ruff]; rules are E9 + pyflakes only, with today's 130
+    # findings grandfathered per-file so this is green from day one.
+    #
+    # A dedicated job rather than a validate.sh section: validate.sh is
+    # deliberately stdlib-only / no-pip, so it cannot assume ruff is installed —
+    # putting the gate there would make it a silent no-op for anyone without
+    # ruff. BLOCKING (no continue-on-error), mirroring python-units.
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 5
+    permissions:
+      contents: read  # least-privilege — ruff only reads in-repo files
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install ruff
+        # Pinned: an unpinned ruff would let a new upstream release add rules to
+        # E9/F (or change fix behavior) and red the gate on an untouched tree.
+        # Bump deliberately, re-running the grandfather snapshot in pyproject.toml.
+        run: python3 -m pip install 'ruff==0.16.0'
+
+      - name: Ruff (E9 + pyflakes; config in root pyproject.toml)
+        run: ruff check --output-format=github .
+
+      - name: Ruff debt ratchet (no same-code regressions inside grandfathered files)
+        # per-file-ignores silences a code for a WHOLE file, so the step above
+        # cannot tell a pre-existing F401 from a brand-new one in the same file.
+        # This second pass runs --isolated (ignoring the grandfather) and compares
+        # per-(file, code) counts against the committed baseline, which only
+        # ratchets down — the ADR-034 R2-baseline idiom applied to ruff.
+        run: |
+          # `ruff check` exits 1 whenever findings exist, and 130 legitimately do;
+          # the ratchet script is the arbiter, so capture rather than propagate.
+          ruff check --isolated --select E9,F --output-format=concise . \
+            > "$RUNNER_TEMP/ruff-findings.txt" || true
+          python3 scripts/_lib/check_ruff_debt.py docs/ruff-debt-baseline.tsv \
+            < "$RUNNER_TEMP/ruff-findings.txt"
+
   vslice-inventory-only-rescaffold:
     # BC-9971 v-slice for the inventory-only-domain re-scaffold classifier
     # (flow-classify-domain-state.sh) — exercises the four classification
