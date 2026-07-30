@@ -54,14 +54,7 @@
 -->
 <ExtlClntAppOauthConfigurablePolicies xmlns="http://soap.sforce.com/2006/04/metadata">
     <commaSeparatedPermissionSet>{{PERMISSION_SETS}}</commaSeparatedPermissionSet>
-    <!-- externalClientApplication + label are NOT on the 2026-07-28 retrieve's
-         captured field list. They are included by analogy with the sibling ECA
-         types (ExtlClntAppGlobalOauthSettings, ExtlClntAppOauthSettings), which
-         both carry this linkage pair. Confirm against your own retrieve; drop
-         them if your org's shape rejects them. -->
-    <externalClientApplication>{{APP_NAME}}</externalClientApplication>
     <ipRelaxationPolicyType>{{IP_RELAXATION}}</ipRelaxationPolicyType>
-    <label>{{LABEL}}</label>
     <permittedUsersPolicyType>{{PERMITTED_USERS}}</permittedUsersPolicyType>
     <refreshTokenPolicyType>{{REFRESH_TOKEN_POLICY}}</refreshTokenPolicyType>
     <!-- Only when refreshTokenPolicyType selects a bounded lifetime. The unit
@@ -69,4 +62,13 @@
     <!-- <refreshTokenValidityPeriod>30</refreshTokenValidityPeriod> -->
     <!-- <refreshTokenValidityUnit>Days</refreshTokenValidityUnit> -->
     <requiredSessionLevel>{{SESSION_LEVEL}}</requiredSessionLevel>
+    <!-- externalClientApplication + label are NOT on the 2026-07-28 retrieve's
+         captured field list. Every sibling ECA type carries this linkage pair,
+         so this template probably needs it too — but "probably" is not good
+         enough to emit by default, so they are commented out. Uncomment after
+         a retrieve confirms your org's shape, and keep alphabetical order:
+         externalClientApplication goes after commaSeparatedPermissionSet, and
+         label after ipRelaxationPolicyType. -->
+    <!-- <externalClientApplication>{{APP_NAME}}</externalClientApplication> -->
+    <!-- <label>{{LABEL}}</label> -->
 </ExtlClntAppOauthConfigurablePolicies>
