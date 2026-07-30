@@ -87,121 +87,134 @@ deliberately *not* this change: it is a per-plugin pass that carries version bum
 per-command judgment about which tools each genuinely needs. It is tracked separately, and
 the debt rows are the ledger for it.
 
-## Amendment 2026-07-29 (BC-16866) — the revops `sf`-CLI Bash axis, classified
+## Amendment 2026-07-30 (BC-16866) — the revops Bash axis, classified
 
 Context above established that revops SF skills invoke **no** MCP tool, so R8 correctly
 does not cover them, and that the genuine least-privilege question for them is a **Bash
 axis**: a skill that runs `sf project deploy` with no `allowed-tools` inherits
-unrestricted tool access. This amendment records the audit that question needed, and
-separates the classification (settled here) from the frontmatter change (deliberately
-not made here — see § Why the frontmatter change is a separate step).
+unrestricted tool access. This amendment records that audit, and separates the
+classification (settled here) from the frontmatter change (deliberately not made here —
+see § Why the frontmatter change is a separate step).
 
-### Method: fenced-code invocation in the SKILL.md body, not raw mentions
+### Criterion: who runs the command, not where the command text sits
 
-The trap the follow-up named is real — `sf-apex` and `sf-soql` *display* `sf` commands in
-examples while being code generators, so any "mentions `sf`" test false-mandates them.
-The criterion used is **`sf` invoked at the start of a line inside a fenced code block of
-the `SKILL.md` body**, counted separately from raw mentions anywhere in the body.
+The first pass used a **fenced-code** criterion: `sf` invoked at the start of a line
+inside a fenced block of the `SKILL.md` body. It was chosen to survive the prose-vs-code
+trap — `sf-apex` and `sf-soql` *display* `sf` commands while being code generators — and
+for that narrow purpose it works.
 
-**Scope limitation, stated because it changes how much the counts prove:** this scans
-`SKILL.md` bodies only, not the bundled `references/*.md` those bodies progressively
-disclose. Scanning the references too finds fenced `sf` invocations in **8 of the 9**
-skills classified as knowledge — `sf-metadata` 87, `sf-soql` 38, `sf-testing` 36,
-`sf-connected-apps` 20, `sf-apex` 19, `sf-integration` 16, `sf-permissions` 6,
-`sf-diagram-mermaid` 5.
+It is nonetheless the wrong test, and review caught it. It measures **where the command
+text sits**, not **where the imperative sits**. A skill whose body says "run the smallest
+useful test set first" while its command string lives in a bundled reference reads as
+knowledge under it, and is in fact directing the agent to execute.
 
-That does **not** flip the classification, and the reason matters: those hits concentrate
-in files named `cli-reference.md`, `cli-commands.md`, `field-and-cli-reference.md` —
-lookup tables *documenting* the CLI for a human or for code generation. Treating them as
-invocation is the prose-vs-code trap one level deeper: reference material about a CLI is
-the single most likely place for a command to appear without anyone running it.
+The criterion is therefore:
 
-What it does mean is that the counts below bound *the skill's own procedure*, not
-everything an agent might encounter while following it — so a classification for any
-skill whose references are CLI-heavy should be confirmed by a run, not by the number.
-`sf-testing` is the sharpest case: 36 fenced invocations across its references,
-25 of them in `references/cli-commands.md`.
+> A skill **executes** (a *driver*) if its own `SKILL.md` body instructs the agent to run
+> something — `sf`, or a bundled script — as a step in its procedure, wherever the command
+> text lives: inline, fenced, or in a bundled reference the body points the agent to.
+>
+> A skill is **knowledge** if it instead produces an artifact (code, XML, queries,
+> diagrams) or delegates execution to a named sibling skill.
+>
+> The discriminator is **who runs it**: this skill, or someone it hands off to.
 
-### Classification of all 14 skills
+The delegating cases are what make this testable rather than a matter of taste. `sf-soql`
+§ 4 says "If the user wants runtime verification, hand off execution to `sf-data`";
+`sf-apex` § 5 hands off deploy and test; `sf-diagram-mermaid` § 2 sends real schema
+discovery to `sf-metadata`. Each names its executor. `sf-testing` § Recommended Workflow
+says "Run the smallest useful test set first" and names no one. The first three are
+knowledge; the fourth is a driver.
 
-**`sf`-CLI drivers (5)** — execute `sf` in fenced blocks:
+**Corroboration that the fenced criterion failed.** Exactly one of the fourteen already
+declares `allowed-tools`: `sf-connected-apps`, with a bare `Bash`. The fenced criterion
+classified it knowledge. The criterion above classifies it a driver — § 3 says "retrieve
+it from an org first: `sf project retrieve start --metadata … --target-org <alias>`". The
+one skill a human had already judged to need a Bash grant is one the old test missed.
 
-| Skill | fenced `sf` | `sf` verbs | other shell |
+### Two axes, because they diverge
+
+Least privilege cares whether a skill shells out **at all**, which fixes the Bash grant.
+Risk cares whether it reaches **a Salesforce org**. Those are different sets, so the table
+records both.
+
+| Skill | Executes | Reaches an org | Evidence |
 | -- | -- | -- | -- |
-| `sf-deploy` | 18 | `apex`, `data`, `org`, `project` | `references/deploy.sh` (bundled) |
-| `sf-debug` | 4 | `apex`, `data` | — |
-| `sf-flow` | 3 | `flow` | — |
-| `sf-lwc` | 3 | `lightning` | — |
-| `sf-data` | 1 | `sobject` | `jq` |
+| `sf-deploy` | `sf` (`project`/`apex`/`data`/`org`) + bundled `references/deploy.sh` | yes | 19 fenced invocations |
+| `sf-debug` | `sf` (`apex log`/`tail`, `data`) | yes | 4 fenced |
+| `sf-flow` | `sf` (`flow run test`/`get test`) | yes | 3 fenced |
+| `sf-lwc` | `sf` (`lightning dev`) | yes | 3 fenced |
+| `sf-data` | `sf` (`data`, `sobject`) | yes | 1 fenced + 5 inline verbs |
+| `sf-testing` | `sf apex run test`, via `references/` | yes | § Workflow: "Run the smallest useful test set first" |
+| `sf-metadata` | `sf` metadata + `sobject describe`, via § 2 and `references/` | yes | § 2: "For querying, prefer `sf` … commands" |
+| `sf-connected-apps` | `sf project retrieve`, `sf org login` | yes | § 3: "retrieve it from an org first" |
+| `sf-permissions` | `sf`, via `references/` — **org-mutating** | yes | § 2: "Verify `sf` auth before running permission analysis"; `references/agent-access-guide.md:53` runs `sf org assign permset … -o TARGET_ORG` |
+| `sf-diagram-mermaid` | `python scripts/query-org-metadata.py` (optional) | yes, read-only | § 2 + the § Reference Map link at `SKILL.md:153` |
+| `sf-docs` | `python scripts/extract_salesforce_doc.py` | **no — web docs only** | § "An optional wrapper script is available at …" (`SKILL.md:27`) |
+| `sf-apex` | — | no | generates code; § 5 hands off deploy and test |
+| `sf-soql` | — | no | generates queries; § 4 hands off execution to `sf-data` |
+| `sf-integration` | — | no | generates from `assets/`; see § Bundled files are not evidence |
 
-**Knowledge / code-generation (9)** — zero fenced `sf` invocations, correctly exempt:
-`sf-apex`, `sf-connected-apps` (already declares `allowed-tools`), `sf-diagram-mermaid`,
-`sf-docs`, `sf-integration`, `sf-metadata`, `sf-permissions`, `sf-soql`, `sf-testing`.
+**Eleven execute, three do not.** The first pass said five and nine. Every
+re-classification moved the same way — toward *more* execution — because a test keyed on
+fenced command text can only under-count.
 
-**Flagged for a second look during the hardening pass.** Five of the nine also mention
-`sf` in inline backticks inside gotcha/knowledge prose — `sf-testing` ("Live tests via
-`sf apex run test --wait 10 --target-org <alias>`"), `sf-metadata`, `sf-integration`,
-`sf-apex`, `sf-permissions` — and, per the scope limitation above, eight of the nine carry
-fenced `sf` in their references. The fenced-SKILL.md criterion reads all nine as
-knowledge, which is the defensible call.
+### Three findings the hardening pass must not inherit blind
 
-#### `sf-testing` — resolved, and why it needs no declaration
+1. **`Bash(sf:*)` is not a sufficient grant**, though it is the shape the follow-up
+   assumed. Three drivers run something that is not `sf`: `sf-deploy` (bundled
+   `references/deploy.sh`), `sf-diagram-mermaid` and `sf-docs` (bundled Python). A uniform
+   `Bash(sf:*)` breaks all three.
+2. **Executing is not the same as reaching an org.** `sf-docs` shells out on every
+   retrieval and never contacts Salesforce. It needs a Bash grant while carrying none of
+   the org risk, so grant shape and risk tier have to be decided separately.
+3. **`sf-permissions` mutates.** Its bundled access guide runs `sf org assign permset …
+   -o TARGET_ORG`. It sits above the read-only drivers on risk and should be dogfooded
+   first, not last.
 
-It is the one knowledge skill whose *subject matter* is CLI execution, so it deserves an
-explicit answer rather than a flag. Its `SKILL.md` is structured as **nine numbered
-conventions** under "Brite Test Discipline" (coverage targets, `@TestSetup` static-state
-semantics, Queueable re-entry, `@TestVisible` gates) — a discipline document, not a
-procedure. Both `sf` mentions are descriptive, not imperative: § 8 documents what *CI* does
-("Scratch-org-per-PR validates deploys before merge. Live tests via `sf apex run test …`"),
-and § "When This Skill Owns the Task" lists "`sf apex run test` workflows" as a **routing
-trigger** — the skill's activation criteria, not a step it performs. Its 25 fenced
-invocations live in `references/cli-commands.md`, a lookup table.
+### Bundled files are not evidence of execution
 
-So: **knowledge, and it receives no `allowed-tools` declaration.** That is the safe
-resolution by construction, not a deferral — a skill with no declaration is *unrestricted*,
-exactly today's behavior, so it cannot be broken by an under-enumeration. The risk here runs
-one way only: adding a too-narrow declaration to a CLI-adjacent skill breaks it, while
-adding none preserves the status quo. `sf-testing` is therefore **explicitly out of scope
-for the hardening pass** until someone dogfoods it and demonstrates the skill itself
-executing `sf` — which BC-17743 carries as a blocking criterion, not a note.
+Six skills ship `hooks/scripts/*.py` that `plugins/revops/hooks/hooks.json` never wires —
+it registers only the SessionStart SFDX banner, the core-enablement nudge, and a
+SubagentStart brain hint. Those are upstream leftovers that never run. `sf-integration`'s
+two `scripts/*.sh` and `sf-flow`'s `scripts/doc_generator.py` are likewise referenced by
+no `SKILL.md`. Only a script the body actually points the agent at counts, which is why
+`sf-diagram-mermaid` and `sf-docs` are drivers while `sf-integration` is not.
 
-The same reasoning covers the other four inline-mention skills: no declaration, no
-restriction, no breakage, and no false claim of least privilege where none was applied.
+### Restricted `Bash` is expressible and already precedented here
 
-### Two premises corrected
+The follow-up framed `allowed-tools: Bash(sf:*), Read` as hypothetical. In-tree precedent
+already exists: `workflows/agent-browser` declares `Bash(agent-browser:*)`, and
+`workflows/{setup-claude-md, post-plan-setup}` declare `Bash(find:*), Bash(cat:*),
+Bash(ls:*)`. So a meaningful scoping is available, and a bare `Bash` grant — what
+`sf-connected-apps` declares today — is presence without least privilege.
 
-1. **Restricted `Bash` IS expressible and already precedented here.** The follow-up
-   framed `allowed-tools: Bash(sf:*), Read` as hypothetical. In-tree precedent already
-   exists: `workflows/agent-browser` declares `Bash(agent-browser:*)`, and
-   `workflows/{setup-claude-md, post-plan-setup}` declare `Bash(find:*), Bash(cat:*),
-   Bash(ls:*)`. So a meaningful scoping is available — a bare `Bash` grant, which is what
-   `revops/sf-connected-apps` and every flow-architecture/cadence skill declare, would be
-   presence without least privilege.
-2. **`Read` is required by all five drivers, though only `sf-lwc` says so.** Each leans
-   on bundled `references/*.md` for progressive disclosure — 16 to 38 mentions apiece — so
-   an enumeration derived only from explicit tool names would under-grant and break them.
+`Read` is required by every driver except `sf-docs`: each points its body at bundled
+`references/*.md` for progressive disclosure, between 4 and 24 files apiece. An
+enumeration derived only from explicit tool names would under-grant and break them.
 
 ### Why the frontmatter change is a separate step
 
 **No gate in this repo can verify an `allowed-tools` restriction.** `validate.sh` checks
-its *format* (§ `allowed-tools` format) and R5 checks that MCP names are fully qualified;
-neither can tell whether a declared set is sufficient for what the body actually does. An
-under-enumeration therefore fails at **agent runtime**, silently, on the Salesforce deploy
-path — and `sf-deploy` is the worst case: 18 invocations across four `sf` verbs plus a
-bundled `references/deploy.sh`, so a `Bash(sf:*)`-only grant would break it. (Its mention
-of `scripts/prepare-scratch-deploy.sh` is **not** a bundled script and not something this
-skill runs — SKILL.md:283 names it as `brite-salesforce/scripts/…`, invoked by that repo's
-GitHub Actions workflow. Out of scope for this skill's grant.)
+its *format*, and R5 checks that MCP names are fully qualified; neither can tell whether a
+declared set is sufficient for what the body actually does. An under-enumeration fails at
+**agent runtime**, silently, on the Salesforce deploy path — and `sf-deploy` is the worst
+case: 19 invocations across four `sf` verbs plus a bundled `references/deploy.sh`, so a
+`Bash(sf:*)`-only grant would break it. (Its mention of `prepare-scratch-deploy.sh` is
+**not** bundled and not something this skill runs: `SKILL.md:279,283` name it as
+`brite-salesforce/scripts/…`, invoked by that repo's GitHub Actions workflow. Out of scope
+for this skill's grant.)
 
-That makes the frontmatter edit a dogfood-gated change, not a static one: each driver
-needs one real run against an org after its declaration lands. It is filed as a follow-up
-carrying this enumeration, so that work starts from the audit rather than repeating it.
-This amendment is docs-only and carries no version bump; the frontmatter change will carry
-a revops bump when it lands.
+That makes the frontmatter edit dogfood-gated rather than static: each driver needs one
+real run against an org after its declaration lands. It is filed as **BC-17743** carrying
+this enumeration, so that work starts from the audit instead of repeating it. This
+amendment is docs-only and carries no version bump; the frontmatter change will carry a
+revops bump when it lands.
 
 **No lint rule** is proposed, per the follow-up's own reasoning: a static detector for
-"drives the `sf` CLI" is the prose-vs-code trap in rule form. The fenced-code criterion
-above is good enough for a one-time audit by a human reader, and too brittle to gate on.
+"drives the `sf` CLI" is the prose-vs-code trap in rule form. The criterion above is a
+one-time audit instrument for a human reader and too brittle to gate on — that its own
+first version was wrong is the argument.
 
 ## Alternatives considered
 
