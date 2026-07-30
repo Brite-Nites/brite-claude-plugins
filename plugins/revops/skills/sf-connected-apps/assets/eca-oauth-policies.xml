@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template: External Client App - OAuth Configurable Policies
+  Use Case: The OAuth security policy that actually governs whether a JWT
+            credential works — permitted users, IP relaxation, refresh-token
+            lifetime, and session level.
+
+  This is the type people reach for when they mean "ECA policies". The
+  similarly-named ExtlClntAppConfigurablePolicies (.ecaPlcy) carries only app
+  enablement and start page — see assets/eca-policies.xml.
+
+  PROVENANCE — read before trusting any value below.
+  Seven field names were captured from a live retrieve (brite-dev-kells,
+  2026-07-28): permittedUsersPolicyType, ipRelaxationPolicyType,
+  commaSeparatedPermissionSet, refreshTokenPolicyType, refreshTokenValidityPeriod,
+  refreshTokenValidityUnit, requiredSessionLevel. Anything NOT on that list is
+  marked inline below. Picklist values can also move between API versions, so
+  SKILL.md § Recommended Workflow step 3 stands: retrieve from your own org and
+  treat the retrieved file as the schema source of truth.
+
+  FOR JWT BEARER, THE SETTINGS THAT MATTER:
+  - permittedUsersPolicyType must be AdminApprovedPreAuthorized (value observed
+    in the 2026-07-28 retrieve). JWT has no interactive consent step, so a
+    self-authorize policy can never be satisfied — that part follows from how JWT
+    works, not from one observation. The failure reads "user is not admin
+    approved to access this app".
+  - requiredSessionLevel must not require High Assurance. A server-to-server
+    session cannot satisfy MFA — again structural, not observational. STANDARD
+    (value observed in the same retrieve) means High Assurance off.
+  - commaSeparatedPermissionSet selects the pre-authorized permission set(s).
+    As of 2026-07-28 the Setup picker listed IsCustom = true permsets only, so a
+    standard licensed permset (e.g. SalesEngagementBasicUser, Type = Standard)
+    could not be chosen. Grant via a purpose-built custom handle permset rather
+    than a profile, which would authorize everyone on that profile.
+
+  Replace placeholders:
+  - {{APP_NAME}}: The ExternalClientApplication API name (must match .eca file)
+  - {{LABEL}}: Display label for this policy configuration
+  - {{PERMITTED_USERS}}: AdminApprovedPreAuthorized for JWT bearer
+  - {{IP_RELAXATION}}: the field is ipRelaxationPolicyType, NOT ConnectedApp's
+    ipRelaxation, and its values are NOT ConnectedApp's ENFORCE / BYPASS /
+    ENFORCE_ACTIVATED_USERS. `Bypass` was the value observed on the live ECA;
+    the enforcing counterpart's exact token was not captured. Prefer enforcing
+    IP restrictions wherever the calling runtime has a stable egress IP — relax
+    only when it does not, and say why in the PR.
+  - {{PERMISSION_SETS}}: comma-separated custom permset API names
+  - {{REFRESH_TOKEN_POLICY}}: refresh-token lifetime policy. The zero-persistence
+    value for THIS type was not captured — Brite's Marketing_Claude_MCP already
+    runs one, so retrieve its .ecaOauthPlcy and record the value here. Do NOT
+    copy ConnectedApp's lowercase `zero`; that is a different type's enum.
+  - {{SESSION_LEVEL}}: STANDARD unless High Assurance is genuinely required
+
+  File Naming: [AppName].ecaOauthPlcy-meta.xml
+-->
+<ExtlClntAppOauthConfigurablePolicies xmlns="http://soap.sforce.com/2006/04/metadata">
+    <commaSeparatedPermissionSet>{{PERMISSION_SETS}}</commaSeparatedPermissionSet>
+    <ipRelaxationPolicyType>{{IP_RELAXATION}}</ipRelaxationPolicyType>
+    <permittedUsersPolicyType>{{PERMITTED_USERS}}</permittedUsersPolicyType>
+    <refreshTokenPolicyType>{{REFRESH_TOKEN_POLICY}}</refreshTokenPolicyType>
+    <!-- Only when refreshTokenPolicyType selects a bounded lifetime. The unit
+         token below is a guess, not a captured value — verify before use. -->
+    <!-- <refreshTokenValidityPeriod>30</refreshTokenValidityPeriod> -->
+    <!-- <refreshTokenValidityUnit>Days</refreshTokenValidityUnit> -->
+    <requiredSessionLevel>{{SESSION_LEVEL}}</requiredSessionLevel>
+    <!-- externalClientApplication + label are NOT on the 2026-07-28 retrieve's
+         captured field list. Every sibling ECA type carries this linkage pair,
+         so this template probably needs it too — but "probably" is not good
+         enough to emit by default, so they are commented out. Uncomment after
+         a retrieve confirms your org's shape, and keep alphabetical order:
+         externalClientApplication goes after commaSeparatedPermissionSet, and
+         label after ipRelaxationPolicyType. -->
+    <!-- <externalClientApplication>{{APP_NAME}}</externalClientApplication> -->
+    <!-- <label>{{LABEL}}</label> -->
+</ExtlClntAppOauthConfigurablePolicies>

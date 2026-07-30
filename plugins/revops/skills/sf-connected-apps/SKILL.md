@@ -21,7 +21,7 @@ Use this skill when the user needs **OAuth app configuration** in Salesforce: Co
 
 Brite's integration auth landscape sits mid-migration. Spring '26 disabled org-wide creation of classic Connected Apps (SF Support re-enable required — treated as temporary migration runway), so every net-new OAuth app must be an `ExternalClientApplication`. Current inventory:
 
-- **`Marketing_Claude_MCP`** — **Brite's first pure ECA**, provisioned post-Spring-'26 per BC-5579. Plugin-side MCP runtime access. JWT bearer. Scopes `Api` + `RefreshToken`. `refreshTokenPolicy: zero`. Private key in the Engineering Bitwarden collection.
+- **`Marketing_Claude_MCP`** — **Brite's first pure ECA**, provisioned post-Spring-'26 per BC-5579. Plugin-side MCP runtime access. JWT bearer. Scopes `Api` + `RefreshToken`. Zero-persistence refresh-token policy — as a pure ECA the field is `refreshTokenPolicyType` on `ExtlClntAppOauthConfigurablePolicies`, not ConnectedApp's `refreshTokenPolicy`. Private key in the Engineering Bitwarden collection.
 - **`Outbound_Sales_Ops`** — live runtime integration writing CF-owned fields on Lead/Contact. **Legacy ConnectedApp auto-wrapped with an ECA settings file during the Spring '26 migration** — NOT a pure ECA. Parent `.connectedApp-meta.xml` + wrapper `.eca-meta.xml`. JWT bearer. `isAdminApproved=true`, `refreshTokenPolicy=zero`, `ipRelaxation=ENFORCE`.
 - **`CI_Deploy`** — ECA committed but **inactive** ("compliance-posture-only"). CI does NOT use this app. GitHub Actions deploys authenticate via `SFDX_AUTH_URL` under Salesforce's built-in `PlatformCLI` Connected App.
 - **`OutboundSync`** — separate sync path.
@@ -38,7 +38,7 @@ These rules bind any sf-connected-apps work done in a Brite repo. Violations blo
 
 2. **JWT-via-SFDX-CLI flow requires BOTH `Api` and `RefreshToken` scopes.** The `sf org login jwt` command persists auth records in `~/.sfdx/` and needs `RefreshToken` for that persistence — drop it and JWT exchange fails with "refresh_token scope is required." Pure JWT exchange at a non-CLI runtime (e.g. a Python MCP calling the token endpoint directly) does NOT require `RefreshToken` — apply the scope requirement where SFDX handles the handshake, not universally. Source: `docs/research/salesforce-mcp-findings.md` Q3 lines 50-52.
 
-3. **Set `refreshTokenPolicy: zero` on ECA OAuth policies (lowercase `zero`).** The Salesforce XML enum is lowercase — see `assets/connected-app-jwt.xml` and the `infinite | zero | specific_lifetime` enumeration in `assets/eca-policies.xml`. Uppercase `ZERO` will not validate. Belt-and-suspenders against long-lived refresh tokens even when clients mis-request them; default for new ECAs unless a flow documents a specific persistence need in its PR.
+3. **Default to a zero refresh-token policy, and mind which type you are editing.** On a **ConnectedApp** the field is `<refreshTokenPolicy>` inside `<oauthPolicy>`, and the enum is lowercase — `infinite | zero | specific_lifetime`; uppercase `ZERO` will not validate. See `assets/connected-app-jwt.xml`. On a **pure ECA** the field is `refreshTokenPolicyType` on `ExtlClntAppOauthConfigurablePolicies` (`assets/eca-oauth-policies.xml`) — a different type with a different enum, so do not copy the ConnectedApp value across. **The ECA zero-persistence value is not yet recorded here.** `Marketing_Claude_MCP` already runs one, so retrieve its `.ecaOauthPlcy` and write the value into this rule and into the asset. Until that lands, this convention is enforceable for ConnectedApps and advisory for ECAs — do not fail a review on a value the skill cannot supply. Belt-and-suspenders against long-lived refresh tokens even when clients mis-request them; default for new ECAs unless a flow documents a specific persistence need in its PR.
 
 4. **Exclude `ExtlClntAppOauthSettings` via `.forceignore` for sandbox deploys.** The file embeds an org-specific `oauthLink` (`OrgId:ConsumerRecordId`) that does not resolve cross-org. Excluded alongside the `ExternalClientApplication` type for sandbox work; temporarily comment the exclusions out before running a production deploy, then re-enable. The canonical toggle procedure lives in [sf-deploy](../sf-deploy/SKILL.md).
 
@@ -118,7 +118,10 @@ Use the provided assets instead of building from scratch:
 - `assets/external-client-app.xml`
 - `assets/eca-global-oauth.xml`
 - `assets/eca-oauth-settings.xml`
-- `assets/eca-policies.xml`
+- `assets/eca-policies.xml` — app enablement + start page ONLY
+- `assets/eca-oauth-policies.xml` — permitted users, IP relaxation, refresh-token lifetime, session level
+
+**The two policy types are near-identically named and carry disjoint fields.** `ExtlClntAppConfigurablePolicies` (`.ecaPlcy`) holds `externalClientApplication`, `isEnabled`, `isOauthPluginEnabled`, `label`, `startPage`. Everything that governs whether a credential actually works lives on `ExtlClntAppOauthConfigurablePolicies` (`.ecaOauthPlcy`) — and its field names are not ConnectedApp's: `ipRelaxationPolicyType` (not `ipRelaxation`), `refreshTokenPolicyType` (not `refreshTokenPolicy`). Putting OAuth policy on the `.ecaPlcy` type produces a file that will not deploy.
 
 If you need source-controlled ECA OAuth security metadata, retrieve it from an org first and treat the retrieved file as the schema source of truth:
 - `sf project retrieve start --metadata ExtlClntAppOauthSecuritySettings:<AppName> --target-org <alias>`
@@ -159,6 +162,72 @@ Default fix direction:
 - enable PKCE for public clients
 - keep secrets outside version control
 - use JWT certificates or controlled secret storage where appropriate
+
+---
+
+## ECA Pre-Authorization and JWT Bearer
+
+These are the settings that decide whether a JWT credential works at all. All measured against `brite-dev-kells`, 2026-07-28.
+
+### Permitted Users must be `AdminApprovedPreAuthorized`
+
+JWT has no interactive consent step, so a self-authorize policy can never be satisfied. The failure is `user is not admin approved to access this app`. Set `permittedUsersPolicyType` accordingly on `ExtlClntAppOauthConfigurablePolicies`.
+
+### The pre-auth permission-set picker lists custom permsets only
+
+As of 2026-07-28 it listed `IsCustom = true` permission sets only. A standard licensed permset — `SalesEngagementBasicUser`, `Type = Standard` — did not appear, no matter how correct it looked. That leaves two options: a profile grant, which authorizes everyone on that profile, or a purpose-built custom handle permset. Prefer the handle permset. (Picker behaviour is UI-version-sensitive; re-check before concluding a permset is unselectable today.)
+
+### The certificate upload only appears after JWT Bearer Flow is enabled
+
+Tick **Enable JWT Bearer Flow** first; the certificate field renders only then. There is no "Use digital signatures" checkbox as on Connected Apps — looking for one is a genuine dead end.
+
+This is a Setup-UI path. The metadata type carrying the flow-enablement flags was not captured in the 2026-07-28 audit — `ExtlClntAppOauthConfigurablePolicies` does **not** carry it, and `ExtlClntAppOauthSecuritySettings` is the likely home but unverified. Retrieve before assuming a metadata-only route exists.
+
+### High Assurance session level breaks JWT outright
+
+A server-to-server session cannot satisfy MFA. If `requiredSessionLevel` demands High Assurance the exchange fails in a way that looks nothing like an auth problem. `STANDARD` means High Assurance off.
+
+### Wrong audience fails as `invalid_grant: invalid assertion`
+
+The per-environment audience mapping already lives in [references/oauth-flows-reference.md](references/oauth-flows-reference.md) (sandbox is `https://test.salesforce.com`). What is worth adding is the symptom: using `login.salesforce.com` against a sandbox returns `invalid_grant: invalid assertion`, which reads like a certificate fault and sends you to the wrong place entirely.
+
+---
+
+## Verifying ECA Auth — Two Techniques Worth Keeping
+
+### `sf org login jwt` exits 0 on a FAILED JWT
+
+Observed directly on 2026-07-28: a login returning `user is not admin approved to access this app` still exited 0. The same false-success is recorded for `sf hardis auth login` in the `brite-salesforce` repo; it applies to the raw CLI command too. **Never treat exit status as proof.** Always confirm with a real query against the org.
+
+### Falsify a pre-auth grant without touching the live credential
+
+To test whether a pre-authorization grant is load-bearing, run JWT as a **second user on the same profile who lacks the permset**. The holder authorizes and the non-holder fails, so the permset is the only variable — and you never deselect a grant on a working credential.
+
+This settled a real dispute. `docs/runbooks/ci-deploy-user-provisioning.md` (BC-13242) records permset-only pre-auth failing in prod for `ci@`, which turned out **not** to generalize.
+
+---
+
+## An Empty Metadata Retrieve Is Not Evidence of a Platform Limitation
+
+Two wrong conclusions were drawn in a row from the same empty retrieve — first "the type is org-local and Setup-UI-only", then "wildcards don't enumerate these types". Both false.
+
+The real cause: `ExtlClntAppGlobalOauthSettings` and the policy records **are created when OAuth is enabled on the app**, and the retrieve ran before that. Wildcards and type-level retrieves both work fine.
+
+The lesson generalizes past ECAs. Before concluding a metadata type cannot be captured, run:
+
+```bash
+sf org list metadata --metadata-type <TypeName> --target-org <alias>
+```
+
+That distinguishes "does not exist yet" from "cannot be captured" in one call.
+
+---
+
+## Security Note: `.ecaGlblOauth` Carries the Consumer Key in Plaintext
+
+`ExtlClntAppGlobalOauthSettings` stores the `consumerKey` in plaintext beside the base64 certificate. Those two fields appear only on a **retrieved** file — the authoring template at `assets/eca-global-oauth.xml` carries neither, which is why the two look inconsistent.
+
+This skill is what tells people to retrieve these types, so treat a retrieved `.ecaGlblOauth` as sensitive: keep it out of commits, and check the consuming repo's `.forceignore` before retrieving into a working tree. Same mechanism as Convention 4 above, applied to a different type.
 
 ---
 

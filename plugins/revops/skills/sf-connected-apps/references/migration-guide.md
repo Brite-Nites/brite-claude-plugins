@@ -139,6 +139,12 @@ Week 12: Delete Connected App
 </ExtlClntAppOauthSettings>
 ```
 
+**File 4: OAuth Configurable Policies** (`MyApp.ecaOauthPlcy-meta.xml`) — **required for JWT bearer**
+
+This is the file that carries pre-authorization. Skip it and the app deploys fine but JWT fails with `user is not admin approved to access this app`, because Permitted Users never becomes `AdminApprovedPreAuthorized`. Full template and the per-field provenance notes: [`assets/eca-oauth-policies.xml`](../assets/eca-oauth-policies.xml).
+
+Note this is **not** `MyApp.ecaPlcy-meta.xml` (`ExtlClntAppConfigurablePolicies`), which carries only app enablement and start page.
+
 **Optional companion metadata (retrieve-first):** `MyApp.ecaOauthSecurity-meta.xml`
 - Use this when you need to source-control ECA OAuth security settings now supported by the CLI/SDR registry.
 - Recommended workflow: retrieve from an org first, then commit the retrieved file under `extlClntAppOauthSecuritySettings/`.
@@ -150,8 +156,11 @@ sf project deploy start \
   --metadata ExternalClientApplication:MyApp \
   --metadata ExtlClntAppGlobalOauthSettings:MyApp \
   --metadata ExtlClntAppOauthSettings:MyApp \
+  --metadata ExtlClntAppOauthConfigurablePolicies:MyApp \
   --target-org <target-org>
 ```
+
+Enabling JWT Bearer Flow itself is a Setup-UI step, and the certificate field renders only after it is ticked — see the sf-connected-apps SKILL.md § ECA Pre-Authorization and JWT Bearer.
 
 #### 3.4 Retrieve New Consumer Key
 
@@ -183,8 +192,10 @@ For each integrated system:
 | Consumer Secret | New Consumer Secret (different) |
 | Callback URL | Same (in `ecaGlblOauth`) |
 | Scopes | Same (in `ecaOauth`) |
-| IP Relaxation | In `ecaPlcy` (admin-managed) |
-| Refresh Token Policy | In `ecaPlcy` (admin-managed) |
+| IP Relaxation | `ipRelaxationPolicyType` in `ecaOauthPlcy` — NOT `ecaPlcy`, and NOT the ConnectedApp field name |
+| Refresh Token Policy | `refreshTokenPolicyType` in `ecaOauthPlcy` — same caveat |
+| Permitted Users / pre-authorization | `permittedUsersPolicyType` + `commaSeparatedPermissionSet` in `ecaOauthPlcy` |
+| Session level (High Assurance) | `requiredSessionLevel` in `ecaOauthPlcy` |
 | OAuth security controls | In `ecaOauthSecurity` when source-controlled (retrieve-first) |
 
 ---
@@ -231,13 +242,14 @@ sf project deploy start \
   --metadata ExternalClientApplication:MyApp \
   --metadata ExtlClntAppGlobalOauthSettings:MyApp \
   --metadata ExtlClntAppOauthSettings:MyApp \
+  --metadata ExtlClntAppOauthConfigurablePolicies:MyApp \
   --target-org production
 ```
 
 #### 6.2 Cutover Steps
 
-1. Deploy ECA to production
-2. Configure policies in Setup
+1. Deploy ECA to production, including the OAuth policies file — without it Permitted Users is not pre-authorized and JWT fails
+2. Enable JWT Bearer Flow and upload the certificate in Setup (UI-only; the certificate field appears only after the flow is ticked)
 3. Update production integrations
 4. Monitor for errors
 5. Keep Connected App active as fallback
@@ -316,6 +328,8 @@ sf project retrieve start \
 mkdir -p force-app/main/default/externalClientApps
 mkdir -p force-app/main/default/extlClntAppGlobalOauthSets
 mkdir -p force-app/main/default/extlClntAppOauthSettings
+# Required for JWT bearer — carries pre-authorization (Phase 3, File 4):
+mkdir -p force-app/main/default/extlClntAppOauthPolicies
 # Optional when you source-control security settings:
 mkdir -p force-app/main/default/extlClntAppOauthSecuritySettings
 
@@ -325,4 +339,6 @@ sf project deploy start \
   --target-org $TARGET_ORG
 
 echo "✅ ECA deployed. Retrieve new Consumer Key from Setup."
+echo "   For JWT: confirm .ecaOauthPlcy deployed, then enable JWT Bearer Flow"
+echo "   and upload the certificate in Setup — that step is UI-only."
 ```

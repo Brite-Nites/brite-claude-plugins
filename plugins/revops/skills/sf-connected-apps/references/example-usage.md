@@ -207,6 +207,13 @@ Migrate our "SalesPortal" Connected App to an External Client App for better sec
    3. SalesPortalECA.ecaOauth-meta.xml
    4. (Optional) SalesPortalECA.ecaOauthSecurity-meta.xml after retrieve-first validation
 
+   Three files suffice here because this is an Authorization Code flow, which has
+   an interactive consent step. A JWT Bearer app additionally REQUIRES
+   SalesPortalECA.ecaOauthPlcy-meta.xml (ExtlClntAppOauthConfigurablePolicies)
+   to set Permitted Users to AdminApprovedPreAuthorized — without it JWT fails
+   with "user is not admin approved to access this app". See migration-guide.md
+   Phase 3 File 4.
+
 🔄 Migration Steps:
    1. ✓ Generate ECA metadata files
    2. □ Deploy ECA to DevHub
@@ -237,8 +244,13 @@ sf project deploy start \
   --metadata ExternalClientApplication:MyECAName \
   --metadata ExtlClntAppGlobalOauthSettings:MyECAName \
   --metadata ExtlClntAppOauthSettings:MyECAName \
+  --metadata ExtlClntAppOauthConfigurablePolicies:MyECAName \
   --target-org my-devhub
 ```
+
+Drop the last line only if the app has no OAuth policy file. For JWT bearer it is
+required — it carries Permitted Users, and without it authentication fails with
+"user is not admin approved to access this app".
 
 ### Retrieve Existing Apps
 ```bash
@@ -252,5 +264,18 @@ sf project retrieve start \
   --metadata ExternalClientApplication:MyECAName \
   --metadata ExtlClntAppGlobalOauthSettings:MyECAName \
   --metadata ExtlClntAppOauthSettings:MyECAName \
+  --metadata ExtlClntAppOauthConfigurablePolicies:MyECAName \
+  --metadata ExtlClntAppConfigurablePolicies:MyECAName \
   --target-org my-org
 ```
+
+Retrieve both policy types. The retrieved file is the schema source of truth for
+this app family, and the two are easy to confuse:
+`ExtlClntAppOauthConfigurablePolicies` (`.ecaOauthPlcy`) carries the OAuth policy,
+while `ExtlClntAppConfigurablePolicies` (`.ecaPlcy`) carries only app enablement
+and start page.
+
+An empty result for either is not evidence the type cannot be captured — those
+records are created when OAuth is enabled on the app. Use
+`sf org list metadata --metadata-type <T>` to tell "does not exist yet" from
+"cannot be captured".

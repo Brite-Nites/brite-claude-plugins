@@ -1,36 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Template: External Client App - Configurable Policies
-  Use Case: Admin-configurable security policies for the ECA
+  Use Case: App-level enablement and landing page for the ECA
 
-  Note: This file is AUTO-GENERATED on first deployment.
-  Admins can modify these values in Setup UI or via Metadata API.
+  THIS TYPE CARRIES NO OAUTH POLICY. IP relaxation, refresh-token lifetime,
+  permitted users, and session level live on the near-identically-named
+  ExtlClntAppOauthConfigurablePolicies — see assets/eca-oauth-policies.xml.
+  Confusing the two is the easiest mistake to make here and produces a file
+  that will not deploy.
+
+  Field list verified against a live retrieve from brite-dev-kells (2026-07-28).
+
+  Note: these records are created when OAuth is enabled on the app, not when the
+  app is created. A retrieve that runs before then comes back empty — that is
+  "does not exist yet", NOT "cannot be captured". See SKILL.md
+  § An Empty Metadata Retrieve Is Not Evidence of a Platform Limitation.
 
   Replace placeholders:
-  - {{IP_RELAXATION}}: IP restriction policy
-  - {{REFRESH_TOKEN_POLICY}}: Refresh token lifetime policy
-  - {{SESSION_TIMEOUT}}: Session timeout in minutes
-
-  IP Relaxation Options:
-  - ENFORCE: Enforce IP restrictions (recommended)
-  - BYPASS: Bypass IP restrictions (use with caution)
-  - ENFORCE_ACTIVATED_USERS: Enforce for activated users only
-
-  Refresh Token Policies:
-  - infinite: Tokens never expire
-  - zero: No refresh tokens (use with JWT)
-  - specific_lifetime: Expire after specified period
+  - {{APP_NAME}}: The ExternalClientApplication API name (must match .eca file)
+  - {{LABEL}}: Display label for this policy configuration
+  - {{IS_ENABLED}}: true | false — whether the app is enabled in this org
+  - {{IS_OAUTH_PLUGIN_ENABLED}}: true | false — whether the OAuth plugin is active
+  - {{START_PAGE}}: landing URL after login; omit the element entirely if unused
 
   File Naming: [AppName].ecaPlcy-meta.xml
 -->
 <ExtlClntAppConfigurablePolicies xmlns="http://soap.sforce.com/2006/04/metadata">
-    <!-- IP Restriction Policy -->
-    <ipRelaxation>{{IP_RELAXATION}}</ipRelaxation>
-
-    <!-- Refresh Token Lifetime -->
-    <refreshTokenPolicy>{{REFRESH_TOKEN_POLICY}}</refreshTokenPolicy>
-    <!-- <refreshTokenValidityPeriod>30</refreshTokenValidityPeriod> -->
-
-    <!-- Session Timeout (minutes) -->
-    <sessionTimeout>{{SESSION_TIMEOUT}}</sessionTimeout>
+    <externalClientApplication>{{APP_NAME}}</externalClientApplication>
+    <isEnabled>{{IS_ENABLED}}</isEnabled>
+    <isOauthPluginEnabled>{{IS_OAUTH_PLUGIN_ENABLED}}</isOauthPluginEnabled>
+    <label>{{LABEL}}</label>
+    <!-- Optional — uncomment only if the app has a landing page. Left commented
+         so an unreplaced placeholder cannot deploy as a literal URL. -->
+    <!-- <startPage>{{START_PAGE}}</startPage> -->
 </ExtlClntAppConfigurablePolicies>
