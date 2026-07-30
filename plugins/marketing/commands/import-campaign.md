@@ -371,8 +371,8 @@ Workflow:
 3. Invoke the helper:
 
 ```bash
-python3 plugins/marketing/scripts/import_campaign.py compose \
-  --canonicals-manifest plugins/marketing/data/canonicals/_manifest.yaml \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/import_campaign.py" compose \
+  --canonicals-manifest "${CLAUDE_PLUGIN_ROOT}/data/canonicals/_manifest.yaml" \
   < "/tmp/import-campaign-payload-<slug>.json" \
   > "docs/campaigns/<entity>/<slug>/manifest.json"
 ```

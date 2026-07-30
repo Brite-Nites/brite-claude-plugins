@@ -193,12 +193,12 @@ linear_tmp="$(mktemp -t portfolio-snapshot-linear.XXXXXX.json)"
 printf '%s' '<phase-4-linear-result-as-json>' > "$linear_tmp"
 
 # Invoke the helper
-python3 plugins/marketing/scripts/portfolio_snapshot.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/portfolio_snapshot.py" \
   --span <monthly|quarterly> \
   --window-start <window_start> \
   --window-end <window_end> \
   --campaigns-dir docs/campaigns \
-  --canonicals-dir plugins/marketing/data/canonicals \
+  --canonicals-dir "${CLAUDE_PLUGIN_ROOT}/data/canonicals" \
   --sf-json "$sf_tmp" \
   --sf-status <ok|degraded_auth|degraded_query|empty> \
   --linear-json "$linear_tmp" \

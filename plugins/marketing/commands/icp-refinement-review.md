@@ -46,7 +46,7 @@ The review loop for `category=icp-refinement` signals in the GTM Discoveries pip
 Invoke the helper to enumerate pending `icp-refinement` signals across the campaigns tree:
 
 ```bash
-python3 plugins/marketing/scripts/icp_refinement_review.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/icp_refinement_review.py" \
   --campaigns-dir docs/campaigns \
   scan
 ```
@@ -115,7 +115,7 @@ If invoked with `--non-interactive --decision-map <path>`, skip Step 1 entirely.
 Invoke the helper to mutate `discoveries.json` in place:
 
 ```bash
-python3 plugins/marketing/scripts/icp_refinement_review.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/icp_refinement_review.py" \
   --campaigns-dir docs/campaigns \
   apply --decision-map <path-to-decision-map.json>
 ```
@@ -133,7 +133,7 @@ If exit code is non-zero, surface the helper's stderr to the operator and halt (
 For every `promoted` decision, invoke the helper to print a markdown blob:
 
 ```bash
-python3 plugins/marketing/scripts/icp_refinement_review.py \
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/icp_refinement_review.py" \
   --campaigns-dir docs/campaigns \
   emit-handbook --decision-map <path-to-decision-map.json>
 ```
