@@ -13,8 +13,8 @@
 
   Note: these records are created when OAuth is enabled on the app, not when the
   app is created. A retrieve that runs before then comes back empty — that is
-  "does not exist yet", NOT "cannot be captured". See SKILL.md § An empty
-  metadata retrieve is not evidence of a platform limitation.
+  "does not exist yet", NOT "cannot be captured". See SKILL.md
+  § An Empty Metadata Retrieve Is Not Evidence of a Platform Limitation.
 
   Replace placeholders:
   - {{APP_NAME}}: The ExternalClientApplication API name (must match .eca file)
@@ -30,5 +30,7 @@
     <isEnabled>{{IS_ENABLED}}</isEnabled>
     <isOauthPluginEnabled>{{IS_OAUTH_PLUGIN_ENABLED}}</isOauthPluginEnabled>
     <label>{{LABEL}}</label>
-    <startPage>{{START_PAGE}}</startPage>
+    <!-- Optional — uncomment only if the app has a landing page. Left commented
+         so an unreplaced placeholder cannot deploy as a literal URL. -->
+    <!-- <startPage>{{START_PAGE}}</startPage> -->
 </ExtlClntAppConfigurablePolicies>

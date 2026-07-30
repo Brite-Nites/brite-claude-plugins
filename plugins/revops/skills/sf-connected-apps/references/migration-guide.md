@@ -183,8 +183,10 @@ For each integrated system:
 | Consumer Secret | New Consumer Secret (different) |
 | Callback URL | Same (in `ecaGlblOauth`) |
 | Scopes | Same (in `ecaOauth`) |
-| IP Relaxation | In `ecaPlcy` (admin-managed) |
-| Refresh Token Policy | In `ecaPlcy` (admin-managed) |
+| IP Relaxation | `ipRelaxationPolicyType` in `ecaOauthPlcy` — NOT `ecaPlcy`, and NOT the ConnectedApp field name |
+| Refresh Token Policy | `refreshTokenPolicyType` in `ecaOauthPlcy` — same caveat |
+| Permitted Users / pre-authorization | `permittedUsersPolicyType` + `commaSeparatedPermissionSet` in `ecaOauthPlcy` |
+| Session level (High Assurance) | `requiredSessionLevel` in `ecaOauthPlcy` |
 | OAuth security controls | In `ecaOauthSecurity` when source-controlled (retrieve-first) |
 
 ---

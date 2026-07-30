@@ -38,7 +38,7 @@ These rules bind any sf-connected-apps work done in a Brite repo. Violations blo
 
 2. **JWT-via-SFDX-CLI flow requires BOTH `Api` and `RefreshToken` scopes.** The `sf org login jwt` command persists auth records in `~/.sfdx/` and needs `RefreshToken` for that persistence — drop it and JWT exchange fails with "refresh_token scope is required." Pure JWT exchange at a non-CLI runtime (e.g. a Python MCP calling the token endpoint directly) does NOT require `RefreshToken` — apply the scope requirement where SFDX handles the handshake, not universally. Source: `docs/research/salesforce-mcp-findings.md` Q3 lines 50-52.
 
-3. **Default to a zero refresh-token policy, and mind which type you are editing.** On a **ConnectedApp** the field is `<refreshTokenPolicy>` inside `<oauthPolicy>`, and the enum is lowercase — `infinite | zero | specific_lifetime`; uppercase `ZERO` will not validate. See `assets/connected-app-jwt.xml`. On a **pure ECA** the field is `refreshTokenPolicyType` on `ExtlClntAppOauthConfigurablePolicies` (`assets/eca-oauth-policies.xml`) — a different type with a different enum, so do not copy the ConnectedApp value across. Retrieve from the org to confirm the value your API version accepts. Belt-and-suspenders against long-lived refresh tokens even when clients mis-request them; default for new ECAs unless a flow documents a specific persistence need in its PR.
+3. **Default to a zero refresh-token policy, and mind which type you are editing.** On a **ConnectedApp** the field is `<refreshTokenPolicy>` inside `<oauthPolicy>`, and the enum is lowercase — `infinite | zero | specific_lifetime`; uppercase `ZERO` will not validate. See `assets/connected-app-jwt.xml`. On a **pure ECA** the field is `refreshTokenPolicyType` on `ExtlClntAppOauthConfigurablePolicies` (`assets/eca-oauth-policies.xml`) — a different type with a different enum, so do not copy the ConnectedApp value across. **The ECA zero-persistence value is not yet recorded here.** `Marketing_Claude_MCP` already runs one, so retrieve its `.ecaOauthPlcy` and write the value into this rule and into the asset. Until that lands, this convention is enforceable for ConnectedApps and advisory for ECAs — do not fail a review on a value the skill cannot supply. Belt-and-suspenders against long-lived refresh tokens even when clients mis-request them; default for new ECAs unless a flow documents a specific persistence need in its PR.
 
 4. **Exclude `ExtlClntAppOauthSettings` via `.forceignore` for sandbox deploys.** The file embeds an org-specific `oauthLink` (`OrgId:ConsumerRecordId`) that does not resolve cross-org. Excluded alongside the `ExternalClientApplication` type for sandbox work; temporarily comment the exclusions out before running a production deploy, then re-enable. The canonical toggle procedure lives in [sf-deploy](../sf-deploy/SKILL.md).
 
@@ -175,19 +175,21 @@ JWT has no interactive consent step, so a self-authorize policy can never be sat
 
 ### The pre-auth permission-set picker lists custom permsets only
 
-It shows `IsCustom = true` permission sets. A standard licensed permset — `SalesEngagementBasicUser`, `Type = Standard` — can **never** be selected, no matter how correct it looks. That leaves two options: a profile grant, which authorizes everyone on that profile, or a purpose-built custom handle permset. Prefer the handle permset.
+As of 2026-07-28 it listed `IsCustom = true` permission sets only. A standard licensed permset — `SalesEngagementBasicUser`, `Type = Standard` — did not appear, no matter how correct it looked. That leaves two options: a profile grant, which authorizes everyone on that profile, or a purpose-built custom handle permset. Prefer the handle permset. (Picker behaviour is UI-version-sensitive; re-check before concluding a permset is unselectable today.)
 
 ### The certificate upload only appears after JWT Bearer Flow is enabled
 
 Tick **Enable JWT Bearer Flow** first; the certificate field renders only then. There is no "Use digital signatures" checkbox as on Connected Apps — looking for one is a genuine dead end.
 
+This is a Setup-UI path. The metadata type carrying the flow-enablement flags was not captured in the 2026-07-28 audit — `ExtlClntAppOauthConfigurablePolicies` does **not** carry it, and `ExtlClntAppOauthSecuritySettings` is the likely home but unverified. Retrieve before assuming a metadata-only route exists.
+
 ### High Assurance session level breaks JWT outright
 
 A server-to-server session cannot satisfy MFA. If `requiredSessionLevel` demands High Assurance the exchange fails in a way that looks nothing like an auth problem. `STANDARD` means High Assurance off.
 
-### Sandbox audience is `https://test.salesforce.com`
+### Wrong audience fails as `invalid_grant: invalid assertion`
 
-Using `login.salesforce.com` against a sandbox returns `invalid_grant: invalid assertion`, which reads like a certificate fault and sends you to the wrong place entirely.
+The per-environment audience mapping already lives in [references/oauth-flows-reference.md](references/oauth-flows-reference.md) (sandbox is `https://test.salesforce.com`). What is worth adding is the symptom: using `login.salesforce.com` against a sandbox returns `invalid_grant: invalid assertion`, which reads like a certificate fault and sends you to the wrong place entirely.
 
 ---
 
@@ -195,7 +197,7 @@ Using `login.salesforce.com` against a sandbox returns `invalid_grant: invalid a
 
 ### `sf org login jwt` exits 0 on a FAILED JWT
 
-Observed directly: a login returning `user is not admin approved to access this app` still exited 0. The repo already records this for `sf hardis auth login`; it applies to the raw CLI command too. **Never treat exit status as proof.** Always confirm with a real query against the org.
+Observed directly on 2026-07-28: a login returning `user is not admin approved to access this app` still exited 0. The same false-success is recorded for `sf hardis auth login` in the `brite-salesforce` repo; it applies to the raw CLI command too. **Never treat exit status as proof.** Always confirm with a real query against the org.
 
 ### Falsify a pre-auth grant without touching the live credential
 
@@ -223,7 +225,9 @@ That distinguishes "does not exist yet" from "cannot be captured" in one call.
 
 ## Security Note: `.ecaGlblOauth` Carries the Consumer Key in Plaintext
 
-`ExtlClntAppGlobalOauthSettings` stores the `consumerKey` in plaintext beside the base64 certificate. This skill is what tells people to retrieve these types, so treat a retrieved `.ecaGlblOauth` as sensitive: keep it out of commits, and check the consuming repo's `.forceignore` before retrieving into a working tree.
+`ExtlClntAppGlobalOauthSettings` stores the `consumerKey` in plaintext beside the base64 certificate. Those two fields appear only on a **retrieved** file — the authoring template at `assets/eca-global-oauth.xml` carries neither, which is why the two look inconsistent.
+
+This skill is what tells people to retrieve these types, so treat a retrieved `.ecaGlblOauth` as sensitive: keep it out of commits, and check the consuming repo's `.forceignore` before retrieving into a working tree. Same mechanism as Convention 4 above, applied to a different type.
 
 ---
 

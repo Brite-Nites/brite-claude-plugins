@@ -24,8 +24,18 @@
   - ChatterApi: Chatter REST API
   - CustomPermissions: Custom permission access
 
-  IMPORTANT: OAuth flows (Authorization Code, Client Credentials, etc.) are
-  configured via the Admin UI or ExtlClntAppOauthConfigurablePolicies, NOT here.
+  IMPORTANT: OAuth flows (Authorization Code, Client Credentials, JWT Bearer)
+  are NOT enabled here. They are enabled in the Setup UI.
+
+  Not via ExtlClntAppOauthConfigurablePolicies either — an earlier version of
+  this comment said so and was wrong. That type's captured fields are permitted
+  users, IP relaxation, refresh-token lifetime and session level; none of them
+  turns a flow on. See assets/eca-oauth-policies.xml.
+
+  The metadata type carrying the flow-enablement flags was NOT captured in the
+  2026-07-28 audit. ExtlClntAppOauthSecuritySettings is the likely home — it is
+  retrieve-first per SKILL.md § Recommended Workflow step 3 — but treat that as
+  unverified and confirm with a retrieve before relying on a metadata-only path.
 
   File Naming: [AppName].ecaOauth-meta.xml
 -->
