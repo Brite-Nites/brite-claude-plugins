@@ -537,6 +537,57 @@ Even for simple pass-through flows, add at least one assignment:
 
 ---
 
+## Flow Deactivation Requires FlowDefinition, Not Draft Status (CRITICAL)
+
+**Deploying a flow with `<status>Draft</status>` does NOT deactivate an already-active
+flow.** The org keeps the previously-active version active and merely adds a new inactive
+version alongside it. Any retirement that relies on Draft alone silently leaves the flow
+running in production.
+
+### The actual lever
+
+`FlowDefinition` with `<activeVersionNumber>0</activeVersionNumber>` — one file per flow,
+at `force-app/main/default/flowDefinitions/<FlowName>.flowDefinition-meta.xml`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<FlowDefinition xmlns="http://soap.sforce.com/2006/04/metadata">
+    <activeVersionNumber>0</activeVersionNumber>
+</FlowDefinition>
+```
+
+This clears the persistent active version, taking the flow to 0 Active.
+
+### Where Draft status still helps
+
+Draft is defense-in-depth, not the mechanism. This org honors `<status>`, so the **new**
+version deploys inactive — but the **old** active version persists until
+`activeVersionNumber=0` clears it. Deploy both together: the flow at Draft, and the
+matching `FlowDefinition` at 0.
+
+### Manifest requirement
+
+`FlowDefinition` must be listed in the deploy manifest as **explicit members** to
+propagate through full-package lanes. Omitting it silently drops the deactivation and
+reproduces the original symptom.
+
+### Evidence
+
+Verified twice in the `brite-dev-kells` sandbox, across two independent adversarial
+reviews:
+
+- **BC-17234 / brite-salesforce PR #516** — retirement of 3 nurture flows. The combined
+  Draft + `FlowDefinition=0` deploy reached 0 Active; the Draft-only counterfactual left
+  the flows Active.
+- **brite-salesforce PR #519** — a controlled activation/deactivation matrix: 6 deploys
+  and 12 Tooling-API SOQL probes confirming the model above.
+
+Consumer-side write-up: `brite-salesforce/.claude/rules/deploy.md` (landed via PR #519).
+Per `brite-salesforce/CLAUDE.md` § Agent Tooling that repo is authoritative for deploy
+discipline; this skill mirrors it outward.
+
+---
+
 ## Summary: Lessons Learned
 
 ### Fault Connector Self-Reference
@@ -573,5 +624,5 @@ Even for simple pass-through flows, add at least one assignment:
 - **Problem**: Parent RTF references a child subflow that doesn't exist or isn't active
 - **Info Warning**: "The referenced flow X has no active version" (deploys succeed but flow fails at runtime)
 - **Solution**: Deploy and activate child subflow FIRST, then deploy and activate parent RTF
-- **Activation Order**: Child Active -> Parent Active (reverse for deactivation: Parent Draft -> Child Draft)
+- **Activation Order**: Child Active -> Parent Active. Deactivation is NOT the mirror image — Draft status alone does not deactivate anything (see § Flow Deactivation Requires FlowDefinition, Not Draft Status). Retire parent before child, and clear each one with `FlowDefinition activeVersionNumber=0`.
 - **Proof**: Case Escalation pattern — RTF on Case (after-save, Priority=High AND Status=New) calls Sub_EscalateCase to create Task. Passed positive, negative, and bulk (5x) tests on AgentforceTesting org, API 66.0
