@@ -178,7 +178,10 @@ sf project deploy start --metadata ExtlClntAppOauthSettings:MyApp --target-org [
 # 3. Deploy Global OAuth (if needed)
 sf project deploy start --metadata ExtlClntAppGlobalOauthSettings:MyApp --target-org [alias]
 
-# 4. Deploy companion security/policy metadata when you use it
+# 4. Deploy companion security/policy metadata.
+#    ExtlClntAppOauthConfigurablePolicies is NOT optional for JWT bearer — it
+#    carries Permitted Users, and without it auth fails with
+#    "user is not admin approved to access this app".
 sf project deploy start --metadata ExtlClntAppOauthSecuritySettings:MyApp --target-org [alias]
 sf project deploy start --metadata ExtlClntAppOauthConfigurablePolicies:MyApp --target-org [alias]
 sf project deploy start --metadata ExtlClntAppConfigurablePolicies:MyApp --target-org [alias]
