@@ -194,6 +194,10 @@ _Avoid_: "break-glass" (jargon/idiom — superseded; see the naming convention i
 A revops guidance/guard mechanism (status line, advisory nudge, pre-flight) that reads a repo-local pipeline config and stays silent where it is absent — so the portable `revops` plugin carries the *capability* while a repo's config *activates* it ([ADR-026](docs/decisions/026-revops-promotion-topology.md)).
 _Avoid_: hardcoding brite-salesforce branch names into revops — that breaks portability ([ADR-007](docs/decisions/007-revops-plugin-design.md) §3.1).
 
+**driver · knowledge skill**:
+The two halves of the revops skill surface, split by **who runs the command**. A **driver**'s own `SKILL.md` body tells the agent to run something — `sf`, or a bundled script — as a step in its own procedure, wherever the command text happens to sit: inline, in a fenced block, or in a bundled reference the body points the agent to. A **knowledge skill** instead produces an artifact (code, XML, queries, diagrams) or delegates execution to a named sibling skill. Reachability is transitive: a script a `references/` file invokes counts, because the body's Reference Map is part of the procedure. Only drivers are in scope for a least-privilege `allowed-tools` grant ([ADR-042](docs/decisions/042-skill-allowed-tools-mcp-coverage.md) § Amendment BC-16866).
+_Avoid_: inferring the split from where `sf` text appears — a skill can direct execution without printing the command, and can print one it never runs (that mistake is what the BC-16866 amendment corrects); reading only `SKILL.md` and stopping, which under-counts every reference-invoked bundled script; and reading "driver" as "reaches an org" — the two axes diverge (`sf-docs` executes, against web docs only).
+
 ### Marketing / launch-campaign
 
 > Email-duplicate vocabulary for `/marketing:launch-campaign`. "Dedup"/"duplicate"
