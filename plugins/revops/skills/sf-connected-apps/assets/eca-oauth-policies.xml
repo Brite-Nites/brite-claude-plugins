@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template: External Client App - OAuth Configurable Policies
+  Use Case: The OAuth security policy that actually governs whether a JWT
+            credential works — permitted users, IP relaxation, refresh-token
+            lifetime, and session level.
+
+  This is the type people reach for when they mean "ECA policies". The
+  similarly-named ExtlClntAppConfigurablePolicies (.ecaPlcy) carries only app
+  enablement and start page — see assets/eca-policies.xml.
+
+  Field list verified against a live retrieve from brite-dev-kells (2026-07-28).
+  Retrieve from your own org before relying on the exact enum set: SKILL.md § 3
+  treats the retrieved file as the schema source of truth, and picklist values
+  can move between API versions.
+
+  FOR JWT BEARER, THE SETTINGS THAT MATTER:
+  - permittedUsersPolicyType MUST be AdminApprovedPreAuthorized. JWT has no
+    interactive consent step, so a self-authorize policy can never be satisfied.
+    The failure reads "user is not admin approved to access this app".
+  - requiredSessionLevel MUST NOT require High Assurance. A server-to-server
+    session cannot satisfy MFA, and the failure looks nothing like an auth
+    problem. STANDARD = High Assurance off.
+  - commaSeparatedPermissionSet selects the pre-authorized permission set(s).
+    The Setup picker lists IsCustom = true permsets ONLY — a standard licensed
+    permset (e.g. SalesEngagementBasicUser, Type = Standard) can never be
+    chosen. Grant via a purpose-built custom handle permset rather than a
+    profile, which would authorize everyone on that profile.
+
+  Replace placeholders:
+  - {{APP_NAME}}: The ExternalClientApplication API name (must match .eca file)
+  - {{LABEL}}: Display label for this policy configuration
+  - {{PERMITTED_USERS}}: AdminApprovedPreAuthorized for JWT bearer
+  - {{IP_RELAXATION}}: e.g. Bypass — note the field is ipRelaxationPolicyType,
+    NOT ConnectedApp's ipRelaxation, and the values are not ConnectedApp's
+    ENFORCE / BYPASS / ENFORCE_ACTIVATED_USERS
+  - {{PERMISSION_SETS}}: comma-separated custom permset API names
+  - {{REFRESH_TOKEN_POLICY}}: refresh-token lifetime policy
+  - {{SESSION_LEVEL}}: STANDARD unless High Assurance is genuinely required
+
+  File Naming: [AppName].ecaOauthPlcy-meta.xml
+-->
+<ExtlClntAppOauthConfigurablePolicies xmlns="http://soap.sforce.com/2006/04/metadata">
+    <commaSeparatedPermissionSet>{{PERMISSION_SETS}}</commaSeparatedPermissionSet>
+    <externalClientApplication>{{APP_NAME}}</externalClientApplication>
+    <ipRelaxationPolicyType>{{IP_RELAXATION}}</ipRelaxationPolicyType>
+    <label>{{LABEL}}</label>
+    <permittedUsersPolicyType>{{PERMITTED_USERS}}</permittedUsersPolicyType>
+    <refreshTokenPolicyType>{{REFRESH_TOKEN_POLICY}}</refreshTokenPolicyType>
+    <!-- Only when refreshTokenPolicyType selects a bounded lifetime: -->
+    <!-- <refreshTokenValidityPeriod>30</refreshTokenValidityPeriod> -->
+    <!-- <refreshTokenValidityUnit>Days</refreshTokenValidityUnit> -->
+    <requiredSessionLevel>{{SESSION_LEVEL}}</requiredSessionLevel>
+</ExtlClntAppOauthConfigurablePolicies>
