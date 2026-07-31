@@ -42,22 +42,72 @@ _KEYCHAIN_ACCOUNT="${USER:-$(id -un)}"
 # A subprocess that touches the master password must be one an attacker cannot
 # have written. Two ways to qualify:
 #   1. it is one of the caller-supplied known install paths, or
-#   2. it sits in a mode-0700 directory. Only that directory's owner can
-#      traverse it, and the `-x` test on the binary proves the owner is us.
-#      A private temp dir (the test suite's stub) qualifies; the places an
-#      attacker can actually plant a binary do not — /tmp is 1777,
-#      /usr/local/bin is 0755, node_modules/.bin is 0755.
-# `ls -ld` mode strings are POSIX; `stat` format flags differ between BSD and
-# GNU, so this stays portable across macOS and Linux.
+#   2. it sits on a safe path — see _path_is_safe.
+# The second admits a private temp dir (the test suite's stub) and excludes the
+# places a binary can actually be planted: /tmp itself is 1777, /usr/local/bin
+# is 0755, node_modules/.bin is 0755.
+_mode_of() {
+  ls -ld "$1" 2>/dev/null | cut -c1-10
+}
+
+# A directory is safe when nobody but us (or root) can put a binary in it, and
+# nobody but us (or root) can swap the directory itself out.
+#
+# Ownership is CHECKED, not inferred. An earlier cut of this reasoned that a
+# mode-0700 directory can only be traversed by its owner, so reaching the
+# binary proved we were that owner. That inference silently fails for root,
+# which bypasses permission checks entirely — running as root, an
+# attacker-owned 0700 directory would have passed. `[ -O ]` asks the question
+# directly and answers it correctly for root too (euid 0 owns only uid-0
+# paths).
+#
+# Ancestors are walked for the same reason. Mode 0700 stops a co-tenant writing
+# INTO the directory; it does nothing about renaming the directory itself,
+# which needs write on the parent. One attacker-writable ancestor and the whole
+# thing can be swapped. The sticky exemption is what makes a shared parent like
+# /tmp safe: sticky means only an entry's own owner may rename or delete it, so
+# a co-tenant with write access to /tmp still cannot touch our directory. It is
+# an exemption from the write-bit test only — a sticky directory's OWNER can
+# still rename entries inside it, so the ownership test applies regardless.
+#
+# The path is resolved with `pwd -P` first so the walk sees real directories,
+# never symlinks: link modes are meaningless (always 0777 on Linux) and would
+# otherwise read as world-writable. `ls -ld` mode strings and `[ -O ]` are
+# portable across macOS and Linux; `stat` format flags are not.
+_path_is_safe() {
+  _d="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
+  [ -n "$_d" ] || return 1
+  [ -O "$_d" ] || return 1
+  [ "$(_mode_of "$_d")" = "drwx------" ] || return 1
+  while [ "$_d" != "/" ]; do
+    _d="$(dirname "$_d")"
+    _m="$(_mode_of "$_d")"
+    [ -n "$_m" ] || return 1
+    if [ ! -O "$_d" ] && [ -z "$(find "$_d" -maxdepth 0 -user root 2>/dev/null)" ]; then
+      return 1
+    fi
+    case "$_m" in
+      *t|*T) continue ;;
+    esac
+    case "$_m" in
+      ?????w????|????????w?) return 1 ;;
+    esac
+  done
+  return 0
+}
+
 _bin_is_trusted() {
   _p="$1"; shift
   for _ok in "$@"; do
     if [ "$_p" = "$_ok" ]; then return 0; fi
   done
-  case "$(ls -ld "$(dirname "$_p")" 2>/dev/null | cut -c1-10)" in
-    drwx------) return 0 ;;
+  # Relative paths are rejected outright: the walk below is only meaningful
+  # against a rooted path, and nothing legitimate needs one here.
+  case "$_p" in
+    /*) ;;
+    *) return 1 ;;
   esac
-  return 1
+  _path_is_safe "$(dirname "$_p")"
 }
 
 _resolve_bw_bin() {

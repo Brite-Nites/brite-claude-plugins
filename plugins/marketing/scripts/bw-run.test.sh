@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # bw-run.test.sh — pure-bash test suite for bw-run.sh (BC-6906).
 # Stubs `bw` AND `security` via PATH-prepended temp dir; real `jq` is
-# required on PATH. 25 cases / 91 assertions: 5 spec-mandated + review-driven additions
+# required on PATH. 27 cases / 98 assertions: 5 spec-mandated + review-driven additions
 # (T-F1 BW_SESSION unset, T-F3 mixed-result batch, T-F4 sequential per-item
 # failure, T-F5 empty EXPORTS, P3-1 missing command after --, P3-8
-# bad-arg-shape variants, BC-6958 micro-fix coverage) + 10 Keychain
-# self-unlock cases (T16–T25, covering the happy path, both fail-closed
+# bad-arg-shape variants, BC-6958 micro-fix coverage) + 12 Keychain
+# self-unlock cases (T16–T27, covering the happy path, both fail-closed
 # exits, the single-attempt contract, the two binary-trust rejections, and the
-# minted-session non-export plus its caller-supplied control).
+# minted-session non-export plus its caller-supplied control, and the two
+# path-safety rejections).
 # The `security` stub defaults to item-not-found so every pre-self-unlock
 # case keeps its exact behavior regardless of the developer's real Keychain.
 # macOS bash 3.2 portable.
@@ -99,10 +100,18 @@ SECSTUB
 chmod +x "$STUB_DIR/security"
 export PATH="$STUB_DIR:$PATH"
 # The self-unlock path will only hand the master password to a binary it
-# trusts: a known install path, or one inside a mode-0700 directory. The
-# overrides get the same check, so pointing them at the stubs works only
-# because `mktemp -d` creates STUB_DIR as 0700 — the same reason an attacker
-# cannot use this route (see T22).
+# trusts: a known install path, or one on a safe path — a mode-0700 directory
+# we own, under ancestors that are ours or root's and not group/other-writable
+# unless sticky. The overrides get the same check, so pointing them at the
+# stubs works only because `mktemp -d` creates STUB_DIR as 0700 under sticky
+# /tmp. That is also why an attacker cannot use this route (T22, T26), and it
+# means every self-unlock case below exercises the sticky-ancestor exemption
+# as a side effect.
+#
+# Coverage limit, stated rather than left implied: the `[ -O ]` ownership test
+# is NOT directly exercised. Constructing the case it defends — a mode-0700
+# directory owned by someone else — needs a second uid, which this suite has
+# no way to obtain. T26 covers the ancestor half of the same predicate.
 export BW_RUN_SECURITY_BIN="$STUB_DIR/security"
 export BW_RUN_BW_BIN="$STUB_DIR/bw"
 # The Keychain lookup is scoped to the invoking account, matching the -a the
@@ -641,6 +650,60 @@ t23_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
 assert_eq "$t23_unlock" "0" "t23 no unlock attempted with an untrusted security"
 t23_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
 assert_eq "$t23_sec" "0" "t23 untrusted security binary never invoked"
+
+# --- TEST 26: private dir under a swappable parent -> declines --------------
+# Mode 0700 stops a co-tenant writing INTO the directory. It does nothing about
+# renaming the directory itself, which only needs write on the parent — so one
+# attacker-writable, non-sticky ancestor and the whole thing can be swapped for
+# an attacker's copy. The binary's own directory here is impeccable (0700,
+# ours); only its parent is wrong. Contrast /tmp, which is equally
+# world-writable but sticky, and which every self-unlock test above already
+# walks through successfully — sticky means only an entry's own owner can
+# rename it, so a co-tenant cannot swap our temp dir.
+echo "--- TEST 26: 0700 dir under a world-writable non-sticky parent -> exit 1 ---"
+setup
+SWAPPABLE_PARENT="$STUB_DIR/swappable"
+rm -rf "$SWAPPABLE_PARENT"
+mkdir -p "$SWAPPABLE_PARENT/priv"
+chmod 0700 "$SWAPPABLE_PARENT/priv"
+cp "$STUB_DIR/bw" "$SWAPPABLE_PARENT/priv/bw"
+chmod +x "$SWAPPABLE_PARENT/priv/bw"
+chmod 0777 "$SWAPPABLE_PARENT"   # world-writable, NOT sticky
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+err_file="$STUB_DIR/t26.err"
+# Premise guards: the binary is executable and its own directory is private,
+# so a rejection can only come from the ancestor walk.
+assert_eq "$([ -x "$SWAPPABLE_PARENT/priv/bw" ] && echo yes || echo no)" "yes" \
+  "t26 override is executable"
+assert_eq "$(ls -ld "$SWAPPABLE_PARENT/priv" | cut -c1-10)" "drwx------" \
+  "t26 the binary's own directory is private"
+set +e
+BW_RUN_BW_BIN="$SWAPPABLE_PARENT/priv/bw" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t26 exit code is 1"
+t26_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t26_unlock" "0" "t26 no unlock attempted under a swappable parent"
+t26_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t26_sec" "0" "t26 master password never read under a swappable parent"
+
+# --- TEST 27: relative override path -> declines ----------------------------
+# The ancestor walk is only meaningful against a rooted path.
+echo "--- TEST 27: relative bw override -> exit 1 ---"
+setup
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+err_file="$STUB_DIR/t27.err"
+set +e
+(cd "$STUB_DIR" && BW_RUN_BW_BIN="./bw" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file")
+rc=$?
+set -e
+assert_eq "$rc" "1" "t27 exit code is 1"
+t27_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t27_unlock" "0" "t27 no unlock attempted for a relative override"
 
 # --- Shadowed bw/jq on PATH (T24 premise, T25 control) ---------------------
 # Both log what BW_SESSION they were handed, then delegate so the run proceeds
