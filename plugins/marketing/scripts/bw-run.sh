@@ -34,6 +34,9 @@ fi
 # an env var an attacker can set is not an exemption from the check it would
 # otherwise defeat.
 _SECURITY_BIN="${BW_RUN_SECURITY_BIN:-/usr/bin/security}"
+# System directories only. `ls`, `find` and `readlink` all live here on both
+# macOS and Linux; if these are attacker-writable the machine is already lost.
+_TRUSTED_PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 # find-generic-password matches on service name alone unless an account is
 # given, so it must be scoped to the same -a the provisioning hint uses;
 # otherwise a same-service item for another account can win the lookup.
@@ -47,8 +50,29 @@ _KEYCHAIN_ACCOUNT="${USER:-$(id -un)}"
 # was the only branch that verified nothing — and on macOS, Homebrew makes
 # /usr/local/bin and /opt/homebrew/bin user-owned (commonly group-writable),
 # precisely the shape these checks exist to reject. Corrected 2026-07-31.
+# The check must not be steerable by the thing it defends against. Everything
+# below leans on external helpers, and an attacker who can seed PATH — the
+# exact attacker this exists to stop — could otherwise substitute `ls` and have
+# the check report success for any binary, making every rule above decorative.
+# Two defences, because one is not enough on its own:
+#   - `_self_unlock` pins PATH to the system directories for its whole
+#     duration, the same move as sudo's secure_path. This is what actually
+#     protects `ls`, `find` and `readlink`.
+#   - dirname, basename and cut are gone, replaced by bash parameter
+#     expansion, which cannot be substituted at all. Shrinking the external
+#     surface to three is what makes pinning a claim worth trusting.
 _mode_of() {
-  ls -ld "$1" 2>/dev/null | cut -c1-10
+  _ml="$(ls -ld "$1" 2>/dev/null)" || return 1
+  printf '%s' "${_ml:0:10}"
+}
+
+# dirname, without dirname.
+_dirname_of() {
+  case "$1" in
+    */*) _dn="${1%/*}"; [ -n "$_dn" ] || _dn="/" ;;
+    *)   _dn="." ;;
+  esac
+  printf '%s' "$_dn"
 }
 
 # Follow a symlinked binary to the thing that will actually run. Checking the
@@ -67,11 +91,11 @@ _resolve_symlinks() {
     [ -n "$_target" ] || return 1
     case "$_target" in
       /*) _rp="$_target" ;;
-      *)  _rp="$(dirname "$_rp")/$_target" ;;
+      *)  _rp="$(_dirname_of "$_rp")/$_target" ;;
     esac
   done
-  _rdir="$(cd "$(dirname "$_rp")" 2>/dev/null && pwd -P)" || return 1
-  printf '%s/%s' "${_rdir%/}" "$(basename "$_rp")"
+  _rdir="$(cd "$(_dirname_of "$_rp")" 2>/dev/null && pwd -P)" || return 1
+  printf '%s/%s' "${_rdir%/}" "${_rp##*/}"
 }
 
 # Every ancestor must be un-swappable by anyone but us or root.
@@ -88,7 +112,7 @@ _resolve_symlinks() {
 _ancestors_ok() {
   _d="$1"
   while [ "$_d" != "/" ]; do
-    _d="$(dirname "$_d")"
+    _d="$(_dirname_of "$_d")"
     _m="$(_mode_of "$_d")"
     [ -n "$_m" ] || return 1
     if [ ! -O "$_d" ] && [ -z "$(find "$_d" -maxdepth 0 -user root 2>/dev/null)" ]; then
@@ -146,8 +170,8 @@ _bin_is_trusted() {
     *) return 1 ;;
   esac
   _real="$(_resolve_symlinks "$_p")" || return 1
-  _pdir="$(cd "$(dirname "$_p")" 2>/dev/null && pwd -P)" || return 1
-  _rdir="$(dirname "$_real")"
+  _pdir="$(cd "$(_dirname_of "$_p")" 2>/dev/null && pwd -P)" || return 1
+  _rdir="$(_dirname_of "$_real")"
 
   # Known-install match is checked against BOTH ends: Homebrew's allowlisted
   # /usr/local/bin/bw is a symlink into ../Cellar, so requiring the resolved
@@ -167,15 +191,46 @@ _bin_is_trusted() {
   return 0
 }
 
+# Known install locations, preference order. This doubles as the DISCOVERY
+# list: PATH is not consulted for bw at all.
+#
+# It has to work that way now that PATH is pinned during the attempt. A pinned
+# PATH cannot include the Homebrew prefixes — they are commonly group-writable,
+# which is exactly what _dir_is_system rejects — so `command -v bw` under the
+# pin would miss /opt/homebrew/bin/bw and silently decline to mint on the most
+# common setup there is. Searching the known list directly fixes that and is
+# better besides: a PATH good enough to search is a PATH good enough to poison,
+# and discovery now cannot name anything the trust check would not accept.
+#
+# An install somewhere else is still reachable, just deliberately rather than
+# by accident: point BW_RUN_BW_BIN at it and it goes through the private-path
+# rules like any other override.
+_BW_KNOWN_INSTALLS="/opt/homebrew/bin/bw /usr/local/bin/bw /usr/bin/bw"
+
 _resolve_bw_bin() {
+  # An explicit override is used or refused on its own merits — never quietly
+  # swapped for something else. Being told which binary to use and then picking
+  # a different one would be worse than failing.
   if [ -n "${BW_RUN_BW_BIN:-}" ]; then
-    _cand="$BW_RUN_BW_BIN"
-  else
-    _cand="$(command -v bw 2>/dev/null)" || return 1
+    [ -x "$BW_RUN_BW_BIN" ] || return 1
+    # Word splitting is the point: the list is passed as separate arguments.
+    # shellcheck disable=SC2086
+    _bin_is_trusted "$BW_RUN_BW_BIN" $_BW_KNOWN_INSTALLS || return 1
+    printf '%s' "$BW_RUN_BW_BIN"
+    return 0
   fi
-  [ -x "$_cand" ] || return 1
-  _bin_is_trusted "$_cand" /opt/homebrew/bin/bw /usr/local/bin/bw /usr/bin/bw || return 1
-  printf '%s' "$_cand"
+  # Discovery takes the first install that is both present AND trusted, rather
+  # than the first present one. On a Mac with a group-writable /opt/homebrew/bin
+  # and a sound /usr/local/bin, stopping at the first present entry would refuse
+  # to mint on a machine that has a perfectly good bw one line further down.
+  for _k in $_BW_KNOWN_INSTALLS; do
+    [ -x "$_k" ] || continue
+    # shellcheck disable=SC2086
+    _bin_is_trusted "$_k" $_BW_KNOWN_INSTALLS || continue
+    printf '%s' "$_k"
+    return 0
+  done
+  return 1
 }
 
 # At most ONE mint attempt per process (ADR-010 § 1 contract): the absent-session
@@ -189,6 +244,23 @@ _MINTED_BW_BIN=""
 _self_unlock() {
   [ "$_SELF_UNLOCK_TRIED" = "1" ] && return 1
   _SELF_UNLOCK_TRIED=1
+  # Pin PATH for the whole attempt — see the note above _mode_of. The trust
+  # check's own helpers must not be drawn from the PATH it exists to defend
+  # against, or an attacker steers the verdict rather than the binary.
+  #
+  # Restored before returning, deliberately. The wrapper's later bare `bw` and
+  # `jq` calls stay on the caller's PATH exactly as before: that is ADR-010's
+  # deferred scope line, and quietly narrowing it here would be a different
+  # change wearing this one's clothes.
+  _saved_path="$PATH"
+  PATH="$_TRUSTED_PATH"
+  _rc=0
+  _self_unlock_attempt || _rc=$?
+  PATH="$_saved_path"
+  return "$_rc"
+}
+
+_self_unlock_attempt() {
   [ -x "$_SECURITY_BIN" ] || return 1
   _bin_is_trusted "$_SECURITY_BIN" /usr/bin/security || return 1
   # Resolve bw BEFORE reading the password: if we would have nowhere trusted to

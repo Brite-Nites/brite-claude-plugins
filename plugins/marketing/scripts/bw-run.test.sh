@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # bw-run.test.sh — pure-bash test suite for bw-run.sh (BC-6906).
 # Stubs `bw` AND `security` via PATH-prepended temp dir; real `jq` is
-# required on PATH. 31 cases / 111 assertions: 5 spec-mandated + review-driven additions
+# required on PATH. 33 cases / 121 assertions: 5 spec-mandated + review-driven additions
 # (T-F1 BW_SESSION unset, T-F3 mixed-result batch, T-F4 sequential per-item
 # failure, T-F5 empty EXPORTS, P3-1 missing command after --, P3-8
-# bad-arg-shape variants, BC-6958 micro-fix coverage) + 16 Keychain
-# self-unlock cases (T16–T31, covering the happy path, both fail-closed
+# bad-arg-shape variants, BC-6958 micro-fix coverage) + 18 Keychain
+# self-unlock cases (T16–T33, covering the happy path, both fail-closed
 # exits, the single-attempt contract, the two binary-trust rejections, and the
 # minted-session non-export plus its caller-supplied control, and the two
 # path-safety rejections, the symlink-target checks, and the listed-path
-# narrowing pair).
+# narrowing pair, list-based discovery, and the PATH-pin defence).
 # The `security` stub defaults to item-not-found so every pre-self-unlock
 # case keeps its exact behavior regardless of the developer's real Keychain.
 # macOS bash 3.2 portable.
@@ -857,7 +857,7 @@ cp "$STUB_DIR/bw" "$LISTED_BAD_DIR/bw"; chmod +x "$LISTED_BAD_DIR/bw"
 cp "$STUB_DIR/bw" "$LISTED_OK_DIR/bw";  chmod +x "$LISTED_OK_DIR/bw"
 chmod 0777 "$LISTED_BAD_DIR"   # group+other writable — the Homebrew-on-macOS shape
 chmod 0755 "$LISTED_OK_DIR"    # 0755 but ours and not group/other writable
-sed "s#/opt/homebrew/bin/bw /usr/local/bin/bw /usr/bin/bw#$LISTED_BAD_DIR/bw $LISTED_OK_DIR/bw#" \
+sed "s#^_BW_KNOWN_INSTALLS=.*#_BW_KNOWN_INSTALLS=\"$LISTED_BAD_DIR/bw $LISTED_OK_DIR/bw\"#" \
   "$WRAPPER" >"$LISTED_WRAPPER"
 chmod +x "$LISTED_WRAPPER"
 listed_rewritten=$(grep -c -- "$LISTED_OK_DIR/bw" "$LISTED_WRAPPER" || true)
@@ -898,6 +898,96 @@ assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t31 a sound listed path st
 # everything, which would break every real Homebrew install.
 t31_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
 assert_eq "$t31_unlock" "1" "t31 control: listed paths are narrowed, not disabled"
+
+# --- TEST 32: discovery walks the known list, not PATH ----------------------
+# With PATH pinned during the attempt, `command -v bw` could no longer see
+# /opt/homebrew/bin — the commonest real install — so discovery reads the known
+# list directly. This runs with BW_RUN_BW_BIN UNSET, which is the only case
+# that exercises discovery at all, and with a decoy `bw` first on PATH that
+# must be ignored. The first list entry is the world-writable one, so a
+# discovery that ignored trust would pick it and fail; picking the second entry
+# is the observable proof that discovery and the trust check agree.
+echo "--- TEST 32: bw discovered from the known list, PATH decoy ignored ---"
+setup
+DECOY_DIR="$STUB_DIR/decoy"
+rm -rf "$DECOY_DIR"
+mkdir -p "$DECOY_DIR"
+cat >"$DECOY_DIR/bw" <<'DECOY'
+#!/usr/bin/env bash
+printf 'DECOY-BW-INVOKED %s\n' "$*" >>"$STUB_CALL_LOG"
+exit 91
+DECOY
+chmod +x "$DECOY_DIR/bw"
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
+printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+printf '[{"name":"solo-key","login":{"password":"val-solo"}}]' >"$STUB_LIST_FILE"
+out_file="$STUB_DIR/t32.out"
+set +e
+PATH="$DECOY_DIR:$PATH" env -u BW_SESSION -u BW_RUN_BW_BIN \
+  bash "$LISTED_WRAPPER" KEY1=solo-key -- bash -c 'env | grep "^KEY1="' \
+  >"$out_file" 2>/dev/null
+rc=$?
+set -e
+assert_eq "$rc" "0" "t32 exit code is 0"
+assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t32 KEY1 exported via discovered bw"
+t32_decoy=$(grep -c '^DECOY-BW-INVOKED' "$STUB_CALL_LOG" || true)
+assert_eq "$t32_decoy" "0" "t32 PATH decoy never invoked for the unlock"
+t32_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t32_unlock" "1" "t32 discovery skipped the unsafe first entry and used the sound one"
+
+# --- TEST 33: a lying `ls` on PATH cannot steer the trust check -------------
+# The whole predicate leans on `ls` for directory modes. Without the PATH pin
+# an attacker who can seed PATH — the exact attacker these checks exist to stop
+# — substitutes `ls`, has every directory report drwx------, and walks the
+# master password out through a binary of their choosing. That makes every rule
+# above decorative, so it is worth a test of its own.
+#
+# Setup is T22's: an override in a genuinely world-writable directory, which
+# must be refused. The only difference is a shadow `ls` first on PATH that
+# reports drwx------ for anything. Pinned, the real `ls` runs and the directory
+# is refused. Unpinned, the lie is believed and the mint proceeds.
+echo "--- TEST 33: shadowed \`ls\` on PATH cannot fake a private directory ---"
+setup
+LIAR_DIR="$STUB_DIR/liar"
+rm -rf "$LIAR_DIR"
+mkdir -p "$LIAR_DIR"
+cat >"$LIAR_DIR/ls" <<'LIARLS'
+#!/usr/bin/env bash
+printf 'SHADOW-LS %s\n' "$*" >>"$STUB_CALL_LOG"
+printf 'drwx------  2 nobody nobody 4096 Jan 1 00:00 faked\n'
+LIARLS
+chmod +x "$LIAR_DIR/ls"
+WIDE_OPEN_DIR="$STUB_DIR/wideopen"
+rm -rf "$WIDE_OPEN_DIR"
+mkdir -p "$WIDE_OPEN_DIR"
+cp "$STUB_DIR/bw" "$WIDE_OPEN_DIR/bw"
+chmod +x "$WIDE_OPEN_DIR/bw"
+chmod 0777 "$WIDE_OPEN_DIR"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+# Premise: the shadow really would lie if it were consulted.
+assert_eq "$(PATH="$LIAR_DIR:$PATH" ls -ld "$WIDE_OPEN_DIR" | cut -c1-10)" "drwx------" \
+  "t33 premise: the shadowed ls reports a fake private mode"
+assert_eq "$(ls -ld "$WIDE_OPEN_DIR" | cut -c1-10)" "drwxrwxrwx" \
+  "t33 premise: the directory is genuinely world-writable"
+# The premise check above ran the shadow itself, which logs. Clear the log so
+# the SHADOW-LS assertion below counts the wrapper's calls and nothing else.
+: >"$STUB_CALL_LOG"
+err_file="$STUB_DIR/t33.err"
+set +e
+PATH="$LIAR_DIR:$PATH" BW_RUN_BW_BIN="$WIDE_OPEN_DIR/bw" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t33 exit code is 1"
+t33_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t33_unlock" "0" "t33 no unlock: the lying ls was never consulted"
+t33_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t33_sec" "0" "t33 master password never read"
+t33_shadow_ls=$(grep -c '^SHADOW-LS ' "$STUB_CALL_LOG" || true)
+assert_eq "$t33_shadow_ls" "0" "t33 the pinned PATH kept the shadowed ls out entirely"
 
 # --- Summary ---------------------------------------------------------------
 echo ""
