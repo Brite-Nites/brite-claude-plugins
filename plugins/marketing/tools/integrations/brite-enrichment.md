@@ -188,13 +188,13 @@ distribution) driven by a Claude Code session, with credentials in
 
 This is acceptable **only** for the single operator who is already `ACCOUNTADMIN`
 (strictly more power than `ENRICHMENT_MCP_WRITER`: INSERT/UPDATE on three staging tables, no
-DDL/DELETE/mart-write). **No** Bitwarden item, **no** `bw-run.sh` key injection, **no** plugin
+DDL/DELETE/mart-write). **No** Secrets Manager secret, **no** `bws run` key injection, **no** plugin
 `.mcp.json` `SNOWFLAKE_*` wiring.
 
 ### 2. Plugin-distributed install — health-only until REST
 
 The plugin ships an `enrichment` entry in `plugins/marketing/.mcp.json` that fetches the
-engine via `uvx` from a pinned SHA and injects only the **7 provider keys** via `bw-run.sh`
+engine via `uvx` from a pinned SHA and injects the **`brite-claude-enrichment` project** via `bws run`
 (the broker the tam-map servers use). It carries **no Snowflake credentials** — so every
 Snowflake-touching tool (`query_entity`, the budget gate inside `enrich_contacts`/`verify_emails`,
 and `ingest_enriched_contacts`) cannot run there; only `check_enrichment_health` works (it
@@ -295,7 +295,7 @@ the lag). Verify a just-written contact at the staging layer, not via `query_ent
 - **Bumping the pinned SHA (distributed plugin).** `.mcp.json` pins the engine to a git SHA,
   so engine fixes don't auto-propagate; update `@<pinned-sha>`, bump the plugin version, and
   fully restart Claude Code. (Not relevant to the v1 local run, which uses the live source.)
-- **`bw-run.sh` fails closed.** One missing/misspelled vault item = the whole MCP won't start
+- **`bws run` fails closed.** A missing secret or an invalid access token = the whole MCP won't start
   (exit 3), not a graceful per-provider skip. Confirm a vault item exists before adding its row.
 - **Restart, don't `/reload-plugins`.** MCP server processes keep the previous version's
   env/path until a full Claude Code restart.

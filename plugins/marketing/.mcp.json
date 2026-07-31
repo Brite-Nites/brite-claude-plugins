@@ -19,7 +19,7 @@
       "args": [
         "run",
         "--project-id",
-        "7e1b0a53-7b6b-434f-8f9b-b498015112ef",
+        "TAM-MAP-PROJECT-ID-PENDING",
         "--",
         "exec npx -y spider-cloud-mcp@2.1.1"
       ]
@@ -30,7 +30,7 @@
       "args": [
         "run",
         "--project-id",
-        "7e1b0a53-7b6b-434f-8f9b-b498015112ef",
+        "TAM-MAP-PROJECT-ID-PENDING",
         "--",
         "exec node '${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/aiark-mcp.js'"
       ]
@@ -41,7 +41,7 @@
       "args": [
         "run",
         "--project-id",
-        "7e1b0a53-7b6b-434f-8f9b-b498015112ef",
+        "TAM-MAP-PROJECT-ID-PENDING",
         "--",
         "exec node '${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js'"
       ]
@@ -59,7 +59,7 @@
       "args": [
         "run",
         "--project-id",
-        "7e1b0a53-7b6b-434f-8f9b-b498015112ef",
+        "ENRICHMENT-PROJECT-ID-PENDING",
         "--",
         "exec uvx --from 'git+https://github.com/Brite-Nites/brite-data-platform@0ac5389cc198a29a7f68c710f0814cf645c31666#subdirectory=tools/enrichment-mcp' brite-enrichment-mcp"
       ],

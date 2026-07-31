@@ -43,7 +43,7 @@ Before running the 6 checks, label the capability with its **artifact class**. T
 Two things that *look* like they need their own class but do **not**:
 
 - **A human-facing GUI / wizard is not a fourth class.** It is the **Check-1 (Runtime Model) FAIL outcome for any class** — Check 1 already asks "does an *agent* invoke this?" ADR-025 handled hardis's VS Code GUI exactly this way: SKIP-via-Check-1-fail, recommended to the human dev team instead of hosted in revops.
-- **stdio-MCP vs HTTP-MCP is not a sub-split of the MCP class.** That distinction is a *secret-config* concern owned by [ADR-010](010-plugin-secret-config-canon.md) (`bw-run.sh` env vs the BC-5551 header-substitution exception). Checks 1/3/4/5/6 read identically for both transports, so the adoption framework treats them as one class.
+- **stdio-MCP vs HTTP-MCP is not a sub-split of the MCP class.** That distinction is a *secret-config* concern owned by [ADR-010](010-plugin-secret-config-canon.md) (`bws run` env vs the BC-5551 header-substitution exception). Checks 1/3/4/5/6 read identically for both transports, so the adoption framework treats them as one class.
 
 ### The 6 checks, by class
 

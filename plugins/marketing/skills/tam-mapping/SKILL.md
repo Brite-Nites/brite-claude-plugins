@@ -199,7 +199,7 @@ Run in parallel; merge + dedup by domain at completion.
 | Spider.cloud | `mcp__plugin_marketing_spider__*` | `plugins/marketing/scripts/tam-map/spider_crawl.py` | crawls homepage + `/about` + `/contact` |
 | AI Ark | `mcp__plugin_marketing_aiark__*` | `plugins/marketing/scripts/tam-map/aiark-mcp.js` | paginated, no stated rate limit |
 | Discolike | `mcp__plugin_marketing_discolike__*` | `plugins/marketing/scripts/tam-map/discolike-mcp.js` | offset-based, X-Total-Count header |
-| IcyPeas | `Bash` → `"${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh" ICYPEAS_API_KEY=tam-map-icypeas-api-key -- python "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/icypeas_client.py" --icp ./output/{slug}/icp.json` | (no MCP — script-only per BC-5946) | max 100/page |
+| IcyPeas | `Bash` → `bws run --project-id TAM-MAP-PROJECT-ID-PENDING -- "exec python '${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/icypeas_client.py' --icp ./output/{slug}/icp.json"` | (no MCP — script-only per BC-5946) | max 100/page |
 
 Output:
 
@@ -297,7 +297,7 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 
 | `enrichment_provider` | Implementation | Status |
 |---|---|---|
-| `blitz_waterfall` | Shells to `"${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh" BLITZAPI_KEY=tam-map-blitzapi-key PROSPEO_API_KEY=tam-map-prospeo-api-key -- python "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/enrich_waterfall.py" --in <input> --out enriched.jsonl` (BlitzAPI 5 req/s serialized, Prospeo fallback max 20 workers) | **Auto-detect fallback (step 3). Production-ready.** |
+| `blitz_waterfall` | Shells to `bws run --project-id TAM-MAP-PROJECT-ID-PENDING -- "exec python '${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/enrich_waterfall.py' --in <input> --out enriched.jsonl"` (BlitzAPI 5 req/s serialized, Prospeo fallback max 20 workers) | **Auto-detect fallback (step 3). Production-ready.** |
 | `brite_cli` | Shells to `services/enrichment/cli.py` in brite-data-platform | Pending repo wiring; falls through to `blitz_waterfall` if repo missing locally |
 | `brite_mcp` | Routes the whole candidate list through the `bulk_enrich` bulk door (`mcp__plugin_marketing_enrichment__bulk_enrich` → REST `/enrich/batch`, per [ADR-017](https://github.com/Brite-Nites/brite-data-platform/blob/main/docs/decisions/017-bulk-enrichment-door.md)) — **never** a per-company loop of single `enrich_contacts` calls. | **Auto-detect default (step 1) since the ADR-008 default-flip (BC-16888); granted in `allowed-tools` (BC-13165).** Selecting or auto-detecting it routes the whole list through the bulk door. If `bulk_enrich` is unavailable in-session (the brite-enrichment MCP server failed to register/spawn), `brite_mcp` logs `brite_mcp selected but bulk_enrich unavailable in-session (MCP server not reachable) — using blitz_waterfall` and falls through to `blitz_waterfall`. |
 | `skip` | No enrichment — pass through unenriched | Opt-in for testing or for handing off to BC-2717 list-building (which has its own enrichment pre-flight) |
@@ -337,7 +337,7 @@ Pluggable per [ADR-008](../../../../docs/decisions/008-tam-mapping-enrichment-pl
 
 > Nites/Supply paths skip this phase. Downstream consumers (BC-2717 or BC-5826) handle SMTP verification.
 
-- Tool: `Bash` → `"${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh" MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key -- python "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/verify_smtp.py" --in enriched.jsonl --out verified.jsonl`.
+- Tool: `Bash` → `bws run --project-id TAM-MAP-PROJECT-ID-PENDING -- "exec python '${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/verify_smtp.py' --in enriched.jsonl --out verified.jsonl"`.
 - Throughput: 160 req/sec (MillionVerifier rate limit).
 - Filter result codes:
   - **Keep** code `1` (`valid`).
@@ -457,7 +457,7 @@ See [§3 Phase 4.5](#phase-45--exclusion-mandatory--never-skipped) for the full 
 
 ### Workflow 4 — Phase 6 SMTP verify (Labs)
 
-1. `Bash` → `"${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh" MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key -- python "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/verify_smtp.py" --in enriched.jsonl --out verified.jsonl`.
+1. `Bash` → `bws run --project-id TAM-MAP-PROJECT-ID-PENDING -- "exec python '${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/verify_smtp.py' --in enriched.jsonl --out verified.jsonl"`.
 2. Filter result codes 1 + 2 (with explicit `catch_all` flag); drop 3–6.
 
 ### Workflow 5 — Phase 7 tier delegation (Labs)
