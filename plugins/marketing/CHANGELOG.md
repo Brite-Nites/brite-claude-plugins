@@ -16,6 +16,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- **The `gbrain-team` broker reads its OAuth client from the environment (ADR-045).** `scripts/gbrain-team-broker.sh` no longer touches Bitwarden, so it needs no `bw`, no `BW_SESSION`, and no `bw unlock`. With ADR-044 this removes the last vault-session consumer in the repo. The same change lands byte-identically in all six plugins that register the server.
+
+  **Required operator action — this breaks existing installs until done:**
+  1. Open the Bitwarden item `Brite team gbrain — my client` and export its username as `GBRAIN_CLIENT_ID` and its password as `GBRAIN_CLIENT_SECRET` in your shell profile.
+  2. If you have gbrain write access, also export `GBRAIN_WRITE_CLIENT_ID` / `GBRAIN_WRITE_CLIENT_SECRET` from `Brite team gbrain — write OAuth client`.
+  3. Re-launch Claude Code from a shell that has them.
+
+  Teammates whose personal client hasn't been issued yet (BC-11758) export the shared Engineering client's values instead — open tier only. The personal → shared fallback chain is gone: it existed only so the broker could *discover* which vault item was present, and an exported variable holds exactly one value. The read and write pairs stay separate on purpose — `--write` never falls back to the read pair, so a missing write client fails loudly at spawn instead of surfacing later as a `put_page` 403 (BC-12113).
 - **Secrets now come from Bitwarden Secrets Manager via `bws run` (ADR-044).** `bw-run.sh` and its test suite are deleted. The four secret-bearing MCP servers and the skills' Python CLI call sites authenticate with a machine-account access token scoped to two projects — `brite-claude-tam-map` (7 secrets) and `brite-claude-enrichment` (8). No vault master password, no `bw unlock`, no `BW_SESSION`.
 
   **Required operator action — this breaks existing installs until done:**

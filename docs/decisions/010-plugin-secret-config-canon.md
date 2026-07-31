@@ -1,12 +1,14 @@
 # 010. Plugin secret-config canon (Bitwarden + `bw-run.sh`)
 
-**Status:** Superseded in part by [ADR-044](044-secrets-manager-machine-account-broker.md) (2026-07-31)
+**Status:** Superseded in part by [ADR-044](044-secrets-manager-machine-account-broker.md) and [ADR-045](045-gbrain-broker-env-oauth-client.md) (2026-07-31)
 
 > The **mechanism** below — the `bw-run.sh` wrapper, its contract, its `.mcp.json` shape, and the
 > `BW_SESSION` preflight — was replaced by Bitwarden Secrets Manager machine accounts and `bws run`.
 > The wrapper and its test suite no longer exist in the tree. This record is kept for the context,
 > drivers, rejected alternatives, and the HTTP-MCP exception, all of which still stand.
-> `gbrain-team-broker.sh` still follows the `BW_SESSION` pattern described here.
+> `gbrain-team-broker.sh` was the last consumer of the `BW_SESSION` pattern described here;
+> [ADR-045](045-gbrain-broker-env-oauth-client.md) moved it to environment-supplied OAuth client
+> credentials, so nothing in the tree requires a vault session any more.
 **Date:** 2026-05-10
 **Linear:** [BC-6958](https://linear.app/brite-nites/issue/BC-6958)
 **Related ADRs:** [ADR-007](007-revops-plugin-design.md), [ADR-008](008-tam-mapping-enrichment-pluggability.md), [ADR-009](009-sf-capability-adoption.md)

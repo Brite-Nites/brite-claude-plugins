@@ -59,7 +59,7 @@ From the audit report (full detail in the session transcript / audit summary):
 - **TEST-07** wire `gen-skill-docs.py --check` into CI — S
 - **TEST-08** relocate the warn-only `claude plugin list` section out of validate.sh (non-hermetic) — S
 - **DX-2** stale-bare-root guard: SessionStart warning + tracked doc note (root snapshot was 103 commits behind at audit time) — S
-- **SEC-05** gbrain broker: reject `http://` token endpoints (`gbrain-team-broker.sh:59`) — S
+- **SEC-05** gbrain broker: reject `http://` token endpoints (`gbrain-team-broker.sh`, the `TOKEN_URL` derivation) — S
 - **Investigate-only:** SH-05 validate.sh YAML-parser fragility · SH-07 telemetry stale markers · PY-04 canonicals reader/linter divergence · PY-07 tam-map JSONL loaders abort on one bad line
 
 ## Findings awaiting a maintainer decision (not plannable as-is)
