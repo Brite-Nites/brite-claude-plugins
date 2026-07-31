@@ -53,7 +53,7 @@ Narrate: `Step 1/5: Verifying git prerequisites...`
 1. Confirm git repo: `git rev-parse --is-inside-work-tree`
 2. Confirm clean state: `git status --porcelain` (should be empty)
 3. Fetch latest: `git fetch origin`
-4. Identify base branch: usually `main` or `master`
+4. Identify the base branch — resolve it per Step 2, do NOT assume `main`/`master`
 ```
 
 If working directory is dirty, use error recovery (see `_shared/observability.md`). AskUserQuestion with options: "Stash changes / Commit changes first / Abort worktree setup."
@@ -64,22 +64,61 @@ Narrate: `Step 1/5: Verifying git prerequisites... done`
 
 Narrate: `Step 2/5: Creating branch and worktree...`
 
-Use the EnterWorktree tool to create an isolated worktree. Name it after the Linear issue:
+Create an isolated worktree named after the Linear issue, using `git worktree add` directly.
 
-**Branch naming convention**: `[issue-id]/[short-description]`
-- Example: `BRI-1617/writing-plans-skill`
-- Example: `BRI-42/fix-auth-redirect`
+**Do not use the `EnterWorktree` tool for this skill.** It cannot express any of the three invariants below. It accepts only `name` and `path`: its base comes from the `worktree.baseRef` *setting* (`fresh`, the default, branches from `origin/<default-branch>`; `head` from local HEAD), its branch name is derived from `name`, and it offers no tracking control. So it cannot take an explicit base, cannot use Linear's `gitBranchName`, and cannot pass `--no-track` — in a promotion-chain repo `fresh` produces precisely the prohibited branch-from-`main`.
 
-**Validate the issue ID** before using it in shell commands — it must match `^[A-Z]+-[0-9]+$`. Reject any ID containing spaces, semicolons, pipes, or other shell metacharacters.
+One code path keeps all three invariants enforceable everywhere. After creating the worktree, `cd` into it for the remaining steps.
 
-If the EnterWorktree tool is not available, fall back to manual git commands (always quote variables).
+#### Resolve the base branch — do NOT assume the default branch
 
-Derive `DESCRIPTION` from the issue title: lowercase, replace non-alphanumeric characters with hyphens, collapse consecutive hyphens, strip leading/trailing hyphens, truncate to 50 chars. Validate it matches `^[a-z0-9][a-z0-9-]*[a-z0-9]$` (or `^[a-z0-9]$` for single-char). If validation fails, ask the developer for a safe branch description.
+**The repo's default branch is not always a legal base.** In a promotion-chain repo, cutting a feature branch from the default branch is prohibited by construction: `brite-salesforce` promotes `integration → main` via a promotion PR (bn-salesforce ADR-016; the in-repo mirror is [`docs/decisions/026-revops-promotion-topology.md`](../../../../docs/decisions/026-revops-promotion-topology.md)), so a branch cut from `main` produces a promotion PR carrying unrelated commits — the exact failure that topology exists to prevent.
+
+Resolve `BASE` in this order and stop at the first hit:
+
+1. **A base stated by the caller or the developer** — the invoking command passing one, or the developer naming a branch in conversation. Always wins.
+2. **The consuming repo's `CLAUDE.md`** — read it before defaulting. If it names a base branch or a promotion topology, follow it. When a repo's `CLAUDE.md` and this skill disagree, `CLAUDE.md` wins; file the divergence against the Brite Skill Packs project.
+3. **`origin/HEAD`** — fallback only:
 
 ```bash
-# ISSUE_ID = Linear issue ID (e.g. BRI-42)
-# DESCRIPTION = slugified short summary (e.g. fix-auth-redirect)
-git worktree add ".claude/worktrees/${ISSUE_ID}" -b "${ISSUE_ID}/${DESCRIPTION}" origin/main
+BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
+```
+
+**This is the single definition of base resolution.** `session-start` (pull) and `ship` (PR base) defer to this order rather than re-deriving it — if they resolved independently they could disagree, and a feature cut from `integration` would still open its PR against `main`. Step 5 records the resolved `BASE` in the completion marker so downstream steps consume the value actually used.
+
+**`BASE` is always a remote-tracking ref (`<remote>/<branch>`).** `--short` yields that form directly, so nothing needs prepending. A `CLAUDE.md` may declare a **bare** branch name (`integration`) — qualify it before use, or downstream `git pull`/`merge` will treat the branch name as a remote:
+
+```bash
+# Qualify a bare branch name declared by CLAUDE.md.
+case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac
+```
+
+Once qualified, `${BASE%%/*}` is the remote and `${BASE#*/}` is the branch, and both stay correct for branch names containing slashes (`origin/release/1.2` → `origin` + `release/1.2`). Qualification is what matters: on an unqualified `integration` **both** expansions return `integration`, which is how `git pull integration integration` happens. Use `${BASE#*/}` — not `${BASE#origin/}` — wherever a bare branch name is needed, so a remote named something other than `origin` still works. **Do not** write this as `"origin/$(… | sed … || echo main)"`: a pipeline's exit status is its *last* command's, `sed` succeeds on empty input, so the `|| echo main` can never fire and `BASE` silently becomes `origin/` — which fails with `fatal: invalid reference: origin/` in exactly the situations the fallback exists for (`origin/HEAD` unset, a remote not named `origin`, some CI checkouts).
+
+#### Resolve the branch name — prefer Linear's own field
+
+Linear's `get_issue` returns a **`gitBranchName`** field (e.g. `holden/bc-17836-worktree-base`). Use it verbatim when available: it already encodes the team's convention, and it is the name Linear matches for automatic issue-to-branch linking.
+
+Only when it is unavailable, fall back to `[issue-id]/[short-description]`:
+- Example: `BC-1617/writing-plans-skill`
+- Derive `DESCRIPTION` from the issue title: lowercase, replace non-alphanumeric characters with hyphens, collapse consecutive hyphens, strip leading/trailing hyphens, truncate to 50 chars. Validate it matches `^[a-z0-9][a-z0-9-]*[a-z0-9]$` (or `^[a-z0-9]$` for single-char). If validation fails, ask the developer for a safe branch description.
+
+**Validate the issue ID** before using it in shell commands — it must match `^[A-Z]+-[0-9]+$`. Reject any ID containing spaces, semicolons, pipes, or other shell metacharacters. Apply the same check to a `gitBranchName` taken from the tracker: it must match `^[A-Za-z0-9._/-]+$` before it reaches a shell.
+
+Always quote variables.
+
+```bash
+# ISSUE_ID = Linear issue ID (e.g. BC-42)
+# BRANCH   = Linear gitBranchName, else "${ISSUE_ID}/${DESCRIPTION}"
+# BASE     = resolved above — NOT hardcoded to origin/main
+#
+# --no-track matters: without it, `git worktree add ... origin/<base>` sets <base>
+# as the new branch's upstream. That makes bare `git pull` and `git status`
+# ahead/behind silently refer to the BASE branch — the everyday confusion — and,
+# where push.default is set to `upstream` rather than the `simple` default, a bare
+# `git push` writes straight to the base branch. Never setting it beats unsetting
+# it afterwards, which needs error-suppression that can mask a real failure.
+git worktree add --no-track ".claude/worktrees/${ISSUE_ID}" -b "${BRANCH}" "${BASE}"
 ```
 
 Narrate: `Step 2/5: Creating branch and worktree... done`
@@ -127,7 +166,7 @@ Report to the developer with this completion marker:
 Artifacts:
 - Worktree path: [worktree-path]
 - Branch: [branch-name]
-- Base: origin/main @ [commit-hash]
+- Base: [base-ref] @ [commit-hash]  ← state the ref you actually used, and why
 
 Baseline:
 - Tests: [pass/fail count]
@@ -149,8 +188,10 @@ Worktree cleanup happens during the `ship` command:
 
 ## Rules
 
-- Always base worktrees on the latest `origin/main` (or default branch)
+- Resolve the base branch per Step 2 — explicit argument, then the consuming repo's `CLAUDE.md`, then `origin/HEAD`. **In a promotion-chain repo the default branch is the wrong base by construction**, so "use the default branch" is not a safe rule to state.
+- Fetch before branching so the base is current
+- Create the branch with `--no-track` so it never inherits the base as its upstream
 - Never reuse a worktree from a previous issue — always start fresh
 - If baseline tests fail, document it but don't block — the developer may know about it
-- Branch names must include the Linear issue ID for traceability
+- Branch names must identify the Linear issue for traceability; prefer Linear's own `gitBranchName` so the tracker's auto-linking works and the repo's convention is respected
 - Keep worktrees in `.claude/worktrees/` to avoid cluttering the project root

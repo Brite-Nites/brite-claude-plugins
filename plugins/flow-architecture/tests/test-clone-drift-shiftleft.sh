@@ -37,13 +37,13 @@ SS_UPSTREAM="plugins/workflows/commands/session-start.md"
 # recorded Upstream-SHA was bumped to the new upstream blob in the same PR).
 # review + ship re-synced again in BC-12113 (save-results put_page → the dedicated
 # gbrain-team-write server propagated to both upstreams + clones).
-SS_TARGET='Upstream-SHA: 97cdc134d86405a0510b0128abb6f71256e1d3eb'
+SS_TARGET='Upstream-SHA: e162bf3210abf45d5e51ec106e17b3ef1c7acbd7'
 REV_CLONE="plugins/flow-architecture/commands/review.md"
 REV_UPSTREAM="plugins/workflows/commands/review.md"
 REV_TARGET='Upstream-SHA: c4607b2cf4679f794a84cf2e1e0e004f2e4864a0'
 SHIP_CLONE="plugins/flow-architecture/commands/ship.md"
 SHIP_UPSTREAM="plugins/workflows/commands/ship.md"
-SHIP_TARGET='Upstream-SHA: 35fa8c4047c2dbffc6421ad66a86ace4e32afa58'
+SHIP_TARGET='Upstream-SHA: 6894e697371695f60a312f62a20bfc5b0fa38fde'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 # Unique per-invocation output file (portable mktemp template — trailing X's,
 # no suffix, works on both BSD/macOS and GNU/Linux). Avoids a fixed /tmp path

@@ -70,7 +70,18 @@ If Linear or sequential-thinking fails:
 Narrate: `Step 1/8: Environment setup...`
 
 1. **Check git status** — Ensure working directory is clean. If dirty, warn and ask how to proceed.
-2. **Pull latest** — `git pull origin main` (or the default branch).
+2. **Pull latest** — the pull needs a base, so resolve one first using the **same order** the `git-worktrees` skill defines (caller-stated base → the consuming repo's `CLAUDE.md` → `origin/HEAD`); do not re-invent that order here. **This requires a narrow pre-read of `CLAUDE.md` for a declared base branch or promotion topology** — the full `CLAUDE.md` payload load is item 3, which runs *after* this step, so waiting for it would mean pulling before the base is known. Then:
+
+   ```bash
+   # BASE may ALREADY be set from the caller or the CLAUDE.md pre-read above.
+   # `:=` assigns only when it is unset/empty, so origin/HEAD stays a genuine fallback.
+   # A bare `BASE=$(...)` here would silently overwrite a declared `integration` with `main`.
+   : "${BASE:=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
+   case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac   # CLAUDE.md may declare a bare name
+   git fetch "${BASE%%/*}" && git merge --ff-only "$BASE"
+   ```
+
+   Carry `BASE` forward — Step 7 and ship both consume it. **Do not hardcode `main`**: in a promotion-chain repo that pulls the wrong branch into the working tree, and the session then starts from a base Step 7 correctly refuses to branch from.
 3. **Read project CLAUDE.md** — Load architecture context, conventions, previous learnings.
 4. **Read auto-memory** — Check for session summaries and follow-ups from previous sessions.
 5. **Context budget check** — After loading CLAUDE.md and auto-memory, estimate the Tier 1+2 line count. If CLAUDE.md exceeds ~120 lines, log an advisory warning: "CLAUDE.md is [N] lines — consider running `/workflows:ship` to trigger best-practices-audit for extraction to docs/." Do NOT stop — advisory only, consistent with CDR check pattern.
@@ -197,11 +208,11 @@ Narrate: `Step 7/8: Setting up worktree...`
 
 After the plan is approved, the `git-worktrees` skill activates:
 
-1. Create an isolated worktree with branch `[issue-id]/[short-description]`
+1. Create an isolated worktree. The skill resolves both the **base branch** and the **branch name** — do not assume `origin/main` or a fixed name shape here. Prefer Linear's `gitBranchName`; in a promotion-chain repo the default branch is the wrong base by construction.
 2. Install dependencies
 3. Verify clean test/build/lint baseline
 
-If the developer prefers not to use worktrees, fall back to a simple branch: `git checkout -b [issue-id]/[short-description]`
+If the developer prefers not to use worktrees, fall back to a simple branch off the same resolved base: `git checkout -b "$BRANCH" "$BASE"`.
 
 **Phase transition**: Worktree → Execute. Decisions: [baseline pass/fail status]. Artifacts: [worktree path, branch name]. Next: execution.
 

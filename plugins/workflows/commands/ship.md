@@ -90,6 +90,27 @@ Push the branch and create a PR:
 1. **Push branch**: `git push -u origin HEAD`
 2. **Create PR** using `gh pr create`:
 
+**Target the branch you actually branched from.** `gh pr create` with no `--base` defaults to the repo's default branch. In a promotion-chain repo that opens the PR against `main` even though the feature was cut from `integration`, bypassing the promotion gate. Resolve the same base `git-worktrees` used and pass it explicitly:
+
+```bash
+# RECORDED_BASE comes from the git-worktrees completion marker emitted in this session:
+#   "- Base: <base-ref> @ <commit-hash>"
+# Read that line from the session context and set RECORDED_BASE to its <base-ref>. That is the
+# ref the branch was actually cut from; re-deriving here can disagree with it, which is the whole
+# bug (cut from integration, PR opened against main). Only if no marker exists in this session --
+# e.g. ship run standalone on a pre-existing branch -- resolve fresh, and resolve it by the SAME
+# order git-worktrees defines: check the consuming repo's CLAUDE.md for a declared base or
+# promotion topology BEFORE falling through to origin/HEAD. Skipping that step is how a
+# standalone ship in a promotion-chain repo still targets the wrong branch.
+# CLAUDE_MD_BASE = a base declared by the consuming repo's CLAUDE.md, if any. It sits BETWEEN
+# the recorded marker and origin/HEAD; omitting it is what made standalone ship target main.
+BASE="${RECORDED_BASE:-${CLAUDE_MD_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}}"
+case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac   # a declared base may be bare
+# ${BASE#*/} strips the remote whatever it is called; ${BASE#origin/} would leave
+# "upstream/integration" intact, which is not a branch name.
+gh pr create --base "${BASE#*/}" ...
+```
+
 ```
 Title: [concise imperative description, under 70 chars]
 
