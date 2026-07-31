@@ -28,23 +28,47 @@ fi
 #
 # This path hands the MASTER password (strictly worse to leak than a session
 # token — a session dies on `bw lock`, the master password does not) to two
-# subprocesses, so both are resolved to absolute paths in trusted prefixes
-# rather than inherited PATH: a shadowed `bw` earlier in PATH would otherwise
-# receive it. Override an unusual bw install with BW_RUN_BW_BIN.
-# BW_RUN_SECURITY_BIN exists so the test suite can point at its stub; in real
-# use the macOS path is fixed and PATH is deliberately not consulted.
+# subprocesses, so neither is taken from PATH on trust: a shadowed `bw` earlier
+# in PATH would otherwise receive it. Both must pass _bin_is_trusted, and that
+# check applies to the BW_RUN_BW_BIN / BW_RUN_SECURITY_BIN overrides as well —
+# an env var an attacker can set is not an exemption from the check it would
+# otherwise defeat.
 _SECURITY_BIN="${BW_RUN_SECURITY_BIN:-/usr/bin/security}"
+# find-generic-password matches on service name alone unless an account is
+# given, so it must be scoped to the same -a the provisioning hint uses;
+# otherwise a same-service item for another account can win the lookup.
+_KEYCHAIN_ACCOUNT="${USER:-$(id -un)}"
+
+# A subprocess that touches the master password must be one an attacker cannot
+# have written. Two ways to qualify:
+#   1. it is one of the caller-supplied known install paths, or
+#   2. it sits in a mode-0700 directory. Only that directory's owner can
+#      traverse it, and the `-x` test on the binary proves the owner is us.
+#      A private temp dir (the test suite's stub) qualifies; the places an
+#      attacker can actually plant a binary do not — /tmp is 1777,
+#      /usr/local/bin is 0755, node_modules/.bin is 0755.
+# `ls -ld` mode strings are POSIX; `stat` format flags differ between BSD and
+# GNU, so this stays portable across macOS and Linux.
+_bin_is_trusted() {
+  _p="$1"; shift
+  for _ok in "$@"; do
+    if [ "$_p" = "$_ok" ]; then return 0; fi
+  done
+  case "$(ls -ld "$(dirname "$_p")" 2>/dev/null | cut -c1-10)" in
+    drwx------) return 0 ;;
+  esac
+  return 1
+}
 
 _resolve_bw_bin() {
   if [ -n "${BW_RUN_BW_BIN:-}" ]; then
-    [ -x "$BW_RUN_BW_BIN" ] && printf '%s' "$BW_RUN_BW_BIN" && return 0
-    return 1
+    _cand="$BW_RUN_BW_BIN"
+  else
+    _cand="$(command -v bw 2>/dev/null)" || return 1
   fi
-  _cand="$(command -v bw 2>/dev/null)" || return 1
-  case "$_cand" in
-    /opt/homebrew/bin/bw|/usr/local/bin/bw|/usr/bin/bw) printf '%s' "$_cand" ;;
-    *) return 1 ;;
-  esac
+  [ -x "$_cand" ] || return 1
+  _bin_is_trusted "$_cand" /opt/homebrew/bin/bw /usr/local/bin/bw /usr/bin/bw || return 1
+  printf '%s' "$_cand"
 }
 
 # At most ONE mint attempt per process (ADR-010 § 1 contract): the absent-session
@@ -56,8 +80,11 @@ _self_unlock() {
   [ "$_SELF_UNLOCK_TRIED" = "1" ] && return 1
   _SELF_UNLOCK_TRIED=1
   [ -x "$_SECURITY_BIN" ] || return 1
+  _bin_is_trusted "$_SECURITY_BIN" /usr/bin/security || return 1
+  # Resolve bw BEFORE reading the password: if we would have nowhere trusted to
+  # send it, it must never leave the Keychain in the first place.
   _bw_bin="$(_resolve_bw_bin)" || return 1
-  _bw_master="$("$_SECURITY_BIN" find-generic-password -s bw-master -w 2>/dev/null)" || return 1
+  _bw_master="$("$_SECURITY_BIN" find-generic-password -a "$_KEYCHAIN_ACCOUNT" -s bw-master -w 2>/dev/null)" || return 1
   if [ -z "$_bw_master" ]; then
     return 1
   fi

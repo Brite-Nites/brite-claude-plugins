@@ -5,9 +5,10 @@
 # (T-F1 BW_SESSION unset, T-F3 mixed-result batch, T-F4 sequential per-item
 # failure, T-F5 empty EXPORTS, P3-1 missing command after --, P3-8
 # bad-arg-shape variants, BC-6958 micro-fix coverage) + 4 Keychain
-# self-unlock cases (T16–T19). The `security` stub defaults to
-# item-not-found so every pre-self-unlock case keeps its exact behavior
-# regardless of the developer's real Keychain.
+# self-unlock cases (T16–T22, covering the happy path, both fail-closed
+# exits, the single-attempt contract, and the two binary-trust rejections).
+# The `security` stub defaults to item-not-found so every pre-self-unlock
+# case keeps its exact behavior regardless of the developer's real Keychain.
 # macOS bash 3.2 portable.
 set -euo pipefail
 
@@ -96,11 +97,16 @@ fi
 SECSTUB
 chmod +x "$STUB_DIR/security"
 export PATH="$STUB_DIR:$PATH"
-# The self-unlock path resolves these two to absolute paths in trusted
-# prefixes (it carries the master password, so it must not trust PATH).
-# Point both at the stubs for testing.
+# The self-unlock path will only hand the master password to a binary it
+# trusts: a known install path, or one inside a mode-0700 directory. The
+# overrides get the same check, so pointing them at the stubs works only
+# because `mktemp -d` creates STUB_DIR as 0700 — the same reason an attacker
+# cannot use this route (see T22).
 export BW_RUN_SECURITY_BIN="$STUB_DIR/security"
 export BW_RUN_BW_BIN="$STUB_DIR/bw"
+# The Keychain lookup is scoped to the invoking account, matching the -a the
+# provisioning hint documents.
+TEST_ACCOUNT="${USER:-$(id -un)}"
 
 # --- Test harness ----------------------------------------------------------
 TESTS_RUN=0
@@ -478,8 +484,12 @@ assert_eq "$rc" "0" "t16 exit code is 0"
 assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t16 KEY1 exported"
 unlock_calls=$(grep -c '^unlock --raw --passwordenv BW_PASSWORD' "$STUB_CALL_LOG" || true)
 assert_eq "$unlock_calls" "1" "t16 exactly 1 unlock call with --passwordenv"
-sec_calls=$(grep -c '^security find-generic-password -s bw-master -w' "$STUB_CALL_LOG" || true)
-assert_eq "$sec_calls" "1" "t16 keychain consulted once"
+sec_calls=$(grep -Fxc "security find-generic-password -a $TEST_ACCOUNT -s bw-master -w" "$STUB_CALL_LOG" || true)
+assert_eq "$sec_calls" "1" "t16 keychain consulted once, scoped to our account"
+# Negative: an unscoped lookup (service name only) can match another account's
+# same-service item, so the -a must not regress away.
+t16_unscoped=$(grep -Fxc "security find-generic-password -s bw-master -w" "$STUB_CALL_LOG" || true)
+assert_eq "$t16_unscoped" "0" "t16 no unscoped keychain lookup"
 case "$(cat "$out_file")" in
   *"BW_SESSION="*) T16_LEAK=1 ;;
   *) T16_LEAK=0 ;;
@@ -570,6 +580,63 @@ assert_eq "$rc" "1" "t21 exit code is 1"
 t21_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
 assert_eq "$t21_unlock" "1" "t21 exactly one mint attempt (no double-unlock)"
 assert_contains "$(cat "$err_file")" "vault is not unlocked" "t21 fails closed with stale-session error"
+
+# --- TEST 22: override pointing into an untrusted directory -> declines -----
+# The regression this pins: BW_RUN_BW_BIN used to accept ANY executable, which
+# handed the master password to an attacker-chosen binary and reopened the very
+# hole the absolute-path resolution closes. An env var an attacker can set must
+# not be an exemption from the trust check. Here the override is a perfectly
+# executable copy of the working stub — only its directory is wrong (0755, the
+# mode of every place a binary can actually be planted: /tmp, /usr/local/bin,
+# node_modules/.bin).
+echo "--- TEST 22: bw override in a non-private dir -> no mint, exit 1 ---"
+setup
+UNTRUSTED_DIR="$STUB_DIR/untrusted"
+mkdir -p "$UNTRUSTED_DIR"
+chmod 0755 "$UNTRUSTED_DIR"
+cp "$STUB_DIR/bw" "$UNTRUSTED_DIR/bw"
+chmod +x "$UNTRUSTED_DIR/bw"
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
+printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+err_file="$STUB_DIR/t22.err"
+# Guard the premise: the override IS executable, so a rejection can only come
+# from the trust check and not from the -x test.
+assert_eq "$([ -x "$UNTRUSTED_DIR/bw" ] && echo yes || echo no)" "yes" "t22 override is executable"
+set +e
+BW_RUN_BW_BIN="$UNTRUSTED_DIR/bw" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t22 exit code is 1"
+t22_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t22_unlock" "0" "t22 no unlock attempted with an untrusted bw"
+t22_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t22_sec" "0" "t22 master password never read for an untrusted bw"
+assert_contains "$(cat "$err_file")" "BW_SESSION not set" "t22 fails closed"
+
+# --- TEST 23: security override in an untrusted directory -> declines -------
+# Same rule on the other subprocess. A substituted `security` does not receive
+# the master password, but it supplies it, so an attacker-chosen one steers the
+# unlock; the check is uniform rather than argued case by case.
+echo "--- TEST 23: security override in a non-private dir -> no mint, exit 1 ---"
+setup
+cp "$STUB_DIR/security" "$UNTRUSTED_DIR/security"
+chmod +x "$UNTRUSTED_DIR/security"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+err_file="$STUB_DIR/t23.err"
+set +e
+BW_RUN_SECURITY_BIN="$UNTRUSTED_DIR/security" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t23 exit code is 1"
+t23_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t23_unlock" "0" "t23 no unlock attempted with an untrusted security"
+t23_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t23_sec" "0" "t23 untrusted security binary never invoked"
 
 # --- Summary ---------------------------------------------------------------
 echo ""
