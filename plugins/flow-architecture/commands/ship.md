@@ -26,7 +26,7 @@ gbrain:
 
 <!-- eval-waiver: Cloned Ship and Compound: pre-ship audit, push plus FDA-shaped PR, Q46 ship-summary writeback, Greptile gate, compound-learnings, best-practices audit, handbook-drift, and a retro notification; outputs are an LLM-authored PR body plus ship-summary comment plus session report, with no fixed-right-answer artifact separable from narration. Re-synced for BC-17836 (PR base resolved instead of defaulting to the repo default branch). -->
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: f3e1380cb1ecec4759c783e68a50a2802e2ff470. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 51d5b3f1d93b3a976bf60959498c3d7582e5619d. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
 
 # Ship & Compound
 
@@ -128,7 +128,10 @@ Push the branch and create a PR:
 # Read that line from the session context and set RECORDED_BASE to its <base-ref>. That is the
 # ref the branch was actually cut from; re-deriving here can disagree with it, which is the whole
 # bug (cut from integration, PR opened against main). Only if no marker exists in this session --
-# e.g. ship run standalone on a pre-existing branch -- fall back to resolving it fresh.
+# e.g. ship run standalone on a pre-existing branch -- resolve fresh, and resolve it by the SAME
+# order git-worktrees defines: check the consuming repo's CLAUDE.md for a declared base or
+# promotion topology BEFORE falling through to origin/HEAD. Skipping that step is how a
+# standalone ship in a promotion-chain repo still targets the wrong branch.
 BASE="${RECORDED_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
 gh pr create --base "${BASE#origin/}" ...
 ```

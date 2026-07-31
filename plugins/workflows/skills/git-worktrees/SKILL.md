@@ -64,12 +64,11 @@ Narrate: `Step 1/5: Verifying git prerequisites... done`
 
 Narrate: `Step 2/5: Creating branch and worktree...`
 
-Create an isolated worktree named after the Linear issue. **Which mechanism you may use depends on the base** — read the next section first, then come back here.
+Create an isolated worktree named after the Linear issue, using `git worktree add` directly.
 
-**The `EnterWorktree` tool cannot express a non-default base.** It accepts only `name` and `path`; its base comes from the `worktree.baseRef` setting — `fresh` (the default) branches from `origin/<default-branch>`, and `head` branches from local HEAD. It offers no base argument, no branch-name argument beyond `name`, and no tracking control.
+**Do not use the `EnterWorktree` tool for this skill.** It cannot express any of the three invariants below. It accepts only `name` and `path`: its base comes from the `worktree.baseRef` *setting* (`fresh`, the default, branches from `origin/<default-branch>`; `head` from local HEAD), its branch name is derived from `name`, and it offers no tracking control. So it cannot take an explicit base, cannot use Linear's `gitBranchName`, and cannot pass `--no-track` — in a promotion-chain repo `fresh` produces precisely the prohibited branch-from-`main`.
 
-- **Trunk-based repo** (base resolves to the default branch): `EnterWorktree` is correct and preferred.
-- **Promotion-chain repo, or any resolved base that is NOT the default branch**: `EnterWorktree` **must not be used** — `fresh` would produce precisely the prohibited branch-from-`main`. Use the manual `git worktree add` path below, which takes an explicit base.
+One code path keeps all three invariants enforceable everywhere. After creating the worktree, `cd` into it for the remaining steps.
 
 #### Resolve the base branch — do NOT assume the default branch
 
@@ -87,7 +86,14 @@ BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo ori
 
 **This is the single definition of base resolution.** `session-start` (pull) and `ship` (PR base) defer to this order rather than re-deriving it — if they resolved independently they could disagree, and a feature cut from `integration` would still open its PR against `main`. Step 5 records the resolved `BASE` in the completion marker so downstream steps consume the value actually used.
 
-`--short` yields a ready-to-use `origin/<branch>`, so nothing needs prepending. **Do not** write this as `"origin/$(… | sed … || echo main)"`: a pipeline's exit status is its *last* command's, `sed` succeeds on empty input, so the `|| echo main` can never fire and `BASE` silently becomes `origin/` — which fails with `fatal: invalid reference: origin/` in exactly the situations the fallback exists for (`origin/HEAD` unset, a remote not named `origin`, some CI checkouts).
+**`BASE` is always a remote-tracking ref (`<remote>/<branch>`).** `--short` yields that form directly, so nothing needs prepending. A `CLAUDE.md` may declare a **bare** branch name (`integration`) — qualify it before use, or downstream `git pull`/`merge` will treat the branch name as a remote:
+
+```bash
+# Qualify a bare branch name declared by CLAUDE.md.
+case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac
+```
+
+Never split `BASE` into remote and branch with `${BASE%%/*}` / `${BASE#*/}` — that breaks on any branch name containing a slash (`release/1.2`). Use the whole ref: `git fetch <remote> && git merge --ff-only "$BASE"`. **Do not** write this as `"origin/$(… | sed … || echo main)"`: a pipeline's exit status is its *last* command's, `sed` succeeds on empty input, so the `|| echo main` can never fire and `BASE` silently becomes `origin/` — which fails with `fatal: invalid reference: origin/` in exactly the situations the fallback exists for (`origin/HEAD` unset, a remote not named `origin`, some CI checkouts).
 
 #### Resolve the branch name — prefer Linear's own field
 
@@ -99,7 +105,7 @@ Only when it is unavailable, fall back to `[issue-id]/[short-description]`:
 
 **Validate the issue ID** before using it in shell commands — it must match `^[A-Z]+-[0-9]+$`. Reject any ID containing spaces, semicolons, pipes, or other shell metacharacters. Apply the same check to a `gitBranchName` taken from the tracker: it must match `^[A-Za-z0-9._/-]+$` before it reaches a shell.
 
-Use the manual path whenever `EnterWorktree` is unavailable **or** the resolved `BASE` is not the repo's default branch (always quote variables).
+Always quote variables.
 
 ```bash
 # ISSUE_ID = Linear issue ID (e.g. BC-42)

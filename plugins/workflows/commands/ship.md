@@ -98,7 +98,10 @@ Push the branch and create a PR:
 # Read that line from the session context and set RECORDED_BASE to its <base-ref>. That is the
 # ref the branch was actually cut from; re-deriving here can disagree with it, which is the whole
 # bug (cut from integration, PR opened against main). Only if no marker exists in this session --
-# e.g. ship run standalone on a pre-existing branch -- fall back to resolving it fresh.
+# e.g. ship run standalone on a pre-existing branch -- resolve fresh, and resolve it by the SAME
+# order git-worktrees defines: check the consuming repo's CLAUDE.md for a declared base or
+# promotion topology BEFORE falling through to origin/HEAD. Skipping that step is how a
+# standalone ship in a promotion-chain repo still targets the wrong branch.
 BASE="${RECORDED_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
 gh pr create --base "${BASE#origin/}" ...
 ```
