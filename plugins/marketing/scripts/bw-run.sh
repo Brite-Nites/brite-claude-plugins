@@ -161,6 +161,26 @@ _dir_is_system() {
   _ancestors_ok "$1"
 }
 
+# The directory rules say nothing about a file already sitting inside one. A
+# root-owned 0755 /usr/local/bin passes _dir_is_system while
+# /usr/local/bin/bw inside it is group-writable or owned by someone else — and
+# whoever can write that file chooses what receives the master password.
+# Checking containers is not checking the thing in them.
+#
+# Moot on the private branch, where a 0700 directory nobody else can traverse
+# already implies nobody else can write the file. Applied to both anyway:
+# uniform is cheaper to keep correct than a rule that holds only where someone
+# once argued it was needed.
+_file_is_sound() {
+  if [ ! -O "$1" ] && [ -z "$(find "$1" -maxdepth 0 -user root 2>/dev/null)" ]; then
+    return 1
+  fi
+  case "$(_mode_of "$1")" in
+    ?????w????|????????w?) return 1 ;;
+  esac
+  return 0
+}
+
 _bin_is_trusted() {
   _p="$1"; shift
   # Relative paths are rejected outright: the walks are only meaningful against
@@ -172,6 +192,10 @@ _bin_is_trusted() {
   _real="$(_resolve_symlinks "$_p")" || return 1
   _pdir="$(cd "$(_dirname_of "$_p")" 2>/dev/null && pwd -P)" || return 1
   _rdir="$(_dirname_of "$_real")"
+  # The binary itself, not just what contains it. Checked on the resolved
+  # target: a symlink's own mode is meaningless (always 0777 on Linux), and
+  # what protects the link is the directory holding it, checked below.
+  _file_is_sound "$_real" || return 1
 
   # Known-install match is checked against BOTH ends: Homebrew's allowlisted
   # /usr/local/bin/bw is a symlink into ../Cellar, so requiring the resolved

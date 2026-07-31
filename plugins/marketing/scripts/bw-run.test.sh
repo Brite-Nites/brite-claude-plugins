@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # bw-run.test.sh — pure-bash test suite for bw-run.sh (BC-6906).
 # Stubs `bw` AND `security` via PATH-prepended temp dir; real `jq` is
-# required on PATH. 33 cases / 121 assertions: 5 spec-mandated + review-driven additions
+# required on PATH. 35 cases / 129 assertions: 5 spec-mandated + review-driven additions
 # (T-F1 BW_SESSION unset, T-F3 mixed-result batch, T-F4 sequential per-item
 # failure, T-F5 empty EXPORTS, P3-1 missing command after --, P3-8
-# bad-arg-shape variants, BC-6958 micro-fix coverage) + 18 Keychain
-# self-unlock cases (T16–T33, covering the happy path, both fail-closed
+# bad-arg-shape variants, BC-6958 micro-fix coverage) + 20 Keychain
+# self-unlock cases (T16–T35, covering the happy path, both fail-closed
 # exits, the single-attempt contract, the two binary-trust rejections, and the
 # minted-session non-export plus its caller-supplied control, and the two
 # path-safety rejections, the symlink-target checks, and the listed-path
-# narrowing pair, list-based discovery, and the PATH-pin defence).
+# narrowing pair, list-based discovery, the PATH-pin defence, and the
+# binary-file checks).
 # The `security` stub defaults to item-not-found so every pre-self-unlock
 # case keeps its exact behavior regardless of the developer's real Keychain.
 # macOS bash 3.2 portable.
@@ -27,6 +28,11 @@ if ! command -v jq >/dev/null; then
   exit 2
 fi
 
+# Stub binaries get an EXPLICIT 0755, never `chmod +x`. `chmod +x` keeps
+# whatever the umask gave the file, and on a umask-002 box (user-private
+# groups) that is 0775 — group-writable. The wrapper refuses a group-writable
+# binary for the master-password path, so umask alone would otherwise decide
+# whether this suite passes.
 # --- Stub bw via PATH ------------------------------------------------------
 STUB_DIR="$(mktemp -d)"
 trap 'rm -rf "$STUB_DIR"' EXIT
@@ -83,7 +89,7 @@ case "$1" in
     ;;
 esac
 BWSTUB
-chmod +x "$STUB_DIR/bw"
+chmod 0755 "$STUB_DIR/bw"
 
 cat >"$STUB_DIR/security" <<'SECSTUB'
 #!/usr/bin/env bash
@@ -98,7 +104,7 @@ else
   exit 44
 fi
 SECSTUB
-chmod +x "$STUB_DIR/security"
+chmod 0755 "$STUB_DIR/security"
 export PATH="$STUB_DIR:$PATH"
 # The self-unlock path will only hand the master password to a binary it
 # trusts: a mode-0700 directory we own, under ancestors that are ours or
@@ -111,11 +117,13 @@ export PATH="$STUB_DIR:$PATH"
 # and it means every self-unlock case below exercises the sticky-ancestor
 # exemption as a side effect.
 #
-# Coverage limit, stated rather than left implied: the `[ -O ]` ownership test
-# is NOT directly exercised. Constructing the case it defends — a directory
-# owned by someone else — needs a second uid, which this suite has no way to
-# obtain. T26 covers the ancestor half of the same predicate, and T30 covers
-# the write-bit half on the listed branch.
+# Coverage limit, stated rather than left implied: the `[ -O ]` ownership
+# tests are NOT directly exercised, on directories or on the binary itself.
+# Constructing the case they defend — something owned by another user — needs a
+# second uid, which this suite has no way to obtain; deleting either ownership
+# check leaves the suite green, which is worth knowing rather than discovering.
+# The write-bit halves of the same predicates ARE covered: T26 on ancestors,
+# T30 on a listed directory, T34/T35 on the binary.
 export BW_RUN_SECURITY_BIN="$STUB_DIR/security"
 export BW_RUN_BW_BIN="$STUB_DIR/bw"
 # The Keychain lookup is scoped to the invoking account, matching the -a the
@@ -612,7 +620,7 @@ UNTRUSTED_DIR="$STUB_DIR/untrusted"
 mkdir -p "$UNTRUSTED_DIR"
 chmod 0755 "$UNTRUSTED_DIR"
 cp "$STUB_DIR/bw" "$UNTRUSTED_DIR/bw"
-chmod +x "$UNTRUSTED_DIR/bw"
+chmod 0755 "$UNTRUSTED_DIR/bw"
 printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
 printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
 printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
@@ -640,7 +648,7 @@ assert_contains "$(cat "$err_file")" "BW_SESSION not set" "t22 fails closed"
 echo "--- TEST 23: security override in a non-private dir -> no mint, exit 1 ---"
 setup
 cp "$STUB_DIR/security" "$UNTRUSTED_DIR/security"
-chmod +x "$UNTRUSTED_DIR/security"
+chmod 0755 "$UNTRUSTED_DIR/security"
 printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
 printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
 err_file="$STUB_DIR/t23.err"
@@ -671,7 +679,7 @@ rm -rf "$SWAPPABLE_PARENT"
 mkdir -p "$SWAPPABLE_PARENT/priv"
 chmod 0700 "$SWAPPABLE_PARENT/priv"
 cp "$STUB_DIR/bw" "$SWAPPABLE_PARENT/priv/bw"
-chmod +x "$SWAPPABLE_PARENT/priv/bw"
+chmod 0755 "$SWAPPABLE_PARENT/priv/bw"
 chmod 0777 "$SWAPPABLE_PARENT"   # world-writable, NOT sticky
 printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
 printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
@@ -724,7 +732,7 @@ cat >"$SHADOW_DIR/jq" <<SHADOWJQ
 printf 'SHADOW-JQ session=[%s]\n' "\${BW_SESSION:-}" >>"\$STUB_CALL_LOG"
 exec "$REAL_JQ" "\$@"
 SHADOWJQ
-chmod +x "$SHADOW_DIR/bw" "$SHADOW_DIR/jq"
+chmod 0755 "$SHADOW_DIR/bw" "$SHADOW_DIR/jq"
 
 # --- TEST 24: a minted session never reaches PATH-resolved binaries ---------
 # Minting creates a live vault token that would not otherwise exist, so it is
@@ -794,7 +802,7 @@ BAD_TARGET_DIR="$STUB_DIR/badtarget"
 rm -rf "$LINK_DIR" "$BAD_TARGET_DIR"
 mkdir -p "$LINK_DIR" "$BAD_TARGET_DIR"
 cp "$STUB_DIR/bw" "$BAD_TARGET_DIR/bw"
-chmod +x "$BAD_TARGET_DIR/bw"
+chmod 0755 "$BAD_TARGET_DIR/bw"
 chmod 0700 "$LINK_DIR"
 chmod 0777 "$BAD_TARGET_DIR"
 ln -sf "$BAD_TARGET_DIR/bw" "$LINK_DIR/bw"
@@ -851,15 +859,19 @@ assert_eq "$t29_unlock" "1" "t29 exactly 1 unlock via the symlinked binary"
 LISTED_WRAPPER="$STUB_DIR/bw-run-listed.sh"
 LISTED_BAD_DIR="$STUB_DIR/listed-bad"
 LISTED_OK_DIR="$STUB_DIR/listed-ok"
-rm -rf "$LISTED_BAD_DIR" "$LISTED_OK_DIR"
-mkdir -p "$LISTED_BAD_DIR" "$LISTED_OK_DIR"
-cp "$STUB_DIR/bw" "$LISTED_BAD_DIR/bw"; chmod +x "$LISTED_BAD_DIR/bw"
-cp "$STUB_DIR/bw" "$LISTED_OK_DIR/bw";  chmod +x "$LISTED_OK_DIR/bw"
+LISTED_LOOSE_DIR="$STUB_DIR/listed-loosefile"
+rm -rf "$LISTED_BAD_DIR" "$LISTED_OK_DIR" "$LISTED_LOOSE_DIR"
+mkdir -p "$LISTED_BAD_DIR" "$LISTED_OK_DIR" "$LISTED_LOOSE_DIR"
+cp "$STUB_DIR/bw" "$LISTED_BAD_DIR/bw";    chmod 0755 "$LISTED_BAD_DIR/bw"
+cp "$STUB_DIR/bw" "$LISTED_OK_DIR/bw";     chmod 0755 "$LISTED_OK_DIR/bw"
+cp "$STUB_DIR/bw" "$LISTED_LOOSE_DIR/bw"
 chmod 0777 "$LISTED_BAD_DIR"   # group+other writable — the Homebrew-on-macOS shape
 chmod 0755 "$LISTED_OK_DIR"    # 0755 but ours and not group/other writable
-sed "s#^_BW_KNOWN_INSTALLS=.*#_BW_KNOWN_INSTALLS=\"$LISTED_BAD_DIR/bw $LISTED_OK_DIR/bw\"#" \
+chmod 0755 "$LISTED_LOOSE_DIR" # sound directory...
+chmod 0777 "$LISTED_LOOSE_DIR/bw"   # ...holding a writable binary (T35)
+sed "s#^_BW_KNOWN_INSTALLS=.*#_BW_KNOWN_INSTALLS=\"$LISTED_BAD_DIR/bw $LISTED_OK_DIR/bw $LISTED_LOOSE_DIR/bw\"#" \
   "$WRAPPER" >"$LISTED_WRAPPER"
-chmod +x "$LISTED_WRAPPER"
+chmod 0755 "$LISTED_WRAPPER"
 listed_rewritten=$(grep -c -- "$LISTED_OK_DIR/bw" "$LISTED_WRAPPER" || true)
 assert_eq "$([ "$listed_rewritten" -ge 1 ] && echo yes || echo no)" "yes" \
   "t30 premise: allowlist call site was rewritten (guards against drift)"
@@ -917,7 +929,7 @@ cat >"$DECOY_DIR/bw" <<'DECOY'
 printf 'DECOY-BW-INVOKED %s\n' "$*" >>"$STUB_CALL_LOG"
 exit 91
 DECOY
-chmod +x "$DECOY_DIR/bw"
+chmod 0755 "$DECOY_DIR/bw"
 printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
 printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
 printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
@@ -958,12 +970,12 @@ cat >"$LIAR_DIR/ls" <<'LIARLS'
 printf 'SHADOW-LS %s\n' "$*" >>"$STUB_CALL_LOG"
 printf 'drwx------  2 nobody nobody 4096 Jan 1 00:00 faked\n'
 LIARLS
-chmod +x "$LIAR_DIR/ls"
+chmod 0755 "$LIAR_DIR/ls"
 WIDE_OPEN_DIR="$STUB_DIR/wideopen"
 rm -rf "$WIDE_OPEN_DIR"
 mkdir -p "$WIDE_OPEN_DIR"
 cp "$STUB_DIR/bw" "$WIDE_OPEN_DIR/bw"
-chmod +x "$WIDE_OPEN_DIR/bw"
+chmod 0755 "$WIDE_OPEN_DIR/bw"
 chmod 0777 "$WIDE_OPEN_DIR"
 printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
 printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
@@ -988,6 +1000,59 @@ t33_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
 assert_eq "$t33_sec" "0" "t33 master password never read"
 t33_shadow_ls=$(grep -c '^SHADOW-LS ' "$STUB_CALL_LOG" || true)
 assert_eq "$t33_shadow_ls" "0" "t33 the pinned PATH kept the shadowed ls out entirely"
+
+# --- TESTS 34/35: the binary itself, not just what contains it --------------
+# Every directory rule above constrains the container. None of them says
+# anything about a file already sitting in it, so a writable bw inside a sound
+# directory could still be swapped by whoever can write it.
+#
+# T34 takes the private branch, where this is belt-and-braces: a 0700 directory
+# nobody else can traverse already implies nobody else can write the file. T35
+# takes the listed branch, where it genuinely matters — a root-owned 0755
+# /usr/local/bin passes the directory check while the bw inside it is
+# group-writable. Both directories are deliberately impeccable, so only the
+# file check can produce the rejection.
+echo "--- TEST 34: writable binary in a private dir -> no mint, exit 1 ---"
+setup
+LOOSE_PRIV_DIR="$STUB_DIR/loose-private"
+rm -rf "$LOOSE_PRIV_DIR"
+mkdir -p "$LOOSE_PRIV_DIR"
+cp "$STUB_DIR/bw" "$LOOSE_PRIV_DIR/bw"
+chmod 0777 "$LOOSE_PRIV_DIR/bw"
+chmod 0700 "$LOOSE_PRIV_DIR"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+assert_eq "$(ls -ld "$LOOSE_PRIV_DIR" | cut -c1-10)" "drwx------" \
+  "t34 premise: the containing directory is impeccable"
+assert_eq "$([ -x "$LOOSE_PRIV_DIR/bw" ] && echo yes || echo no)" "yes" \
+  "t34 premise: the binary is executable"
+err_file="$STUB_DIR/t34.err"
+set +e
+BW_RUN_BW_BIN="$LOOSE_PRIV_DIR/bw" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t34 exit code is 1"
+t34_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t34_sec" "0" "t34 master password never read for a writable binary"
+
+echo "--- TEST 35: writable binary in a sound LISTED dir -> no mint, exit 1 ---"
+setup
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+assert_eq "$(ls -ld "$LISTED_LOOSE_DIR" | cut -c1-10)" "drwxr-xr-x" \
+  "t35 premise: the listed directory itself is sound"
+assert_eq "$(ls -ld "$LISTED_LOOSE_DIR/bw" | cut -c1-10)" "-rwxrwxrwx" \
+  "t35 premise: the binary inside it is world-writable"
+err_file="$STUB_DIR/t35.err"
+set +e
+BW_RUN_BW_BIN="$LISTED_LOOSE_DIR/bw" \
+  env -u BW_SESSION bash "$LISTED_WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t35 exit code is 1"
+t35_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t35_sec" "0" "t35 being in a listed sound dir does not excuse the file"
 
 # --- Summary ---------------------------------------------------------------
 echo ""
