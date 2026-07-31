@@ -8,21 +8,27 @@ Every invocation below resolves the project id inline. Export it once (`export T
 
 ## Required env vars and Secrets Manager mapping
 
-| Script / MCP                  | Env var                     | Secrets Manager secret      |
-|-------------------------------|-----------------------------|-----------------------------|
-| `spider` MCP, `spider_crawl.py` | `SPIDER_API_KEY`            | `tam-map-spider-api-key`    |
-| `aiark` MCP                     | `AIARK_API_KEY`             | `tam-map-aiark-api-key`     |
-| `discolike` MCP                 | `DISCOLIKE_API_KEY`         | `tam-map-discolike-api-key` |
-| `icypeas_client.py`             | `ICYPEAS_API_KEY`           | `tam-map-icypeas-api-key`   |
-| `enrich_waterfall.py`           | `BLITZAPI_KEY`              | `tam-map-blitzapi-key`      |
-| `enrich_waterfall.py`           | `PROSPEO_API_KEY`           | `tam-map-prospeo-api-key`   |
-| `verify_smtp.py`                | `MILLIONVERIFIER_API_KEY`   | `tam-map-millionverifier-api-key` |
+The secret's name **is** the environment variable name — there is no mapping step
+to get wrong. Provision each one under `brite-claude-tam-map` named exactly as
+the middle column.
+
+| Script / MCP                    | Env var = Secrets Manager secret name |
+|---------------------------------|---------------------------------------|
+| `spider` MCP, `spider_crawl.py` | `SPIDER_API_KEY`                      |
+| `aiark` MCP                     | `AIARK_API_KEY`                       |
+| `discolike` MCP                 | `DISCOLIKE_API_KEY`                   |
+| `icypeas_client.py`             | `ICYPEAS_API_KEY`                     |
+| `enrich_waterfall.py`           | `BLITZAPI_KEY`                        |
+| `enrich_waterfall.py`           | `PROSPEO_API_KEY`                     |
+| `verify_smtp.py`                | `MILLIONVERIFIER_API_KEY`             |
 
 > The LLM tier-scoring step (formerly `tier_and_segment.py`) now runs inline via the `icp-scoring` skill (`abc` rubric) and needs no API key — the session's own Claude credentials apply. Removed per BC-6907.
 
 ## Canonical invocation
 
-The wrapper auto-detects the longest common prefix of item names and batches a single `bw list items --search` call when the prefix is ≥ 3 chars (BC-6905 Q3 measured 86% latency savings at N=7 vs sequential). All `tam-map-*` items share the `tam-map-` prefix, so the batch path always engages in production.
+`bws run --project-id` injects **every** secret in the project in one call — there is no per-key selection and no batching to tune. That is why the project, not the individual secret, is the unit of blast radius: each command below sees all 7 tam-map keys, not just the one it needs.
+
+`bws` joins the command argv with spaces and runs the result through `sh -c`. Paths that could contain a space therefore need their quotes carried **into** the joined string, as the snippets below do.
 
 ### `spider_crawl.py` (Spider.cloud crawl)
 
@@ -62,7 +68,7 @@ Three reasons drove the migration from `~/.zshrc`-exported per-key env vars:
 
 ## Setup
 
-Run `/marketing:setup-tam-map` in Claude Code. It detects current state, walks `bw login` (one-time) and `bw unlock` (per-session), and verifies all 3 MCPs + 4 CLI scripts before exiting.
+Run `/marketing:setup-tam-map` in Claude Code. It detects current state, walks installing `bws` and exporting `BWS_ACCESS_TOKEN` (both one-time per machine — there is no per-session unlock step), and verifies all 3 MCPs + 4 CLI scripts before exiting.
 
 ## Python interpreter
 

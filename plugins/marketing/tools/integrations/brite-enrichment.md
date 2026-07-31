@@ -201,15 +201,22 @@ and `ingest_enriched_contacts`) cannot run there; only `check_enrichment_health`
 reports `snowflake_reachable: false`). Putting a production write key on every laptop was
 **withdrawn** (ADR-012 Addendum 1) — do not wire `SNOWFLAKE_*` into `.mcp.json`.
 
-| Env var | Bitwarden item | Provider role |
-|---|---|---|
-| `OPENMART_API_KEY` | `enrichment-openmart-api-key` | people discovery |
-| `PROSPEO_API_KEY` | `enrichment-prospeo-api-key` | discovery + email + phone |
-| `ICYPEAS_API_KEY` | `enrichment-icypeas-api-key` | work-email waterfall |
-| `LEADMAGIC_API_KEY` | `enrichment-leadmagic-api-key` | email + phone |
-| `DATAGMA_API_KEY` | `enrichment-datagma-api-key` | phone fallback |
-| `BOUNCEBAN_API_KEY` | `enrichment-bounceban-api-key` | email deliverability (`verify_emails`) |
-| `EMAILGUARD_API_KEY` | `enrichment-emailguard-api-key` | ESP detection (`verify_emails`) |
+All 8 live in the Secrets Manager project `brite-claude-enrichment`. A secret's
+name **is** the environment variable name, so the left column is also the secret
+name — there is no separate item to look up.
+
+| Env var = secret name | Provider role |
+|---|---|
+| `OPENMART_API_KEY` | people discovery |
+| `PROSPEO_API_KEY` | discovery + email + phone |
+| `ICYPEAS_API_KEY` | work-email waterfall |
+| `LEADMAGIC_API_KEY` | email + phone |
+| `DATAGMA_API_KEY` | phone fallback |
+| `BOUNCEBAN_API_KEY` | email deliverability (`verify_emails`) |
+| `EMAILGUARD_API_KEY` | ESP detection (`verify_emails`) |
+| `ENRICHMENT_API_TOKEN` | auth for the REST service at `ENRICHMENT_API_URL` (the bulk door) |
+
+`PROSPEO_API_KEY` and `ICYPEAS_API_KEY` also exist in `brite-claude-tam-map`, with **different values** — the two pipelines are fed from different vendor accounts. That name collision is what forces two projects rather than one; see [ADR-044](../../../../docs/decisions/044-secrets-manager-machine-account-broker.md).
 
 ### 3. End state — server-side REST custody (BC-5264)
 

@@ -211,7 +211,7 @@ Branching:
 - All three show `✓ Connected` → continue to Phase 3b.
 - Any show `✗ Failed to connect` → troubleshooting loop:
   1. Ask user to open a fresh terminal and run `for v in SPIDER_API_KEY AIARK_API_KEY DISCOLIKE_API_KEY; do printf "%s=%s\n" "$v" "${!v:+set}"; done` — expect `set` for all three.
-  2. If any prints empty → `BWS_ACCESS_TOKEN` didn't reach the shell that launched Claude Code, or the secret is missing from the project. Re-launch Claude Code from a shell where you exported `BW_SESSION` (Step 2b), then re-run Phase 3.
+  2. If any prints empty → `BWS_ACCESS_TOKEN` didn't reach the shell that launched Claude Code, or the secret is missing from the project. Re-launch Claude Code from a shell where you exported `BWS_ACCESS_TOKEN` (Step 2b), then re-run Phase 3.
   3. If all `set` but Spider still fails → confirm the package is reachable: `npx -y spider-cloud-mcp --help` (network call to npm). If that errors, npm is the issue, not the key.
   4. If all `set` but `aiark` or `discolike` fail → those wrappers live at `plugins/marketing/scripts/tam-map/{aiark,discolike}-mcp.js`. Run the wrapper directly: `node plugins/marketing/scripts/tam-map/aiark-mcp.js` — it should print a stdio handshake or error to stderr if the key is bad. The wrappers were ported from upstream tam-map and carry an `!! VERIFY BEFORE USING !!` warning about endpoint paths; if you hit a 4xx error, the wrapper may need its endpoints updated against `docs.ai-ark.com/reference` (a Brite-known limitation tracked in the wrapper source).
 
@@ -247,7 +247,7 @@ If any of the 4 `--help` checks fails:
 - Missing Python deps → `python3 -m pip install -r plugins/marketing/scripts/tam-map/requirements.txt`.
 - Script-level error → open the script, read the error message; the wrappers ship verbatim from upstream tam-map@`9f5c72e74b` so a runtime error likely means an upstream bug.
 
-If a script's `--help` passes but a real invocation fails with a missing-env-var error, re-check that the corresponding Bitwarden item exists with a non-empty value (re-run Phase 2a's admin-provisioning check), then re-launch Claude Code so the wrapper picks up the corrected value on the next spawn.
+If a script's `--help` passes but a real invocation fails with a missing-env-var error, re-check that the corresponding Secrets Manager secret exists with a non-empty value (re-run Phase 2a's admin-provisioning check), then re-launch Claude Code so `bws run` picks up the corrected value on the next spawn.
 
 ### Phase 3d — CLI live round-trip (correctness)
 
@@ -260,7 +260,12 @@ Run via `bws run` (one invocation — the project supplies all four keys):
 
 ```bash
 bws run --project-id "$(bws project list | jq -r '.[]|select(.name=="brite-claude-tam-map")|.id')" -- '
-set -uo pipefail
+set -u
+# POSIX sh only — `bws` joins argv and runs the body through `sh -c`, which is
+# dash on most Linux boxes. Do NOT add `-o pipefail`: dash rejects it, and `set`
+# is a special builtin, so the whole board would die on this line. Nothing here
+# needs it — every pipeline ends in `jq -e ... && echo 1 || echo 0`, so `&&`
+# already tests jq's status.
 pass=0; fail=0; known=0
 # A label carrying a [known: BC-####] tag is a drift already scoped for repair:
 # count it amber (known), never a surprise red. The glob must match the tag mid-string.
@@ -304,7 +309,7 @@ fi
 
 The script runs **all four** providers and reports a full board (no short-circuit). A `✗` (surprise) is a **correctness** failure, not a missing-key problem: the provider authenticated (no 401/403) but its endpoint or request shape drifted — the exact silent-failure class BC-7157 (aiark) and BC-12128 (BlitzAPI) fixed. A `⚠` is the **same kind of break but already tracked** under a `[known: BC-####]` tag (amber, not a surprise). Repair (or wait out) the wrapper and re-run; **do not proceed on a `✗`.** (A transient vendor outage or an `-m` timeout also surfaces as `✗` with an empty body on an untagged provider — re-run once before concluding a request-shape drift. Caveat: on a `[known:]`-tagged provider *any* failure, including an outage, shows as `⚠`, so re-run there too to tell a real outage from the tracked break.)
 
-(The four surfaces are deliberately cheap: MillionVerifier `/credits` and Prospeo `account-information` cost nothing; BlitzAPI `domain-to-linkedin` and IcyPeas `find-companies` (`size:1`) cost ~1 credit each. This keeps the smoke re-runnable without burning the per-key credit budget. Note: all four keys are expanded inside the inner `bash -c`, so the plaintext never enters your shell history — but the resolved value does sit in the `curl` process arguments (visible via `ps` / `/proc` / command-line audit logs) for the duration of each call, so treat the probe command as sensitive. MillionVerifier additionally rides its key in the URL query string (`?api=…`, vendor-mandated; the other three use a header), so it can also reach network/proxy access logs — the header-based three do not.)
+(The four surfaces are deliberately cheap: MillionVerifier `/credits` and Prospeo `account-information` cost nothing; BlitzAPI `domain-to-linkedin` and IcyPeas `find-companies` (`size:1`) cost ~1 credit each. This keeps the smoke re-runnable without burning the per-key credit budget. Note: all four keys are expanded inside the shell `bws` spawns for the probe body, not by your own shell, so the plaintext never enters your shell history — but the resolved value does sit in the `curl` process arguments (visible via `ps` / `/proc` / command-line audit logs) for the duration of each call, so treat the probe command as sensitive. MillionVerifier additionally rides its key in the URL query string (`?api=…`, vendor-mandated; the other three use a header), so it can also reach network/proxy access logs — the header-based three do not.)
 
 ---
 
@@ -321,7 +326,7 @@ If you see either symptom after no intentional config change, this is almost alw
 
 **Remedy:** re-run `/marketing:setup-tam-map`. Phase 1's dual-path probes will detect `npm=MISSING` and/or `pip=MISSING` against the new marketplace clone path and route you to Step 2a's marketplace-clone install commands. Phase 1's worktree-relative paths stay green for dev mode; the new probes cover prod mode.
 
-(Secrets themselves live in Secrets Manager and are unaffected by auto-update — you do NOT need to re-run Phase 2a's admin-provisioning check unless `bw list items --search tam-map-` returns fewer than 7 rows.)
+(Secrets themselves live in Secrets Manager and are unaffected by auto-update — you do NOT need to re-run Phase 2a's admin-provisioning check unless `bws secret list "$TAM_PID"` returns fewer than 7 secrets.)
 
 (Spider's MCP stays connected through auto-updates because `npx -y spider-cloud-mcp` resolves via npx's global cache, not local `node_modules/`. Aiark/discolike are local Node wrappers, hence the divergence.)
 
