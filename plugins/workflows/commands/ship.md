@@ -93,9 +93,12 @@ Push the branch and create a PR:
 **Target the branch you actually branched from.** `gh pr create` with no `--base` defaults to the repo's default branch. In a promotion-chain repo that opens the PR against `main` even though the feature was cut from `integration`, bypassing the promotion gate. Resolve the same base `git-worktrees` used and pass it explicitly:
 
 ```bash
-# Prefer the base git-worktrees RECORDED in its completion marker ("Base: <ref> @ <sha>") —
-# that is the ref the branch was actually cut from. Re-deriving here can disagree with it,
-# which is the whole bug: cut from integration, PR opened against main.
+# RECORDED_BASE comes from the git-worktrees completion marker emitted in this session:
+#   "- Base: <base-ref> @ <commit-hash>"
+# Read that line from the session context and set RECORDED_BASE to its <base-ref>. That is the
+# ref the branch was actually cut from; re-deriving here can disagree with it, which is the whole
+# bug (cut from integration, PR opened against main). Only if no marker exists in this session --
+# e.g. ship run standalone on a pre-existing branch -- fall back to resolving it fresh.
 BASE="${RECORDED_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
 gh pr create --base "${BASE#origin/}" ...
 ```

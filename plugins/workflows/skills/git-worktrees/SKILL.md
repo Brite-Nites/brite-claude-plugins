@@ -64,7 +64,12 @@ Narrate: `Step 1/5: Verifying git prerequisites... done`
 
 Narrate: `Step 2/5: Creating branch and worktree...`
 
-Use the EnterWorktree tool to create an isolated worktree. Name it after the Linear issue.
+Create an isolated worktree named after the Linear issue. **Which mechanism you may use depends on the base** — read the next section first, then come back here.
+
+**The `EnterWorktree` tool cannot express a non-default base.** It accepts only `name` and `path`; its base comes from the `worktree.baseRef` setting — `fresh` (the default) branches from `origin/<default-branch>`, and `head` branches from local HEAD. It offers no base argument, no branch-name argument beyond `name`, and no tracking control.
+
+- **Trunk-based repo** (base resolves to the default branch): `EnterWorktree` is correct and preferred.
+- **Promotion-chain repo, or any resolved base that is NOT the default branch**: `EnterWorktree` **must not be used** — `fresh` would produce precisely the prohibited branch-from-`main`. Use the manual `git worktree add` path below, which takes an explicit base.
 
 #### Resolve the base branch — do NOT assume the default branch
 
@@ -94,7 +99,7 @@ Only when it is unavailable, fall back to `[issue-id]/[short-description]`:
 
 **Validate the issue ID** before using it in shell commands — it must match `^[A-Z]+-[0-9]+$`. Reject any ID containing spaces, semicolons, pipes, or other shell metacharacters. Apply the same check to a `gitBranchName` taken from the tracker: it must match `^[A-Za-z0-9._/-]+$` before it reaches a shell.
 
-If the EnterWorktree tool is not available, fall back to manual git commands (always quote variables).
+Use the manual path whenever `EnterWorktree` is unavailable **or** the resolved `BASE` is not the repo's default branch (always quote variables).
 
 ```bash
 # ISSUE_ID = Linear issue ID (e.g. BC-42)
