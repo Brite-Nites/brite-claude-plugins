@@ -197,11 +197,11 @@ Narrate: `Step 7/8: Setting up worktree...`
 
 After the plan is approved, the `git-worktrees` skill activates:
 
-1. Create an isolated worktree with branch `[issue-id]/[short-description]`
+1. Create an isolated worktree. The skill resolves both the **base branch** and the **branch name** — do not assume `origin/main` or a fixed name shape here. Prefer Linear's `gitBranchName`; in a promotion-chain repo the default branch is the wrong base by construction.
 2. Install dependencies
 3. Verify clean test/build/lint baseline
 
-If the developer prefers not to use worktrees, fall back to a simple branch: `git checkout -b [issue-id]/[short-description]`
+If the developer prefers not to use worktrees, fall back to a simple branch off the same resolved base: `git checkout -b "$BRANCH" "$BASE"`.
 
 **Phase transition**: Worktree → Execute. Decisions: [baseline pass/fail status]. Artifacts: [worktree path, branch name]. Next: execution.
 
