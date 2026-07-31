@@ -40,45 +40,53 @@ _SECURITY_BIN="${BW_RUN_SECURITY_BIN:-/usr/bin/security}"
 _KEYCHAIN_ACCOUNT="${USER:-$(id -un)}"
 
 # A subprocess that touches the master password must be one an attacker cannot
-# have written. Two ways to qualify:
-#   1. it is one of the caller-supplied known install paths, or
-#   2. it sits on a safe path — see _path_is_safe.
-# The second admits a private temp dir (the test suite's stub) and excludes the
-# places a binary can actually be planted: /tmp itself is 1777, /usr/local/bin
-# is 0755, node_modules/.bin is 0755.
+# have written. Naming a path does not make it safe, so the known-install list
+# is a NARROWING filter, never a pass: an allowlisted path still has to survive
+# the same directory checks as any other. An earlier cut returned success on a
+# bare string match, which meant the one branch meant to represent "known good"
+# was the only branch that verified nothing — and on macOS, Homebrew makes
+# /usr/local/bin and /opt/homebrew/bin user-owned (commonly group-writable),
+# precisely the shape these checks exist to reject. Corrected 2026-07-31.
 _mode_of() {
   ls -ld "$1" 2>/dev/null | cut -c1-10
 }
 
-# A directory is safe when nobody but us (or root) can put a binary in it, and
-# nobody but us (or root) can swap the directory itself out.
+# Follow a symlinked binary to the thing that will actually run. Checking the
+# link's directory says nothing about where the link points: /usr/local/bin/bw
+# can be a symlink to anywhere, and Homebrew genuinely does symlink its bin
+# entries into ../Cellar. Both ends are checked, since either being writable is
+# enough to swap what executes. `readlink` without flags is portable; `-f` is
+# not (BSD lacks it), hence the manual loop and the hop cap for link cycles.
+_resolve_symlinks() {
+  _rp="$1"
+  _hops=0
+  while [ -L "$_rp" ]; do
+    _hops=$((_hops + 1))
+    [ "$_hops" -gt 40 ] && return 1
+    _target="$(readlink "$_rp" 2>/dev/null)" || return 1
+    [ -n "$_target" ] || return 1
+    case "$_target" in
+      /*) _rp="$_target" ;;
+      *)  _rp="$(dirname "$_rp")/$_target" ;;
+    esac
+  done
+  _rdir="$(cd "$(dirname "$_rp")" 2>/dev/null && pwd -P)" || return 1
+  printf '%s/%s' "${_rdir%/}" "$(basename "$_rp")"
+}
+
+# Every ancestor must be un-swappable by anyone but us or root.
 #
-# Ownership is CHECKED, not inferred. An earlier cut of this reasoned that a
-# mode-0700 directory can only be traversed by its owner, so reaching the
-# binary proved we were that owner. That inference silently fails for root,
-# which bypasses permission checks entirely — running as root, an
-# attacker-owned 0700 directory would have passed. `[ -O ]` asks the question
-# directly and answers it correctly for root too (euid 0 owns only uid-0
-# paths).
+# Mode 0700 on a directory stops a co-tenant writing INTO it; it does nothing
+# about renaming the directory itself, which needs only write on ITS parent.
+# One attacker-writable ancestor and the whole thing goes.
 #
-# Ancestors are walked for the same reason. Mode 0700 stops a co-tenant writing
-# INTO the directory; it does nothing about renaming the directory itself,
-# which needs write on the parent. One attacker-writable ancestor and the whole
-# thing can be swapped. The sticky exemption is what makes a shared parent like
-# /tmp safe: sticky means only an entry's own owner may rename or delete it, so
-# a co-tenant with write access to /tmp still cannot touch our directory. It is
-# an exemption from the write-bit test only — a sticky directory's OWNER can
-# still rename entries inside it, so the ownership test applies regardless.
-#
-# The path is resolved with `pwd -P` first so the walk sees real directories,
-# never symlinks: link modes are meaningless (always 0777 on Linux) and would
-# otherwise read as world-writable. `ls -ld` mode strings and `[ -O ]` are
-# portable across macOS and Linux; `stat` format flags are not.
-_path_is_safe() {
-  _d="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
-  [ -n "$_d" ] || return 1
-  [ -O "$_d" ] || return 1
-  [ "$(_mode_of "$_d")" = "drwx------" ] || return 1
+# The sticky exemption is what keeps a shared parent like /tmp usable: sticky
+# means only an entry's own owner may rename or delete it, so a co-tenant with
+# write access to /tmp still cannot swap our directory. It exempts the write-bit
+# test ONLY — a sticky directory's OWNER can still rename entries inside it, so
+# the ownership test applies regardless.
+_ancestors_ok() {
+  _d="$1"
   while [ "$_d" != "/" ]; do
     _d="$(dirname "$_d")"
     _m="$(_mode_of "$_d")"
@@ -96,18 +104,67 @@ _path_is_safe() {
   return 0
 }
 
+# Ownership is CHECKED, not inferred. An earlier cut reasoned that a mode-0700
+# directory can only be traversed by its owner, so reaching the binary proved we
+# were that owner. That fails silently for root, which bypasses permission
+# checks entirely. `[ -O ]` asks directly and is right for root too (euid 0 owns
+# only uid-0 paths).
+#
+# Two policies, because the two kinds of directory legitimately differ:
+#   private — mode 0700 and ours. Required of any path we were not told about.
+#             Excludes package directories, which are the realistic plant site:
+#             node_modules/.bin is 0755 and owned by us, so it passes an
+#             ownership test and must be caught on mode.
+#   system  — ours or root's, and not group/other-writable. Applied to
+#             known-install paths, which are 0755 by design and cannot be asked
+#             for 0700. A group-writable /usr/local/bin fails here, which is
+#             the Homebrew-on-macOS case worth failing on.
+# `ls -ld` mode strings and `[ -O ]` are portable across macOS and Linux;
+# `stat` format flags are not.
+_dir_is_private() {
+  [ -O "$1" ] || return 1
+  [ "$(_mode_of "$1")" = "drwx------" ] || return 1
+  _ancestors_ok "$1"
+}
+
+_dir_is_system() {
+  if [ ! -O "$1" ] && [ -z "$(find "$1" -maxdepth 0 -user root 2>/dev/null)" ]; then
+    return 1
+  fi
+  case "$(_mode_of "$1")" in
+    ?????w????|????????w?) return 1 ;;
+  esac
+  _ancestors_ok "$1"
+}
+
 _bin_is_trusted() {
   _p="$1"; shift
-  for _ok in "$@"; do
-    if [ "$_p" = "$_ok" ]; then return 0; fi
-  done
-  # Relative paths are rejected outright: the walk below is only meaningful
-  # against a rooted path, and nothing legitimate needs one here.
+  # Relative paths are rejected outright: the walks are only meaningful against
+  # a rooted path, and nothing legitimate needs one here.
   case "$_p" in
     /*) ;;
     *) return 1 ;;
   esac
-  _path_is_safe "$(dirname "$_p")"
+  _real="$(_resolve_symlinks "$_p")" || return 1
+  _pdir="$(cd "$(dirname "$_p")" 2>/dev/null && pwd -P)" || return 1
+  _rdir="$(dirname "$_real")"
+
+  # Known-install match is checked against BOTH ends: Homebrew's allowlisted
+  # /usr/local/bin/bw is a symlink into ../Cellar, so requiring the resolved
+  # path to be listed would reject every Homebrew install.
+  _listed=1
+  for _ok in "$@"; do
+    if [ "$_p" = "$_ok" ] || [ "$_real" = "$_ok" ]; then _listed=0; break; fi
+  done
+
+  if [ "$_listed" = "0" ]; then
+    _dir_is_system "$_pdir" || return 1
+    _dir_is_system "$_rdir" || return 1
+    return 0
+  fi
+  _dir_is_private "$_pdir" || return 1
+  _dir_is_private "$_rdir" || return 1
+  return 0
 }
 
 _resolve_bw_bin() {

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # bw-run.test.sh — pure-bash test suite for bw-run.sh (BC-6906).
 # Stubs `bw` AND `security` via PATH-prepended temp dir; real `jq` is
-# required on PATH. 27 cases / 98 assertions: 5 spec-mandated + review-driven additions
+# required on PATH. 31 cases / 111 assertions: 5 spec-mandated + review-driven additions
 # (T-F1 BW_SESSION unset, T-F3 mixed-result batch, T-F4 sequential per-item
 # failure, T-F5 empty EXPORTS, P3-1 missing command after --, P3-8
-# bad-arg-shape variants, BC-6958 micro-fix coverage) + 12 Keychain
-# self-unlock cases (T16–T27, covering the happy path, both fail-closed
+# bad-arg-shape variants, BC-6958 micro-fix coverage) + 16 Keychain
+# self-unlock cases (T16–T31, covering the happy path, both fail-closed
 # exits, the single-attempt contract, the two binary-trust rejections, and the
 # minted-session non-export plus its caller-supplied control, and the two
-# path-safety rejections).
+# path-safety rejections, the symlink-target checks, and the listed-path
+# narrowing pair).
 # The `security` stub defaults to item-not-found so every pre-self-unlock
 # case keeps its exact behavior regardless of the developer's real Keychain.
 # macOS bash 3.2 portable.
@@ -100,18 +101,21 @@ SECSTUB
 chmod +x "$STUB_DIR/security"
 export PATH="$STUB_DIR:$PATH"
 # The self-unlock path will only hand the master password to a binary it
-# trusts: a known install path, or one on a safe path — a mode-0700 directory
-# we own, under ancestors that are ours or root's and not group/other-writable
-# unless sticky. The overrides get the same check, so pointing them at the
-# stubs works only because `mktemp -d` creates STUB_DIR as 0700 under sticky
-# /tmp. That is also why an attacker cannot use this route (T22, T26), and it
-# means every self-unlock case below exercises the sticky-ancestor exemption
-# as a side effect.
+# trusts: a mode-0700 directory we own, under ancestors that are ours or
+# root's and not group/other-writable unless sticky. A known install path is
+# narrowed, not waved through — it skips the 0700 rule a 0755 system directory
+# cannot meet, and nothing else (T30/T31). Symlinks are followed and both ends
+# checked (T28/T29). The overrides get the same treatment, so pointing them at
+# the stubs works only because `mktemp -d` creates STUB_DIR as 0700 under
+# sticky /tmp. That is also why an attacker cannot use this route (T22, T26),
+# and it means every self-unlock case below exercises the sticky-ancestor
+# exemption as a side effect.
 #
 # Coverage limit, stated rather than left implied: the `[ -O ]` ownership test
-# is NOT directly exercised. Constructing the case it defends — a mode-0700
-# directory owned by someone else — needs a second uid, which this suite has
-# no way to obtain. T26 covers the ancestor half of the same predicate.
+# is NOT directly exercised. Constructing the case it defends — a directory
+# owned by someone else — needs a second uid, which this suite has no way to
+# obtain. T26 covers the ancestor half of the same predicate, and T30 covers
+# the write-bit half on the listed branch.
 export BW_RUN_SECURITY_BIN="$STUB_DIR/security"
 export BW_RUN_BW_BIN="$STUB_DIR/bw"
 # The Keychain lookup is scoped to the invoking account, matching the -a the
@@ -777,6 +781,123 @@ assert_eq "$([ "$t25_bw_saw" -ge 1 ] && echo yes || echo no)" "yes" \
 t25_jq_saw=$(grep -c '^SHADOW-JQ session=\[caller-token\]' "$STUB_CALL_LOG" || true)
 assert_eq "$([ "$t25_jq_saw" -ge 1 ] && echo yes || echo no)" "yes" \
   "t25 detector works: a real leak does show up in this log"
+
+# --- TEST 28: symlink in a private dir pointing somewhere unsafe -> declines -
+# Checking the link's directory says nothing about where the link points. Here
+# the override's own directory is impeccable (0700, ours) and only the TARGET
+# sits in a world-writable directory — so the rejection can only come from
+# following the link and checking the far end.
+echo "--- TEST 28: bw symlink -> world-writable target -> no mint, exit 1 ---"
+setup
+LINK_DIR="$STUB_DIR/linkdir"
+BAD_TARGET_DIR="$STUB_DIR/badtarget"
+rm -rf "$LINK_DIR" "$BAD_TARGET_DIR"
+mkdir -p "$LINK_DIR" "$BAD_TARGET_DIR"
+cp "$STUB_DIR/bw" "$BAD_TARGET_DIR/bw"
+chmod +x "$BAD_TARGET_DIR/bw"
+chmod 0700 "$LINK_DIR"
+chmod 0777 "$BAD_TARGET_DIR"
+ln -sf "$BAD_TARGET_DIR/bw" "$LINK_DIR/bw"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+assert_eq "$(ls -ld "$LINK_DIR" | cut -c1-10)" "drwx------" \
+  "t28 the link's own directory is private"
+assert_eq "$([ -x "$LINK_DIR/bw" ] && echo yes || echo no)" "yes" \
+  "t28 the link resolves to an executable"
+err_file="$STUB_DIR/t28.err"
+set +e
+BW_RUN_BW_BIN="$LINK_DIR/bw" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t28 exit code is 1"
+t28_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t28_sec" "0" "t28 master password never read for an unsafe link target"
+
+# --- TEST 29: symlink to a safe target -> still works -----------------------
+# Symlinks are followed, not banned. Homebrew genuinely symlinks its bin
+# entries into ../Cellar, so a blanket rejection would break real installs.
+echo "--- TEST 29: bw symlink -> private target -> mint succeeds ---"
+setup
+SAFE_LINK_DIR="$STUB_DIR/linkdir2"
+rm -rf "$SAFE_LINK_DIR"
+mkdir -p "$SAFE_LINK_DIR"
+chmod 0700 "$SAFE_LINK_DIR"
+ln -sf "$STUB_DIR/bw" "$SAFE_LINK_DIR/bw"
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
+printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+printf '[{"name":"solo-key","login":{"password":"val-solo"}}]' >"$STUB_LIST_FILE"
+out_file="$STUB_DIR/t29.out"
+set +e
+BW_RUN_BW_BIN="$SAFE_LINK_DIR/bw" \
+  env -u BW_SESSION bash "$WRAPPER" KEY1=solo-key -- bash -c 'env | grep "^KEY1="' \
+  >"$out_file" 2>/dev/null
+rc=$?
+set -e
+assert_eq "$rc" "0" "t29 exit code is 0"
+assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t29 KEY1 exported through a symlinked bw"
+t29_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t29_unlock" "1" "t29 exactly 1 unlock via the symlinked binary"
+
+# --- TESTS 30/31: a known-install path is NARROWED, not waved through --------
+# The allowlist branch used to return success on a bare string match, so the
+# one branch meaning "known good" was the only branch that checked nothing.
+# The real allowlist points at /usr/local/bin and friends, which no test can
+# write to, so these two run a COPY of the wrapper with the allowlist rewritten
+# to a directory the suite controls. The sed guard below fails loudly if the
+# call site ever drifts, so this cannot quietly stop testing anything.
+LISTED_WRAPPER="$STUB_DIR/bw-run-listed.sh"
+LISTED_BAD_DIR="$STUB_DIR/listed-bad"
+LISTED_OK_DIR="$STUB_DIR/listed-ok"
+rm -rf "$LISTED_BAD_DIR" "$LISTED_OK_DIR"
+mkdir -p "$LISTED_BAD_DIR" "$LISTED_OK_DIR"
+cp "$STUB_DIR/bw" "$LISTED_BAD_DIR/bw"; chmod +x "$LISTED_BAD_DIR/bw"
+cp "$STUB_DIR/bw" "$LISTED_OK_DIR/bw";  chmod +x "$LISTED_OK_DIR/bw"
+chmod 0777 "$LISTED_BAD_DIR"   # group+other writable — the Homebrew-on-macOS shape
+chmod 0755 "$LISTED_OK_DIR"    # 0755 but ours and not group/other writable
+sed "s#/opt/homebrew/bin/bw /usr/local/bin/bw /usr/bin/bw#$LISTED_BAD_DIR/bw $LISTED_OK_DIR/bw#" \
+  "$WRAPPER" >"$LISTED_WRAPPER"
+chmod +x "$LISTED_WRAPPER"
+listed_rewritten=$(grep -c -- "$LISTED_OK_DIR/bw" "$LISTED_WRAPPER" || true)
+assert_eq "$([ "$listed_rewritten" -ge 1 ] && echo yes || echo no)" "yes" \
+  "t30 premise: allowlist call site was rewritten (guards against drift)"
+
+echo "--- TEST 30: listed path in a group/other-writable dir -> no mint, exit 1 ---"
+setup
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+err_file="$STUB_DIR/t30.err"
+set +e
+BW_RUN_BW_BIN="$LISTED_BAD_DIR/bw" \
+  env -u BW_SESSION bash "$LISTED_WRAPPER" KEY1=solo-key -- echo wrapped >/dev/null 2>"$err_file"
+rc=$?
+set -e
+assert_eq "$rc" "1" "t30 exit code is 1"
+t30_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
+assert_eq "$t30_sec" "0" "t30 being listed does not skip the directory check"
+
+echo "--- TEST 31: listed path in a sound 0755 dir -> mint succeeds (control) ---"
+setup
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
+printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+printf '[{"name":"solo-key","login":{"password":"val-solo"}}]' >"$STUB_LIST_FILE"
+out_file="$STUB_DIR/t31.out"
+set +e
+BW_RUN_BW_BIN="$LISTED_OK_DIR/bw" \
+  env -u BW_SESSION bash "$LISTED_WRAPPER" KEY1=solo-key -- bash -c 'env | grep "^KEY1="' \
+  >"$out_file" 2>/dev/null
+rc=$?
+set -e
+assert_eq "$rc" "0" "t31 exit code is 0"
+assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t31 a sound listed path still works"
+# Without this control T30 would pass even if the listed branch rejected
+# everything, which would break every real Homebrew install.
+t31_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
+assert_eq "$t31_unlock" "1" "t31 control: listed paths are narrowed, not disabled"
 
 # --- Summary ---------------------------------------------------------------
 echo ""
