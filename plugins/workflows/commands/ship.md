@@ -90,6 +90,14 @@ Push the branch and create a PR:
 1. **Push branch**: `git push -u origin HEAD`
 2. **Create PR** using `gh pr create`:
 
+**Target the branch you actually branched from.** `gh pr create` with no `--base` defaults to the repo's default branch. In a promotion-chain repo that opens the PR against `main` even though the feature was cut from `integration`, bypassing the promotion gate. Resolve the same base `git-worktrees` used and pass it explicitly:
+
+```bash
+BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
+# ...or the base named by the consuming repo's CLAUDE.md, which wins over the default.
+gh pr create --base "${BASE#origin/}" ...
+```
+
 ```
 Title: [concise imperative description, under 70 chars]
 

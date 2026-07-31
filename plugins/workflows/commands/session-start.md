@@ -70,7 +70,7 @@ If Linear or sequential-thinking fails:
 Narrate: `Step 1/8: Environment setup...`
 
 1. **Check git status** — Ensure working directory is clean. If dirty, warn and ask how to proceed.
-2. **Pull latest** — `git pull origin main` (or the default branch).
+2. **Pull latest** — resolve the base first, then pull it: `BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main) && git pull "${BASE%%/*}" "${BASE#*/}"`. **Do not hardcode `main`** — in a promotion-chain repo that pulls the wrong branch into the working tree, and the session then starts from a base Step 7 correctly refuses to branch from.
 3. **Read project CLAUDE.md** — Load architecture context, conventions, previous learnings.
 4. **Read auto-memory** — Check for session summaries and follow-ups from previous sessions.
 5. **Context budget check** — After loading CLAUDE.md and auto-memory, estimate the Tier 1+2 line count. If CLAUDE.md exceeds ~120 lines, log an advisory warning: "CLAUDE.md is [N] lines — consider running `/workflows:ship` to trigger best-practices-audit for extraction to docs/." Do NOT stop — advisory only, consistent with CDR check pattern.

@@ -68,17 +68,19 @@ Use the EnterWorktree tool to create an isolated worktree. Name it after the Lin
 
 #### Resolve the base branch — do NOT assume the default branch
 
-**The repo's default branch is not always a legal base.** In a promotion-chain repo, cutting a feature branch from the default branch is prohibited by construction: `brite-salesforce` promotes `integration → main` via a promotion PR (ADR-016), so a branch cut from `main` produces a promotion PR carrying unrelated commits — the exact failure that topology exists to prevent.
+**The repo's default branch is not always a legal base.** In a promotion-chain repo, cutting a feature branch from the default branch is prohibited by construction: `brite-salesforce` promotes `integration → main` via a promotion PR (bn-salesforce ADR-016; the in-repo mirror is [`docs/decisions/026-revops-promotion-topology.md`](../../../../docs/decisions/026-revops-promotion-topology.md)), so a branch cut from `main` produces a promotion PR carrying unrelated commits — the exact failure that topology exists to prevent.
 
 Resolve `BASE` in this order and stop at the first hit:
 
-1. **An explicit base in the invocation** — e.g. `--base origin/integration`. Always wins.
+1. **A base stated by the caller or the developer** — the invoking command passing one, or the developer naming a branch in conversation. Always wins.
 2. **The consuming repo's `CLAUDE.md`** — read it before defaulting. If it names a base branch or a promotion topology, follow it. When a repo's `CLAUDE.md` and this skill disagree, `CLAUDE.md` wins; file the divergence against the Brite Skill Packs project.
-3. **`origin/HEAD`** — fallback only, matching the idiom the rest of this plugin already uses:
+3. **`origin/HEAD`** — fallback only:
 
 ```bash
-BASE="origin/$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo main)"
+BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
 ```
+
+`--short` yields a ready-to-use `origin/<branch>`, so nothing needs prepending. **Do not** write this as `"origin/$(… | sed … || echo main)"`: a pipeline's exit status is its *last* command's, `sed` succeeds on empty input, so the `|| echo main` can never fire and `BASE` silently becomes `origin/` — which fails with `fatal: invalid reference: origin/` in exactly the situations the fallback exists for (`origin/HEAD` unset, a remote not named `origin`, some CI checkouts).
 
 #### Resolve the branch name — prefer Linear's own field
 
@@ -96,13 +98,14 @@ If the EnterWorktree tool is not available, fall back to manual git commands (al
 # ISSUE_ID = Linear issue ID (e.g. BC-42)
 # BRANCH   = Linear gitBranchName, else "${ISSUE_ID}/${DESCRIPTION}"
 # BASE     = resolved above — NOT hardcoded to origin/main
-git worktree add ".claude/worktrees/${ISSUE_ID}" -b "${BRANCH}" "${BASE}"
-
-# Detach the new branch from the base's upstream.
-# `git worktree add ... origin/<base>` sets <base> as the branch's upstream. With
-# push.default = upstream, a bare `git push` would then write straight to the base
-# branch and bypass the PR gate entirely.
-git -C ".claude/worktrees/${ISSUE_ID}" branch --unset-upstream 2>/dev/null || true
+#
+# --no-track matters: without it, `git worktree add ... origin/<base>` sets <base>
+# as the new branch's upstream. That makes bare `git pull` and `git status`
+# ahead/behind silently refer to the BASE branch — the everyday confusion — and,
+# where push.default is set to `upstream` rather than the `simple` default, a bare
+# `git push` writes straight to the base branch. Never setting it beats unsetting
+# it afterwards, which needs error-suppression that can mask a real failure.
+git worktree add --no-track ".claude/worktrees/${ISSUE_ID}" -b "${BRANCH}" "${BASE}"
 ```
 
 Narrate: `Step 2/5: Creating branch and worktree... done`
@@ -174,7 +177,7 @@ Worktree cleanup happens during the `ship` command:
 
 - Resolve the base branch per Step 2 — explicit argument, then the consuming repo's `CLAUDE.md`, then `origin/HEAD`. **In a promotion-chain repo the default branch is the wrong base by construction**, so "use the default branch" is not a safe rule to state.
 - Fetch before branching so the base is current
-- Never let the new branch keep the base as its push upstream (`git branch --unset-upstream`)
+- Create the branch with `--no-track` so it never inherits the base as its upstream
 - Never reuse a worktree from a previous issue — always start fresh
 - If baseline tests fail, document it but don't block — the developer may know about it
 - Branch names must identify the Linear issue for traceability; prefer Linear's own `gitBranchName` so the tracker's auto-linking works and the repo's convention is respected
