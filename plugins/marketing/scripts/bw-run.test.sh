@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # bw-run.test.sh — pure-bash test suite for bw-run.sh (BC-6906).
 # Stubs `bw` AND `security` via PATH-prepended temp dir; real `jq` is
-# required on PATH. 19 cases: 5 spec-mandated + review-driven additions
+# required on PATH. 25 cases / 91 assertions: 5 spec-mandated + review-driven additions
 # (T-F1 BW_SESSION unset, T-F3 mixed-result batch, T-F4 sequential per-item
 # failure, T-F5 empty EXPORTS, P3-1 missing command after --, P3-8
-# bad-arg-shape variants, BC-6958 micro-fix coverage) + 4 Keychain
-# self-unlock cases (T16–T22, covering the happy path, both fail-closed
-# exits, the single-attempt contract, and the two binary-trust rejections).
+# bad-arg-shape variants, BC-6958 micro-fix coverage) + 10 Keychain
+# self-unlock cases (T16–T25, covering the happy path, both fail-closed
+# exits, the single-attempt contract, the two binary-trust rejections, and the
+# minted-session non-export plus its caller-supplied control).
 # The `security` stub defaults to item-not-found so every pre-self-unlock
 # case keeps its exact behavior regardless of the developer's real Keychain.
 # macOS bash 3.2 portable.
@@ -107,6 +108,9 @@ export BW_RUN_BW_BIN="$STUB_DIR/bw"
 # The Keychain lookup is scoped to the invoking account, matching the -a the
 # provisioning hint documents.
 TEST_ACCOUNT="${USER:-$(id -un)}"
+# Captured before any jq shadowing (STUB_DIR holds no jq), so the T24/T25
+# shadow can record what it saw and then delegate to the real thing.
+REAL_JQ="$(command -v jq)"
 
 # --- Test harness ----------------------------------------------------------
 TESTS_RUN=0
@@ -637,6 +641,79 @@ t23_unlock=$(grep -c '^unlock' "$STUB_CALL_LOG" || true)
 assert_eq "$t23_unlock" "0" "t23 no unlock attempted with an untrusted security"
 t23_sec=$(grep -c '^security ' "$STUB_CALL_LOG" || true)
 assert_eq "$t23_sec" "0" "t23 untrusted security binary never invoked"
+
+# --- Shadowed bw/jq on PATH (T24 premise, T25 control) ---------------------
+# Both log what BW_SESSION they were handed, then delegate so the run proceeds
+# normally. Whether they appear in the call log is the whole assertion.
+SHADOW_DIR="$STUB_DIR/shadow"
+mkdir -p "$SHADOW_DIR"
+cat >"$SHADOW_DIR/bw" <<SHADOWBW
+#!/usr/bin/env bash
+printf 'SHADOW-BW session=[%s]\n' "\${BW_SESSION:-}" >>"\$STUB_CALL_LOG"
+exec "$STUB_DIR/bw" "\$@"
+SHADOWBW
+cat >"$SHADOW_DIR/jq" <<SHADOWJQ
+#!/usr/bin/env bash
+printf 'SHADOW-JQ session=[%s]\n' "\${BW_SESSION:-}" >>"\$STUB_CALL_LOG"
+exec "$REAL_JQ" "\$@"
+SHADOWJQ
+chmod +x "$SHADOW_DIR/bw" "$SHADOW_DIR/jq"
+
+# --- TEST 24: a minted session never reaches PATH-resolved binaries ---------
+# Minting creates a live vault token that would not otherwise exist, so it is
+# the case that must not leak one. The minted session is therefore never
+# exported: it goes to the already-trusted binary one invocation at a time.
+# A `bw` and a `jq` planted earlier in PATH must come away with nothing —
+# the bw must not run at all, and the jq must see an empty BW_SESSION.
+echo "--- TEST 24: minted session invisible to PATH-shadowed bw/jq ---"
+setup
+printf '{"status":"locked"}' >"$STUB_STATUS_FILE"
+printf '{"status":"unlocked"}' >"$STUB_STATUS_AFTER_UNLOCK_FILE"
+printf 'stub-master-pw' >"$STUB_KEYCHAIN_FILE"
+printf 'minted-session-token' >"$STUB_UNLOCK_TOKEN_FILE"
+printf '[{"name":"solo-key","login":{"password":"val-solo"}}]' >"$STUB_LIST_FILE"
+out_file="$STUB_DIR/t24.out"
+set +e
+PATH="$SHADOW_DIR:$PATH" env -u BW_SESSION bash "$WRAPPER" \
+  KEY1=solo-key -- bash -c 'env | grep "^KEY1="' >"$out_file" 2>/dev/null
+rc=$?
+set -e
+assert_eq "$rc" "0" "t24 exit code is 0 (trusted bw used, shadow bypassed)"
+assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t24 KEY1 exported"
+t24_shadow_bw=$(grep -c '^SHADOW-BW ' "$STUB_CALL_LOG" || true)
+assert_eq "$t24_shadow_bw" "0" "t24 PATH-shadowed bw never invoked"
+t24_jq_leak=$(grep -c '^SHADOW-JQ session=\[minted-session-token\]' "$STUB_CALL_LOG" || true)
+assert_eq "$t24_jq_leak" "0" "t24 minted session never reaches jq env"
+# Premise guard: if the shadowed jq never ran at all, the leak assertion above
+# would pass for the wrong reason.
+t24_jq_ran=$(grep -c '^SHADOW-JQ session=\[\]' "$STUB_CALL_LOG" || true)
+assert_eq "$([ "$t24_jq_ran" -ge 1 ] && echo yes || echo no)" "yes" \
+  "t24 premise: shadowed jq did run, and saw an empty session"
+
+# --- TEST 25: caller-supplied session keeps the pre-existing PATH behavior ---
+# Negative control with two jobs. It proves T24's detector actually detects —
+# a leak shows up in the same log when one genuinely exists — and it pins
+# ADR-010's deferred scope line: a caller-exported BW_SESSION still reaches
+# PATH-resolved binaries, exactly as it did before this PR. Narrowing that is
+# the separate proposal; if someone takes it on, this test should change
+# deliberately rather than be discovered by surprise.
+echo "--- TEST 25: caller-supplied session still reaches PATH binaries (control) ---"
+setup
+printf '[{"name":"solo-key","login":{"password":"val-solo"}}]' >"$STUB_LIST_FILE"
+out_file="$STUB_DIR/t25.out"
+set +e
+PATH="$SHADOW_DIR:$PATH" BW_SESSION=caller-token bash "$WRAPPER" \
+  KEY1=solo-key -- bash -c 'env | grep "^KEY1="' >"$out_file" 2>/dev/null
+rc=$?
+set -e
+assert_eq "$rc" "0" "t25 exit code is 0"
+assert_contains "$(cat "$out_file")" "KEY1=val-solo" "t25 KEY1 exported"
+t25_bw_saw=$(grep -c '^SHADOW-BW session=\[caller-token\]' "$STUB_CALL_LOG" || true)
+assert_eq "$([ "$t25_bw_saw" -ge 1 ] && echo yes || echo no)" "yes" \
+  "t25 caller session reaches PATH-resolved bw (pre-existing, ADR-010 scope line)"
+t25_jq_saw=$(grep -c '^SHADOW-JQ session=\[caller-token\]' "$STUB_CALL_LOG" || true)
+assert_eq "$([ "$t25_jq_saw" -ge 1 ] && echo yes || echo no)" "yes" \
+  "t25 detector works: a real leak does show up in this log"
 
 # --- Summary ---------------------------------------------------------------
 echo ""

@@ -75,6 +75,9 @@ _resolve_bw_bin() {
 # and stale-session branches both call this, and a mint that "succeeds" but still
 # fails verification must not trigger a second attempt.
 _SELF_UNLOCK_TRIED=0
+# A self-minted session is held in these two rather than exported — see _bw.
+_MINTED_SESSION=""
+_MINTED_BW_BIN=""
 
 _self_unlock() {
   [ "$_SELF_UNLOCK_TRIED" = "1" ] && return 1
@@ -88,26 +91,52 @@ _self_unlock() {
   if [ -z "$_bw_master" ]; then
     return 1
   fi
-  if ! BW_SESSION="$(BW_PASSWORD="$_bw_master" "$_bw_bin" unlock --raw --passwordenv BW_PASSWORD 2>/dev/null)"; then
+  if ! _minted="$(BW_PASSWORD="$_bw_master" "$_bw_bin" unlock --raw --passwordenv BW_PASSWORD 2>/dev/null)"; then
     _bw_master=""
     return 1
   fi
   _bw_master=""
-  export BW_SESSION
+  [ -n "$_minted" ] || return 1
+  _MINTED_SESSION="$_minted"
+  _MINTED_BW_BIN="$_bw_bin"
+}
+
+# Do we hold a usable session, from either source?
+_have_session() {
+  [ -n "${BW_SESSION:-}" ] || [ -n "$_MINTED_SESSION" ]
+}
+
+# Run bw. A self-minted session is deliberately NOT exported: it is handed to
+# the already-trusted binary one invocation at a time, so neither a
+# PATH-substituted `bw` nor a PATH-substituted `jq` further down the pipe ever
+# has a live vault token in its environment. Minting is the case where the
+# wrapper creates a token that would not otherwise exist, so it is the case
+# that must not leak one.
+#
+# A caller-supplied BW_SESSION keeps the pre-existing behavior untouched: it is
+# already exported in our environment by whoever launched us, PATH-resolved bw
+# has always inherited it, and narrowing that is ADR-010's deferred separate
+# proposal — not something to smuggle in here.
+_bw() {
+  if [ -n "$_MINTED_SESSION" ]; then
+    BW_SESSION="$_MINTED_SESSION" "$_MINTED_BW_BIN" "$@"
+  else
+    bw "$@"
+  fi
 }
 
 _UNLOCK_HINT="Run \`bw unlock\` and export BW_SESSION, or provision Keychain self-unlock: security add-generic-password -U -a \"\$USER\" -s bw-master -w"
 
-if [ -z "${BW_SESSION:-}" ]; then
+if ! _have_session; then
   _self_unlock || true
 fi
-if [ -z "${BW_SESSION:-}" ]; then
+if ! _have_session; then
   echo "bw-run.sh: BW_SESSION not set. $_UNLOCK_HINT" >&2
   exit 1
 fi
-if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
+if ! _bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
   _self_unlock || true
-  if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
+  if ! _bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
     echo "bw-run.sh: vault is not unlocked (BW_SESSION may be stale). $_UNLOCK_HINT" >&2
     exit 1
   fi
@@ -165,7 +194,7 @@ lcp() {
 if [ "${#EXPORTS[@]}" -gt 0 ]; then
   PREFIX="$(lcp)"
   if [ "${#PREFIX}" -ge 3 ]; then
-    CACHE="$(bw list items --search "$PREFIX")"
+    CACHE="$(_bw list items --search "$PREFIX")"
     for entry in "${EXPORTS[@]}"; do
       key="${entry%%=*}"; item="${entry#*=}"
       # Two-pass discrimination via jq (~2N calls at N=7 is still <5% of the
@@ -205,7 +234,7 @@ if [ "${#EXPORTS[@]}" -gt 0 ]; then
   else
     for entry in "${EXPORTS[@]}"; do
       key="${entry%%=*}"; item="${entry#*=}"
-      if ! value="$(bw get password "$item")" || [ -z "$value" ]; then
+      if ! value="$(_bw get password "$item")" || [ -z "$value" ]; then
         echo "bw-run.sh: bw get password failed for item \`$item\`" >&2
         exit 3
       fi
@@ -222,5 +251,7 @@ fi
 # process.env access could otherwise exfiltrate the master vault token.
 # The wrapper has finished all bw calls by this point; the wrapped process
 # only needs the per-vendor KEY=value exports we already set above.
+# This covers the caller-supplied session. A self-minted one was never exported
+# in the first place (see _bw), so there is nothing here for it to drop.
 unset BW_SESSION
 exec "$@"
