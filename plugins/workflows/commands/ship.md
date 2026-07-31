@@ -106,7 +106,9 @@ Push the branch and create a PR:
 # the recorded marker and origin/HEAD; omitting it is what made standalone ship target main.
 BASE="${RECORDED_BASE:-${CLAUDE_MD_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}}"
 case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac   # a declared base may be bare
-gh pr create --base "${BASE#origin/}" ...
+# ${BASE#*/} strips the remote whatever it is called; ${BASE#origin/} would leave
+# "upstream/integration" intact, which is not a branch name.
+gh pr create --base "${BASE#*/}" ...
 ```
 
 ```

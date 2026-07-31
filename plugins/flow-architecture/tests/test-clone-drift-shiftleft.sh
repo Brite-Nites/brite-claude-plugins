@@ -43,7 +43,7 @@ REV_UPSTREAM="plugins/workflows/commands/review.md"
 REV_TARGET='Upstream-SHA: c4607b2cf4679f794a84cf2e1e0e004f2e4864a0'
 SHIP_CLONE="plugins/flow-architecture/commands/ship.md"
 SHIP_UPSTREAM="plugins/workflows/commands/ship.md"
-SHIP_TARGET='Upstream-SHA: bcf26361265ae891d2e89c7be6f6fecfadb05669'
+SHIP_TARGET='Upstream-SHA: 6894e697371695f60a312f62a20bfc5b0fa38fde'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 # Unique per-invocation output file (portable mktemp template — trailing X's,
 # no suffix, works on both BSD/macOS and GNU/Linux). Avoids a fixed /tmp path

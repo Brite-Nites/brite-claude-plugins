@@ -93,7 +93,7 @@ BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo ori
 case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac
 ```
 
-Never split `BASE` into remote and branch with `${BASE%%/*}` / `${BASE#*/}` — that breaks on any branch name containing a slash (`release/1.2`). Use the whole ref: `git fetch <remote> && git merge --ff-only "$BASE"`. **Do not** write this as `"origin/$(… | sed … || echo main)"`: a pipeline's exit status is its *last* command's, `sed` succeeds on empty input, so the `|| echo main` can never fire and `BASE` silently becomes `origin/` — which fails with `fatal: invalid reference: origin/` in exactly the situations the fallback exists for (`origin/HEAD` unset, a remote not named `origin`, some CI checkouts).
+Once qualified, `${BASE%%/*}` is the remote and `${BASE#*/}` is the branch, and both stay correct for branch names containing slashes (`origin/release/1.2` → `origin` + `release/1.2`). Qualification is what matters: on an unqualified `integration` **both** expansions return `integration`, which is how `git pull integration integration` happens. Use `${BASE#*/}` — not `${BASE#origin/}` — wherever a bare branch name is needed, so a remote named something other than `origin` still works. **Do not** write this as `"origin/$(… | sed … || echo main)"`: a pipeline's exit status is its *last* command's, `sed` succeeds on empty input, so the `|| echo main` can never fire and `BASE` silently becomes `origin/` — which fails with `fatal: invalid reference: origin/` in exactly the situations the fallback exists for (`origin/HEAD` unset, a remote not named `origin`, some CI checkouts).
 
 #### Resolve the branch name — prefer Linear's own field
 
