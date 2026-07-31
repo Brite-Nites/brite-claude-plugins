@@ -73,7 +73,10 @@ Narrate: `Step 1/8: Environment setup...`
 2. **Pull latest** — the pull needs a base, so resolve one first using the **same order** the `git-worktrees` skill defines (caller-stated base → the consuming repo's `CLAUDE.md` → `origin/HEAD`); do not re-invent that order here. **This requires a narrow pre-read of `CLAUDE.md` for a declared base branch or promotion topology** — the full `CLAUDE.md` payload load is item 3, which runs *after* this step, so waiting for it would mean pulling before the base is known. Then:
 
    ```bash
-   BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)  # fallback only
+   # BASE may ALREADY be set from the caller or the CLAUDE.md pre-read above.
+   # `:=` assigns only when it is unset/empty, so origin/HEAD stays a genuine fallback.
+   # A bare `BASE=$(...)` here would silently overwrite a declared `integration` with `main`.
+   : "${BASE:=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
    case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac   # CLAUDE.md may declare a bare name
    git fetch "${BASE%%/*}" && git merge --ff-only "$BASE"
    ```

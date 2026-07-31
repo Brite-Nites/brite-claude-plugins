@@ -102,7 +102,10 @@ Push the branch and create a PR:
 # order git-worktrees defines: check the consuming repo's CLAUDE.md for a declared base or
 # promotion topology BEFORE falling through to origin/HEAD. Skipping that step is how a
 # standalone ship in a promotion-chain repo still targets the wrong branch.
-BASE="${RECORDED_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
+# CLAUDE_MD_BASE = a base declared by the consuming repo's CLAUDE.md, if any. It sits BETWEEN
+# the recorded marker and origin/HEAD; omitting it is what made standalone ship target main.
+BASE="${RECORDED_BASE:-${CLAUDE_MD_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}}"
+case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac   # a declared base may be bare
 gh pr create --base "${BASE#origin/}" ...
 ```
 

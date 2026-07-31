@@ -28,7 +28,7 @@ gbrain:
 
 <!-- eval-waiver: Cloned session orchestrator: pull latest, preflight, query Linear for FDA discipline-child issues, then brainstorm, plan, worktree, and execute via dispatched skills plus an L4 plan-X dispatch; it is a sequencing and dispatch shell whose substantive artifacts (the plan-section writeback included) are produced by the dispatched skills, so it emits no fixed-right-answer artifact of its own. -->
 
-<!-- Cloned from workflows v3.32.0 (commands/session-start.md) on 2026-05-28. Upstream-SHA: 859555b4a11c133bfff1b7fb5f9c6aead3ae1e9b. Drift-detection per parking lot #45. Re-synced for BC-11891 (context7 removal — both files dropped their Context7 prereq probes in tandem). Re-synced for BC-11754 (team-gbrain context-load phase — propagated verbatim from upstream). Re-synced for BC-12947 (eval-waiver marker added to upstream). Re-synced for BC-17836 (worktree base + branch name resolved instead of hardcoded origin/main). -->
+<!-- Cloned from workflows v3.32.0 (commands/session-start.md) on 2026-05-28. Upstream-SHA: e162bf3210abf45d5e51ec106e17b3ef1c7acbd7. Drift-detection per parking lot #45. Re-synced for BC-11891 (context7 removal — both files dropped their Context7 prereq probes in tandem). Re-synced for BC-11754 (team-gbrain context-load phase — propagated verbatim from upstream). Re-synced for BC-12947 (eval-waiver marker added to upstream). Re-synced for BC-17836 (worktree base + branch name resolved instead of hardcoded origin/main). -->
 
 # Session Start
 
@@ -78,7 +78,10 @@ Items 1-2 are bash side-effects that must complete first. **Items 3, 4, 7-glob, 
 2. **Pull latest** — the pull needs a base, so resolve one first using the **same order** the `git-worktrees` skill defines (caller-stated base → the consuming repo's `CLAUDE.md` → `origin/HEAD`); do not re-invent that order here. **This requires a narrow pre-read of `CLAUDE.md` for a declared base branch or promotion topology** — the full `CLAUDE.md` payload load is item 3, which runs *after* this step, so waiting for it would mean pulling before the base is known. Then:
 
    ```bash
-   BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)  # fallback only
+   # BASE may ALREADY be set from the caller or the CLAUDE.md pre-read above.
+   # `:=` assigns only when it is unset/empty, so origin/HEAD stays a genuine fallback.
+   # A bare `BASE=$(...)` here would silently overwrite a declared `integration` with `main`.
+   : "${BASE:=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
    case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac   # CLAUDE.md may declare a bare name
    git fetch "${BASE%%/*}" && git merge --ff-only "$BASE"
    ```

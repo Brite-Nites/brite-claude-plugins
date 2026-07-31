@@ -26,7 +26,7 @@ gbrain:
 
 <!-- eval-waiver: Cloned Ship and Compound: pre-ship audit, push plus FDA-shaped PR, Q46 ship-summary writeback, Greptile gate, compound-learnings, best-practices audit, handbook-drift, and a retro notification; outputs are an LLM-authored PR body plus ship-summary comment plus session report, with no fixed-right-answer artifact separable from narration. Re-synced for BC-17836 (PR base resolved instead of defaulting to the repo default branch). -->
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 51d5b3f1d93b3a976bf60959498c3d7582e5619d. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: bcf26361265ae891d2e89c7be6f6fecfadb05669. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
 
 # Ship & Compound
 
@@ -132,7 +132,10 @@ Push the branch and create a PR:
 # order git-worktrees defines: check the consuming repo's CLAUDE.md for a declared base or
 # promotion topology BEFORE falling through to origin/HEAD. Skipping that step is how a
 # standalone ship in a promotion-chain repo still targets the wrong branch.
-BASE="${RECORDED_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
+# CLAUDE_MD_BASE = a base declared by the consuming repo's CLAUDE.md, if any. It sits BETWEEN
+# the recorded marker and origin/HEAD; omitting it is what made standalone ship target main.
+BASE="${RECORDED_BASE:-${CLAUDE_MD_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}}"
+case "$BASE" in */*) ;; *) BASE="origin/$BASE" ;; esac   # a declared base may be bare
 gh pr create --base "${BASE#origin/}" ...
 ```
 
