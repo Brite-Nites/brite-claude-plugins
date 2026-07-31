@@ -46,7 +46,7 @@ Narrate: `Step 1/5: Verifying git prerequisites...`
 1. Confirm git repo: `git rev-parse --is-inside-work-tree`
 2. Confirm clean state: `git status --porcelain` (should be empty)
 3. Fetch latest: `git fetch origin`
-4. Identify base branch: usually `main` or `master`
+4. Identify the base branch — resolve it per Step 2, do NOT assume `main`/`master`
 ```
 
 If working directory is dirty, use error recovery (see `_shared/observability.md`). AskUserQuestion with options: "Stash changes / Commit changes first / Abort worktree setup."
@@ -72,6 +72,8 @@ Resolve `BASE` in this order and stop at the first hit:
 ```bash
 BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
 ```
+
+**This is the single definition of base resolution.** `session-start` (pull) and `ship` (PR base) defer to this order rather than re-deriving it — if they resolved independently they could disagree, and a feature cut from `integration` would still open its PR against `main`. Step 5 records the resolved `BASE` in the completion marker so downstream steps consume the value actually used.
 
 `--short` yields a ready-to-use `origin/<branch>`, so nothing needs prepending. **Do not** write this as `"origin/$(… | sed … || echo main)"`: a pipeline's exit status is its *last* command's, `sed` succeeds on empty input, so the `|| echo main` can never fire and `BASE` silently becomes `origin/` — which fails with `fatal: invalid reference: origin/` in exactly the situations the fallback exists for (`origin/HEAD` unset, a remote not named `origin`, some CI checkouts).
 

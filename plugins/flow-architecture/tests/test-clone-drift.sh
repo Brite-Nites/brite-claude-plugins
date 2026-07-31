@@ -21,7 +21,7 @@ CLONE_FILE="plugins/flow-architecture/commands/session-start.md"
 # Baseline re-synced in BC-12947 (Batch F added an eval-waiver marker to the
 # workflows session-start upstream, so the clone's recorded Upstream-SHA was
 # bumped to the new upstream blob in the same PR).
-TARGET_LINE='Upstream-SHA: b0112f052f28fe15800fce4dcd54c57468cf1874'
+TARGET_LINE='Upstream-SHA: 5c2b9e561cdd5c41220df3ac4d8847cc7c09f324'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 
 # Drive the classifier from the branch's HEAD blob, not origin/main. The test

@@ -26,7 +26,7 @@ gbrain:
 
 <!-- eval-waiver: Cloned Ship and Compound: pre-ship audit, push plus FDA-shaped PR, Q46 ship-summary writeback, Greptile gate, compound-learnings, best-practices audit, handbook-drift, and a retro notification; outputs are an LLM-authored PR body plus ship-summary comment plus session report, with no fixed-right-answer artifact separable from narration. Re-synced for BC-17836 (PR base resolved instead of defaulting to the repo default branch). -->
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 97ed01907ab2fd31939b7c99823ebab7c6083733. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 54ac9e09838e2f540eee232221c1565085a1f64b. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
 
 # Ship & Compound
 
@@ -123,8 +123,10 @@ Push the branch and create a PR:
 **Target the branch you actually branched from.** `gh pr create` with no `--base` defaults to the repo's default branch. In a promotion-chain repo that opens the PR against `main` even though the feature was cut from `integration`, bypassing the promotion gate. Resolve the same base `git-worktrees` used and pass it explicitly:
 
 ```bash
-BASE=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
-# ...or the base named by the consuming repo's CLAUDE.md, which wins over the default.
+# Prefer the base git-worktrees RECORDED in its completion marker ("Base: <ref> @ <sha>") —
+# that is the ref the branch was actually cut from. Re-deriving here can disagree with it,
+# which is the whole bug: cut from integration, PR opened against main.
+BASE="${RECORDED_BASE:-$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)}"
 gh pr create --base "${BASE#origin/}" ...
 ```
 
