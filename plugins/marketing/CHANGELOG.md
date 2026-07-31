@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ## [Unreleased]
 
 ### Changed
+
+- **Secrets now come from Bitwarden Secrets Manager via `bws run` (ADR-044).** `bw-run.sh` and its test suite are deleted. The four secret-bearing MCP servers and the skills' Python CLI call sites authenticate with a machine-account access token scoped to two projects — `brite-claude-tam-map` (7 secrets) and `brite-claude-enrichment` (8). No vault master password, no `bw unlock`, no `BW_SESSION`.
+
+  **Required operator action — this breaks existing installs until done:**
+  1. Install `bws`. There is **no Homebrew formula**; `brew install bitwarden-cli` gives you `bw`, a different tool. Use Bitwarden's script or the [`bitwarden/sdk-sm` releases](https://github.com/bitwarden/sdk-sm/releases).
+  2. Get a machine-account token from your Brite admin and `export BWS_ACCESS_TOKEN=...` in your shell profile. Once per machine, not per session.
+  3. Re-launch Claude Code from a shell that has it. Run `/marketing:setup-tam-map` to verify.
+
+  Two projects rather than one is forced, not preferred: a secret's name *is* its environment variable name, and `PROSPEO_API_KEY` / `ICYPEAS_API_KEY` are each fed from a different vault item depending on caller, so one project cannot hold both. Note also that `bws run --project-id` injects **every** secret in the project — there is no per-key selection, so each server sees its whole project.
+
+  Why the wrapper was removed rather than hardened: an attempt to keep it (PR #565) produced eight security findings across nine review rounds, five of them introduced by the hardening itself. All traced to one inversion — a broker holding the key to the entire vault in order to fetch eleven vendor API keys. ADR-044 records the analysis.
 - **ADR-008 default-flip executed (BC-16888)** — `enrichment_provider` auto-detect now resolves `brite_mcp` first when the brite-enrichment MCP is registered (was: opt-in only; auto-detect went `brite_cli` → `blitz_waterfall`). Engine-maturity sign-off recorded as an operator decision (2026-07-08) on BC-16888; the fail-open fall-through to `blitz_waterfall` is unchanged. ADR-008 + `tam-mapping` + `list-building` updated in lockstep (`plugin.json` and `/marketing:tam-map` already described the target order). BC-13096/BC-6322 continue as hardening tracks.
 
 ### Added
