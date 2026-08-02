@@ -26,7 +26,7 @@ gbrain:
 
 <!-- eval-waiver: Cloned review loop: self-verify, diff-triage, simplify agents, dynamic reviewer selection, validation subagents, a P1 fix loop, and a final report; the artifact is an LLM-merged and severity-classified findings report from dispatched agents, and the agent-selection logic is config-driven branching, not a fixed-right-answer decide() separable from the agent narration. Read-only on Linear in v1 (review-summary writeback is a v1.1 parking-lot). -->
 
-<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: c4607b2cf4679f794a84cf2e1e0e004f2e4864a0. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12947 (eval-waiver marker added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
+<!-- Cloned from workflows v3.29.4 (commands/review.md) on 2026-05-07. Upstream-SHA: 275417af2201cd6a596b59d81fa6eecf51be53f2. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12947 (eval-waiver marker added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). Re-synced for ADR-045 (write-client remedy now a `GBRAIN_WRITE_CLIENT_*` export, not a vault item). -->
 
 # Review Loop (Phase 5)
 

@@ -26,7 +26,7 @@ gbrain:
 
 <!-- eval-waiver: Cloned Ship and Compound: pre-ship audit, push plus FDA-shaped PR, Q46 ship-summary writeback, Greptile gate, compound-learnings, best-practices audit, handbook-drift, and a retro notification; outputs are an LLM-authored PR body plus ship-summary comment plus session report, with no fixed-right-answer artifact separable from narration. Re-synced for BC-17836 (PR base resolved instead of defaulting to the repo default branch). -->
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 6894e697371695f60a312f62a20bfc5b0fa38fde. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). -->
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: a4c715f836c33a4509154f79030ad2eaeff25b07. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). Re-synced for ADR-045 (write-client remedy now a `GBRAIN_WRITE_CLIENT_*` export, not a vault item). -->
 
 # Ship & Compound
 
