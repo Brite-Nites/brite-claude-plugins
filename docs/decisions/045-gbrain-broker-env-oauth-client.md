@@ -75,7 +75,11 @@ Bitwarden still **stores** the values — the teammate copies them out of
 only.
 
 - **No vault session.** No `bw`, no `bw unlock`, no `BW_SESSION`. With ADR-044,
-  this repo has no `BW_SESSION` consumer left.
+  this repo has no `BW_SESSION` consumer left on any live path. The only
+  remaining references are `scripts/spike-bw-run/`, the throwaway BC-6905 proof
+  of concept, which nothing invokes; the broker still `unset`s `BW_SESSION`
+  before `exec` as belt-and-braces for a developer who has one exported from the
+  old world.
 - **Read and write are separate variable pairs, and write never falls back.**
   `--write` reads `GBRAIN_WRITE_CLIENT_*` and nothing else. A missing write
   client is a hard exit 3, not a silent downgrade to a read identity — the

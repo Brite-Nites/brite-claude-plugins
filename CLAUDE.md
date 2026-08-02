@@ -78,4 +78,4 @@ Single-context; ADRs live in `docs/decisions/` (not `docs/adr/`). See `docs/agen
 
 ## Gotchas
 
-Full catalog: [docs/gotchas.md](docs/gotchas.md) — read before touching `plugin.json`, hooks, versions, or CI. Two that gate every session: **bump the plugin version in the SAME commit** as any `plugins/<p>/{hooks,skills,commands,agents}/**` edit (plugin.json + marketplace.json); and **plugin.json is a strict schema** — any unrecognized field silently hard-fails.
+Full catalog: [docs/gotchas.md](docs/gotchas.md) — read before touching `plugin.json`, hooks, versions, or CI. Two that gate every session: **bump the plugin version in the SAME commit** as any `plugins/<p>/{hooks,skills,commands,agents,scripts}/**` edit (plugin.json + marketplace.json); and **plugin.json is a strict schema** — any unrecognized field silently hard-fails.

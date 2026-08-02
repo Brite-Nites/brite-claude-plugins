@@ -220,10 +220,14 @@ Stdio MCPs and CLI scripts read credentials from OS environment variables — th
 - **Rotation propagation:** values are fetched per-MCP-process-spawn, not per-tool-call. MCP server processes are persistent for the Claude Code session; tool calls reuse the running process and its in-memory env. **`/reload-plugins` does NOT re-spawn MCP processes** (measured in BC-6906 T14: it reloads plugin metadata only). To pick up a rotated Secrets Manager value, the user must trigger a real MCP-process re-spawn — typically by re-launching Claude Code (or, if your Claude Code version exposes it, a per-server `claude mcp restart <name>` command). This is still cheaper than the pre-broker world (which required `~/.zshrc` edits *and* a re-launch); it just isn't zero-touch.
 - **Scope:** `bws run --project-id` injects **every** secret in that project into the wrapped process — there is no per-key selection. Size projects to the blast radius you want: a server sees all of its project's secrets, so put unrelated credentials in separate projects rather than accepting the widening.
 
+**Exception — HTTP MCPs.** This canon applies to **stdio MCPs and CLI scripts only.** For HTTP MCPs with credentialed `Authorization: Bearer ${...}` headers, both `${ENV_VAR}` and `${user_config.*}` substitution into headers are broken in current Claude Code (BC-5551 / upstream issues [#6204](https://github.com/anthropics/claude-code/issues/6204), [#9427](https://github.com/anthropics/claude-code/issues/9427)). Ship user-level registration with guided onboarding (the Email Bison pattern at `/marketing:setup-email-bison`) until upstream lands fixes — see § Email Bison MCP Onboarding above.
+
 ## Team gbrain credentials
 
-The `gbrain-team` MCP server is the one credentialed server this canon does *not*
-cover, because it needs an OAuth token rather than a static API key.
+`gbrain-team` is a **stdio** server, so the canon above covers how its credential
+reaches the process. What the canon does not cover is *which* credential: this
+server needs a short-lived OAuth token rather than a static API key, so it is
+brokered rather than injected.
 `scripts/gbrain-team-broker.sh` exchanges an OAuth client for a short-lived
 bearer token at spawn time, then bridges stdio to the HTTP endpoint via
 `mcp-remote`. Decision record: [ADR-045](docs/decisions/045-gbrain-broker-env-oauth-client.md).
@@ -263,8 +267,6 @@ it to the other five, and bump all six plugin versions in the same commit — th
 script ships in the version-keyed plugin cache, so an unbumped plugin keeps
 running the old broker. `validate.sh` §2b-gbrain fails on any drift. The
 single-source fix (`plugins/_shared/`) is tracked as BC-11757.
-
-**Exception — HTTP MCPs.** This canon applies to **stdio MCPs and CLI scripts only.** For HTTP MCPs with credentialed `Authorization: Bearer ${...}` headers, both `${ENV_VAR}` and `${user_config.*}` substitution into headers are broken in current Claude Code (BC-5551 / upstream issues [#6204](https://github.com/anthropics/claude-code/issues/6204), [#9427](https://github.com/anthropics/claude-code/issues/9427)). Ship user-level registration with guided onboarding (the Email Bison pattern at `/marketing:setup-email-bison`) until upstream lands fixes — see § Email Bison MCP Onboarding above.
 
 ## ADR Convention
 
