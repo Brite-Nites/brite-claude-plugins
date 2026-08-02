@@ -210,8 +210,18 @@ Branching:
 
 - All three show `✓ Connected` → continue to Phase 3b.
 - Any show `✗ Failed to connect` → troubleshooting loop:
-  1. Ask user to open a fresh terminal and run `for v in SPIDER_API_KEY AIARK_API_KEY DISCOLIKE_API_KEY; do printf "%s=%s\n" "$v" "${!v:+set}"; done` — expect `set` for all three.
-  2. If any prints empty → `BWS_ACCESS_TOKEN` didn't reach the shell that launched Claude Code, or the secret is missing from the project. Re-launch Claude Code from a shell where you exported `BWS_ACCESS_TOKEN` (Step 2b), then re-run Phase 3.
+  1. Ask user to open a fresh terminal and check the **broker credential**, not the provider keys: `printf "BWS_ACCESS_TOKEN=%s\n" "${BWS_ACCESS_TOKEN:+set}"` — expect `set`.
+
+     > Do **not** check for `SPIDER_API_KEY` / `AIARK_API_KEY` / `DISCOLIKE_API_KEY` in the user's shell. `bws` injects those into the **child process** it spawns, never into the parent. A correctly configured developer has only `BWS_ACCESS_TOKEN`, so probing for the provider keys reports empty on a healthy machine and sends you down the wrong branch.
+
+  2. If `BWS_ACCESS_TOKEN` prints empty → it didn't reach the shell that launched Claude Code. Re-launch Claude Code from a shell where you exported it (Step 2b), then re-run Phase 3.
+  2b. If it is `set`, confirm the token can actually read the project and that the secrets exist — this is the check that replaces the old per-key shell probe:
+
+     ```bash
+     bws secret list "$(bws project list | jq -r '.[]|select(.name=="brite-claude-tam-map")|.id')" | jq -r '.[].key'
+     ```
+
+     Expect 7 names, matching the env vars exactly (`SPIDER_API_KEY`, `AIARK_API_KEY`, `DISCOLIKE_API_KEY`, `ICYPEAS_API_KEY`, `BLITZAPI_KEY`, `PROSPEO_API_KEY`, `MILLIONVERIFIER_API_KEY`). An auth error means the token is bad or revoked; a short list means the secret is missing from the project (re-run Phase 2a's admin-provisioning check); a name mismatch means the secret is misnamed, and since a secret's name **is** the injected variable name, the server will start with that variable unset.
   3. If all `set` but Spider still fails → confirm the package is reachable: `npx -y spider-cloud-mcp --help` (network call to npm). If that errors, npm is the issue, not the key.
   4. If all `set` but `aiark` or `discolike` fail → those wrappers live at `plugins/marketing/scripts/tam-map/{aiark,discolike}-mcp.js`. Run the wrapper directly: `node plugins/marketing/scripts/tam-map/aiark-mcp.js` — it should print a stdio handshake or error to stderr if the key is bad. The wrappers were ported from upstream tam-map and carry an `!! VERIFY BEFORE USING !!` warning about endpoint paths; if you hit a 4xx error, the wrapper may need its endpoints updated against `docs.ai-ark.com/reference` (a Brite-known limitation tracked in the wrapper source).
 
