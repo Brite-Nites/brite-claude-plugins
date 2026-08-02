@@ -6,7 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+
+- **Phase 3a's troubleshooting loop gave a healthy machine a false diagnosis.** Step 1 told the user to check `SPIDER_API_KEY` / `AIARK_API_KEY` / `DISCOLIKE_API_KEY` in their own shell and expect `set`. Under `bws` those variables only ever exist in the **child process** the broker spawns — a correctly configured developer has just `BWS_ACCESS_TOKEN`, so all three read empty and step 2 blamed a missing token. The loop now checks the broker credential, and adds a step 2b that lists the project's secrets by name to distinguish a bad token from a missing secret from a misnamed one. (A misnamed secret is worth catching on its own: a secret's name *is* the injected variable name, so the server starts with that variable silently unset.) Reported by Greptile on PR #571.
+- **Phase 3d's four-provider probe died on its first line under Linux.** `bws` joins the command argv and runs it through `sh -c`, which is dash on most Linux boxes. The probe body opened `set -uo pipefail`; dash rejects `-o pipefail`, and because `set` is a POSIX special builtin, a failing `set` exits a non-interactive shell outright — so none of the four checks ran. It survived review because it previously ran under an explicit `bash -c`, which the migration dropped, and because macOS `/bin/sh` is bash in POSIX mode and accepts `pipefail`. Now `set -u`, with a comment saying why. Nothing needed `pipefail`: every pipeline ends in `jq -e ... && echo 1 || echo 0`, so `&&` already tests jq's status.
+- Stale references to the deleted `bw-run.sh` era inside files this migration rewrote — `BW_SESSION` in a troubleshooting step whose own Step 2b no longer mentions it, "Bitwarden item"/"the wrapper", an inner `bash -c` that no longer exists, and `bw list items --search tam-map-` as a provisioning check.
+- Two mapping tables contradicted the naming rule this migration introduces. `scripts/tam-map/README.md` renamed its header to "Secrets Manager secret" but kept the old `tam-map-*` vault item names, and `tools/integrations/brite-enrichment.md` still said "Bitwarden item" and listed 7 rows for an 8-secret project (`ENRICHMENT_API_TOKEN` was missing). An admin provisioning from either table would have created secrets that inject the wrong variable names.
+- `CONTRIBUTING.md § Plugin secret-config canon` credited ADR-010 for the decision ADR-044 records, and never linked ADR-044 despite ADR-044 naming that section as its companion doc. It also dropped `jq` from the stated requirements while three files still pipe through it; `jq` is now documented as a setup-and-verification requirement, not an MCP-runtime one.
+
 ### Changed
+
+- **Secrets now come from Bitwarden Secrets Manager via `bws run` (ADR-044).** `bw-run.sh` and its test suite are deleted. The four secret-bearing MCP servers and the skills' Python CLI call sites authenticate with a machine-account access token scoped to two projects — `brite-claude-tam-map` (7 secrets) and `brite-claude-enrichment` (8). No vault master password, no `bw unlock`, no `BW_SESSION`.
+
+  **Required operator action — this breaks existing installs until done:**
+  1. Install `bws`. There is **no Homebrew formula**; `brew install bitwarden-cli` gives you `bw`, a different tool. Use Bitwarden's script or the [`bitwarden/sdk-sm` releases](https://github.com/bitwarden/sdk-sm/releases).
+  2. Get a machine-account token from your Brite admin and `export BWS_ACCESS_TOKEN=...` in your shell profile. Once per machine, not per session.
+  3. Re-launch Claude Code from a shell that has it. Run `/marketing:setup-tam-map` to verify.
+
+  Two projects rather than one is forced, not preferred: a secret's name *is* its environment variable name, and `PROSPEO_API_KEY` / `ICYPEAS_API_KEY` are each fed from a different vault item depending on caller, so one project cannot hold both. Note also that `bws run --project-id` injects **every** secret in the project — there is no per-key selection, so each server sees its whole project.
+
+  Why the wrapper was removed rather than hardened: an attempt to keep it (PR #565) produced eight security findings across nine review rounds, five of them introduced by the hardening itself. All traced to one inversion — a broker holding the key to the entire vault in order to fetch eleven vendor API keys. ADR-044 records the analysis.
 - **ADR-008 default-flip executed (BC-16888)** — `enrichment_provider` auto-detect now resolves `brite_mcp` first when the brite-enrichment MCP is registered (was: opt-in only; auto-detect went `brite_cli` → `blitz_waterfall`). Engine-maturity sign-off recorded as an operator decision (2026-07-08) on BC-16888; the fail-open fall-through to `blitz_waterfall` is unchanged. ADR-008 + `tam-mapping` + `list-building` updated in lockstep (`plugin.json` and `/marketing:tam-map` already described the target order). BC-13096/BC-6322 continue as hardening tracks.
 
 ### Added

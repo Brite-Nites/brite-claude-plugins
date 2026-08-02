@@ -15,33 +15,35 @@
     },
     "spider": {
       "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "command": "bws",
       "args": [
-        "SPIDER_API_KEY=tam-map-spider-api-key",
+        "run",
+        "--project-id",
+        "627506e6-db07-46b9-8b4d-b498016a0e17",
         "--",
-        "npx",
-        "-y",
-        "spider-cloud-mcp@2.1.1"
+        "exec npx -y spider-cloud-mcp@2.1.1"
       ]
     },
     "aiark": {
       "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "command": "bws",
       "args": [
-        "AIARK_API_KEY=tam-map-aiark-api-key",
+        "run",
+        "--project-id",
+        "627506e6-db07-46b9-8b4d-b498016a0e17",
         "--",
-        "node",
-        "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/aiark-mcp.js"
+        "exec node '${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/aiark-mcp.js'"
       ]
     },
     "discolike": {
       "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "command": "bws",
       "args": [
-        "DISCOLIKE_API_KEY=tam-map-discolike-api-key",
+        "run",
+        "--project-id",
+        "627506e6-db07-46b9-8b4d-b498016a0e17",
         "--",
-        "node",
-        "${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js"
+        "exec node '${CLAUDE_PLUGIN_ROOT}/scripts/tam-map/discolike-mcp.js'"
       ]
     },
     "gbrain-team": {
@@ -53,21 +55,13 @@
     },
     "enrichment": {
       "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/bw-run.sh",
+      "command": "bws",
       "args": [
-        "OPENMART_API_KEY=enrichment-openmart-api-key",
-        "PROSPEO_API_KEY=enrichment-prospeo-api-key",
-        "ICYPEAS_API_KEY=enrichment-icypeas-api-key",
-        "LEADMAGIC_API_KEY=enrichment-leadmagic-api-key",
-        "DATAGMA_API_KEY=enrichment-datagma-api-key",
-        "BOUNCEBAN_API_KEY=enrichment-bounceban-api-key",
-        "EMAILGUARD_API_KEY=enrichment-emailguard-api-key",
-        "ENRICHMENT_API_TOKEN=enrichment-api-token",
+        "run",
+        "--project-id",
+        "f18972cc-185f-490a-91ac-b498016a1d36",
         "--",
-        "uvx",
-        "--from",
-        "git+https://github.com/Brite-Nites/brite-data-platform@0ac5389cc198a29a7f68c710f0814cf645c31666#subdirectory=tools/enrichment-mcp",
-        "brite-enrichment-mcp"
+        "exec uvx --from 'git+https://github.com/Brite-Nites/brite-data-platform@0ac5389cc198a29a7f68c710f0814cf645c31666#subdirectory=tools/enrichment-mcp' brite-enrichment-mcp"
       ],
       "env": {
         "USE_MOCK_PROVIDERS": "False",

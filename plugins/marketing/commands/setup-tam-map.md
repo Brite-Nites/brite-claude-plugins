@@ -1,9 +1,9 @@
 ---
-description: Guided setup for the tam-map pipeline (Spider.cloud + AI Ark + Discolike MCPs + IcyPeas/BlitzAPI/Prospeo/MillionVerifier CLI scripts). Three phases — Detect, Unlock & bootstrap, Verify — no shell-profile edits required. The 7 third-party API keys live in Bitwarden (Engineering collection) and are fetched at every MCP-process spawn by `plugins/marketing/scripts/bw-run.sh`. Vault is the single source of truth; rotated values propagate at the next MCP-process spawn (re-launch Claude Code — `/reload-plugins` only reloads plugin metadata, not MCP server processes; measured BC-6906 T14). Use when tam-mapping tools are missing, a skill errors with "tool not found" for spider/aiark/discolike, or on first-time tam-map onboarding.
+description: Guided setup for the tam-map pipeline (Spider.cloud + AI Ark + Discolike MCPs + IcyPeas/BlitzAPI/Prospeo/MillionVerifier CLI scripts). Three phases — Detect, Bootstrap, Verify. The 7 third-party API keys live in the Bitwarden Secrets Manager project `brite-claude-tam-map` and are injected at every MCP-process spawn by `bws run`. Secrets Manager is the single source of truth; rotated values propagate at the next MCP-process spawn (re-launch Claude Code — `/reload-plugins` only reloads plugin metadata, not MCP server processes; measured BC-6906 T14). Use when tam-mapping tools are missing, a skill errors with "tool not found" for spider/aiark/discolike, or on first-time tam-map onboarding.
 allowed-tools: Bash, Read, AskUserQuestion
 ---
 
-<!-- eval-waiver: Three-phase setup and health wizard for the tam-map pipeline (Bitwarden unlock, npm and pip bootstrap, MCP registration, then a per-provider GREEN/DEGRADED/RED verify board); its logic is live-state diagnosis (bw status, dual-path probes, authenticated curls to seven vendor APIs whose pass or fail depends on real keys, vendor uptime, and credit balances), with no hermetic artifact. -->
+<!-- eval-waiver: Three-phase setup and health wizard for the tam-map pipeline (machine-account token check, npm and pip bootstrap, MCP registration, then a per-provider GREEN/DEGRADED/RED verify board); its logic is live-state diagnosis (bws auth probe, dual-path probes, authenticated curls to seven vendor APIs whose pass or fail depends on real keys, vendor uptime, and credit balances), with no hermetic artifact. -->
 
 # /marketing:setup-tam-map
 
@@ -11,7 +11,7 @@ Execute the phases below sequentially. Use `AskUserQuestion` at each numbered ch
 
 Seven third-party API keys total: `SPIDER_API_KEY`, `AIARK_API_KEY`, `DISCOLIKE_API_KEY`, `ICYPEAS_API_KEY`, `BLITZAPI_KEY`, `PROSPEO_API_KEY`, `MILLIONVERIFIER_API_KEY`. Three MCPs are plugin-scoped: `spider`, `aiark`, `discolike`. Four other providers (IcyPeas, BlitzAPI, Prospeo, MillionVerifier) are CLI-only — they ship as Python scripts under `plugins/marketing/scripts/tam-map/`.
 
-Pattern: plugin-scoped stdio MCPs + Bitwarden-backed credential broker (`plugins/marketing/scripts/bw-run.sh`). The wrapper resolves each `KEY=tam-map-<item>` argument against the Engineering vault at every spawn and `exec`s the wrapped command. Vault is the single source of truth — rotated values reach a running MCP only on its next process spawn, which currently means re-launching Claude Code (`/reload-plugins` reloads plugin metadata but does NOT re-spawn MCP server processes; measured BC-6906 T14). Pre-req: `BW_SESSION` exported in the shell that launches Claude Code. For background see `docs/research/tam-map-port-policy.md` § 1, `docs/designs/BC-6906-bw-run-prod-migration.md`, and `CONTRIBUTING.md § Plugin secret-config canon`.
+Pattern: plugin-scoped stdio MCPs + Bitwarden Secrets Manager (`bws run`, ADR-044). Each server names a project; `bws` injects that project's secrets and runs the command. Secrets Manager is the single source of truth — rotated values reach a running MCP only on its next process spawn, which currently means re-launching Claude Code (`/reload-plugins` reloads plugin metadata but does NOT re-spawn MCP server processes; measured BC-6906 T14). Pre-req: `BWS_ACCESS_TOKEN` exported in the shell that launches Claude Code — set once per machine, not per session. For background see `docs/research/tam-map-port-policy.md` § 1 and `CONTRIBUTING.md § Plugin secret-config canon`.
 
 ---
 
@@ -21,18 +21,18 @@ Probe state, then route to the next phase based on what's missing. Run all check
 
 ```bash
 # Dependencies
-command -v bw >/dev/null && echo "bw=set" || echo "bw=MISSING"
-command -v jq >/dev/null && echo "jq=set" || echo "jq=MISSING"
+command -v bws >/dev/null && echo "bws=set" || echo "bws=MISSING"
+command -v jq  >/dev/null && echo "jq=set"  || echo "jq=MISSING"
 
-# Vault state (unauthenticated | locked | unlocked | MISSING)
-if command -v bw >/dev/null; then
-  bw status 2>/dev/null | jq -r '"vault=" + .status' 2>/dev/null || echo "vault=MISSING"
+# Secrets Manager auth (does the exported token actually work?)
+if command -v bws >/dev/null && [ -n "${BWS_ACCESS_TOKEN:-}" ]; then
+  bws project list >/dev/null 2>&1 && echo "auth=ok" || echo "auth=FAILED"
 else
-  echo "vault=MISSING"
+  echo "auth=MISSING"
 fi
 
-# Session token
-[ -n "${BW_SESSION:-}" ] && echo "session=set" || echo "session=MISSING"
+# Machine-account token (one-time per machine, not per session)
+[ -n "${BWS_ACCESS_TOKEN:-}" ] && echo "token=set" || echo "token=MISSING"
 
 # MCP registration state
 claude mcp list 2>&1 | grep -E "spider|aiark|discolike" || echo "mcps=NONE_REGISTERED"
@@ -65,35 +65,33 @@ fi
 
 Interpret the output and route:
 
-- `bw=MISSING` or `jq=MISSING` or `npm=MISSING` or `pip=MISSING` → go to **Phase 2, Step 2a** (one-time bootstrap).
-- `vault=unauthenticated` → go to **Phase 2, Step 2a** (need `bw login`).
-- `vault=locked` or `session=MISSING` → go to **Phase 2, Step 2b** (per-session unlock).
-- If `vault=unlocked` + `session=set`, skip Step 2b — only Step 2a (one-time bootstrap, if any one-time gap exists) and Phase 3 (verify) remain.
-- All green (`bw`, `jq`, `npm`, `pip`, `vault=unlocked`, `session=set`, all three MCPs `✓ Connected`) → jump to **Phase 3 — Verify**.
-  - Bitwarden item provisioning (the 7 `tam-map-*` items) is checked only in Phase 2a's admin-provisioning step on first-time onboarding; the count probe is deferred to save a 3.2s `bw list items --search` round-trip on already-onboarded machines.
-  - If Phase 3 verify shows MCPs failing to connect, the most likely cause is missing Bitwarden items — re-route to Phase 2a's admin-provisioning check.
+- `bws=MISSING` or `jq=MISSING` or `npm=MISSING` or `pip=MISSING` → go to **Phase 2, Step 2a** (one-time bootstrap).
+- `token=MISSING` or `auth=MISSING` → go to **Phase 2, Step 2b** (one-time token export).
+- `auth=FAILED` → the token is present but rejected: revoked, expired, or copied incompletely. Go to **Phase 2, Step 2b** and get a fresh one.
+- All green (`bws`, `jq`, `npm`, `pip`, `token=set`, `auth=ok`, all three MCPs `✓ Connected`) → jump to **Phase 3 — Verify**.
+  - Secret provisioning (the 7 secrets in `brite-claude-tam-map`) is checked only in Phase 2a's admin-provisioning step on first-time onboarding; the count probe is deferred to save a round-trip on already-onboarded machines.
+  - If Phase 3 verify shows MCPs failing to connect, the most likely cause is missing secrets — re-route to Phase 2a's admin-provisioning check.
 
 If multiple categories are red, run Step 2a first, then Step 2b, then Phase 3.
 
-## Phase 2 — Unlock & bootstrap
+## Phase 2 — Bootstrap
 
-Two sub-steps. Skip Step 2a entirely if the Phase 1 probe shows everything one-time is already in place; you only need it on first-time onboarding (or after a Bitwarden vault provisioning change).
+Two sub-steps, both one-time. Skip Step 2a entirely if the Phase 1 probe shows everything is already in place; you only need it on first-time onboarding (or after a Secrets Manager provisioning change).
 
 ### Step 2a [ONE-TIME, skip if done]
 
 Tell the user: "Run these one-time commands in a terminal outside Claude Code. Skip any block whose check in Phase 1 already showed green."
 
-**1. Install Bitwarden CLI and jq** (skip if Phase 1 showed `bw=set` and `jq=set`):
+**1. Install the Secrets Manager CLI and jq** (skip if Phase 1 showed `bws=set` and `jq=set`).
+
+`bws` has **no Homebrew formula** — `brew install bitwarden-cli` gives you `bw`, a different tool. Install it from Bitwarden's script or the [`bitwarden/sdk-sm` releases](https://github.com/bitwarden/sdk-sm/releases), then put the binary on your `PATH`:
 
 ```bash
-brew install bitwarden-cli jq
+brew install jq          # jq only
+bws --version            # confirm bws is on PATH after installing it
 ```
 
-**2. Authenticate with Bitwarden** (skip if Phase 1 showed `vault=locked` or `vault=unlocked` — `bw login` is only needed when status is `unauthenticated`):
-
-```bash
-bw login
-```
+**2. There is no login step.** Authentication is the machine-account token in Step 2b. Nothing here needs your Bitwarden account password.
 
 **3. Install Node deps for the 2 stdio wrappers** (skip if Phase 1 showed `npm=set`).
 
@@ -136,47 +134,59 @@ python3 -m pip install -r plugins/marketing/scripts/tam-map/requirements.txt
 ```
 
 Ask via `AskUserQuestion`:
-- Question: "Dependencies installed and `bw login` complete?"
+- Question: "Dependencies installed (`bws`, `jq`, npm, pip)?"
 - Options: "Yes" / "Errors — need help"
 
 If "Errors — need help" → halt and triage. Common causes: outdated `npm` (`npm install -g npm@latest` and retry), outdated `pip` (`python3 -m pip install --upgrade pip`), Python older than 3.10 (upstream verified against 3.11+), or Homebrew not on PATH.
 
-**Admin-provisioning check.** The 7 expected Bitwarden items in the Engineering collection are:
+**Admin-provisioning check.** The 7 expected secrets live in the Secrets Manager project `brite-claude-tam-map`. Their names are the environment variable names, exactly:
 
-- `tam-map-spider-api-key`
-- `tam-map-aiark-api-key`
-- `tam-map-discolike-api-key`
-- `tam-map-icypeas-api-key`
-- `tam-map-blitzapi-key`
-- `tam-map-prospeo-api-key`
-- `tam-map-millionverifier-api-key`
+- `SPIDER_API_KEY`
+- `AIARK_API_KEY`
+- `DISCOLIKE_API_KEY`
+- `ICYPEAS_API_KEY`
+- `BLITZAPI_KEY`
+- `PROSPEO_API_KEY`
+- `MILLIONVERIFIER_API_KEY`
 
-Each must exist with a non-empty value in its login.password field. Probe the count automatically (only runs here, not in Phase 1's happy path):
+Probe the count automatically (only runs here, not in Phase 1's happy path):
 
 ```bash
-items=$(bw list items --search tam-map- 2>/dev/null | jq 'length')
+pid=$(bws project list 2>/dev/null | jq -r '.[]|select(.name=="brite-claude-tam-map")|.id')
+items=$(bws secret list "$pid" 2>/dev/null | jq 'length')
 echo "items=$items"
 ```
 
-If `items < 7`, the count below 7 directly identifies missing provisioning. Halt with: "Reach out to your Brite admin for provisioning. The 7 expected items are listed above. Re-run `/marketing:setup-tam-map` after provisioning." Exit.
+If `items < 7`, the count below 7 directly identifies missing provisioning. Halt with: "Reach out to your Brite admin for provisioning. The 7 expected secrets are listed above. Re-run `/marketing:setup-tam-map` after provisioning." Exit.
 
 If `items >= 7`, the count is sufficient — proceed to Step 2b (or Phase 3 if Step 2b is already satisfied).
 
-### Step 2b [PER-SESSION]
+### Step 2b [ONE-TIME PER MACHINE]
 
-Tell the user: "Open a fresh terminal *outside* Claude Code and run:
+Unlike the previous Bitwarden broker, this is **not** per-session. A machine-account token does not lock or expire mid-session, so it is set once and forgotten.
+
+Tell the user: "Add this to your shell profile (`~/.zshrc` or `~/.bashrc`), then open a fresh terminal:
 
 ```bash
-export BW_SESSION=\"$(bw unlock --raw)\"
+export BWS_ACCESS_TOKEN='<your machine-account token>'
 ```
 
-Answer the prompt with your Bitwarden master password. Then launch Claude Code from that same shell so it inherits `BW_SESSION`. The wrapper `plugins/marketing/scripts/bw-run.sh` reads `BW_SESSION` at every MCP/CLI spawn; without it, every MCP will fail to authenticate."
+Get the token from your Brite admin — it is issued once per machine account in Secrets Manager and cannot be retrieved after creation. Then launch Claude Code from a shell that has it."
+
+Probe whether it is already present:
+
+```bash
+[ -n "${BWS_ACCESS_TOKEN:-}" ] && echo "token=set" || echo "token=MISSING"
+bws project list >/dev/null 2>&1 && echo "auth=ok" || echo "auth=FAILED"
+```
+
+`token=set` with `auth=FAILED` means the token is present but rejected — it has been revoked, has expired, or was copied incompletely.
 
 Ask via `AskUserQuestion`:
-- Question: "Did Claude Code launch from a shell where you exported `BW_SESSION`?"
+- Question: "Did Claude Code launch from a shell where `BWS_ACCESS_TOKEN` is exported?"
 - Options: "Yes" / "No, need to retry"
 
-If "No, need to retry" → halt with: "Quit Claude Code, return to your terminal, run `export BW_SESSION=\"$(bw unlock --raw)\"`, then re-launch Claude Code from that same shell. Re-run `/marketing:setup-tam-map` once Claude Code is back up."
+If "No, need to retry" → halt with: "Quit Claude Code, add the export to your shell profile, open a fresh terminal, then re-launch Claude Code from it. Re-run `/marketing:setup-tam-map` once Claude Code is back up."
 
 ## Phase 3 — Verify
 
@@ -200,8 +210,18 @@ Branching:
 
 - All three show `✓ Connected` → continue to Phase 3b.
 - Any show `✗ Failed to connect` → troubleshooting loop:
-  1. Ask user to open a fresh terminal and run `for v in SPIDER_API_KEY AIARK_API_KEY DISCOLIKE_API_KEY; do printf "%s=%s\n" "$v" "${!v:+set}"; done` — expect `set` for all three.
-  2. If any prints empty → `BW_SESSION` didn't reach the shell that launched Claude Code, or the wrapper couldn't resolve the item against the vault. Re-launch Claude Code from a shell where you exported `BW_SESSION` (Step 2b), then re-run Phase 3.
+  1. Ask user to open a fresh terminal and check the **broker credential**, not the provider keys: `printf "BWS_ACCESS_TOKEN=%s\n" "${BWS_ACCESS_TOKEN:+set}"` — expect `set`.
+
+     > Do **not** check for `SPIDER_API_KEY` / `AIARK_API_KEY` / `DISCOLIKE_API_KEY` in the user's shell. `bws` injects those into the **child process** it spawns, never into the parent. A correctly configured developer has only `BWS_ACCESS_TOKEN`, so probing for the provider keys reports empty on a healthy machine and sends you down the wrong branch.
+
+  2. If `BWS_ACCESS_TOKEN` prints empty → it didn't reach the shell that launched Claude Code. Re-launch Claude Code from a shell where you exported it (Step 2b), then re-run Phase 3.
+  2b. If it is `set`, confirm the token can actually read the project and that the secrets exist — this is the check that replaces the old per-key shell probe:
+
+     ```bash
+     bws secret list "$(bws project list | jq -r '.[]|select(.name=="brite-claude-tam-map")|.id')" | jq -r '.[].key'
+     ```
+
+     Expect 7 names, matching the env vars exactly (`SPIDER_API_KEY`, `AIARK_API_KEY`, `DISCOLIKE_API_KEY`, `ICYPEAS_API_KEY`, `BLITZAPI_KEY`, `PROSPEO_API_KEY`, `MILLIONVERIFIER_API_KEY`). An auth error means the token is bad or revoked; a short list means the secret is missing from the project (re-run Phase 2a's admin-provisioning check); a name mismatch means the secret is misnamed, and since a secret's name **is** the injected variable name, the server will start with that variable unset.
   3. If all `set` but Spider still fails → confirm the package is reachable: `npx -y spider-cloud-mcp --help` (network call to npm). If that errors, npm is the issue, not the key.
   4. If all `set` but `aiark` or `discolike` fail → those wrappers live at `plugins/marketing/scripts/tam-map/{aiark,discolike}-mcp.js`. Run the wrapper directly: `node plugins/marketing/scripts/tam-map/aiark-mcp.js` — it should print a stdio handshake or error to stderr if the key is bad. The wrappers were ported from upstream tam-map and carry an `!! VERIFY BEFORE USING !!` warning about endpoint paths; if you hit a 4xx error, the wrapper may need its endpoints updated against `docs.ai-ark.com/reference` (a Brite-known limitation tracked in the wrapper source).
 
@@ -218,7 +238,7 @@ For each connected MCP, call a tool that exercises a **real, filtered** request:
   - Second probe: `aiark_similarity` with `{"seed_domains": ["stripe.com"], "limit": 1}` → must return ≥1 record.
 - `discolike`: call `discolike_search` with a 1-result seed → must return ≥1 record.
 
-If any errors with `401` / `403` / `Invalid API key`, the Bitwarden item value is wrong. Update it in Bitwarden, then re-launch Claude Code so the affected MCP server re-spawns through `bw-run.sh` with the corrected value (`/reload-plugins` reloads plugin metadata only — it does NOT re-spawn MCP server processes; measured BC-6906 T14). Re-run `/marketing:setup-tam-map`'s Phase 3 to verify. If a probe **authenticates (no 401/403) but returns the unfiltered default or empty data**, that is a request-shape/endpoint drift in the wrapper — file + repair it (the BC-7157 / BC-12128 fixes are the model) rather than treating the run as green.
+If any errors with `401` / `403` / `Invalid API key`, the secret's value is wrong. Update it in Secrets Manager, then re-launch Claude Code so the affected MCP server re-spawns through `bws run` with the corrected value (`/reload-plugins` reloads plugin metadata only — it does NOT re-spawn MCP server processes; measured BC-6906 T14). Re-run `/marketing:setup-tam-map`'s Phase 3 to verify. If a probe **authenticates (no 401/403) but returns the unfiltered default or empty data**, that is a request-shape/endpoint drift in the wrapper — file + repair it (the BC-7157 / BC-12128 fixes are the model) rather than treating the run as green.
 
 ### Phase 3c — CLI script check (liveness only)
 
@@ -237,7 +257,7 @@ If any of the 4 `--help` checks fails:
 - Missing Python deps → `python3 -m pip install -r plugins/marketing/scripts/tam-map/requirements.txt`.
 - Script-level error → open the script, read the error message; the wrappers ship verbatim from upstream tam-map@`9f5c72e74b` so a runtime error likely means an upstream bug.
 
-If a script's `--help` passes but a real invocation fails with a missing-env-var error, re-check that the corresponding Bitwarden item exists with a non-empty value (re-run Phase 2a's admin-provisioning check), then re-launch Claude Code so the wrapper picks up the corrected value on the next spawn.
+If a script's `--help` passes but a real invocation fails with a missing-env-var error, re-check that the corresponding Secrets Manager secret exists with a non-empty value (re-run Phase 2a's admin-provisioning check), then re-launch Claude Code so `bws run` picks up the corrected value on the next spawn.
 
 ### Phase 3d — CLI live round-trip (correctness)
 
@@ -246,16 +266,16 @@ If a script's `--help` passes but a real invocation fails with a missing-env-var
 - **blitzapi** (`domain-to-linkedin`) and **icypeas** (`find-companies`) are probed on their **real enrichment surfaces** — green proves the **current request-shape still works** (request-shape correctness — the probe confirms the endpoint accepts the request and returns its expected envelope, not that the data is non-empty; these two are the ones that actually drift).
 - **prospeo** (`account-information`) and **millionverifier** (`/credits`) are probed on cheap **auth/account side-surfaces** — green proves only that the **key authenticates and the account is reachable** (liveness++), **not** that their real enrichment/verify request-shape is intact. This is deliberate: those two aren't drifting, and a credit-free re-runnable smoke is an explicit design goal (cost note below). If either ever drifts, promote its probe to a real surface then — the way blitzapi/icypeas earned theirs.
 
-Run via `bw-run.sh` (one invocation, all four keys):
+Run via `bws run` (one invocation — the project supplies all four keys):
 
 ```bash
-plugins/marketing/scripts/bw-run.sh \
-  BLITZAPI_KEY=tam-map-blitzapi-key \
-  PROSPEO_API_KEY=tam-map-prospeo-api-key \
-  MILLIONVERIFIER_API_KEY=tam-map-millionverifier-api-key \
-  ICYPEAS_API_KEY=tam-map-icypeas-api-key \
-  -- bash -c '
-set -uo pipefail
+bws run --project-id "$(bws project list | jq -r '.[]|select(.name=="brite-claude-tam-map")|.id')" -- '
+set -u
+# POSIX sh only — `bws` joins argv and runs the body through `sh -c`, which is
+# dash on most Linux boxes. Do NOT add `-o pipefail`: dash rejects it, and `set`
+# is a special builtin, so the whole board would die on this line. Nothing here
+# needs it — every pipeline ends in `jq -e ... && echo 1 || echo 0`, so `&&`
+# already tests jq's status.
 pass=0; fail=0; known=0
 # A label carrying a [known: BC-####] tag is a drift already scoped for repair:
 # count it amber (known), never a surprise red. The glob must match the tag mid-string.
@@ -299,7 +319,7 @@ fi
 
 The script runs **all four** providers and reports a full board (no short-circuit). A `✗` (surprise) is a **correctness** failure, not a missing-key problem: the provider authenticated (no 401/403) but its endpoint or request shape drifted — the exact silent-failure class BC-7157 (aiark) and BC-12128 (BlitzAPI) fixed. A `⚠` is the **same kind of break but already tracked** under a `[known: BC-####]` tag (amber, not a surprise). Repair (or wait out) the wrapper and re-run; **do not proceed on a `✗`.** (A transient vendor outage or an `-m` timeout also surfaces as `✗` with an empty body on an untagged provider — re-run once before concluding a request-shape drift. Caveat: on a `[known:]`-tagged provider *any* failure, including an outage, shows as `⚠`, so re-run there too to tell a real outage from the tracked break.)
 
-(The four surfaces are deliberately cheap: MillionVerifier `/credits` and Prospeo `account-information` cost nothing; BlitzAPI `domain-to-linkedin` and IcyPeas `find-companies` (`size:1`) cost ~1 credit each. This keeps the smoke re-runnable without burning the per-key credit budget. Note: all four keys are expanded inside the inner `bash -c`, so the plaintext never enters your shell history — but the resolved value does sit in the `curl` process arguments (visible via `ps` / `/proc` / command-line audit logs) for the duration of each call, so treat the probe command as sensitive. MillionVerifier additionally rides its key in the URL query string (`?api=…`, vendor-mandated; the other three use a header), so it can also reach network/proxy access logs — the header-based three do not.)
+(The four surfaces are deliberately cheap: MillionVerifier `/credits` and Prospeo `account-information` cost nothing; BlitzAPI `domain-to-linkedin` and IcyPeas `find-companies` (`size:1`) cost ~1 credit each. This keeps the smoke re-runnable without burning the per-key credit budget. Note: all four keys are expanded inside the shell `bws` spawns for the probe body, not by your own shell, so the plaintext never enters your shell history — but the resolved value does sit in the `curl` process arguments (visible via `ps` / `/proc` / command-line audit logs) for the duration of each call, so treat the probe command as sensitive. MillionVerifier additionally rides its key in the URL query string (`?api=…`, vendor-mandated; the other three use a header), so it can also reach network/proxy access logs — the header-based three do not.)
 
 ---
 
@@ -316,15 +336,15 @@ If you see either symptom after no intentional config change, this is almost alw
 
 **Remedy:** re-run `/marketing:setup-tam-map`. Phase 1's dual-path probes will detect `npm=MISSING` and/or `pip=MISSING` against the new marketplace clone path and route you to Step 2a's marketplace-clone install commands. Phase 1's worktree-relative paths stay green for dev mode; the new probes cover prod mode.
 
-(Bitwarden items themselves live in the Engineering vault and are unaffected by auto-update — you do NOT need to re-run Phase 2a's admin-provisioning check unless `bw list items --search tam-map-` returns fewer than 7 rows.)
+(Secrets themselves live in Secrets Manager and are unaffected by auto-update — you do NOT need to re-run Phase 2a's admin-provisioning check unless `bws secret list "$TAM_PID"` returns fewer than 7 secrets.)
 
 (Spider's MCP stays connected through auto-updates because `npx -y spider-cloud-mcp` resolves via npx's global cache, not local `node_modules/`. Aiark/discolike are local Node wrappers, hence the divergence.)
 
 ---
 
-tam-map is set up. The wrapper `plugins/marketing/scripts/bw-run.sh` fetches values from Bitwarden at every MCP-process spawn. Two scenarios to be aware of:
+tam-map is set up. `bws run` fetches the project's secrets at every MCP-process spawn. Two scenarios to be aware of:
 
-- **Vault lock mid-session** (~30s recovery): re-run `export BW_SESSION="$(bw unlock --raw)"` in your launching shell, then re-launch Claude Code.
-- **Rotated Bitwarden value**: the running MCP holds the value it was spawned with; tool calls reuse the same process. To pick up the new value, re-launch Claude Code (`/reload-plugins` reloads plugin metadata only; it does NOT re-spawn MCP server processes — measured BC-6906 T14). Per-server `claude mcp restart <name>` may exist in newer Claude Code versions; check `claude mcp --help`.
+- **Token revoked or expired**: MCPs stop spawning. Get a fresh token from your Brite admin, update your shell profile, and re-launch Claude Code. There is no mid-session vault lock to recover from any more.
+- **Rotated secret value**: the running MCP holds the value it was spawned with; tool calls reuse the same process. To pick up the new value, re-launch Claude Code (`/reload-plugins` reloads plugin metadata only; it does NOT re-spawn MCP server processes — measured BC-6906 T14). Per-server `claude mcp restart <name>` may exist in newer Claude Code versions; check `claude mcp --help`.
 
 See `plugins/marketing/scripts/tam-map/README.md` for the canonical CLI invocation pattern, and `CONTRIBUTING.md § Plugin secret-config canon` for the wrapper's broader rationale.
