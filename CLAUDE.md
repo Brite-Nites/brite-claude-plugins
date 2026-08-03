@@ -25,7 +25,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full script reference, `plugin.js
 
 ## Key References
 
-- **Memory:** `memory/MEMORY.md` — session-spanning knowledge (project status, recent decisions, session history). Always loaded at session start; check it before asking about prior work.
+- **Memory:** `memory/MEMORY.md` — session-spanning knowledge (project status, recent decisions, session history). Check it at session start, before asking about prior work.
 - **Skill ↔ tool integration pattern:** [`docs/guides/skill-tool-integration-pattern.md`](docs/guides/skill-tool-integration-pattern.md) — how skills reference MCP servers. Apply the 6-item PR checklist before merging any skill that calls an external service.
 - **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md) — plugin resolution, runtime flow, hook execution, full skill routing catalog.
 - **Marketing skill porting:** [`docs/guides/marketing-skill-porting.md`](docs/guides/marketing-skill-porting.md) — upstream `coreyhaines31/marketingskills` → `plugins/marketing/` conventions.
