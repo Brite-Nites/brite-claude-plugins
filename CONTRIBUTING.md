@@ -222,6 +222,52 @@ Stdio MCPs and CLI scripts read credentials from OS environment variables — th
 
 **Exception — HTTP MCPs.** This canon applies to **stdio MCPs and CLI scripts only.** For HTTP MCPs with credentialed `Authorization: Bearer ${...}` headers, both `${ENV_VAR}` and `${user_config.*}` substitution into headers are broken in current Claude Code (BC-5551 / upstream issues [#6204](https://github.com/anthropics/claude-code/issues/6204), [#9427](https://github.com/anthropics/claude-code/issues/9427)). Ship user-level registration with guided onboarding (the Email Bison pattern at `/marketing:setup-email-bison`) until upstream lands fixes — see § Email Bison MCP Onboarding above.
 
+## Team gbrain credentials
+
+`gbrain-team` is a **stdio** server, so the canon above covers how its credential
+reaches the process. What the canon does not cover is *which* credential: this
+server needs a short-lived OAuth token rather than a static API key, so it is
+brokered rather than injected.
+`scripts/gbrain-team-broker.sh` exchanges an OAuth client for a short-lived
+bearer token at spawn time, then bridges stdio to the HTTP endpoint via
+`mcp-remote`. Decision record: [ADR-045](docs/decisions/045-gbrain-broker-env-oauth-client.md).
+
+**Export the client in your shell profile**, next to `BWS_ACCESS_TOKEN`:
+
+1. Open the Bitwarden item `Brite team gbrain — my client`. Its **username** is
+   the client id; its **password** is the client secret.
+2. Add both to your shell profile:
+   ```sh
+   export GBRAIN_CLIENT_ID=...
+   export GBRAIN_CLIENT_SECRET=...
+   ```
+3. If you have gbrain **write** access (`/workflows:ship` and
+   `/workflows:review` save results back to the brain), also export the separate
+   write pair from `Brite team gbrain — write OAuth client`:
+   ```sh
+   export GBRAIN_WRITE_CLIENT_ID=...
+   export GBRAIN_WRITE_CLIENT_SECRET=...
+   ```
+4. Relaunch Claude Code from a shell that has them. MCP servers read the
+   environment at spawn.
+5. If your personal client hasn't been issued yet (BC-11758), export the shared
+   Engineering client's values instead — open tier only.
+
+**The read and write pairs are separate on purpose.** `--write` reads
+`GBRAIN_WRITE_CLIENT_*` and never falls back to the read pair. A missing write
+client fails loudly at spawn rather than authenticating as a read identity and
+surfacing much later as a `put_page` 403. Do not "simplify" this by collapsing
+the two pairs.
+
+**Editing the broker means editing six files.** `gbrain-team-broker.sh` is
+duplicated byte-for-byte into `cadence`, `core`, `flow-architecture`,
+`marketing`, `revops`, and `workflows`, because each plugin's `.mcp.json` execs
+its own `${CLAUDE_PLUGIN_ROOT}` copy. Change `plugins/core/scripts/` first, copy
+it to the other five, and bump all six plugin versions in the same commit — the
+script ships in the version-keyed plugin cache, so an unbumped plugin keeps
+running the old broker. `validate.sh` §2b-gbrain fails on any drift. The
+single-source fix (`plugins/_shared/`) is tracked as BC-11757.
+
 ## ADR Convention
 
 Architecture Decision Records live in `docs/decisions/NNN-kebab-title.md`. They are imported into CLAUDE.md via individual `@` imports (directory imports are not supported). The `/workflows:architecture-decision` command generates ADRs and auto-appends the import. `/workflows:project-start` generates ADRs for all major tech decisions made during the interview.

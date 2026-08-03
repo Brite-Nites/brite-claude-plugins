@@ -1,28 +1,33 @@
 #!/usr/bin/env bash
-# gbrain-team-broker.sh — Bitwarden + OAuth credential broker for the team gbrain
+# gbrain-team-broker.sh — OAuth credential broker for the team gbrain
 # HTTP MCP endpoint (BC-11006, the §5.5 activation of BC-10520).
 #
 # At MCP spawn time:
-#   1. Read client_id (.login.username) + client_secret (.login.password) from
-#      Bitwarden. Read mode (default) resolves the teammate's personal item,
-#      falling back to the shared Engineering item "Brite team gbrain — plugin
-#      OAuth client". Write mode (--write, BC-12113) resolves ONLY the
-#      Engineering item "Brite team gbrain — write OAuth client" — no fallback:
-#      a write identity must never silently downgrade to a read identity (the
+#   1. Read client_id + client_secret from the environment. Read mode (default)
+#      uses GBRAIN_CLIENT_ID / GBRAIN_CLIENT_SECRET. Write mode (--write,
+#      BC-12113) uses the SEPARATE pair GBRAIN_WRITE_CLIENT_ID /
+#      GBRAIN_WRITE_CLIENT_SECRET. Neither pair substitutes for the other: a
+#      write identity must never silently downgrade to a read identity (the
 #      caller's put_page would 403 as working-but-wrong-identity), and the read
-#      items must never be asked for write-scope tokens.
+#      client must never be asked for a write-scope token.
 #   2. POST <serve-host>/token (RFC 6749 client_credentials, client_secret_post
 #      auth method, scope=read — or scope=write under --write) — auth method
 #      matches gbrain's oauth-provider default (see ~/code/gbrain
 #      src/core/oauth-provider.ts).
-#   3. Export the resulting access_token as GBRAIN_TEAM_TOKEN, drop BW_SESSION
-#      (defense-in-depth — mirrors plugins/marketing/scripts/bw-run.sh § exec).
+#   3. Export the resulting access_token as GBRAIN_TEAM_TOKEN, and scrub the
+#      client credentials out of the environment (see § Scrub below).
 #   4. exec mcp-remote against <mcp-url>, passing the literal string
 #      'Authorization: Bearer ${GBRAIN_TEAM_TOKEN}' (single-quoted, so the
 #      shell does NOT expand it). mcp-remote then expands ${GBRAIN_TEAM_TOKEN}
 #      from its own env, keeping the bearer token out of argv / `ps`.
 #
-# Non-goals (canon scope discipline, mirrors plugins/marketing/scripts/bw-run.sh):
+# Credential source (ADR-045): both variables are exported once in the
+# developer's shell profile, exactly like BWS_ACCESS_TOKEN (ADR-044). Bitwarden
+# still holds the values — the teammate copies them out at onboarding — it just
+# no longer sits in the runtime path, so this script needs no `bw`, no
+# BW_SESSION, and no `bw unlock`.
+#
+# Non-goals (canon scope discipline):
 #   no token caching   (fresh /token per spawn; matches plugin OAuth rotation
 #                      semantics — runbook.md § OAuth client_secret rotation)
 #   no token refresh   (token TTL > typical session length; refresh on next spawn)
@@ -42,20 +47,12 @@
 set -euo pipefail
 
 # --- Preflight --------------------------------------------------------------
-for cmd in jq bw curl npx; do
+for cmd in jq curl npx; do
   if ! command -v "$cmd" >/dev/null; then
     echo "gbrain-team-broker.sh: \`$cmd\` is required" >&2
     exit 1
   fi
 done
-if [ -z "${BW_SESSION:-}" ]; then
-  echo "gbrain-team-broker.sh: BW_SESSION not set. Run \`bw unlock\` and export BW_SESSION." >&2
-  exit 1
-fi
-if ! bw status 2>/dev/null | jq -e '.status == "unlocked"' >/dev/null; then
-  echo "gbrain-team-broker.sh: vault is not unlocked (BW_SESSION may be stale). Run \`bw unlock\` again." >&2
-  exit 1
-fi
 
 # --- Arg parse --------------------------------------------------------------
 WRITE_MODE=0
@@ -79,56 +76,66 @@ if [ -z "$TOKEN_URL" ]; then
   exit 2
 fi
 
-# --- Fetch OAuth client from Bitwarden --------------------------------------
-# Resolution order (BC-11758 step 2 — Model-A per-teammate clients):
-#   1. "Brite team gbrain — my client" — the teammate's PERSONAL-vault item (fixed
-#      name; personal vaults are per-user, so no per-user config or $USER mapping
-#      is needed). Holds that teammate's tm-<name> client → tier-scoped reads.
-#   2. "Brite team gbrain — plugin OAuth client" — the legacy SHARED Engineering
-#      item (open-tier-only since the BC-11758 step-1 shrink). The fallback keeps
-#      unmigrated teammates working until their personal client lands; it retires
-#      with the shared client's revocation (proofs + 1 quiet week — brite-team-gbrain
-#      runbook § federation scoping).
-# The two names never collide within one user's view, so `bw get item <name>`
-# stays unambiguous in both steps.
-BW_ITEM_PERSONAL='Brite team gbrain — my client'
-BW_ITEM_SHARED='Brite team gbrain — plugin OAuth client'
-# Write mode (BC-12113): the dedicated `write`-scope service client's Engineering
-# item — brite-team-gbrain runbook § OAuth clients, "Bitwarden plan (write client)".
-BW_ITEM_WRITE='Brite team gbrain — write OAuth client'
-
-# _load_client_from_item <name>: fetch the item and populate CLIENT_ID/CLIENT_SECRET.
-# Returns nonzero when the item is absent OR malformed (empty username/password), so a
-# retrievable-but-broken personal item falls through to the shared fallback instead of
-# hard-failing the spawn (the teammate is still covered by the migration fallback).
-_load_client_from_item() {
-  local _json
-  _json="$(bw get item "$1" 2>/dev/null)" || return 1
-  CLIENT_ID="$(printf '%s' "$_json" | jq -r '.login.username // ""')"
-  CLIENT_SECRET="$(printf '%s' "$_json" | jq -r '.login.password // ""')"
-  [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ]
-}
-
+# --- Resolve the OAuth client from the environment --------------------------
+# Read mode carries whichever client the teammate was issued: their own
+# tier-scoped client after the BC-11758 step-2 migration, or the shared
+# open-tier Engineering client until theirs lands. This script cannot tell the
+# two apart and does not need to — the tier is a server-side property of the
+# client itself. The vault-era personal-item → shared-item fallback chain
+# existed only because the broker had to *discover* which item was present; an
+# exported variable holds exactly one value, so that chain has no analogue here
+# and is deliberately gone (ADR-045 § Consequences).
+#
+# Write mode reads a SEPARATE pair and never falls back to the read pair, by
+# design. Absent = the BC-12113 register-client ceremony hasn't run for this
+# developer; the server stays down and the save-results prose degrades safely
+# (skip + TODO).
 if [ "$WRITE_MODE" -eq 1 ]; then
-  # No fallback chain in write mode: the read items must never be handed a
-  # write-scope token request, and a silent downgrade to a read identity would
-  # surface later as a confusing put_page 403 instead of failing loudly here.
-  # Absent item = the BC-12113 ceremony hasn't run yet — the server simply stays
-  # down and the save-results prose degrades safely (skip + TODO).
-  if ! _load_client_from_item "$BW_ITEM_WRITE"; then
-    echo "gbrain-team-broker.sh: --write requires the Engineering-collection item \`$BW_ITEM_WRITE\` (username=client_id + password=client_secret); it is absent or malformed — has the BC-12113 register-client ceremony run?" >&2
-    exit 3
-  fi
-elif _load_client_from_item "$BW_ITEM_PERSONAL"; then
-  :  # personal (tier-scoped) identity resolved
-elif _load_client_from_item "$BW_ITEM_SHARED"; then
-  # If the personal item exists but is malformed, say so — silent fallback would mask a
-  # half-finished ceremony (saved item, wrong fields) as working-but-wrong-identity.
-  if bw get item "$BW_ITEM_PERSONAL" >/dev/null 2>&1; then
-    echo "gbrain-team-broker.sh: WARNING — \`$BW_ITEM_PERSONAL\` exists but is missing username (client_id) or password (client_secret); using the shared fallback \`$BW_ITEM_SHARED\` (open tier only). Fix the personal item and relaunch." >&2
-  fi
+  ID_VAR='GBRAIN_WRITE_CLIENT_ID'
+  SECRET_VAR='GBRAIN_WRITE_CLIENT_SECRET'
+  CLIENT_ID="${GBRAIN_WRITE_CLIENT_ID:-}"
+  CLIENT_SECRET="${GBRAIN_WRITE_CLIENT_SECRET:-}"
+  UNSET_HINT="--write needs the dedicated write-scope client, and the read pair is NOT a substitute (it would 403 on put_page). Has the BC-12113 register-client ceremony run for you?"
 else
-  echo "gbrain-team-broker.sh: no usable gbrain client item — looked for \`$BW_ITEM_PERSONAL\` (personal vault), then \`$BW_ITEM_SHARED\` (Engineering collection); each needs username=client_id + password=client_secret" >&2
+  ID_VAR='GBRAIN_CLIENT_ID'
+  SECRET_VAR='GBRAIN_CLIENT_SECRET'
+  CLIENT_ID="${GBRAIN_CLIENT_ID:-}"
+  CLIENT_SECRET="${GBRAIN_CLIENT_SECRET:-}"
+  UNSET_HINT="Copy them out of the Bitwarden item \`Brite team gbrain — my client\` (username=client_id, password=client_secret), export both from your shell profile, and relaunch Claude Code — see CONTRIBUTING.md § Team gbrain credentials."
+fi
+
+# --- Scrub the client credentials from the environment ----------------------
+# In the vault era client_id/client_secret were shell locals read from `bw` and
+# never exported. They now arrive as real environment variables, so without an
+# explicit unset mcp-remote and every transitive npm dep it loads would inherit
+# the client secret. Scrub all four the moment they are copied into locals, so
+# the rest of this script — and everything it execs — runs without them. This
+# is the containment property `bws` provides for free via command.env_remove on
+# BWS_ACCESS_TOKEN (ADR-044 § Token containment); ADR-045 restates it as an
+# obligation this script owns itself.
+unset GBRAIN_CLIENT_ID GBRAIN_CLIENT_SECRET GBRAIN_WRITE_CLIENT_ID GBRAIN_WRITE_CLIENT_SECRET
+# Defence-in-depth for anyone whose profile still exports a vault session from
+# the pre-ADR-044 world. Nothing in this script needs it.
+unset BW_SESSION
+
+if [ -z "$CLIENT_ID" ] && [ -z "$CLIENT_SECRET" ]; then
+  echo "gbrain-team-broker.sh: neither \$$ID_VAR nor \$$SECRET_VAR is set. $UNSET_HINT" >&2
+  exit 3
+fi
+# A half-set pair is its own loud failure, never a fall-through. The vault-era
+# code warned rather than silently proceeding when a retrievable-but-malformed
+# item would otherwise have been masked as working-but-wrong-identity; a profile
+# exporting the id but not the secret is the same class of half-finished setup
+# and gets the same treatment.
+if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
+  if [ -z "$CLIENT_ID" ]; then
+    MISSING_VAR="$ID_VAR"
+    PRESENT_VAR="$SECRET_VAR"
+  else
+    MISSING_VAR="$SECRET_VAR"
+    PRESENT_VAR="$ID_VAR"
+  fi
+  echo "gbrain-team-broker.sh: \$$MISSING_VAR is empty while \$$PRESENT_VAR is set — refusing to run a half-configured client rather than authenticating as the wrong identity. Fix your shell profile and relaunch." >&2
   exit 3
 fi
 
@@ -163,12 +170,6 @@ unset TOKEN_RESP
 
 export GBRAIN_TEAM_TOKEN="$ACCESS_TOKEN"
 unset ACCESS_TOKEN
-
-# --- Defense-in-depth: drop vault session before exec -----------------------
-# The wrapped mcp-remote process (and any transitive npm dep it loads) should
-# never have BW_SESSION in its env — same rationale as bw-run.sh's BW_SESSION
-# unset before exec.
-unset BW_SESSION
 
 # --- Bridge stdio ↔ HTTP MCP via mcp-remote ---------------------------------
 # Single-quoted '${GBRAIN_TEAM_TOKEN}' is intentional: the literal string

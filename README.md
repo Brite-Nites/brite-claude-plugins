@@ -185,6 +185,8 @@ The `workflows` plugin configures three MCP servers automatically:
 
 The Linear MCP server provides tools for managing issues, projects, milestones, and documentation directly from Claude Code.
 
+`gbrain-team` needs `GBRAIN_CLIENT_ID` and `GBRAIN_CLIENT_SECRET` exported in your shell profile before you launch Claude Code, and `GBRAIN_WRITE_CLIENT_ID` / `GBRAIN_WRITE_CLIENT_SECRET` as well if you have write access. Setup steps are in [CONTRIBUTING.md § Team gbrain credentials](CONTRIBUTING.md#team-gbrain-credentials); the reasoning is [ADR-045](docs/decisions/045-gbrain-broker-env-oauth-client.md).
+
 ---
 
 ## Plugin Development Guide

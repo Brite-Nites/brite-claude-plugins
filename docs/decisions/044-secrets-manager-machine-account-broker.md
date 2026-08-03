@@ -104,6 +104,11 @@ OAuth client from a personal vault, so it still requires `BW_SESSION` and the
 unlock tax does not fully lift until it moves too. That is a separate decision
 about a per-human credential and gets its own ADR.
 
+> **Resolved by [ADR-045](045-gbrain-broker-env-oauth-client.md) (2026-07-31).**
+> The gbrain broker now reads its OAuth client from environment variables
+> exported in the developer's shell profile. With both decisions in force, no
+> `BW_SESSION` consumer remains in this repo.
+
 The HTTP-MCP exception in ADR-010 is unaffected.
 
 ## Reversibility

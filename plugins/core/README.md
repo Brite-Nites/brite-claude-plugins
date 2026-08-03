@@ -22,6 +22,11 @@ Layer 3  domain plugins .............. workflows, marketing, cadence, revops, fl
    each domain plugin now live here once.
 3. **Team-gbrain MCP registration** (`.mcp.json`) — the `gbrain-team` server, registered
    once for the whole marketplace via the shared `scripts/gbrain-team-broker.sh` broker.
+   The broker reads its OAuth client from `GBRAIN_CLIENT_ID` / `GBRAIN_CLIENT_SECRET`
+   in your shell profile (ADR-045) — no vault session, no `bw unlock`. Setup steps:
+   [CONTRIBUTING.md § Team gbrain credentials](../../CONTRIBUTING.md#team-gbrain-credentials).
+   This plugin owns the canonical copy of the broker; the other five plugins carry
+   byte-identical clones, enforced by `validate.sh` §2b-gbrain.
 
 ## Why a separate plugin
 

@@ -213,6 +213,38 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 2b-gbrain — gbrain-team broker contract + six-copy identity (ADR-045)
+# ══════════════════════════════════════════════════════════════════════
+# Runs plugins/core/tests/test_gbrain_team_broker.sh. Two invariants that had
+# no automated guard before ADR-045 moved the broker off the vault:
+#   (a) the six per-plugin copies stay byte-identical — each plugin's .mcp.json
+#       execs its OWN ${CLAUDE_PLUGIN_ROOT} copy, so a fix landing in one and
+#       missing five is silent (docs/audits/002 DEBT-1, gated on BC-11757);
+#   (b) --write resolves a SEPARATE credential pair and never falls back to the
+#       read pair, and the client secret never reaches the exec'd child.
+# Missing file FAILs rather than warn-skips: a mandatory gate that silently
+# passes when its harness is deleted is the BC-12589 trap.
+# RESULT-line contract (pass=N fail=N).
+section "2b-gbrain. gbrain-team broker contract + six-copy identity (ADR-045)"
+
+gbrain_broker_test="$REPO_ROOT/plugins/core/tests/test_gbrain_team_broker.sh"
+if [ ! -f "$gbrain_broker_test" ]; then
+  fail "plugins/core/tests/test_gbrain_team_broker.sh not found — the ADR-045 broker contract test is missing"
+else
+  if gbt_out=$(bash "$gbrain_broker_test" 2>&1); then
+    gbt_count=$(printf '%s\n' "$gbt_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$gbt_count" ] && [ "$gbt_count" -gt 0 ]; then
+      pass "gbrain-team broker contract + six-copy identity (${gbt_count} assertions)"
+    else
+      fail "gbrain-team broker contract — RESULT line missing or pass=0 (harness ran no assertions)"
+    fi
+  else
+    fail "gbrain-team broker contract failed:"
+    printf '%s\n' "$gbt_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 2b-migrate — marketing manifest v1→v2 migration regression (BC-11852/BC-16381)
 # ══════════════════════════════════════════════════════════════════════
 # Runs plugins/marketing/scripts/test_migrate_manifest_v1_to_v2.sh — the

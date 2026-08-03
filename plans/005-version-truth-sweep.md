@@ -129,7 +129,7 @@ Verified facts (2026-07-02, origin/main @ 04d87b12):
 - Commands tables: add the 5 missing commands with one-line descriptions taken
   from each command file's frontmatter `description:` (read
   `plugins/workflows/commands/<name>.md` head).
-- MCP table: add the `gbrain-team` row (stdio, Bitwarden+OAuth broker, team
+- MCP table: add the `gbrain-team` row (stdio, env-var OAuth broker per ADR-045, team
   knowledge base).
 - Add a short "Plugins in this repo" table (6 rows: name, one-line purpose —
   source the one-liners from each plugin.json `description`, truncated) so the
