@@ -1,0 +1,135 @@
+name: enrichment-pin-bump
+
+# BC-13083: the marketing plugin's `enrichment` MCP server installs the engine
+# from brite-data-platform pinned to an exact git SHA in
+# plugins/marketing/.mcp.json. The pin is frozen by design (reproducible
+# installs); the cost was that bumps relied on a human remembering. This
+# workflow turns the bump into a bot-proposed PR: weekly (or on dispatch) it
+# checks whether any commit on brite-data-platform main has touched the engine
+# paths (tools/enrichment-mcp/, services/) since the pinned SHA, and if so
+# opens/updates a PR that re-pins to main HEAD and bumps the marketing plugin
+# version in lockstep.
+#
+# The bot never merges. The PR body carries the review contract: CI green AND
+# a cold MCP `initialize` handshake against the new SHA (BC-17944 — `--help`
+# liveness has hidden real breakage twice).
+#
+# Setup (one-time, operator): create a fine-grained PAT with
+#   - Brite-Nites/brite-data-platform: Contents read
+#   - Brite-Nites/brite-claude-plugins: Contents read/write + Pull requests read/write
+# and store it as the repo secret ENRICHMENT_PIN_BOT_TOKEN. A PAT (not the
+# default GITHUB_TOKEN) is required twice over: cross-repo read, and PRs
+# pushed with GITHUB_TOKEN do not trigger CI.
+
+on:
+  schedule:
+    - cron: '17 14 * * 1' # Mondays 14:17 UTC
+  workflow_dispatch:
+
+permissions: {} # intentionally empty — everything runs through the PAT
+
+jobs:
+  check-and-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          token: ${{ secrets.ENRICHMENT_PIN_BOT_TOKEN }}
+
+      - name: Compare pin to upstream engine and open a bump PR if behind
+        env:
+          GH_TOKEN: ${{ secrets.ENRICHMENT_PIN_BOT_TOKEN }}
+          UPSTREAM: Brite-Nites/brite-data-platform
+          MCP_JSON: plugins/marketing/.mcp.json
+          PLUGIN_JSON: plugins/marketing/.claude-plugin/plugin.json
+          MARKETPLACE_JSON: .claude-plugin/marketplace.json
+          BOT_BRANCH: bot/enrichment-pin-bump
+        run: |
+          set -euo pipefail
+
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::ENRICHMENT_PIN_BOT_TOKEN is not configured — skipping. See the workflow header for setup."
+            exit 0
+          fi
+
+          PIN="$(grep -o 'brite-data-platform@[0-9a-f]\{40\}' "$MCP_JSON" | head -1 | cut -d@ -f2)"
+          if [ -z "$PIN" ]; then
+            echo "::error::could not extract the pinned SHA from $MCP_JSON"
+            exit 1
+          fi
+          echo "pinned: $PIN"
+
+          # A bump is due only when a commit touching an engine path is not
+          # reachable from the pin — unrelated upstream churn never triggers.
+          BUMP_DUE=0
+          for path in tools/enrichment-mcp services; do
+            ENG="$(gh api "repos/$UPSTREAM/commits?path=$path&sha=main&per_page=1" --jq '.[0].sha // empty')"
+            [ -z "$ENG" ] && continue
+            STATUS="$(gh api "repos/$UPSTREAM/compare/$PIN...$ENG" --jq .status)"
+            echo "latest commit touching $path: $ENG ($STATUS relative to pin)"
+            case "$STATUS" in ahead|diverged) BUMP_DUE=1 ;; esac
+          done
+          if [ "$BUMP_DUE" -eq 0 ]; then
+            echo "engine paths unchanged since the pin — nothing to do"
+            exit 0
+          fi
+
+          NEW="$(gh api "repos/$UPSTREAM/commits/main" --jq .sha)"
+          echo "bump target (upstream main HEAD): $NEW"
+
+          # Idempotence: if an open bot PR already proposes this exact SHA, stop.
+          EXISTING="$(gh pr list --head "$BOT_BRANCH" --state open --json number,body \
+            --jq ".[] | select(.body | contains(\"$NEW\")) | .number" || true)"
+          if [ -n "$EXISTING" ]; then
+            echo "open PR #$EXISTING already proposes $NEW — nothing to do"
+            exit 0
+          fi
+
+          # Re-pin + lockstep version bump (same-commit rule; see docs/gotchas.md).
+          sed -i "s/$PIN/$NEW/" "$MCP_JSON"
+          CUR="$(jq -r .version "$PLUGIN_JSON")"
+          NEXT="$(echo "$CUR" | awk -F. '{print $1"."$2"."$3+1}')"
+          for f in "$PLUGIN_JSON" "$MARKETPLACE_JSON"; do
+            COUNT="$(grep -c "\"version\": \"$CUR\"" "$f")"
+            if [ "$COUNT" -ne 1 ]; then
+              echo "::error::expected exactly 1 occurrence of version $CUR in $f, found $COUNT — refusing to sed blind; bump manually"
+              exit 1
+            fi
+            sed -i "s/\"version\": \"$CUR\"/\"version\": \"$NEXT\"/" "$f"
+          done
+
+          git config user.name "enrichment-pin-bump bot"
+          git config user.email "noreply@britenites.com"
+          git switch -c "$BOT_BRANCH"
+          git add "$MCP_JSON" "$PLUGIN_JSON" "$MARKETPLACE_JSON"
+          TITLE="chore(marketing): re-pin enrichment engine ${PIN:0:7} -> ${NEW:0:7} (bot, BC-13083)"
+          git commit -m "$TITLE" \
+            -m "Engine paths (tools/enrichment-mcp/ or services/) advanced on brite-data-platform main past the pinned SHA. Marketing $CUR -> $NEXT in lockstep (plugin.json + marketplace.json)."
+          # Plain --force: shallow checkout has no remote-tracking ref for the
+          # bot branch, so a lease check would always fail. The branch is
+          # bot-owned; force-overwrite is the intended semantics.
+          git push --force --set-upstream origin "$BOT_BRANCH"
+
+          printf '%s\n' \
+            "Bot-proposed re-pin (BC-13083): the enrichment engine advanced past the pinned SHA." \
+            "" \
+            "- Pin: \`$PIN\` → \`$NEW\`" \
+            "- Compare: https://github.com/$UPSTREAM/compare/$PIN...$NEW" \
+            "- Marketing version: $CUR → $NEXT (lockstep, same commit)" \
+            "" \
+            "## Review contract — do not merge on CI alone" \
+            "" \
+            "1. CI green." \
+            "2. Run a **cold MCP \`initialize\` handshake** against the new SHA through the production spawn path (\`bws run\` → \`uvx --from git+…@$NEW\` → stdio JSON-RPC \`initialize\`/\`tools/list\`). \`--help\` liveness is not sufficient (BC-17944; before that BC-7157, BC-12128)." \
+            "" \
+            "This PR was opened by \`.github/workflows/enrichment-pin-bump.yml\`." \
+            > /tmp/pr-body.md
+
+          OPEN_PR="$(gh pr list --head "$BOT_BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$OPEN_PR" ]; then
+            gh pr edit "$OPEN_PR" --body-file /tmp/pr-body.md --title "$TITLE"
+            echo "updated existing PR #$OPEN_PR"
+          else
+            gh pr create --head "$BOT_BRANCH" --title "$TITLE" --body-file /tmp/pr-body.md
+          fi
