@@ -144,15 +144,23 @@ fi
 # don't break the form encoding. -sS keeps progress quiet but surfaces errors.
 # Body stays off stderr; we parse via jq so a non-JSON response surfaces as
 # "unknown" rather than echoing the raw body (which could include error data).
+# The secret travels via `client_secret@-`: curl url-encodes it from stdin,
+# keeping it out of argv (`ps`, /proc/<pid>/cmdline, command-line audit
+# logging — BC-17946). printf is a bash builtin, so no argv exposure there
+# either, and unlike a heredoc it never spills to a temp file on bash 3.2
+# (macOS) — the no-file-I/O canon above covers credentials too. The pipe
+# feeds only this curl; the broker's own stdin — the MCP stdio channel for
+# the exec below — is untouched.
 # Scope tracks the mode: the token must carry `write` for put_page
 # (gbrain operations.ts put_page requires write scope; read tokens 403 with
 # insufficient_scope), and read mode keeps requesting the minimal `read`.
 if [ "$WRITE_MODE" -eq 1 ]; then TOKEN_SCOPE="write"; else TOKEN_SCOPE="read"; fi
-if ! TOKEN_RESP="$(curl -sS -X POST "$TOKEN_URL" \
-      --data-urlencode "grant_type=client_credentials" \
-      --data-urlencode "scope=$TOKEN_SCOPE" \
-      --data-urlencode "client_id=$CLIENT_ID" \
-      --data-urlencode "client_secret=$CLIENT_SECRET")"; then
+if ! TOKEN_RESP="$(printf '%s' "$CLIENT_SECRET" \
+      | curl -sS -X POST "$TOKEN_URL" \
+          --data-urlencode "grant_type=client_credentials" \
+          --data-urlencode "scope=$TOKEN_SCOPE" \
+          --data-urlencode "client_id=$CLIENT_ID" \
+          --data-urlencode "client_secret@-")"; then
   echo "gbrain-team-broker.sh: curl POST $TOKEN_URL failed (network / DNS)" >&2
   unset CLIENT_ID CLIENT_SECRET
   exit 4
