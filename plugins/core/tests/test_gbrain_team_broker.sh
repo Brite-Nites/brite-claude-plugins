@@ -249,6 +249,7 @@ SHIM
            bash "$BROKER" --write "$URL" 2>&1)
     rc_is "write: exchange succeeds under the argv shim" 0 "$?"
     argv_log="$(cat "$TMP/curl-argv.log")"
+    has   "write: shim captured a curl invocation" "$argv_log" "CURL_ARGV: "
     lacks "write: client_secret never enters curl argv" "$argv_log" "write-secret"
     has   "write: secret still reaches /token" "$(cat "$TMP/posts.jsonl")" '"client_secret": "write-secret"'
 
