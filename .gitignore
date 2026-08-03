@@ -72,3 +72,4 @@ docs/campaigns/**/*contacts-found*.csv
 # Local agent config — shows up untracked in every repo; never campaign data.
 /.codex/
 /AGENTS.md
+**/.venv/

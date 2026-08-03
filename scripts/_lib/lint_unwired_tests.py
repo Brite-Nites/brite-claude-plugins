@@ -70,6 +70,13 @@ def stem_loop_stems(validate_code):
     return stems
 
 
+# Dependency/interpreter dirs are not the repo's test namespace: a virtualenv
+# under plugins/*/scripts/ (tam-map's .venv, 2026-08-03) carries site-packages
+# test_*.py files that no runner should ever wire — flagging those blocks
+# every push while pointing at third-party code nobody here owns.
+PRUNE_DIRS = {".venv", "venv", "node_modules", "site-packages", "__pycache__"}
+
+
 def enumerate_tests(root):
     """test_*.sh / test-*.sh / test_*.py under scripts/ or plugins/*/{tests,scripts}/."""
     seen = set()
@@ -77,7 +84,8 @@ def enumerate_tests(root):
     roots += glob.glob(os.path.join(root, "plugins", "*", "tests"))
     roots += glob.glob(os.path.join(root, "plugins", "*", "scripts"))
     for base in roots:
-        for dirpath, _dirs, files in os.walk(base):
+        for dirpath, dirs, files in os.walk(base):
+            dirs[:] = [d for d in dirs if d not in PRUNE_DIRS]
             for fn in files:
                 if re.match(r"^test[_-].*\.(sh|py)$", fn):
                     seen.add(os.path.relpath(os.path.join(dirpath, fn), root))

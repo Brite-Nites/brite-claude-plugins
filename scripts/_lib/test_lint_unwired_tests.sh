@@ -63,6 +63,12 @@ SH
 : > "$root/plugins/foo/scripts/test_data.sh"       # stem "data" is a code token but NOT in a test_$VAR loop (P3 stem-tightening)
 : > "$root/scripts/test_commentonly.sh"            # referenced ONLY in a comment (P3 comment-strip)
 
+# DEPENDENCY-DIR test files (must NOT be flagged: .venv/node_modules are not
+# the repo's test namespace — the 2026-08-03 tam-map virtualenv incident,
+# where site-packages test_*.py blocked every push):
+mkdir -p "$root/plugins/foo/scripts/.venv/lib/python3.14/site-packages/aiohttp"
+: > "$root/plugins/foo/scripts/.venv/lib/python3.14/site-packages/aiohttp/test_utils.py"
+
 out="$(python3 "$LINT" "$root" 2>&1)"; rc="$?"
 
 check "mixed tree exits nonzero (orphans present)" 1 "$rc"
@@ -71,7 +77,8 @@ for wired in \
   "scripts/test_wired_literal.sh" \
   "plugins/foo/tests/test-glob-one.sh" \
   "plugins/foo/scripts/test_wiredstem.sh" \
-  "plugins/foo/tests/test_discovered.py" ; do
+  "plugins/foo/tests/test_discovered.py" \
+  "plugins/foo/scripts/.venv/lib/python3.14/site-packages/aiohttp/test_utils.py" ; do
   if printf '%s' "$out" | grep -q "$wired"; then
     fail=$((fail + 1)); printf 'FAIL: %s wrongly flagged as unwired\n' "$wired" >&2
   else
