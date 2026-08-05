@@ -66,11 +66,11 @@ ok()   { PASS=$((PASS+1)); echo "  PASS  $1"; }
 bad()  { FAIL=$((FAIL+1)); echo "  FAIL  $1"; }
 
 # --- created-record tracking + cleanup (runs no matter how we exit) ----------
-ACCT_ID=""; GMAIL_ACCT_ID=""; C1_ID=""; C2_ID=""; C3_ID=""; C4_ID=""
+ACCT_ID=""; GMAIL_ACCT_ID=""; C1_ID=""; C2_ID=""; C3_ID=""; C4_ID=""; C5_ID=""
 cleanup() {
   echo ""
   echo "Cleaning up test records..."
-  for id in "$C1_ID" "$C2_ID" "$C3_ID" "$C4_ID"; do
+  for id in "$C1_ID" "$C2_ID" "$C3_ID" "$C4_ID" "$C5_ID"; do
     [ -n "$id" ] && sf data delete record --sobject Contact --record-id "$id" --target-org "$TARGET_ORG" >/dev/null 2>&1 \
       && echo "  deleted Contact $id"
   done
@@ -88,22 +88,34 @@ v=r[0].get('$1') if r else None
 print('' if v is None else v)" 2>/dev/null; }
 
 classify_contact() {
-  python3 - "$SCRIPT_DIR" "$1" "$2" "$3" "$4" <<'PY'
+  line=$(classify_contacts "$1" "$2" "$3" "$4")
+  printf '%s\n' "${line#*|}"
+}
+
+classify_contacts() {
+  python3 - "$SCRIPT_DIR" "$@" <<'PY'
 import sys
 
-script_dir, email, contact_id, lifecycle_stage, lead_status = sys.argv[1:6]
+script_dir = sys.argv[1]
+args = sys.argv[2:]
 sys.path.insert(0, script_dir)
 
 from salesforce_preload import MatchedContact, classify_rows
 
-email = email.strip().lower()
-plan = classify_rows(
-    [{"email": email, "company": "ZZ_PRELOAD_SMOKE Matched", "domain": "example.com"}],
-    {email: [MatchedContact(contact_id, lifecycle_stage or None, lead_status or None)]},
-    {},
-)
-row = plan.rows[0]
-print(f"{row.disposition}|{row.contact_id}")
+if len(args) % 4:
+    raise SystemExit("expected groups of: email contact_id lifecycle_stage lead_status")
+
+rows = []
+contacts_by_email = {}
+for i in range(0, len(args), 4):
+    email, contact_id, lifecycle_stage, lead_status = args[i:i + 4]
+    email = email.strip().lower()
+    rows.append({"email": email, "company": "ZZ_PRELOAD_SMOKE Matched", "domain": "example.com"})
+    contacts_by_email[email] = [MatchedContact(contact_id, lifecycle_stage or None, lead_status or None)]
+
+plan = classify_rows(rows, contacts_by_email, {})
+for row in plan.rows:
+    print(f"{row.email}|{row.disposition}|{row.contact_id}")
 PY
 }
 
@@ -131,6 +143,15 @@ apply_matched_seed_plan() {
     matched) return 0 ;;
     *) echo "Refusing matched-seed write: unexpected disposition '$disposition'" >&2; return 4 ;;
   esac
+}
+
+apply_matched_seed_plan_lines() {
+  plan_lines="${1:-}"
+
+  printf '%s\n' "$plan_lines" | while IFS='|' read -r _email disposition target_id; do
+    [ -z "$_email$disposition$target_id" ] && continue
+    apply_matched_seed_plan "$disposition" "$target_id" || exit $?
+  done
 }
 
 force_contact_seed_state() {
@@ -316,20 +337,47 @@ if [ -n "$ACCT_ID" ]; then
       before_lc=$(echo "$Q" | field Lifecycle_Stage__c); before_ls=$(echo "$Q" | field Lead_Status__c)
       [ "$before_lc" = "Do_Not_Prospect" ] && [ -z "$before_ls" ] && ok "fixture is Do_Not_Prospect + blank status" || bad "fixture was not in D2 shape (stage='$before_lc' status='$before_ls')"
 
-      CLASS=$(classify_contact "$C4_EMAIL" "$C4_ID" "$before_lc" "$before_ls")
-      DISP="${CLASS%%|*}"; TARGET_ID="${CLASS#*|}"
-      [ "$DISP" = "matched" ] && ok "classifier returned MATCHED, not MATCHED_SEED" || bad "classifier returned '$DISP' instead of matched"
-      [ -z "$TARGET_ID" ] && ok "D2 opt-out carries no update target" || bad "D2 opt-out unexpectedly carried target id '$TARGET_ID'"
+      C5_EMAIL="zz-preload-d2-control-$STAMP@gmail.com"
+      C5_ID=$(sf data create record --sobject Contact \
+        --values "LastName='ZZ_PRELOAD_SMOKE D2 Control $STAMP' Email='$C5_EMAIL' AccountId='$ACCT_ID'" \
+        --target-org "$TARGET_ORG" --json 2>/dev/null | jqid)
+      if [ -n "$C5_ID" ]; then
+        ok "D2 control matched-seed fixture Contact created ($C5_ID)"
+        if force_contact_seed_state "$C5_ID" both_null; then
+          Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C5_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+          control_lc=$(echo "$Q" | field Lifecycle_Stage__c); control_ls=$(echo "$Q" | field Lead_Status__c)
+          [ -z "$control_lc" ] && [ -z "$control_ls" ] && ok "D2 control fixture is blank on both governed fields" || bad "D2 control fixture was not both-null (stage='$control_lc' status='$control_ls')"
 
-      if apply_matched_seed_plan "$DISP" "$TARGET_ID"; then
-        ok "D2 opt-out passed through matched-seed write gate without update"
+          PLAN_LINES=$(classify_contacts \
+            "$C4_EMAIL" "$C4_ID" "$before_lc" "$before_ls" \
+            "$C5_EMAIL" "$C5_ID" "$control_lc" "$control_ls")
+          D2_LINE=$(printf '%s\n' "$PLAN_LINES" | awk -F'|' -v e="$C4_EMAIL" '$1 == e {print; exit}')
+          CONTROL_LINE=$(printf '%s\n' "$PLAN_LINES" | awk -F'|' -v e="$C5_EMAIL" '$1 == e {print; exit}')
+          D2_DISP=$(echo "$D2_LINE" | cut -d'|' -f2); D2_TARGET=$(echo "$D2_LINE" | cut -d'|' -f3)
+          CONTROL_DISP=$(echo "$CONTROL_LINE" | cut -d'|' -f2); CONTROL_TARGET=$(echo "$CONTROL_LINE" | cut -d'|' -f3)
+          [ "$D2_DISP" = "matched" ] && ok "write-selection plan keeps D2 row MATCHED, not MATCHED_SEED" || bad "write-selection plan returned '$D2_DISP' for D2 row"
+          [ -z "$D2_TARGET" ] && ok "write-selection plan carries no D2 update target" || bad "write-selection plan carried D2 target id '$D2_TARGET'"
+          [ "$CONTROL_DISP" = "matched_seed" ] && [ "$CONTROL_TARGET" = "$C5_ID" ] && ok "write-selection plan includes both-null control as MATCHED_SEED" || bad "write-selection plan did not include the control seed target"
+
+          if apply_matched_seed_plan_lines "$PLAN_LINES"; then
+            ok "combined write-selection pass completed"
+          else
+            bad "combined write-selection pass failed"
+          fi
+
+          Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C5_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+          [ "$(echo "$Q" | field Lifecycle_Stage__c)" = "Cold_Prospect" ] && ok "D2 control Contact was seeded by the live update path" || bad "D2 control Contact was not seeded"
+          [ "$(echo "$Q" | field Lead_Status__c)" = "New" ] && ok "D2 control Lead_Status__c = New" || bad "D2 control Lead_Status__c was not seeded"
+
+          Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C4_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+          after_lc=$(echo "$Q" | field Lifecycle_Stage__c); after_ls=$(echo "$Q" | field Lead_Status__c)
+          [ "$after_lc" = "$before_lc" ] && [ "$after_ls" = "$before_ls" ] && ok "D2 opt-out Contact left entirely untouched while batch seed ran" || bad "D2 opt-out Contact changed (before='$before_lc/$before_ls' after='$after_lc/$after_ls')"
+        else
+          bad "could not prepare D2 control matched-seed fixture"
+        fi
       else
-        bad "D2 opt-out write gate failed"
+        bad "D2 control matched-seed fixture Contact did not insert"
       fi
-
-      Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C4_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
-      after_lc=$(echo "$Q" | field Lifecycle_Stage__c); after_ls=$(echo "$Q" | field Lead_Status__c)
-      [ "$after_lc" = "$before_lc" ] && [ "$after_ls" = "$before_ls" ] && ok "D2 opt-out Contact left entirely untouched" || bad "D2 opt-out Contact changed (before='$before_lc/$before_ls' after='$after_lc/$after_ls')"
     else
       bad "could not prepare D2 opt-out Contact fixture"
     fi
