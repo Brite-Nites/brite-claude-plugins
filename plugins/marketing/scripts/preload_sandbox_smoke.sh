@@ -122,6 +122,17 @@ seed_matched_contact() {
     --target-org "$TARGET_ORG" --json >/dev/null 2>&1
 }
 
+apply_matched_seed_plan() {
+  disposition="${1:-}"
+  target_id="${2:-}"
+
+  case "$disposition" in
+    matched_seed) seed_matched_contact "$target_id" ;;
+    matched) return 0 ;;
+    *) echo "Refusing matched-seed write: unexpected disposition '$disposition'" >&2; return 4 ;;
+  esac
+}
+
 force_contact_seed_state() {
   id="${1:-}"
   mode="${2:-}"
@@ -270,7 +281,7 @@ if [ -n "$ACCT_ID" ]; then
       [ "$TARGET_ID" = "$C3_ID" ] && ok "MATCHED_SEED carries the Contact Id" || bad "MATCHED_SEED target id was '$TARGET_ID'"
 
       if [ "$DISP" = "matched_seed" ] && [ "$TARGET_ID" = "$C3_ID" ]; then
-        if seed_matched_contact "$TARGET_ID"; then
+        if apply_matched_seed_plan "$DISP" "$TARGET_ID"; then
           Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C3_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
           [ "$(echo "$Q" | field Lifecycle_Stage__c)" = "Cold_Prospect" ] && ok "matched Contact Lifecycle_Stage__c = Cold_Prospect" || bad "matched Contact Lifecycle_Stage__c was not seeded"
           [ "$(echo "$Q" | field Lead_Status__c)" = "New" ] && ok "matched Contact Lead_Status__c = New" || bad "matched Contact Lead_Status__c was not seeded"
@@ -310,6 +321,12 @@ if [ -n "$ACCT_ID" ]; then
       [ "$DISP" = "matched" ] && ok "classifier returned MATCHED, not MATCHED_SEED" || bad "classifier returned '$DISP' instead of matched"
       [ -z "$TARGET_ID" ] && ok "D2 opt-out carries no update target" || bad "D2 opt-out unexpectedly carried target id '$TARGET_ID'"
 
+      if apply_matched_seed_plan "$DISP" "$TARGET_ID"; then
+        ok "D2 opt-out passed through matched-seed write gate without update"
+      else
+        bad "D2 opt-out write gate failed"
+      fi
+
       Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C4_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
       after_lc=$(echo "$Q" | field Lifecycle_Stage__c); after_ls=$(echo "$Q" | field Lead_Status__c)
       [ "$after_lc" = "$before_lc" ] && [ "$after_ls" = "$before_ls" ] && ok "D2 opt-out Contact left entirely untouched" || bad "D2 opt-out Contact changed (before='$before_lc/$before_ls' after='$after_lc/$after_ls')"
@@ -330,7 +347,7 @@ CLASS=$(classify_contact "zz-preload-missing-id-$STAMP@gmail.com" "" "" "")
 DISP="${CLASS%%|*}"; TARGET_ID="${CLASS#*|}"
 [ "$DISP" = "matched" ] && ok "classifier does not produce MATCHED_SEED without a Contact Id" || bad "classifier returned '$DISP' for missing Contact Id"
 [ -z "$TARGET_ID" ] && ok "missing-id plan carries no update target" || bad "missing-id plan carried target id '$TARGET_ID'"
-if seed_matched_contact ""; then
+if apply_matched_seed_plan "matched_seed" ""; then
   bad "empty Contact Id update unexpectedly succeeded"
 else
   ok "empty Contact Id refused before Salesforce update"
