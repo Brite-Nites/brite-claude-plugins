@@ -17,6 +17,11 @@
 #      Lead_Status__c=New, owned by Marketing Admin, under that Account.
 #   D. A no-person row lands with FirstName blank + LastName = the company,
 #      and NO placeholder.
+#   E. A matched Contact null on BOTH governed fields is classified as
+#      MATCHED_SEED and seeded by real UPDATE-by-Id.
+#   F. A matched Contact with either governed field set is classified as
+#      MATCHED and left entirely untouched (D2 opt-out).
+#   G. A missing Contact Id fails closed before any Salesforce update.
 #   Every record it creates, it deletes again at the end (even on failure).
 #
 # HOW TO RUN IT (Monday, once you have a working sandbox)
@@ -35,6 +40,8 @@
 # ============================================================================
 
 set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TARGET_ORG=""
 while [ $# -gt 0 ]; do
@@ -59,11 +66,11 @@ ok()   { PASS=$((PASS+1)); echo "  PASS  $1"; }
 bad()  { FAIL=$((FAIL+1)); echo "  FAIL  $1"; }
 
 # --- created-record tracking + cleanup (runs no matter how we exit) ----------
-ACCT_ID=""; GMAIL_ACCT_ID=""; C1_ID=""; C2_ID=""
+ACCT_ID=""; GMAIL_ACCT_ID=""; C1_ID=""; C2_ID=""; C3_ID=""; C4_ID=""
 cleanup() {
   echo ""
   echo "Cleaning up test records..."
-  for id in "$C1_ID" "$C2_ID"; do
+  for id in "$C1_ID" "$C2_ID" "$C3_ID" "$C4_ID"; do
     [ -n "$id" ] && sf data delete record --sobject Contact --record-id "$id" --target-org "$TARGET_ORG" >/dev/null 2>&1 \
       && echo "  deleted Contact $id"
   done
@@ -79,6 +86,78 @@ field() { python3 -c "import json,sys
 r=json.load(sys.stdin)['result']['records']
 v=r[0].get('$1') if r else None
 print('' if v is None else v)" 2>/dev/null; }
+
+classify_contact() {
+  python3 - "$SCRIPT_DIR" "$1" "$2" "$3" "$4" <<'PY'
+import sys
+
+script_dir, email, contact_id, lifecycle_stage, lead_status = sys.argv[1:6]
+sys.path.insert(0, script_dir)
+
+from salesforce_preload import MatchedContact, classify_rows
+
+email = email.strip().lower()
+plan = classify_rows(
+    [{"email": email, "company": "ZZ_PRELOAD_SMOKE Matched", "domain": "example.com"}],
+    {email: [MatchedContact(contact_id, lifecycle_stage or None, lead_status or None)]},
+    {},
+)
+row = plan.rows[0]
+print(f"{row.disposition}|{row.contact_id}")
+PY
+}
+
+seed_matched_contact() {
+  id="${1:-}"
+  if [ -z "$id" ]; then
+    echo "Refusing matched-seed update: missing Contact Id" >&2
+    return 4
+  fi
+  case "$id" in
+    *[!a-zA-Z0-9]*) echo "Refusing matched-seed update: unexpected Contact Id shape" >&2; return 4 ;;
+  esac
+
+  sf data update record --sobject Contact --record-id "$id" \
+    --values "Lifecycle_Stage__c='Cold_Prospect' Lead_Status__c='New'" \
+    --target-org "$TARGET_ORG" --json >/dev/null 2>&1
+}
+
+force_contact_seed_state() {
+  id="${1:-}"
+  mode="${2:-}"
+  case "$id" in
+    ""|*[!a-zA-Z0-9]*) return 4 ;;
+  esac
+
+  apex_file="$(mktemp "${TMPDIR:-/tmp}/preload-smoke-apex.XXXXXX")"
+  case "$mode" in
+    both_null)
+      cat > "$apex_file" <<APEX
+Contact c = [SELECT Id, Lifecycle_Stage__c, Lead_Status__c FROM Contact WHERE Id = '$id' LIMIT 1];
+c.Lifecycle_Stage__c = null;
+c.Lead_Status__c = null;
+update c;
+APEX
+      ;;
+    dnp_status_null)
+      cat > "$apex_file" <<APEX
+Contact c = [SELECT Id, Lifecycle_Stage__c, Lead_Status__c FROM Contact WHERE Id = '$id' LIMIT 1];
+c.Lifecycle_Stage__c = 'Do_Not_Prospect';
+c.Lead_Status__c = null;
+update c;
+APEX
+      ;;
+    *)
+      rm -f "$apex_file"
+      return 4
+      ;;
+  esac
+
+  sf apex run --file "$apex_file" --target-org "$TARGET_ORG" --json >/dev/null 2>&1
+  status=$?
+  rm -f "$apex_file"
+  return "$status"
+}
 
 # --- hard production guard ---------------------------------------------------
 echo "=== Salesforce pre-load sandbox smoke test ==="
@@ -168,6 +247,93 @@ if [ -n "$ACCT_ID" ]; then
   fi
 else
   bad "skipped (no Account from Check B)"
+fi
+echo ""
+
+# --- Check E: matched both-null Contact -> MATCHED_SEED -> UPDATE by Id -----
+echo "Check E — matched both-null Contact seeds via real UPDATE-by-Id:"
+if [ -n "$ACCT_ID" ]; then
+  C3_EMAIL="zz-preload-matched-seed-$STAMP@gmail.com"
+  C3_ID=$(sf data create record --sobject Contact \
+    --values "LastName='ZZ_PRELOAD_SMOKE Matched Seed $STAMP' Email='$C3_EMAIL' AccountId='$ACCT_ID'" \
+    --target-org "$TARGET_ORG" --json 2>/dev/null | jqid)
+  if [ -n "$C3_ID" ]; then
+    ok "matched-seed fixture Contact created ($C3_ID)"
+    if force_contact_seed_state "$C3_ID" both_null; then
+      Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C3_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+      lc=$(echo "$Q" | field Lifecycle_Stage__c); ls=$(echo "$Q" | field Lead_Status__c)
+      [ -z "$lc" ] && [ -z "$ls" ] && ok "fixture is blank on both governed fields" || bad "fixture was not both-null before seed (stage='$lc' status='$ls')"
+
+      CLASS=$(classify_contact "$C3_EMAIL" "$C3_ID" "$lc" "$ls")
+      DISP="${CLASS%%|*}"; TARGET_ID="${CLASS#*|}"
+      [ "$DISP" = "matched_seed" ] && ok "classifier returned MATCHED_SEED" || bad "classifier returned '$DISP' instead of matched_seed"
+      [ "$TARGET_ID" = "$C3_ID" ] && ok "MATCHED_SEED carries the Contact Id" || bad "MATCHED_SEED target id was '$TARGET_ID'"
+
+      if [ "$DISP" = "matched_seed" ] && [ "$TARGET_ID" = "$C3_ID" ]; then
+        if seed_matched_contact "$TARGET_ID"; then
+          Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C3_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+          [ "$(echo "$Q" | field Lifecycle_Stage__c)" = "Cold_Prospect" ] && ok "matched Contact Lifecycle_Stage__c = Cold_Prospect" || bad "matched Contact Lifecycle_Stage__c was not seeded"
+          [ "$(echo "$Q" | field Lead_Status__c)" = "New" ] && ok "matched Contact Lead_Status__c = New" || bad "matched Contact Lead_Status__c was not seeded"
+        else
+          bad "matched-seed UPDATE-by-Id failed"
+        fi
+      else
+        bad "skipped matched-seed UPDATE because classifier did not produce a safe target"
+      fi
+    else
+      bad "could not prepare both-null matched Contact fixture"
+    fi
+  else
+    bad "matched-seed fixture Contact did not insert"
+  fi
+else
+  bad "skipped (no Account from Check B)"
+fi
+echo ""
+
+# --- Check F: D2 opt-out, either governed field set -> untouched -------------
+echo "Check F — D2 opt-out: matched Contact with one field set is untouched:"
+if [ -n "$ACCT_ID" ]; then
+  C4_EMAIL="zz-preload-d2-optout-$STAMP@gmail.com"
+  C4_ID=$(sf data create record --sobject Contact \
+    --values "LastName='ZZ_PRELOAD_SMOKE D2 Optout $STAMP' Email='$C4_EMAIL' AccountId='$ACCT_ID'" \
+    --target-org "$TARGET_ORG" --json 2>/dev/null | jqid)
+  if [ -n "$C4_ID" ]; then
+    ok "D2 opt-out fixture Contact created ($C4_ID)"
+    if force_contact_seed_state "$C4_ID" dnp_status_null; then
+      Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C4_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+      before_lc=$(echo "$Q" | field Lifecycle_Stage__c); before_ls=$(echo "$Q" | field Lead_Status__c)
+      [ "$before_lc" = "Do_Not_Prospect" ] && [ -z "$before_ls" ] && ok "fixture is Do_Not_Prospect + blank status" || bad "fixture was not in D2 shape (stage='$before_lc' status='$before_ls')"
+
+      CLASS=$(classify_contact "$C4_EMAIL" "$C4_ID" "$before_lc" "$before_ls")
+      DISP="${CLASS%%|*}"; TARGET_ID="${CLASS#*|}"
+      [ "$DISP" = "matched" ] && ok "classifier returned MATCHED, not MATCHED_SEED" || bad "classifier returned '$DISP' instead of matched"
+      [ -z "$TARGET_ID" ] && ok "D2 opt-out carries no update target" || bad "D2 opt-out unexpectedly carried target id '$TARGET_ID'"
+
+      Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C4_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+      after_lc=$(echo "$Q" | field Lifecycle_Stage__c); after_ls=$(echo "$Q" | field Lead_Status__c)
+      [ "$after_lc" = "$before_lc" ] && [ "$after_ls" = "$before_ls" ] && ok "D2 opt-out Contact left entirely untouched" || bad "D2 opt-out Contact changed (before='$before_lc/$before_ls' after='$after_lc/$after_ls')"
+    else
+      bad "could not prepare D2 opt-out Contact fixture"
+    fi
+  else
+    bad "D2 opt-out fixture Contact did not insert"
+  fi
+else
+  bad "skipped (no Account from Check B)"
+fi
+echo ""
+
+# --- Check G: missing Contact Id fails closed --------------------------------
+echo "Check G — missing matched Contact Id fails closed:"
+CLASS=$(classify_contact "zz-preload-missing-id-$STAMP@gmail.com" "" "" "")
+DISP="${CLASS%%|*}"; TARGET_ID="${CLASS#*|}"
+[ "$DISP" = "matched" ] && ok "classifier does not produce MATCHED_SEED without a Contact Id" || bad "classifier returned '$DISP' for missing Contact Id"
+[ -z "$TARGET_ID" ] && ok "missing-id plan carries no update target" || bad "missing-id plan carried target id '$TARGET_ID'"
+if seed_matched_contact ""; then
+  bad "empty Contact Id update unexpectedly succeeded"
+else
+  ok "empty Contact Id refused before Salesforce update"
 fi
 echo ""
 
