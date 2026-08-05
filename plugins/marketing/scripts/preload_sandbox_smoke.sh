@@ -22,6 +22,8 @@
 #   F. A matched Contact with either governed field set is classified as
 #      MATCHED and left entirely untouched (D2 opt-out).
 #   G. A missing Contact Id fails closed before any Salesforce update.
+#   H. A matched_seed row that becomes non-null between classification and
+#      write is dropped by the pre-write re-check while another row still seeds.
 #   Every record it creates, it deletes again at the end (even on failure).
 #
 # HOW TO RUN IT (Monday, once you have a working sandbox)
@@ -66,11 +68,11 @@ ok()   { PASS=$((PASS+1)); echo "  PASS  $1"; }
 bad()  { FAIL=$((FAIL+1)); echo "  FAIL  $1"; }
 
 # --- created-record tracking + cleanup (runs no matter how we exit) ----------
-ACCT_ID=""; GMAIL_ACCT_ID=""; C1_ID=""; C2_ID=""; C3_ID=""; C4_ID=""; C5_ID=""
+ACCT_ID=""; GMAIL_ACCT_ID=""; C1_ID=""; C2_ID=""; C3_ID=""; C4_ID=""; C5_ID=""; C6_ID=""; C7_ID=""
 cleanup() {
   echo ""
   echo "Cleaning up test records..."
-  for id in "$C1_ID" "$C2_ID" "$C3_ID" "$C4_ID" "$C5_ID"; do
+  for id in "$C1_ID" "$C2_ID" "$C3_ID" "$C4_ID" "$C5_ID" "$C6_ID" "$C7_ID"; do
     [ -n "$id" ] && sf data delete record --sobject Contact --record-id "$id" --target-org "$TARGET_ORG" >/dev/null 2>&1 \
       && echo "  deleted Contact $id"
   done
@@ -148,10 +150,26 @@ apply_matched_seed_plan() {
 apply_matched_seed_plan_lines() {
   plan_lines="${1:-}"
 
-  printf '%s\n' "$plan_lines" | while IFS='|' read -r _email disposition target_id; do
+  while IFS='|' read -r _email disposition target_id; do
     [ -z "$_email$disposition$target_id" ] && continue
-    apply_matched_seed_plan "$disposition" "$target_id" || exit $?
-  done
+
+    if [ "$disposition" = "matched_seed" ] && [ -n "$target_id" ]; then
+      case "$target_id" in
+        *[!a-zA-Z0-9]*) echo "Refusing matched-seed re-check: unexpected Contact Id shape" >&2; return 4 ;;
+      esac
+
+      Q=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$target_id'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+      lc=$(echo "$Q" | field Lifecycle_Stage__c); ls=$(echo "$Q" | field Lead_Status__c)
+      if [ -n "$lc" ] || [ -n "$ls" ]; then
+        echo "  NOTE  dropped stale matched_seed $target_id (stage='$lc' status='$ls')"
+        continue
+      fi
+    fi
+
+    apply_matched_seed_plan "$disposition" "$target_id" || return $?
+  done <<PLAN
+$plan_lines
+PLAN
 }
 
 force_contact_seed_state() {
@@ -395,10 +413,69 @@ CLASS=$(classify_contact "zz-preload-missing-id-$STAMP@gmail.com" "" "" "")
 DISP="${CLASS%%|*}"; TARGET_ID="${CLASS#*|}"
 [ "$DISP" = "matched" ] && ok "classifier does not produce MATCHED_SEED without a Contact Id" || bad "classifier returned '$DISP' for missing Contact Id"
 [ -z "$TARGET_ID" ] && ok "missing-id plan carries no update target" || bad "missing-id plan carried target id '$TARGET_ID'"
-if apply_matched_seed_plan "matched_seed" ""; then
+if apply_matched_seed_plan_lines "zz-preload-missing-id-$STAMP@gmail.com|matched_seed|"; then
   bad "empty Contact Id update unexpectedly succeeded"
 else
   ok "empty Contact Id refused before Salesforce update"
+fi
+echo ""
+
+# --- Check H: pre-write re-check drops a stale matched_seed ------------------
+echo "Check H — pre-write re-check drops stale matched_seed rows:"
+if [ -n "$ACCT_ID" ]; then
+  C6_EMAIL="zz-preload-stale-seed-$STAMP@gmail.com"
+  C7_EMAIL="zz-preload-stale-control-$STAMP@gmail.com"
+  C6_ID=$(sf data create record --sobject Contact \
+    --values "LastName='ZZ_PRELOAD_SMOKE Stale Seed $STAMP' Email='$C6_EMAIL' AccountId='$ACCT_ID'" \
+    --target-org "$TARGET_ORG" --json 2>/dev/null | jqid)
+  C7_ID=$(sf data create record --sobject Contact \
+    --values "LastName='ZZ_PRELOAD_SMOKE Stale Control $STAMP' Email='$C7_EMAIL' AccountId='$ACCT_ID'" \
+    --target-org "$TARGET_ORG" --json 2>/dev/null | jqid)
+
+  if [ -n "$C6_ID" ] && [ -n "$C7_ID" ]; then
+    ok "stale-race fixture Contacts created ($C6_ID / $C7_ID)"
+    if force_contact_seed_state "$C6_ID" both_null && force_contact_seed_state "$C7_ID" both_null; then
+      Q6=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C6_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+      Q7=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C7_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+      c6_lc=$(echo "$Q6" | field Lifecycle_Stage__c); c6_ls=$(echo "$Q6" | field Lead_Status__c)
+      c7_lc=$(echo "$Q7" | field Lifecycle_Stage__c); c7_ls=$(echo "$Q7" | field Lead_Status__c)
+      [ -z "$c6_lc" ] && [ -z "$c6_ls" ] && [ -z "$c7_lc" ] && [ -z "$c7_ls" ] && ok "stale-race fixtures classify from both-null state" || bad "stale-race fixtures were not both-null before classify"
+
+      PLAN_LINES=$(classify_contacts \
+        "$C6_EMAIL" "$C6_ID" "$c6_lc" "$c6_ls" \
+        "$C7_EMAIL" "$C7_ID" "$c7_lc" "$c7_ls")
+      STALE_LINE=$(printf '%s\n' "$PLAN_LINES" | awk -F'|' -v e="$C6_EMAIL" '$1 == e {print; exit}')
+      CONTROL_LINE=$(printf '%s\n' "$PLAN_LINES" | awk -F'|' -v e="$C7_EMAIL" '$1 == e {print; exit}')
+      STALE_DISP=$(echo "$STALE_LINE" | cut -d'|' -f2); STALE_TARGET=$(echo "$STALE_LINE" | cut -d'|' -f3)
+      CONTROL_DISP=$(echo "$CONTROL_LINE" | cut -d'|' -f2); CONTROL_TARGET=$(echo "$CONTROL_LINE" | cut -d'|' -f3)
+      [ "$STALE_DISP" = "matched_seed" ] && [ "$STALE_TARGET" = "$C6_ID" ] && ok "stale-race row initially selected as MATCHED_SEED" || bad "stale-race row was not initially selected"
+      [ "$CONTROL_DISP" = "matched_seed" ] && [ "$CONTROL_TARGET" = "$C7_ID" ] && ok "stale-race control selected as MATCHED_SEED" || bad "stale-race control was not selected"
+
+      if force_contact_seed_state "$C6_ID" dnp_status_null; then
+        ok "stale-race row became non-null before write"
+        if apply_matched_seed_plan_lines "$PLAN_LINES"; then
+          ok "stale-race write pass completed"
+        else
+          bad "stale-race write pass failed"
+        fi
+
+        Q6=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C6_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+        Q7=$(sf data query --query "SELECT Lifecycle_Stage__c,Lead_Status__c FROM Contact WHERE Id='$C7_ID'" --target-org "$TARGET_ORG" --json 2>/dev/null)
+        [ "$(echo "$Q6" | field Lifecycle_Stage__c)" = "Do_Not_Prospect" ] && ok "stale-race row kept its non-null stage" || bad "stale-race row stage changed"
+        [ -z "$(echo "$Q6" | field Lead_Status__c)" ] && ok "stale-race row did not get Lead_Status__c = New" || bad "stale-race row was incorrectly seeded"
+        [ "$(echo "$Q7" | field Lifecycle_Stage__c)" = "Cold_Prospect" ] && ok "stale-race control was seeded" || bad "stale-race control stage was not seeded"
+        [ "$(echo "$Q7" | field Lead_Status__c)" = "New" ] && ok "stale-race control Lead_Status__c = New" || bad "stale-race control status was not seeded"
+      else
+        bad "could not stale the matched_seed fixture before write"
+      fi
+    else
+      bad "could not prepare stale-race fixtures as both-null"
+    fi
+  else
+    bad "stale-race fixture Contact insert failed"
+  fi
+else
+  bad "skipped (no Account from Check B)"
 fi
 echo ""
 
