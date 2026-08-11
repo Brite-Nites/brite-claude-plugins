@@ -14,20 +14,31 @@ Read the Greptile AI reviewer's verdict on an open PR, report its 0–5 confiden
 
 ```bash
 PR="$(gh pr view --json number -q .number)"
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-verdict.sh" --pr "$PR"
+VERDICT="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-verdict.sh" --pr "$PR")"
+STATE="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-gate-state.sh" --verdict "$VERDICT")"
 ```
 
-The verdict helper emits one JSON line: `{"present":true,"score":3,…}`, `{"present":true,"score":null,…}`, or `{"present":false}`. **Always read the score from the helper — never parse the Greptile comment yourself.**
+`greptile-verdict.sh` emits one JSON line: `{"present":true,"score":3,…}`, `{"present":true,"score":null,…}`, or `{"present":false}`. **Always read the score from the helper — never parse the Greptile comment yourself.** Read the verdict exactly once per check (below and in the convergence loop's re-review wait) — a second read moments later can only add noise, never a different answer.
+
+`{"present":false}` and a converged `5/5` are NOT the same outcome — the gate must never report one as if it were the other. `greptile-gate-state.sh` (pure, unit-tested in `tests/test-greptile-gate-state.sh`) classifies `VERDICT` into `STATE`, one of `NO_REVIEWER` | `CONVERGED` | `NEEDS_ROUND` — the gate's three PR-open-time terminal states.
 
 ## Workflow
 
 1. **Resolve the PR.** Use the PR number/url the user gave, else `gh pr view --json number,url` for the current branch. No PR → report and stop.
 
-2. **Read the verdict** via `greptile-verdict.sh --pr <PR>`.
-   - `present:false` → "No Greptile verdict — Greptile isn't installed or hasn't reviewed yet. **Skipping the gate.**" Exit 0. *(Never block a ship.)*
-   - `present:true` → report "Greptile scored this PR **N/5**" (or, `score:null`, "reviewed but posted no parseable score").
+2. **Read the verdict and classify it** (Quick start).
+   - `NO_REVIEWER` → terminal state **NO REVIEWER ON THIS REPO** — its own outcome, distinct from a pass and from a converged 5/5. Greptile isn't installed on this repo, or hasn't posted a review yet. Post it where a steward will see it — **once**, idempotently, so a re-run of this skill against the same PR doesn't pile up duplicate comments:
+     ```bash
+     MARKER="Greptile gate: NO REVIEWER ON THIS REPO"
+     if ! gh pr view "$PR" --json comments -q '.comments[].body' | grep -qF "$MARKER"; then
+       gh pr comment "$PR" --body "**${MARKER}.** Greptile isn't installed on this repo, or hasn't posted a review yet — no machine reviewed this PR. Non-blocking; a human reviewer should read the diff directly."
+     fi
+     ```
+     Then skip the gate (never blocks a ship). Report to the developer: "**NO REVIEWER ON THIS REPO** — Greptile isn't installed or hasn't reviewed yet. Skipping the gate." Exit 0. Carry the **NO REVIEWER ON THIS REPO** state into whatever you report upward (session summary, PR description, handoff) — see `/workflows:ship` Step 2b/Step 8.
+   - `CONVERGED` → already 5/5 → skip straight to the Final review (step 4).
+   - `NEEDS_ROUND` → report "Greptile scored this PR **N/5**" (or, `score:null`, "reviewed but posted no parseable score") and enter the convergence loop (step 3).
 
-3. **Convergence loop — repeat up to a maximum of 3 rounds, until the score is 5/5.** If the current score is already 5/5, skip straight to the Final review. Otherwise run a round (human-in-the-loop):
+3. **Convergence loop — repeat up to a maximum of 3 rounds, until the score is 5/5.** Otherwise run a round (human-in-the-loop):
    1. **Grill on intent — every round.** Run the `grill-with-docs` skill to align on requirements and sharpen terminology; capture decisions in CONTEXT.md / ADRs. Where Greptile flagged a *deliberate* choice, reply to its comment explaining the intent so it learns.
    2. **Fix the code.** Run `/workflows:review`; fix each finding with sequential-thinking and ultrathink; re-run `/workflows:review` until it returns nothing.
    3. **Confirm before pushing.** Show the developer the changes and get approval — every round is human-in-the-loop.
@@ -52,7 +63,7 @@ The verdict helper emits one JSON line: `{"present":true,"score":3,…}`, `{"pre
 
 ## Notes
 
-- **Skip-gracefully is mandatory.** Greptile absent → report + exit 0; never hard-fail a ship.
+- **Skip-gracefully is mandatory, but silence is not.** Greptile absent → **NO REVIEWER ON THIS REPO** (its own terminal state, posted to the PR and reported upward) + exit 0; never hard-fail a ship. Before BC-18947, absence and a pass produced the same exit-0 output — a repo with no reviewer read identically to a converged 5/5.
 - **@-handle.** `@greptile-apps` is the confirmed trigger handle for this org. If it ever changes, the await fails *safe* (`TIMED_OUT` rather than hang) — but update it here, since a wrong handle posts the comment and triggers nothing.
 - The verdict reader keys off the Greptile author and the latest comment by timestamp; the freshness classifier treats a pre-trigger comment as stale, so an old summary never reads as a fresh re-review. Because Greptile re-scores by **editing its summary in place** (the comment keeps its original `createdAt`), freshness is the latest of three signals — comment `createdAt`, the head-SHA check-run's `completed_at`, and the comment's `updated_at` — so an in-place re-score is not misread as no-response.
 - Requires authenticated `gh`, plus `jq` and `python3` (the helpers check and error clearly).

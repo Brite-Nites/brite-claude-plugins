@@ -143,11 +143,13 @@ Narrate: `Step 2b: Greptile gate...`
 
 The `greptile-gate` skill activates to read Greptile's verdict on the PR just created in Step 2 and converge it toward a 5/5 confidence score.
 
-- If Greptile isn't installed on the repo (or hasn't reviewed yet), the gate reports that and **skips** — it never blocks the ship.
+- If Greptile isn't installed on the repo (or hasn't reviewed yet), the gate reports the terminal state **NO REVIEWER ON THIS REPO** — distinct from a pass and from a converged 5/5, posted to the PR — and **skips**; it never blocks the ship.
 - If Greptile scored below 5/5, the gate runs up to 3 human-in-the-loop rounds (grill-with-docs → `/workflows:review` fix loop → push → `@greptile-apps` re-review → bounded wait), then a final independent review on 5/5.
 - **The gate never merges** — it converges and hands back; you merge manually.
 
 Because the gate runs *before* the terminal steps below, Steps 4–6 (compound-learnings, audit, handbook-drift) operate on the converged code. If the gate can't reach 5/5 in 3 rounds (or Greptile times out), it stops and hands you the remaining findings — decide whether to continue before the terminal steps run.
+
+Record the gate's terminal state (`NO REVIEWER ON THIS REPO` / `CONVERGED 5/5` / `N/5 — escalated after 3 rounds`) for the session summary in Step 8, so a steward landing the PR sees whether a machine reviewed it.
 
 Narrate: `Step 2b: Greptile gate... done`
 
@@ -257,6 +259,7 @@ Present a session summary:
 **Shipped**: [Issue ID] — [Title]
 **PR**: [URL]
 **Linear**: Updated to [status]
+**Greptile gate**: [NO REVIEWER ON THIS REPO / CONVERGED 5/5 / N/5 — escalated after 3 rounds]
 
 **Learnings captured**:
 - CLAUDE.md: [N] entries added/updated/pruned
