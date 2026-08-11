@@ -28,7 +28,8 @@
 # was bound to. stdout keeps the two-line contract.
 #
 #   --pr <ref>           PR number/url (required)
-#   --trigger <iso8601>  when "@greptile-apps please re-review" was posted (required)
+#   --trigger <iso8601>  when "@greptile-apps please re-review" was posted (required;
+#                        must carry a UTC offset — BC-18987, see greptile-freshness.sh)
 #   --max-wait <sec>     total bound, default 600 (anti-hang)
 #   --interval <sec>     poll interval, default 30
 #
@@ -64,6 +65,32 @@ case "$INTERVAL" in ''|*[!0-9]*) echo "--interval must be a non-negative integer
 [ "$INTERVAL" -ge 1 ] || INTERVAL=1
 
 now_iso() { python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z"))'; }
+
+# Validate --trigger before anything else runs (BC-18987). A naive or date-only
+# trigger PARSES — it just silently means the wrong instant, possibly hours in
+# the past — which is what let a bad trigger promote a stale comment to
+# FRESH_PASS downstream in greptile-freshness.sh. Rejecting it here, before the
+# deadline math and before any `gh` call, fails loudly at the cheapest possible
+# point instead of burning a poll's worth of API calls first and failing inside
+# the classifier anyway (it re-validates identically, since it is also called
+# directly by callers other than this loop).
+python3 - "$TRIGGER" <<'PY'
+import sys, datetime
+raw = sys.argv[1]
+try:
+    dt = datetime.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+except (ValueError, TypeError):
+    print(f"fatal: --trigger is not a valid ISO-8601 timestamp: {raw!r}", file=sys.stderr)
+    sys.exit(2)
+if dt.tzinfo is None:
+    print(
+        f"fatal: --trigger has no UTC offset: {raw!r} — a naive timestamp is "
+        "silently ambiguous and can misclassify a stale review as fresh; "
+        "pass a timezone-aware value (e.g. a trailing Z)",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+PY
 
 # deadline = trigger + max-wait
 DEADLINE="$(python3 - "$TRIGGER" "$MAX_WAIT" <<'PY'

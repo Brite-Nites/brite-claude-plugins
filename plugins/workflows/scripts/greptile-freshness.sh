@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # greptile-freshness.sh — classify the state of a Greptile re-review wait.
 #
-#   --trigger <iso8601>     when the re-review was requested
+#   --trigger <iso8601>     when the re-review was requested. Must carry a UTC
+#                           offset (e.g. a trailing Z) — a naive or date-only
+#                           value is REJECTED (exit non-zero), not coerced, per
+#                           BC-18987: it anchors every comparison below, so a
+#                           silent misparse there is a confident wrong answer,
+#                           not an absent one.
 #   --now <iso8601>         current time
 #   --deadline <iso8601>    trigger + max-wait (the anti-hang bound)
 #   --verdict-ts <iso8601>  commented_at of the latest Greptile comment (empty if none)
@@ -44,6 +49,20 @@
 # back to timestamps when the footer is unreadable would restore exactly the hole
 # BC-18961 opened, and BC-18947 already settled the principle for this helper
 # family: absence gets its own state, never a pass.
+#
+# TRIGGER VALIDATION (BC-18987). Every OTHER timestamp here degrades gracefully
+# on bad input — unparseable becomes empty, which reads as PENDING (see the
+# --review-ts / --edited-ts robustness cases in the test suite). --trigger does
+# NOT get that treatment. A garbage trigger is obviously wrong and safely
+# absent; a naive or date-only trigger PARSES — it just silently means the
+# wrong instant, one that can sit hours in the past — which lets it promote a
+# pre-trigger comment to FRESH_PASS. Coercing it to UTC (the old behaviour) was
+# exactly backwards: it made the near-miss more dangerous than garbage, not
+# less. So --trigger is checked up front and rejected outright (exit non-zero)
+# rather than fed through the lenient parser. The SHA identity binding
+# (BC-18961) still contains this hazard for a trigger that is syntactically
+# valid but semantically wrong (e.g. reused from an earlier round) — that is
+# a different problem and out of scope here.
 #
 # Pure classifier — ISO-8601 parse/compare via python3 (robust across
 # BSD/GNU date). The poll/sleep wait-loop lives in the gate skill, not here.
@@ -89,9 +108,33 @@ def parse(s):
         dt = dt.replace(tzinfo=datetime.timezone.utc)  # naive → UTC, never crash on compare
     return dt
 
+
+def parse_trigger(s):
+    """--trigger only (BC-18987). Same grammar as parse(), but a naive result
+    is a hard failure instead of a silent UTC coercion — a near-miss trigger is
+    a confident wrong answer, not an absent one, so it does not get to degrade
+    quietly the way garbage does. Unparseable input still fails loudly too,
+    since a required anchor with no value at all is exactly as unusable."""
+    try:
+        dt = datetime.datetime.fromisoformat((s or "").replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        print(f"fatal: --trigger is not a valid ISO-8601 timestamp: {s!r}", file=sys.stderr)
+        sys.exit(2)
+    if dt.tzinfo is None:
+        print(
+            f"fatal: --trigger has no UTC offset: {s!r} — a naive timestamp is "
+            "silently ambiguous and can misclassify a stale review as fresh; "
+            "pass a timezone-aware value (e.g. a trailing Z)",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    return dt
+
+
 argv = (sys.argv[1:11] + [""] * 10)[:10]
 trigger, now, deadline, vts, score, rts, ets, present, reviewed_sha, head_sha = argv
-t, v, n, d, r = parse(trigger), parse(vts), parse(now), parse(deadline), parse(rts)
+t = parse_trigger(trigger)
+v, n, d, r = parse(vts), parse(now), parse(deadline), parse(rts)
 e = parse(ets)
 
 
