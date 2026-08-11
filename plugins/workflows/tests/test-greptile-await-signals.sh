@@ -61,7 +61,16 @@ emit() { # emit <file> — apply a --jq program if one was requested
 }
 case "$args" in
   *"--json headRepositoryOwner,headRepository"*) echo "Brite-Nites/mission-control" ;;
-  *"--json headRefOid"*)  cat "$FIX/head_sha.txt" ;;
+  *"--json headRefOid"*)
+    # head_fails.txt lets a test simulate N consecutive transient `gh` failures
+    # before the call starts succeeding — the TLS-error shape seen live.
+    n="$(cat "$FIX/head_fails.txt" 2>/dev/null || echo 0)"
+    if [ "${n:-0}" -gt 0 ]; then
+      echo $((n - 1)) > "$FIX/head_fails.txt"
+      echo "fake gh: transient failure" >&2
+      exit 1
+    fi
+    cat "$FIX/head_sha.txt" ;;
   *"--json url"*)         echo "https://github.com/Brite-Nites/mission-control/pull/2" ;;
   *"--json comments,reviews"*) cat "$FIX/comments.json" ;;
   *check-runs*)           emit "$FIX/check-runs.json" "$@" ;;
@@ -86,13 +95,19 @@ set_summary() {
 }
 echo "$SHA_HEAD" > "$GREPTILE_FIXTURES/head_sha.txt"
 
-# run_await — one evaluation (max-wait 0 makes the deadline the trigger, so a
-# non-fresh poll lands on TIMED_OUT instead of sleeping). STATE and TRACE are set.
+# run_await [max-wait] — default 0, which puts the deadline AT the trigger so a
+# single non-fresh poll lands on TIMED_OUT instead of sleeping. Pass a large
+# max-wait to let the loop actually poll more than once.
+#
+# Always wrapped in `timeout`: a multi-poll case that fails to converge would
+# otherwise spin for the whole max-wait. A prior regression test in this repo
+# hung the code it was testing; this harness fails in seconds instead.
+echo 0 > "$GREPTILE_FIXTURES/head_fails.txt"
 run_await() {
   local out
   set +e
-  out="$(PATH="$TMP/bin:$PATH" bash "$AWAIT" --pr 2 --trigger "$TRIGGER" \
-          --max-wait 0 --interval 1 2>"$TMP/stderr")"
+  out="$(PATH="$TMP/bin:$PATH" timeout 30 bash "$AWAIT" --pr 2 --trigger "$TRIGGER" \
+          --max-wait "${1:-0}" --interval 1 2>"$TMP/stderr")"
   set -e
   STATE="$(printf '%s' "$out" | tail -1)"
   TRACE="$(cat "$TMP/stderr")"
@@ -174,6 +189,36 @@ set_check_runs "[{\"name\":\"Greptile Review\",\"status\":\"completed\",\"conclu
 set_summary "$SHA_HEAD" 3
 run_await
 assert_state "bound-but-failing" "FRESH_FAIL"
+
+# ── 9. a transient head-resolution failure RECOVERS on the next poll ─
+# Raised by Greptile on PR #580, and correctly. The head is re-read every poll so
+# a `gh` flake can clear — but the first draft routed an empty head to the
+# terminal UNBOUND, which ended the wait on exactly the failure the re-read was
+# added to survive. `gh` fails once here, then succeeds; the wait must continue
+# and then pass. Multi-poll on purpose: every other case here is single-poll,
+# which is why the defect got through.
+section 9 "transient gh failure on the head → wait continues, next poll passes"
+set_check_runs "[{\"name\":\"Greptile Review\",\"status\":\"completed\",\"conclusion\":\"success\",\"completed_at\":\"$REAL_DONE\"}]"
+set_summary "$SHA_HEAD" 5
+echo 1 > "$GREPTILE_FIXTURES/head_fails.txt"     # fail once, then recover
+run_await 86400                                   # deadline far out, so it polls again
+assert_state "transient-head-failure-recovers" "FRESH_PASS"
+assert_trace "first poll shows the unresolved head" "head=<unresolved>"
+if [ "$(grep -c '^poll=' "$TMP/stderr")" -ge 2 ]; then
+  pass "the wait actually polled more than once"
+else
+  fail "expected >=2 polls, trace shows: $TRACE"
+fi
+echo 0 > "$GREPTILE_FIXTURES/head_fails.txt"
+
+# ── 10. an unresolved head still never becomes a pass ────────────────
+# The recovery in case 9 must not weaken the safety property. With `gh` failing
+# every time, the wait is bounded and ends without a verdict — never FRESH_*.
+section 10 "head never resolves → bounded TIMED_OUT, never a pass"
+echo 99 > "$GREPTILE_FIXTURES/head_fails.txt"     # fails on every poll
+run_await 3
+assert_state "unresolved-head-never-passes" "TIMED_OUT"
+echo 0 > "$GREPTILE_FIXTURES/head_fails.txt"
 
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-18961 greptile-await signal-read tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"

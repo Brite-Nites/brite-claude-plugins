@@ -290,15 +290,24 @@ run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLIN
   --present true --reviewed-sha "" --head-sha "$SHA_HEAD"
 assert_state "unreadable-footer" "UNBOUND"
 
-# ── 29. UNBOUND: head unresolved (gh flake) ───────────────────────────
+# ── 29. head unresolved is TRANSIENT → PENDING, not UNBOUND ───────────
 # `api.github.com` threw TLS errors three times during the incident run, so an
-# unresolvable head is a live failure mode, not a hypothetical. Half an identity
-# check is not an identity check.
-section 29 "head SHA unresolved → UNBOUND"
+# unresolvable head is a live failure mode, not a hypothetical. It must stay
+# recoverable: the head is re-read every poll precisely so a flake can clear, and
+# returning a terminal state here would throw that away. Distinct from case 28 —
+# an absent footer never recovers, a failed API call often does.
+section 29 "head SHA unresolved (transient) → PENDING, recoverable"
 run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
   --verdict-ts "$TS_FRESH" --score 5 \
   --present true --reviewed-sha "$SHA_HEAD" --head-sha ""
-assert_state "head-unresolved" "UNBOUND"
+assert_state "head-unresolved-recoverable" "PENDING"
+
+# ── 29b. …but it is still bounded, and still never a pass ─────────────
+section "29b" "head unresolved past the deadline → TIMED_OUT, never FRESH"
+run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_PAST" --deadline "$DEADLINE" \
+  --verdict-ts "$TS_FRESH" --score 5 \
+  --present true --reviewed-sha "$SHA_HEAD" --head-sha ""
+assert_state "head-unresolved-bounded" "TIMED_OUT"
 
 # ── 30. no verdict at all is PENDING, not UNBOUND ─────────────────────
 # UNBOUND means "a verdict exists that I cannot bind". Silence still means wait.

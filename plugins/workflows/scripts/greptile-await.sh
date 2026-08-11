@@ -95,7 +95,11 @@ REPO="$(gh pr view "$PR" --json headRepositoryOwner,headRepository -q '(.headRep
 head_sha() {
   gh pr view "$PR" --json headRefOid -q .headRefOid 2>/dev/null || true
 }
-HEAD_SHA="$(head_sha)"
+# Deliberately NOT resolved here. The loop re-reads it as its first action, so a
+# startup read would be a second API call whose value is never used — and it
+# would silently absorb the first transient failure, hiding the recovery path
+# from anything trying to exercise it. Declared only to satisfy `set -u`.
+HEAD_SHA=""
 
 # Comment-edit freshness signal (BC-12580 / BC-17025). Greptile re-scores by
 # EDITING its summary comment, which bumps only the comment's updated_at —

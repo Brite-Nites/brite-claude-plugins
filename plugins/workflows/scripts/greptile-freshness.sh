@@ -17,7 +17,13 @@
 #   FRESH_FAIL  same, score != 5 (including null)
 #   PENDING     not yet — includes "the score is bound to a DIFFERENT commit"
 #   TIMED_OUT   still not, and now >= deadline
-#   UNBOUND     a verdict exists but its binding cannot be read — cannot verify, never a pass
+#   UNBOUND     a verdict exists but its FOOTER cannot be read — cannot verify, never a pass
+#
+# UNBOUND vs PENDING when identity is unavailable — the distinction is which
+# failure recovers. An unreadable footer does not: polling cannot make it appear,
+# so it is terminal. An unresolved HEAD does: it means `gh` threw, and the next
+# poll re-reads it. Collapsing the two would end a wait on a transient network
+# error, which is why they are separate branches below.
 #
 # TWO CONDITIONS, BOTH REQUIRED (BC-18961)
 #
@@ -117,11 +123,20 @@ timed_out = n is not None and d is not None and n >= d
 if str(present).lower() != "true":
     # No Greptile verdict at all yet — nothing to bind. Keep waiting.
     print("TIMED_OUT" if timed_out else "PENDING")
-elif not rsha or not hsha:
-    # A verdict exists but we cannot tell which commit it describes: the summary
-    # footer did not parse, or the head never resolved. More polling cannot make
-    # an unreadable footer readable, so say so now rather than burn the deadline
-    # and land on a state that reads like "Greptile went quiet".
+elif not hsha:
+    # The HEAD did not resolve. This is a TRANSIENT failure — `gh` threw, or the
+    # API was briefly unreachable (TLS verification errors hit three times during
+    # the BC-18961 run). The next poll re-reads it and may well succeed, so this
+    # must NOT be terminal: ending the wait here would waste the very per-poll
+    # re-read that was added to recover from it. Keep waiting; the deadline still
+    # bounds us, and an unresolved head can never produce a pass.
+    print("TIMED_OUT" if timed_out else "PENDING")
+elif not rsha:
+    # The head resolved, but the summary footer did not parse — so we have a
+    # verdict and no way to tell which commit it describes. Unlike the case
+    # above, this does NOT recover: polling cannot make an absent footer appear.
+    # Say so immediately rather than burn the deadline and land on a state that
+    # reads like "Greptile went quiet". Most likely a format change upstream.
     print("UNBOUND")
 elif not sha_match:
     # CONDITION 1 FAILS — this is mission-control#2. The score describes a
