@@ -14,30 +14,27 @@ Read the Greptile AI reviewer's verdict on an open PR, report its 0–5 confiden
 
 ```bash
 PR="$(gh pr view --json number -q .number)"
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-verdict.sh" --pr "$PR"
-```
-
-The verdict helper emits one JSON line: `{"present":true,"score":3,…}`, `{"present":true,"score":null,…}`, or `{"present":false}`. **Always read the score from the helper — never parse the Greptile comment yourself.**
-
-`{"present":false}` and a converged `5/5` are NOT the same outcome — the gate must never report one as if it were the other. Classify the verdict with `greptile-gate-state.sh` (pure, unit-tested in `tests/test-greptile-gate-state.sh`) before deciding what to do next:
-
-```bash
 VERDICT="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-verdict.sh" --pr "$PR")"
 STATE="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-gate-state.sh" --verdict "$VERDICT")"
 ```
 
-`STATE` is one of `NO_REVIEWER` | `CONVERGED` | `NEEDS_ROUND` — the gate's three PR-open-time terminal states.
+`greptile-verdict.sh` emits one JSON line: `{"present":true,"score":3,…}`, `{"present":true,"score":null,…}`, or `{"present":false}`. **Always read the score from the helper — never parse the Greptile comment yourself.** Read the verdict exactly once per check (below and in the convergence loop's re-review wait) — a second read moments later can only add noise, never a different answer.
+
+`{"present":false}` and a converged `5/5` are NOT the same outcome — the gate must never report one as if it were the other. `greptile-gate-state.sh` (pure, unit-tested in `tests/test-greptile-gate-state.sh`) classifies `VERDICT` into `STATE`, one of `NO_REVIEWER` | `CONVERGED` | `NEEDS_ROUND` — the gate's three PR-open-time terminal states.
 
 ## Workflow
 
 1. **Resolve the PR.** Use the PR number/url the user gave, else `gh pr view --json number,url` for the current branch. No PR → report and stop.
 
-2. **Read the verdict** via `greptile-verdict.sh --pr <PR>`, then classify it (above).
-   - `NO_REVIEWER` → terminal state **NO REVIEWER ON THIS REPO** — its own outcome, distinct from a pass and from a converged 5/5. Greptile isn't installed on this repo, or hasn't posted a review yet. Post it where a steward will see it, then skip the gate (never blocks a ship):
+2. **Read the verdict and classify it** (Quick start).
+   - `NO_REVIEWER` → terminal state **NO REVIEWER ON THIS REPO** — its own outcome, distinct from a pass and from a converged 5/5. Greptile isn't installed on this repo, or hasn't posted a review yet. Post it where a steward will see it — **once**, idempotently, so a re-run of this skill against the same PR doesn't pile up duplicate comments:
      ```bash
-     gh pr comment "$PR" --body "**Greptile gate: NO REVIEWER ON THIS REPO.** Greptile isn't installed on this repo, or hasn't posted a review yet — no machine reviewed this PR. Non-blocking; a human reviewer should read the diff directly."
+     MARKER="Greptile gate: NO REVIEWER ON THIS REPO"
+     if ! gh pr view "$PR" --json comments -q '.comments[].body' | grep -qF "$MARKER"; then
+       gh pr comment "$PR" --body "**${MARKER}.** Greptile isn't installed on this repo, or hasn't posted a review yet — no machine reviewed this PR. Non-blocking; a human reviewer should read the diff directly."
+     fi
      ```
-     Report to the developer: "**NO REVIEWER ON THIS REPO** — Greptile isn't installed or hasn't reviewed yet. Skipping the gate." Exit 0. Carry the **NO REVIEWER ON THIS REPO** state into whatever you report upward (session summary, PR description, handoff) — see `/workflows:ship` Step 2b/Step 8.
+     Then skip the gate (never blocks a ship). Report to the developer: "**NO REVIEWER ON THIS REPO** — Greptile isn't installed or hasn't reviewed yet. Skipping the gate." Exit 0. Carry the **NO REVIEWER ON THIS REPO** state into whatever you report upward (session summary, PR description, handoff) — see `/workflows:ship` Step 2b/Step 8.
    - `CONVERGED` → already 5/5 → skip straight to the Final review (step 4).
    - `NEEDS_ROUND` → report "Greptile scored this PR **N/5**" (or, `score:null`, "reviewed but posted no parseable score") and enter the convergence loop (step 3).
 
