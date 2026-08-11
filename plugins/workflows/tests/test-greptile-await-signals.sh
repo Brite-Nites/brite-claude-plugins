@@ -13,6 +13,12 @@
 # nothing, emptying review_ts on every poll. Every unit test still passed. Only
 # running it against a real PR exposed it. These cases close that hole.
 #
+# Case 12 covers a second, narrower gap (BC-18987): the classifier's own
+# --trigger rejection is unit-tested in test-greptile-freshness.sh, but
+# greptile-await.sh re-validates the same trigger itself, earlier, before
+# resolving REPO or entering the poll loop — and that entry-point behavior had
+# no coverage of its own. Flagged by Greptile on this PR's own review.
+#
 # Method: a fake `gh` first on PATH, answering from fixtures. Hermetic — no
 # network, fixed timestamps, no `date` calls. Bash 3.2 compatible.
 
@@ -241,6 +247,40 @@ assert_trace "verdict_ts is empty, NOT the string 'false'" "verdict_ts=-"
 case "$TRACE" in
   *"verdict_ts=false"*) fail "field shift: 'false' leaked into verdict_ts — $TRACE" ;;
   *) pass "no field shift — 'present' did not leak into an earlier field" ;;
+esac
+
+# ── 12. bad --trigger is rejected before any gh call (BC-18987) ──────
+# The trigger check is pure argument validation and runs before REPO is
+# resolved or the poll loop starts. Point PATH at a `gh` that unconditionally
+# fails loudly, so if validation did NOT run first, the failure this test sees
+# would be a confusing "gh command failed" rather than the parser's own clear
+# message — that distinction is what proves the ordering, not just the exit
+# code.
+section 12 "bad trigger — rejected before any gh call, not a gh failure"
+mkdir -p "$TMP/bin-unreachable"
+cat > "$TMP/bin-unreachable/gh" <<'STUB'
+#!/usr/bin/env bash
+echo "fake gh: should never be called for a rejected trigger" >&2
+exit 1
+STUB
+chmod +x "$TMP/bin-unreachable/gh"
+set +e
+BAD_OUT="$(PATH="$TMP/bin-unreachable:$PATH" timeout 10 bash "$AWAIT" --pr 2 --trigger "2026-08-11T12:33:58" --max-wait 5 --interval 1 2>"$TMP/stderr")"
+BAD_EXIT=$?
+set -e
+BAD_ERR="$(cat "$TMP/stderr")"
+if [ "$BAD_EXIT" -ne 0 ] && [ -z "$BAD_OUT" ]; then
+  pass "bad-trigger-nonzero-exit-no-state"
+else
+  fail "bad-trigger-nonzero-exit-no-state: EXIT=$BAD_EXIT STDOUT=$BAD_OUT"
+fi
+case "$BAD_ERR" in
+  *"no UTC offset"*) pass "bad-trigger-error-message" ;;
+  *) fail "bad-trigger-error-message: stderr lacks 'no UTC offset' — got: $BAD_ERR" ;;
+esac
+case "$BAD_ERR" in
+  *"should never be called"*) fail "bad-trigger-called-gh: fake gh was invoked despite rejection — $BAD_ERR" ;;
+  *) pass "bad-trigger-never-called-gh" ;;
 esac
 
 # ──────────────────────────────────────────────────────────────────────
