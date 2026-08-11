@@ -1,0 +1,11 @@
+{
+  "comments": [
+    {
+      "id": "IC_decoy",
+      "author": { "login": "greptile-apps" },
+      "body": "<h3>Confidence Score: 4/5</h3>\n\nThis regressed in [an earlier change](https://github.com/brite-nites/mission-control/commit/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef), which is worth a look. No summary footer is present on this comment.\n",
+      "createdAt": "2026-08-11T17:15:30Z",
+      "url": "https://github.com/brite-nites/mission-control/pull/2#issuecomment-1"
+    }
+  ]
+}

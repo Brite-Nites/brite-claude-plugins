@@ -3,15 +3,29 @@
 # or the wait times out. The thin IO/sleep shell that composes:
 #   greptile-verdict.sh   (read the latest verdict)   +
 #   greptile-freshness.sh (classify vs the trigger time, with a deadline)
-# Freshness keys on max(comment createdAt, head-SHA check-run completed_at,
-# comment updated_at), so an in-place-edited re-review (Greptile edits its summary
-# rather than reposting) is not misread as stale → false TIMED_OUT (BC-16924 added
-# the check-run signal; BC-12580 / BC-17025 added the comment-edit signal, which
-# also covers the case where the check-run completed BEFORE the trigger).
+# A pass requires BOTH conditions (BC-18961):
+#   IDENTITY  the summary's "Last reviewed commit" == the PR's current head, so
+#             the score is known to describe THIS head and not a previous one.
+#   TIME      max(comment createdAt, head-SHA check-run completed_at, comment
+#             updated_at) > trigger, so an in-place-edited re-review (Greptile
+#             edits its summary rather than reposting) is not misread as stale →
+#             false TIMED_OUT (BC-16924 added the check-run signal; BC-12580 /
+#             BC-17025 added the comment-edit signal, which also covers the case
+#             where the check-run completed BEFORE the trigger).
+#
+# Time alone was the bug: on mission-control#2 a Greptile ACK check-run completed
+# 8s after the trigger while the summary still carried the PREVIOUS head's 5/5,
+# and the helper reported FRESH_PASS on a score bound to a commit that was no
+# longer the head. Identity is the condition that cannot be faked by a clock.
 #
 # Prints the terminal state on the last line:
-#   FRESH_PASS | FRESH_FAIL | TIMED_OUT
+#   FRESH_PASS | FRESH_FAIL | TIMED_OUT | UNBOUND
 # followed by the final verdict JSON (for the caller to surface the score).
+# UNBOUND = a verdict exists but its commit binding could not be read. It is NOT
+# a pass and NOT a timeout; it means "verify by hand" (see greptile-freshness.sh).
+#
+# A per-poll trace goes to STDERR — which signal fired, and which commit the score
+# was bound to. stdout keeps the two-line contract.
 #
 #   --pr <ref>           PR number/url (required)
 #   --trigger <iso8601>  when "@greptile-apps please re-review" was posted (required)
@@ -60,16 +74,28 @@ print(d.isoformat().replace("+00:00", "Z"))
 PY
 )"
 
-# Head-SHA freshness signal (BC-16924). Resolve the PR's repo + HEAD sha ONCE
-# (they don't change during a single wait); the check-run itself is re-read each
-# poll because it completes DURING the wait. If resolution fails, review_ts is
-# empty and freshness degrades to the verdict-ts-only behavior — no regression.
-# NOTE: uses the PR's HEAD repository — correct for same-repo PRs (the norm here).
-# A fork PR resolves to the fork, whose commit may lack the base-repo Greptile
-# check-run → review_ts empty → verdict-ts-only fallback (no crash). Fork PRs are
-# out of scope for this gate.
+# Head-SHA freshness signal (BC-16924). The repo doesn't change during a wait, so
+# it is resolved once. NOTE: uses the PR's HEAD repository — correct for same-repo
+# PRs (the norm here). A fork PR resolves to the fork, whose commit may lack the
+# base-repo Greptile check-run → review_ts empty (no crash). Fork PRs are out of
+# scope for this gate.
 REPO="$(gh pr view "$PR" --json headRepositoryOwner,headRepository -q '(.headRepositoryOwner.login // "") + "/" + (.headRepository.name // "")' 2>/dev/null || true)"
-HEAD_SHA="$(gh pr view "$PR" --json headRefOid -q .headRefOid 2>/dev/null || true)"
+
+# The HEAD SHA, by contrast, is re-read EVERY poll (BC-18961). It was resolved
+# once before the loop, on the reasoning that a PR's head does not move during a
+# single wait. Two things are wrong with that:
+#   1. It is not true. A push during the wait moves the head, and the gate should
+#      then be waiting for a review of the NEW head, not the one it started with.
+#   2. A single transient `gh` failure at startup pinned HEAD_SHA empty for the
+#      WHOLE wait. Re-reading gives every poll a fresh chance to recover — which
+#      matters here, because `api.github.com` threw TLS verification errors three
+#      times during the incident run.
+# Now that the head is load-bearing (it is half of the identity check), a stale or
+# empty value must not persist: empty head → UNBOUND, never a pass.
+head_sha() {
+  gh pr view "$PR" --json headRefOid -q .headRefOid 2>/dev/null || true
+}
+HEAD_SHA="$(head_sha)"
 
 # Comment-edit freshness signal (BC-12580 / BC-17025). Greptile re-scores by
 # EDITING its summary comment, which bumps only the comment's updated_at —
@@ -138,19 +164,45 @@ edited_ts() {
 }
 
 review_ts() {
-  # Latest completed_at among Greptile check-runs on HEAD (empty if none/pending).
-  # An in-progress check-run has a null completed_at → empty → not yet fresh.
+  # Latest completed_at among Greptile check-runs on HEAD that actually CARRY A
+  # REVIEW VERDICT (empty if none/pending). An in-progress run has a null
+  # completed_at → empty → not yet fresh.
   [ -n "$HEAD_SHA" ] && [ -n "$REPO" ] && [ "$REPO" != "/" ] || { echo ""; return; }
   # per_page=100 so the Greptile run can't fall off page 1 on a busy HEAD (the
   # default 30 would silently empty review_ts → revert to the bug). Keep the
   # case-insensitive name filter (robust if Greptile ever renames the check).
   # Same `if out=$(...)` guard as edited_ts: on a bad SHA `gh api` writes the
   # error body to stdout, which a trailing `|| echo ""` would NOT suppress.
+  #
+  # CONCLUSION FILTER (BC-18961). `status == "completed"` alone is NOT enough.
+  # Greptile puts more than one check-run named "Greptile Review" on a single
+  # head: an ACK run that finishes in seconds with conclusion `neutral`, then the
+  # real review that finishes with `success`. On mission-control#2 the ack
+  # completed at 17:34:06Z — 8s after the trigger, and 4s before the real review
+  # even started — so a status-only filter reported "a review finished on your
+  # head" while the summary still held the PREVIOUS head's 5/5.
+  #
+  # Allow-list, not a deny-list: only conclusions that mean "a verdict was
+  # reached" count. A conclusion Greptile invents tomorrow is excluded by
+  # default, which delays a pass rather than fabricating one.
+  #
+  # NOTE for anyone re-checking this by hand: the check-runs endpoint defaults to
+  # `filter=latest`, which returns only the newest run PER NAME and therefore
+  # HIDES the ack run entirely. Add `filter=all` or you will see one run and
+  # conclude, wrongly, that this filter is unnecessary. That default is why the
+  # defect went unexplained through two investigations.
   local out
   if out="$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100" --jq '
     [ .check_runs[]
       | select((.name // "") | test("greptile"; "i"))
       | select(.status == "completed")
+      # Bind the conclusion BEFORE piping the allow-list: inside `[…] | index(X)`
+      # the input `.` is the LIST, so a bare `.conclusion` there reads the array,
+      # not the check-run, and silently matches nothing. That mistake empties
+      # review_ts on every poll — the failure is a false TIMED_OUT, which is safe
+      # but useless, and no classifier unit test would catch it.
+      | (.conclusion // "") as $c
+      | select(["success","failure","action_required"] | index($c))
       | (.completed_at // "") ]
     | map(select(. != "")) | sort | last // ""' 2>/dev/null)"; then
     printf '%s\n' "$out"
@@ -183,14 +235,19 @@ while [ "$i" -lt "$max_iters" ]; do
   # `cid` is carried over from the PREVIOUS poll rather than read here. Greptile edits
   # in place, so the id is stable across the wait. On the first poll `cid` is empty and
   # the edit signal simply doesn't participate (the other two still do).
+  # Re-read the head FIRST, so the check-run and the identity check below both
+  # describe the same commit this poll is asking about.
+  HEAD_SHA="$(head_sha)"
   rts="$(review_ts)"      # head-SHA Greptile check-run completed_at (BC-16924)
   ets_cid="$cid"          # the id `ets` is about (see the id-match guard below)
   ets="$(edited_ts "$ets_cid")"  # that comment's updated_at, if edited since trigger
   verdict="$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')"
-  # One jq pass extracts all three fields (tab-separated) to save forks per poll.
-  # `cid` is refreshed here for the NEXT poll's edit read.
-  IFS="$(printf '\t')" read -r score vts cid <<EOF
-$(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // ""), (.comment_id // "")] | @tsv')
+  # One jq pass extracts every field (tab-separated) to save forks per poll.
+  # `cid` is refreshed here for the NEXT poll's edit read. `rsha` is the commit
+  # the score is bound to — read from the SAME body as the score, so the two
+  # cannot describe different rounds.
+  IFS="$(printf '\t')" read -r score vts cid present rsha <<EOF
+$(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // ""), (.comment_id // ""), ((.present // false) | tostring), (.reviewed_sha // "")] | @tsv')
 EOF
   # Id-match guard: `ets` was read for the PREVIOUS poll's selected comment. If the
   # verdict has since selected a DIFFERENT object (Greptile posted a second comment,
@@ -199,9 +256,27 @@ EOF
   # verdict-ts / review-ts, which already see a newly-posted comment via its
   # post-trigger createdAt. Cheap, and makes the binding exact under selection churn.
   [ -n "$ets_cid" ] && [ "$ets_cid" = "$cid" ] || ets=""
-  state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --edited-ts "$ets" --score "$score")"
+  state="$("$FRESHNESS" --trigger "$TRIGGER" --now "$(now_iso)" --deadline "$DEADLINE" --verdict-ts "$vts" --review-ts "$rts" --edited-ts "$ets" --score "$score" --present "$present" --reviewed-sha "$rsha" --head-sha "$HEAD_SHA")"
+  # Per-poll trace to stderr (BC-18961 step 4). stdout stays exactly the two-line
+  # contract — verdict JSON, then state — so callers are unaffected; `2>&1` or a
+  # redirect captures this. The whole investigation cost of this defect was that
+  # nobody could see WHICH signal fired or WHAT commit the score described, and
+  # the deciding evidence (an ack check-run) was gone from every later query by
+  # the time anyone looked. Print it while it is still true.
+  # Binding note. Prefix-tolerant in both directions, matching the classifier's
+  # rule so the trace can't say MISMATCH on an abbreviated id the classifier
+  # accepted. `state` remains the authoritative answer; this only explains it.
+  bind_note=""
+  if [ -n "$rsha" ] && [ -n "$HEAD_SHA" ]; then
+    bind_note=" (MISMATCH — score describes another commit)"
+    case "$HEAD_SHA" in "$rsha"*) bind_note=" (MATCH)" ;; esac
+    case "$rsha" in "$HEAD_SHA"*) bind_note=" (MATCH)" ;; esac
+  fi
+  printf 'poll=%s state=%s head=%s bound=%s%s score=%s verdict_ts=%s review_ts=%s edited_ts=%s\n' \
+    "$i" "$state" "${HEAD_SHA:-<unresolved>}" "${rsha:-<unreadable>}" "$bind_note" \
+    "$score" "${vts:--}" "${rts:--}" "${ets:--}" >&2
   case "$state" in
-    FRESH_PASS|FRESH_FAIL|TIMED_OUT)
+    FRESH_PASS|FRESH_FAIL|TIMED_OUT|UNBOUND)
       printf '%s\n%s\n' "$verdict" "$state"
       exit 0 ;;
     PENDING)

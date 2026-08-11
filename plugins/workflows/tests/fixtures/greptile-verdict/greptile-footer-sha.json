@@ -1,0 +1,11 @@
+{
+  "comments": [
+    {
+      "id": "IC_kwDOTTxcP88AAAABOU7ZPw",
+      "author": { "login": "greptile-apps" },
+      "body": "<h3>Confidence Score: 5/5</h3>\n\nThis PR closes the gaps an independent review found.\n\n<sub>Reviews (3): Last reviewed commit: [\"Close the gaps an independent review fou...\"](https://github.com/brite-nites/mission-control/commit/2323f2ac830135fb438fecdcfa2a6f57d01ed8c2) | [Re-trigger Greptile](https://app.greptile.com/api/retrigger?id=52276934)</sub>\n",
+      "createdAt": "2026-08-11T17:15:30Z",
+      "url": "https://github.com/brite-nites/mission-control/pull/2#issuecomment-5256658762"
+    }
+  ]
+}

@@ -214,6 +214,51 @@ else
   fail "expected score:5 from heading — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
 fi
 
+# ══ BC-18961: reviewed_sha — the commit the score is BOUND to ═════════
+#
+# The gate's real question is "is this score about MY head?", and only this field
+# answers it. `commented_at` cannot: it is the comment's createdAt, and Greptile
+# re-scores by editing the summary in place, so it never moves. On the live PR it
+# still reads 17:15:30Z for a review that happened at 17:35:31Z.
+
+# ── 15. the SHA is read from the summary footer ──────────────────────
+section 15 "footer — 'Last reviewed commit' yields the bound SHA"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-footer-sha.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.reviewed_sha')" = "2323f2ac830135fb438fecdcfa2a6f57d01ed8c2" ]; then
+  pass "reviewed_sha parsed from the footer"
+else
+  fail "expected the full head SHA — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 16. a commit link in prose is NOT the binding ────────────────────
+# The regex anchors on the "last reviewed commit" label, not on /commit/ alone.
+# Without that anchor, any commit Greptile happens to cite in its review prose
+# could be mistaken for the binding — which would be worse than having no
+# binding, because it would be confidently wrong.
+section 16 "decoy — commit link in prose, no footer → null, not a false binding"
+run_capture "$VERDICT" --comments-file "$FIXTURES/greptile-decoy-commit-link.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "4" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.reviewed_sha')" = "null" ]; then
+  pass "reviewed_sha:null (deadbeef… prose link correctly ignored)"
+else
+  fail "expected score:4 reviewed_sha:null — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
+# ── 17. no footer at all → null (degrades to UNBOUND downstream) ─────
+# Older fixtures predate the footer entirely. They must yield null rather than
+# erroring, so the classifier can route them to UNBOUND — never to a pass.
+section 17 "no footer → reviewed_sha null, verdict still parses"
+run_capture "$VERDICT" --comments-file "$FIXTURES/score-3.json"
+if [ "$EXIT" -eq 0 ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.score')" = "3" ] \
+   && [ "$(printf '%s' "$STDOUT" | jq -r '.reviewed_sha')" = "null" ]; then
+  pass "reviewed_sha:null on a footerless summary, score intact"
+else
+  fail "expected score:3 reviewed_sha:null — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+fi
+
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-12248 greptile-verdict unit tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
