@@ -53,9 +53,15 @@ STATE="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-gate-state.sh" --verdict "
       bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-await.sh" --pr "$PR" --trigger "$TRIGGER_ISO"
       ```
       Final line is the terminal state:
-      - `FRESH_PASS` → now 5/5 → go to Final review.
+      - `FRESH_PASS` → now 5/5, **and the score is confirmed bound to your head** → go to Final review.
       - `FRESH_FAIL` → re-report the new N/5; if rounds remain, loop; else escalate (below).
       - `TIMED_OUT` → Greptile didn't respond within the bound → stop and hand back with context.
+      - `UNBOUND` → a score exists but the helper could not read which commit it describes → **stop; do not treat as a pass.** Verify by hand (below) and report that the helper could not verify. Most likely cause: Greptile changed its summary footer, which is worth a ticket.
+
+      Add `2>/dev/null` only if you do not want the per-poll trace; it goes to
+      stderr and names which signal fired and which commit the score was bound to.
+      Keep it when something looks wrong — it is the record this gate lacked when
+      BC-18961 happened.
 
    **After 3 rounds without 5/5 → escalate:** stop and hand the developer the remaining Greptile findings plus the full context of what each round tried. Do not merge.
 
@@ -66,5 +72,7 @@ STATE="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-gate-state.sh" --verdict "
 - **Skip-gracefully is mandatory, but silence is not.** Greptile absent → **NO REVIEWER ON THIS REPO** (its own terminal state, posted to the PR and reported upward) + exit 0; never hard-fail a ship. Before BC-18947, absence and a pass produced the same exit-0 output — a repo with no reviewer read identically to a converged 5/5.
 - **@-handle.** `@greptile-apps` is the confirmed trigger handle for this org. If it ever changes, the await fails *safe* (`TIMED_OUT` rather than hang) — but update it here, since a wrong handle posts the comment and triggers nothing.
 - The verdict reader keys off the Greptile author and the latest comment by timestamp; the freshness classifier treats a pre-trigger comment as stale, so an old summary never reads as a fresh re-review. Because Greptile re-scores by **editing its summary in place** (the comment keeps its original `createdAt`), freshness is the latest of three signals — comment `createdAt`, the head-SHA check-run's `completed_at`, and the comment's `updated_at` — so an in-place re-score is not misread as no-response.
+- **A pass needs identity, not just recency (BC-18961).** Those three timestamps only answer "did something happen since I asked". They cannot answer "is this score about *my* head", and on mission-control#2 that gap produced a `FRESH_PASS` carrying a 5/5 bound to the previous commit. Greptile puts **two** check-runs named `Greptile Review` on one head — an ack that finishes in seconds with conclusion `neutral`, then the real review — and the ack completing after the trigger was enough to satisfy a recency-only test. So the helper now also requires the summary's **"Last reviewed commit" SHA to equal the PR head**, and counts only check-runs whose conclusion is a real verdict.
+- **The evidence is still the SHA, and you should still check it.** The helper is a convenience; it tells you when to look, not what is true. Its terminal check is now the same one you would run by hand: `Last reviewed commit` in the summary body, the `Reviews (N)` counter, and a completed check-run on your head. Note that `gh api …/check-runs` defaults to `filter=latest`, which shows only the newest run per name — **pass `filter=all`** or the ack run is invisible and the history will look simpler than it was.
 - Requires authenticated `gh`, plus `jq` and `python3` (the helpers check and error clearly).
 - `grill-with-docs` is a user-global skill — invoke its behavior; don't vendor a copy.

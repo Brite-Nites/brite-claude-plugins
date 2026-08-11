@@ -6,7 +6,8 @@
 #   --pr <number|url>        gh pr view <ref> --json comments,reviews, then parse
 #
 # Verdict:
-#   {"present":true,"score":<0-5|null>,"comment_id":"…","commented_at":"…"}
+#   {"present":true,"score":<0-5|null>,"comment_id":"…","commented_at":"…",
+#    "reviewed_sha":"<40-hex|null>"}
 #   {"present":false}                              (no Greptile comment/review)
 #
 # A "Greptile comment" is any PR comment OR review whose author login contains
@@ -14,6 +15,13 @@
 # comment in the common case, but as a review body in some configs — both are
 # scanned. When several exist, the most recent by timestamp wins. score is the
 # 0–5 confidence rating parsed from the body.
+#
+# `reviewed_sha` is the commit the score is BOUND to, read from the summary's
+# "Last reviewed commit" footer (BC-18961). It is the only signal that answers
+# the gate's actual question — "is this score about MY head?" — because it is
+# parsed from the SAME body read as the score, and Greptile rewrites the whole
+# body in one edit. Timestamps cannot answer it: `commented_at` is the comment's
+# createdAt, which never moves once Greptile starts re-scoring in place.
 
 set -euo pipefail
 
@@ -68,10 +76,27 @@ printf '%s' "$COMMENTS_JSON" | jq -c '
       // (b | capture("(?i)confidence\\s*(?:score)?[\\s:]*(?<s>[0-5])\\s*/\\s*5") | .s)
       // null )
     | if . == null then null else tonumber end;
+  # The commit this score is BOUND to, from the summary footer (BC-18961):
+  #   <sub>Reviews (3): Last reviewed commit: ["msg"](https://…/commit/<sha>) | …</sub>
+  #
+  # SCOPE NOTE — this regex is coupled to the Greptile summary format. It was
+  # built against a four-for-four sample (mission-control#2, brite-claude-plugins
+  # #579/#576/#575), which is evidence, not a guarantee. If Greptile changes the
+  # footer, this yields null, and null MUST route to the UNBOUND state in
+  # greptile-freshness.sh — never to a pass. That is the property to preserve if
+  # you touch either file: a format drift degrades to "cannot verify", never to
+  # "verified". A silent fallback to timestamps here would re-open BC-18961.
+  #
+  # Anchored on the "last reviewed commit" label rather than on /commit/ alone, so
+  # a commit link elsewhere in the review prose cannot be mistaken for the binding
+  # (covered by a negative test).
+  def sha_of(b):
+    ( b | capture("(?i)last\\s+reviewed\\s+commit[^\\n]*?/commit/(?<s>[0-9a-fA-F]{7,40})") | .s | ascii_downcase )
+    // null;
   ( [ ((.comments // [])[] | {login: (.author.login // ""), body: (.body // ""), ts: (.createdAt // ""),   id: .id}),
       ((.reviews  // [])[] | {login: (.author.login // ""), body: (.body // ""), ts: (.submittedAt // ""), id: .id}) ]
     | map(select((.login | ascii_downcase) | test("greptile")))
-    | map(. + {score: score_of(.body)}) ) as $g
+    | map(. + {score: score_of(.body), reviewed_sha: sha_of(.body)}) ) as $g
   | if ($g | length) == 0
     then {present: false}
     # Greptile posts a SCORED comment and, seconds later, an EMPTY COMMENTED
@@ -80,6 +105,7 @@ printf '%s' "$COMMENTS_JSON" | jq -c '
     # back to the latest overall when none has one.
     else ( ($g | map(select(.score != null)) | sort_by(.ts) | last)
            // ($g | sort_by(.ts) | last) ) as $c
-         | {present: true, score: $c.score, comment_id: $c.id, commented_at: $c.ts}
+         | {present: true, score: $c.score, comment_id: $c.id, commented_at: $c.ts,
+            reviewed_sha: $c.reviewed_sha}
     end
 '
