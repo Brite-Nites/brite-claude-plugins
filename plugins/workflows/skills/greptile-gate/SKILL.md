@@ -57,6 +57,7 @@ STATE="$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/greptile-gate-state.sh" --verdict "
       - `FRESH_FAIL` → re-report the new N/5; if rounds remain, loop; else escalate (below).
       - `TIMED_OUT` → Greptile didn't respond within the bound → stop and hand back with context.
       - `UNBOUND` → a score exists but the helper could not read which commit it describes → **stop; do not treat as a pass.** Verify by hand (below) and report that the helper could not verify. Most likely cause: Greptile changed its summary footer, which is worth a ticket.
+      - **Non-zero exit, nothing printed** (message on stderr instead) → `$TRIGGER_ISO` was rejected as not a valid, timezone-aware timestamp (BC-18987) → stop; this means the trigger was built or passed wrong, not that Greptile failed. Unreachable via the `TRIGGER_ISO` line above (it always emits an aware Z-form timestamp) — only bites a hand-typed `--trigger` or a future caller.
 
       Add `2>/dev/null` only if you do not want the per-poll trace; it goes to
       stderr and names which signal fired and which commit the score was bound to.

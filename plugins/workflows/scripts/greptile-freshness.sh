@@ -50,19 +50,29 @@
 # BC-18961 opened, and BC-18947 already settled the principle for this helper
 # family: absence gets its own state, never a pass.
 #
-# TRIGGER VALIDATION (BC-18987). Every OTHER timestamp here degrades gracefully
-# on bad input — unparseable becomes empty, which reads as PENDING (see the
-# --review-ts / --edited-ts robustness cases in the test suite). --trigger does
-# NOT get that treatment. A garbage trigger is obviously wrong and safely
-# absent; a naive or date-only trigger PARSES — it just silently means the
-# wrong instant, one that can sit hours in the past — which lets it promote a
-# pre-trigger comment to FRESH_PASS. Coercing it to UTC (the old behaviour) was
-# exactly backwards: it made the near-miss more dangerous than garbage, not
-# less. So --trigger is checked up front and rejected outright (exit non-zero)
-# rather than fed through the lenient parser. The SHA identity binding
-# (BC-18961) still contains this hazard for a trigger that is syntactically
-# valid but semantically wrong (e.g. reused from an earlier round) — that is
-# a different problem and out of scope here.
+# TRIGGER VALIDATION (BC-18987). --trigger anchors every comparison below, so
+# it is checked up front and rejected outright (exit non-zero) on a naive or
+# date-only value instead of being fed through the lenient parser. A garbage
+# --trigger already degraded safely to PENDING before this fix; the dangerous
+# case was the near-miss that PARSES — coercing it to UTC could silently mean
+# the wrong instant, one that can sit hours in the past, which let it promote
+# a pre-trigger comment to FRESH_PASS.
+#
+# The OTHER timestamp fields (--verdict-ts / --review-ts / --edited-ts / --now
+# / --deadline) still go through the lenient parse() below, UNCHANGED — and it
+# is worth being precise about what that buys them. Unparseable input on those
+# fields does degrade gracefully (see the --review-ts / --edited-ts robustness
+# cases in the test suite). A NAIVE value on them does not: parse() still
+# UTC-coerces it, the same near-miss this fix closes for --trigger. Those
+# fields are not user-typed like --trigger was in the BC-18961 investigation —
+# they come from the GitHub API, which always emits Z-form — and the BC-18961
+# SHA identity binding still has to hold regardless of what any timestamp
+# says, so the same hazard on these fields is contained by provenance and by
+# identity, not by validation. If any of them is ever fed a caller-supplied
+# value instead of an API response, it needs the same parse_trigger() treatment
+# --trigger just got. The SHA identity binding also still contains a --trigger
+# that is syntactically valid but semantically wrong (e.g. reused from an
+# earlier round) — that is a different problem and out of scope here.
 #
 # Pure classifier — ISO-8601 parse/compare via python3 (robust across
 # BSD/GNU date). The poll/sleep wait-loop lives in the gate skill, not here.

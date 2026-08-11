@@ -86,13 +86,13 @@ assert_state() {
 # state — a rejection has neither.
 assert_rejected() {
   local label="$1" needle="$2"
-  if [ "$EXIT" -ne 0 ]; then
+  if [ "$EXIT" -ne 0 ] && [ -z "$STDOUT" ]; then
     case "$STDERR" in
       *"$needle"*) pass "$label → rejected" ;;
       *) fail "$label: rejected (EXIT=$EXIT) but stderr lacks '$needle' — STDERR=$STDERR" ;;
     esac
   else
-    fail "$label: expected rejection (non-zero exit) — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+    fail "$label: expected rejection (non-zero exit, no stdout) — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
   fi
 }
 
