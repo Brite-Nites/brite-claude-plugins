@@ -91,7 +91,10 @@ REPO="$(gh pr view "$PR" --json headRepositoryOwner,headRepository -q '(.headRep
 #      matters here, because `api.github.com` threw TLS verification errors three
 #      times during the incident run.
 # Now that the head is load-bearing (it is half of the identity check), a stale or
-# empty value must not persist: empty head → UNBOUND, never a pass.
+# empty value must not persist. An empty head is treated as TRANSIENT — PENDING,
+# so the next poll can recover — never as a pass, and never as terminal. (Making
+# it terminal was a regression Greptile caught on PR #580: it ended the wait on
+# the first blip, which is exactly what this per-poll re-read exists to survive.)
 head_sha() {
   gh pr view "$PR" --json headRefOid -q .headRefOid 2>/dev/null || true
 }
@@ -246,12 +249,21 @@ while [ "$i" -lt "$max_iters" ]; do
   ets_cid="$cid"          # the id `ets` is about (see the id-match guard below)
   ets="$(edited_ts "$ets_cid")"  # that comment's updated_at, if edited since trigger
   verdict="$("$VERDICT" --pr "$PR" 2>/dev/null || echo '{"present":false}')"
-  # One jq pass extracts every field (tab-separated) to save forks per poll.
-  # `cid` is refreshed here for the NEXT poll's edit read. `rsha` is the commit
-  # the score is bound to — read from the SAME body as the score, so the two
-  # cannot describe different rounds.
-  IFS="$(printf '\t')" read -r score vts cid present rsha <<EOF
-$(printf '%s' "$verdict" | jq -r '[(.score // "null"), (.commented_at // ""), (.comment_id // ""), ((.present // false) | tostring), (.reviewed_sha // "")] | @tsv')
+  # One jq pass extracts every field to save forks per poll. `cid` is refreshed
+  # here for the NEXT poll's edit read. `rsha` is the commit the score is bound
+  # to — read from the SAME body as the score, so the two cannot describe
+  # different rounds.
+  #
+  # DELIMITER: unit separator (0x1F), NOT tab. Tab is IFS *whitespace*, so bash
+  # collapses runs of it into one separator and strips trailing ones — which
+  # SHIFTS every field after an empty one. A `{"present":false}` verdict emits
+  # three empty fields in a row, so `present` landed empty and `vts` got the
+  # string "false". Observed live in the gate trace for this very PR
+  # (`poll=4 ... score=null verdict_ts=false`). It failed safe — an empty
+  # `present` reads as "no verdict" → PENDING — but it was wrong, and it made
+  # the trace lie. 0x1F is not IFS whitespace, so empty fields are preserved.
+  IFS="$(printf '\037')" read -r score vts cid present rsha <<EOF
+$(printf '%s' "$verdict" | jq -r '[((.score // "null") | tostring), (.commented_at // ""), (.comment_id // ""), ((.present // false) | tostring), (.reviewed_sha // "")] | join("\u001f")')
 EOF
   # Id-match guard: `ets` was read for the PREVIOUS poll's selected comment. If the
   # verdict has since selected a DIFFERENT object (Greptile posted a second comment,

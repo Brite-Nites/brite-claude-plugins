@@ -220,6 +220,29 @@ run_await 3
 assert_state "unresolved-head-never-passes" "TIMED_OUT"
 echo 0 > "$GREPTILE_FIXTURES/head_fails.txt"
 
+# ── 11. no Greptile verdict at all — fields must not shift ───────────
+# A {"present":false} verdict emits three EMPTY fields in a row. The first draft
+# joined them with a tab, and tab is IFS *whitespace* — bash collapses runs of it
+# and strips trailing ones, so every field after the first empty one shifted:
+# `present` landed empty and `vts` got the literal string "false". Caught in the
+# live gate trace for this PR (`poll=4 … score=null verdict_ts=false`), not by
+# any test. The delimiter is now 0x1F, which is not IFS whitespace.
+#
+# It failed safe — an empty `present` reads as "no verdict" → keep waiting — so
+# this case asserts the state AND the trace, because only the trace shows the
+# corruption. A test on state alone would have passed against the bug.
+section 11 "absent verdict — empty fields must not shift the parse"
+set_check_runs '[]'
+printf '{"comments":[],"reviews":[]}\n' > "$GREPTILE_FIXTURES/comments.json"
+run_await
+assert_state "absent-verdict-still-waits" "TIMED_OUT"
+assert_trace "score reads as null" "score=null"
+assert_trace "verdict_ts is empty, NOT the string 'false'" "verdict_ts=-"
+case "$TRACE" in
+  *"verdict_ts=false"*) fail "field shift: 'false' leaked into verdict_ts — $TRACE" ;;
+  *) pass "no field shift — 'present' did not leak into an earlier field" ;;
+esac
+
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-18961 greptile-await signal-read tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
 printf 'RESULT pass=%d fail=%d\n' "$PASS" "$FAIL"
