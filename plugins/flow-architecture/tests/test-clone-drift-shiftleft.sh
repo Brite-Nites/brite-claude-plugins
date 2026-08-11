@@ -36,14 +36,15 @@ SS_UPSTREAM="plugins/workflows/commands/session-start.md"
 # ship, disable-model-invocation — to the workflows upstreams, so each clone's
 # recorded Upstream-SHA was bumped to the new upstream blob in the same PR).
 # review + ship re-synced again in BC-12113 (save-results put_page → the dedicated
-# gbrain-team-write server propagated to both upstreams + clones).
+# gbrain-team-write server propagated to both upstreams + clones). ship re-synced
+# again in BC-18989 (BC-18947's Greptile-absent gate state ported into the clone).
 SS_TARGET='Upstream-SHA: e162bf3210abf45d5e51ec106e17b3ef1c7acbd7'
 REV_CLONE="plugins/flow-architecture/commands/review.md"
 REV_UPSTREAM="plugins/workflows/commands/review.md"
 REV_TARGET='Upstream-SHA: 275417af2201cd6a596b59d81fa6eecf51be53f2'
 SHIP_CLONE="plugins/flow-architecture/commands/ship.md"
 SHIP_UPSTREAM="plugins/workflows/commands/ship.md"
-SHIP_TARGET='Upstream-SHA: a4c715f836c33a4509154f79030ad2eaeff25b07'
+SHIP_TARGET='Upstream-SHA: 14bef26e0e133d154838f0cf1f66fe72ab71f0fa'
 EMPTY_BLOB='e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 # Unique per-invocation output file (portable mktemp template — trailing X's,
 # no suffix, works on both BSD/macOS and GNU/Linux). Avoids a fixed /tmp path

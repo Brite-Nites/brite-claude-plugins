@@ -26,7 +26,7 @@ gbrain:
 
 <!-- eval-waiver: Cloned Ship and Compound: pre-ship audit, push plus FDA-shaped PR, Q46 ship-summary writeback, Greptile gate, compound-learnings, best-practices audit, handbook-drift, and a retro notification; outputs are an LLM-authored PR body plus ship-summary comment plus session report, with no fixed-right-answer artifact separable from narration. Re-synced for BC-17836 (PR base resolved instead of defaulting to the repo default branch). -->
 
-<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: a4c715f836c33a4509154f79030ad2eaeff25b07. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). Re-synced for ADR-045 (write-client remedy now a `GBRAIN_WRITE_CLIENT_*` export, not a vault item). -->
+<!-- Cloned from workflows v3.29.4 (commands/ship.md) on 2026-05-07. Upstream-SHA: 14bef26e0e133d154838f0cf1f66fe72ab71f0fa. Drift-detection per parking lot #45. Re-synced for BC-11754/55 (team-gbrain flywheel — context-load + save-results — propagated verbatim from upstream). Re-synced for BC-12409 — greptile-gate Step 2b ported from #420. Re-synced for BC-12947 (eval-waiver marker + disable-model-invocation added to upstream). Re-synced for BC-12113 (save-results put_page → the dedicated gbrain-team-write server). Re-synced for ADR-045 (write-client remedy now a `GBRAIN_WRITE_CLIENT_*` export, not a vault item). Re-synced for BC-18947 (Greptile-absent gate state made distinct from a pass; Step 2b + Step 8 summary). -->
 
 # Ship & Compound
 
@@ -184,11 +184,13 @@ Narrate: `Step 2b: Greptile gate...`
 
 The `greptile-gate` skill activates to read Greptile's verdict on the PR just created in Step 2 and converge it toward a 5/5 confidence score.
 
-- If Greptile isn't installed on the repo (or hasn't reviewed yet), the gate reports that and **skips** — it never blocks the ship.
+- If Greptile isn't installed on the repo (or hasn't reviewed yet), the gate reports the terminal state **NO REVIEWER ON THIS REPO** — distinct from a pass and from a converged 5/5, posted to the PR — and **skips**; it never blocks the ship.
 - If Greptile scored below 5/5, the gate runs up to 3 human-in-the-loop rounds (grill-with-docs → `/workflows:review` fix loop → push → `@greptile-apps` re-review → bounded wait), then a final independent review on 5/5.
 - **The gate never merges** — it converges and hands back; you merge manually.
 
 Because the gate runs *before* the terminal steps below, Steps 4–6 (compound-learnings, audit, handbook-drift) operate on the converged code. If the gate can't reach 5/5 in 3 rounds (or Greptile times out), it stops and hands you the remaining findings — decide whether to continue before the terminal steps run.
+
+Record the gate's terminal state (`NO REVIEWER ON THIS REPO` / `CONVERGED 5/5` / `N/5 — escalated after 3 rounds`) for the session summary in Step 8, so a steward landing the PR sees whether a machine reviewed it.
 
 This step is preserved near-verbatim from workflows ship.md (TRANSITIVE REUSE per Q50 amendment 2). The `greptile-gate` skill lives in the workflows plugin and is invoked transparently — FDA does not re-implement it.
 
@@ -331,6 +333,7 @@ Present a session summary:
 **Shipped**: [Issue ID] — [Title]
 **PR**: [URL]
 **Linear**: Updated to [status]
+**Greptile gate**: [NO REVIEWER ON THIS REPO / CONVERGED 5/5 / N/5 — escalated after 3 rounds]
 **FDA audit pre-flight**: [exit 0 / overridden gates / N soft-gate warnings]
 **Q46 ship-summary**: [created / updated] at [Linear comment URL]
 
