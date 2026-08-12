@@ -81,6 +81,21 @@ assert_state() {
   fi
 }
 
+# BC-18987: a bad --trigger is rejected outright (exit non-zero), not
+# classified. Distinct from assert_state, which expects EXIT=0 and a printed
+# state — a rejection has neither.
+assert_rejected() {
+  local label="$1" needle="$2"
+  if [ "$EXIT" -ne 0 ] && [ -z "$STDOUT" ]; then
+    case "$STDERR" in
+      *"$needle"*) pass "$label → rejected" ;;
+      *) fail "$label: rejected (EXIT=$EXIT) but stderr lacks '$needle' — STDERR=$STDERR" ;;
+    esac
+  else
+    fail "$label: expected rejection (non-zero exit, no stdout) — EXIT=$EXIT STDOUT=$STDOUT STDERR=$STDERR"
+  fi
+}
+
 # ── 1. Tracer bullet: fresh review, score 5, within window → FRESH_PASS ─
 section 1 "fresh review, score 5, within window"
 run_fresh --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLINE" \
@@ -346,53 +361,70 @@ run_capture "$FRESH" --trigger "$TRIGGER" --now "$NOW_OPEN" --deadline "$DEADLIN
   --present true --reviewed-sha "232" --head-sha "$SHA_HEAD"
 assert_state "short-sha" "UNBOUND"
 
-# ══ BC-18961: the latent trigger hazard ═══════════════════════════════
+# ══ BC-18961 / BC-18987: the trigger hazard ════════════════════════════
 #
-# NOT the cause of the incident — the trigger actually passed was a correct
-# Z-form UTC timestamp (2026-08-11T17:33:58Z, confirmed from the session
-# transcript). But the sweep that cleared it found a real second defect that
-# outlives this fix: parse() fails ASYMMETRICALLY. Unparseable input returns
-# None and degrades to PENDING, which is safe. Input that is only PARTIALLY
-# parseable — no timezone, or date-only — is silently stamped UTC and can land
-# hours in the past, making any old comment look fresh. Nothing validates the
-# trigger.
+# NOT the cause of the BC-18961 incident — the trigger actually passed was a
+# correct Z-form UTC timestamp (2026-08-11T17:33:58Z, confirmed from the
+# session transcript). But the sweep that cleared it found a real second
+# defect, fixed separately under BC-18987: parse() failed ASYMMETRICALLY.
+# Unparseable input returned None and degraded to PENDING, which is safe.
+# Input that was only PARTIALLY parseable — no timezone, or date-only — was
+# silently stamped UTC and could land hours in the past, making any old
+# comment look fresh. Nothing validated the trigger.
 #
-# The identity condition now neutralises this: a wrong trigger cannot manufacture
-# a pass, because the SHA check is not time-based. These cases pin that the
-# neutralisation holds, so the hazard cannot come back through the time axis.
+# BC-18961's SHA identity binding contained this at the time these cases were
+# written: a wrong trigger could not manufacture a pass, because the SHA check
+# is not time-based. BC-18987 has since closed the hazard at its source —
+# --trigger is now validated up front and a naive/date-only value is REJECTED
+# (exit non-zero) before identity is ever consulted (see parse_trigger() and
+# assert_rejected() above).
+#
+# Cases 35-36 (syntactically invalid triggers) now assert that rejection
+# directly. Case 37 (a trigger that is syntactically valid but semantically
+# wrong — reused from an earlier round) is untouched by the parser fix, since
+# nothing about its FORMAT is invalid; it still relies on the SHA mismatch, so
+# it still asserts PENDING. Case 38 shows the two fixes stacked: the same input
+# as 35, but with identity satisfied — proof that rejection now happens
+# independently of identity, not merely alongside it.
 
 # ── 35. naive local-time trigger, score bound to the WRONG head ───────
-section 35 "hazard — naive local-time trigger cannot promote a stale binding"
+# Format is invalid regardless of SHA — parse_trigger() rejects it before
+# identity is checked.
+section 35 "hazard — naive local-time trigger is rejected outright (BC-18987)"
 run_capture "$FRESH" --trigger "2026-08-11T12:33:58" --now "2026-08-11T17:34:08Z" \
   --deadline "2026-08-11T17:42:58Z" --verdict-ts "2026-08-11T17:15:30Z" --score 5 \
   --present true --reviewed-sha "$SHA_PREV" --head-sha "$SHA_HEAD"
-assert_state "hazard-naive-local-trigger" "PENDING"
+assert_rejected "hazard-naive-local-trigger" "no UTC offset"
 
 # ── 36. date-only trigger, score bound to the WRONG head ──────────────
-section 36 "hazard — date-only trigger cannot promote a stale binding"
+section 36 "hazard — date-only trigger is rejected outright (BC-18987)"
 run_capture "$FRESH" --trigger "2026-08-11" --now "2026-08-11T17:34:08Z" \
   --deadline "2026-08-11T17:42:58Z" --verdict-ts "2026-08-11T17:15:30Z" --score 5 \
   --present true --reviewed-sha "$SHA_PREV" --head-sha "$SHA_HEAD"
-assert_state "hazard-date-only-trigger" "PENDING"
+assert_rejected "hazard-date-only-trigger" "no UTC offset"
 
 # ── 37. reused earlier-round trigger, score bound to the WRONG head ───
+# A valid, timezone-aware timestamp — just the wrong ROUND's. BC-18987 only
+# validates format, not provenance, so this is still exactly what the SHA
+# identity binding exists to contain. Unchanged by the parser fix.
 section 37 "hazard — reused round-1 trigger cannot promote a stale binding"
 run_capture "$FRESH" --trigger "2026-08-11T17:12:56Z" --now "2026-08-11T17:34:08Z" \
   --deadline "2026-08-11T17:42:58Z" --verdict-ts "2026-08-11T17:15:30Z" --score 5 \
   --present true --reviewed-sha "$SHA_PREV" --head-sha "$SHA_HEAD"
 assert_state "hazard-reused-trigger" "PENDING"
 
-# ── 38. the hazard is REAL — same three triggers, identity removed ────
-# Proves cases 35-37 are load-bearing rather than vacuous: with the identity
-# condition satisfied, a naive trigger DOES still promote a pre-trigger comment.
-# That is the residual defect, tracked separately; the binding is what contains
-# it. If this case ever flips to PENDING, the trigger itself gained validation
-# and the follow-up ticket can close.
-section 38 "hazard is real — naive trigger + matching SHA still passes on an OLD comment"
+# ── 38. the same naive trigger as 35, now with identity SATISFIED ─────
+# Before BC-18987, this exact input (naive trigger, matching SHA) was the case
+# that proved 35-37's PENDING came from identity, not from the trigger being
+# sound — it printed FRESH_PASS on a pre-trigger comment. Now rejection fires
+# before identity is even read, so the outcome here matches case 35 exactly:
+# the parser closes the gap directly, rather than relying on containment to
+# catch what it lets through.
+section 38 "hazard is closed — naive trigger rejected even with matching SHA"
 run_capture "$FRESH" --trigger "2026-08-11T12:33:58" --now "2026-08-11T17:34:08Z" \
   --deadline "2026-08-11T17:42:58Z" --verdict-ts "2026-08-11T17:15:30Z" --score 5 \
   --present true --reviewed-sha "$SHA_HEAD" --head-sha "$SHA_HEAD"
-assert_state "hazard-demonstrated" "FRESH_PASS"
+assert_rejected "hazard-demonstrated" "no UTC offset"
 
 # ──────────────────────────────────────────────────────────────────────
 printf '\nBC-12249 greptile-freshness unit tests: %d PASS / %d FAIL\n' "$PASS" "$FAIL"
