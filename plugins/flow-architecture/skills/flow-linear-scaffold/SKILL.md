@@ -59,6 +59,8 @@ parent
 | Milestone description refresh | 1 | `save_milestone` (idempotent on Sub-flows table content) |
 | **Total** | **2 + 7N** | --- |
 
+**Provenance label (BC-17663).** Every `save_issue` write above — sub-flow parents AND all 5 discipline children — includes the label `fda-scaffold` alongside the Q24 mod 3 labels (`type:<discipline>` + `domain:<slug>`). This stamps scaffold provenance at birth so later cleanups filter instead of audit. If the label does not exist on the target team, that is a **permanent** failure per Section 5 (same class as `invalid label`) — create the team label first.
+
 ---
 
 ## 2. Idempotency (Q13.2) --- 3 layers
