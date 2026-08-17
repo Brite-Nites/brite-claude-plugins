@@ -1,3 +1,5 @@
+<!-- eval-waiver: Shared PROCEDURE include, not a command — it has no frontmatter and is never invoked as /revops:concurrency-probe. Its body is the two DeployRequest queries plus a hand-off to scripts/promotion_topology.py --concurrency-verdict, which owns every decision here and IS behaviorally eval'd (scripts/test_promotion_topology.sh asserts the fail-closed property across nine broken-input shapes). There is nothing left in this file to fixture: it decides nothing itself. It lands in the diff-gate's changed set only because classify_changes globs with fnmatch, whose `*` crosses `/`, while command_surface uses Path.glob, which does not — so this path is invisible to --check's surface and cannot take a debt row. -->
+
 # Shared procedure — blocking deploy-concurrency probe (BC-19521)
 
 Not a command. Included by reference from `/revops:preview-changes`,

@@ -1,3 +1,5 @@
+<!-- eval-waiver: Shared REFERENCE include, not a command — it has no frontmatter and is never invoked as /revops:manual-ui-verification. Its entire body is static operator prose describing four Lightning-UI verification procedures a human performs in a browser; it parses nothing, decides nothing, and emits no artifact. Split out of preview-changes.md Phase 5 to bring that body under the R2 500-line gate. Same fnmatch-vs-Path.glob asymmetry as its siblings: visible to the diff-gate, invisible to --check's surface, so it cannot take a debt row. -->
+
 # Shared reference — manual UI verification after a Salesforce deploy
 
 Not a command. Included by reference from `/revops:preview-changes` Phase 5.

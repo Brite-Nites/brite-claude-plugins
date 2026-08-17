@@ -1,3 +1,5 @@
+<!-- eval-waiver: Shared PROCEDURE include, not a command — it has no frontmatter and is never invoked as /revops:forceignore-preflight. Its body is the F1 .forceignore pattern-match block (BC-12347) lifted verbatim from the three deploy commands that previously each carried a copy; extracting it changed no behaviour and added no decision. It is exercised through its callers, whose own eval-waivers cover the live-deploy sequence it sits in. Same fnmatch-vs-Path.glob asymmetry as its sibling: visible to the diff-gate, invisible to --check's surface, so it cannot take a debt row. -->
+
 # Shared procedure — `.forceignore` pre-flight (F1, BC-12347)
 
 Not a command. Included by reference from `/revops:preview-changes`,
