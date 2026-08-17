@@ -30,7 +30,7 @@ Delegate elsewhere when the user is:
 - building Flows → [sf-flow](../sf-flow/SKILL.md)
 - doing org data operations → [sf-data](../sf-data/SKILL.md)
 
-> **Default recommendation for brite-salesforce deploys**: prefer [`/revops:deploy-sandbox`](../../commands/deploy-sandbox.md) (sandbox) or [`/revops:deploy-prod`](../../commands/deploy-prod.md) (production) over raw `sf project deploy start`. See [Orchestration Commands](#orchestration-commands-recommended-path-for-brite-salesforce) below for the gate sequence and the non-orchestrable-cases fallback.
+> **Default recommendation for brite-salesforce deploys**: prefer [`/revops:preview-changes`](../../commands/preview-changes.md) (your own dev org) or [`/revops:push-to-production`](../../commands/push-to-production.md) (production, via CI) over raw `sf project deploy start`. See [Orchestration Commands](#orchestration-commands-recommended-path-for-brite-salesforce) below for the gate sequence and the non-orchestrable-cases fallback.
 
 ---
 
@@ -60,7 +60,7 @@ sf project retrieve start --source-dir force-app --target-org <alias>
 sf apex run test --target-org <alias> --wait 10
 ```
 
-Brite-owned org aliases: `brite-sandbox` (default sandbox), `brite-prod` / `brite-prod-marketingadmin` (production). Confirm the alias with the user before any prod-targeting command.
+Brite-owned org aliases, per [ADR-026](../../../../docs/decisions/026-revops-promotion-topology.md) and the single list in [`config/org-aliases.json`](../../config/org-aliases.json): `brite-dev-<name>` (per-developer, the only laptop-deployable org), `brite-integration` / `briteint` and `brite-uat` (CI-deployed), `brite-prod` / `brite-prod-marketingadmin` (production, CI-deployed), `brite-sandbox` (retiring). Confirm the alias with the user before any prod-targeting command, and never deploy to a shared org from a laptop.
 
 ---
 
@@ -93,7 +93,7 @@ These rules are non-negotiable on the brite-salesforce repo.
 ### Dry-run-first
 
 ```bash
-sf project deploy start --source-dir force-app --dry-run --target-org brite-sandbox --wait 30 --json
+sf project deploy start --source-dir force-app --dry-run --target-org brite-dev-<name> --wait 30 --json
 ```
 
 Inspect the job report. If a component fails, fix in source and re-validate. Only proceed to actual deploy after a clean dry-run.
@@ -177,7 +177,7 @@ See brite-salesforce/CLAUDE.md §External Client Apps and brite-salesforce/`docs
 
 Ask for or infer:
 - target org alias (never assume `--target-org`)
-- whether the deploy is sandbox (`brite-sandbox`) or production (`brite-prod`)
+- which lane the deploy is in — your own dev org (`brite-dev-<name>`), integration (`brite-integration`), or production (`brite-prod`)
 - deploy scope: `--source-dir force-app` (default), `--metadata <list>`, or `--manifest`
 - validate-only vs deploy vs quick-deploy vs retrieve
 - Apex test level (`NoTestRun` only for non-Apex sandbox deploys; `RunLocalTests` for any prod deploy)
@@ -247,8 +247,10 @@ Output template: [references/deployment-report-template.md](references/deploymen
 
 For any deploy from the **brite-salesforce** repo, prefer these orchestration commands over raw `sf project deploy start`. They bake the dry-run + Apex tests + Tooling API verification + manual browser checks into a sequenced gate flow; raw CLI skips all of that.
 
-- [`/revops:deploy-sandbox`](../../commands/deploy-sandbox.md) — sandbox deploy: pre-flight, dry-run, deploy, Apex tests, manual browser verification. Use after metadata changes are review-clean and you want to validate in `brite-sandbox` before opening a PR.
-- [`/revops:deploy-prod`](../../commands/deploy-prod.md) — production deploy: pre-flight (cwd + branch + clean tree + intent), prod dry-run, double-confirmation gate, deploy, coverage check, Tooling API post-deploy verification. Use after `/revops:deploy-sandbox` is clean and the PR is merged to `main`.
+- [`/revops:preview-changes`](../../commands/preview-changes.md) — inner-loop deploy: pre-flight, blocking concurrency probe, dry-run, deploy, Apex tests, manual browser verification. Targets your own `brite-dev-<name>` org. Use after metadata changes are review-clean and before submitting to integration.
+- [`/revops:submit-changes-to-integration`](../../commands/submit-changes-to-integration.md) — opens the PR into `integration`. CI deploys to `brite-integration` on merge; you never deploy there yourself.
+- [`/revops:push-to-production`](../../commands/push-to-production.md) — production ship: pre-flight (cwd + branch + in-sync + clean tree + blocking concurrency probe + `.forceignore` + intent), double-confirmation gate, then it **dispatches and watches CI**. The deploy, the coverage gate, and post-deploy verification run in CI, not on your laptop. Use after the change has been through integration and merged to `main`.
+- [`/revops:emergency-deploy-to-production`](../../commands/emergency-deploy-to-production.md) — last resort, only when the CI lane itself is down. Requires `--reason`, keeps every guard, validates before it quick-deploys.
 - [`/revops:post-deploy-runbook`](../../commands/post-deploy-runbook.md) — post-deploy manual steps: diff-driven walk through Screen Flow activation, Scheduled Apex re-schedule, Named Credential URL updates, Kanban Group By cache flush.
 
 Raw `sf project deploy start` (documented in **Recommended Workflow** above) remains the fallback for non-orchestrable cases: one-off targeted deploys outside the brite-salesforce dev flow, scratch-org work, or debugging a specific component in isolation.
