@@ -1,4 +1,4 @@
-"""Contract tests for the /revops:post-deploy-runbook slash command,
+"""Contract tests for the /revops:run-manual-post-deploy-steps slash command,
 locking the BC-11038 Flow Draft cleanup phase.
 
 Slash commands are Claude-orchestrated markdown, not executable code, so these
@@ -23,7 +23,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COMMAND_PATH = ROOT / "commands" / "post-deploy-runbook.md"
+COMMAND_PATH = ROOT / "commands" / "run-manual-post-deploy-steps.md"
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 

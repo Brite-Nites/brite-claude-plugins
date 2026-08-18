@@ -1,7 +1,7 @@
-"""Contract tests for the /revops:doctor slash command.
+"""Contract tests for the /revops:check-environment-health slash command.
 
 Slash commands are Claude-orchestrated markdown, not executable code, so these
-tests verify the markdown's contract (frontmatter, declared tools, the ten
+tests verify the markdown's contract (frontmatter, declared tools, the eleven
 required checks, the table+Overall+remediation reporting shape, zero-gate /
 zero-mutation / no-retry rules, version bump) rather than runtime execution.
 The live walk (zero-mutation diff + idempotent re-run against brite-sandbox) is
@@ -25,7 +25,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COMMAND_PATH = ROOT / "commands" / "doctor.md"
+COMMAND_PATH = ROOT / "commands" / "check-environment-health.md"
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 
@@ -98,7 +98,7 @@ def test_no_gate_prompts() -> None:
 
 
 def test_all_check_topics_present() -> None:
-    """Every AC-required check (ten) must be greppable so the contract is auditable."""
+    """Every ADR-026 check must be greppable so the contract is auditable."""
     body = read_command().lower()
     topics = {
         "sf CLI version": ["sf --version"],
@@ -106,7 +106,11 @@ def test_all_check_topics_present() -> None:
         "gh auth": ["gh auth status"],
         "plugin-installed": ["claude plugin list"],
         "mcp-connected": ["claude mcp list"],
-        "brite-sandbox authed": ["sf org list", "connectedstatus"],
+        "dev-org and legacy-sandbox posture": [
+            "sf org list",
+            "resolve-dev-org",
+            "legacy brite-sandbox",
+        ],
         "default target-org": ["sf config get target-org"],
         "trivial SOQL": ["select id from organization limit 1"],
         "permset self-probe": ["permissionsetassignment"],
@@ -120,8 +124,8 @@ def test_all_check_topics_present() -> None:
     assert not missing, f"Check topics missing from command body: {missing}"
 
 
-def test_ten_emit_labels_present() -> None:
-    """The AC names exactly ten checks. test_all_check_topics_present greps a
+def test_eleven_emit_labels_present() -> None:
+    """ADR-026 names exactly eleven checks. test_all_check_topics_present greps a
     representative command per topic, but that passes even if a check's `emit`
     row were deleted while its prose needle survived. Lock the actual emit labels
     (the second arg of each `emit STATUS "<label>"`) by set-equality so dropping,
@@ -133,11 +137,11 @@ def test_ten_emit_labels_present() -> None:
     labels = set(re.findall(r'emit (?:PASS|FAIL|WARN|SKIP) "([^"]+)"', body))
     expected = {
         "sf CLI", "node", "gh auth", "revops plugin", "revops MCP",
-        "brite-sandbox auth", "default target-org", "trivial SOQL",
+        "dev org", "legacy brite-sandbox", "default target-org", "trivial SOQL",
         "permset self-probe", "brite-prod auth",
     }
     assert labels == expected, (
-        "doctor must emit exactly the ten AC check labels; "
+        "health check must emit exactly the eleven ADR-026 check labels; "
         f"missing={expected - labels}, unexpected={labels - expected}"
     )
 
@@ -150,7 +154,7 @@ def test_key_commands_present_verbatim() -> None:
         "claude mcp list",
         "sf org list",
         "sf config get target-org",
-        "sf data query --target-org brite-sandbox",
+        'sf data query --target-org "$DEV_ORG"',
         "SELECT Id FROM Organization LIMIT 1",
         "PermissionSetAssignment",
         "sf org display --target-org brite-prod",
@@ -181,7 +185,7 @@ def test_warn_and_skip_severity_routing() -> None:
     required = [
         r'emit WARN "default target-org"',
         r'emit WARN "permset self-probe"',
-        r'emit SKIP "brite-sandbox auth"',
+        r'emit SKIP "legacy brite-sandbox"',
         r'emit SKIP "trivial SOQL"',
         r'emit WARN "brite-prod auth"',
         r'emit SKIP "brite-prod auth"',
@@ -212,13 +216,13 @@ def test_warn_and_skip_severity_routing() -> None:
 
 def test_reporting_has_overall_and_remediation() -> None:
     """Output is a table + an Overall line + per-FAIL/WARN remediation, and the
-    auth/default-org remediation must route back to /revops:setup-sandbox.
+    auth/default-org remediation must route back to /revops:setup-dev-workspace.
     """
     body = read_command()
     assert "Overall" in body, "Report must include an Overall line (mirror smoke-test)"
     assert "Remediation" in body, "Report must include a Remediation section for FAIL/WARN"
-    assert "/revops:setup-sandbox" in body, (
-        "Auth/default-org remediation must point at /revops:setup-sandbox"
+    assert "/revops:setup-dev-workspace" in body, (
+        "Auth/default-org remediation must point at /revops:setup-dev-workspace"
     )
 
 
