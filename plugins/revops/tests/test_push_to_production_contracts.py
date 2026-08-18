@@ -33,3 +33,12 @@ def test_requires_run_url_capable_gh_and_uses_dispatch_receipt() -> None:
     assert 'RUN_URL="$(gh workflow run deploy-prod.yml' in COMMAND
     assert "gh run list --repo Brite-Nites/brite-salesforce" not in COMMAND
     assert "RUN_ID" in COMMAND
+
+
+def test_preflights_the_main_dispatch_schema_before_any_confirmation() -> None:
+    contract = COMMAND.find("Confirm the `main` workflow's dispatch contract")
+    confirmation = COMMAND.find("## Phase 2 — DOUBLE confirmation gate")
+    assert 0 <= contract < confirmation
+    assert "gh workflow view deploy-prod.yml" in COMMAND
+    assert "--validate-prod-workflow -" in COMMAND
+    assert "CI_CONTRACT_OK" in COMMAND

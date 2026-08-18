@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic decision core for the ADR-026 promotion topology (BC-19521).
 
-The revops commands are orchestrators, not engines. Four decisions inside them
+The revops commands are orchestrators, not engines. Five decisions inside them
 are pure functions of their inputs, so they live here instead of as prose the
 model is asked to follow:
 
@@ -9,6 +9,7 @@ model is asked to follow:
   --resolve-dev-org -       Which brite-dev-<name> org is THIS developer's?
   --concurrency-verdict -   Is a deploy to this org safe to start right now?
   --pipeline-guidance <dir> What does the repo-local pipeline config say?
+  --validate-prod-workflow - Does main expose the complete prod dispatch contract?
 
 Every one of them FAILS CLOSED. An unparseable input, a missing field, or an
 unknown alias produces a blocking verdict, never a permissive one. That is the
@@ -415,12 +416,136 @@ def pipeline_guidance(repo_root: str | Path, lane: str | None = None) -> dict[st
     return out
 
 
+# ── production workflow contract ───────────────────────────────────────────
+
+
+def _yaml_block(
+    lines: list[str], key: str, start: int = 0, stop: int | None = None
+) -> tuple[int, int, int]:
+    """Locate an indentation-delimited YAML mapping block without a YAML dependency."""
+    stop = len(lines) if stop is None else stop
+    for index in range(start, stop):
+        stripped = lines[index].strip()
+        if stripped != f"{key}:" or stripped.startswith("#"):
+            continue
+        parent_indent = len(lines[index]) - len(lines[index].lstrip(" "))
+        end = index + 1
+        while end < stop:
+            candidate = lines[end]
+            candidate_indent = len(candidate) - len(candidate.lstrip(" "))
+            if (
+                candidate.strip()
+                and not candidate.lstrip().startswith("#")
+                and candidate_indent <= parent_indent
+            ):
+                break
+            end += 1
+        return index, end, parent_indent
+    raise ValueError(f"missing `{key}` block")
+
+
+def _yaml_direct_children(
+    lines: list[str], start: int, stop: int, parent_indent: int
+) -> dict[str, tuple[int, int]]:
+    """Return direct mapping children and their indentation-delimited spans."""
+    child_indent: int | None = None
+    children: dict[str, tuple[int, int]] = {}
+    indexes: list[tuple[str, int]] = []
+
+    for index in range(start + 1, stop):
+        line = lines[index]
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        line_indent = len(line) - len(line.lstrip(" "))
+        if line_indent <= parent_indent:
+            continue
+        match = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)", line.strip())
+        if not match:
+            continue
+        if child_indent is None:
+            child_indent = line_indent
+        if line_indent == child_indent:
+            indexes.append((match.group(1), index))
+
+    for offset, (name, index) in enumerate(indexes):
+        end = indexes[offset + 1][1] if offset + 1 < len(indexes) else stop
+        children[name] = (index, end)
+    return children
+
+
+def validate_prod_workflow(source: str) -> dict[str, Any]:
+    """Prove the reviewed deploy-prod workflow_dispatch schema is present.
+
+    This intentionally parses only the indentation structure needed for the
+    GitHub Actions input contract. It does not interpret arbitrary YAML.
+    Anything absent or ambiguous blocks the dispatcher before a prod gate.
+    """
+    lines = source.splitlines()
+    required_inputs = {"mode", "confirm", "activation"}
+    required_options = {
+        "mode": {"validate", "deploy"},
+        "activation": {"plan", "canary", "apply"},
+    }
+
+    try:
+        dispatch_start, dispatch_end, dispatch_indent = _yaml_block(
+            lines, "workflow_dispatch"
+        )
+        dispatch_children = _yaml_direct_children(
+            lines, dispatch_start, dispatch_end, dispatch_indent
+        )
+        if "inputs" not in dispatch_children:
+            raise ValueError("missing `workflow_dispatch.inputs` block")
+
+        inputs_start, inputs_end = dispatch_children["inputs"]
+        inputs_indent = len(lines[inputs_start]) - len(lines[inputs_start].lstrip(" "))
+        inputs = _yaml_direct_children(lines, inputs_start, inputs_end, inputs_indent)
+        missing = sorted(required_inputs - set(inputs))
+        if missing:
+            raise ValueError("missing workflow_dispatch inputs: " + ", ".join(missing))
+
+        for input_name, expected in required_options.items():
+            block_start, block_end = inputs[input_name]
+            block = "\n".join(lines[block_start:block_end])
+            actual = {
+                match.group(1)
+                for match in re.finditer(
+                    r"^\s*-\s*['\"]?([A-Za-z0-9_-]+)['\"]?\s*$",
+                    block,
+                    re.MULTILINE,
+                )
+            }
+            missing_options = sorted(expected - actual)
+            if missing_options:
+                raise ValueError(
+                    f"input `{input_name}` is missing options: "
+                    + ", ".join(missing_options)
+                )
+    except ValueError as exc:
+        return {
+            "decision": "blocked_error",
+            "blocking": True,
+            "reason": str(exc),
+        }
+
+    return {
+        "decision": "ready",
+        "blocking": False,
+        "inputs": sorted(required_inputs),
+        "reason": "main deploy workflow exposes the reviewed production dispatch contract",
+    }
+
+
 # ── CLI ─────────────────────────────────────────────────────────────────────
 
 
 def _read_stdin_json(arg: str) -> dict[str, Any]:
     raw = sys.stdin.read() if arg == "-" else Path(arg).read_text(encoding="utf-8")
     return json.loads(raw)
+
+
+def _read_text(arg: str) -> str:
+    return sys.stdin.read() if arg == "-" else Path(arg).read_text(encoding="utf-8")
 
 
 def main(argv: list[str]) -> int:
@@ -434,6 +559,11 @@ def main(argv: list[str]) -> int:
     mode.add_argument("--resolve-dev-org", metavar="FILE|-", help="`sf org list --json` payload")
     mode.add_argument("--concurrency-verdict", metavar="FILE|-", help="probe payload")
     mode.add_argument("--pipeline-guidance", metavar="REPO_ROOT", help="repo to read config from")
+    mode.add_argument(
+        "--validate-prod-workflow",
+        metavar="FILE|-",
+        help="GitHub Actions workflow YAML to validate",
+    )
     parser.add_argument("--requested", help="alias the user explicitly asked for")
     parser.add_argument("--lane", help="lane name for --pipeline-guidance")
     parser.add_argument("--registry", help="override the org-aliases.json path (testing)")
@@ -441,6 +571,19 @@ def main(argv: list[str]) -> int:
 
     if args.pipeline_guidance:
         print(json.dumps(pipeline_guidance(args.pipeline_guidance, args.lane), indent=2))
+        return 0
+
+    if args.validate_prod_workflow:
+        try:
+            source = _read_text(args.validate_prod_workflow)
+        except OSError as exc:
+            print(json.dumps({
+                "decision": "blocked_error",
+                "blocking": True,
+                "reason": f"could not read workflow YAML: {exc}",
+            }, indent=2))
+            return 2
+        print(json.dumps(validate_prod_workflow(source), indent=2))
         return 0
 
     try:

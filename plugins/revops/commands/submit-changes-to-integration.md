@@ -127,12 +127,14 @@ Show the user:
 > - Branch: `{branch}` → base `integration`
 > - Commits: {N}
 > - Metadata paths changed: {N}
-> - Metadata paths deleted: {N} — these need `destructiveChanges.xml` in the PR, or they will not be removed from the org.
+> - Metadata paths deleted: {N} — these require a reviewed `manifest/destructive/BC-<ticket>.xml` and the separate `destructive-deploy.yml` ceremony. The merge-triggered lane remains additive.
 > - Dev-org verification: {answer from 1.7}
 >
 > On merge, CI deploys this to `brite-integration`. Nothing deploys from this machine.
 
-If any deletions were listed, ask whether `destructiveChanges.xml` is in the PR. A deletion that is not expressed there is a silent no-op — the file leaves git and the component stays in the org.
+If any deletions were listed, require the same PR to include the reviewed, ticket-scoped `manifest/destructive/BC-<ticket>.xml`. If it is absent, **halt before the push gate**: the file would leave git while the component silently stayed in every org. Never commit `manifest/destructiveChanges.xml` or `manifest/preDestructiveChanges.xml`; hardis auto-executes those filenames in ordinary lanes.
+
+Make clear that merging the PR does **not** execute the ticket manifest. After the additive merge, a release manager runs `.github/workflows/destructive-deploy.yml` validate-only against `briteint`, reviews the plan, and then follows the human-gated ceremony. Production deletion happens only after normal promotion and its own validate-only review.
 
 Ask via `AskUserQuestion`:
 
@@ -175,7 +177,7 @@ Use `--draft` if the user passed it. `{title}` comes from `--title` if given, ot
 
 - What changed, in one or two sentences.
 - Which dev org it was verified in, or why it could not be (from 1.7).
-- Whether `destructiveChanges.xml` is included, if any paths were deleted.
+- The exact `manifest/destructive/BC-<ticket>.xml` path, if any paths were deleted, and that the separate destructive ceremony is still pending.
 - The Linear issue, if the branch name carries one.
 
 If a PR already exists for this branch, `gh` says so. That is not an error — print the existing PR URL and continue to Phase 4.
@@ -218,6 +220,6 @@ Narrate: `Phase 4/4: Completion... done`
 - **This command never deploys.** No `sf project deploy start` appears in it and none may be added. Integration is CI-deployed; a laptop deploy to `brite-integration` is refused by policy.
 - **Never skip a gate.** Every `AskUserQuestion` halt path must halt.
 - **Never force-push.** A failed push is surfaced and halts. Rewriting a shared branch's history to make a push succeed is not a fix.
-- **Deletions need `destructiveChanges.xml`.** Removing a file from git does not remove the component from the org. Phase 2 surfaces deletions so this cannot pass unnoticed.
+- **Deletions use only the ticket-scoped ceremony.** Removing a file from git does not remove the component from an org. Require `manifest/destructive/BC-<ticket>.xml` in the reviewed PR, then route it through `destructive-deploy.yml`; the normal merge remains additive. Never commit either hardis auto-executed root filename.
 - **Do not retry on failure.** Surface the raw output and halt.
 - **brite-salesforce wins on convention conflicts.** Its `CLAUDE.md` defines branch and PR discipline; this command mirrors it.

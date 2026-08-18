@@ -245,7 +245,7 @@ Then tell the user, plainly:
 
 > Three things still need doing, and only you can do them.
 >
-> 1. Run `/revops:run-manual-post-deploy-steps` — Screen Flow activation, Scheduled Apex re-schedule, Named Credential URLs, and cache flushes did **not** run. CI normally does the post-deploy verification ([BC-19514](https://linear.app/brite-nites/issue/BC-19514)); this path skipped it.
+> 1. Run `/revops:run-manual-post-deploy-steps --production-breakglass` for the non-Flow manual steps. This path skipped CI's activation/verifier ([BC-19514](https://linear.app/brite-nites/issue/BC-19514)), so Flow activation stays blocked pending a separate Kells/release-manager scope decision; the runbook will not turn a break-glass deploy into an implicit behavioral go-live.
 > 2. File a Linear issue for whatever made CI unavailable. The lane being down is its own defect, separate from the change you just shipped.
 > 3. Paste the record above into that issue and into the team channel.
 

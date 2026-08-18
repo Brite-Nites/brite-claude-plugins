@@ -25,7 +25,7 @@ Set `RANGE` to the diff range this command uses, then run the block.
 
 | Caller | `RANGE` |
 |---|---|
-| `/revops:preview-changes` | merge-base of `origin/main` with `HEAD`, or `main~1..main` when run from `main` |
+| `/revops:preview-changes` | merge-base of `origin/integration` with `HEAD`, or `integration~1..integration` when run from `integration`; `main` is refused |
 | `/revops:push-to-production` | `main~1..main` (the squash commit that just landed) |
 | `/revops:emergency-deploy-to-production` | `main~1..main`, or the explicit `--ref` range |
 

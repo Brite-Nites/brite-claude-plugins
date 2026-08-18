@@ -1,6 +1,7 @@
 ---
 disable-model-invocation: true
 description: Walk the manual post-deploy steps `sf` cannot automate — diff-driven pass through Screen Flow activation, Flow Draft cleanup, Scheduled Apex re-schedule, Named Credential URL updates, and Kanban Group By cache flush. Use after `/revops:preview-changes` or `/revops:push-to-production` lands. Formerly `/revops:post-deploy-runbook`.
+argument-hint: (--target-org brite-dev-<name> | --production | --production-breakglass)
 allowed-tools: Bash, AskUserQuestion
 ---
 
@@ -14,9 +15,25 @@ Execute the phases below sequentially. Use `AskUserQuestion` at each numbered ga
 
 Source material: `brite-salesforce/CLAUDE.md` §Apex & Automation (Screen Flow activation, Scheduled Apex re-schedule), §Deploy & Retrieve (Named Credential PLACEHOLDER convention), §Metadata Authoring (Kanban Group By cache gotcha). The five post-deploy steps are the top documented causes of silent post-deploy failures in the Brite org.
 
-Out of scope for this command: the deploy itself (use `/revops:preview-changes` or `/revops:push-to-production`), automating manual steps beyond Flow Draft cleanup (each remaining step requires human judgment about org-specific config), rollback of partial runbook completion, component types beyond the five detected.
+Out of scope for this command: the deploy itself (use `/revops:preview-changes` or `/revops:push-to-production`), changing the production Flow-activation decision made by CI, automating manual steps beyond dev-org Flow Draft cleanup (each remaining step requires human judgment about org-specific config), rollback of partial runbook completion, component types beyond the five detected.
 
 See the **Rules** section at the bottom for the enforcement contract (zero mutations except Phase 3, org-agnostic for manual phases, no auto-retries, no Linear mutations).
+
+---
+
+## Invocation context — required before Phase 1
+
+Require **exactly one** context:
+
+- `--target-org brite-dev-<name>` — a per-developer org after `/revops:preview-changes`. Reject the value unless it matches `^brite-dev-[a-z0-9][a-z0-9-]*$`; store the validated value as `{dev-org}`. This is the only context in which Phase 2 may guide Flow activation and Phase 3 may query or delete Flow Draft versions.
+- `--production` — the deploy came from `/revops:push-to-production`. There is no target-org flag and this command issues no Salesforce CLI query or mutation. Production Flow activation and version verification belong to the selected `plan|canary|apply` stage in `deploy-prod.yml`.
+- `--production-breakglass` — the deploy came from `/revops:emergency-deploy-to-production` while CI was down. This command still issues no Salesforce CLI query or mutation. Because no reviewed CI activation stage ran, Flow activation remains blocked pending a separate Kells/release-manager scope decision; this runbook handles only the other detected manual steps.
+
+If neither or both are present, **halt before reading the diff**:
+
+> Choose exactly one post-deploy context: `--target-org brite-dev-<name>` after an inner-loop deploy, `--production` after the CI production lane, or `--production-breakglass` after the emergency lane. The command will not infer an org from local defaults.
+
+Reject every shared or protected alias (`briteint`, `brite-integration`, `brite-uat`, `brite-prod`, `brite-sandbox`) passed through `--target-org`. Do not resolve or inspect local org defaults.
 
 ---
 
@@ -46,7 +63,7 @@ Ask via `AskUserQuestion`:
 - Question: `Which commit range holds the deploy you want to walk?`
 - Options:
   - `Just-deployed commit (HEAD~1..HEAD)` — Phase 1.3 uses `git diff HEAD~1 HEAD --name-only`.
-  - `Last 5 commits on main (origin/main~5..origin/main)` — Phase 1.3 uses `git diff origin/main~5 origin/main --name-only`.
+  - `Last 5 commits on the deployed lane` — use `origin/integration~5..origin/integration` for `--target-org brite-dev-<name>`, or `origin/main~5..origin/main` for `--production`. Never compare a Salesforce feature/dev deployment to `main`.
   - `Custom range — enter your own git range expression` — user enters the range via the Other free-text field (e.g., `<sha-before-deploy>..<sha-at-deploy>`); interpolate verbatim into `git diff <range> --name-only`.
 
 The default recommendation is `Just-deployed commit (HEAD~1..HEAD)`.
@@ -102,6 +119,20 @@ Narrate: `Phase 1/7: Diff-based detection... done`
 
 Narrate: `Phase 2/7: Flow activation...`
 
+### Production Flow ownership
+
+If the invocation uses `--production`, do not enter the manual activation steps below. Print:
+
+> Production Flow activation is owned by the explicit `plan|canary|apply` activation stage in `deploy-prod.yml`, followed by the six-type verifier. `plan` is intentionally read-only. Do not activate a Flow manually here: that would bypass the reviewed scope and could turn a reported Draft into an unapproved behavioral go-live.
+
+Mark Phase 2 `CI-owned — see deploy run` and proceed to Phase 3. The remainder of Phase 2 applies only to the validated `{dev-org}` context.
+
+If the invocation uses `--production-breakglass`, also skip the manual activation steps. Print:
+
+> The break-glass deploy bypassed CI's activation stage. Flow activation is **not approved by that fact** and remains blocked pending a separate Kells/release-manager scope decision. Do not activate a Flow manually from this runbook.
+
+Mark Phase 2 `blocked — separate activation decision required` and proceed to Phase 3.
+
 ### 2.1 List affected Flows
 
 From the Phase 1.3 diff output, filter paths matching `^force-app/.*/flows/.*\.flow-meta\.xml$` — the same regex as Phase 1.3 (one source of truth). For each, extract the developer name from the filename (strip `.flow-meta.xml`). Print the list:
@@ -144,7 +175,11 @@ Narrate: `Phase 2/7: Flow activation... done`
 
 Narrate: `Phase 3/7: Flow Draft cleanup...`
 
-This phase queries the Tooling API for stale Flow Draft versions created during the deploy window and offers to delete them. Deploying Flows creates new Draft versions on every deploy (see [BC-11038](https://linear.app/brite-nites/issue/BC-11038)) — left uncleaned, they pile up and clutter the Flow version history. This is the one phase that issues `sf` CLI mutations (gated by operator consent via Phase 3.3).
+If the invocation uses `--production`, **do not query or delete Flow versions**. Mark Phase 3 `CI-owned — see deploy run`, narrate `Phase 3/7: Flow Draft cleanup... skipped (production CI-owned)`, and proceed to Phase 4. A production `plan` result that lists Drafts is evidence for a later deliberate decision, not permission for this runbook to clean up or activate them.
+
+If the invocation uses `--production-breakglass`, likewise do not query or delete Flow versions. Mark Phase 3 `blocked — separate activation decision required` and proceed to Phase 4. The emergency deploy did not grant cleanup or activation authority.
+
+The rest of this phase is dev-org only. It queries the Tooling API for stale Flow Draft versions created during the deploy window and offers to delete them. Deploying Flows creates new Draft versions on every deploy (see [BC-11038](https://linear.app/brite-nites/issue/BC-11038)) — left uncleaned, they pile up and clutter the Flow version history. This is the one phase that issues `sf` CLI mutations (gated by operator consent via Phase 3.3), and every call pins the validated `{dev-org}` explicitly.
 
 ### 3.1 Derive deploy-window start
 
@@ -173,7 +208,7 @@ If either command fails (non-zero exit or empty output), fall back to the SOQL d
 Run:
 
 ```bash
-sf data query --use-tooling-api --json \
+sf data query --use-tooling-api --json --target-org {dev-org} \
   --query "SELECT Id, Status, Definition.DeveloperName, VersionNumber, CreatedDate
            FROM Flow
            WHERE Status = 'Draft'
@@ -214,7 +249,7 @@ Ask via `AskUserQuestion`:
 For each Draft in the result set, run:
 
 ```bash
-sf data delete record --use-tooling-api --sobject Flow --record-id <Id> --json
+sf data delete record --use-tooling-api --sobject Flow --record-id <Id> --target-org {dev-org} --json
 ```
 
 After all deletions, report the count:
@@ -235,7 +270,7 @@ Ask via `AskUserQuestion`:
 
 - Question: `Delete Flow Draft: {Definition.DeveloperName} v{VersionNumber} ({CreatedDate})?`
 - Options:
-  - `Delete` — run `sf data delete record --use-tooling-api --sobject Flow --record-id <Id> --json`. Surface success or failure per record.
+  - `Delete` — run `sf data delete record --use-tooling-api --sobject Flow --record-id <Id> --target-org {dev-org} --json`. Surface success or failure per record.
   - `Keep` — skip this Draft.
 
 After all individual gates, report the final count:
@@ -341,7 +376,7 @@ The prod and sandbox endpoints usually differ (different vendor environments, di
 
 Ask via `AskUserQuestion`:
 
-- Question: `Named Credential URL update — completed all {N} credentials across all target orgs?` (substitute `{N}` with the count from 5.1)
+- Question: `Named Credential URL update — completed all {N} credentials in this run's explicit environment?` (substitute `{N}` with the count from 5.1)
 - Options:
   - `All URLs updated` — mark phase status `completed`. Proceed.
   - `Skip — will do later` — mark phase status `skipped`. Proceed (Phase 7 surfaces as follow-up).
@@ -401,10 +436,10 @@ Narrate: `Phase 6/7: Kanban Group By cache flush... done`
 
 Narrate: `Phase 7/7: Completion summary...`
 
-Print the per-phase status matrix, using the phase-status values set in Phases 2-6 (`completed`, `skipped`, `N/A — not detected` for any phase that Phase 1 didn't flag, or Phase 3's additional `N/A — no Drafts detected` / `N/A — query failed`):
+Print the per-phase status matrix, using the phase-status values set in Phases 2-6 (`completed`, `skipped`, `N/A — not detected` for any phase that Phase 1 didn't flag, `CI-owned — see deploy run` for normal production Flows, `blocked — separate activation decision required` for break glass, or Phase 3's additional `N/A — no Drafts detected` / `N/A — query failed` in a dev org):
 
-- `✓ Flow activation: {completed / skipped / N/A — not detected}`
-- `✓ Flow Draft cleanup: {completed / skipped / N/A — no Drafts detected / N/A — query failed / N/A — not detected}`
+- `✓ Flow activation: {completed / skipped / CI-owned — see deploy run / blocked — separate activation decision required / N/A — not detected}`
+- `✓ Flow Draft cleanup: {completed / skipped / CI-owned — see deploy run / blocked — separate activation decision required / N/A — no Drafts detected / N/A — query failed / N/A — not detected}`
 - `✓ Scheduled Apex re-schedule: {completed / skipped / N/A — not detected}`
 - `✓ Named Credential URL update: {completed / skipped / N/A — not detected}`
 - `✓ Kanban Group By flush: {completed / skipped / N/A — not detected}`
@@ -419,7 +454,7 @@ If **any** phase has status `skipped`, append the follow-up list:
 
 If **no** phase has status `skipped` and at least one phase ran, append:
 
-> Post-deploy manual runbook complete. The deploy is now functionally live — Flows active, Flow Drafts cleaned, Scheduled Apex jobs restored, Named Credential URLs real, Kanban caches flushed as applicable.
+> Post-deploy manual runbook complete. The CI Flow-activation decision is preserved, and Scheduled Apex jobs, Named Credential URLs, and Kanban caches are handled as applicable.
 
 If **all** phases were `N/A — not detected` (Phase 1 fast-exit path), the summary suffices — no additional narration needed.
 
@@ -429,11 +464,11 @@ Narrate: `Phase 7/7: Completion summary... done`
 
 ## Rules
 
-- **This command issues ZERO `sf` CLI mutations except in Phase 3.** Phases 2 and 4–6 are read-only walkthroughs of user-performed manual steps. Phase 3 (Flow Draft cleanup) is the sole exception — it runs `sf data delete record` against Flow Drafts, gated by operator consent via Phase 3.3. Every other mutating action is executed by the user in their browser / IDE / Developer Console; the command narrates, detects, and gates.
+- **This command issues ZERO `sf` CLI mutations except in dev-org Phase 3.** Phases 2 and 4–6 are walkthroughs of user-performed manual steps. Phase 3 (Flow Draft cleanup) is the sole CLI exception — it runs `sf data delete record` against the explicitly validated `{dev-org}`, gated by operator consent via Phase 3.3. In `--production` context, Phases 2 and 3 are CI-owned and issue no Salesforce command. Every other mutating action is executed by the user in their browser / IDE / Developer Console; the command narrates, detects, and gates.
 - **Never advance past a gate silently.** Every `AskUserQuestion` has a defined advance / halt / repeat disposition for each option: the phase-completed option advances with status `completed`; the `Skip — will do later` option advances with status `skipped` (Phase 7 surfaces it as follow-up); `Need help` repeats the same question (see final rule); any other answer — including halt paths defined per-phase — halts cleanly without continuing to the next phase.
 - **`sf`, not `sfdx`.** Any CLI invocations (e.g., the `sf apex run` example in Phase 4.2 guidance, or the `sf data delete record` in Phase 3.4) use `sf`. Legacy `sfdx` subcommands are deprecated per `brite-salesforce/CLAUDE.md`.
 - **No auto-retries.** If Phase 1's `git diff` invocation fails (non-zero exit), print the raw error and halt — never silently retry with a different range. If a `grep` call in Phase 1.3 (Kanban secondary check) or Phase 5.1 (PLACEHOLDER surface) **errors** (exit ≥ 2 — real fault like unreadable file, bad regex, permission denied), surface the raw error and halt. Exit 1 (no match found) is a legitimate outcome at both grep sites — it means the candidate paths had no Picklist/MultiselectPicklist (Phase 1.3) or the NC is a modern ExternalCredential-backed one with no `<endpoint>` (Phase 5.1) — and is handled by body-phase logic, not treated as failure. Phase 3.2 Tooling API query failure is advisory and does not halt (see Phase 3.2 failure handling).
-- **Org-agnostic (except Phase 3).** Unlike `/revops:preview-changes` and `/revops:push-to-production`, this command does not pin a target org for manual-step phases. The user invokes it after deploying to whichever org the manual steps apply to; the command shows paths for both sandbox and prod where relevant (e.g., Phase 5), but issues no org-specific calls itself outside of Phase 3. Phase 3 (Flow Draft cleanup) runs `sf data query` and `sf data delete record` against the default target-org — ensure the default org is set to the deployed org before running the runbook.
+- **Context is explicit; local defaults are never authority.** `--target-org` accepts only a validated `brite-dev-<name>` and pins it on every Phase 3 query/delete. `--production` performs no Salesforce CLI query or mutation and never repeats the CI Flow decision. `--production-breakglass` also performs no Salesforce CLI query/mutation and leaves Flow activation blocked for a separate human decision. Shared and protected aliases are refused as `--target-org` values.
 - **No Linear mutations.** Skip follow-ups surface as narrated reminders only; the user creates Linear sub-issues manually if tracking is needed. This preserves the Phase 2 template contract (allowed-tools = `Bash, AskUserQuestion`) inherited from `/revops:preview-changes` (BC-5790) and `/revops:push-to-production` (BC-5791).
 - **Conditional phases compile cleanly.** When Phase 1 detection flags a phase as not-applicable, the entire phase block (narration + listing + gate) is skipped — no "N/A" inline noise. The only place `N/A — not detected` appears is the Phase 7 summary matrix. Phase 3 is not conditional on a diff flag — it always runs in the non-fast-exit path and self-determines via the Tooling API query result.
 - **Need help is a repeat, not an advance.** If a user answers `Need help` at any gate, print the extended guidance and re-ask the original Completed/Skip question. Do not treat `Need help` as a terminal answer.

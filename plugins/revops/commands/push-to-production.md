@@ -32,7 +32,7 @@ Out of scope: inner-loop deploys (use `/revops:preview-changes`), promoting to i
 
 Legacy name `/revops:deploy-prod` still resolves — it is a deprecation stub that points here.
 
-> **Dependency.** This command dispatches `deploy-prod.yml`, which is built in brite-salesforce [BC-19513](https://linear.app/brite-nites/issue/BC-19513). Until that workflow exists, Phase 4 will halt at the workflow-presence check and tell you so. That is the intended behaviour: the plugin refuses to pretend a lane exists.
+> **Dependency.** This command dispatches the `main` copy of `deploy-prod.yml`. [BC-19513](https://linear.app/brite-nites/issue/BC-19513) built the deploy lane; [BC-19514](https://linear.app/brite-nites/issue/BC-19514) added the `activation` contract and post-deploy verification. Phase 1 proves that all three required inputs exist on `main` before asking any production confirmation question. If integration contains the contract but `main` does not yet, the command fails closed until the normal promotion carries it forward.
 
 ---
 
@@ -171,17 +171,57 @@ fi
 
   > `/revops:push-to-production` requires `gh` 2.87.0 or newer because that version returns the exact workflow-run URL created by `gh workflow run`. Upgrade `gh`, then re-run. Do not fall back to `gh run list`: selecting “the newest run” can attach to another operator's production deploy.
 
-### 1.6 `.forceignore` pre-flight (F1, BC-12347)
+### 1.6 Confirm the `main` workflow's dispatch contract
 
-Narrate: `Phase 1.6/5: .forceignore pre-flight...`
+The workflow name existing is not enough. During the BC-19514 rollout, `integration` exposed the `activation` input before `main`; sending that input to the older `main` workflow makes GitHub refuse the dispatch after the operator has already completed the production ceremony. Read the exact workflow copy that a `--ref main` dispatch will execute and fail closed before any confirmation.
+
+Run:
+
+```bash
+WORKFLOW_YAML="$(gh workflow view deploy-prod.yml \
+  --repo Brite-Nites/brite-salesforce \
+  --ref main \
+  --yaml 2>&1)"
+WORKFLOW_STATUS=$?
+if [ "$WORKFLOW_STATUS" -ne 0 ]; then
+  printf '%s\n' "$WORKFLOW_YAML"
+  echo "CI_CONTRACT_UNAVAILABLE"
+else
+  CONTRACT_JSON="$(printf '%s\n' "$WORKFLOW_YAML" \
+    | python3 "${CLAUDE_PLUGIN_ROOT}/scripts/promotion_topology.py" \
+        --validate-prod-workflow - 2>&1)"
+  CONTRACT_STATUS=$?
+  printf '%s\n' "$CONTRACT_JSON"
+  if [ "$CONTRACT_STATUS" -ne 0 ]; then
+    echo "CI_CONTRACT_UNAVAILABLE"
+  else
+    CONTRACT_DECISION="$(printf '%s\n' "$CONTRACT_JSON" \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin).get("decision", ""))' 2>/dev/null)"
+    if [ "$CONTRACT_DECISION" = "ready" ]; then
+      echo "CI_CONTRACT_OK"
+    else
+      echo "CI_CONTRACT_INCOMPLETE"
+    fi
+  fi
+fi
+```
+
+- `CI_CONTRACT_OK` → continue.
+- `CI_CONTRACT_UNAVAILABLE` or `CI_CONTRACT_INCOMPLETE` → **halt before Phase 2.** Print the raw error and:
+
+  > The `main` copy of `deploy-prod.yml` does not yet expose the reviewed BC-19513/BC-19514 dispatch contract (`mode`, `confirm`, `activation`). Do not remove an input or dispatch a different ref. Promote the reviewed Salesforce change through the normal integration → main ceremony, then re-run.
+
+### 1.7 `.forceignore` pre-flight (F1, BC-12347)
+
+Narrate: `Phase 1.7/5: .forceignore pre-flight...`
 
 Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceignore-preflight.md) with `RANGE="main~1..main"` — the squash commit that just landed, per BC-6000 squash-merge discipline. Act on the result exactly as that file says.
 
 CI runs the same check as a mirrored step. Running it here too is deliberate: it costs a second and it tells you *before* you dispatch, not five minutes into a run.
 
-Narrate: `Phase 1.6/5: .forceignore pre-flight... done`
+Narrate: `Phase 1.7/5: .forceignore pre-flight... done`
 
-### 1.7 Confirm intent
+### 1.8 Confirm intent
 
 Collect:
 
@@ -261,7 +301,7 @@ Look for a workflow whose `path` ends in `deploy-prod.yml`.
 - Present and `state` is `active` → continue.
 - Absent → **halt** with:
 
-  > `deploy-prod.yml` does not exist in `Brite-Nites/brite-salesforce`. It is built in [BC-19513](https://linear.app/brite-nites/issue/BC-19513). Until it lands there is no CI production lane to dispatch, and this command will not fall back to a local deploy — brite-salesforce ADR-016 section 6 retired that path. If production genuinely must move before then, use `/revops:emergency-deploy-to-production` and record why.
+  > `deploy-prod.yml` is no longer active in `Brite-Nites/brite-salesforce`. Phase 1 already proved the `main` file's input contract, so the workflow changed or was disabled during the confirmation ceremony. Stop and reconcile that state. This command will not fall back to a local deploy.
 
 - Present but `disabled_manually` → **halt** and say so; someone disabled the lane on purpose, and finding out why comes first.
 
@@ -335,7 +375,7 @@ Print the summary:
 - `✓ CI run conclusion: {conclusion}`
 - One line per CI job with its conclusion — including the coverage gate and the post-deploy verification job, which is where those checks now live ([BC-19514](https://linear.app/brite-nites/issue/BC-19514)).
 
-If the run's output reports Flows deployed as Draft, surface that list here verbatim. It is the one post-deploy result that still needs a human.
+If the run's output reports Flows deployed as Draft, surface that list here verbatim as CI evidence. **Do not activate them manually.** `plan` intentionally performs no activation; `canary` and `apply` own their exact scopes inside the reviewed workflow. A different behavioral go-live requires a new deliberate CI dispatch decision, not a post-deploy runbook shortcut.
 
 Then run the guidance layer:
 
@@ -345,12 +385,13 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/promotion_topology.py" --pipeline-guidanc
 
 If `decision` is `guidance`, use the config's lane names in the hint below. If it is `no_config` or `unreadable`, print the default hint unchanged — the guidance layer no-ops where the config is absent, by design (ADR-026 section 5). Never present it as a gate.
 
-> Production deploy landed via CI. **Next: run `/revops:run-manual-post-deploy-steps`** for the steps `sf` cannot automate:
+> Production deploy landed via CI. **Next: run `/revops:run-manual-post-deploy-steps --production`** for the steps CI cannot automate:
 >
-> - Screen Flow activation (flagged above if any)
 > - Scheduled Apex re-schedule (if Apex jobs were redeployed)
 > - Named Credential URL refresh (per prod org)
 > - Kanban / page layout cache flush (if new picklist values landed on standard objects)
+>
+> Flow activation and Flow-version verification are already owned by the selected CI `activation` stage. The manual runbook must not repeat them.
 
 Narrate: `Phase 5/5: Completion... done`
 
@@ -363,6 +404,7 @@ Narrate: `Phase 5/5: Completion... done`
 - **Phase 2 gates are two separate `AskUserQuestion` calls.** A single multi-option picker is unacceptable.
 - **The Phase 0.5 probe blocks.** A `blocked_*` verdict halts the command. `--override-concurrency` clears a recent deploy and nothing clears an in-flight one.
 - **Confirm the workflow exists before dispatching.** A missing `deploy-prod.yml` halts; it never degrades into a local deploy.
+- **Confirm the `main` dispatch schema before the production gates.** The file must expose `mode`, `confirm`, and `activation`, with the reviewed option set. A workflow on `integration` is not evidence for a dispatch that executes `main`.
 - **Dispatch `main` only, with every required input.** Always pass `mode=deploy`, `confirm=DEPLOY-PROD`, and the explicit `activation` mode. Never accept an arbitrary SHA or feature-branch ref.
 - **Use the exact run URL returned by `gh workflow run`.** Require `gh >= 2.87.0`; never guess the run with `gh run list`.
 - **Never re-dispatch to check on a run.** Re-attaching with `gh run watch` is a read and is safe. A second dispatch is a second deploy.

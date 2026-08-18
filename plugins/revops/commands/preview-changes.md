@@ -17,7 +17,7 @@ Canonical invocation pattern comes from `brite-salesforce/CLAUDE.md` §Commands 
 
 **Target org — read this first.** This command deploys to **the developer's own `brite-dev-<name>` org**, resolved at Phase 0.25. It no longer pins the shared `brite-sandbox`, which is retiring: inner-loop work moves to per-developer orgs and shared integration moves to `brite-integration` (alias `briteint`), reached by merging a PR, not by a laptop deploy. The full alias list lives in one file, [`../config/org-aliases.json`](../config/org-aliases.json), shared with the brite-salesforce deploy-policy hook. See [ADR-026](../../../docs/decisions/026-revops-promotion-topology.md).
 
-**Deploy scope.** Defaults to feature-branch-diff-scoped `--source-dir` (computed from `git diff $(git merge-base origin/main HEAD)..HEAD`) to avoid Flow Draft pile-up and unrelated drift surprises — see [BC-11030](https://linear.app/brite-nites/issue/BC-11030). Pass `--reconcile` to opt into full-tree behavior for explicit drift sync (org-refresh hydration, first-run on a long-paused feature branch, mass drift audit). When run from `main` itself the diff range falls back to `main~1..main`.
+**Deploy scope.** Defaults to feature-branch-diff-scoped `--source-dir` (computed from `git diff $(git merge-base origin/integration HEAD)..HEAD`) to avoid Flow Draft pile-up and unrelated drift surprises — see [BC-11030](https://linear.app/brite-nites/issue/BC-11030). Salesforce feature branches are cut from `integration`, never `main`; when run from `integration` itself the range falls back to `integration~1..integration`. Running this inner-loop command from `main` is refused. Pass `--reconcile` to opt into full-tree behavior for explicit drift sync (org-refresh hydration, first-run on a long-paused feature branch, mass drift audit).
 
 Out of scope for this command: promoting to integration (use `/revops:submit-changes-to-integration`), prod deploy (use `/revops:push-to-production`), post-deploy manual runbook (use `/revops:run-manual-post-deploy-steps`), automating browser verification.
 
@@ -33,11 +33,11 @@ Inspect the invocation arguments. The command supports three optional flags:
 - `--target-org brite-dev-<name>` — name your own dev org explicitly instead of letting Phase 0.25 resolve it. Only a `brite-dev-<name>` alias is accepted; anything else is rejected, not honoured.
 - `--override-concurrency` — proceed past a *recent* deploy found by the Phase 0.5 probe. It does **not** clear an in-flight deploy.
 
-If `--reconcile` is in the invocation, set deploy mode to `reconcile` for the rest of the run and skip the diff resolution in Phase 2.1. Otherwise the deploy mode is `branch-diff`, and the bash blocks in Phase 2 / Phase 3 compute the `--source-dir` set from the feature branch diff vs `origin/main`.
+If `--reconcile` is in the invocation, set deploy mode to `reconcile` for the rest of the run and skip the diff resolution in Phase 2.1. Otherwise the deploy mode is `branch-diff`, and the bash blocks in Phase 2 / Phase 3 compute the `--source-dir` set from the feature branch diff vs `origin/integration`.
 
 Tell the user which mode is active before Phase 1 starts:
 
-> Mode: `branch-diff` — deploying only paths changed on this branch since `origin/main`. Pass `--reconcile` to deploy the full tree.
+> Mode: `branch-diff` — deploying only paths changed on this branch since `origin/integration`. Pass `--reconcile` to deploy the full tree.
 
 or, if `--reconcile` was passed:
 
@@ -145,7 +145,7 @@ Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceig
 
 Set `RANGE` from the Phase 0 deploy mode:
 
-- Mode `branch-diff` — the merge-base of `origin/main` with `HEAD`, or `main~1..main` when run from `main` itself.
+- Mode `branch-diff` — the merge-base of `origin/integration` with `HEAD`, or `integration~1..integration` when run from `integration` itself. `main` is refused.
 - Mode `reconcile` — skip the whole pre-flight. Print `NOTE: reconcile mode — skipping .forceignore pre-flight.` and proceed to Phase 2.
 
 Narrate: `Phase 1.3/6: .forceignore pre-flight... done`
@@ -168,34 +168,37 @@ The deploy invocation is assembled from the Phase 0 mode. Run **one** of the two
 sf project deploy start --source-dir force-app --dry-run --target-org {dev-org} --json
 ```
 
-**Mode `branch-diff`** (default — compute `--source-dir` set from this branch's diff vs `origin/main`):
+**Mode `branch-diff`** (default — compute `--source-dir` set from this branch's diff vs `origin/integration`):
 
 ```bash
 set -e
 
 # Resolve diff range. On a feature branch (the normal case), use the
-# merge-base with origin/main so we capture every commit the branch added.
-# If we somehow run from main itself (e.g., post-merge sanity re-deploy),
-# fall back to the single squash commit on main.
+# merge-base with origin/integration so we capture every commit the branch added.
+# An integration-branch sanity run uses its latest squash commit. Main is the
+# production branch and is never a valid source for this inner-loop command.
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [ "$BRANCH" = "main" ]; then
-  RANGE="main~1..main"
+  echo "ERROR: /revops:preview-changes cannot run from main. Cut work from integration."
+  exit 2
+elif [ "$BRANCH" = "integration" ]; then
+  RANGE="integration~1..integration"
 else
-  # origin/main must be reachable. If the user hasn't fetched recently,
+  # origin/integration must be reachable. If the user hasn't fetched recently,
   # this could be stale — surface that.
-  if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
-    echo "ERROR: origin/main not found in this clone — run \`git fetch origin main\` first."
+  if ! git rev-parse --verify origin/integration >/dev/null 2>&1; then
+    echo "ERROR: origin/integration not found in this clone — run \`git fetch origin integration\` first."
     exit 2
   fi
   # Capture merge-base exit status separately. If there's no common
   # ancestor (orphaned branch, shallow clone where ancestor isn't fetched),
   # bare command substitution would leave RANGE="..HEAD" — a malformed
   # range that silently behaves like an empty diff downstream.
-  if ! MERGE_BASE=$(git merge-base origin/main HEAD 2>&1); then
-    echo "ERROR: \`git merge-base origin/main HEAD\` failed — output below."
+  if ! MERGE_BASE=$(git merge-base origin/integration HEAD 2>&1); then
+    echo "ERROR: \`git merge-base origin/integration HEAD\` failed — output below."
     printf '%s\n' "$MERGE_BASE"
-    echo "Is origin/main fetched and reachable from HEAD? (A shallow clone"
-    echo "may need \`git fetch --unshallow origin main\`.)"
+    echo "Is origin/integration fetched and reachable from HEAD? (A shallow clone"
+    echo "may need \`git fetch --unshallow origin integration\`.)"
     exit 2
   fi
   RANGE="${MERGE_BASE}..HEAD"
@@ -216,8 +219,7 @@ if ! RAW_DELETED=$(git diff "$RANGE" --name-only --diff-filter=D 2>&1); then
 fi
 
 # --diff-filter=ACMRT excludes deletions (D) — sf can't deploy a path
-# that no longer exists. True deletions must be handled via
-# destructiveChanges.xml — surface them but don't try to deploy them.
+# that no longer exists. Deletions use the separate reviewed ceremony.
 CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
 DELETED=$(printf '%s\n' "$RAW_DELETED" | grep '^force-app/' || true)
 
@@ -244,10 +246,12 @@ printf '%s\n' "$COALESCED" | sed 's/^/  /'
 
 if [ -n "$DELETED" ]; then
   echo
-  echo "WARNING: $(printf '%s\n' "$DELETED" | wc -l | tr -d ' ') deletion(s) detected — NOT included in --source-dir."
-  echo "Metadata deletions must be expressed via destructiveChanges.xml in the PR."
+  echo "ERROR: $(printf '%s\n' "$DELETED" | wc -l | tr -d ' ') metadata deletion(s) detected."
+  echo "This command is additive and will not continue over a partial deploy."
+  echo "Use manifest/destructive/BC-<ticket>.xml and the destructive-deploy.yml ceremony."
   echo "Deleted paths:"
   printf '%s\n' "$DELETED" | sed 's/^/  /'
+  exit 2
 fi
 
 # Array form (not word-split) so the argv expands under zsh too — the Bash tool runs zsh (BC-16872).
@@ -256,7 +260,7 @@ while IFS= read -r p; do [ -n "$p" ] && ARGS+=(--source-dir "$p"); done <<< "$CO
 sf project deploy start "${ARGS[@]}" --dry-run --target-org {dev-org} --json
 ```
 
-If any deletions were surfaced above, decide before continuing: do they belong in this deploy via `destructiveChanges.xml`? If yes, fold the destructive manifest in and re-run. If no (e.g., the file was moved/renamed and the new path is in the deploy set), continue.
+Any deletion **must stop this command**. Record the intended members in the reviewed, ticket-scoped `manifest/destructive/BC-<ticket>.xml`; after the additive PR lands, a release manager uses `.github/workflows/destructive-deploy.yml` validate-only first and then the human-gated ceremony. Never commit `manifest/destructiveChanges.xml` or fold a destructive package into this inner-loop deploy.
 
 ### 2.2 Parse response
 
@@ -300,14 +304,17 @@ set -e
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [ "$BRANCH" = "main" ]; then
-  RANGE="main~1..main"
+  echo "ERROR: /revops:preview-changes cannot run from main. Cut work from integration."
+  exit 2
+elif [ "$BRANCH" = "integration" ]; then
+  RANGE="integration~1..integration"
 else
-  if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
-    echo "ERROR: origin/main not found in this clone — run \`git fetch origin main\` first."
+  if ! git rev-parse --verify origin/integration >/dev/null 2>&1; then
+    echo "ERROR: origin/integration not found in this clone — run \`git fetch origin integration\` first."
     exit 2
   fi
-  if ! MERGE_BASE=$(git merge-base origin/main HEAD 2>&1); then
-    echo "ERROR: \`git merge-base origin/main HEAD\` failed at Phase 3 — output below."
+  if ! MERGE_BASE=$(git merge-base origin/integration HEAD 2>&1); then
+    echo "ERROR: \`git merge-base origin/integration HEAD\` failed at Phase 3 — output below."
     printf '%s\n' "$MERGE_BASE"
     exit 2
   fi
@@ -319,7 +326,20 @@ if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
   printf '%s\n' "$RAW_CHANGED"
   exit 2
 fi
+if ! RAW_DELETED=$(git diff "$RANGE" --name-only --diff-filter=D 2>&1); then
+  echo "ERROR: \`git diff $RANGE --diff-filter=D\` failed at Phase 3 — output below."
+  printf '%s\n' "$RAW_DELETED"
+  exit 2
+fi
 CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
+DELETED=$(printf '%s\n' "$RAW_DELETED" | grep '^force-app/' || true)
+
+if [ -n "$DELETED" ]; then
+  echo "ERROR: Metadata deletions appeared before Phase 3; refusing the partial additive deploy."
+  echo "Use manifest/destructive/BC-<ticket>.xml and destructive-deploy.yml."
+  printf '%s\n' "$DELETED" | sed 's/^/  /'
+  exit 2
+fi
 
 if [ -z "$CHANGED" ]; then
   echo "ERROR: Re-resolved diff is empty at Phase 3 — refusing to deploy."

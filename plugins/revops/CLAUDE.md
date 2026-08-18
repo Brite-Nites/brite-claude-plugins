@@ -14,7 +14,7 @@ Locked decisions: [ADR-007](../../docs/decisions/007-revops-plugin-design.md) (d
 
 Deploy lifecycle, reshaped by [ADR-026](../../docs/decisions/026-revops-promotion-topology.md):
 
-`setup-dev-workspace` (guided auth to your own `brite-dev-<name>` org) → `check-environment-health` (zero-mutation health check) → `preview-changes` (deploy to your dev org) → `submit-changes-to-integration` (PR into `integration`; CI deploys) → `push-to-production` (dispatch + watch CI) → `run-manual-post-deploy-steps`. Break-glass: `emergency-deploy-to-production`.
+`setup-dev-workspace` (guided auth to your own `brite-dev-<name>` org) → `check-environment-health` (zero-mutation health check) → `preview-changes` (deploy to your dev org) → `submit-changes-to-integration` (PR into `integration`; CI deploys) → `push-to-production` (dispatch + watch CI) → `run-manual-post-deploy-steps --production`. After an inner-loop deploy, use `run-manual-post-deploy-steps --target-org brite-dev-<name>`. Break-glass: `emergency-deploy-to-production`.
 
 Every command gates on `AskUserQuestion`, parses `--json` (not stdout), passes `--target-org` explicitly, and runs from inside an SFDX repo (cwd check for `sfdx-project.json`).
 

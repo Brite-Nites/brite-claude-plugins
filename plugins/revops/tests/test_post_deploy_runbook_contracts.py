@@ -68,6 +68,36 @@ def test_allowed_tools_is_bash_and_ask() -> None:
     )
 
 
+def test_invocation_requires_an_explicit_dev_or_production_context() -> None:
+    frontmatter, body = split_frontmatter(read_command())
+    hint = next(
+        line for line in frontmatter.splitlines() if line.startswith("argument-hint:")
+    )
+    assert "--target-org brite-dev-<name>" in hint
+    assert "--production" in hint
+    assert "--production-breakglass" in hint
+    assert "exactly one" in body
+    assert "default target-org" not in body
+
+
+def test_production_context_never_reactivates_or_deletes_flow_versions() -> None:
+    body = read_command()
+    assert "Production Flow ownership" in body
+    assert "activation stage in `deploy-prod.yml`" in body
+    assert "Do not activate a Flow manually" in body
+    assert "do not query or delete Flow versions" in body
+    assert "blocked — separate activation decision required" in body
+
+
+def test_dev_flow_draft_commands_pin_the_resolved_target_org() -> None:
+    body = read_command()
+    phase3 = body[body.find("## Phase 3"):body.find("## Phase 4")]
+    assert "--target-org {dev-org}" in phase3
+    assert phase3.count("sf data delete record") >= 2
+    for command in re.findall(r"sf data delete record[^\n]*", phase3):
+        assert "--target-org {dev-org}" in command
+
+
 # ── Phase ordering: Phase 3 sits between Flow activation and Scheduled Apex ─
 
 def test_phase_ordering_flow_draft_between_activation_and_scheduled() -> None:

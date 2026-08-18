@@ -3,7 +3,8 @@
 #
 # promotion_topology.py is the deterministic decision core behind the ADR-026
 # reshape: alias classification, per-developer org resolution, the BLOCKING
-# concurrency probe, and the config-gated guidance layer.
+# concurrency probe, the config-gated guidance layer, and the prod workflow
+# dispatch contract.
 #
 # The property under test is FAIL-CLOSED. The old Phase 0.5 concurrency lookback
 # was prose that said "do not halt the deploy over an advisory check", so a
@@ -196,7 +197,39 @@ if [ "$enf" = "False" ]; then ok; else bad "guidance: enforcing should be False,
 
 rm -rf "$box"
 
-# ── 6. no side effects ──────────────────────────────────────────────────────
+# ── 6. production workflow dispatch contract ───────────────────────────────
+complete_workflow='on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options:
+          - validate
+          - deploy
+      confirm:
+        type: string
+      activation:
+        type: choice
+        options:
+          - plan
+          - canary
+          - apply
+jobs: {}'
+workflow_contract() {
+  printf '%s' "$1" | python3 "$MOD" --validate-prod-workflow - 2>/dev/null
+}
+assert_decision "prod workflow: complete contract is ready" ready \
+  "$(workflow_contract "$complete_workflow")"
+assert_decision "prod workflow: missing activation blocks" blocked_error \
+  "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed '/      activation:/,/          - apply/d')")"
+assert_decision "prod workflow: missing deploy option blocks" blocked_error \
+  "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed '/          - deploy/d')")"
+assert_decision "prod workflow: missing apply option blocks" blocked_error \
+  "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed '/          - apply/d')")"
+assert_decision "prod workflow: empty input blocks" blocked_error \
+  "$(workflow_contract '')"
+
+# ── 7. no side effects ──────────────────────────────────────────────────────
 # The module must not write anything, including when fed injection payloads.
 sbox="$(mktemp -d)"
 ( cd "$sbox" && python3 "$MOD" --classify '$(touch pwned)' >/dev/null 2>&1
