@@ -63,7 +63,15 @@ case "$MAX_WAIT" in ''|*[!0-9]*) echo "--max-wait must be a non-negative integer
 case "$INTERVAL" in ''|*[!0-9]*) echo "--interval must be a non-negative integer" >&2; exit 2 ;; esac
 [ "$INTERVAL" -ge 1 ] || INTERVAL=1
 
-now_iso() { python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z"))'; }
+# Tests inject a fixed clock so historical fixtures do not expire as wall time
+# advances. Production leaves the variable unset and reads UTC normally.
+now_iso() {
+  if [ -n "${GREPTILE_AWAIT_NOW:-}" ]; then
+    printf '%s\n' "$GREPTILE_AWAIT_NOW"
+  else
+    python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00","Z"))'
+  fi
+}
 
 # deadline = trigger + max-wait
 DEADLINE="$(python3 - "$TRIGGER" "$MAX_WAIT" <<'PY'

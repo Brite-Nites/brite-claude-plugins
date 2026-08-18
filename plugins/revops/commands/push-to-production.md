@@ -1,7 +1,7 @@
 ---
 disable-model-invocation: true
 description: Push a merged change to the production Salesforce org by dispatching and watching the brite-salesforce CI deploy workflow. Runs the local pre-flight ceremonies (clean tree, branch check, blocking concurrency probe, .forceignore pre-flight, intent summary), then hands the deploy itself to CI — this command never deploys from your laptop. Use after the PR is merged to `main`. Formerly `/revops:deploy-prod`.
-argument-hint: [--override-concurrency] [--ref <sha>]
+argument-hint: [--override-concurrency] [--activation <plan|canary|apply>]
 allowed-tools: Bash, AskUserQuestion
 ---
 
@@ -41,13 +41,15 @@ Legacy name `/revops:deploy-prod` still resolves — it is a deprecation stub th
 Inspect the invocation arguments:
 
 - `--override-concurrency` — proceed past a *recent* prod deploy found by the Phase 0.5 probe. It does **not** clear an in-flight deploy.
-- `--ref <sha>` — dispatch CI against an explicit commit instead of the current `HEAD` of `main`. Rare; use it when `main` has moved on since the change you mean to ship.
+- `--activation <plan|canary|apply>` — choose the post-deploy Flow-activation scope. Default: `plan` (read-only). `canary` activates only `Lead_Disqualify`; `apply` activates every eligible Flow and is a separate behavioral go-live decision.
+
+Reject any other activation value before the concurrency probe. There is deliberately no `--ref`: the production workflow refuses every ref except `main`, and Phase 1.4 already proves local `main` equals `origin/main`.
 
 There is no `--reconcile` here any more. Deploy scope is CI's decision now: the workflow computes it from the merge commit, so a scope flag on the laptop side would be a lie about who is in charge. If you need a full-tree prod reconcile, run the workflow directly with its own inputs and say why in the run notes.
 
-Tell the user what will happen before Phase 1 starts:
+Set `ACTIVATION=plan` unless the invocation explicitly selected `canary` or `apply`. Tell the user what will happen before Phase 1 starts:
 
-> This command will run local pre-flight checks, then dispatch the `deploy-prod.yml` workflow in `Brite-Nites/brite-salesforce` and watch it. No `sf` deploy runs on this machine.
+> This command will run local pre-flight checks, then dispatch the `deploy-prod.yml` workflow from `main` in `Brite-Nites/brite-salesforce` with Flow activation mode `{ACTIVATION}` and watch the exact run it creates. No `sf` deploy runs on this machine.
 
 ---
 
@@ -138,18 +140,36 @@ fi
 
   > Local `main` and `origin/main` differ. CI will deploy `origin/main`. Pull (or push) so the two agree, confirm which commit you actually mean to ship, then re-run.
 
-### 1.5 Confirm `gh` is authenticated
+### 1.5 Confirm `gh` is authenticated and new enough to return the created run URL
 
 Run:
 
 ```bash
-gh auth status 2>&1 && echo "GH_OK" || echo "GH_NOT_AUTHED"
+gh auth status 2>&1 && echo "GH_AUTH_OK" || echo "GH_NOT_AUTHED"
+GH_VERSION="$(gh --version 2>/dev/null | awk 'NR == 1 { print $3 }')"
+python3 - "$GH_VERSION" <<'PY'
+import re
+import sys
+
+match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:[-+].*)?", sys.argv[1])
+if not match or tuple(map(int, match.groups())) < (2, 87, 0):
+    raise SystemExit(1)
+PY
+if [ "$?" -eq 0 ]; then
+  echo "GH_VERSION_OK $GH_VERSION"
+else
+  echo "GH_TOO_OLD ${GH_VERSION:-unknown}"
+fi
 ```
 
-- `GH_OK` → continue.
+- `GH_AUTH_OK` and `GH_VERSION_OK` → continue.
 - `GH_NOT_AUTHED` → **halt** with:
 
   > `gh` is not authenticated, so this command cannot dispatch or watch the deploy workflow. Run `gh auth login`, then re-run `/revops:push-to-production`.
+
+- `GH_TOO_OLD` → **halt** with:
+
+  > `/revops:push-to-production` requires `gh` 2.87.0 or newer because that version returns the exact workflow-run URL created by `gh workflow run`. Upgrade `gh`, then re-run. Do not fall back to `gh run list`: selecting “the newest run” can attach to another operator's production deploy.
 
 ### 1.6 `.forceignore` pre-flight (F1, BC-12347)
 
@@ -178,6 +198,7 @@ Show the user a pre-flight summary:
 > - Repo: `Brite-Nites/brite-salesforce`
 > - Branch: `main` (in sync with `origin/main`)
 > - Commit: `{short-sha}` — `{commit-subject}` (by `{author}`)
+> - Flow activation: `{ACTIVATION}` (`plan` is read-only; `canary`/`apply` mutate Flow activation)
 > - Working tree: clean
 > - Concurrency probe: clear
 > - `.forceignore` pre-flight: no unexpected exclusions
@@ -205,7 +226,7 @@ This phase issues **two separate** `AskUserQuestion` calls — never a single mu
 
 Ask via `AskUserQuestion`:
 
-- Question: `Dispatch the production deploy for {short-sha} — "{commit-subject}"?`
+- Question: `Dispatch the production deploy for {short-sha} — "{commit-subject}" — with Flow activation mode {ACTIVATION}?`
 - Options:
   - `Yes, dispatch the prod deploy` — proceed to Gate B.
   - `No, stop here` — **halt** cleanly. Print: *"Stopped at Gate A. Nothing was dispatched."* Exit.
@@ -244,34 +265,24 @@ Look for a workflow whose `path` ends in `deploy-prod.yml`.
 
 - Present but `disabled_manually` → **halt** and say so; someone disabled the lane on purpose, and finding out why comes first.
 
-### 3.2 Dispatch
+### 3.2 Dispatch and capture the exact created run
 
 ```bash
-REF="${REF:-main}"   # `--ref <sha>` overrides; default is main
-gh workflow run deploy-prod.yml \
+RUN_URL="$(gh workflow run deploy-prod.yml \
   --repo Brite-Nites/brite-salesforce \
-  --ref "$REF" 2>&1
+  --ref main \
+  --raw-field mode=deploy \
+  --raw-field confirm=DEPLOY-PROD \
+  --raw-field activation="$ACTIVATION" 2>&1)"
+DISPATCH_STATUS=$?
+printf '%s\n' "$RUN_URL"
 ```
 
-- Success → continue to 3.3.
-- Failure → **halt.** Print the raw output. Common causes: no `workflow_dispatch` trigger on the workflow, or the token lacks `actions:write` on the repo. Do not retry.
+- Non-zero `DISPATCH_STATUS` → **halt.** Print the raw output. Common causes: no `workflow_dispatch` trigger on the workflow, or the token lacks `actions:write` on the repo. Do not retry.
+- Exit 0 and `RUN_URL` exactly matches `https://github.com/Brite-Nites/brite-salesforce/actions/runs/{numeric-id}` → set `RUN_ID` to that final numeric path segment and continue.
+- Exit 0 but the output is not exactly that URL → **halt** with the raw output. The dispatch may have succeeded, so **do not re-dispatch**. Open the Actions tab and reconcile manually.
 
-### 3.3 Resolve the run id
-
-`gh workflow run` does not return the run id. Poll briefly for the newest run on that workflow and ref.
-
-```bash
-sleep 5
-gh run list --repo Brite-Nites/brite-salesforce \
-  --workflow deploy-prod.yml --limit 5 \
-  --json databaseId,headSha,status,createdAt,event 2>&1
-```
-
-Pick the newest run whose `headSha` matches the commit you dispatched and whose `event` is `workflow_dispatch`. Print its `databaseId` and its URL.
-
-- No matching run after two polls → **halt**. Print the listing verbatim and:
-
-  > Dispatch was accepted but no matching run appeared. Check the Actions tab for `Brite-Nites/brite-salesforce` directly. **Do not re-dispatch** — a second run against the same commit is exactly the concurrent-deploy hazard Phase 0.5 exists to prevent.
+Do not call `gh run list` to resolve the run. The returned URL is the dispatch receipt; a “newest matching run” query is ambiguous when two authorized operators dispatch the same `main` SHA close together.
 
 Narrate: `Phase 3/5: Dispatching deploy-prod.yml... done (run {id})`
 
@@ -320,6 +331,7 @@ Print the summary:
 - `✓ Concurrency probe: clear` (or `⚠ overridden — {N} recent deploy(s)`)
 - `✓ .forceignore pre-flight: no unexpected exclusions`
 - `✓ Dispatched deploy-prod.yml @ {short-sha} (run {id})`
+- `✓ Flow activation mode: {ACTIVATION}`
 - `✓ CI run conclusion: {conclusion}`
 - One line per CI job with its conclusion — including the coverage gate and the post-deploy verification job, which is where those checks now live ([BC-19514](https://linear.app/brite-nites/issue/BC-19514)).
 
@@ -351,6 +363,8 @@ Narrate: `Phase 5/5: Completion... done`
 - **Phase 2 gates are two separate `AskUserQuestion` calls.** A single multi-option picker is unacceptable.
 - **The Phase 0.5 probe blocks.** A `blocked_*` verdict halts the command. `--override-concurrency` clears a recent deploy and nothing clears an in-flight one.
 - **Confirm the workflow exists before dispatching.** A missing `deploy-prod.yml` halts; it never degrades into a local deploy.
+- **Dispatch `main` only, with every required input.** Always pass `mode=deploy`, `confirm=DEPLOY-PROD`, and the explicit `activation` mode. Never accept an arbitrary SHA or feature-branch ref.
+- **Use the exact run URL returned by `gh workflow run`.** Require `gh >= 2.87.0`; never guess the run with `gh run list`.
 - **Never re-dispatch to check on a run.** Re-attaching with `gh run watch` is a read and is safe. A second dispatch is a second deploy.
 - **Read the run's conclusion, do not infer it.** `--exit-status` and the `conclusion` field are the contract; scraped log text is not.
 - **`sf`, not `sfdx`,** for the read-only probes this command still makes. Legacy `sfdx` subcommands are deprecated per `brite-salesforce/CLAUDE.md`.
