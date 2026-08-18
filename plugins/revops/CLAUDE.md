@@ -36,7 +36,7 @@ Shared procedures in `commands/_shared/` (not commands — included by reference
 
 The alias list lives in **one** file: [`config/org-aliases.json`](config/org-aliases.json). The brite-salesforce PreToolUse deploy-policy hook ([BC-19519](https://linear.app/brite-nites/issue/BC-19519)) reads the same file, so the two repos cannot drift. Adding an org means editing that JSON, not editing prose in five commands.
 
-`scripts/promotion_topology.py` is the deterministic decision core: alias classification, dev-org resolution, the concurrency verdict, and the config-gated guidance layer. All four **fail closed**. `scripts/test_promotion_topology.sh` is its behavioral eval, wired into `validate.sh`.
+`scripts/promotion_topology.py` is the deterministic decision core: alias classification, dev-org resolution, the concurrency verdict, the config-gated guidance layer, and the production-workflow dispatch contract. All five **fail closed**. `scripts/test_promotion_topology.sh` is its behavioral eval, wired into `validate.sh`.
 
 ## Skills (14)
 

@@ -203,18 +203,46 @@ complete_workflow='on:
     inputs:
       mode:
         type: choice
+        default: validate
         options:
           - validate
           - deploy
       confirm:
         type: string
+        default: ""
       activation:
         type: choice
+        default: plan
         options:
           - plan
           - canary
           - apply
-jobs: {}'
+      expected_sha:
+        type: string
+        default: ""
+jobs:
+  deploy:
+    if: github.event_name == '\''workflow_dispatch'\'' && inputs.mode == '\''deploy'\''
+    steps:
+      - name: Authorize the dispatcher (RM roster only)
+        run: echo authorized
+      - name: Bind the dispatch to the approved commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo invalid
+            exit 1
+          fi
+          if [ "$EXPECTED_SHA" != "$GITHUB_SHA" ]; then
+            echo moved
+            exit 1
+          fi
+      - name: Checkout (full history for hardis git ops)
+        uses: actions/checkout@v4
+      - name: JWT auth → prod
+        run: echo auth'
 workflow_contract() {
   printf '%s' "$1" | python3 "$MOD" --validate-prod-workflow - 2>/dev/null
 }
@@ -222,10 +250,55 @@ assert_decision "prod workflow: complete contract is ready" ready \
   "$(workflow_contract "$complete_workflow")"
 assert_decision "prod workflow: missing activation blocks" blocked_error \
   "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed '/      activation:/,/          - apply/d')")"
+assert_decision "prod workflow: missing expected SHA blocks" blocked_error \
+  "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed '/      expected_sha:/,/        type: string/d')")"
+assert_decision "prod workflow: non-string expected SHA blocks" blocked_error \
+  "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed 's/        type: string/        type: boolean/')")"
 assert_decision "prod workflow: missing deploy option blocks" blocked_error \
   "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed '/          - deploy/d')")"
 assert_decision "prod workflow: missing apply option blocks" blocked_error \
   "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed '/          - apply/d')")"
+assert_decision "prod workflow: missing SHA enforcement step blocks" blocked_error \
+  "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed '/      - name: Bind the dispatch to the approved commit/,/      - name: Checkout/d')")"
+assert_decision "prod workflow: SHA gate after auth blocks" blocked_error \
+  "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed 's/      - name: Bind the dispatch to the approved commit/      - name: Bind the dispatch to the approved commit LATE/')")"
+assert_decision "prod workflow: ignored expected SHA blocks" blocked_error \
+  "$(workflow_contract "$(printf '%s' "$complete_workflow" | sed 's/\[ \"\$EXPECTED_SHA\" != \"\$GITHUB_SHA\" \]/[ \"$GITHUB_SHA\" != \"$GITHUB_SHA\" ]/')")"
+comment_spoof_workflow="$(printf '%s' "$complete_workflow" | sed \
+  -e '/if \[\[ ! \"\$EXPECTED_SHA\"/s/^/#/' \
+  -e '/if \[ \"\$EXPECTED_SHA\" != \"\$GITHUB_SHA\"/s/^/#/')"
+assert_decision "prod workflow: comment-only SHA guards block" blocked_error \
+  "$(workflow_contract "$comment_spoof_workflow")"
+schema_spoof_workflow="$(printf '%s' "$complete_workflow" | python3 -c '
+import sys
+s = sys.stdin.read()
+old = """      expected_sha:
+        type: string
+        default: \"\""""
+new = """      expected_sha:
+        description: |
+          type: string
+          default: \"\"
+        type: boolean
+        default: false"""
+print(s.replace(old, new), end="")
+')"
+assert_decision "prod workflow: description cannot spoof expected-SHA schema" blocked_error \
+  "$(workflow_contract "$schema_spoof_workflow")"
+dead_guard_workflow="$(printf '%s' "$complete_workflow" | python3 -c '
+import sys
+s = sys.stdin.read()
+start = "          if [[ ! \"$EXPECTED_SHA\" =~ ^[0-9a-f]{40}$ ]]; then"
+end = """          if [ \"$EXPECTED_SHA\" != \"$GITHUB_SHA\" ]; then
+            echo moved
+            exit 1
+          fi"""
+s = s.replace(start, "          if false; then\n" + start, 1)
+s = s.replace(end, end + "\n          fi", 1)
+print(s, end="")
+')"
+assert_decision "prod workflow: dead-code SHA guards block" blocked_error \
+  "$(workflow_contract "$dead_guard_workflow")"
 assert_decision "prod workflow: empty input blocks" blocked_error \
   "$(workflow_contract '')"
 

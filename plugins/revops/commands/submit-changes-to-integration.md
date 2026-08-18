@@ -81,13 +81,21 @@ git ls-remote --heads origin integration 2>&1
 
 Narrate: `Phase 1.6/4: .forceignore pre-flight...`
 
-Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceignore-preflight.md) with `RANGE` = the merge-base of `origin/integration` with `HEAD`:
+Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceignore-preflight.md) with `SCOPE_MODE=diff` and `RANGE` = the merge-base of `origin/integration` with `HEAD`:
 
 ```bash
-MERGE_BASE=$(git merge-base origin/integration HEAD 2>&1) && RANGE="${MERGE_BASE}..HEAD"
+if ! MERGE_BASE=$(git merge-base origin/integration HEAD 2>&1); then
+  echo "ERROR: git merge-base origin/integration HEAD failed — F1 cannot prove the submitted scope."
+  printf '%s\n' "$MERGE_BASE"
+  echo "FORCEIGNORE_PREFLIGHT_ERROR=1"
+  exit 2
+fi
+SCOPE_MODE=diff
+RANGE="${MERGE_BASE}..HEAD"
 ```
 
-If the merge-base cannot be computed, print the error and skip the pre-flight with a `WARN` — it is not worth blocking a PR over, and CI runs the mirrored check anyway.
+If the merge-base cannot be computed, print the raw error and halt. CI's mirrored
+check is defense in depth, not permission for the local submit path to go fail-open.
 
 Narrate: `Phase 1.6/4: .forceignore pre-flight... done`
 

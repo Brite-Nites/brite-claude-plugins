@@ -1,6 +1,6 @@
 ---
 name: sf-deploy
-description: Salesforce deploy orchestration for Brite's brite-salesforce repo. TRIGGER when user deploys SFDX metadata to sandbox or production, runs `sf project deploy start`, validates with dry-run, needs post-deploy Tooling API SOQL verification, toggles `.forceignore` for ECA/Named Credential/Prompt exclusions, re-activates Screen Flows that deploy as Draft, re-schedules Apex after sandbox refresh, or troubleshoots deploy-time failures. DO NOT TRIGGER when writing Apex/LWC code (use sf-apex/sf-lwc), creating metadata XML (use sf-metadata), or querying org data (use sf-data).
+description: Salesforce deploy orchestration for Brite's brite-salesforce repo. TRIGGER when a user needs a per-dev preview, an integration PR, the CI production dispatcher, lane-owned post-deploy verification, ticket-scoped destruction, or deploy-failure diagnosis. DO NOT TRIGGER for Apex/LWC authoring (use sf-apex/sf-lwc), metadata creation (use sf-metadata), or org data work (use sf-data).
 user-invocable: false
 license: MIT
 metadata:
@@ -30,34 +30,27 @@ Delegate elsewhere when the user is:
 - building Flows → [sf-flow](../sf-flow/SKILL.md)
 - doing org data operations → [sf-data](../sf-data/SKILL.md)
 
-> **Default recommendation for brite-salesforce deploys**: prefer [`/revops:preview-changes`](../../commands/preview-changes.md) (your own dev org) or [`/revops:push-to-production`](../../commands/push-to-production.md) (production, via CI) over raw `sf project deploy start`. See [Orchestration Commands](#orchestration-commands-recommended-path-for-brite-salesforce) below for the gate sequence and the non-orchestrable-cases fallback.
+> **Brite entry points**: use [`/revops:preview-changes`](../../commands/preview-changes.md) for the developer's own org and [`/revops:push-to-production`](../../commands/push-to-production.md) for production via CI. See [Orchestration Commands](#orchestration-commands-recommended-path-for-brite-salesforce) for every lane, including documented break glass.
 
 ---
 
 ## Brite Context
 
-The `brite-salesforce` repo is the **source of truth** for the Salesforce org. All configuration flows repo → org via `sf project deploy start`; never make changes in Setup UI.
+The `brite-salesforce` repo is the **source of truth** for the Salesforce org. All configuration flows repo → org via `sf project deploy start`; never use Setup UI as an alternate metadata editor. The only guided UI exceptions are the exact post-deploy steps named by `/revops:run-manual-post-deploy-steps`; none authorizes production Flow activation outside CI's selected `plan|canary|apply` stage.
 
 - **Source format:** SFDX (not MDAPI). Metadata lives under `force-app/main/default/`.
 - **API version:** 65.0 (pinned in `sfdx-project.json`).
 - **Automation:** Apex-first. Flows used only for screen flows and simple notifications.
 - **CLI:** `sf` v2 only. Legacy `sfdx` is deprecated.
-- **Target org:** always pass `--target-org <alias>` explicitly. Never rely on a default org.
+- **Laptop target:** only an explicit `brite-dev-<name>` alias. Shared and production orgs move through CI.
 
-Canonical deploy + test invocations:
+Canonical entry points:
 
-```bash
-# Validate (dry-run)
-sf project deploy start --source-dir force-app --dry-run --target-org <alias>
-
-# Deploy
-sf project deploy start --source-dir force-app --target-org <alias>
-
-# Retrieve (WARNING: overwrites local; commit first)
-sf project retrieve start --source-dir force-app --target-org <alias>
-
-# Apex tests (cannot run locally)
-sf apex run test --target-org <alias> --wait 10
+```text
+/revops:preview-changes --target-org brite-dev-<name>
+/revops:submit-changes-to-integration
+/revops:push-to-production --activation plan|canary|apply
+/revops:run-manual-post-deploy-steps --production
 ```
 
 Brite-owned org aliases, per [ADR-026](../../../../docs/decisions/026-revops-promotion-topology.md) and the single list in [`config/org-aliases.json`](../../config/org-aliases.json): `brite-dev-<name>` (per-developer, the only laptop-deployable org), `brite-integration` / `briteint` and `brite-uat` (CI-deployed), `brite-prod` / `brite-prod-marketingadmin` (production, CI-deployed), `brite-sandbox` (retiring). A normal command never targets prod from the laptop; it dispatches the reviewed CI workflow.
@@ -92,11 +85,13 @@ These rules are non-negotiable on the brite-salesforce repo.
 
 ### Dry-run-first
 
-```bash
-sf project deploy start --source-dir force-app --dry-run --target-org brite-dev-<name> --wait 30 --json
+```text
+/revops:preview-changes --target-org brite-dev-<name>
 ```
 
-Inspect the job report. If a component fails, fix in source and re-validate. Only proceed to actual deploy after a clean dry-run.
+The command owns the branch boundary, target classification, deletion tripwire,
+concurrency probe, dry-run, and same-scope deploy. If a component fails, fix source and
+re-run the command.
 
 ### Production coverage and verification
 
@@ -125,7 +120,7 @@ Deploy succeeded ≠ feature works. These are Brite-specific regressions that si
 **Connected App creation is disabled as of Spring '26.** Brite uses External Client Apps (ECAs) with metadata type `ExternalClientApplication` (NOT `ConnectedApp`).
 
 - **ECAs don't propagate between orgs.** Must be created/deployed separately in each org.
-- **OAuth settings (`ExtlClntAppOauthSettings`) are excluded from sandbox deploys** via `.forceignore` because `oauthLink` is org-scoped. Comment out the `.forceignore` line when crossing to production; restore before committing.
+- **OAuth settings (`ExtlClntAppOauthSettings`) carry org-scoped state.** The shared pre-flight classifies them, and the reviewed CI lane owns any approved production handling. Keep the repository `.forceignore` intact locally.
 - **Do not use JWT Bearer Flow + ECA + scratch org.** `sf org create scratch` rejects JWT-ECA sessions with `INVALID_INPUT: The callback URL provided is not valid` — see `forcedotcom/cli#3025`, `#3482`. Brite CI uses `SFDX_AUTH_URL` via the built-in `PlatformCLI` Connected App instead. Full context in brite-salesforce/`docs/plans/bc-5400-research.md`.
 - Brite currently has 4 active ECAs: `Marketing_Claude_MCP`, `Outbound_Sales_Ops`, `CI_Deploy`, `OutboundSync`.
 
@@ -135,69 +130,27 @@ See brite-salesforce/CLAUDE.md §External Client Apps and brite-salesforce/`docs
 
 ## Required Context to Gather First
 
-Ask for or infer:
-- target org alias (never assume `--target-org`)
-- which lane the deploy is in — your own dev org (`brite-dev-<name>`), integration (`brite-integration`), or production (`brite-prod`)
-- deploy scope: `--source-dir force-app` (default), `--metadata <list>`, or `--manifest`
-- validate-only vs deploy vs quick-deploy vs retrieve
-- Apex test level (`NoTestRun` only for non-Apex sandbox deploys; `RunLocalTests` for any prod deploy)
-- whether special metadata types are involved (Flow, ECA, Named Credential, Prompt — these need `.forceignore` toggles)
+Resolve these before choosing a command:
 
-Preflight:
+- repository and current branch
+- lane: per-dev preview, integration PR, production CI, or documented break glass
+- a `brite-dev-<name>` alias for the per-dev lane; never infer a shared or production alias
+- requested activation scope (`plan`, `canary`, or `apply`) for production
+- whether the diff contains deletions, Flow changes, Named Credentials, or other `.forceignore`-classified metadata
 
-```bash
-sf --version
-sf org list
-sf org display --target-org <alias> --json
-test -f sfdx-project.json
-```
+Then enter the matching orchestrator below. Each orchestrator owns its own current-state and authentication preflight; do not reproduce it with a generic CLI recipe.
 
 ---
 
 ## Recommended Workflow
 
-### 1. Preflight
-Confirm `sf` CLI version, auth, and that `sfdx-project.json` is present.
+1. **Per-dev:** run `/revops:preview-changes --target-org brite-dev-<name>`. Completion is a clean dry-run, scoped deploy, targeted tests, and manual UI verification in that dev org.
+2. **Integration:** run `/revops:submit-changes-to-integration`. Completion is a reviewed PR whose required checks are current; merging is a human action and CI owns `briteint`.
+3. **Production:** after the Kells-gated integration → main promotion, run `/revops:push-to-production --activation plan|canary|apply`. Completion is the exact Actions receipt showing deploy, activation policy, six-type verification, and final summary in order.
+4. **Manual remainder:** run `/revops:run-manual-post-deploy-steps --production`. It owns only the steps CI cannot automate; it never widens the selected Flow activation scope.
+5. **Deletion:** stop the normal path and use `manifest/destructive/BC-<ticket>.xml` plus the dispatch-only destructive ceremony.
 
-### 2. Validate (dry-run)
-```bash
-sf project deploy start --dry-run --source-dir force-app --target-org <alias> --wait 30 --json
-```
-Use manifest- or metadata-scoped validation when the change set is narrow.
-
-### 3. Deploy the smallest correct scope
-
-```bash
-# source-dir deploy (canonical Brite pattern)
-sf project deploy start --source-dir force-app --target-org <alias> --wait 30 --json
-
-# manifest deploy
-sf project deploy start --manifest manifest/package.xml --target-org <alias> --test-level RunLocalTests --wait 30 --json
-
-# quick deploy after a successful validation (skips re-running tests)
-sf project deploy quick --job-id <validation-job-id> --target-org <alias> --json
-```
-
-### 4. Run Apex tests (any deploy touching Apex)
-```bash
-sf apex run test --target-org <alias> --wait 10
-```
-For prod, add `--code-coverage --result-format human` and confirm ≥90% org-wide.
-
-### 5. Manual post-deploy steps
-- Activate any Screen Flows via Setup → Flows.
-- Update Named Credential URLs if the deploy touched NCs.
-- Re-schedule Apex if this was a sandbox refresh.
-- Toggle `.forceignore` exclusions back on if they were commented out for this deploy.
-
-### 6. Verify (production)
-```bash
-sf project deploy report --job-id <job-id> --target-org <alias> --json
-```
-Then run the Tooling API SOQL verifications above for critical components.
-
-### 7. Report
-Summarize what deployed, what was skipped, which post-deploy manual steps ran, and what the next safe action is.
+Summarize the lane, exact receipt, selected activation scope, verification result, and next human gate.
 
 Output template: [references/deployment-report-template.md](references/deployment-report-template.md)
 
@@ -205,15 +158,17 @@ Output template: [references/deployment-report-template.md](references/deploymen
 
 ## Orchestration Commands (recommended path for brite-salesforce)
 
-For any deploy from the **brite-salesforce** repo, prefer these orchestration commands over raw `sf project deploy start`. They bake the dry-run + Apex tests + Tooling API verification + manual browser checks into a sequenced gate flow; raw CLI skips all of that.
+Route every deploy from the **brite-salesforce** repo through these orchestration commands. They bind the branch, target, scope, dry-run, tests, verification, and human gates into one reviewable flow.
 
 - [`/revops:preview-changes`](../../commands/preview-changes.md) — inner-loop deploy: pre-flight, blocking concurrency probe, dry-run, deploy, Apex tests, manual browser verification. Targets your own `brite-dev-<name>` org. Use after metadata changes are review-clean and before submitting to integration.
 - [`/revops:submit-changes-to-integration`](../../commands/submit-changes-to-integration.md) — opens the PR into `integration`. CI deploys to `brite-integration` on merge; you never deploy there yourself.
 - [`/revops:push-to-production`](../../commands/push-to-production.md) — production ship: pre-flight (cwd + branch + in-sync + clean tree + blocking concurrency probe + `.forceignore` + intent), double-confirmation gate, then it **dispatches and watches CI**. The deploy, the coverage gate, and post-deploy verification run in CI, not on your laptop. Use after the change has been through integration and merged to `main`.
-- [`/revops:emergency-deploy-to-production`](../../commands/emergency-deploy-to-production.md) — last resort, only when the CI lane itself is down. Requires `--reason`, keeps every guard, validates before it quick-deploys.
-- [`/revops:run-manual-post-deploy-steps`](../../commands/run-manual-post-deploy-steps.md) — post-deploy manual steps. Use `--target-org brite-dev-<name>` after the inner loop, `--production` after the normal CI lane, or `--production-breakglass` after the emergency lane. Normal production Flow activation remains owned by CI; break glass leaves it blocked for a separate release-manager decision.
+- [`/revops:emergency-deploy-to-production`](../../commands/emergency-deploy-to-production.md) — last resort, only when the CI lane itself is down. Requires a reason plus durable acknowledgement from the other production admin, keeps every guard, enforces coverage, and F2-verifies after quick-deploy.
+- [`/revops:run-manual-post-deploy-steps`](../../commands/run-manual-post-deploy-steps.md) — post-deploy manual steps. After the inner loop, use `--target-org brite-dev-<name> --deploy-id <exact-0Af-id>` so any dev Flow cleanup binds to the completed deploy receipt; use `--production` after the normal CI lane or `--production-breakglass` after the emergency lane. Normal production Flow activation remains owned by CI; break glass leaves it blocked for a separate release-manager decision.
 
-Raw `sf project deploy start` is limited to an explicit per-dev org, scratch-org work, or a different repository whose own policy permits it. It is never a fallback to `briteint` or `brite-prod`; normal shared-org movement stays in CI, and the only local prod path is the separately gated emergency command.
+The ordinary laptop lane is `/revops:preview-changes` with an explicit per-dev alias.
+Scratch validation belongs to CI, shared-org movement belongs to CI, and the only local
+production path is the separately gated emergency command.
 
 ---
 
@@ -226,9 +181,10 @@ Raw `sf project deploy start` is limited to an explicit per-dev org, scratch-org
 | `CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY` | trigger / Flow / validation side effect | inspect the automation stack |
 | tests fail during deploy | broken code or fragile tests | run targeted tests, fix root cause, revalidate |
 | field/object not found in permset | wrong order | deploy objects/fields before permission sets |
-| Flow invalid / version conflict | dependency or activation problem | deploy as Draft, verify, then activate |
+| Flow invalid / version conflict | dependency or activation problem | in a per-dev org, deploy as Draft, verify, then use the explicit dev activation gate; production stays in CI's selected `plan|canary|apply` scope |
 | 1-original + N silent "Completed" Queueable retries in Apex Jobs | callout failure inside self-chaining Queueable | check Named Credential URL first (common regression after deploy) |
-| Screen Flow shows Draft in target org | deploys as Draft regardless of source | activate via Setup UI + SOQL-verify |
+| Screen Flow shows Draft in a dev org | deploys as Draft regardless of source | use the explicit-target dev post-deploy runbook |
+| Flow remains Draft in production | selected CI activation scope did not include it or policy blocked it | read the exact Actions receipt; make a new release-manager decision rather than activating manually |
 | `INVALID_INPUT: The callback URL provided is not valid` on `sf org create scratch` | JWT Bearer Flow + ECA incompatibility | use `SFDX_AUTH_URL` via `PlatformCLI` instead |
 
 Full workflows: [references/orchestration.md](references/orchestration.md), [references/trigger-deployment-safety.md](references/trigger-deployment-safety.md)
@@ -272,7 +228,6 @@ Generic CI patterns (apply where relevant): [references/deployment-workflows.md]
 
 ### Specialized deployment safety
 - [references/trigger-deployment-safety.md](references/trigger-deployment-safety.md)
-- [references/deploy.sh](references/deploy.sh)
 
 ### Brite source material (cross-repo)
 - brite-salesforce/CLAUDE.md §Deploy & Retrieve, §External Client Apps, §Apex & Automation
@@ -297,10 +252,11 @@ Generic CI patterns (apply where relevant): [references/deployment-workflows.md]
 
 ```text
 Deployment goal: <validate / deploy / retrieve / quick-deploy>
-Target org: <alias>
+Lane / target: <per-dev alias | integration CI | production CI>
 Scope: <source-dir / metadata / manifest>
 Result: <passed / failed / partial>
-Post-deploy manual steps: <Flow activation / NC URL / Scheduled Apex / forceignore restore>
-Tooling API verification: <passed / pending / not applicable>
+Activation scope: <dev-only manual | plan | canary | apply | not applicable>
+Post-deploy manual steps: <NC URL / Scheduled Apex / UI cache / not applicable>
+CI verification receipt: <run URL | pending | not applicable>
 Next step: <safe follow-up action>
 ```

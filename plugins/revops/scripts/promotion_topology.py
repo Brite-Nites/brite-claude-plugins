@@ -36,6 +36,7 @@ import argparse
 import json
 import re
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -473,15 +474,128 @@ def _yaml_direct_children(
     return children
 
 
+def _yaml_named_steps(
+    lines: list[str], start: int, stop: int, parent_indent: int
+) -> dict[str, tuple[int, int]]:
+    """Return top-level ``- name:`` steps inside one YAML ``steps`` list."""
+    step_indent: int | None = None
+    indexes: list[tuple[str, int]] = []
+    for index in range(start + 1, stop):
+        line = lines[index]
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        line_indent = len(line) - len(line.lstrip(" "))
+        if line_indent <= parent_indent:
+            continue
+        match = re.match(r"^-\s+name:\s*['\"]?(.+?)['\"]?\s*$", line.strip())
+        if not match:
+            continue
+        if step_indent is None:
+            step_indent = line_indent
+        if line_indent == step_indent:
+            indexes.append((match.group(1), index))
+
+    steps: dict[str, tuple[int, int]] = {}
+    for offset, (name, index) in enumerate(indexes):
+        end = indexes[offset + 1][1] if offset + 1 < len(indexes) else stop
+        if name in steps:
+            raise ValueError(f"duplicate workflow step name: {name}")
+        steps[name] = (index, end)
+    return steps
+
+
+def _yaml_literal_block(
+    lines: list[str], key: str, start: int, stop: int
+) -> tuple[int, int, str]:
+    """Return one indentation-delimited ``key: |`` scalar body."""
+    matches: list[tuple[int, int, str]] = []
+    for index in range(start, stop):
+        if lines[index].strip() != f"{key}: |":
+            continue
+        indent = len(lines[index]) - len(lines[index].lstrip(" "))
+        end = index + 1
+        while end < stop:
+            candidate = lines[end]
+            candidate_indent = len(candidate) - len(candidate.lstrip(" "))
+            if candidate.strip() and candidate_indent <= indent:
+                break
+            end += 1
+        matches.append((index, end, "\n".join(lines[index + 1 : end])))
+    if len(matches) != 1:
+        raise ValueError(f"expected one `{key}: |` block; found {len(matches)}")
+    return matches[0]
+
+
+def _yaml_scalar_child(
+    lines: list[str], children: dict[str, tuple[int, int]], key: str
+) -> str:
+    """Return one direct scalar mapping value, rejecting nested/decoy text."""
+    if key not in children:
+        raise ValueError(f"missing direct `{key}` field")
+    line = lines[children[key][0]].strip()
+    match = re.fullmatch(rf"{re.escape(key)}:\s*(\S(?:.*\S)?)?", line)
+    if not match or not match.group(1):
+        raise ValueError(f"`{key}` must be a scalar value")
+    return match.group(1)
+
+
+def _yaml_scalar_sequence(
+    lines: list[str], start: int, stop: int
+) -> set[str]:
+    """Parse one indentation-homogeneous YAML sequence of plain scalar tokens."""
+    parent_indent = len(lines[start]) - len(lines[start].lstrip(" "))
+    item_indent: int | None = None
+    values: list[str] = []
+    for index in range(start + 1, stop):
+        line = lines[index]
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent <= parent_indent:
+            raise ValueError("options sequence escaped its YAML block")
+        if item_indent is None:
+            item_indent = indent
+        if indent != item_indent:
+            raise ValueError("options must be a flat scalar sequence")
+        match = re.fullmatch(r"-\s*['\"]?([A-Za-z0-9_-]+)['\"]?", line.strip())
+        if not match:
+            raise ValueError("options must contain only plain scalar tokens")
+        values.append(match.group(1))
+    if not values or len(set(values)) != len(values):
+        raise ValueError("options must be a non-empty sequence with no duplicates")
+    return set(values)
+
+
+def _consume_fail_red_guard(
+    program: list[str], start: int, condition: str, label: str
+) -> int:
+    """Consume one top-level ``if`` whose only terminal action is ``exit 1``."""
+    if start >= len(program) or program[start] != condition:
+        raise ValueError(f"approved-SHA gate is missing the top-level {label} guard")
+    try:
+        end = program.index("fi", start + 1)
+    except ValueError as exc:
+        raise ValueError(f"approved-SHA {label} guard has no closing `fi`") from exc
+    body = program[start + 1 : end]
+    if not body or body[-1] != "exit 1":
+        raise ValueError(f"approved-SHA {label} guard must end in `exit 1`")
+    for line in body[:-1]:
+        if not (line.startswith("echo ") or line.startswith("printf ")):
+            raise ValueError(
+                f"approved-SHA {label} guard contains a non-reporting command"
+            )
+    return end + 1
+
+
 def validate_prod_workflow(source: str) -> dict[str, Any]:
-    """Prove the reviewed deploy-prod workflow_dispatch schema is present.
+    """Prove the reviewed deploy-prod dispatch and SHA gate are present.
 
     This intentionally parses only the indentation structure needed for the
     GitHub Actions input contract. It does not interpret arbitrary YAML.
     Anything absent or ambiguous blocks the dispatcher before a prod gate.
     """
     lines = source.splitlines()
-    required_inputs = {"mode", "confirm", "activation"}
+    required_inputs = {"mode", "confirm", "activation", "expected_sha"}
     required_options = {
         "mode": {"validate", "deploy"},
         "activation": {"plan", "canary", "apply"},
@@ -504,23 +618,132 @@ def validate_prod_workflow(source: str) -> dict[str, Any]:
         if missing:
             raise ValueError("missing workflow_dispatch inputs: " + ", ".join(missing))
 
-        for input_name, expected in required_options.items():
+        input_children: dict[str, dict[str, tuple[int, int]]] = {}
+        for input_name in required_inputs:
             block_start, block_end = inputs[input_name]
-            block = "\n".join(lines[block_start:block_end])
-            actual = {
-                match.group(1)
-                for match in re.finditer(
-                    r"^\s*-\s*['\"]?([A-Za-z0-9_-]+)['\"]?\s*$",
-                    block,
-                    re.MULTILINE,
-                )
-            }
+            block_indent = len(lines[block_start]) - len(lines[block_start].lstrip(" "))
+            input_children[input_name] = _yaml_direct_children(
+                lines, block_start, block_end, block_indent
+            )
+
+        expected_types = {
+            "mode": "choice",
+            "confirm": "string",
+            "activation": "choice",
+            "expected_sha": "string",
+        }
+        for input_name, expected_type in expected_types.items():
+            actual_type = _yaml_scalar_child(
+                lines, input_children[input_name], "type"
+            )
+            if actual_type != expected_type:
+                raise ValueError(f"input `{input_name}` must be a {expected_type}")
+
+        for input_name, expected in required_options.items():
+            children = input_children[input_name]
+            if "options" not in children:
+                raise ValueError(f"input `{input_name}` has no direct options block")
+            actual = _yaml_scalar_sequence(lines, *children["options"])
             missing_options = sorted(expected - actual)
             if missing_options:
                 raise ValueError(
                     f"input `{input_name}` is missing options: "
                     + ", ".join(missing_options)
                 )
+
+        defaults = {
+            "mode": "validate",
+            "confirm": '""',
+            "activation": "plan",
+            "expected_sha": '""',
+        }
+        for input_name, expected_default in defaults.items():
+            actual_default = _yaml_scalar_child(
+                lines, input_children[input_name], "default"
+            )
+            if actual_default != expected_default:
+                raise ValueError(
+                    f"input `{input_name}` must default to {expected_default}"
+                )
+        if _yaml_scalar_child(
+            lines, input_children["expected_sha"], "default"
+        ) not in {'""', "''"}:
+            raise ValueError("input `expected_sha` must default to an empty string")
+
+        jobs_start, jobs_end, jobs_indent = _yaml_block(lines, "jobs")
+        jobs = _yaml_direct_children(lines, jobs_start, jobs_end, jobs_indent)
+        if "deploy" not in jobs:
+            raise ValueError("missing `jobs.deploy` block")
+        deploy_start, deploy_end = jobs["deploy"]
+        deploy_block = "\n".join(lines[deploy_start:deploy_end])
+        if not re.search(
+            r"^\s*if:\s*github\.event_name\s*==\s*['\"]workflow_dispatch['\"]"
+            r"\s*&&\s*inputs\.mode\s*==\s*['\"]deploy['\"]\s*$",
+            deploy_block,
+            re.MULTILINE,
+        ):
+            raise ValueError("deploy job is not restricted to a deploy dispatch")
+
+        steps_start, steps_end, steps_indent = _yaml_block(
+            lines, "steps", deploy_start, deploy_end
+        )
+        steps = _yaml_named_steps(lines, steps_start, steps_end, steps_indent)
+        gate_name = "Bind the dispatch to the approved commit"
+        checkout_name = "Checkout (full history for hardis git ops)"
+        auth_matches = [name for name in steps if name.startswith("JWT auth → prod")]
+        if len(auth_matches) != 1:
+            raise ValueError("missing or ambiguous production JWT auth step")
+        auth_name = auth_matches[0]
+        missing_steps = [
+            name for name in (gate_name, checkout_name, auth_name) if name not in steps
+        ]
+        if missing_steps:
+            raise ValueError("missing deploy safety steps: " + ", ".join(missing_steps))
+
+        gate_start, gate_end = steps[gate_name]
+        if gate_start >= steps[checkout_name][0] or gate_start >= steps[auth_name][0]:
+            raise ValueError("approved-SHA gate must run before checkout and production auth")
+
+        env_start, env_end, env_indent = _yaml_block(
+            lines, "env", gate_start, gate_end
+        )
+        env_children = _yaml_direct_children(lines, env_start, env_end, env_indent)
+        if "EXPECTED_SHA" not in env_children:
+            raise ValueError("approved-SHA gate has no EXPECTED_SHA environment input")
+        expected_env_line = lines[env_children["EXPECTED_SHA"][0]].strip()
+        if expected_env_line != "EXPECTED_SHA: ${{ inputs.expected_sha }}":
+            raise ValueError("EXPECTED_SHA must come directly from inputs.expected_sha")
+
+        _, _, run_program = _yaml_literal_block(lines, "run", gate_start, gate_end)
+        executable_program = textwrap.dedent("\n".join(
+            line for line in run_program.splitlines() if not line.lstrip().startswith("#")
+        )).strip()
+        if "${{" in executable_program:
+            raise ValueError("approved-SHA input must reach shell through env, not interpolation")
+        program = [line.strip() for line in executable_program.splitlines() if line.strip()]
+        if not program or program[0] != "set -euo pipefail":
+            raise ValueError("approved-SHA gate must begin with `set -euo pipefail`")
+        cursor = _consume_fail_red_guard(
+            program,
+            1,
+            'if [[ ! "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then',
+            "shape",
+        )
+        cursor = _consume_fail_red_guard(
+            program,
+            cursor,
+            'if [ "$EXPECTED_SHA" != "$GITHUB_SHA" ]; then',
+            "equality",
+        )
+        for line in program[cursor:]:
+            if not (line.startswith("echo ") or line.startswith("printf ")):
+                raise ValueError("approved-SHA gate has an unexpected trailing command")
+
+        pre_gate = "\n".join(lines[deploy_start:gate_start])
+        if re.search(r"^\s*uses:\s*", pre_gate, re.MULTILINE) or re.search(
+            r"(^|[;&|]\s*)(sf|sfdx)\s+", pre_gate
+        ):
+            raise ValueError("approved-SHA gate must run before any action or Salesforce command")
     except ValueError as exc:
         return {
             "decision": "blocked_error",
@@ -532,7 +755,7 @@ def validate_prod_workflow(source: str) -> dict[str, Any]:
         "decision": "ready",
         "blocking": False,
         "inputs": sorted(required_inputs),
-        "reason": "main deploy workflow exposes the reviewed production dispatch contract",
+        "reason": "main deploy workflow exposes and enforces the reviewed production dispatch contract",
     }
 
 

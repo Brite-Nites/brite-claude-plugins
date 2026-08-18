@@ -152,14 +152,32 @@ Ask via `AskUserQuestion`:
 
 ### 1.3 `.forceignore` pre-flight (F1, BC-12347)
 
+Before F1, bind the dry-run source to immutable git state:
+
+```bash
+SOURCE_SHA=$(git rev-parse HEAD)
+INTEGRATION_SHA=$(git rev-parse origin/integration)
+DIRTY=$(git status --porcelain)
+if [ -n "$DIRTY" ]; then
+  echo "ERROR: preview source is not committed; dry-run and deploy could inspect different bytes."
+  printf '%s\n' "$DIRTY"
+  exit 2
+fi
+echo "SOURCE_LOCKED head=$SOURCE_SHA integration=$INTEGRATION_SHA"
+```
+
+Store the two full SHAs as `{dry-run-sha}` and `{dry-run-integration-sha}`.
+Inner-loop iteration may be fast, but the bytes that passed the dry-run must be
+the bytes deployed after the human gate. Commit the intended source first.
+
 Narrate: `Phase 1.3/6: .forceignore pre-flight...`
 
 Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceignore-preflight.md). Act on its result exactly as that file says.
 
 Set `RANGE` from the Phase 0 deploy mode:
 
-- Mode `branch-diff` — the merge-base of `origin/integration` with `HEAD`, or `integration~1..integration` when run from `integration` itself. `main` is refused.
-- Mode `reconcile` — skip the whole pre-flight. Print `NOTE: reconcile mode — skipping .forceignore pre-flight.` and proceed to Phase 2.
+- Mode `branch-diff` — set `SCOPE_MODE=diff`; set `RANGE` to the merge-base of `origin/integration` with `HEAD`, or `integration~1..integration` when run from `integration` itself. `main` is refused.
+- Mode `reconcile` — set `SCOPE_MODE=reconcile` and use the same reviewed branch range as branch-diff mode. Reconcile deploys the full tree, but F1 remains the BC-12347 changed-path guard: any changed path that `.forceignore` would silently drop blocks; permanent ignored support/org-issued files outside the diff remain repository policy.
 
 Narrate: `Phase 1.3/6: .forceignore pre-flight... done`
 
@@ -186,10 +204,8 @@ sf project deploy start --source-dir force-app --dry-run --target-org {dev-org} 
 ```bash
 set -e
 
-# Resolve diff range. On a feature branch (the normal case), use the
-# merge-base with origin/integration so we capture every commit the branch added.
-# An integration-branch sanity run uses its latest squash commit. Main is the
-# production branch and is never a valid source for this inner-loop command.
+# Resolve a feature branch from its merge-base with origin/integration so every added commit is captured.
+# An integration sanity run uses its latest squash commit; main is never valid for this inner-loop command.
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [ "$BRANCH" = "main" ]; then
   echo "ERROR: /revops:preview-changes cannot run from main. Cut work from integration."
@@ -203,10 +219,8 @@ else
     echo "ERROR: origin/integration not found in this clone — run \`git fetch origin integration\` first."
     exit 2
   fi
-  # Capture merge-base exit status separately. If there's no common
-  # ancestor (orphaned branch, shallow clone where ancestor isn't fetched),
-  # bare command substitution would leave RANGE="..HEAD" — a malformed
-  # range that silently behaves like an empty diff downstream.
+  # Capture merge-base status: without a common ancestor, bare substitution would leave RANGE="..HEAD"
+  # and silently behave like an empty downstream diff.
   if ! MERGE_BASE=$(git merge-base origin/integration HEAD 2>&1); then
     echo "ERROR: \`git merge-base origin/integration HEAD\` failed — output below."
     printf '%s\n' "$MERGE_BASE"
@@ -302,6 +316,24 @@ Narrate: `Phase 2/6: Dry-run deploy... done`
 
 Narrate: `Phase 3/6: Deploying to {dev-org}...`
 
+Before resolving either deploy mode, prove the repository still names the
+exact source and integration baseline used by the dry-run:
+
+```bash
+CURRENT_SHA=$(git rev-parse HEAD)
+CURRENT_INTEGRATION_SHA=$(git rev-parse origin/integration)
+DIRTY=$(git status --porcelain)
+if [ -n "$DIRTY" ] || [ "$CURRENT_SHA" != "{dry-run-sha}" ] || \
+   [ "$CURRENT_INTEGRATION_SHA" != "{dry-run-integration-sha}" ]; then
+  echo "ERROR: source moved after the dry-run; restart /revops:preview-changes."
+  printf '%s\n' "$DIRTY"
+  exit 2
+fi
+```
+
+Do not fetch, reset, or try to repair the mismatch inside this command. A new
+commit or integration baseline requires a new dry-run and a new human gate.
+
 Use the same deploy-mode branch chosen at Phase 0. Re-compute the `--source-dir` set in this phase (do not cache state across the Phase 2 confirmation gate — re-resolving from `git diff` keeps the deploy honest if the working tree changed unexpectedly).
 
 **Mode `reconcile`** (same as Phase 2.1, without `--dry-run`):
@@ -375,7 +407,7 @@ sf project deploy start "${ARGS[@]}" --target-org {dev-org} --json
 
 Parse the JSON (same `status === 0` check as Phase 2):
 
-- `status: 0` → deploy succeeded. Print `result.numberComponentsDeployed` and `result.id` (the AsyncResult Id, useful for Setup > Deployment Status lookups).
+- A completed successful response (`status === 0`, `result.done === true`, `result.success === true`, `result.status === "Succeeded"`, and `result.checkOnly === false`) → deploy succeeded. Print `result.numberComponentsDeployed` and the exact `result.id` (the AsyncResult Id). Tell the operator to preserve that ID and pass it as `--deploy-id` to `/revops:run-manual-post-deploy-steps`; Phase 3 re-reads its server timestamps and deployed-component receipt before it can offer Flow Draft cleanup.
 - Any other `status` → deploy failed after dry-run passed. This is unusual (dry-run normally catches failures) but can happen with rollbacks or race conditions. Print `result.details.componentFailures[*]` verbatim. **Halt** with:
 
   > Deploy failed in `{dev-org}` despite dry-run passing. Inspect the errors above and check `Setup > Deployment Status` in that org. Apex tests were not attempted.

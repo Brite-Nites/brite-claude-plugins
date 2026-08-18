@@ -21,37 +21,62 @@ so the same drop is caught whichever lane the change travels.
 
 ## Procedure
 
-Set `RANGE` to the diff range this command uses, then run the block.
+Set `SCOPE_MODE` and, for a diff-scoped caller, `RANGE`, then run the block.
 
-| Caller | `RANGE` |
-|---|---|
-| `/revops:preview-changes` | merge-base of `origin/integration` with `HEAD`, or `integration~1..integration` when run from `integration`; `main` is refused |
-| `/revops:push-to-production` | `main~1..main` (the squash commit that just landed) |
-| `/revops:emergency-deploy-to-production` | `main~1..main`, or the explicit `--ref` range |
+| Caller | `SCOPE_MODE` | `RANGE` |
+|---|---|---|
+| `/revops:preview-changes` (branch diff) | `diff` | merge-base of `origin/integration` with `HEAD`, or `integration~1..integration` when run from `integration`; `main` is refused |
+| `/revops:preview-changes --reconcile` | `reconcile` | same reviewed branch range as branch-diff mode; the deploy is full-tree, but F1 asks which changed paths would be silently dropped |
+| `/revops:push-to-production` | `diff` | `main~1..main` (the squash commit that just landed) |
+| `/revops:emergency-deploy-to-production` | `diff` | `main~1..main` (the command accepts no arbitrary ref) |
 
-Skip the whole block when the caller is in `reconcile` (full-tree) mode: the
-operator opted into deploying everything, so a per-path diff check has nothing to
-say. Print `NOTE: reconcile mode — skipping .forceignore pre-flight.` and move on.
+Reconcile never skips F1. It still checks the reviewed change range, because
+BC-12347's contract is **changed path + ignored = block**. Enumerating the whole
+tree would make reconcile impossible: `.forceignore` intentionally excludes
+nondeployable `jsconfig`, tests, and org-issued state that already exist in the
+repo. Permanent exclusions outside the change range remain repository policy;
+any changed path that the full-tree deploy would silently drop is a hard block.
 
 ```bash
-set +e  # individual checks may return non-zero legitimately
+set -u
 
 if [ ! -f .forceignore ]; then
-  echo "NOTE: no .forceignore found — pre-flight skipped."
-  exit 0
+  echo "ERROR: .forceignore is missing — F1 cannot prove the deploy scope."
+  echo "FORCEIGNORE_PREFLIGHT_ERROR=1"
+  exit 2
+fi
+if ! FORCEIGNORE_CONTENT=$(cat .forceignore 2>&1); then
+  echo "ERROR: .forceignore is unreadable — F1 cannot prove the deploy scope."
+  printf '%s\n' "$FORCEIGNORE_CONTENT"
+  echo "FORCEIGNORE_PREFLIGHT_ERROR=1"
+  exit 2
 fi
 
-# RANGE is set by the caller — see the table above.
-RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1)
-if [ $? -ne 0 ]; then
-  echo "WARN: git diff failed — skipping .forceignore pre-flight (not blocking)."
-  printf '%s\n' "$RAW_CHANGED"
-  exit 0
-fi
+# SCOPE_MODE and (for diff mode) RANGE are set by the caller — see the table above.
+case "${SCOPE_MODE:-}" in
+  diff|reconcile)
+    if [ -z "${RANGE:-}" ]; then
+      echo "ERROR: F1 diff mode requires a non-empty RANGE."
+      echo "FORCEIGNORE_PREFLIGHT_ERROR=1"
+      exit 2
+    fi
+    if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
+      echo "ERROR: git diff failed — F1 cannot prove the deploy scope."
+      printf '%s\n' "$RAW_CHANGED"
+      echo "FORCEIGNORE_PREFLIGHT_ERROR=1"
+      exit 2
+    fi
+    ;;
+  *)
+    echo "ERROR: F1 requires SCOPE_MODE=diff or SCOPE_MODE=reconcile."
+    echo "FORCEIGNORE_PREFLIGHT_ERROR=1"
+    exit 2
+    ;;
+esac
 CHANGED=$(printf '%s\n' "$RAW_CHANGED" | grep '^force-app/' || true)
 
 if [ -z "$CHANGED" ]; then
-  echo "INFO: no force-app/** paths in the diff — .forceignore pre-flight: nothing to check."
+  echo "INFO: no force-app/** paths in the selected deploy scope — .forceignore pre-flight: nothing to check."
   exit 0
 fi
 
@@ -62,9 +87,15 @@ while IFS= read -r fpath; do
   [ -z "$fpath" ] && continue
   fpath_rel="${fpath#force-app/main/default/}"
   matched_pattern=""
+  excluded=0
   while IFS= read -r pattern; do
     case "$pattern" in ''|\#*) continue ;; esac
-    pat="${pattern#/}"
+    negated=0
+    case "$pattern" in
+      \!*) negated=1; pat="${pattern#!}" ;;
+      *) pat="$pattern" ;;
+    esac
+    pat="${pat#/}"
     [ -z "$pat" ] && continue
     hit=0
     case "$fpath" in *$pat*) hit=1 ;; esac
@@ -73,10 +104,16 @@ while IFS= read -r fpath; do
     fi
     if [ "$hit" = "1" ]; then
       matched_pattern="$pattern"
-      break
+      if [ "$negated" = "1" ]; then
+        excluded=0
+      else
+        excluded=1
+      fi
     fi
-  done < .forceignore
-  if [ -n "$matched_pattern" ]; then
+  done <<< "$FORCEIGNORE_CONTENT"
+  # .forceignore follows ordered gitignore-style rules: a later !pattern
+  # re-includes a path. Never break on the first positive match.
+  if [ "$excluded" = "1" ]; then
     case "$matched_pattern" in
       *namedCredential*)
         NC_EXCLUDED="${NC_EXCLUDED}  ${fpath} (pattern: ${matched_pattern})\n"
@@ -94,25 +131,22 @@ if [ -z "$NC_EXCLUDED" ] && [ -z "$OTHER_EXCLUDED" ]; then
 fi
 
 if [ -n "$NC_EXCLUDED" ]; then
-  printf '\nNamed Credential exclusions (expected — placeholder URLs; handled by /revops:run-manual-post-deploy-steps Phase 5):\n'
+  printf '\nNamed Credential exclusions detected (PLACEHOLDER protects runtime URLs, but an ignored source change still cannot ride this deploy):\n'
   printf '%b' "$NC_EXCLUDED"
 fi
 
 if [ -n "$OTHER_EXCLUDED" ]; then
   printf '\n⚠️  .forceignore exclusions detected — these paths will be silently dropped by sf project deploy:\n'
   printf '%b' "$OTHER_EXCLUDED"
-  printf '\nRemediation: temporarily comment out the matching .forceignore line(s), run the deploy, then restore.\n'
-  echo "FORCEIGNORE_BLOCKED=1"
-else
-  echo "FORCEIGNORE_BLOCKED=0"
 fi
+
+printf '\nF1 BLOCKED: a deploy path is excluded. Resolve the policy in source, commit the reviewed .forceignore change, and promote it through the same lane. A local edit cannot change the remote CI checkout.\n'
+echo "FORCEIGNORE_BLOCKED=1"
+exit 2
 ```
 
 ## Acting on the result
 
-- `FORCEIGNORE_BLOCKED=1` — ask via `AskUserQuestion`:
-  - Question: `⚠️ .forceignore will silently drop the paths listed above. How do you want to proceed?`
-  - Options:
-    - `I've resolved the .forceignore conflict — continue` → continue the caller's phase sequence.
-    - `Halt — fix .forceignore first` → **halt** cleanly. Print: *"Stopped at .forceignore pre-flight. Comment out the relevant .forceignore lines, verify the fix, then re-run."* Exit.
-- `FORCEIGNORE_BLOCKED=0`, or no exclusions at all — continue silently. Named Credential exclusions are expected and were already printed.
+- `FORCEIGNORE_PREFLIGHT_ERROR=1` — **halt**. The scope could not be measured, so no deploy decision is possible.
+- `FORCEIGNORE_BLOCKED=1` — **halt**. Resolve the exclusion as a reviewed repository change and re-run from the resulting commit. Never continue from an uncommitted `.forceignore` edit.
+- `FORCEIGNORE_BLOCKED=0`, or no exclusions at all — continue.

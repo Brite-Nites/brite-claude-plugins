@@ -1,11 +1,11 @@
 ---
 disable-model-invocation: true
-description: Last-resort production deploy for when the CI lane itself is unavailable — re-trigger CI first, and only if that is impossible, run a guarded local validate then quick-deploy against brite-prod. Requires a stated reason, keeps every pre-flight including the blocking concurrency probe and the .forceignore guard, and leaves a written record. Use only when `/revops:push-to-production` cannot run. Formerly `/revops:deploy-prod --break-glass`.
-argument-hint: --reason "<why CI cannot be used>" [--override-concurrency]
+description: Last-resort production deploy for when the CI lane itself is unavailable — re-trigger CI first, and only if that is impossible, run a guarded local validate then quick-deploy against brite-prod. Requires a stated reason plus recorded acknowledgement from the other production admin, keeps every pre-flight including the blocking concurrency probe and the .forceignore guard, enforces Apex coverage, runs F2 verification, and leaves a written record. Use only when `/revops:push-to-production` cannot run. Formerly `/revops:deploy-prod --break-glass`.
+argument-hint: --reason "<why CI cannot be used>" --second-admin <holdeeno|kells-source> --ack-url <https://evidence> [--override-concurrency]
 allowed-tools: Bash, AskUserQuestion
 ---
 
-<!-- eval-waiver: Guarded last-resort live-org deploy: it runs local git and .forceignore pre-flights, gates on three separate AskUserQuestion calls, then shells sf project deploy validate and sf project deploy quick against the real brite-prod org. Every phase depends on live host, git, and org state and the substance is the gated mutation sequence itself; the pure decisions (concurrency verdict, org classification) are already delegated to scripts/promotion_topology.py and covered by scripts/test_promotion_topology.sh. -->
+<!-- eval-waiver: Guarded last-resort live-org deploy: it runs local git and .forceignore pre-flights, requires two-admin evidence, gates on three separate AskUserQuestion calls, then shells sf project deploy validate and sf project deploy quick against the real brite-prod org and invokes the repo's F2 verifier. Every phase depends on live host, git, and org state and the substance is the gated mutation sequence itself; deterministic receipt/coverage decisions are delegated to scripts/breakglass_deploy_guard.py and covered by tests/test_breakglass_deploy_guard.py, while concurrency verdicts remain in scripts/promotion_topology.py. -->
 
 # /revops:emergency-deploy-to-production
 
@@ -27,15 +27,38 @@ Legacy invocation `/revops:deploy-prod --break-glass` still resolves through the
 
 ---
 
-## Phase 0 — Require a reason
+## Phase 0 — Require a reason and the other admin's acknowledgement
 
 Narrate: `Phase 0: Recording the reason...`
 
-`--reason "<text>"` is **required**. If it is missing, **halt** with:
+`--reason "<text>"`, `--second-admin <holdeeno|kells-source>`, and `--ack-url <https://evidence>` are **all required**. If any is missing, **halt** with:
 
-> `/revops:emergency-deploy-to-production` requires `--reason "<why CI cannot be used>"`. The reason is not paperwork — it is the check. Writing down why the normal lane cannot be used is usually the moment you notice that it can.
+> `/revops:emergency-deploy-to-production` requires a reason, the other production admin's GitHub login, and a durable acknowledgement URL. This is a two-admin break-glass lane, not a faster single-admin deploy.
 
-If the reason is present, echo it back and keep it: it goes in the Phase 5 record.
+Require the reason to be one nonblank line of at most 500 characters. Read the
+authenticated GitHub operator without trusting git config or a user-supplied login:
+
+```bash
+if ! OPERATOR=$(gh api user --jq .login 2>&1); then
+  printf '%s\n' "$OPERATOR"
+  echo "ERROR: cannot prove the authenticated GitHub operator."
+  exit 2
+fi
+```
+
+The only valid operator/second-admin pairs are `holdeeno` + `kells-source` in either order. The identities must differ. Any other operator, self-acknowledgement, or unrecognized second admin **halts**. Never interpolate acknowledgement contents as shell. Keep the reason, both identities, and URL for the Phase 3 ceremony and Phase 5 record.
+
+The acknowledgement URL is narrower than a generic evidence link: require a
+comment permalink matching
+`^https://github\.com/Brite-Nites/brite-salesforce/(issues|pull)/[0-9]+#issuecomment-[0-9]+$`.
+The comment body must use this exact structure, filled with the current values:
+
+```text
+BREAKGLASS-ACK
+operator: <authenticated operator>
+sha: <full lowercase main SHA>
+reason: <exact one-line reason>
+```
 
 Then ask via `AskUserQuestion`:
 
@@ -103,7 +126,7 @@ LOCAL=$(git rev-parse HEAD); REMOTE=$(git rev-parse origin/main)
 [ "$LOCAL" = "$REMOTE" ] && echo "IN_SYNC $LOCAL" || echo "DIVERGED local=$LOCAL remote=$REMOTE"
 ```
 
-`DIVERGED` → **halt**: *"Local `main` and `origin/main` differ. Reconcile them before deploying — otherwise nobody can tell afterwards what actually shipped."*
+`IN_SYNC` → store the full SHA as `{approved-sha}`. `DIVERGED` → **halt**: *"Local `main` and `origin/main` differ. Reconcile them before deploying — otherwise nobody can tell afterwards what actually shipped."*
 
 ### 2.4 Blocking concurrency probe
 
@@ -113,9 +136,45 @@ Run the shared procedure in [`_shared/concurrency-probe.md`](_shared/concurrency
 
 ### 2.5 `.forceignore` pre-flight (F1, BC-12347)
 
-Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceignore-preflight.md) with `RANGE="main~1..main"`. Act on its result exactly as that file says.
+Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceignore-preflight.md) with `SCOPE_MODE=diff` and `RANGE="main~1..main"`. Act on its result exactly as that file says.
 
 ADR-026 section 4: the emergency path is never unguarded. A component silently dropped by `.forceignore` during an emergency deploy is a defect you will find days later, under worse conditions.
+
+### 2.6 Verify the second-admin acknowledgement
+
+After Phase 2.3 has fixed `{approved-sha}`, fetch the exact GitHub comment ID
+from the already shape-validated permalink and let the deterministic guard bind
+its author and structured body to this ceremony:
+
+```bash
+ACK_ID="${ACK_URL##*#issuecomment-}"
+if ! gh api "repos/Brite-Nites/brite-salesforce/issues/comments/$ACK_ID" \
+  > /tmp/revops-breakglass-ack.json; then
+  cat /tmp/revops-breakglass-ack.json 2>/dev/null || true
+  echo "ERROR: cannot read the second-admin acknowledgement."
+  exit 2
+fi
+
+if ! ACK_GUARD_JSON=$( \
+  ACK_OPERATOR="$OPERATOR" \
+  ACK_SECOND_ADMIN="$SECOND_ADMIN" \
+  ACK_URL="$ACK_URL" \
+  ACK_REASON="$REASON" \
+  ACK_SHA="{approved-sha}" \
+  python3 "${CLAUDE_PLUGIN_ROOT}/scripts/breakglass_deploy_guard.py" \
+    ack /tmp/revops-breakglass-ack.json 2>&1
+); then
+  printf '%s\n' "$ACK_GUARD_JSON"
+  echo "ERROR: second-admin acknowledgement is absent, spoofed, or stale."
+  exit 2
+fi
+printf '%s\n' "$ACK_GUARD_JSON"
+```
+
+Only `decision: ready` continues. A URL supplied by the operator is never proof
+by itself; the fetched comment must be authored by `{second-admin}` and name the
+exact operator, full SHA, and reason. A generic, edited-to-different-scope, or
+earlier acknowledgement is not reusable; a generic or earlier approval is not reusable.
 
 Narrate: `Phase 2/5: Pre-flight checks... done`
 
@@ -129,7 +188,7 @@ Three separate `AskUserQuestion` calls. Never a single multi-option picker. The 
 
 ### 3.1 Gate A — the reason still holds
 
-Show the reason from Phase 0 back to the user, alongside what Phase 1 found.
+Show the reason from Phase 0, the full `{approved-sha}`, Phase 1's finding, the operator/second-admin pair, the acknowledgement URL, and Phase 2.6's `decision: ready` receipt. If the receipt is absent, **halt**; do not re-interpret the link manually.
 
 - Question: `Your stated reason: "{reason}". Phase 1 found: {finding}. Does the reason still hold?`
 - Options:
@@ -154,16 +213,26 @@ Narrate: `Phase 3/5: Confirmation gates... done` only after all three return pro
 
 ---
 
-## Phase 4 — Guarded validate, then quick-deploy *(mutating)*
+## Phase 4 — Recheck, validate, quick-deploy, then F2 verify *(mutating)*
 
-Narrate: `Phase 4/5: Validate then quick-deploy...`
+Narrate: `Phase 4/5: Recheck, validate, quick-deploy, then F2 verify...`
 
-Two steps, in this order, always. `validate` runs the full deploy and its Apex tests against production without committing anything; `quick-deploy` then commits that already-validated result. Skipping the validate to save time is how an emergency deploy fails halfway.
+Four steps, in this order, always. Recheck the approved SHA; `validate` runs the deploy and RunLocalTests against production without committing anything; `quick-deploy` then commits that already-validated result; the six-type F2 verifier reads the deployed components back from the org. Skipping a step is how an emergency deploy becomes an unmeasured partial state.
+
+### 4.0 Recheck the approved commit
+
+Immediately before the first org command, fetch `origin/main` again and require both local `HEAD` and remote `main` to equal `{approved-sha}`. Any command failure or mismatch **halts** and restarts the whole command from Phase 0; the other admin acknowledged a commit, not a moving branch.
+
+```bash
+git fetch origin main --quiet 2>&1
+[ "$(git rev-parse HEAD)" = "{approved-sha}" ] && \
+  [ "$(git rev-parse origin/main)" = "{approved-sha}" ]
+```
 
 ### 4.1 Validate
 
 ```bash
-set -e
+set -euo pipefail
 RANGE="main~1..main"
 
 if ! RAW_CHANGED=$(git diff "$RANGE" --name-only --diff-filter=ACMRT 2>&1); then
@@ -194,32 +263,79 @@ printf '%s\n' "$COALESCED" | sed 's/^/  /'
 # Array form so the argv expands under zsh too — the Bash tool runs zsh (BC-16872).
 ARGS=()
 while IFS= read -r p; do [ -n "$p" ] && ARGS+=(--source-dir "$p"); done <<< "$COALESCED"
-sf project deploy validate "${ARGS[@]}" --target-org brite-prod --json
+
+if ! sf project deploy validate "${ARGS[@]}" \
+  --target-org brite-prod \
+  --test-level RunLocalTests \
+  --json > /tmp/revops-breakglass-validate.json; then
+  cat /tmp/revops-breakglass-validate.json
+  echo "ERROR: production validation failed. Nothing was deployed."
+  exit 2
+fi
+cat /tmp/revops-breakglass-validate.json
+
+if printf '%s\n' "$CHANGED" | grep -Eq '^force-app/.*/(classes/.*\.cls|triggers/.*\.trigger)$'; then
+  python3 "${CLAUDE_PLUGIN_ROOT}/scripts/breakglass_deploy_guard.py" \
+    validate /tmp/revops-breakglass-validate.json \
+    --require-apex-coverage --minimum-coverage 90 \
+    | tee /tmp/revops-breakglass-validate-guard.json
+else
+  python3 "${CLAUDE_PLUGIN_ROOT}/scripts/breakglass_deploy_guard.py" \
+    validate /tmp/revops-breakglass-validate.json \
+    | tee /tmp/revops-breakglass-validate-guard.json
+fi
 ```
 
-Parse the JSON via top-level `status === 0`:
+The deterministic guard requires an explicit completed, successful, check-only result; positive and exactly reconciled component counts; explicit zero component/test errors; an explicit empty component-failure surface; and complete RunLocalTests totals with zero failures. When an Apex class or trigger changed, it additionally requires weighted code coverage of **at least 90%**; missing or malformed coverage blocks. Read the validated deploy ID from `/tmp/revops-breakglass-validate-guard.json` only after the guard exits zero.
 
-- `status: 0` → **keep `result.id`.** That validated-deploy id is the input to 4.2, and it is only valid for a limited window. Report `numberComponentsTotal` and, if present, the Apex test summary.
-- Any other `status` → print `result.details.componentFailures[*].problem` for each failure and **halt**:
+- `decision: ready` → keep `deploy_id`. That validated-deploy ID is the input to 4.2, and it is only valid for a limited window. Report component count, test failures, and the coverage verdict.
+- Any other result or non-zero helper exit → **halt**:
 
   > Validation failed against `brite-prod`. Nothing was deployed. Fix the errors above — the emergency path does not have a force option, because a deploy that fails validation would fail the same way in CI.
 
 ### 4.2 Quick-deploy
 
-Only reached if 4.1 returned `status: 0`.
+Only reached if 4.1's deterministic guard returned `decision: ready`.
 
 ```bash
-sf project deploy quick --job-id {validated-deploy-id} --target-org brite-prod --json
+set -euo pipefail
+if ! sf project deploy quick \
+  --job-id {validated-deploy-id} \
+  --target-org brite-prod \
+  --json > /tmp/revops-breakglass-deploy.json; then
+  cat /tmp/revops-breakglass-deploy.json
+  echo "ERROR: quick-deploy failed. Production may already have changed; do not retry."
+  exit 2
+fi
+cat /tmp/revops-breakglass-deploy.json
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/breakglass_deploy_guard.py" \
+  quick /tmp/revops-breakglass-deploy.json \
+  | tee /tmp/revops-breakglass-deploy-guard.json
 ```
 
-Parse the JSON via `status === 0`:
+The deterministic quick-receipt guard requires top-level `status === 0`; an explicit completed, successful, non-check-only result; a trustworthy deploy ID; an explicit empty component-failure surface; zero component errors; and positive, exactly reconciled total/deployed counts:
 
-- `status: 0` → deploy landed. Print `result.numberComponentsDeployed` and `result.id`.
-- Any other `status` → print `result.details.componentFailures[*]` verbatim and **halt**:
+- `decision: ready` → the deploy landed. Print `components_deployed` and `deploy_id`.
+- Any other result or non-zero helper exit → print the receipt and **halt**:
 
   > Quick-deploy failed after validation passed. Production may be in a partial state — inspect `Setup > Deployment Status` in `brite-prod` immediately. Do not re-run this command until you understand what landed.
 
-Narrate: `Phase 4/5: Validate then quick-deploy... done`
+### 4.3 F2 read-back verification
+
+The deploy response proves Salesforce accepted the package; it does not prove the deployed components are usable. Require the current Salesforce checkout to contain the reviewed BC-19514 verifier, then run it against the exact quick-deploy receipt:
+
+```bash
+set -euo pipefail
+test -f scripts/ci/verify-deploy-components.js
+node scripts/ci/verify-deploy-components.js \
+  --deploy-result /tmp/revops-breakglass-deploy.json \
+  --target-org brite-prod \
+  --json | tee /tmp/revops-breakglass-f2.json
+```
+
+The verifier checks the six supported types from the completed deploy receipt and fails closed on incomplete queries or malformed result rows. Any non-zero exit means the deploy may have landed but F2 is unproven: **halt, preserve all three `/tmp/revops-breakglass-*` receipts, record the partial verification state, and do not retry or declare completion.** Flow activation remains separately blocked; F2 is not activation authority.
+
+Narrate: `Phase 4/5: Recheck, validate, quick-deploy, then F2 verify... done`
 
 ---
 
@@ -233,19 +349,23 @@ Print the record:
 
 - `⚠ EMERGENCY PRODUCTION DEPLOY — bypassed the CI lane`
 - `Reason: {reason}`
+- `Operator: @{operator}`
+- `Second admin: @{second-admin}`
+- `Second-admin acknowledgement: {ack-url}`
 - `CI lane state at Phase 1: {finding}`
-- `Commit: {short-sha} — {commit-subject}`
+- `Commit: {approved-sha} — {commit-subject}`
 - `Concurrency probe: clear` (or `⚠ overridden — {N} recent deploy(s)`)
 - `.forceignore pre-flight: {result}`
 - `Validated: {validate-id} ({N} components)`
+- `RunLocalTests: 0 failures; Apex coverage: {N}%` (or `N/A — no Apex changed`)
 - `Deployed: {deploy-id} ({N} components)`
-- `Operator: {git config user.name}`
+- `F2 six-type verification: passed ({verification receipt})`
 
 Then tell the user, plainly:
 
 > Three things still need doing, and only you can do them.
 >
-> 1. Run `/revops:run-manual-post-deploy-steps --production-breakglass` for the non-Flow manual steps. This path skipped CI's activation/verifier ([BC-19514](https://linear.app/brite-nites/issue/BC-19514)), so Flow activation stays blocked pending a separate Kells/release-manager scope decision; the runbook will not turn a break-glass deploy into an implicit behavioral go-live.
+> 1. Run `/revops:run-manual-post-deploy-steps --production-breakglass` for the remaining manual steps. F2 verification ran above, but this path still skipped CI's activation stage ([BC-19514](https://linear.app/brite-nites/issue/BC-19514)), so Flow activation stays blocked pending a separate Kells/release-manager scope decision; the runbook will not turn a break-glass deploy into an implicit behavioral go-live.
 > 2. File a Linear issue for whatever made CI unavailable. The lane being down is its own defect, separate from the change you just shipped.
 > 3. Paste the record above into that issue and into the team channel.
 
@@ -258,10 +378,12 @@ Narrate: `Phase 5/5: Completion... done`
 ## Rules
 
 - **CI first, always.** Phase 1 re-checks the lane and halts if it is healthy. This command is not a faster alternative to `/revops:push-to-production`; it is what you use when that is impossible.
-- **`--reason` is required.** No reason, no deploy. Writing it down is the check.
+- **Reason plus the other admin's acknowledgement are required.** Only `holdeeno` and `kells-source` can form the operator/second-admin pair; self-acknowledgement and generic evidence block.
 - **Every guard still runs.** The concurrency probe blocks and fails closed; the `.forceignore` pre-flight runs. ADR-026 section 4: the emergency path is never unguarded.
 - **Three gates, three separate `AskUserQuestion` calls.** A single multi-option picker is unacceptable.
-- **Validate before quick-deploy, always.** There is no direct-deploy option here and none may be added.
+- **Recheck the exact acknowledged SHA, then validate before quick-deploy, always.** There is no direct-deploy option here and none may be added.
+- **Apex changes require RunLocalTests with zero failures and weighted coverage ≥90%.** Missing or malformed coverage blocks; the deterministic parser is `scripts/breakglass_deploy_guard.py`.
+- **F2 read-back is part of break glass, not a follow-up.** Run `scripts/ci/verify-deploy-components.js` against the exact quick-deploy receipt. A failed verifier means partial/unproven completion, never success.
 - **No force flags.** A validation failure halts. There is no override, because a change that fails validation locally would fail identically in CI.
 - **Parse `--json` via `status === 0`.** Never `result.success` — it has changed shape across `sf` CLI 2.x versions.
 - **Do not retry on failure.** Surface the raw output and halt. Silent retries during an incident are how partial state becomes unknowable state.

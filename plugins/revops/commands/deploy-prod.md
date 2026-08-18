@@ -15,7 +15,7 @@ every plugin).
 
 **What changed beyond the name.** It **dispatches and watches CI** rather than deploying from your laptop. brite-salesforce ADR-016 section 6, and Amendment E, retired the raw local prod deploy.
 
-**Flags.** `--reconcile` is gone — deploy scope is CI's decision now. `--override-concurrency` is new. If you were reaching for `--break-glass`, that is now its own command: `/revops:emergency-deploy-to-production`, and it requires `--reason`.
+**Flags.** `--reconcile` is gone — deploy scope is CI's decision now. `--override-concurrency` is new. If you were reaching for `--break-glass`, that is now its own two-admin command: `/revops:emergency-deploy-to-production`; it requires a reason and durable acknowledgement from the other production admin.
 
 **Do not run this flow.** Read and follow [`push-to-production.md`](./push-to-production.md) and run that
 procedure end-to-end, passing along any `$ARGUMENTS`.

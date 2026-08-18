@@ -15,6 +15,7 @@ def test_dispatches_main_with_every_required_prod_input() -> None:
     assert "--raw-field mode=deploy" in COMMAND
     assert "--raw-field confirm=DEPLOY-PROD" in COMMAND
     assert '--raw-field activation="$ACTIVATION"' in COMMAND
+    assert '--raw-field expected_sha="{approved-sha}"' in COMMAND
 
 
 def test_activation_is_explicit_and_defaults_to_plan() -> None:
@@ -42,3 +43,15 @@ def test_preflights_the_main_dispatch_schema_before_any_confirmation() -> None:
     assert "gh workflow view deploy-prod.yml" in COMMAND
     assert "--validate-prod-workflow -" in COMMAND
     assert "CI_CONTRACT_OK" in COMMAND
+
+
+def test_approved_sha_is_rechecked_immediately_before_dispatch() -> None:
+    approval = COMMAND.index("store the full value as `{approved-sha}`")
+    recheck = COMMAND.index("### 3.2 Recheck the approved commit")
+    dispatch = COMMAND.index("### 3.3 Dispatch and capture the exact created run")
+
+    assert approval < recheck < dispatch
+    assert 'DISPATCH_LOCAL=$(git rev-parse HEAD)' in COMMAND
+    assert 'DISPATCH_REMOTE=$(git rev-parse origin/main)' in COMMAND
+    assert 'APPROVED_SHA_MOVED approved={approved-sha}' in COMMAND
+    assert "start the command again from Phase 1" in COMMAND

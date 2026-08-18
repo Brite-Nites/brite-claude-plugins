@@ -135,7 +135,8 @@ else
 fi
 ```
 
-- `IN_SYNC` → continue.
+- `IN_SYNC` → store the full value as `{approved-sha}` for the confirmation summary,
+  the final pre-dispatch recheck, and the workflow input. Continue.
 - `DIVERGED` → **halt**. Print the divergence listing verbatim and:
 
   > Local `main` and `origin/main` differ. CI will deploy `origin/main`. Pull (or push) so the two agree, confirm which commit you actually mean to ship, then re-run.
@@ -209,13 +210,13 @@ fi
 - `CI_CONTRACT_OK` → continue.
 - `CI_CONTRACT_UNAVAILABLE` or `CI_CONTRACT_INCOMPLETE` → **halt before Phase 2.** Print the raw error and:
 
-  > The `main` copy of `deploy-prod.yml` does not yet expose the reviewed BC-19513/BC-19514 dispatch contract (`mode`, `confirm`, `activation`). Do not remove an input or dispatch a different ref. Promote the reviewed Salesforce change through the normal integration → main ceremony, then re-run.
+  > The `main` copy of `deploy-prod.yml` does not yet expose the reviewed dispatch contract (`mode`, `confirm`, `activation`, `expected_sha`). Do not remove an input or dispatch a different ref. Promote the reviewed Salesforce change through the normal integration → main ceremony, then re-run.
 
 ### 1.7 `.forceignore` pre-flight (F1, BC-12347)
 
 Narrate: `Phase 1.7/5: .forceignore pre-flight...`
 
-Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceignore-preflight.md) with `RANGE="main~1..main"` — the squash commit that just landed, per BC-6000 squash-merge discipline. Act on the result exactly as that file says.
+Run the shared procedure in [`_shared/forceignore-preflight.md`](_shared/forceignore-preflight.md) with `SCOPE_MODE=diff` and `RANGE="main~1..main"` — the squash commit that just landed, per BC-6000 squash-merge discipline. Act on the result exactly as that file says.
 
 CI runs the same check as a mirrored step. Running it here too is deliberate: it costs a second and it tells you *before* you dispatch, not five minutes into a run.
 
@@ -305,7 +306,30 @@ Look for a workflow whose `path` ends in `deploy-prod.yml`.
 
 - Present but `disabled_manually` → **halt** and say so; someone disabled the lane on purpose, and finding out why comes first.
 
-### 3.2 Dispatch and capture the exact created run
+### 3.2 Recheck the approved commit
+
+The confirmation ceremony approved `{approved-sha}`, not whichever commit happens to be
+at `main` later. Re-fetch immediately before dispatch:
+
+```bash
+git fetch origin main --quiet 2>&1
+DISPATCH_LOCAL=$(git rev-parse HEAD)
+DISPATCH_REMOTE=$(git rev-parse origin/main)
+if [ "$DISPATCH_LOCAL" = "{approved-sha}" ] && [ "$DISPATCH_REMOTE" = "{approved-sha}" ]; then
+  echo "APPROVED_SHA_STILL_CURRENT {approved-sha}"
+else
+  echo "APPROVED_SHA_MOVED approved={approved-sha} local=$DISPATCH_LOCAL remote=$DISPATCH_REMOTE"
+  exit 2
+fi
+```
+
+- `APPROVED_SHA_STILL_CURRENT` → continue immediately to 3.3.
+- `APPROVED_SHA_MOVED` or any command failure → **halt**. The confirmation is stale;
+  start the command again from Phase 1. Do not ask a one-line reconfirmation because the
+  diff, workflow contract, `.forceignore` result, and activation decision all belong to
+  the approved commit.
+
+### 3.3 Dispatch and capture the exact created run
 
 ```bash
 RUN_URL="$(gh workflow run deploy-prod.yml \
@@ -313,6 +337,7 @@ RUN_URL="$(gh workflow run deploy-prod.yml \
   --ref main \
   --raw-field mode=deploy \
   --raw-field confirm=DEPLOY-PROD \
+  --raw-field expected_sha="{approved-sha}" \
   --raw-field activation="$ACTIVATION" 2>&1)"
 DISPATCH_STATUS=$?
 printf '%s\n' "$RUN_URL"
@@ -404,8 +429,8 @@ Narrate: `Phase 5/5: Completion... done`
 - **Phase 2 gates are two separate `AskUserQuestion` calls.** A single multi-option picker is unacceptable.
 - **The Phase 0.5 probe blocks.** A `blocked_*` verdict halts the command. `--override-concurrency` clears a recent deploy and nothing clears an in-flight one.
 - **Confirm the workflow exists before dispatching.** A missing `deploy-prod.yml` halts; it never degrades into a local deploy.
-- **Confirm the `main` dispatch schema before the production gates.** The file must expose `mode`, `confirm`, and `activation`, with the reviewed option set. A workflow on `integration` is not evidence for a dispatch that executes `main`.
-- **Dispatch `main` only, with every required input.** Always pass `mode=deploy`, `confirm=DEPLOY-PROD`, and the explicit `activation` mode. Never accept an arbitrary SHA or feature-branch ref.
+- **Confirm the `main` dispatch schema before the production gates.** The file must expose `mode`, `confirm`, `activation`, and `expected_sha`, with the reviewed option set. A workflow on `integration` is not evidence for a dispatch that executes `main`.
+- **Dispatch `main` only, with every required input.** Always pass `mode=deploy`, `confirm=DEPLOY-PROD`, the explicit `activation` mode, and the full approved commit as `expected_sha`. The workflow must reject a different `github.sha` before any org access.
 - **Use the exact run URL returned by `gh workflow run`.** Require `gh >= 2.87.0`; never guess the run with `gh run list`.
 - **Never re-dispatch to check on a run.** Re-attaching with `gh run watch` is a read and is safe. A second dispatch is a second deploy.
 - **Read the run's conclusion, do not infer it.** `--exit-status` and the `conclusion` field are the contract; scraped log text is not.

@@ -108,7 +108,7 @@ Urgency changes scheduling, not topology:
 4. Use the promotion-window ceremony for `integration → main`.
 5. Dispatch `/revops:push-to-production` from `main`.
 
-Do not deploy one class directly to prod. If GitHub Actions itself is unavailable, the release manager may use `/revops:emergency-deploy-to-production --reason <incident>`; that is break glass, not a faster hotfix lane. Afterward, `/revops:run-manual-post-deploy-steps --production-breakglass` leaves Flow activation blocked for a separate human scope decision.
+Do not deploy one class directly to prod. If GitHub Actions itself is unavailable, the release manager may use `/revops:emergency-deploy-to-production` with a reason and durable acknowledgement from the other production admin; that is break glass, not a faster hotfix lane. Afterward, `/revops:run-manual-post-deploy-steps --production-breakglass` leaves Flow activation blocked for a separate human scope decision.
 
 ---
 
