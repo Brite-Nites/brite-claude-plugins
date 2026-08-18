@@ -33,6 +33,19 @@ Inspect the invocation arguments. The command supports three optional flags:
 - `--target-org brite-dev-<name>` — name your own dev org explicitly instead of letting Phase 0.25 resolve it. Only a `brite-dev-<name>` alias is accepted; anything else is rejected, not honoured.
 - `--override-concurrency` — proceed past a *recent* deploy found by the Phase 0.5 probe. It does **not** clear an in-flight deploy.
 
+Before selecting either deploy mode, refuse the production branch:
+
+```bash
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" = "main" ]; then
+  echo "ERROR: /revops:preview-changes cannot run from main. Cut work from integration."
+  exit 2
+fi
+```
+
+Stop the command if this check fails. `--reconcile` changes deploy scope; it never
+overrides the branch boundary.
+
 If `--reconcile` is in the invocation, set deploy mode to `reconcile` for the rest of the run and skip the diff resolution in Phase 2.1. Otherwise the deploy mode is `branch-diff`, and the bash blocks in Phase 2 / Phase 3 compute the `--source-dir` set from the feature branch diff vs `origin/integration`.
 
 Tell the user which mode is active before Phase 1 starts:

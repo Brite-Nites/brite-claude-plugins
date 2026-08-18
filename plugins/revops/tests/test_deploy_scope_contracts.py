@@ -80,6 +80,17 @@ def test_preview_preserves_diff_scope_safety_contract() -> None:
     assert "--source-dir force-app --target-org {dev-org}" in body
 
 
+def test_preview_refuses_main_before_reconcile_can_bypass_diff_resolution() -> None:
+    body = read(PREVIEW_PATH)
+    phase_zero = body.index("## Phase 0 — Deploy-mode resolution")
+    early_refusal = body.index('if [ "$BRANCH" = "main" ]; then', phase_zero)
+    mode_selection = body.index("If `--reconcile` is in the invocation", phase_zero)
+
+    assert phase_zero < early_refusal < mode_selection
+    assert "`--reconcile` changes deploy scope; it never\noverrides the branch boundary" in body
+    assert body.count('if [ "$BRANCH" = "main" ]; then') >= 3
+
+
 def test_preview_refuses_deletions_and_routes_to_ticket_scoped_ceremony() -> None:
     body = read(PREVIEW_PATH)
     assert "manifest/destructive/BC-<ticket>.xml" in body
