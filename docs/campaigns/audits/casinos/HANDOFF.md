@@ -1,5 +1,9 @@
 # Casinos — session handoff (2026-08-14)
 
+> Prospects are referenced by role + property. No names or email addresses: this
+> repo is public and person-level detail is out of scope per the PR #511 policy.
+> Resolve contacts in EB or Salesforce.
+
 ## ✅ LIVE — activated 2026-08-14, sending
 
 | Campaign | Lane | Leads | Sent | Status | plain_text | Steps | Senders | Cap |
@@ -56,11 +60,11 @@ referral we got. Lead tribal properties with the Seminole reference.
 
 ## Chase these three before any campaign sends
 
-| Who | What happened | Age |
+| Role / property | What happened | Age |
 |---|---|---|
-| **Justin Sullivan** — Corp Dir Marketing, Gila River (`justin.sullivan@wingilariver.com`) | *"I've got a couple of projects… maybe set up a call late next week?"* Santi replied same day. **Nothing since.** | since 2026-06-01 |
-| **John Moss** — VP Eng & Facilities, Virgin Hotels LV | Asked for a palm-tree lighting proposal, **call booked Apr 8 9am**, then mis-filed do-not-contact | Apr 2026 |
-| **Elise Grabowski** — Fortune Bay | **Call booked Wed 4/15 11am** with Rainer, then mis-filed do-not-contact | Apr 2026 |
+| **Corp Dir Marketing, Gila River** | *"I've got a couple of projects… maybe set up a call late next week?"* Santi replied same day. **Nothing since.** | since 2026-06-01 |
+| **VP Eng & Facilities, Virgin Hotels LV** | Asked for a palm-tree lighting proposal, **call booked Apr 8 9am**, then mis-filed do-not-contact | Apr 2026 |
+| **Fortune Bay contact** | **Call booked Wed 4/15 11am** with Rainer, then mis-filed do-not-contact | Apr 2026 |
 
 Virgin Hotels LV is suppressed from the campaign (open SF opportunity) — that's correct,
 it belongs to sales, not outbound.
