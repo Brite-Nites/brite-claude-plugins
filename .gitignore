@@ -72,3 +72,26 @@ docs/campaigns/**/*contacts-found*.csv
 # Local agent config — shows up untracked in every repo; never campaign data.
 /.codex/
 /AGENTS.md
+
+# Campaign audit working data — person-level contact exports (names/emails/
+# titles) per the PR #511 policy above; repo is public. Reasoning lives in the
+# .md files, which stay tracked. Source of truth is EB / SF / the Snowflake
+# STG_EMAILBISON__* tables, not these snapshots. Files remain on disk.
+docs/campaigns/audits/**/*.csv
+docs/campaigns/audits/**/*.tsv
+docs/campaigns/audits/**/*.json
+docs/campaigns/audits/**/*.jsonl
+docs/campaigns/audits/**/*.py
+docs/campaigns/audits/**/*.log
+docs/campaigns/audits/**/*.txt
+docs/campaigns/audits/**/*.sh
+docs/campaigns/audits/**/_*
+docs/campaigns/audits/**/.ruff_cache/
+docs/campaigns/audits/**/__pycache__/
+
+# Loose working files dropped at repo root — same person-level concern.
+/ct_*.csv
+/nora-followup-worklist.csv
+/replied-never-tagged-positive.csv
+/pa_proxy.json
+/supp4.log
