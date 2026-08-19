@@ -73,10 +73,13 @@ docs/campaigns/**/*contacts-found*.csv
 /.codex/
 /AGENTS.md
 
-# Campaign audit working data — person-level contact exports (names/emails/
-# titles) per the PR #511 policy above; repo is public. Reasoning lives in the
-# .md files, which stay tracked. Source of truth is EB / SF / the Snowflake
-# STG_EMAILBISON__* tables, not these snapshots. Files remain on disk.
+# Campaign audit working data — person-level contact records per the PR #511
+# policy above; repo is public. The Markdown is ignored too: these are narrative
+# records of identifiable people (opt-out requests, booked calls, quoted replies)
+# and redacting them far enough to be publishable removes what makes them useful.
+# Source of truth is EB / Salesforce / the Snowflake STG_EMAILBISON__* tables.
+# Everything stays on disk as the working audit record — nothing is deleted.
+docs/campaigns/audits/**/*.md
 docs/campaigns/audits/**/*.csv
 docs/campaigns/audits/**/*.tsv
 docs/campaigns/audits/**/*.json
