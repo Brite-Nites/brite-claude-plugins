@@ -25,7 +25,18 @@ tables, so whichever database your profile points at does not matter.
 
 ## Running
 
+Paths below are from the **repository root** — the runner takes SQL on stdin, so it does not
+care about your working directory as long as both paths resolve:
+
 ```bash
+Q=docs/audits/bc-19654-optout-backfill/queries
+python3 "$Q/sfq.py" < "$Q/q_base.sql"
+```
+
+Or from inside this directory:
+
+```bash
+cd docs/audits/bc-19654-optout-backfill
 python3 queries/sfq.py < queries/q_base.sql
 ```
 

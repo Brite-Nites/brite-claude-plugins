@@ -4,9 +4,13 @@ Snowflake `ANALYTICS.STAGING.STG_EMAILBISON__*`, warehouse snapshot `2026-08-21 
 (predates the Karol writes made the same day at 16:01, so these are pre-change figures).
 Queries in `queries/` — see `queries/README.md` for setup. Every figure below is reproducible:
 
+Paths below are from the **repository root**:
+
 ```bash
 python3 -m pip install 'snowflake-connector-python[secure-local-storage]' pyyaml
-python3 queries/sfq.py < queries/q_base.sql
+
+Q=docs/audits/bc-19654-optout-backfill/queries
+python3 "$Q/sfq.py" < "$Q/q_base.sql"
 ```
 
 ## The 407 was broadly right
