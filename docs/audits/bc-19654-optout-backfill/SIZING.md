@@ -2,7 +2,12 @@
 
 Snowflake `ANALYTICS.STAGING.STG_EMAILBISON__*`, warehouse snapshot `2026-08-21 10:14 UTC`
 (predates the Karol writes made the same day at 16:01, so these are pre-change figures).
-Queries in `queries/`; run with `services/.venv/bin/python queries/sfq.py < queries/<f>.sql`.
+Queries in `queries/` — see `queries/README.md` for setup. Every figure below is reproducible:
+
+```bash
+python3 -m pip install 'snowflake-connector-python[secure-local-storage]' pyyaml
+python3 queries/sfq.py < queries/q_base.sql
+```
 
 ## The 407 was broadly right
 

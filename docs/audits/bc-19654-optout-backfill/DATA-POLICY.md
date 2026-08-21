@@ -26,4 +26,5 @@ with `<person>@domain` or a role description.
 
 The source of truth is not this directory in any case: suppression state lives in Email Bison,
 and the full reply history is in Snowflake `ANALYTICS.STAGING.STG_EMAILBISON__*`. Every number
-in the markdown is reproducible from `queries/` — run them to regenerate any list.
+in the markdown is reproducible from `queries/` — see `queries/README.md` for setup, then run
+them to regenerate any list.
