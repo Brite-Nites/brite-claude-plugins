@@ -674,7 +674,56 @@ EOF
   # repo and diff its top-level key-set against the composer output. Excludes
   # only `migrated_from` (audit-only field from the v1→v2 migration, never
   # written by /marketing:import-campaign).
-  cohort_manifest="$script_dir/../../../docs/campaigns/labs/hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02/manifest.json"
+  # GOLDEN FIXTURE, inlined (BC-19812 / PR #587). This used to read the live
+  # cohort-1 manifest out of docs/campaigns/, which is no longer tracked — that
+  # tree holds GTM working data and is gitignored, so a fresh checkout has no
+  # such file and this assertion hard-FAILed in CI. The key-set is the contract
+  # under test, so it is frozen here the way the sibling harnesses inline their
+  # fixtures (see test_migrate_manifest_v1_to_v2.sh). Update deliberately if the
+  # manifest schema changes.
+  cohort_manifest="$(mktemp)"
+  cat > "$cohort_manifest" <<'COHORT_FIXTURE_EOF'
+{
+  "schema_version": 2,
+  "slug": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+  "entity": "labs",
+  "vertical": "hotels-resorts",
+  "persona": "director-of-resort-experience",
+  "offer": "holiday-anchor-audit",
+  "year": 2026,
+  "month": 2,
+  "linear": {
+    "milestone_id": "17450de2-f8f2-4107-8625-c07594e06066",
+    "milestone_url": "https://linear.app/brite-nites/project/brite-gtm-fa8fc238ef28",
+    "project": "Brite GTM"
+  },
+  "salesforce": {
+    "campaign_id": null,
+    "campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02"
+  },
+  "email_bison": {
+    "workspace": "emailbison-b2b",
+    "campaign_name": "hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02",
+    "campaigns": []
+  },
+  "created_at": "2026-05-19T21:02:53Z",
+  "scaffolded_by": "/marketing:plan-campaign",
+  "migrated_from": {
+    "schema_version": 1,
+    "migrated_at": "2026-05-27T00:00:00Z",
+    "migrated_by": "plugins/marketing/scripts/migrate_manifest_v1_to_v2.py (BC-11852)"
+  }
+}
+COHORT_FIXTURE_EOF
+  # Drift guard: when campaign data IS present locally, warn (never fail) if the
+  # frozen fixture has diverged from the real manifest.
+  live_cohort="$script_dir/../../../docs/campaigns/labs/hotels-resorts-director-of-resort-experience-holiday-anchor-audit-fy26-m02/manifest.json"
+  if [ -f "$live_cohort" ]; then
+    if ! diff -q <(python3 -c "import json,sys;print(','.join(sorted(json.load(open(sys.argv[1])).keys())))" "$cohort_manifest") \
+                 <(python3 -c "import json,sys;print(','.join(sorted(json.load(open(sys.argv[1])).keys())))" "$live_cohort") >/dev/null 2>&1; then
+      echo "  WARN  L: frozen cohort-1 fixture has drifted from the live manifest — update the fixture"
+    fi
+  fi
   if [ -f "$cohort_manifest" ]; then
     # Path passed via env var (COHORT_MANIFEST) — never interpolated into the
     # python -c source — so a path containing a quote can't break the inline
