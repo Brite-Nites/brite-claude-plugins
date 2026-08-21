@@ -98,3 +98,17 @@ docs/campaigns/audits/**/__pycache__/
 /replied-never-tagged-positive.csv
 /pa_proxy.json
 /supp4.log
+
+# Campaign audit working data under docs/audits/ — person-level contact records
+# (names, emails, titles, reply bodies) per the PR #511 / #585 policy: this repo is
+# PUBLIC and must not track them. The people in these files asked to stop being
+# contacted; publishing their addresses would compound that.
+# Reasoning stays tracked as markdown; the queries are tracked (they contain no PII).
+# Everything stays on disk as the working audit record — nothing is deleted.
+docs/audits/**/*.csv
+docs/audits/**/*.tsv
+docs/audits/**/*.json
+docs/audits/**/*.jsonl
+docs/audits/**/*.txt
+docs/audits/**/*.log
+docs/audits/**/_*
