@@ -112,3 +112,19 @@ docs/audits/**/*.jsonl
 docs/audits/**/*.txt
 docs/audits/**/*.log
 docs/audits/**/_*
+# Vendored third-party agent skills (npx skills add ...).
+# Versions are pinned in skills-lock.json, which IS committed; the files are not.
+# Mirrors the brite-gtm convention (BC-16250 git-hygiene audit).
+.agents/
+.claude/skills/
+
+# Campaign working data under docs/campaigns/ — operator decision 2026-08-21.
+# This repo is PUBLIC and is plugin/process infrastructure. Campaign artifacts are
+# GTM operating data, not infrastructure: TAM lists, contact rows (names, emails,
+# LinkedIn), campaign state, deal values, account relationships. Their system of
+# record is Email Bison / Salesforce / Snowflake, not git.
+# Same reasoning as the docs/audits/ block above, applied one level wider: that rule
+# ignores PII file TYPES, this ignores the whole tree, because company-level TAM
+# lists are themselves the work product and should not be published either.
+# Nothing is deleted — every file stays on disk as the working record.
+docs/campaigns/
