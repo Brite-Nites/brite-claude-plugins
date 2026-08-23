@@ -1,4 +1,4 @@
-"""Contract tests for the /revops:post-deploy-runbook slash command,
+"""Contract tests for the /revops:run-manual-post-deploy-steps slash command,
 locking the BC-11038 Flow Draft cleanup phase.
 
 Slash commands are Claude-orchestrated markdown, not executable code, so these
@@ -23,7 +23,8 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COMMAND_PATH = ROOT / "commands" / "post-deploy-runbook.md"
+COMMAND_PATH = ROOT / "commands" / "run-manual-post-deploy-steps.md"
+GUARD_PATH = ROOT / "scripts" / "flow_postdeploy_guard.py"
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 
@@ -43,6 +44,7 @@ def split_frontmatter(text: str) -> tuple[str, str]:
 
 def test_command_file_exists() -> None:
     assert COMMAND_PATH.is_file(), f"Slash command file missing: {COMMAND_PATH}"
+    assert GUARD_PATH.is_file(), f"Flow evidence guard missing: {GUARD_PATH}"
 
 
 # ── Frontmatter ─────────────────────────────────────────────────────────
@@ -66,6 +68,37 @@ def test_allowed_tools_is_bash_and_ask() -> None:
     assert declared == {"Bash", "AskUserQuestion"}, (
         f"allowed-tools must be exactly {{Bash, AskUserQuestion}}; got {sorted(declared)}"
     )
+
+
+def test_invocation_requires_an_explicit_dev_or_production_context() -> None:
+    frontmatter, body = split_frontmatter(read_command())
+    hint = next(
+        line for line in frontmatter.splitlines() if line.startswith("argument-hint:")
+    )
+    assert "--target-org brite-dev-<name>" in hint
+    assert "--deploy-id <0Af...>" in hint
+    assert "--production" in hint
+    assert "--production-breakglass" in hint
+    assert "exactly one" in body
+    assert "default target-org" not in body
+
+
+def test_production_context_never_reactivates_or_deletes_flow_versions() -> None:
+    body = read_command()
+    assert "Production Flow ownership" in body
+    assert "activation stage in `deploy-prod.yml`" in body
+    assert "Do not activate a Flow manually" in body
+    assert "do not query or delete Flow versions" in body
+    assert "blocked — separate activation decision required" in body
+
+
+def test_dev_flow_draft_commands_pin_the_resolved_target_org() -> None:
+    body = read_command()
+    phase3 = body[body.find("## Phase 3"):body.find("## Phase 4")]
+    assert "--target-org {dev-org}" in phase3
+    assert phase3.count("sf data delete record") >= 2
+    for command in re.findall(r"sf data delete record[^\n]*", phase3):
+        assert "--target-org {dev-org}" in command
 
 
 # ── Phase ordering: Phase 3 sits between Flow activation and Scheduled Apex ─
@@ -108,7 +141,7 @@ def test_narration_denominators_are_seven() -> None:
     assert not wrong, f"Narration denominators must all be /7; found: {wrong}"
 
 
-# ── SOQL query shape: Status = 'Draft' + time-bounded CreatedDate ────────
+# ── SOQL query shape: exact affected Flows + time-bounded Drafts ─────────
 
 def test_soql_queries_draft_status() -> None:
     """BC-11038 AC: SOQL must filter Status = 'Draft'."""
@@ -123,6 +156,9 @@ def test_soql_has_time_bounded_created_date() -> None:
     body = read_command()
     assert re.search(r"CreatedDate\s*>=\s*<deploy-window-start>", body), (
         "Phase 3 SOQL must contain CreatedDate >= <deploy-window-start> predicate"
+    )
+    assert re.search(r"CreatedDate\s*<=\s*<deploy-window-end>", body), (
+        "Phase 3 SOQL must contain CreatedDate <= <deploy-window-end> predicate"
     )
 
 
@@ -154,12 +190,46 @@ def test_query_uses_json_flag() -> None:
     )
 
 
-def test_fallback_to_last_n_hours() -> None:
-    """The spec mandates LAST_N_HOURS:2 as fallback when git date extraction fails."""
+def test_timestamp_failure_never_broadens_to_a_recent_time_window() -> None:
     body = read_command()
-    assert "LAST_N_HOURS:2" in body, (
-        "Phase 3 must fall back to LAST_N_HOURS:2 when git date extraction fails"
-    )
+    assert "using LAST_N_HOURS" not in body
+    assert "or the `LAST_N_HOURS" not in body
+    assert "blocked — deploy receipt untrusted" in body
+    assert "no query and no mutation" in body
+
+
+def test_dev_cleanup_window_comes_from_the_exact_completed_deploy_receipt() -> None:
+    body = read_command()
+    phase3 = body[body.find("## Phase 3"):body.find("## Phase 4")]
+    assert "sf project deploy report --job-id {deploy-id}" in phase3
+    assert "--target-org {dev-org} --json" in phase3
+    assert 'flow_postdeploy_guard.py" \\\n  receipt <report-json-file>' in phase3
+    assert "--deploy-id {deploy-id}" in phase3
+    assert "--flow <one-argument-per-affected-name>" in phase3
+    assert "window_start" in phase3 and "window_end" in phase3
+    assert "helper is the only receipt authority" in phase3
+    assert "commit's mutable author date" in phase3
+
+
+def test_diff_range_is_fixed_and_never_interpolates_free_form_shell_text() -> None:
+    body = read_command()
+    phase1 = body[body.find("## Phase 1"):body.find("## Phase 2")]
+    assert 'git diff "$RANGE" --name-only' in phase1
+    assert "Custom range" not in phase1
+    assert "interpolate verbatim" not in phase1
+
+
+def test_cleanup_is_scoped_to_strictly_validated_affected_flow_names() -> None:
+    body = read_command()
+    phase2 = body[body.find("## Phase 2"):body.find("## Phase 3")]
+    phase3 = body[body.find("## Phase 3"):body.find("## Phase 4")]
+
+    assert "^[A-Za-z][A-Za-z0-9_]*$" in phase2
+    assert "Reuse the de-duplicated, sorted, regex-validated affected names" in phase3
+    assert "Definition.DeveloperName IN (<affected-flow-names>)" in phase3
+    assert "--flow <one-argument-per-affected-name>" in phase3
+    assert "N/A — no affected Flows" in phase3
+    assert "only delete-list authority" in phase3
 
 
 # ── AskUserQuestion gate presence (no silent deletion) ───────────────────
@@ -212,15 +282,39 @@ def test_individual_delete_path_exists() -> None:
     )
 
 
-# ── Phase 3 failure tolerance ───────────────────────────────────────────
+# ── Phase 3 fail-closed completeness ────────────────────────────────────
 
-def test_query_failure_does_not_halt() -> None:
-    """Phase 3.2 query failure must not halt the runbook (advisory check)."""
+def test_query_must_be_complete_before_any_delete_gate() -> None:
     body = read_command()
     phase3_section = body[body.find("## Phase 3"):body.find("## Phase 4")]
-    assert "do **not** halt the runbook over an advisory check" in phase3_section, (
-        "Phase 3 must not halt on Tooling API query failure (advisory check)"
-    )
+    assert 'flow_postdeploy_guard.py" \\\n  draft-query <query-json-file>' in phase3_section
+    assert "complete status-0 query whose `totalSize` exactly reconciles" in phase3_section
+    assert "carry only its `delete_ids` to Phase 3.3" in phase3_section
+    assert "blocked — cleanup query untrusted" in phase3_section
+    assert "no deletion prompt and no mutation" in phase3_section
+
+
+def test_every_cleanup_row_is_validated_before_its_id_can_reach_delete() -> None:
+    body = read_command()
+    phase3 = body[body.find("## Phase 3"):body.find("## Phase 4")]
+    assert "unique `301...` Id" in phase3
+    assert "Draft status" in phase3
+    assert "positive version" in phase3
+    assert "CreatedDate inside the closed deployment interval" in phase3
+    assert "For each exact Id in the guard's `delete_ids` array" in phase3
+    assert "For each row in the guard's `drafts` array" in phase3
+
+
+def test_dev_activation_claim_requires_complete_guarded_readback() -> None:
+    body = read_command()
+    phase2 = body[body.find("## Phase 2"):body.find("## Phase 3")]
+    assert "the click alone is not proof" in phase2
+    assert "FROM FlowDefinition" in phase2
+    assert "--target-org {dev-org}" in phase2
+    assert 'flow_postdeploy_guard.py" \\\n  activation-query' in phase2
+    assert "ActiveVersion.VersionNumber" in phase2
+    assert "LatestVersion.VersionNumber" in phase2
+    assert "blocked — activation verification untrusted" in phase2
 
 
 # ── Phase 7 summary includes Flow Draft cleanup ─────────────────────────
@@ -248,15 +342,19 @@ def test_phase3_is_unconditional() -> None:
 
 
 def test_summary_includes_phase3_unique_statuses() -> None:
-    """Phase 7 must surface Phase 3's unique N/A statuses."""
+    """Phase 7 must surface Phase 3's unique safe and blocked statuses."""
     body = read_command()
     phase7_section = body[body.find("## Phase 7"):]
     assert "N/A — no Drafts detected" in phase7_section, (
         "Phase 7 must surface Phase 3's 'N/A — no Drafts detected' status"
     )
-    assert "N/A — query failed" in phase7_section, (
-        "Phase 7 must surface Phase 3's 'N/A — query failed' status"
-    )
+    for status in (
+        "N/A — no affected Flows",
+        "blocked — affected Flow set invalid",
+        "blocked — deploy receipt untrusted",
+        "blocked — cleanup query untrusted",
+    ):
+        assert status in phase7_section
 
 
 # ── BC-11038 rationale callout ──────────────────────────────────────────
