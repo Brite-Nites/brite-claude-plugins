@@ -61,7 +61,7 @@
         "--project-id",
         "f18972cc-185f-490a-91ac-b498016a1d36",
         "--",
-        "exec uvx --from 'git+https://github.com/Brite-Nites/brite-data-platform@20ce7b48cfeae6a07a559311d1ebe4184eacdfec#subdirectory=tools/enrichment-mcp' brite-enrichment-mcp"
+        "exec uvx --from 'git+https://github.com/Brite-Nites/brite-data-platform@b5a68d370bb33edd9c5d59a00310a2b8d2020cd1#subdirectory=tools/enrichment-mcp' brite-enrichment-mcp"
       ],
       "env": {
         "USE_MOCK_PROVIDERS": "False",
