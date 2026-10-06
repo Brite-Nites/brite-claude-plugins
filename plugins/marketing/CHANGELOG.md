@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **Ads watchdog (BC-28219), `scripts/ads_watchdog/`.** A pause-only guard over every Google Ads and Meta ad account, Brite's and the vendors'. Hourly, it pauses any account spending ahead of pace or over its share of the weekly ceiling and names it in Slack. Daily, it audits each account for drift from the agreed settings (auto-apply, automatic ad edits, search partners, AI Max, broad match, "Presence" targeting, the partner brand exclusion list, a spending limit held only by Brite admins) and for leads improbably far below the expected range. The emergency stop pauses every account on both platforms. Its own package, sharing no code with the ads agent it watches. The adapters expose no budget, bid or ad method, and the tests prove the only write either platform adapter sends is a campaign status set to PAUSED. Real config and secrets live in the private runner; nothing here names a real account. Not yet run against live accounts (blocked by BC-28209).
+
 ### Fixed
 
 - **Phase 3a's troubleshooting loop gave a healthy machine a false diagnosis.** Step 1 told the user to check `SPIDER_API_KEY` / `AIARK_API_KEY` / `DISCOLIKE_API_KEY` in their own shell and expect `set`. Under `bws` those variables only ever exist in the **child process** the broker spawns — a correctly configured developer has just `BWS_ACCESS_TOKEN`, so all three read empty and step 2 blamed a missing token. The loop now checks the broker credential, and adds a step 2b that lists the project's secrets by name to distinguish a bad token from a missing secret from a misnamed one. (A misnamed secret is worth catching on its own: a secret's name *is* the injected variable name, so the server starts with that variable silently unset.) Reported by Greptile on PR #571.
