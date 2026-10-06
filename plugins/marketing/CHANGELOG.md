@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **`ads-agent` skill and the `scripts/ads_agent/` run core: Brite's Google Ads agent in propose mode (BC-28215).** One bounded run reads the results snapshot from the warehouse (never the ad APIs), reads current campaign settings from Google Ads, plans one budget move from the worst cost per conversion to the best budget-limited campaign, and runs each change through the limit checks (`max_move`, `no_total_raise`, `weekly_ceiling`). It logs the plan to `ANALYTICS.OPERATIONS.ADS_AGENT_CHANGE_LOG` under an idempotency key and posts one Slack summary; a re-run on the same day plans and posts nothing. `--emit` prints the plan and writes nothing. It never writes to an ad account. Google Ads, Snowflake and Slack sit behind adapters with fakes; tests in `tests/test_ads_agent_run.py`. Rule values are config passed at run time, never code.
+
 ### Fixed
 
 - **Phase 3a's troubleshooting loop gave a healthy machine a false diagnosis.** Step 1 told the user to check `SPIDER_API_KEY` / `AIARK_API_KEY` / `DISCOLIKE_API_KEY` in their own shell and expect `set`. Under `bws` those variables only ever exist in the **child process** the broker spawns — a correctly configured developer has just `BWS_ACCESS_TOKEN`, so all three read empty and step 2 blamed a missing token. The loop now checks the broker credential, and adds a step 2b that lists the project's secrets by name to distinguish a bad token from a missing secret from a misnamed one. (A misnamed secret is worth catching on its own: a secret's name *is* the injected variable name, so the server starts with that variable silently unset.) Reported by Greptile on PR #571.
