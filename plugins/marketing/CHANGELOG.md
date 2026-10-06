@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **Ads creative pipeline core (BC-28221).** `scripts/ads_agent/creative.py` renders territory ads from approved brand-hub photos with the exact territory headline, tracking phone number and logo placed by code (Placid for images, Hyperframes for video), runs one brand check for every system's ads (code checks for text, fonts, overlay colors and logo, then a Claude judge for taste; any AI-edited photo always waits for a person), and builds the row for the warehouse creative-inputs table. Real Placid, ImageKit (read-only) and Claude-judge adapters live in `creative_adapters.py`; the Vertex AI, Higgsfield and Hyperframes adapters wait on accounts. Tests: `tests/test_ads_creative.py`, all on fakes.
+
 ### Fixed
 
 - **Phase 3a's troubleshooting loop gave a healthy machine a false diagnosis.** Step 1 told the user to check `SPIDER_API_KEY` / `AIARK_API_KEY` / `DISCOLIKE_API_KEY` in their own shell and expect `set`. Under `bws` those variables only ever exist in the **child process** the broker spawns — a correctly configured developer has just `BWS_ACCESS_TOKEN`, so all three read empty and step 2 blamed a missing token. The loop now checks the broker credential, and adds a step 2b that lists the project's secrets by name to distinguish a bad token from a missing secret from a misnamed one. (A misnamed secret is worth catching on its own: a secret's name *is* the injected variable name, so the server starts with that variable silently unset.) Reported by Greptile on PR #571.
