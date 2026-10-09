@@ -5,14 +5,14 @@ user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash, Read
 metadata:
-  version: 0.8.0
+  version: 0.9.0
   category: Paid Ads
 ---
 
 # Ads agent (Google and Meta)
 
 One bounded run (BC-28215 propose, BC-28216 approve and act, BC-28218 Meta, BC-28220
-season rules, BC-28579 capacity for the instant-form ad set; spec BC-28205): results
+season rules, BC-28579 and BC-28580 capacity for the instant-form ad set; spec BC-28205): results
 snapshots in, change plan out. The rule is ADR-0033 in brite-gtm: the
 agent may move money inside the ceiling a person set, and never sets money.
 
@@ -49,8 +49,8 @@ result is a new row whose key starts with the plan row's key.
    - Ads in one ad group (on Meta, one ad set) are compared on cost per lead only once
      each has spent `compare_multiple` (5) times `target_cpl`. The worst of those turns off.
 7. Plans a pause for each campaign (on Meta, ad set) in a territory that is full. On Meta,
-   it also plans removing a full territory's locations from the instant-form ad set
-   (season rule 6).
+   it also plans removing a full territory's locations from the instant-form ad set, or
+   pausing that ad set once every territory it covers is full (season rule 6).
 8. On Meta, also plans the rules in "Meta's own rules" below.
 9. Runs each change through the limit checks (`max_move`, `no_total_raise`,
    `weekly_ceiling`, `brand_untouched`, `step_up_gate`, `capacity_open`,
@@ -160,7 +160,7 @@ capacity sheet ("Operations Health 2025-2026").
    `capacity_pause_date`, the plan pauses each campaign (on Meta, ad set) in it. A pause
    only lowers spend, so it goes ahead during the freeze and the taper, and even on a
    stale row. In weeks 1-2 it needs approval like any change. The agent never turns a
-   campaign back on: a person does.
+   campaign or ad set back on: a person does. Act refuses any change that would.
 3. **Capacity before a raise.** No raise goes into a territory whose capacity row is
    missing, older than `capacity_max_age_hours`, or past `capacity_pause_date`. A missing
    or stale row, or a sheet the run cannot read, also posts one Slack alert a day for both
@@ -189,6 +189,13 @@ capacity sheet ("Operations Health 2025-2026").
      breaks the Housing rules, when it would leave no location, or when a listed key is
      not in the targeting (out of step). Act checks again before the write, so a territory
      with room again keeps its locations. The agent never adds a location back.
+   - **Every territory full (BC-28580).** If every listed territory has a current row and
+     a next open install date after `capacity_pause_date`, removing them all would leave
+     the ad set no location. So the plan pauses the instant-form ad set instead, like any
+     capacity pause (rule 2), and proposes no removal. A missing or stale row never counts
+     toward this: the plan proposes the removal above instead, held if it would leave no
+     location. Act refuses an approved removal once every territory is full. The agent
+     never turns the ad set back on: a person does, in Ads Manager.
    - **Otherwise** a raise into `multi` follows every other limit, as before.
    - **No key.** With `multi_territories` missing, `null` or `{}`, no raise goes into
      `multi`, and the notes say why. No alert is sent for it.
@@ -215,7 +222,7 @@ Act mode re-checks every limit just before each write, whatever the plan said. I
 8. breaks a season rule: a move past a launch budget without the step-up gate, a raise
    into a territory whose capacity is full or not current, or a move between territories
    after `territory_freeze_date`. It writes a campaign's or ad set's status only to pause
-   it for capacity.
+   it for capacity, and never turns one back on.
 
 It also refuses a raise that is not half of a planned move, a shared budget, a setting
 already changed today, and a setting whose current value is not the planned old value.
@@ -325,6 +332,9 @@ Run these steps for one platform at a time. `<platform>` is `google_ads` or `met
    name the territory and each location to the Head of GTM. Once it is applied, ask a
    person to take that territory off `multi_territories`. Until then, each day's plan
    holds an out-of-step row and no raise goes into `multi`.
+
+   If the plan pauses the instant-form ad set because every territory it covers is full,
+   tell the Head of GTM. Turning it back on is a person's call, in Ads Manager.
 
 3. Show the Head of GTM each change: campaign, ad set or ad, old → new, reason, checks and
    key. Name any `held` change and the check it failed. Read out the `notes`.
