@@ -4,7 +4,8 @@ spec BC-28205, workstream 4).
 The same seam as test_ads_agent_run.py: fixture snapshots, settings, capacity sheet rows,
 booked appointments and rules in; the plan and the fakes' recorded calls out. Each rule
 test names the brief item it covers in its docstring: 4a step-up gate, 4b capacity pause,
-4c stale capacity row, 4d taper, 4e territory freeze, 4f 'multi' and capacity (BC-28579).
+4c stale capacity row, 4d taper, 4e territory freeze, 4f 'multi' and capacity (BC-28579),
+4g every territory 'multi' covers is full (BC-28580).
 The real capacity sheet reader is checked against a fake Sheets API at the end; nothing
 here calls Google or Snowflake.
 
@@ -15,6 +16,7 @@ ids, budgets, ceilings, results, sheet ids, location keys or step-up cost, ever.
 from __future__ import annotations
 
 import copy
+import json
 import sys
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -713,14 +715,13 @@ def test_after_the_removal_the_plan_is_out_of_step_until_a_person_updates_multi_
     (FORM_TARGETING, dict(COVERS, **{"territory-c": ["930001", "930002", "939999"]}), "location_removal",
      "out of step: multi_territories lists location keys the targeting does not have (939999 for territory-c); a "
      "person brings multi_territories in step with the targeting"),
-    ({GEO: {"cities": [_city("930001"), _city("930002")]}}, {"territory-c": COVERS["territory-c"]},
-     "location_removal", "removing territory-c would leave the ad set no location"),
-], ids=["not-housing-safe", "out-of-step", "no-location-left"])
+], ids=["not-housing-safe", "out-of-step"])
 def test_a_removal_is_held_unless_it_is_housing_safe_in_step_and_leaves_a_location(targeting, covers, failed,
                                                                                    detail):
     """4f rule 3. The removal is held when the targeting it would leave breaks the Housing
-    rules, when multi_territories lists a key the targeting does not have, or when it would
-    leave no location at all. Act never writes a held change."""
+    rules, or when multi_territories lists a key the targeting does not have. Act never
+    writes a held change. A removal that would leave no location is held too: 4g's stale-row
+    case shows it, since a current full row for every listed territory pauses instead."""
     f = _form_fakes(sheet=_sheet(c=C_FULL), targeting=targeting)
     rules = dict(FORM_RULES, multi_territories=covers)
 
@@ -790,6 +791,158 @@ def test_multi_territories_has_a_meaning_and_may_be_left_out():
     without it."""
     assert set(MULTI_RULES) == {"multi_territories"} and all(MULTI_RULES.values())
     assert not set(MULTI_RULES) & set(RULES)
+
+
+# --- 4g: every territory 'multi' covers is full (BC-28580) -----------------------------------
+
+
+def _all_full(now=NOW, **edits):
+    """The capacity sheet with every territory full, each row current. `edits` as in _sheet."""
+    return _sheet(now, **{**dict.fromkeys("abc", C_FULL), **edits})
+
+
+ALL_FULL_WHY = ("every territory multi covers is full (territory-a's next open install date 2026-12-14 is after "
+                "2026-12-10; territory-b's next open install date 2026-12-14 is after 2026-12-10; territory-c's next "
+                "open install date 2026-12-14 is after 2026-12-10), so the ad set pauses rather than lose every "
+                "location")
+
+
+def _kept(geo):
+    """The keys of the cities a planned locations change keeps."""
+    return [c["key"] for c in json.loads(geo["new"]).get("cities", [])]
+
+
+def test_when_every_territory_multi_covers_is_full_the_instant_form_ad_set_pauses_once():
+    """4g. Each territory multi_territories lists has a current row past the pause date, so
+    removing each one's cities would leave the instant-form ad set no location. The plan
+    pauses it instead: one change, and no location removal. A pause only lowers spend, so
+    act applies it with no approval after weeks 1-2, like any capacity pause. The site ad
+    sets in full territories pause too, and the raise into 'multi' stays held."""
+    f = _form_fakes(sheet=_all_full())
+
+    plan = _run(f, rules=FORM_RULES)
+    out = _run(f, rules=FORM_RULES, mode="act")
+
+    pause = _rows(plan)[("6003", "status")]
+    assert (pause["target_type"], pause["old"], pause["new"], pause["status"]) == (
+        "ad_set", "ENABLED", "PAUSED", "proposed")
+    assert pause["reason"] == ALL_FULL_WHY
+    assert [(k["name"], k["passed"]) for k in pause["checks"]] == [("brand_untouched", True)]
+    assert not [c for c in plan["changes"] if c["field"] == GEO]
+    assert sorted((c["target_id"], c["field"]) for c in plan["changes"] if c["status"] == "proposed") == [
+        ("6001", "status"), ("6002", "status"), ("6003", "status")]
+    assert [c["status"] for c in _form_move(plan)] == ["held", "held"]
+    assert pause["key"] in f.google.applied and out["waiting"] == []
+    assert "6003" not in [s["ad_set_id"] for s in f.google.read_settings([META_ACCOUNT])]
+
+
+@pytest.mark.parametrize("sheet, status, kept, failed", [
+    (_sheet(a=C_FULL, c=C_FULL), "proposed", ["920001"], []),
+    (_sheet(a=C_FULL, b=None, c=C_FULL), "proposed", ["920001"], []),
+    (_all_full(b=dict(C_FULL, hours_old=49)), "held", [], ["location_removal"]),
+], ids=["two-of-three-full", "two-full-and-one-row-missing", "all-full-but-one-row-stale"])
+def test_when_only_some_territories_multi_covers_are_known_full_the_removal_stands(sheet, status, kept, failed):
+    """4g. The pause needs a current row past the pause date for every listed territory.
+    With one territory open, or its row missing or stale, BC-28579 stands: no pause of the
+    instant-form ad set, raises into 'multi' held, and one removal of the full territories'
+    cities. With every territory full but one row stale, that removal would leave no
+    location, so it is held."""
+    f = _form_fakes(sheet=sheet)
+
+    plan = _run(f, rules=FORM_RULES)
+
+    geo = _removal(plan)
+    assert ("6003", "status") not in _rows(plan)
+    assert (geo["status"], _kept(geo), _failed(geo)) == (status, kept, failed)
+    if failed:
+        assert _check(geo, "location_removal")["detail"] == (
+            "removing territory-a and territory-b and territory-c would leave the ad set no location")
+    assert _form_move(plan)[1]["status"] == "held"
+
+
+def test_a_rerun_the_same_day_plans_nothing_new_and_the_paused_ad_set_drops_out_after():
+    """4g. Propose twice, then act twice, on one day: the second propose plans nothing new,
+    the change log holds one pause row and one applied row, and the ad set is written once.
+    The next day it is paused, so no run lists it and nothing is planned for it."""
+    f = _form_fakes(sheet=_all_full())
+
+    first = _run(f, rules=FORM_RULES)
+    again = _run(f, rules=FORM_RULES)
+    _run(f, rules=FORM_RULES, mode="act")
+    _run(f, rules=FORM_RULES, mode="act")
+    f.capacity.rows = _all_full(_at("2026-10-07"))
+    tomorrow = _run(f, rules=FORM_RULES, now=_at("2026-10-07"))
+
+    pause = _rows(first)[("6003", "status")]
+    assert again["changes"] == [] and again["already_logged"] == len(first["changes"])
+    assert [r["status"] for r in f.warehouse.change_log if r["key"].startswith(pause["key"])] == [
+        "proposed", "applied"]
+    assert f.google.applied.count(pause["key"]) == 1
+    assert not [c for c in tomorrow["changes"] if c["target_id"] == "6003"]
+
+
+def test_the_emergency_stop_still_blocks_the_pause():
+    """4g. With the emergency stop on, act plans and logs the pause but writes nothing: the
+    instant-form ad set stays on."""
+    f = _form_fakes(sheet=_all_full())
+
+    out = _run(f, rules=dict(FORM_RULES, emergency_stop=True), mode="act")
+
+    assert _rows(out)[("6003", "status")]["status"] == "proposed"
+    assert out["emergency_stop"] is True and out["results"] == [] and f.google.write_calls == []
+    assert "6003" in [s["ad_set_id"] for s in f.google.read_settings([META_ACCOUNT])]
+
+
+def test_the_data_freeze_still_blocks_the_pause():
+    """4g. Yesterday's lead count row is missing, so the run is frozen: it plans and writes
+    nothing, the pause included, and logs only the frozen row."""
+    f = _form_fakes(sheet=_all_full())
+    f.warehouse.lead_reconciliation = []
+
+    out = _run(f, rules=FORM_RULES, mode="act")
+
+    assert out["frozen"]["status"] == "frozen" and out["changes"] == [] and out["results"] == []
+    assert f.google.write_calls == []
+    assert [r["status"] for r in f.warehouse.change_log] == ["frozen"]
+
+
+def test_the_agent_never_turns_the_paused_instant_form_ad_set_back_on():
+    """4g. The day after the pause, every territory has room again. The agent plans nothing
+    for the paused ad set: turning it back on is a person's call. Even an approved plan row
+    that would turn it back on, which the planner never makes, is refused at write time."""
+    f = _form_fakes(sheet=_all_full())
+    _run(f, rules=FORM_RULES, mode="act")
+    day = "2026-10-07"
+    f.capacity.rows = _sheet(_at(day))
+
+    plan = _run(f, rules=FORM_RULES, now=_at(day))
+    f.warehouse.write_change_log([{
+        "run_date": day, "mode": "propose", "platform": "meta_ads", "status": "proposed",
+        "account_id": META_ACCOUNT, "target_type": "ad_set", "target_id": "6003",
+        "target_name": "Fake instant-form ad set", "field": "status", "old": "PAUSED", "new": "ENABLED",
+        "reason": "seeded by the test", "checks": [], "key": "seed-unpause-6003"}])
+    approve(warehouse=f.warehouse, rules=FORM_RULES, key="seed-unpause-6003", by="Fake Head of GTM", now=_at(day))
+    out = _run(f, rules=FORM_RULES, now=_at(day), mode="act")
+
+    assert not [c for c in plan["changes"] if c["target_id"] == "6003"]
+    assert _reason(out, "seed-unpause-6003") == "the agent never turns a paused ad set back on: a person does"
+    assert "seed-unpause-6003" not in f.google.applied
+    assert "6003" not in [s["ad_set_id"] for s in f.google.read_settings([META_ACCOUNT])]
+
+
+def test_act_refuses_an_approved_removal_once_every_territory_multi_covers_is_full():
+    """4g, at write time. The removal was planned and approved while only territory-c was
+    full. By the time act runs, territory-a and territory-b are full too: act refuses the
+    removal, since the ad set now pauses instead, and the targeting keeps every city."""
+    f = _form_fakes(sheet=_sheet(c=C_FULL))
+    geo = _removal(_run(f, rules=FORM_RULES))
+    approve(warehouse=f.warehouse, rules=FORM_RULES, key=geo["key"], by="Fake Head of GTM", now=NOW)
+    f.capacity.rows = _all_full()
+
+    out = _run(f, rules=FORM_RULES, mode="act")
+
+    assert _reason(out, geo["key"]) == "every territory multi covers is full today, so the ad set is paused instead"
+    assert geo["key"] not in f.google.applied and len(_form_cities(f)) == 5
 
 
 # --- every value is a rule setting -----------------------------------------------------------

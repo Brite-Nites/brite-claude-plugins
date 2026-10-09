@@ -83,6 +83,11 @@ sheet, read through the `capacity` adapter. Each rule in its own function below:
   that territory's locations (`_propose_location_removals`). It always waits for approval,
   and is held unless it removes exactly those locations and stays Housing-safe
   (`_location_removal`).
+- Every territory 'multi' covers full (BC-28580). When each listed territory has a current
+  row past capacity_pause_date (`_all_covered_full`), the instant-form ad set is paused
+  instead, like any capacity pause, and no location is removed. A missing or stale row
+  never counts toward it.
+The agent never turns a paused campaign or ad set back on: a person does.
 The gate, the capacity check and the freeze hold both halves of a move together, and act
 checks them again just before each write.
 """
@@ -592,6 +597,8 @@ def _decide(c, *, plan, approved, applied, done, acct):
     change = c["key"].removesuffix(PAIR)  # a move's raise belongs to its cut's change
     if (c["target_type"], c["field"]) not in PLATFORMS[acct["platform"]]["writable"]:
         return "refuse", f"{c['target_type']} {c['field']} is not an ad setting the agent may write"
+    if (c["target_type"], c["field"], c["old"], c["new"]) == (acct["level"], STATUS, "PAUSED", "ENABLED"):
+        return "refuse", f"the agent never turns a paused {LEVELS[acct['level']]['noun']} back on: a person does"
     unit = _unit_of(c, acct)
     if unit and unit["brand"]:
         return "refuse", "brand campaign: the agent never touches brand keywords"
@@ -837,7 +844,7 @@ def _location_removal(c, ctx):
     of those locations must be in the targeting it was planned on: a listed key the
     targeting lacks means multi_territories is out of step with it. Some location must be
     left. Act checks it again before the write, so a territory with room again keeps its
-    locations."""
+    locations, and once every territory is full the ad set is paused instead (BC-28580)."""
     if c["field"] != GEO:
         return None
     old, new = _geo_of(c["old"]), _geo_of(c["new"])
@@ -846,6 +853,8 @@ def _location_removal(c, ctx):
     full = _full_covered(ctx)
     if not full:
         return False, "no territory multi_territories lists is full today, so no location is removed"
+    if _all_covered_full(ctx):
+        return False, "every territory multi covers is full today, so the ad set is paused instead"
     names = " and ".join(t for t, _, _ in full)
     have = _location_keys(old)
     missing = [(t, [k for k in keys if k not in have]) for t, keys, _ in full]
@@ -1338,8 +1347,9 @@ def _propose_capacity_pauses(acct):
     """Pause every budget holder (a Google campaign, a Meta ad set) in a territory whose next
     open install date is after capacity_pause_date: a job booked there now could not be
     installed in time. It only lowers spend, so a stale row still pauses. Brand campaigns
-    are never touched, and the agent never turns a paused holder back on. Returns
-    (changes, reason there are none)."""
+    are never touched, and the agent never turns a paused holder back on (`_decide`). On
+    Meta the instant-form ad set, whose territory is 'multi', pauses once every territory it
+    covers is full (BC-28580). Returns (changes, reason there are none)."""
     names, changes = LEVELS[acct["level"]], []
     pause = _rule_date(acct["rules"], "capacity_pause_date")
     for s in acct["settings"]:
@@ -1347,13 +1357,24 @@ def _propose_capacity_pauses(acct):
         row = t and _capacity_row(t, acct)
         if not row or s["brand"] or row["next_open_install_date"] <= pause:
             continue
-        changes.append({
-            "status": "proposed", "account_id": s["account_id"], "target_type": acct["level"],
-            "target_id": s[names["id"]], "target_name": s[names["name"]], "field": STATUS,
-            "old": "ENABLED", "new": "PAUSED",
-            "reason": f"{t}'s next open install date {row['next_open_install_date']} is after {pause}",
-        })
+        changes.append(_pause(s, f"{t}'s next open install date {row['next_open_install_date']} is after {pause}",
+                              acct))
+    full = _all_covered_full(acct)
+    if full:
+        paused = {c["target_id"] for c in changes}
+        why = ("every territory multi covers is full ("
+               + "; ".join(f"{t}'s next open install date {open_on} is after {pause}" for t, _, open_on in full)
+               + "), so the ad set pauses rather than lose every location")
+        changes += [_pause(s, why, acct) for s in _form_ad_sets(acct) if s["ad_set_id"] not in paused]
     return changes, None if changes else "no territory's next open install date is after capacity_pause_date"
+
+
+def _pause(s, reason, acct):
+    """A proposed pause of budget holder `s` (a settings row) for capacity."""
+    names = LEVELS[acct["level"]]
+    return {"status": "proposed", "account_id": s["account_id"], "target_type": acct["level"],
+            "target_id": s[names["id"]], "target_name": s[names["name"]], "field": STATUS,
+            "old": "ENABLED", "new": "PAUSED", "reason": reason}
 
 
 def _propose_taper(acct, paused):
@@ -1454,25 +1475,42 @@ def _full_covered(ctx):
     return out
 
 
+def _all_covered_full(ctx):
+    """`_full_covered`, when it holds every territory multi_territories lists and each of
+    their rows is current (BC-28580); else []. Pausing the whole instant-form ad set waits
+    for a current row from each territory it covers: a missing or stale row never counts."""
+    covers = _multi(ctx["rules"])
+    if not covers or any(_capacity_stale(t, ctx) for t in covers):
+        return []
+    full = _full_covered(ctx)
+    return full if len(full) == len(covers) else []
+
+
+def _form_ad_sets(acct):
+    """The settings rows of the instant-form ad sets in 'multi' (Meta only), brand left out."""
+    if acct["platform"] != "meta_ads":
+        return []
+    return [s for s in acct["settings"] if _norm(acct["territory"].get((s["account_id"], s["ad_set_id"]))) == MULTI
+            and _path(s) == "instant_form" and not s["brand"]]
+
+
 def _propose_location_removals(acct):
     """Meta only (BC-28579 rule 3). When a territory multi_territories lists is full, one
     change per instant-form ad set in 'multi': its locations without the full territories'.
     Leads from a full territory would go to the BriteBase waitlist, so the ad stops reaching
     it (Holden, 2026-10-06). The change always waits for approval (`_decide`), and is held
     unless it removes exactly those locations and leaves the targeting Housing-safe
-    (`_location_removal`, `_housing_safe`). The agent never adds a location back."""
+    (`_location_removal`, `_housing_safe`). The agent never adds a location back. When every
+    listed territory is full, the ad set is paused instead and nothing is removed (BC-28580)."""
     full = _full_covered(acct)
-    if not full:
+    if not full or _all_covered_full(acct):
         return []
     drop = {k for _, keys, _ in full for k in keys}
     pause = acct["rules"]["capacity_pause_date"]
     why = " and ".join(f"{t} is full (next open install date {open_on}, after {pause})" for t, _, open_on in full)
     why += f", so the ad set stops targeting {'it' if len(full) == 1 else 'them'}"
     changes = []
-    for s in acct["settings"]:
-        if (_norm(acct["territory"].get((s["account_id"], s["ad_set_id"]))) != MULTI or _path(s) != "instant_form"
-                or s["brand"]):
-            continue
+    for s in _form_ad_sets(acct):
         geo = (s.get("targeting") or {}).get(GEO) or {}
         changes.append({
             "status": "proposed", "account_id": s["account_id"], "target_type": "ad_set",
