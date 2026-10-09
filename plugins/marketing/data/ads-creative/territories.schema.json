@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "brite-claude-plugins/marketing/ads-creative/territories.schema.json",
+  "title": "Ads creative territory table (BC-28299)",
+  "description": "The territory table the ads creative pipeline reads. The real file lives in the private runner config; its path is the runner config key `territories_path`. This repo is public, so it holds only this schema and territories.example.json, whose numbers are fictional 555-010-xxxx numbers. scripts/ads_agent/creative.py load_territories enforces the same shape.",
+  "type": "object",
+  "required": ["sites"],
+  "additionalProperties": false,
+  "properties": {
+    "sites": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/site" }
+    }
+  },
+  "$defs": {
+    "site": {
+      "type": "object",
+      "required": ["site", "territory", "cities", "phones", "logo"],
+      "additionalProperties": false,
+      "properties": {
+        "site": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Key for one Brite site. Tracking numbers are per site. Unique in the file."
+        },
+        "territory": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Canonical territory name (brite-data-platform seeds/ref_territories.csv). Written to the creative-inputs row."
+        },
+        "cities": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "City names an ad headline may name for this site. The first is the default."
+        },
+        "phones": {
+          "type": "object",
+          "required": ["google_ads", "meta_ads"],
+          "additionalProperties": false,
+          "properties": {
+            "google_ads": { "$ref": "#/$defs/phone" },
+            "meta_ads": { "$ref": "#/$defs/phone" }
+          },
+          "description": "The site's call-tracking number on each ad platform."
+        },
+        "logo": {
+          "type": "object",
+          "required": ["id", "url"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "pattern": "^https://" }
+          },
+          "description": "The logo file the template places, and the id the brand check matches."
+        }
+      }
+    },
+    "phone": {
+      "type": "string",
+      "pattern": "^\\(\\d{3}\\) \\d{3}-\\d{4}$",
+      "description": "A US number written as it appears in the ad: (NNN) NNN-NNNN."
+    }
+  }
+}

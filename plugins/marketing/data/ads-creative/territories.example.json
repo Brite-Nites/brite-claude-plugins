@@ -1,0 +1,18 @@
+{
+  "sites": [
+    {
+      "site": "example-north",
+      "territory": "Exampleland",
+      "cities": ["Testville", "Sampleton"],
+      "phones": { "google_ads": "(555) 010-0001", "meta_ads": "(555) 010-0002" },
+      "logo": { "id": "logo-example-lockup", "url": "https://example.invalid/logos/logo-example-lockup.png" }
+    },
+    {
+      "site": "example-south",
+      "territory": "Exampleland",
+      "cities": ["Placeholder Springs"],
+      "phones": { "google_ads": "(555) 010-0003", "meta_ads": "(555) 010-0004" },
+      "logo": { "id": "logo-example-lockup", "url": "https://example.invalid/logos/logo-example-lockup.png" }
+    }
+  ]
+}
