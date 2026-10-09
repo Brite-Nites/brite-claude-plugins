@@ -68,8 +68,10 @@ RULES = {"weekly_ceiling": 2000, "max_move_pct": 0.25, "min_conversions": 3,
 AUTONOMOUS = dict(RULES, weeks_1_2=False)  # from about week 3
 
 TERRITORIES = ("territory-a", "territory-b", "territory-c")
-# $280 per booked appointment in both full weeks before TODAY, on both platforms.
-BOOKED = [{"platform": p, "territory": t, "week_start": week, "spend": 840.0, "booked_appointments": 3}
+# $280 per booked appointment in both full weeks before TODAY, on both platforms, in each
+# of the territory weekly mart's four counts.
+COUNTS = ("booked_paid_new", "booked_paid_any_client", "booked_all_new", "booked_all_any_client")
+BOOKED = [{"platform": p, "territory": t, "week_start": week, "spend": 840.0, **dict.fromkeys(COUNTS, 3)}
           for p in ("google_ads", "meta_ads") for t in TERRITORIES for week in ("2026-09-21", "2026-09-28")]
 # Each territory's next open install date is well before the pause date, updated 2 hours ago.
 OPEN = [{"territory": t, "next_open_install_date": date(2026, 11, 20), "updated_at": NOW - timedelta(hours=2)}

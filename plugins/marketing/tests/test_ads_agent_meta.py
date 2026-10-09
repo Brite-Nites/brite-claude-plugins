@@ -50,7 +50,8 @@ AUTONOMOUS = dict(RULES, weeks_1_2=False)  # from about week 3
 
 # Each ad set's territory, as the ad results snapshot names it.
 TERRITORY = {"6001": "territory-a", "6002": "territory-b", "6003": "territory-c"}
-BOOKED = [{"platform": p, "territory": t, "week_start": week, "spend": 840.0, "booked_appointments": 3}
+COUNTS = ("booked_paid_new", "booked_paid_any_client", "booked_all_new", "booked_all_any_client")
+BOOKED = [{"platform": p, "territory": t, "week_start": week, "spend": 840.0, **dict.fromkeys(COUNTS, 3)}
           for p in ("google_ads", "meta_ads") for t in TERRITORY.values() for week in ("2026-09-21", "2026-09-28")]
 OPEN = [{"territory": t, "next_open_install_date": date(2026, 11, 20), "updated_at": NOW - timedelta(hours=2)}
         for t in TERRITORY.values()]
@@ -87,8 +88,8 @@ def _ad(ad_set_id, ad_id, status="ENABLED", created="2026-09-01T09:00:00-06:00")
 
 
 def _result(ad_set_id, ad_id, spend, leads, booked=None):
-    """One ad snapshot row. booked_appointments is there only when a test gives it: the
-    mart has no such column yet."""
+    """One ad snapshot row. booked_appointments is there only when a test gives it; a row
+    without it reads as the mart's null."""
     row = {"platform": "meta_ads", "account_id": ACCOUNT, "campaign_id": "5001", "ad_group_id": ad_set_id,
            "ad_id": ad_id, "territory": TERRITORY.get(ad_set_id, "territory-a"), "spend": spend, "conversions": leads}
     if booked is not None:
@@ -441,14 +442,52 @@ def test_the_path_test_moves_budget_toward_the_lower_cost_per_booked_appointment
     assert all(c["status"] == "proposed" for c in out["changes"] if c["field"] == BUDGET)
 
 
-def test_the_path_test_without_booked_appointments_proposes_no_budget_move_and_says_why():
-    """4c. The snapshot has no booked_appointments column yet (a warehouse follow-up). The
-    path test proposes nothing, no other budget move takes its place, and the run says why."""
-    out = _run(*_fakes(), rules=dict(RULES, meta_path_test_start=START))
+@pytest.mark.parametrize("site, instant_form, why", [
+    ((None, None), None, "the ad results snapshot has no booked_appointments for Fake ad set 6001, so the path test "
+                         "cannot compare cost per booked appointment"),
+    ((2, 1), 0, "the path test needs booked appointments on both paths; none yet on instant_form"),
+    ((0, 0), 6, "the path test needs booked appointments on both paths; none yet on site"),
+    ((0, 0), 0, "the path test needs booked appointments on both paths; none yet on site, instant_form"),
+    ((2, 1), 6, None),
+], ids=["null", "site-only", "instant-form-only", "neither", "both"])
+def test_the_path_test_proposes_a_move_once_both_paths_have_bookings_and_nothing_before(site, instant_form, why):
+    """4c, on the ad snapshot's booked_appointments (BC-28577). Until both paths have a
+    booked appointment the path test proposes nothing, no other budget move takes its
+    place, and the run says why. A null count is unknown, not zero. With site's 3 bookings
+    and none on the instant form, the old rule would have cut the instant form; now it
+    waits. Once both paths have bookings, the move goes toward the cheaper path."""
+    results = [_result("6001", "7001", 500.0, 10, booked=site[0]), _result("6002", "7002", 800.0, 4, booked=site[1]),
+               _result("6003", "7003", 300.0, 3, booked=instant_form)]
 
-    assert [c["status"] for c in out["changes"]] == ["no_change"]
-    assert "the ad results snapshot has no booked_appointments column" in out["changes"][0]["reason"]
-    assert any("path test cannot compare cost per booked appointment" in n for n in out["notes"])
+    out = _run(*_fakes(results=results), rules=dict(RULES, meta_path_test_start=START))
+
+    if why is None:
+        assert _moves(out) == {"6002": (80_000_000, 65_000_000), "6003": (60_000_000, 75_000_000)}
+    else:
+        assert _moves(out) == {} and why in out["notes"]
+
+
+def test_multi_is_one_more_territory_so_the_instant_form_has_its_own_gate():
+    """The step-up gate (BC-28220, BC-28577) on the instant-form ad set, which serves several
+    territories: the snapshot names its territory 'multi', and so does the territory weekly
+    mart. The path test raises 6003 from its $60 launch budget to $75, so the gate decides.
+    It is met on 'multi''s own two weeks at $280, and unmet with no 'multi' rows, though
+    every named territory meets its own gate."""
+    results = [_result("6001", "7001", 500.0, 10, booked=2), _result("6002", "7002", 800.0, 4, booked=1),
+               dict(_result("6003", "7003", 300.0, 3, booked=6), territory="multi")]
+    multi = [dict(r, territory="multi") for r in BOOKED if r["territory"] == "territory-c"]
+
+    gates = []
+    for bookings in (BOOKED + multi, BOOKED):
+        warehouse = FakeWarehouse([], results, AGREED, bookings=bookings)
+        out = _run(warehouse, FakeMetaAds(AD_SETS, ADS, spend=FULL), FakeSlack(), rules=dict(RULES, meta_path_test_start=START))
+        up = next(c for c in out["changes"] if (c["target_id"], c["field"]) == ("6003", BUDGET))
+        gates.append(next(k for k in up["checks"] if k["name"] == "step_up_gate"))
+
+    assert [g["passed"] for g in gates] == [True, False]
+    assert gates[0]["detail"].startswith(
+        "multi would go to $75.00 a day, over its $60.00 launch budget; the step-up gate is met")
+    assert gates[1]["detail"].endswith("the step-up gate is unmet: no booked-appointment data for multi the week of 2026-09-28")
 
 
 def test_budget_moves_stay_inside_one_path_while_the_path_test_runs():
@@ -767,19 +806,24 @@ def _real_warehouse(monkeypatch, replies):
     return warehouse, sent
 
 
-def test_real_warehouse_reads_booked_appointments_only_when_the_column_exists(monkeypatch):
+def test_real_warehouse_reads_the_ad_snapshots_booked_appointments(monkeypatch):
+    """The ad snapshot read names booked_appointments (BC-28577), so a mart without the
+    column stops the run instead of reading as no bookings. The connector's Decimal becomes
+    a float, and a null stays None: unknown, not zero."""
     base = {"platform": "meta_ads", "account_id": ACCOUNT, "campaign_id": "5001", "ad_group_id": 6001,
-            "ad_id": 7001, "territory": "territory-a", "spend": Decimal("12.5"), "conversions": Decimal(2),
-            "window_start_date": "2026-09-22"}
-    warehouse, sent = _real_warehouse(monkeypatch, [[base], [dict(base, booked_appointments=Decimal(1))]])
+            "ad_id": 7001, "territory": "territory-a", "spend": Decimal("12.5"), "conversions": Decimal(2)}
+    warehouse, sent = _real_warehouse(monkeypatch, [[dict(base, booked_appointments=Decimal(1)),
+                                                     dict(base, ad_id=7002, booked_appointments=None)]])
 
-    before, after = warehouse.read_ad_snapshot(), warehouse.read_ad_snapshot()
+    rows = warehouse.read_ad_snapshot()
 
     expected = {"platform": "meta_ads", "account_id": ACCOUNT, "campaign_id": "5001", "ad_group_id": "6001",
                 "ad_id": "7001", "territory": "territory-a", "spend": 12.5, "conversions": 2.0}
-    assert before == [expected]
-    assert after == [dict(expected, booked_appointments=1.0)]
-    assert all("MART_ADS_AGENT_AD_RESULTS_SNAPSHOT" in sql for sql, _ in sent)
+    assert rows == [dict(expected, booked_appointments=1.0), dict(expected, ad_id="7002", booked_appointments=None)]
+    [(sql, params)] = sent
+    assert sql == ("select platform, account_id, campaign_id, ad_group_id, ad_id, territory, spend, conversions, "
+                   "booked_appointments from ANALYTICS.MARTS.MART_ADS_AGENT_AD_RESULTS_SNAPSHOT")
+    assert params is None
 
 
 def test_real_warehouse_reads_one_platforms_creative_inputs(monkeypatch):

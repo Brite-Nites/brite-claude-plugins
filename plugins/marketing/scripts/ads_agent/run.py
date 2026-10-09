@@ -42,8 +42,9 @@ own rules, each in its own function below:
 - Housing: the agent never writes targeting, and holds a flag row for any ad set whose
   targeting breaks Meta's Housing rules (`_housing_breaks`).
 - Two paths: each ad set is a market-site ad set or an instant-form ad set (`_path`).
-- The 50/50 path test: two weeks after `meta_path_test_start`, the day's budget move goes
-  toward the path with the lower cost per booked appointment (`_propose_path_move`).
+- The 50/50 path test: two weeks after `meta_path_test_start`, once both paths have booked
+  appointments, the day's budget move goes toward the path with the lower cost per booked
+  appointment (`_propose_path_move`).
 - The switch to optimising for booked appointments always waits for approval.
 - An ad turns on only from the approved shared library (`_approved_creative`).
 - An ad with near-zero spend after `retire_after_days` is retired (`_propose_ad_retires`).
@@ -57,7 +58,10 @@ sheet, read through the `capacity` adapter. Each rule in its own function below:
   budget, its budget on season_start, only after step_up_weeks full weeks at or under
   step_up_cost_per_booked per booked appointment. Inside the launch budget, money moves as
   before. The launch budget is today's budget less every budget change the agent applied
-  since season_start. With no booked-appointment data the gate is unmet.
+  since season_start. Booked appointments come from the territory weekly mart, in the
+  column that gate_clients and gate_channels choose (`_gate_column`, BC-28577). A territory
+  with none of those bookings, or no data, has not met the gate. 'multi', the territory of
+  an ad set that serves several, is one more territory with its own gate.
 - The capacity pause (`_propose_capacity_pauses`): a territory whose next open install date
   is after capacity_pause_date is paused. It only lowers spend.
 - Capacity before a raise (`_capacity_open`): no raise goes into a territory whose capacity
@@ -113,6 +117,16 @@ SEASON_RULES = {
     "capacity_max_age_hours": "a capacity sheet row older than this blocks raises into its territory and alerts (48)",
 }
 SEASON_DATES = ("season_start", "capacity_pause_date", "taper_start", "territory_freeze_date")
+# Which booked appointments the step-up gate counts (BC-28577), on both platforms. Either may
+# be left out of the rules file: its first choice in GATE_CHOICES is its default.
+GATE_RULES = {
+    "gate_clients": '"new" (default): the gate counts booked appointments of new clients only; "any": of any client',
+    "gate_channels": '"paid" (default): the gate counts bookings credited to this platform\'s paid ads; "all": any channel',
+}
+GATE_CHOICES = {"gate_clients": ("new", "any"), "gate_channels": ("paid", "all")}
+# (gate_clients, gate_channels): the territory weekly mart's column the gate divides spend by.
+GATE_COLUMNS = {("new", "paid"): "booked_paid_new", ("any", "paid"): "booked_paid_any_client",
+                ("new", "all"): "booked_all_new", ("any", "all"): "booked_all_any_client"}
 FLAGS = ("weeks_1_2", "emergency_stop")  # must be JSON true or false, so a typo fails loudly
 
 MODES = ("propose", "act")
@@ -292,7 +306,8 @@ def summary(changes, results=(), *, mode="propose", stopped=False, waiting=0):
 def _check_rules(rules, platform=None):
     """Every rule the run needs is set, and well-formed. `platform` adds that platform's own
     rules; approve passes none, since its plan rows were checked when they were planned.
-    taper_daily_pct alone may be missing or null: `_check_taper` needs it from taper_start."""
+    taper_daily_pct alone may be missing or null: `_check_taper` needs it from taper_start.
+    The gate rules may be missing, for their defaults, but not null."""
     need = [*RULES, *(k for k in SEASON_RULES if k != "taper_daily_pct"),
             *(META_RULES if platform == "meta_ads" else ())]
     missing = [k for k in need if k not in rules]
@@ -319,6 +334,10 @@ def _check_rules(rules, platform=None):
     if bad:
         raise ValueError(f"rule settings out of range: {', '.join(bad)} (weeks a whole number, "
                          "the taper a fraction between 0 and 1, the rest above zero)")
+    bad = [k for k, choices in GATE_CHOICES.items() if rules.get(k, choices[0]) not in choices]
+    if bad:
+        raise ValueError(f"rule settings out of range: {', '.join(bad)} (gate_clients is \"new\" or \"any\", "
+                         "gate_channels is \"paid\" or \"all\")")
     if platform == "meta_ads" and rules["meta_path_test_start"] is not None:
         start = rules["meta_path_test_start"]
         try:
@@ -877,8 +896,7 @@ def _creative(warehouse, platform):
 
 def _ad_set_results(ad_results):
     """Meta results per ad set, summed from the ad snapshot (ad_group_id is the ad set).
-    booked_appointments is None when any of the ad set's rows lacks it: the snapshot has no
-    such column yet, or no value."""
+    booked_appointments is None when any of the ad set's rows has none: a null in the mart."""
     out = {}
     for r in ad_results:
         t = out.setdefault((r["account_id"], r["ad_group_id"]),
@@ -934,9 +952,10 @@ def _propose_path_move(results, acct):
     """The 50/50 path test's verdict (BC-28218 4c): one linked move from the path with the
     higher cost per booked appointment to the lower. The cut comes from the losing path's ad
     set with the highest cost per booked appointment; the raise goes to the winning path's
-    ad set with the lowest. Booked appointments come from the snapshot's booked_appointments
-    column; with no such column the test proposes nothing. Returns (changes, reason there
-    are none)."""
+    ad set with the lowest. Booked appointments come from the ad snapshot's
+    booked_appointments column (BC-28577). The test proposes nothing until both paths have
+    booked appointments, nor while any ad set's count is null. Returns (changes, reason
+    there are none)."""
     rules = acct["rules"]
     per = {p: {"spend": 0.0, "booked": 0.0, "sets": []} for p in PATHS}
     for s in acct["settings"]:
@@ -944,8 +963,8 @@ def _propose_path_move(results, acct):
         if p is None or r is None:
             continue
         if r["booked_appointments"] is None:
-            return [], ("the ad results snapshot has no booked_appointments column, so the path test "
-                        "cannot compare cost per booked appointment")
+            return [], (f"the ad results snapshot has no booked_appointments for {s['ad_set_name']}, so the "
+                        "path test cannot compare cost per booked appointment")
         per[p]["spend"] += r["spend"]
         per[p]["booked"] += r["booked_appointments"]
         if not s["budget_shared"] and not s["brand"]:
@@ -953,6 +972,9 @@ def _propose_path_move(results, acct):
     missing = [p for p in PATHS if not per[p]["spend"]]
     if missing:
         return [], f"the path test needs spend on both paths; none on {', '.join(missing)}"
+    unbooked = [p for p in PATHS if not per[p]["booked"]]
+    if unbooked:
+        return [], f"the path test needs booked appointments on both paths; none yet on {', '.join(unbooked)}"
     cost = {p: _per_booked(per[p]["spend"], per[p]["booked"]) for p in PATHS}
     win, lose = sorted(PATHS, key=cost.get)
     if per[win]["booked"] < rules["min_conversions"]:
@@ -962,8 +984,7 @@ def _propose_path_move(results, acct):
         return [], f"both paths cost ${cost[win]:,.2f} per booked appointment"
     if not per[win]["sets"] or not per[lose]["sets"]:
         return [], "a path has no ad set whose own budget can move"
-    lose_cost = "no booked appointments" if cost[lose] == float("inf") else f"${cost[lose]:,.2f}"
-    why = f"path test: {win} ${cost[win]:,.2f} per booked appointment against {lose_cost} for {lose}"
+    why = f"path test: {win} ${cost[win]:,.2f} per booked appointment against ${cost[lose]:,.2f} for {lose}"
     frm = max(per[lose]["sets"], key=lambda x: x[0])[1]
     to = min(per[win]["sets"], key=lambda x: x[0])[1]
     return _move(frm, to, f"{why}; the {lose} ad set with the highest cost per booked appointment",
@@ -1163,21 +1184,29 @@ def _gate_weeks(acct):
     return [(monday - timedelta(weeks=k)).isoformat() for k in range(1, acct["rules"]["step_up_weeks"] + 1)]
 
 
+def _gate_column(rules):
+    """The territory weekly mart's booked-appointment column the step-up gate counts, as
+    gate_clients and gate_channels choose (BC-28577)."""
+    return GATE_COLUMNS[tuple(rules.get(k, choices[0]) for k, choices in GATE_CHOICES.items())]
+
+
 def _gate(t, ctx):
     """(met, why): territory t's cost per booked appointment, calls counted, was at or under
-    step_up_cost_per_booked in each of the last step_up_weeks full weeks. A week with no
-    row, or with spend and no booking, fails the gate."""
-    limit = ctx["rules"]["step_up_cost_per_booked"]
+    step_up_cost_per_booked in each of the last step_up_weeks full weeks. The bookings are
+    the column `_gate_column` picks. A week with no row, a null spend or count, or none of
+    the chosen bookings fails the gate. 'multi' is matched like any territory, so an ad set
+    that serves several territories is judged on its own 'multi' rows."""
+    limit, column = ctx["rules"]["step_up_cost_per_booked"], _gate_column(ctx["rules"])
     costs = []
     for week in _gate_weeks(ctx):
         row = ctx["bookings"].get((_norm(t), week))
-        if row is None:
+        if row is None or row.get("spend") is None or row.get(column) is None:
             return False, f"the step-up gate is unmet: no booked-appointment data for {t} the week of {week}"
-        costs.append((week, _per_booked(row["spend"], row["booked_appointments"])))
+        costs.append((week, _per_booked(row["spend"], row[column])))
     met = all(cost <= limit for _, cost in costs)
     shown = [("none booked" if cost == float("inf") else f"${cost:,.2f}") + f" the week of {week}"
              for week, cost in costs]
-    return met, (f"the step-up gate is {'met' if met else 'unmet'}: cost per booked appointment "
+    return met, (f"the step-up gate is {'met' if met else 'unmet'}: cost per booked appointment ({column}) "
                  f"{', '.join(shown)}, against ${limit:,.2f}")
 
 

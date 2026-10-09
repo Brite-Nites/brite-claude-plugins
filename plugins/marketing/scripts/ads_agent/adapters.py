@@ -46,6 +46,11 @@ def _http(method, url, headers, body=None):
         return json.load(resp)
 
 
+def _float_or_none(value):
+    """A warehouse number (often a Decimal) as a float; a null stays None."""
+    return None if value is None else float(value)
+
+
 def _digits(value, what):
     """An id that goes into an API path: digits only, so a bad id cannot reach another path."""
     text = str(value)
@@ -391,9 +396,10 @@ class MetaAds:
 
 
 class SnowflakeWarehouse:
-    """Reads the results snapshots, the lead reconciliation, the creative inputs and the
-    change log; writes the change log (MERGE on key). Approval, apply-result and frozen rows
-    use the same columns as plan rows (BC-28216, BC-28219): no ALTER."""
+    """Reads the results snapshots, the lead reconciliation, the territory weekly bookings,
+    the creative inputs and the change log; writes the change log (MERGE on key). Approval,
+    apply-result and frozen rows use the same columns as plan rows (BC-28216, BC-28219): no
+    ALTER."""
 
     ENV = (
         "ADS_AGENT_SNOWFLAKE_ACCOUNT",
@@ -409,14 +415,22 @@ class SnowflakeWarehouse:
     SNAPSHOT = "ANALYTICS.MARTS.MART_ADS_AGENT_RESULTS_SNAPSHOT"
     # The same at ad grain, for the ad kill rule (BC-28216): platform, account_id,
     # campaign_id, ad_group_id, ad_id, territory (the campaign's, for the season rules,
-    # BC-28220), spend, conversions (a conversion is a lead). On Meta, ad_group_id is the
-    # ad set, so Meta's ad set results are these rows summed.
-    # Not built yet either; it needs its own brite-data-platform ticket.
-    # booked_appointments (BC-28218's path test and goal switch) is read when the mart has the
-    # column; it does not yet.
+    # BC-28220), spend, conversions (a conversion is a lead), and booked_appointments, calls
+    # counted (BC-28577), for Meta's path test and goal switch (BC-28218). On Meta,
+    # ad_group_id is the ad set, so Meta's ad set results are these rows summed.
+    # booked_appointments is built by brite-data-platform's BC-28577 spec; the read names it,
+    # so a mart without it stops the run.
     AD_SNAPSHOT = "ANALYTICS.MARTS.MART_ADS_AGENT_AD_RESULTS_SNAPSHOT"
     AD_COLUMNS = ("platform", "account_id", "campaign_id", "ad_group_id", "ad_id", "territory", "spend",
-                  "conversions")
+                  "conversions", "booked_appointments")
+    # One row per platform, territory and week, for the step-up gate (BC-28577): platform,
+    # territory ('multi' for an ad set that serves several), week_start (the Monday of a
+    # Monday-to-Sunday week, local time), spend (dollars) and four counts of booked
+    # appointments, calls counted. In each count's name, paid means credited to that
+    # platform's paid ads and all means any channel; new means new clients only and
+    # any_client means any client. Built by brite-data-platform's BC-28577 spec.
+    TERRITORY_WEEKLY = "ANALYTICS.MARTS.MART_ADS_AGENT_TERRITORY_WEEKLY"
+    BOOKED_COLUMNS = ("booked_paid_new", "booked_paid_any_client", "booked_all_new", "booked_all_any_client")
     # One row per published ad: what went into it, and for an AI-edited photo who approved
     # it (BC-28221; brite-data-platform services/sql/ads_creative_inputs/schema.sql). An ad is
     # in the approved shared library when its row exists (BC-28218).
@@ -471,17 +485,12 @@ class SnowflakeWarehouse:
         return [dict(r, spend=float(r["spend"]), conversions=float(r["conversions"])) for r in rows]
 
     def read_ad_snapshot(self):
-        # select *: a row carries booked_appointments only once the mart has that column.
-        rows = self._query(f"select * from {self.AD_SNAPSHOT}")
-        out = []
-        for r in rows:
-            row = dict({k: r[k] for k in self.AD_COLUMNS}, ad_group_id=str(r["ad_group_id"]), ad_id=str(r["ad_id"]),
-                       spend=float(r["spend"]), conversions=float(r["conversions"]))
-            if "booked_appointments" in r:
-                booked = r["booked_appointments"]
-                row["booked_appointments"] = None if booked is None else float(booked)
-            out.append(row)
-        return out
+        """The ad snapshot's rows. A null booked_appointments stays None: the run reads it as
+        unknown, never as zero."""
+        rows = self._query(f"select {', '.join(self.AD_COLUMNS)} from {self.AD_SNAPSHOT}")
+        return [dict(r, ad_group_id=str(r["ad_group_id"]), ad_id=str(r["ad_id"]), spend=float(r["spend"]),
+                     conversions=float(r["conversions"]), booked_appointments=_float_or_none(r["booked_appointments"]))
+                for r in rows]
 
     def read_creative_inputs(self, platform):
         rows = self._query(
@@ -505,12 +514,17 @@ class SnowflakeWarehouse:
 
     def read_booked_appointments(self, platform, first_week):
         """Booked appointments per territory and week, calls counted, for the step-up gate
-        (BC-28220). No table holds them yet: they belong to the attribution work (BC-28562).
-        Until one exists this reads nothing and returns no rows, so no territory meets the
-        gate. Once it does, return the platform's rows from first_week on: platform,
-        territory, week_start (the week's Monday, YYYY-MM-DD), spend (dollars),
-        booked_appointments."""
-        return []
+        (BC-28220, BC-28577): the platform's rows of TERRITORY_WEEKLY from first_week (a
+        Monday, YYYY-MM-DD) on. week_start comes back as YYYY-MM-DD; spend and each count as
+        a float, or None where the mart holds a null."""
+        rows = self._query(
+            f"select platform, territory, week_start, spend, {', '.join(self.BOOKED_COLUMNS)} "
+            f"from {self.TERRITORY_WEEKLY} where platform = %(p)s and week_start >= %(w)s",
+            {"p": platform, "w": first_week},
+        )
+        return [dict(r, week_start=str(r["week_start"]),
+                     **{k: _float_or_none(r[k]) for k in ("spend", *self.BOOKED_COLUMNS)})
+                for r in rows]
 
     def read_change_log(self, run_date):
         return self._change_log("run_date = %(d)s", run_date)
