@@ -24,7 +24,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from ads_agent.fakes import FakeGoogleAds, FakeSlack, FakeWarehouse  # noqa: E402
+from ads_agent.fakes import FakeGoogleAds, FakeMetaAds, FakeSlack, FakeWarehouse  # noqa: E402
 from ads_agent.run import approve, run  # noqa: E402
 
 NOW = datetime(2026, 10, 6, 14, 0, tzinfo=timezone.utc)
@@ -276,7 +276,7 @@ def test_flag_settings_must_be_true_or_false():
 def test_real_adapters_name_every_missing_env_var(monkeypatch):
     from ads_agent import adapters
 
-    for cls in (adapters.GoogleAds, adapters.SnowflakeWarehouse, adapters.SlackWebhook):
+    for cls in (adapters.GoogleAds, adapters.MetaAds, adapters.SnowflakeWarehouse, adapters.SlackWebhook):
         for name in cls.ENV:
             monkeypatch.delenv(name, raising=False)
         with pytest.raises(adapters.MissingEnv) as err:
@@ -620,25 +620,26 @@ def test_act_never_moves_a_shared_budget():
     assert "shared budget" in _reason(out, "seed-shared-0001")
 
 
-class FakeMetaAds(FakeGoogleAds):
-    platform = "meta_ads"  # test stand-in only; the Meta adapter is BC-28218
-
-
 def test_cross_platform_move_is_refused():
     """j. A Google cut cannot pay for a Meta raise, even one keyed as its pair: a move's
-    halves must sit in one platform's plan, and a run never writes another platform's row."""
+    halves must sit in one platform's plan, and a run never writes another platform's row.
+    (The Meta-side twin is in test_ads_agent_meta.py.)"""
     meta_account = "0000000002"
-    meta = FakeMetaAds([{"account_id": meta_account, "campaign_id": "5001", "campaign_name": "Fake Meta A",
-                         "daily_budget_micros": 100_000_000, "budget_limited": True,
-                         "budget_shared": False, "brand": False}])
+    meta = FakeMetaAds([{"account_id": meta_account, "campaign_id": "5001", "campaign_name": "Fake Meta campaign",
+                         "ad_set_id": "6001", "ad_set_name": "Fake Meta A", "daily_budget_micros": 100_000_000,
+                         "budget_level": "ad_set", "budget_limited": False, "budget_shared": False, "brand": False,
+                         "status": "ENABLED", "optimization_goal": "leads", "destination_type": "WEBSITE",
+                         "targeting": {}}])
+    meta_rules = dict(AUTONOMOUS, meta_path_test_start=None, retire_after_days=7, retire_spend_floor=5,
+                      meta_budget_limited_spend_pct=0.95)
     warehouse, google, slack = _fakes()
     _seed(warehouse, key="seed-xcut-0001", target_type="campaign", target_id="1002",
           field=BUDGET, old=80_000_000, new=60_000_000)
     _seed(warehouse, key="seed-xcut-0001:pair", platform="meta_ads", account_id=meta_account,
-          target_type="campaign", target_id="5001", field=BUDGET, old=100_000_000, new=120_000_000)
+          target_type="ad_set", target_id="6001", field=BUDGET, old=100_000_000, new=120_000_000)
 
     _act(warehouse, google, slack)
-    out = _act(warehouse, meta, slack)
+    out = _act(warehouse, meta, slack, rules=meta_rules)
 
     assert ("apply", "seed-xcut-0001:pair") not in google.write_calls
     assert meta.write_calls == []

@@ -1,7 +1,7 @@
 """Fakes for the ads-agent run seam. Each records every call so tests assert on calls.
 
 Same method names as the real adapters in `adapters.py`. Act mode (BC-28216) asserts on
-`FakeGoogleAds.write_calls`; Meta (BC-28218) adds a fake with the same shape.
+`write_calls`; Meta (BC-28218) has its own fake with the same shape.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import copy
 
 class FakeGoogleAds:
     platform = "google_ads"
+    UNIT = "campaign_id"  # the settings key of the budget holder a write matches
 
     def __init__(self, settings, ads=(), fail_on=()):
         self._settings = copy.deepcopy(settings)
@@ -28,15 +29,16 @@ class FakeGoogleAds:
         return [a for a in copy.deepcopy(self._ads) if a["account_id"] in account_ids]
 
     def apply(self, change):
-        """Write one change, as the real adapter would. A budget or ad status write changes
-        what the next read returns; a campaign create or delete is only recorded."""
+        """Write one change, as the real adapter would. A budget, optimisation goal or ad
+        status write changes what the next read returns; a campaign create or delete is only
+        recorded."""
         self.calls.append(("apply", change["key"]))
         if change["target_id"] in self.fail_on:
             raise RuntimeError(f"fake write failure on {change['target_id']}")
         for s in self._settings:
-            if change["field"] == "daily_budget_micros" and (s["account_id"], s["campaign_id"]) == (
+            if change["target_type"] != "ad" and change["field"] in s and (s["account_id"], s[self.UNIT]) == (
                     change["account_id"], change["target_id"]):
-                s["daily_budget_micros"] = change["new"]
+                s[change["field"]] = change["new"]
         for a in self._ads:
             if change["target_type"] == "ad" and (a["account_id"], f"{a['ad_group_id']}~{a['ad_id']}") == (
                     change["account_id"], change["target_id"]):
@@ -48,12 +50,33 @@ class FakeGoogleAds:
         return [c for c in self.calls if not c[0].startswith("read_")]
 
 
+class FakeMetaAds(FakeGoogleAds):
+    """Meta's shape: one settings row per ad set, keyed by ad_set_id, and an ad's
+    ad_group_id is its ad set. `spend` holds yesterday's spend rows that `read_spend`
+    serves: {"account_id", "level": "ad_set" | "campaign", "id", "spend"}."""
+
+    platform = "meta_ads"
+    UNIT = "ad_set_id"
+
+    def __init__(self, settings, ads=(), fail_on=(), spend=()):
+        super().__init__(settings, ads, fail_on)
+        self.spend = copy.deepcopy(list(spend))
+        self.spend_fails = False  # set True to make the insights read raise
+
+    def read_spend(self, account_ids, day):
+        self.calls.append(("read_spend", tuple(account_ids), day))
+        if self.spend_fails:
+            raise RuntimeError("fake insights failure")
+        return [r for r in copy.deepcopy(self.spend) if r["account_id"] in account_ids]
+
+
 class FakeWarehouse:
-    def __init__(self, snapshot, ad_snapshot=(), lead_reconciliation=()):
+    def __init__(self, snapshot, ad_snapshot=(), lead_reconciliation=(), creative_inputs=()):
         self._snapshot = copy.deepcopy(snapshot)
         self._ad_snapshot = copy.deepcopy(list(ad_snapshot))
         # Public, like change_log, so a test can break the lead feed between runs (BC-28219).
         self.lead_reconciliation = copy.deepcopy(list(lead_reconciliation))
+        self.creative_inputs = copy.deepcopy(list(creative_inputs))
         self.change_log: list[dict] = []
         self.calls: list[tuple] = []
 
@@ -68,6 +91,10 @@ class FakeWarehouse:
     def read_lead_reconciliation(self, lead_date):
         self.calls.append(("read_lead_reconciliation", lead_date))
         return [copy.deepcopy(r) for r in self.lead_reconciliation if r["lead_date"] == lead_date]
+
+    def read_creative_inputs(self, platform):
+        self.calls.append(("read_creative_inputs", platform))
+        return [copy.deepcopy(r) for r in self.creative_inputs if r["platform"] == platform]
 
     def read_change_log(self, run_date):
         self.calls.append(("read_change_log", run_date))
