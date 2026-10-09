@@ -1,5 +1,5 @@
-"""The ads-agent run seam (BC-28215 propose, BC-28216 act, BC-28522 run date; spec BC-28205
-Testing Decisions).
+"""The ads-agent run seam (BC-28215 propose, BC-28216 act, BC-28522 run date, BC-28219 data
+freeze; spec BC-28205 Testing Decisions).
 
 Fixture results snapshot + fixture account settings + rule settings in, change plan
 out, with fakes for Google Ads, the warehouse and Slack. Assertions are on the plan
@@ -13,8 +13,10 @@ ids, budgets, ceilings or results, ever.
 
 from __future__ import annotations
 
+import json
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from types import MappingProxyType
 
@@ -56,8 +58,22 @@ QUIET = [dict(s, budget_limited=False) for s in SETTINGS]  # no budget move to p
 RULES = {"weekly_ceiling": 2000, "max_move_pct": 0.25, "min_conversions": 3,
          "weeks_1_2": True, "emergency_stop": False,
          "target_cpl": 50, "kill_multiple": 3, "compare_multiple": 5,
-         "timezone": "America/Denver"}
+         "timezone": "America/Denver", "max_lead_count_gap": 0.20}
 AUTONOMOUS = dict(RULES, weeks_1_2=False)  # from about week 3
+
+YESTERDAY = "2026-10-05"  # the day before TODAY: the lead counts the data freeze reads
+
+
+def _lead_counts(platform_leads, britebase_leads, gap_pct, spend=500.0, day=YESTERDAY, platform="google_ads"):
+    """One row of the lead reconciliation mart (BC-28219)."""
+    return {"platform": platform, "lead_date": day, "platform_leads": platform_leads,
+            "britebase_leads": britebase_leads, "gap_pct": gap_pct, "platform_spend": spend}
+
+
+# Lead counts that agree, on both platforms, for the day before every run date used here.
+# A run is frozen only when a test says so.
+AGREED = [_lead_counts(20, 20, 0.0, day=day, platform=p)
+          for day in (YESTERDAY, TODAY) for p in ("google_ads", "meta_ads")]
 
 
 def _ad(ad_group_id, ad_id, campaign_id="1003", status="ENABLED"):
@@ -70,8 +86,8 @@ def _ad_result(ad_group_id, ad_id, spend, leads, campaign_id="1003"):
             "ad_group_id": ad_group_id, "ad_id": ad_id, "spend": spend, "conversions": leads}
 
 
-def _fakes(snapshot=SNAPSHOT, settings=SETTINGS, ad_snapshot=(), ads=()):
-    return FakeWarehouse(snapshot, ad_snapshot), FakeGoogleAds(settings, ads), FakeSlack()
+def _fakes(snapshot=SNAPSHOT, settings=SETTINGS, ad_snapshot=(), ads=(), lead_counts=AGREED):
+    return FakeWarehouse(snapshot, ad_snapshot, lead_counts), FakeGoogleAds(settings, ads), FakeSlack()
 
 
 def _run(warehouse, google, slack, rules=RULES, now=NOW, **kw):
@@ -236,12 +252,15 @@ def test_unknown_mode_is_refused_before_any_read():
     assert warehouse.calls == [] and google.calls == []
 
 
-def test_missing_rule_settings_stop_the_run_before_any_read():
+@pytest.mark.parametrize("missing", ["max_move_pct", "max_lead_count_gap"])
+def test_missing_rule_settings_stop_the_run_before_any_read(missing):
     warehouse, google, slack = _fakes()
-    rules = {k: v for k, v in RULES.items() if k != "max_move_pct"}
+    rules = {k: v for k, v in RULES.items() if k != missing}
 
-    with pytest.raises(ValueError, match="max_move_pct"):
+    with pytest.raises(ValueError, match=missing):
         _run(warehouse, google, slack, rules=rules)
+    with pytest.raises(ValueError, match=missing):
+        _approve(warehouse, "f" * 12, rules=rules)
     assert warehouse.calls == [] and google.calls == []
 
 
@@ -666,3 +685,155 @@ def test_act_emit_writes_nothing_anywhere():
 
     assert [r["status"] for r in out["results"]] == ["would_apply", "would_apply"]
     assert warehouse.change_log == [] and slack.posts == [] and google.write_calls == []
+
+
+# --- data freeze (BC-28219): yesterday's lead counts must agree --------------------------
+# If the lead feed breaks, the snapshot shows no leads and the kill rule turns off good ads.
+# Tests carry their case letter (a-d) from the BC-28219 amendment in the docstring.
+
+
+def test_a_lead_count_gap_over_the_limit_freezes_the_run():
+    """a. Google counted 20 leads yesterday and BriteBase 15: a 25% gap, over the 20% limit.
+    The run plans nothing and logs one frozen row with the reason and both counts."""
+    warehouse, google, slack = _fakes(lead_counts=[_lead_counts(20, 15, 0.25)])
+
+    out = _run(warehouse, google, slack)
+
+    assert out["changes"] == []
+    assert warehouse.change_log == [out["frozen"]]
+    row = out["frozen"]
+    assert row["status"] == "frozen" and row["platform"] == "google_ads" and row["run_date"] == TODAY
+    assert row["reason"] == f"google_ads counted 20 leads on {YESTERDAY} and BriteBase 15: a 25.0% gap, over the 20.0% limit"
+    [check] = row["checks"]
+    assert (check["platform_leads"], check["britebase_leads"], check["lead_date"]) == (20, 15, YESTERDAY)
+    assert google.write_calls == []
+
+
+def test_a_gap_that_cannot_be_measured_freezes_the_run():
+    """a. A null gap is only an agreed count when both counts are zero. With one count above
+    zero it is a broken row, so the run freezes."""
+    out = _run(*_fakes(lead_counts=[_lead_counts(20, None, None)]))
+
+    assert out["changes"] == [] and "the gap is unknown" in out["frozen"]["reason"]
+
+
+@pytest.mark.parametrize("lead_counts", [
+    [],
+    [_lead_counts(20, 20, 0.0, platform="meta_ads")],
+    [_lead_counts(20, 20, 0.0, day=TODAY)],
+], ids=["no-row", "other-platform-only", "today-only"])
+def test_no_lead_count_row_for_yesterday_freezes_the_run(lead_counts):
+    """b. No row for this platform for yesterday: the feed is broken, so the run freezes."""
+    warehouse, google, slack = _fakes(lead_counts=lead_counts)
+
+    out = _run(warehouse, google, slack)
+
+    assert out["changes"] == []
+    assert out["frozen"]["reason"] == f"0 lead count rows for {YESTERDAY}, not one: the lead feed may be broken"
+    assert [r["status"] for r in warehouse.change_log] == ["frozen"]
+
+
+def test_no_leads_and_no_spend_on_either_side_does_not_freeze():
+    """c. Both counts zero (gap null) and nothing spent: nothing disagrees, so the run plans."""
+    warehouse, google, slack = _fakes(lead_counts=[_lead_counts(0, 0, None, spend=0.0)])
+
+    out = _run(warehouse, google, slack)
+
+    assert out["frozen"] is None and len(out["changes"]) == 2
+    assert [r["status"] for r in warehouse.change_log] == ["proposed", "proposed"]
+
+
+def test_spend_with_no_leads_on_either_side_freezes_the_run():
+    """c. Both counts zero but the platform spent money: BriteBase's forms may be broken,
+    which reads as zero on both sides. Frozen (WS4 grill rule C5)."""
+    out = _run(*_fakes(lead_counts=[_lead_counts(0, 0, None, spend=120.0)]))
+
+    assert out["changes"] == []
+    assert out["frozen"]["reason"] == (f"spend with no leads: google_ads spent $120.00 on {YESTERDAY} "
+                                       "and neither it nor BriteBase counted a lead")
+
+
+@pytest.mark.parametrize("platform_leads, britebase_leads, gap_pct", [(20, 20, 0.0), (20, 16, 0.20)],
+                         ids=["agree", "at-the-limit"])
+def test_a_gap_at_or_under_the_limit_does_not_freeze(platform_leads, britebase_leads, gap_pct):
+    """d. A gap of exactly 20% is not above the limit: the run plans as usual."""
+    warehouse, google, slack = _fakes(lead_counts=[_lead_counts(platform_leads, britebase_leads, gap_pct)])
+
+    out = _run(warehouse, google, slack)
+
+    assert out["frozen"] is None and len(out["changes"]) == 2
+    assert "frozen" not in [r["status"] for r in warehouse.change_log]
+
+
+def test_yesterday_is_the_day_before_the_local_run_date():
+    """At 18:30 on Oct 6 in Denver it is already Oct 7 in UTC. Yesterday is Oct 5, the day
+    before the local date, so Oct 5's agreed row is the one read and the run plans."""
+    warehouse, google, slack = _fakes(lead_counts=[_lead_counts(20, 20, 0.0)])
+
+    out = _run(warehouse, google, slack, now=EVENING)
+
+    assert out["run_date"] == TODAY and out["frozen"] is None
+    assert ("read_lead_reconciliation", YESTERDAY) in warehouse.calls
+
+
+def test_a_frozen_act_run_writes_nothing_to_the_ad_account():
+    """Planned and approved while the counts agreed, then the feed broke: act applies
+    nothing, approved or not, and plans nothing new."""
+    warehouse, google, slack = _fakes()
+    cut, _ = _keys(_run(warehouse, google, slack))
+    _approve(warehouse, cut)
+    warehouse.lead_reconciliation = []
+
+    out = _act(warehouse, google, slack, rules=RULES)
+
+    assert google.write_calls == []
+    assert out["frozen"] and out["changes"] == [] and out["results"] == [] and out["waiting"] == []
+    assert [r["status"] for r in warehouse.change_log] == ["proposed", "proposed", "approved", "frozen"]
+
+
+def test_a_frozen_approve_is_refused():
+    """Planned while the counts agreed; by approval time they disagree. Nothing is logged."""
+    warehouse, google, slack = _fakes()
+    cut, _ = _keys(_run(warehouse, google, slack))
+    warehouse.lead_reconciliation = [_lead_counts(20, 10, 0.5)]
+
+    with pytest.raises(ValueError, match="google_ads is frozen today, so nothing can be approved"):
+        _approve(warehouse, cut)
+    assert [r["status"] for r in warehouse.change_log] == ["proposed", "proposed"]
+
+
+def test_real_warehouse_reads_one_days_lead_counts_as_plain_values(monkeypatch):
+    """The connector returns Decimal and date values. A frozen row carries them into the
+    change log's JSON and the printed output, so they must come back as int, float and str."""
+    from ads_agent import adapters
+
+    for name in adapters.SnowflakeWarehouse.ENV:
+        monkeypatch.setenv(name, "fake")
+    warehouse, sent = adapters.SnowflakeWarehouse(), []
+    monkeypatch.setattr(warehouse, "_query", lambda sql, params=None, many=None: sent.append((sql, params)) or [
+        {"platform": "google_ads", "lead_date": date(2026, 10, 5), "platform_leads": Decimal(20),
+         "britebase_leads": Decimal(15), "gap_pct": Decimal("0.25"), "platform_spend": None}])
+
+    rows = warehouse.read_lead_reconciliation(YESTERDAY)
+
+    assert rows == [_lead_counts(20, 15, 0.25, spend=None)]
+    assert json.loads(json.dumps(rows)) == rows
+    [(sql, params)] = sent
+    assert "MART_ADS_AGENT_LEAD_RECONCILIATION" in sql and params == {"d": YESTERDAY}
+
+
+def test_a_freeze_posts_one_alert_a_day():
+    """A preview posts nothing. Then one alert, and re-runs that day in either mode log and
+    post nothing new."""
+    warehouse, google, slack = _fakes(lead_counts=[])
+
+    preview = _run(warehouse, google, slack, emit=True)
+    assert preview["frozen"] and slack.posts == [] and warehouse.change_log == []
+    _run(warehouse, google, slack)
+    _run(warehouse, google, slack)
+    _act(warehouse, google, slack)
+
+    assert len(slack.posts) == 1
+    assert slack.posts[0].startswith(f"Ads agent, google_ads, {TODAY} (propose mode): FROZEN.")
+    assert "the lead feed may be broken" in slack.posts[0] and "The watchdog still runs." in slack.posts[0]
+    assert [r["status"] for r in warehouse.change_log] == ["frozen"]

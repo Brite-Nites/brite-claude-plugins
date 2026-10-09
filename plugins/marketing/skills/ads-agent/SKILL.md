@@ -1,11 +1,11 @@
 ---
 name: ads-agent
-description: Runs Brite's own Google Ads agent for one day. Propose mode reads the results snapshots from the warehouse and current settings from Google Ads, plans budget moves and ad turn-offs inside hard limits, writes the plan to the warehouse change log, and posts a Slack summary without changing any ad account. Approve logs the Head of GTM's approval of one planned change. Act mode applies the plan through the Google Ads API inside the hard limits of ADR-0033, approved changes only and one a day in weeks 1-2. Use in the daily session with the Head of GTM. Triggers "ads agent", "run the ads agent", "propose ad changes", "approve ad change", "apply ad changes", "paid ads daily plan". The watchdog is a separate run (BC-28219).
+description: Runs Brite's own Google Ads agent for one day. Propose mode reads the results snapshots from the warehouse and current settings from Google Ads, plans budget moves and ad turn-offs inside hard limits, writes the plan to the warehouse change log, and posts a Slack summary without changing any ad account. Approve logs the Head of GTM's approval of one planned change. Act mode applies the plan through the Google Ads API inside the hard limits of ADR-0033, approved changes only and one a day in weeks 1-2. A run freezes itself, planning and writing nothing, when yesterday's lead counts on the platform and in BriteBase disagree. Use in the daily session with the Head of GTM. Triggers "ads agent", "run the ads agent", "propose ad changes", "approve ad change", "apply ad changes", "paid ads daily plan". The watchdog is a separate run (BC-28219).
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash, Read
 metadata:
-  version: 0.3.0
+  version: 0.4.0
   category: Paid Ads
 ---
 
@@ -21,22 +21,45 @@ result is a new row whose key starts with the plan row's key.
 
 ## What a run does
 
-1. Reads the results snapshots (campaign and ad level) from the warehouse. Results never
+1. Checks yesterday's lead counts (see "Data freeze" below). If the run is frozen, it
+   stops here.
+2. Reads the results snapshots (campaign and ad level) from the warehouse. Results never
    come from the ad APIs. A conversion in the snapshot is a lead.
-2. Reads current settings from Google Ads: daily budgets, "limited by budget", shared
+3. Reads current settings from Google Ads: daily budgets, "limited by budget", shared
    budgets, brand campaigns (label `brand`), and each ad's status.
-3. Plans at most one budget move: from the worst cost per conversion to the best campaign
+4. Plans at most one budget move: from the worst cost per conversion to the best campaign
    that is limited by budget. Total daily budget stays the same. Shared budgets and brand
    campaigns are never moved.
-4. Plans ad turn-offs:
+5. Plans ad turn-offs:
    - An ad with zero leads turns off once it has spent `kill_multiple` (3) times
      `target_cpl`, never before.
    - Ads in one ad group are compared on cost per lead only once each has spent
      `compare_multiple` (5) times `target_cpl`. The worst of those turns off.
-5. Runs each change through the limit checks (`max_move`, `no_total_raise`,
+6. Runs each change through the limit checks (`max_move`, `no_total_raise`,
    `weekly_ceiling`, `brand_untouched`). A change that fails a check is `held`.
-6. Logs new rows and posts one Slack message. A re-run on the same day logs and posts
+7. Logs new rows and posts one Slack message. A re-run on the same day logs and posts
    nothing new.
+
+## Data freeze
+
+If the lead feed breaks, the snapshot shows no leads, and the kill rule would turn off
+good ads. So before planning, each run reads yesterday's row for its platform from
+`ANALYTICS.MARTS.MART_ADS_AGENT_LEAD_RECONCILIATION`. Yesterday is the day before the run
+date in the rules' `timezone`.
+
+The run is frozen when:
+
+- the row is missing (the feed is broken);
+- the platform's and BriteBase's lead counts differ by more than `max_lead_count_gap`;
+- the gap is unknown while either count is above zero;
+- both counts are zero but the platform spent money ("spend with no leads").
+
+Both counts zero with no spend is not frozen.
+
+A frozen run plans, approves and applies nothing. It logs one `frozen` row with the reason
+and both counts, and posts one Slack alert. A re-run the same day posts nothing new.
+`approve` refuses while the platform is frozen. The watchdog is a separate run and still
+pauses during a freeze.
 
 A budget move is two rows, a cut and a raise, and counts as one change. The raise row's key
 is `<cut key>:pair`. Approving either key approves both halves.
@@ -84,6 +107,8 @@ platform per day. A budget move is one change.
    - `compare_multiple`: 5.
    - `timezone`: an IANA time zone name, such as `America/Denver`. The run date is today's
      date there, not in UTC, so an evening approval finds that day's plan.
+   - `max_lead_count_gap`: 0.20 means 20%. Writes freeze when yesterday's platform and
+     BriteBase lead counts differ by more than this.
 
    `weeks_1_2` and `emergency_stop` must be JSON `true` or `false`. `timezone` must be an
    exact IANA name. Anything else stops the run.
@@ -104,6 +129,10 @@ platform per day. A budget move is one change.
    cd "${CLAUDE_PLUGIN_ROOT}/scripts" && bws run --project-id <ads-agent project> -- \
      python3 -m ads_agent propose --rules <rules file>
    ```
+
+   If the output shows `frozen`, stop the daily flow. Tell the Head of GTM the reason, and
+   do not approve or act. The freeze lifts on a run that finds yesterday's lead counts in
+   agreement.
 
 3. Show the Head of GTM each change: campaign or ad, old → new, reason, checks and key.
    Name any `held` change and the check it failed.
@@ -139,6 +168,7 @@ platform per day. A budget move is one change.
 
 - Never approve a change the Head of GTM did not name in this session.
 - Never edit the rules file from this skill. Never change a setting in Google Ads by hand.
+- Never work around a freeze, for example by raising `max_lead_count_gap` to get a plan.
 - Never commit account ids, budgets, ceilings, results or change-log rows to this repo.
 - Exit code 2 names the missing secret, the bad rule setting, or the key that matched
   nothing. Fix it; do not work around it.

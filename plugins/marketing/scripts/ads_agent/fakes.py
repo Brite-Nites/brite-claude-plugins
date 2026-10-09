@@ -49,9 +49,11 @@ class FakeGoogleAds:
 
 
 class FakeWarehouse:
-    def __init__(self, snapshot, ad_snapshot=()):
+    def __init__(self, snapshot, ad_snapshot=(), lead_reconciliation=()):
         self._snapshot = copy.deepcopy(snapshot)
         self._ad_snapshot = copy.deepcopy(list(ad_snapshot))
+        # Public, like change_log, so a test can break the lead feed between runs (BC-28219).
+        self.lead_reconciliation = copy.deepcopy(list(lead_reconciliation))
         self.change_log: list[dict] = []
         self.calls: list[tuple] = []
 
@@ -62,6 +64,10 @@ class FakeWarehouse:
     def read_ad_snapshot(self):
         self.calls.append(("read_ad_snapshot",))
         return copy.deepcopy(self._ad_snapshot)
+
+    def read_lead_reconciliation(self, lead_date):
+        self.calls.append(("read_lead_reconciliation", lead_date))
+        return [copy.deepcopy(r) for r in self.lead_reconciliation if r["lead_date"] == lead_date]
 
     def read_change_log(self, run_date):
         self.calls.append(("read_change_log", run_date))

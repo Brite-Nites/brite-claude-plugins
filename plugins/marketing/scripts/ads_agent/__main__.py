@@ -6,8 +6,9 @@
     bws run --project-id <ads-agent project> -- python3 -m ads_agent act --rules <file> [--emit]
 
 Prints the plan (or the approval row) as JSON. Exit 2 on a missing secret, a missing or
-bad rule setting, or a key that matches no proposed change in today's plan. Today is the
-date in the rules file's `timezone`.
+bad rule setting, a key that matches no proposed change in today's plan, or an approval
+while the platform is frozen. Today is the date in the rules file's `timezone`. A frozen
+run (BC-28219) exits 0 and prints its reason under "frozen".
 """
 
 from __future__ import annotations

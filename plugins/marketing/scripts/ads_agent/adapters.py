@@ -150,8 +150,9 @@ class GoogleAds:
 
 
 class SnowflakeWarehouse:
-    """Reads the results snapshots and the change log; writes the change log (MERGE on key).
-    Approval and apply-result rows use the same columns as plan rows (BC-28216): no ALTER."""
+    """Reads the results snapshots, the lead reconciliation and the change log; writes the
+    change log (MERGE on key). Approval, apply-result and frozen rows use the same columns as
+    plan rows (BC-28216, BC-28219): no ALTER."""
 
     ENV = (
         "ADS_AGENT_SNOWFLAKE_ACCOUNT",
@@ -169,6 +170,11 @@ class SnowflakeWarehouse:
     # campaign_id, ad_group_id, ad_id, spend, conversions (a conversion is a lead).
     # Not built yet either; it needs its own brite-data-platform ticket.
     AD_SNAPSHOT = "ANALYTICS.MARTS.MART_ADS_AGENT_AD_RESULTS_SNAPSHOT"
+    # One row per platform per day, for the data freeze (BC-28219): platform, lead_date,
+    # platform_leads, britebase_leads, gap_pct, platform_spend (dollars). gap_pct is
+    # |platform_leads - britebase_leads| / the larger, a fraction from 0 to 1, null only when
+    # both counts are zero. Built by brite-data-platform's BC-28219 lead reconciliation spec.
+    LEAD_RECONCILIATION = "ANALYTICS.MARTS.MART_ADS_AGENT_LEAD_RECONCILIATION"
     CHANGE_LOG = "ANALYTICS.OPERATIONS.ADS_AGENT_CHANGE_LOG"
     COLUMNS = {  # change-log column: plan row key
         "change_key": "key", "run_date": "run_date", "mode": "mode", "platform": "platform",
@@ -221,6 +227,18 @@ class SnowflakeWarehouse:
         return [
             dict(r, ad_group_id=str(r["ad_group_id"]), ad_id=str(r["ad_id"]),
                  spend=float(r["spend"]), conversions=float(r["conversions"]))
+            for r in rows
+        ]
+
+    def read_lead_reconciliation(self, lead_date):
+        rows = self._query(
+            "select platform, lead_date, platform_leads, britebase_leads, gap_pct, platform_spend "
+            f"from {self.LEAD_RECONCILIATION} where lead_date = %(d)s", {"d": lead_date}
+        )
+        # Plain ints and floats: a frozen row carries these values into the change log's JSON.
+        kinds = {"platform_leads": int, "britebase_leads": int, "gap_pct": float, "platform_spend": float}
+        return [
+            dict(r, lead_date=str(r["lead_date"]), **{k: None if r[k] is None else f(r[k]) for k, f in kinds.items()})
             for r in rows
         ]
 
