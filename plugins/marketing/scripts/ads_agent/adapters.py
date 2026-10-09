@@ -1,5 +1,5 @@
 """Real adapters for the ads-agent run: Google Ads and Meta (settings read, act-mode
-writes), Snowflake, Slack.
+writes), Snowflake, Slack, and Operations' capacity sheet (BC-28220, read only).
 
 None of these accounts exist yet (BC-28209). Each adapter asserts its env vars when it
 is built, so a missing secret fails loudly by name and never prints a value. Secrets
@@ -8,7 +8,8 @@ ADR-044) or Railway service variables.
 
 Third-party libraries load lazily inside methods: CI installs only pytest, so this
 module must import on a stdlib-only interpreter. Runtime needs `google-ads`,
-`snowflake-connector-python` and `cryptography`. Meta needs none: it is plain HTTPS.
+`snowflake-connector-python`, `cryptography` and, for the capacity sheet, `google-auth`.
+Meta needs none: it is plain HTTPS.
 
 Untested against the live APIs: they need the accounts above. The fakes in
 `fakes.py` carry the same method names.
@@ -21,7 +22,8 @@ import json
 import os
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 
 class MissingEnv(RuntimeError):
@@ -137,7 +139,8 @@ class GoogleAds:
 
     def apply(self, change):
         """Write one change, or raise. A budget write first re-reads the campaign's budget
-        and writes only if it still holds the planned old value."""
+        and writes only if it still holds the planned old value. A campaign's status is
+        written only to pause it (the capacity pause, BC-28220), never to turn it on."""
         from google.api_core import protobuf_helpers
 
         client = self._client()
@@ -165,6 +168,13 @@ class GoogleAds:
             op.update.status = getattr(client.enums.AdGroupAdStatusEnum, change["new"])
             client.copy_from(op.update_mask, protobuf_helpers.field_mask(None, op.update._pb))
             service.mutate_ad_group_ads(customer_id=account, operations=[op])
+        elif where == ("campaign", "status") and (change["old"], change["new"]) == ("ENABLED", "PAUSED"):
+            service = client.get_service("CampaignService")
+            op = client.get_type("CampaignOperation")
+            op.update.resource_name = service.campaign_path(account, str(int(change["target_id"])))
+            op.update.status = client.enums.CampaignStatusEnum.PAUSED
+            client.copy_from(op.update_mask, protobuf_helpers.field_mask(None, op.update._pb))
+            service.mutate_campaigns(customer_id=account, operations=[op])
         else:
             raise NotImplementedError(f"{where[0]} {where[1]} -> {change['new']} is not built for Google Ads")
 
@@ -190,9 +200,10 @@ def _meta_goal(ad_set):
 
 class MetaAds:
     """Reads campaign, ad set and ad settings through the Meta Graph API. Act mode
-    (BC-28218) writes through `apply`: an ad set's daily budget, an ad's status, or an ad
-    set's switch from optimising for leads to booked appointments. Nothing else is written:
-    no targeting, no creative, no campaign, ad set or ad is created.
+    (BC-28218) writes through `apply`: an ad set's daily budget, an ad's status, an ad
+    set's switch from optimising for leads to booked appointments, or an ad set paused for
+    capacity (BC-28220). Nothing else is written: no targeting, no creative, no campaign,
+    ad set or ad is created, and no ad set is turned on.
 
     Plain HTTPS, no SDK. The watchdog has its own Meta adapter (ads_watchdog/platforms.py);
     the two share no code, only the env var names.
@@ -349,6 +360,12 @@ class MetaAds:
             if self.STATUS.get(now.get("status")) != change["old"]:
                 raise RuntimeError("the ad's status changed after the plan; nothing written")
             self._post(ad_id, {"status": "ACTIVE" if change["new"] == "ENABLED" else "PAUSED"})
+        elif where == ("ad_set", "status") and (change["old"], change["new"]) == ("ENABLED", "PAUSED"):
+            ad_set_id = _digits(change["target_id"], "ad set id")
+            now = self._reread(ad_set_id, account, "status")
+            if self.STATUS.get(now.get("status")) != "ENABLED":
+                raise RuntimeError("the ad set is no longer active; nothing written")
+            self._post(ad_set_id, {"status": "PAUSED"})
         elif where == ("ad_set", "optimization_goal") and (change["old"], change["new"]) == ("leads", "booked_appointments"):
             ad_set_id = _digits(change["target_id"], "ad set id")
             now = self._reread(ad_set_id, account, "optimization_goal,promoted_object")
@@ -391,13 +408,15 @@ class SnowflakeWarehouse:
     # the BC-28210 account map, and a conversion read rule. Rename here if it lands elsewhere.
     SNAPSHOT = "ANALYTICS.MARTS.MART_ADS_AGENT_RESULTS_SNAPSHOT"
     # The same at ad grain, for the ad kill rule (BC-28216): platform, account_id,
-    # campaign_id, ad_group_id, ad_id, spend, conversions (a conversion is a lead). On Meta,
-    # ad_group_id is the ad set, so Meta's ad set results are these rows summed.
+    # campaign_id, ad_group_id, ad_id, territory (the campaign's, for the season rules,
+    # BC-28220), spend, conversions (a conversion is a lead). On Meta, ad_group_id is the
+    # ad set, so Meta's ad set results are these rows summed.
     # Not built yet either; it needs its own brite-data-platform ticket.
     # booked_appointments (BC-28218's path test and goal switch) is read when the mart has the
     # column; it does not yet.
     AD_SNAPSHOT = "ANALYTICS.MARTS.MART_ADS_AGENT_AD_RESULTS_SNAPSHOT"
-    AD_COLUMNS = ("platform", "account_id", "campaign_id", "ad_group_id", "ad_id", "spend", "conversions")
+    AD_COLUMNS = ("platform", "account_id", "campaign_id", "ad_group_id", "ad_id", "territory", "spend",
+                  "conversions")
     # One row per published ad: what went into it, and for an AI-edited photo who approved
     # it (BC-28221; brite-data-platform services/sql/ads_creative_inputs/schema.sql). An ad is
     # in the approved shared library when its row exists (BC-28218).
@@ -484,10 +503,24 @@ class SnowflakeWarehouse:
             for r in rows
         ]
 
+    def read_booked_appointments(self, platform, first_week):
+        """Booked appointments per territory and week, calls counted, for the step-up gate
+        (BC-28220). No table holds them yet: they belong to the attribution work (BC-28562).
+        Until one exists this reads nothing and returns no rows, so no territory meets the
+        gate. Once it does, return the platform's rows from first_week on: platform,
+        territory, week_start (the week's Monday, YYYY-MM-DD), spend (dollars),
+        booked_appointments."""
+        return []
+
     def read_change_log(self, run_date):
-        rows = self._query(
-            f"select {', '.join(self.COLUMNS)} from {self.CHANGE_LOG} where run_date = %(d)s", {"d": run_date}
-        )
+        return self._change_log("run_date = %(d)s", run_date)
+
+    def read_change_log_since(self, first_day):
+        """Every row from first_day on: the step-up gate's record of applied changes (BC-28220)."""
+        return self._change_log("run_date >= %(d)s", first_day)
+
+    def _change_log(self, where, day):
+        rows = self._query(f"select {', '.join(self.COLUMNS)} from {self.CHANGE_LOG} where {where}", {"d": day})
         out = []
         for r in rows:
             row = {k: r[c] for c, k in self.COLUMNS.items()}
@@ -533,3 +566,86 @@ class SlackWebhook:
         )
         with urllib.request.urlopen(req, timeout=10) as resp:
             resp.read()
+
+
+class CapacitySheet:
+    """Reads each territory's next open install date, and when its row was last updated,
+    from Operations' capacity sheet ("Operations Health 2025-2026") through the Google
+    Sheets API (BC-28220). Read only.
+
+    Credentials by env var name: a Google service account's JSON key, shared on the sheet
+    as a viewer. The sheet id and the range to read are env vars too, so neither is in this
+    repo. The range's first row holds the column names in COLUMNS; confirm them with the
+    sheet's owner before the first run. Dates and times are read as Sheets serial numbers,
+    in the spreadsheet's own time zone, so the sheet's display format does not matter. A
+    cell that is not a date reads as none: no date blocks raises into that territory.
+
+    Untested against the live API: the credentials do not exist yet. `http` and `token`
+    are for tests."""
+
+    ENV = (
+        "ADS_AGENT_CAPACITY_SHEET_ID",
+        "ADS_AGENT_CAPACITY_RANGE",  # e.g. a tab name, or Tab!A:F
+        "ADS_AGENT_CAPACITY_SERVICE_ACCOUNT_JSON",
+    )
+    COLUMNS = {"territory": "Territory", "next_open_install_date": "Next Open Install Date",
+               "updated_at": "Last Updated"}
+    SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly"
+    BASE = "https://sheets.googleapis.com/v4/spreadsheets"
+    DAY_ZERO = datetime(1899, 12, 30)  # serial number 0 in Google Sheets
+
+    def __init__(self, http=_http, token=None):
+        self._env = _require(self.ENV)
+        self._http = http
+        self._token = token or self._service_account_token
+
+    def _service_account_token(self):
+        from google.auth.transport.requests import Request
+        from google.oauth2 import service_account
+
+        info = json.loads(self._env["ADS_AGENT_CAPACITY_SERVICE_ACCOUNT_JSON"])
+        creds = service_account.Credentials.from_service_account_info(info, scopes=[self.SCOPE])
+        creds.refresh(Request())
+        return creds.token
+
+    def read_capacity(self):
+        """[{"territory", "next_open_install_date": a date or None, "updated_at": a datetime
+        with the sheet's time zone, or None}], one per row that names a territory."""
+        sheet = urllib.parse.quote(self._env["ADS_AGENT_CAPACITY_SHEET_ID"], safe="")
+        auth = {"Authorization": f"Bearer {self._token()}"}
+        meta = self._http("GET", f"{self.BASE}/{sheet}?fields=properties.timeZone", auth)
+        zone = ZoneInfo(meta["properties"]["timeZone"])
+        cells = urllib.parse.quote(self._env["ADS_AGENT_CAPACITY_RANGE"], safe="")
+        query = urllib.parse.urlencode({"valueRenderOption": "UNFORMATTED_VALUE",
+                                        "dateTimeRenderOption": "SERIAL_NUMBER"})
+        values = self._http("GET", f"{self.BASE}/{sheet}/values/{cells}?{query}", auth).get("values") or []
+        head = [str(h).strip() for h in (values[0] if values else [])]
+        missing = [name for name in self.COLUMNS.values() if name not in head]
+        if missing:
+            raise RuntimeError(f"capacity sheet columns not found: {', '.join(missing)}")
+        at = {key: head.index(name) for key, name in self.COLUMNS.items()}
+        out = []
+        for row in values[1:]:
+            cell = {key: row[i] if i < len(row) else None for key, i in at.items()}
+            territory = str(cell["territory"] or "").strip()
+            if territory:
+                when = self._time(cell["updated_at"], zone)
+                out.append({"territory": territory, "updated_at": when,
+                            "next_open_install_date": self._time(cell["next_open_install_date"], zone, day=True)})
+        return out
+
+    def _time(self, value, zone, day=False):
+        """A Sheets serial number, or an ISO text date or time, as a date (`day`) or as a
+        datetime in `zone`. Anything else is None."""
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            when = self.DAY_ZERO + timedelta(days=value)
+        elif isinstance(value, str):
+            try:
+                when = datetime.fromisoformat(value.strip())
+            except ValueError:
+                return None
+        else:
+            return None
+        if day:
+            return date(when.year, when.month, when.day)
+        return when.replace(tzinfo=zone) if when.utcoffset() is None else when

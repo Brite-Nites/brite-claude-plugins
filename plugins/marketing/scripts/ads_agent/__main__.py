@@ -7,9 +7,10 @@
 
 <p> is google_ads or meta_ads (BC-28218); each platform has its own rules file. Prints the
 plan (or the approval row) as JSON. Exit 2 on a missing secret, a missing or bad rule
-setting, a key that matches no proposed change in today's plan, or an approval while the
-platform is frozen. Today is the date in the rules file's `timezone`. A frozen run
-(BC-28219) exits 0 and prints its reason under "frozen".
+setting, a run on or after taper_start with no taper_daily_pct (BC-28220), a key that
+matches no proposed change in today's plan, or an approval while the platform is frozen.
+Today is the date in the rules file's `timezone`. A frozen run (BC-28219) exits 0 and
+prints its reason under "frozen". propose and act also read Operations' capacity sheet.
 """
 
 from __future__ import annotations
@@ -19,14 +20,14 @@ import json
 import sys
 from datetime import datetime, timezone
 
-from .adapters import GoogleAds, MetaAds, MissingEnv, SlackWebhook, SnowflakeWarehouse
+from .adapters import CapacitySheet, GoogleAds, MetaAds, MissingEnv, SlackWebhook, SnowflakeWarehouse
 from .run import approve, run
 
 ADAPTERS = {"google_ads": GoogleAds, "meta_ads": MetaAds}
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="ads_agent", description="One bounded ads-agent run (BC-28215, BC-28216, BC-28218).")
+    p = argparse.ArgumentParser(prog="ads_agent", description="One bounded ads-agent run (BC-28215, BC-28216, BC-28218, BC-28220).")
     sub = p.add_subparsers(dest="command", required=True)
     for mode, text in (
         ("propose", "plan, log and post; never writes to the ad account"),
@@ -52,6 +53,7 @@ def main(argv=None):
             out = run(
                 warehouse=SnowflakeWarehouse(),
                 adapter=ADAPTERS[a.platform](),
+                capacity=CapacitySheet(),
                 slack=None if a.emit else SlackWebhook(),
                 rules=rules,
                 now=now,
