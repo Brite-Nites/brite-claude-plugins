@@ -130,9 +130,9 @@ platform per day. A budget move is one change.
      python3 -m ads_agent propose --rules <rules file>
    ```
 
-   If the output shows `frozen`, stop the daily flow. Tell the Head of GTM the reason, and
-   do not approve or act. The freeze lifts on a run that finds yesterday's lead counts in
-   agreement.
+   If `frozen` in the output is not null, stop the daily flow. Tell the Head of GTM its
+   `reason`, and do not approve or act. The freeze lifts on the first run that passes the
+   lead count check.
 
 3. Show the Head of GTM each change: campaign or ad, old → new, reason, checks and key.
    Name any `held` change and the check it failed.
