@@ -1,14 +1,15 @@
 """Run the ads agent against the real adapters.
 
     cd plugins/marketing/scripts
-    bws run --project-id <ads-agent project> -- python3 -m ads_agent propose --rules <file> [--emit]
+    bws run --project-id <ads-agent project> -- python3 -m ads_agent propose --platform <p> --rules <file> [--emit]
     bws run --project-id <ads-agent project> -- python3 -m ads_agent approve <key> --by <name> --rules <file>
-    bws run --project-id <ads-agent project> -- python3 -m ads_agent act --rules <file> [--emit]
+    bws run --project-id <ads-agent project> -- python3 -m ads_agent act --platform <p> --rules <file> [--emit]
 
-Prints the plan (or the approval row) as JSON. Exit 2 on a missing secret, a missing or
-bad rule setting, a key that matches no proposed change in today's plan, or an approval
-while the platform is frozen. Today is the date in the rules file's `timezone`. A frozen
-run (BC-28219) exits 0 and prints its reason under "frozen".
+<p> is google_ads or meta_ads (BC-28218); each platform has its own rules file. Prints the
+plan (or the approval row) as JSON. Exit 2 on a missing secret, a missing or bad rule
+setting, a key that matches no proposed change in today's plan, or an approval while the
+platform is frozen. Today is the date in the rules file's `timezone`. A frozen run
+(BC-28219) exits 0 and prints its reason under "frozen".
 """
 
 from __future__ import annotations
@@ -18,18 +19,21 @@ import json
 import sys
 from datetime import datetime, timezone
 
-from .adapters import GoogleAds, MissingEnv, SlackWebhook, SnowflakeWarehouse
+from .adapters import GoogleAds, MetaAds, MissingEnv, SlackWebhook, SnowflakeWarehouse
 from .run import approve, run
+
+ADAPTERS = {"google_ads": GoogleAds, "meta_ads": MetaAds}
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="ads_agent", description="One bounded ads-agent run (BC-28215, BC-28216).")
+    p = argparse.ArgumentParser(prog="ads_agent", description="One bounded ads-agent run (BC-28215, BC-28216, BC-28218).")
     sub = p.add_subparsers(dest="command", required=True)
     for mode, text in (
         ("propose", "plan, log and post; never writes to the ad account"),
         ("act", "plan once a day, then apply what the hard limits allow"),
     ):
         s = sub.add_parser(mode, help=text)
+        s.add_argument("--platform", required=True, choices=sorted(ADAPTERS), help="the ad platform to plan and write")
         s.add_argument("--rules", required=True, help="rule settings JSON, kept outside this repo")
         s.add_argument("--emit", action="store_true",
                        help="print the plan only: no change-log write, no Slack post, no ad-account write")
@@ -47,7 +51,7 @@ def main(argv=None):
         else:
             out = run(
                 warehouse=SnowflakeWarehouse(),
-                adapter=GoogleAds(),
+                adapter=ADAPTERS[a.platform](),
                 slack=None if a.emit else SlackWebhook(),
                 rules=rules,
                 now=now,

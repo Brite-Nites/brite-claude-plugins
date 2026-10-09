@@ -1,5 +1,5 @@
-"""Real adapters for the ads-agent run: Google Ads (settings read, act-mode writes),
-Snowflake, Slack.
+"""Real adapters for the ads-agent run: Google Ads and Meta (settings read, act-mode
+writes), Snowflake, Slack.
 
 None of these accounts exist yet (BC-28209). Each adapter asserts its env vars when it
 is built, so a missing secret fails loudly by name and never prints a value. Secrets
@@ -8,7 +8,7 @@ ADR-044) or Railway service variables.
 
 Third-party libraries load lazily inside methods: CI installs only pytest, so this
 module must import on a stdlib-only interpreter. Runtime needs `google-ads`,
-`snowflake-connector-python` and `cryptography`.
+`snowflake-connector-python` and `cryptography`. Meta needs none: it is plain HTTPS.
 
 Untested against the live APIs: they need the accounts above. The fakes in
 `fakes.py` carry the same method names.
@@ -16,9 +16,12 @@ Untested against the live APIs: they need the accounts above. The fakes in
 
 from __future__ import annotations
 
+import copy
 import json
 import os
+import urllib.parse
 import urllib.request
+from datetime import datetime
 
 
 class MissingEnv(RuntimeError):
@@ -30,6 +33,23 @@ def _require(names):
     if missing:
         raise MissingEnv(f"missing env vars: {', '.join(missing)}")
     return {n: os.environ[n] for n in names}
+
+
+def _http(method, url, headers, body=None):
+    """One HTTPS call with an optional JSON body; returns the parsed JSON reply."""
+    data = None if body is None else json.dumps(body).encode()
+    req = urllib.request.Request(url, data=data, method=method,
+                                 headers={"Content-Type": "application/json", **headers})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.load(resp)
+
+
+def _digits(value, what):
+    """An id that goes into an API path: digits only, so a bad id cannot reach another path."""
+    text = str(value)
+    if not text.isdigit():
+        raise ValueError(f"{what} {value!r} is not all digits")
+    return text
 
 
 class GoogleAds:
@@ -149,10 +169,214 @@ class GoogleAds:
             raise NotImplementedError(f"{where[0]} {where[1]} -> {change['new']} is not built for Google Ads")
 
 
+def _act(account_id):
+    """The Graph API id of an ad account: the snapshot's digits, prefixed with act_."""
+    return "act_" + _digits(str(account_id).removeprefix("act_"), "ad account id")
+
+
+def _meta_goal(ad_set):
+    """The run's name for what an ad set optimises for. leads: the pixel's Lead event on a
+    site ad set, or an instant form's leads. booked_appointments: Meta's Schedule event on a
+    site ad set, or conversion leads (QUALITY_LEAD) on an instant form. Any other goal keeps
+    Meta's own name, and the agent never switches it."""
+    goal = ad_set.get("optimization_goal")
+    event = (ad_set.get("promoted_object") or {}).get("custom_event_type")
+    if goal == "LEAD_GENERATION" or (goal == "OFFSITE_CONVERSIONS" and event == "LEAD"):
+        return "leads"
+    if goal == "QUALITY_LEAD" or (goal == "OFFSITE_CONVERSIONS" and event == "SCHEDULE"):
+        return "booked_appointments"
+    return goal
+
+
+class MetaAds:
+    """Reads campaign, ad set and ad settings through the Meta Graph API. Act mode
+    (BC-28218) writes through `apply`: an ad set's daily budget, an ad's status, or an ad
+    set's switch from optimising for leads to booked appointments. Nothing else is written:
+    no targeting, no creative, no campaign, ad set or ad is created.
+
+    Plain HTTPS, no SDK. The watchdog has its own Meta adapter (ads_watchdog/platforms.py);
+    the two share no code, only the env var names.
+
+    Budgets: Meta counts in the currency's minor unit (cents), the run in micros, so one
+    cent is 10,000 micros. USD accounts only: any other currency stops the read.
+
+    Settings rows are one per active ad set, carrying its campaign. budget_level says who
+    holds the daily budget: the ad set, or its campaign (Advantage campaign budget), or
+    None for a lifetime budget. Only an ad set's own budget is ever moved; the others are
+    reported as shared. A campaign budget is counted once per ad set in the weekly ceiling,
+    as Google counts a shared budget once per campaign: the total errs high, never low.
+    budget_limited is always False here; the run derives it from `read_spend`.
+
+    Untested against the live API. Before the first act run, confirm with the Head of GTM:
+    the `brand` ad label, and the booked-appointment events in `_meta_goal` (Meta's
+    Schedule event on the site pixel, conversion leads on instant forms)."""
+
+    platform = "meta_ads"
+    ENV = ("META_ADS_SYSTEM_USER_TOKEN",)  # a Brite business system user with access to the ad accounts
+    # A campaign with this ad label holds brand ads; the agent never touches it (ADR-0033 §2).
+    BRAND_LABEL = "brand"
+    MICROS_PER_CENT = 10_000
+    STATUS = {"ACTIVE": "ENABLED", "PAUSED": "PAUSED"}  # Meta's ad status: the run's name
+    AD_SET_FIELDS = ("id,name,campaign_id,daily_budget,lifetime_budget,optimization_goal,"
+                     "promoted_object,destination_type,targeting")
+
+    def __init__(self, http=_http):
+        self._env = _require(self.ENV)
+        self._http = http
+        self._base = f"https://graph.facebook.com/{os.environ.get('META_GRAPH_API_VERSION', 'v24.0')}"
+
+    def _auth(self):
+        return {"Authorization": f"Bearer {self._env['META_ADS_SYSTEM_USER_TOKEN']}"}
+
+    def _get(self, path, **params):
+        return self._http("GET", f"{self._base}/{path}?{urllib.parse.urlencode(params)}", self._auth())
+
+    def _list(self, path, **params):
+        page, rows = self._get(path, **params), []
+        while True:
+            rows += page.get("data", [])
+            following = page.get("paging", {}).get("next")
+            if not following:
+                return rows
+            if not following.startswith("https://graph.facebook.com/"):  # the token goes nowhere else
+                raise RuntimeError("a paging link left graph.facebook.com; stopped")
+            page = self._http("GET", following, self._auth())
+
+    def read_settings(self, account_ids):
+        out = []
+        for account_id in account_ids:
+            act = _act(account_id)
+            currency = self._get(act, fields="currency").get("currency")
+            if currency != "USD":
+                raise RuntimeError(f"ad account {account_id} bills in {currency}, not USD: budget units unknown")
+            active = '["ACTIVE"]'
+            campaigns = {c["id"]: c for c in self._list(
+                f"{act}/campaigns", fields="id,name,daily_budget,lifetime_budget,adlabels{name}", effective_status=active)}
+            ad_sets = [a for a in self._list(f"{act}/adsets", fields=self.AD_SET_FIELDS, effective_status=active)
+                       if a["campaign_id"] in campaigns]
+            subtypes = self._audience_subtypes(act, ad_sets)
+            for a in ad_sets:
+                camp = campaigns[a["campaign_id"]]
+                own, theirs = int(a.get("daily_budget") or 0), int(camp.get("daily_budget") or 0)
+                level = "ad_set" if own else "campaign" if theirs else None
+                labels = camp.get("adlabels") or []
+                labels = labels.get("data", []) if isinstance(labels, dict) else labels
+                out.append({
+                    "account_id": account_id,
+                    "campaign_id": camp["id"],
+                    "campaign_name": camp["name"],
+                    "ad_set_id": a["id"],
+                    "ad_set_name": a["name"],
+                    "daily_budget_micros": (own or theirs) * self.MICROS_PER_CENT or None,
+                    "budget_level": level,
+                    "budget_limited": False,
+                    "budget_shared": level != "ad_set",
+                    "brand": any((x.get("name") or "").lower() == self.BRAND_LABEL for x in labels),
+                    "status": "ENABLED",
+                    "optimization_goal": _meta_goal(a),
+                    "destination_type": a.get("destination_type"),
+                    "targeting": self._with_subtypes(a.get("targeting"), subtypes),
+                })
+        return out
+
+    def _audience_subtypes(self, act, ad_sets):
+        """Each custom audience's subtype (LOOKALIKE, CUSTOM, ...) by id, from the account's
+        own audiences. One the account cannot list stays unknown, and the run's Housing check
+        treats an unknown audience as a lookalike."""
+        if not any((a.get("targeting") or {}).get(side) for a in ad_sets
+                   for side in ("custom_audiences", "excluded_custom_audiences")):
+            return {}
+        return {c["id"]: c.get("subtype") for c in self._list(f"{act}/customaudiences", fields="id,subtype")}
+
+    @staticmethod
+    def _with_subtypes(targeting, subtypes):
+        t = copy.deepcopy(targeting or {})
+        for side in ("custom_audiences", "excluded_custom_audiences"):
+            for audience in t.get(side) or []:
+                audience["subtype"] = subtypes.get(audience.get("id"))
+        return t
+
+    def read_ads(self, account_ids):
+        out = []
+        for account_id in account_ids:
+            for ad in self._list(f"{_act(account_id)}/ads", fields="id,name,campaign_id,adset_id,status,created_time"):
+                if ad.get("status") not in self.STATUS:  # archived and deleted ads are never touched
+                    continue
+                out.append({
+                    "account_id": account_id,
+                    "campaign_id": ad["campaign_id"],
+                    "ad_group_id": ad["adset_id"],
+                    "ad_id": ad["id"],
+                    "ad_name": ad.get("name") or f"ad {ad['id']}",
+                    "status": self.STATUS[ad["status"]],
+                    "created_time": datetime.strptime(ad["created_time"], "%Y-%m-%dT%H:%M:%S%z").isoformat(),
+                })
+        return out
+
+    def read_spend(self, account_ids, day):
+        """One day's spend in dollars per ad set, and per campaign as its ad sets' sum, from
+        the insights API (read only). `day` is YYYY-MM-DD; Meta reads it in the ad account's
+        time zone. An ad set or campaign with no row has no spend to report."""
+        out = []
+        for account_id in account_ids:
+            rows = self._list(f"{_act(account_id)}/insights", level="adset", fields="adset_id,campaign_id,spend",
+                              time_range=json.dumps({"since": day, "until": day}))
+            campaigns = {}
+            for r in rows:
+                spend = float(r.get("spend") or 0)
+                out.append({"account_id": account_id, "level": "ad_set", "id": r["adset_id"], "spend": spend})
+                campaigns[r["campaign_id"]] = campaigns.get(r["campaign_id"], 0.0) + spend
+            out += [{"account_id": account_id, "level": "campaign", "id": c, "spend": s} for c, s in campaigns.items()]
+        return out
+
+    def apply(self, change):
+        """Write one change, or raise. Each write first re-reads the object, and writes only
+        if it sits in the planned ad account and still holds the planned old value."""
+        account = _digits(str(change["account_id"]).removeprefix("act_"), "ad account id")
+        where = (change["target_type"], change["field"])
+        if where == ("ad_set", "daily_budget_micros"):
+            ad_set_id = _digits(change["target_id"], "ad set id")
+            now = self._reread(ad_set_id, account, "daily_budget")
+            if int(now.get("daily_budget") or 0) * self.MICROS_PER_CENT != change["old"]:
+                raise RuntimeError("the budget changed after the plan; nothing written")
+            cents, rest = divmod(int(change["new"]), self.MICROS_PER_CENT)
+            if rest or cents <= 0:
+                raise ValueError(f"{change['new']} micros is not a whole number of cents above zero")
+            self._post(ad_set_id, {"daily_budget": cents})
+        elif where == ("ad", "status") and change["new"] in ("ENABLED", "PAUSED"):
+            ad_id = _digits(str(change["target_id"]).split("~")[-1], "ad id")
+            now = self._reread(ad_id, account, "status")
+            if self.STATUS.get(now.get("status")) != change["old"]:
+                raise RuntimeError("the ad's status changed after the plan; nothing written")
+            self._post(ad_id, {"status": "ACTIVE" if change["new"] == "ENABLED" else "PAUSED"})
+        elif where == ("ad_set", "optimization_goal") and (change["old"], change["new"]) == ("leads", "booked_appointments"):
+            ad_set_id = _digits(change["target_id"], "ad set id")
+            now = self._reread(ad_set_id, account, "optimization_goal,promoted_object")
+            if _meta_goal(now) != "leads":
+                raise RuntimeError("the ad set no longer optimises for leads; nothing written")
+            if now["optimization_goal"] == "LEAD_GENERATION":
+                self._post(ad_set_id, {"optimization_goal": "QUALITY_LEAD"})
+            else:
+                self._post(ad_set_id, {"promoted_object": {**now["promoted_object"], "custom_event_type": "SCHEDULE"}})
+        else:
+            raise NotImplementedError(f"{where[0]} {where[1]} -> {change['new']} is not built for Meta")
+
+    def _reread(self, object_id, account, fields):
+        """Read one object just before a write, and refuse the write if it sits in another
+        ad account."""
+        now = self._get(object_id, fields=f"account_id,{fields}")
+        if str(now.get("account_id")) != account:
+            raise RuntimeError(f"{object_id} is not in ad account {account}; nothing written")
+        return now
+
+    def _post(self, object_id, body):
+        return self._http("POST", f"{self._base}/{object_id}", self._auth(), body)
+
+
 class SnowflakeWarehouse:
-    """Reads the results snapshots, the lead reconciliation and the change log; writes the
-    change log (MERGE on key). Approval, apply-result and frozen rows use the same columns as
-    plan rows (BC-28216, BC-28219): no ALTER."""
+    """Reads the results snapshots, the lead reconciliation, the creative inputs and the
+    change log; writes the change log (MERGE on key). Approval, apply-result and frozen rows
+    use the same columns as plan rows (BC-28216, BC-28219): no ALTER."""
 
     ENV = (
         "ADS_AGENT_SNOWFLAKE_ACCOUNT",
@@ -167,9 +391,17 @@ class SnowflakeWarehouse:
     # the BC-28210 account map, and a conversion read rule. Rename here if it lands elsewhere.
     SNAPSHOT = "ANALYTICS.MARTS.MART_ADS_AGENT_RESULTS_SNAPSHOT"
     # The same at ad grain, for the ad kill rule (BC-28216): platform, account_id,
-    # campaign_id, ad_group_id, ad_id, spend, conversions (a conversion is a lead).
+    # campaign_id, ad_group_id, ad_id, spend, conversions (a conversion is a lead). On Meta,
+    # ad_group_id is the ad set, so Meta's ad set results are these rows summed.
     # Not built yet either; it needs its own brite-data-platform ticket.
+    # booked_appointments (BC-28218's path test and goal switch) is read when the mart has the
+    # column; it does not yet.
     AD_SNAPSHOT = "ANALYTICS.MARTS.MART_ADS_AGENT_AD_RESULTS_SNAPSHOT"
+    AD_COLUMNS = ("platform", "account_id", "campaign_id", "ad_group_id", "ad_id", "spend", "conversions")
+    # One row per published ad: what went into it, and for an AI-edited photo who approved
+    # it (BC-28221; brite-data-platform services/sql/ads_creative_inputs/schema.sql). An ad is
+    # in the approved shared library when its row exists (BC-28218).
+    CREATIVE_INPUTS = "ANALYTICS.OPERATIONS.ADS_CREATIVE_INPUTS"
     # One row per platform per day, for the data freeze (BC-28219): platform, lead_date,
     # platform_leads, britebase_leads, gap_pct, platform_spend (dollars). gap_pct is
     # |platform_leads - britebase_leads| / the larger, a fraction from 0 to 1, null only when
@@ -220,15 +452,25 @@ class SnowflakeWarehouse:
         return [dict(r, spend=float(r["spend"]), conversions=float(r["conversions"])) for r in rows]
 
     def read_ad_snapshot(self):
+        # select *: a row carries booked_appointments only once the mart has that column.
+        rows = self._query(f"select * from {self.AD_SNAPSHOT}")
+        out = []
+        for r in rows:
+            row = dict({k: r[k] for k in self.AD_COLUMNS}, ad_group_id=str(r["ad_group_id"]), ad_id=str(r["ad_id"]),
+                       spend=float(r["spend"]), conversions=float(r["conversions"]))
+            if "booked_appointments" in r:
+                booked = r["booked_appointments"]
+                row["booked_appointments"] = None if booked is None else float(booked)
+            out.append(row)
+        return out
+
+    def read_creative_inputs(self, platform):
         rows = self._query(
-            "select platform, account_id, campaign_id, ad_group_id, ad_id, spend, conversions "
-            f"from {self.AD_SNAPSHOT}"
+            f"select platform, ad_account_id, ad_id, ai_edited, approved_by from {self.CREATIVE_INPUTS} "
+            "where platform = %(p)s", {"p": platform}
         )
-        return [
-            dict(r, ad_group_id=str(r["ad_group_id"]), ad_id=str(r["ad_id"]),
-                 spend=float(r["spend"]), conversions=float(r["conversions"]))
-            for r in rows
-        ]
+        return [dict(r, ad_account_id=str(r["ad_account_id"]), ad_id=str(r["ad_id"]), ai_edited=bool(r["ai_edited"]))
+                for r in rows]
 
     def read_lead_reconciliation(self, lead_date):
         rows = self._query(
