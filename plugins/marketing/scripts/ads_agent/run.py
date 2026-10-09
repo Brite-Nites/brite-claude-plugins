@@ -49,16 +49,34 @@ own rules, each in its own function below:
 - An ad with near-zero spend after `retire_after_days` is retired (`_propose_ad_retires`).
 - "Limited by budget" is derived from yesterday's spend (`_derive_budget_limited`).
 
-Where a later ticket plugs in:
-- season rules and the step-up gate (BC-28220): append to CHECKS; add keys to the check
-  context (e.g. the install-date feed) in `_plan`.
+The season rules (BC-28220). Both platforms; every value is a rule key, so the Head of GTM
+changes it without a deploy. A budget holder's territory is its campaign's, from the
+results snapshots. Each territory's next open install date comes from Operations' capacity
+sheet, read through the `capacity` adapter. Each rule in its own function below:
+- The step-up gate (`_step_up_gate`): a territory's daily budget may grow past its launch
+  budget, its budget on season_start, only after step_up_weeks full weeks at or under
+  step_up_cost_per_booked per booked appointment. Inside the launch budget, money moves as
+  before. The launch budget is today's budget less every budget change the agent applied
+  since season_start. With no booked-appointment data the gate is unmet.
+- The capacity pause (`_propose_capacity_pauses`): a territory whose next open install date
+  is after capacity_pause_date is paused. It only lowers spend.
+- Capacity before a raise (`_capacity_open`): no raise goes into a territory whose capacity
+  row is missing, older than capacity_max_age_hours, or past the pause date. A missing or
+  stale row also posts one Slack alert a day (`_capacity_alerts`).
+- The taper (`_propose_taper`): from taper_start every budget is cut taper_daily_pct a day
+  and no budget move is planned. taper_daily_pct has no default: with none set, a run on
+  or after taper_start is refused.
+- The territory freeze (`_territory_freeze`): from territory_freeze_date a move's cut and
+  raise must sit in one territory.
+The gate, the capacity check and the freeze hold both halves of a move together, and act
+checks them again just before each write.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, available_timezones
 
 # The rule settings a run needs. Values are config, never code, and never in this public
@@ -83,6 +101,18 @@ META_RULES = {
     "retire_spend_floor": "near-zero spend in dollars: an ad that spent this much or less in the snapshot",
     "meta_budget_limited_spend_pct": "limited by budget once yesterday's spend reached this fraction of its daily budget (0.95)",
 }
+# This season's rules, on both platforms (BC-28220). Dates are YYYY-MM-DD run dates.
+SEASON_RULES = {
+    "season_start": "YYYY-MM-DD the season launched; each territory's budget that day is its launch budget",
+    "step_up_cost_per_booked": "dollars per booked appointment, calls counted, a territory must hold to grow past its launch budget",
+    "step_up_weeks": "full weeks (Monday to Sunday) in a row it must hold that cost (2)",
+    "capacity_pause_date": "YYYY-MM-DD: a territory whose next open install date is after this is paused",
+    "taper_start": "YYYY-MM-DD from which every budget is cut taper_daily_pct a day",
+    "taper_daily_pct": "the taper's daily cut, as a fraction (0.10 = 10%); no default, and the run refuses from taper_start without it",
+    "territory_freeze_date": "YYYY-MM-DD from which no budget move crosses territories",
+    "capacity_max_age_hours": "a capacity sheet row older than this blocks raises into its territory and alerts (48)",
+}
+SEASON_DATES = ("season_start", "capacity_pause_date", "taper_start", "territory_freeze_date")
 FLAGS = ("weeks_1_2", "emergency_stop")  # must be JSON true or false, so a typo fails loudly
 
 MODES = ("propose", "act")
@@ -93,10 +123,12 @@ PAIR = ":pair"  # a move's raise is keyed <cut key>:pair; only the planner write
 
 # Per platform: the level that holds a daily budget, and what act mode may write, as
 # (target type, field). Anything else is refused, targeting and rule settings included
-# (ADR-0033 §2: the agent never changes its own rules).
+# (ADR-0033 §2: the agent never changes its own rules). A budget holder's status is
+# written only to pause it for capacity (BC-28220); the adapters refuse any other status.
 PLATFORMS = {
     "google_ads": {"level": "campaign", "writable": {("campaign", BUDGET), ("campaign", STATUS), ("ad", STATUS)}},
-    "meta_ads": {"level": "ad_set", "writable": {("ad_set", BUDGET), ("ad_set", GOAL), ("ad", STATUS)}},
+    "meta_ads": {"level": "ad_set",
+                 "writable": {("ad_set", BUDGET), ("ad_set", GOAL), ("ad_set", STATUS), ("ad", STATUS)}},
 }
 # The keys that name a budget holder: its settings row's id and name, and the field of an
 # ad (or ad result) that points to it.
@@ -115,10 +147,10 @@ EDIT = ("run_date", "platform", "account_id", "target_type", "target_id", "targe
         "field", "old", "new", "checks")
 
 
-def run(*, warehouse, adapter, slack, rules, now, mode="propose", emit=False):
+def run(*, warehouse, adapter, capacity, slack, rules, now, mode="propose", emit=False):
     """Plan, log and post one day's changes. In act mode, then apply what the hard limits
-    allow and log each result. `emit` returns the plan and writes nothing anywhere
-    (ADR-028's side-effect-free mode)."""
+    allow and log each result. `capacity` reads Operations' capacity sheet (BC-28220).
+    `emit` returns the plan and writes nothing anywhere (ADR-028's side-effect-free mode)."""
     if mode not in MODES:
         raise ValueError(f"mode must be propose or act, not {mode!r}")
     platform = adapter.platform
@@ -126,7 +158,9 @@ def run(*, warehouse, adapter, slack, rules, now, mode="propose", emit=False):
         raise ValueError(f"platform must be one of {', '.join(PLATFORMS)}, not {platform!r}")
     _check_rules(rules, platform)
     run_date = _run_date(rules, now)
-    log = [r for r in warehouse.read_change_log(run_date) if r["platform"] == platform]
+    _check_taper(rules, run_date)
+    day_log = warehouse.read_change_log(run_date)  # every platform's rows: alerts are once a day for both
+    log = [r for r in day_log if r["platform"] == platform]
     frozen = _freeze(warehouse, platform, run_date, rules)
     if frozen:
         return _frozen_run(frozen, log, warehouse=warehouse, slack=slack, rules=rules,
@@ -138,33 +172,43 @@ def run(*, warehouse, adapter, slack, rules, now, mode="propose", emit=False):
     level = PLATFORMS[platform]["level"]
     meta = platform == "meta_ads"
     acct = {  # the account state every planner, check and write decision reads
-        "platform": platform, "level": level, "rules": rules, "run_date": run_date, "settings": settings,
+        "platform": platform, "level": level, "rules": rules, "run_date": run_date, "now": now,
+        "settings": settings,
         "units": {(s["account_id"], s[LEVELS[level]["id"]]): s for s in settings},
         "ads": {(a["account_id"], _ad_target(a)): a for a in adapter.read_ads(accounts)},
         # An ad turns on only from the approved shared library (BC-28218 4e).
         "creative": _creative(warehouse, platform) if meta else None,
     }
+    # The season rules' inputs (BC-28220), read on every run: act re-checks them at write time.
+    season, notes = _season(warehouse, capacity, snapshot, ad_results, acct)
+    acct.update(season)
 
-    if mode == "act" and any(r["status"] in PLAN for r in log):
-        changes, notes = [], []  # act plans once a day: a re-run only finishes today's plan
-    else:
-        notes = _derive_budget_limited(adapter, accounts, acct) if meta else []
+    if not (mode == "act" and any(r["status"] in PLAN for r in log)):  # act plans once a day
+        notes += _derive_budget_limited(adapter, accounts, acct) if meta else []
         changes, why_none = _plan(snapshot, ad_results, acct, now)
         notes += why_none
         for c in changes:
             c.update(run_date=run_date, mode=mode, platform=platform)
             c["key"] = _key(c)
         move = [c for c in changes if c["field"] == BUDGET]
-        if len(move) == 2:  # the day's one budget move, [cut, raise]: link the raise to its cut
+        # The day's one budget move, [cut, raise]: link the raise to its cut. Taper cuts
+        # are all cuts, so they never pair.
+        if len(move) == 2 and move[0]["new"] < move[0]["old"] and move[1]["new"] > move[1]["old"]:
             move[1]["key"] = f"{move[0]['key']}{PAIR}"
+    else:
+        changes = []  # a re-run only finishes today's plan
     logged = {r["key"] for r in log}
     new = [c for c in changes if c["key"] not in logged]
+    alerts = _capacity_alerts(acct, day_log, mode)
     out = {"run_date": run_date, "mode": mode, "changes": new, "already_logged": len(changes) - len(new),
            "frozen": None, "notes": notes}
     if meta:
         out["paths"] = _paths(settings)
     if new and not emit:
         warehouse.write_change_log(new)  # the record first: a failed post or write loses no plan
+    if alerts and not emit:
+        warehouse.write_change_log(alerts)
+        slack.post(_alert_text(alerts))
     if mode == "propose":
         if new and not emit:
             slack.post(summary(new, mode=mode))
@@ -247,8 +291,10 @@ def summary(changes, results=(), *, mode="propose", stopped=False, waiting=0):
 
 def _check_rules(rules, platform=None):
     """Every rule the run needs is set, and well-formed. `platform` adds that platform's own
-    rules; approve passes none, since its plan rows were checked when they were planned."""
-    need = list(RULES) + (list(META_RULES) if platform == "meta_ads" else [])
+    rules; approve passes none, since its plan rows were checked when they were planned.
+    taper_daily_pct alone may be missing or null: `_check_taper` needs it from taper_start."""
+    need = [*RULES, *(k for k in SEASON_RULES if k != "taper_daily_pct"),
+            *(META_RULES if platform == "meta_ads" else ())]
     missing = [k for k in need if k not in rules]
     if missing:
         raise ValueError(f"rule settings missing: {', '.join(missing)}")
@@ -260,12 +306,55 @@ def _check_rules(rules, platform=None):
     # case-blind disk and refuse it on Linux.
     if not isinstance(zone, str) or zone not in available_timezones():
         raise ValueError(f"rule setting timezone {zone!r} is not in this machine's IANA time zone list")
+    bad = [k for k in SEASON_DATES if _date_or_none(rules[k]) is None]
+    if bad:
+        raise ValueError(f"rule settings must be YYYY-MM-DD dates: {', '.join(bad)}")
+    bad = [k for k in ("step_up_cost_per_booked", "capacity_max_age_hours") if not (_number(rules[k]) and rules[k] > 0)]
+    weeks = rules["step_up_weeks"]
+    if not (_number(weeks) and isinstance(weeks, int) and weeks >= 1):
+        bad.append("step_up_weeks")
+    pct = rules.get("taper_daily_pct")
+    if pct is not None and not (_number(pct) and 0 < pct < 1):
+        bad.append("taper_daily_pct")
+    if bad:
+        raise ValueError(f"rule settings out of range: {', '.join(bad)} (weeks a whole number, "
+                         "the taper a fraction between 0 and 1, the rest above zero)")
     if platform == "meta_ads" and rules["meta_path_test_start"] is not None:
         start = rules["meta_path_test_start"]
         try:
             date.fromisoformat(start)
         except (TypeError, ValueError):
             raise ValueError(f"rule setting meta_path_test_start {start!r} is not a YYYY-MM-DD date or null") from None
+
+
+def _check_taper(rules, run_date):
+    """The taper's daily cut has no default (BC-28220). From taper_start a run without it
+    is refused, before any read; before then it may be missing or null."""
+    start = _rule_date(rules, "taper_start")
+    if date.fromisoformat(run_date) >= start and rules.get("taper_daily_pct") is None:
+        raise ValueError(f"taper_daily_pct is not set, and the taper began {start}: the agent will not "
+                         "guess how fast to cut. A person sets taper_daily_pct in the rules file")
+
+
+def _number(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _date_or_none(v):
+    """A YYYY-MM-DD string as a date, else None."""
+    try:
+        return date.fromisoformat(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _rule_date(rules, key):
+    return date.fromisoformat(rules[key])
+
+
+def _from(acct, key):
+    """True on and after the date in rule `key`."""
+    return date.fromisoformat(acct["run_date"]) >= _rule_date(acct["rules"], key)
 
 
 def _run_date(rules, now):
@@ -322,10 +411,10 @@ def _unit_of(c, acct):
 
 
 def _reduces_spend(c):
-    """A budget cut or an ad turned off: either only lowers spend."""
+    """A budget cut, or an ad or a budget holder paused: each only lowers spend."""
     if c["field"] == BUDGET:
         return c["old"] is not None and c["new"] is not None and c["new"] < c["old"]
-    return c["target_type"] == "ad" and c["field"] == STATUS and c["new"] == "PAUSED"
+    return c["field"] == STATUS and c["new"] == "PAUSED"
 
 
 # --- the data freeze (BC-28219) ------------------------------------------------------------
@@ -422,8 +511,9 @@ def _apply_order(c):
 def _decide(c, *, plan, approved, applied, done, acct):
     """May act write this proposed change now? Returns (verdict, why). The verdict is apply;
     done (already in effect, so log it with no write); wait (needs approval); or refuse.
-    ADR-0033's hard limits are checked again here, at write time, whatever the plan said.
-    A budget move is one change: its approval and its daily-limit slot belong to the cut."""
+    ADR-0033's hard limits are checked again here, at write time, whatever the plan said,
+    and so are the season rules that limit a move. A budget move is one change: its
+    approval and its daily-limit slot belong to the cut."""
     rules = acct["rules"]
     change = c["key"].removesuffix(PAIR)  # a move's raise belongs to its cut's change
     if (c["target_type"], c["field"]) not in PLATFORMS[acct["platform"]]["writable"]:
@@ -437,8 +527,11 @@ def _decide(c, *, plan, approved, applied, done, acct):
         pct = abs(c["new"] - c["old"]) / c["old"] if c["old"] else float("inf")
         if pct > rules["max_move_pct"]:
             return "refuse", f"moves {pct:.0%} (limit {rules['max_move_pct']:.0%})"
-    for check in (_housing_safe, _approved_creative):  # Meta's own limits, again at write time
-        got = check(c, acct)
+    # Meta's own limits and the season rules (BC-28220), again at write time. The season
+    # checks see the move c is half of, so both halves are refused together.
+    ctx = {**acct, "changes": _halves(c, plan)}
+    for check in (_housing_safe, _approved_creative, _step_up_gate, _capacity_open, _territory_freeze):
+        got = check(c, ctx)
         if got and not got[0]:
             return "refuse", got[1]
     creates_or_deletes = c["target_type"] == "campaign" and c["field"] == STATUS and (
@@ -468,6 +561,14 @@ def _decide(c, *, plan, approved, applied, done, acct):
     return "apply", "every hard limit passed"
 
 
+def _halves(c, plan):
+    """The plan rows of the budget move c is half of, [cut, raise]; [c] for anything else."""
+    if c["field"] != BUDGET:
+        return [c]
+    cut = c["key"].removesuffix(PAIR)
+    return [plan[k] for k in (cut, cut + PAIR) if k in plan] or [c]
+
+
 def _current(c, acct):
     """The setting's value now, as the adapter read it at the start of this run."""
     if c["target_type"] == "ad":
@@ -485,21 +586,28 @@ def _current(c, acct):
 def _plan(snapshot, ad_results, acct, now):
     """The day's changes, each run through CHECKS, and why each rule that planned nothing
     planned nothing. Returns (changes, reasons)."""
-    if acct["platform"] == "meta_ads":
+    meta = acct["platform"] == "meta_ads"
+    pauses, why_no_pause = _propose_capacity_pauses(acct)
+    if meta:
         results = _ad_set_results(ad_results)
-        changes, why_none = _propose_meta_budget_move(results, acct)
     else:
         results = {(r["account_id"], r["campaign_id"]): r for r in snapshot}
-        changes, why_none = _propose_budget_move(results, acct)
+    if _from(acct, "taper_start"):  # the taper replaces the day's budget move (BC-28220)
+        changes, why_none = _propose_taper(acct, {(c["account_id"], c["target_id"]) for c in pauses})
+        whys = [f"no budget move: the taper began {acct['rules']['taper_start']}", why_none]
+    else:
+        changes, why_none = (_propose_meta_budget_move if meta else _propose_budget_move)(results, acct)
+        whys = [why_none]
     kills, why_no_kill = _propose_ad_kills(ad_results, acct)
     changes += kills
-    whys = [why_none, why_no_kill]
-    if acct["platform"] == "meta_ads":
+    whys += [why_no_kill]
+    if meta:
         retires, why_no_retire = _propose_ad_retires(ad_results, acct, {(c["account_id"], c["target_id"]) for c in kills})
         goals, why_no_goal = _propose_goal_switches(results, acct)
         changes += retires + goals + _flag_housing_breaks(acct)
         whys += [why_no_retire, why_no_goal]
-    whys = [w for w in whys if w]
+    changes += pauses
+    whys = [w for w in [*whys, why_no_pause] if w]
     ctx = {**acct, "changes": changes, "now": now}
     for c in changes:
         c["checks"] = []
@@ -519,8 +627,8 @@ def _plan(snapshot, ad_results, acct, now):
 # Limit checks: (change, ctx) -> (passed, detail), or None when the check does not apply
 # to that kind of change. ctx holds the account state (`acct` in run), the day's planned
 # changes and the clock. A change that fails any check is held, not proposed. Rule values
-# come from ctx["rules"], never from code. Act also calls _housing_safe and
-# _approved_creative again at write time, with the account state alone.
+# come from ctx["rules"], never from code. Act calls _housing_safe, _approved_creative and
+# the season checks again at write time, with the change's own move as ctx["changes"].
 
 
 def _max_move(c, ctx):
@@ -583,7 +691,60 @@ def _approved_creative(c, ctx):
     return True, "in the approved shared library"
 
 
-CHECKS = [_max_move, _no_total_raise, _weekly_ceiling, _brand_untouched, _housing_safe, _approved_creative]
+def _step_up_gate(c, ctx):
+    """The step-up gate (BC-28220 rule 1), per territory. A move may lift its raise's
+    territory past the territory's launch budget only after step_up_weeks full weeks at or
+    under step_up_cost_per_booked per booked appointment. Inside the launch budget it
+    passes with no booking data. Both halves of the move pass or fail together."""
+    move = _move_of(c, ctx)
+    if move is None:
+        return None
+    up = move[1]
+    t = _territory_of(up, ctx)
+    if t is None:
+        return False, f"{up['target_name']} has no territory in the results snapshots, so its launch budget is unknown"
+    launch, after = _territory_budget(t, ctx)
+    if after <= launch:
+        return True, f"{t} stays within its launch budget: ${after / 1_000_000:,.2f} a day against ${launch / 1_000_000:,.2f}"
+    met, why = _gate(t, ctx)
+    return met, (f"{t} would go to ${after / 1_000_000:,.2f} a day, over its ${launch / 1_000_000:,.2f} launch "
+                 f"budget; {why}")
+
+
+def _capacity_open(c, ctx):
+    """No raise into a territory whose capacity row is missing, stale or past the pause
+    date (BC-28220 rules 2 and 5). Both halves of the move pass or fail together."""
+    move = _move_of(c, ctx)
+    if move is None:
+        return None
+    up = move[1]
+    t = _territory_of(up, ctx)
+    if t is None:
+        return False, f"{up['target_name']} has no territory in the results snapshots, so its capacity is unknown"
+    why = _capacity_stale(t, ctx)
+    if why:
+        return False, why
+    open_on, pause = _capacity_row(t, ctx)["next_open_install_date"], _rule_date(ctx["rules"], "capacity_pause_date")
+    if open_on > pause:
+        return False, f"{t} is full: its next open install date {open_on} is after {pause}"
+    return True, f"{t}'s next open install date {open_on} is on or before {pause}"
+
+
+def _territory_freeze(c, ctx):
+    """From territory_freeze_date, a move's cut and raise sit in one territory (BC-28220
+    rule 4). A territory the snapshots do not name is never the same as another."""
+    move = _move_of(c, ctx)
+    if move is None or not _from(ctx, "territory_freeze_date"):
+        return None
+    frm, to = (_territory_of(x, ctx) for x in move)
+    if frm and frm == to:
+        return True, f"the move stays inside {frm}"
+    return False, (f"no money moves between territories from {ctx['rules']['territory_freeze_date']}; this move "
+                   f"takes from {frm or 'an unknown territory'} and gives to {to or 'an unknown territory'}")
+
+
+CHECKS = [_max_move, _no_total_raise, _weekly_ceiling, _brand_untouched, _housing_safe, _approved_creative,
+          _step_up_gate, _capacity_open, _territory_freeze]
 
 
 def _propose_budget_move(results, acct, among=None):
@@ -892,3 +1053,213 @@ def _flag_housing_breaks(acct):
          "reason": "its current targeting breaks Meta's Housing rules"}
         for s in acct["settings"] if (breaks := _housing_breaks(s.get("targeting")))
     ]
+
+
+# --- the season rules (BC-28220) -------------------------------------------------------------
+
+
+def _season(warehouse, capacity, snapshot, ad_results, acct):
+    """The season rules' inputs, read once a run: each budget holder's territory, the
+    capacity sheet by territory (None when it could not be read), the budget changes the
+    agent applied since season_start, and booked appointments by territory and week.
+    Returns (keys for acct, notes naming anything that could not be read)."""
+    rules, platform, notes = acct["rules"], acct["platform"], []
+    try:
+        rows = capacity.read_capacity()
+    except Exception as e:  # no capacity means no raise into any territory and no pause
+        rows = None
+        notes.append(f"the capacity sheet could not be read ({type(e).__name__}: {e}), so no raise goes "
+                     "into any territory and no territory is paused for capacity")
+    sheet = None if rows is None else {}
+    oldest = datetime.min.replace(tzinfo=timezone.utc)
+    for r in rows or []:  # one row per territory; if the sheet has two, the newer one counts
+        t = _norm(r["territory"])
+        if t and (t not in sheet or (_aware(r["updated_at"]) or oldest) > (_aware(sheet[t]["updated_at"]) or oldest)):
+            sheet[t] = r
+    history = [r for r in warehouse.read_change_log_since(_rule_date(rules, "season_start").isoformat())
+               if r["platform"] == platform and r["status"] == "applied" and r["field"] == BUDGET]
+    weeks = _gate_weeks(acct)
+    bookings = {(_norm(r["territory"]), r["week_start"]): r
+                for r in warehouse.read_booked_appointments(platform, weeks[-1]) if r["week_start"] in weeks}
+    if not bookings:
+        notes.append("no booked appointments per territory in the warehouse, so no territory meets the step-up "
+                     "gate: no move lifts a territory past its launch budget")
+    territory = _territories(snapshot, ad_results, acct)
+    names = LEVELS[acct["level"]]
+    unknown = [s[names["name"]] for s in acct["settings"] if (s["account_id"], s[names["id"]]) not in territory]
+    if unknown:
+        notes.append(f"no territory in the results snapshots for {', '.join(unknown)}: the agent raises none of "
+                     "them and pauses none of them for capacity")
+    return {"territory": territory, "capacity": sheet, "history": history, "bookings": bookings}, notes
+
+
+def _norm(name):
+    """A territory name to match the sheet and the warehouse on: case and spacing ignored."""
+    return " ".join(str(name or "").split()).casefold()
+
+
+def _aware(t):
+    """A time with a zone, else None: a time with no zone has no age."""
+    return t if isinstance(t, datetime) and t.utcoffset() is not None else None
+
+
+def _territories(snapshot, ad_results, acct):
+    """Each budget holder's territory, by (account, holder id). The marts map each campaign
+    to one territory; on Meta an ad set's ad rows name it too. A holder with no snapshot
+    row has none."""
+    by_campaign = {(r["account_id"], r["campaign_id"]): r["territory"] for r in [*snapshot, *ad_results]
+                   if r.get("territory")}
+    by_ad_set = {(r["account_id"], r["ad_group_id"]): r["territory"] for r in ad_results if r.get("territory")}
+    names, out = LEVELS[acct["level"]], {}
+    for s in acct["settings"]:
+        unit = (s["account_id"], s[names["id"]])
+        t = (by_ad_set.get(unit) if acct["level"] == "ad_set" else None) or by_campaign.get(
+            (s["account_id"], s["campaign_id"]))
+        if t:
+            out[unit] = t
+    return out
+
+
+def _territory_of(c, ctx):
+    """The territory of the budget holder a budget change touches, or None."""
+    return ctx["territory"].get((c["account_id"], c["target_id"])) if c["target_type"] == ctx["level"] else None
+
+
+def _move_of(c, ctx):
+    """(cut, raise) of the budget move change c is half of, from ctx["changes"]; None when c
+    is no half of a move (a taper cut, a pause, an ad)."""
+    if c["field"] != BUDGET:
+        return None
+    budget = [x for x in ctx["changes"] if x["field"] == BUDGET]
+    cuts = [x for x in budget if x["new"] < x["old"]]
+    raises = [x for x in budget if x["new"] > x["old"]]
+    if len(cuts) != 1 or len(raises) != 1 or not any(c is x for x in budget):
+        return None
+    return cuts[0], raises[0]
+
+
+def _territory_budget(t, ctx):
+    """Territory t's daily budget in micros: (its launch budget, after the day's changes).
+    The launch budget is today's budget less every budget change the agent applied since
+    season_start, so a person's own edits count as launch budget. Only budget holders
+    still active count. A change already applied is in today's budget, so it is not
+    added again."""
+    names = LEVELS[ctx["level"]]
+    units = {(s["account_id"], s[names["id"]]): s for s in ctx["settings"]
+             if ctx["territory"].get((s["account_id"], s[names["id"]])) == t}
+    today = sum(s[BUDGET] or 0 for s in units.values())
+    applied = sum(r["new"] - r["old"] for r in ctx["history"] if (r["account_id"], r["target_id"]) in units)
+    done = {r["key"].removesuffix(":applied") for r in ctx["history"]}
+    pending = sum(x["new"] - x["old"] for x in ctx["changes"]
+                  if x["field"] == BUDGET and (x["account_id"], x["target_id"]) in units and x.get("key") not in done)
+    return today - applied, today + pending
+
+
+def _gate_weeks(acct):
+    """The step_up_weeks full weeks, Monday to Sunday, before the run date's week, newest
+    first, each named by its Monday (YYYY-MM-DD)."""
+    day = date.fromisoformat(acct["run_date"])
+    monday = day - timedelta(days=day.weekday())
+    return [(monday - timedelta(weeks=k)).isoformat() for k in range(1, acct["rules"]["step_up_weeks"] + 1)]
+
+
+def _gate(t, ctx):
+    """(met, why): territory t's cost per booked appointment, calls counted, was at or under
+    step_up_cost_per_booked in each of the last step_up_weeks full weeks. A week with no
+    row, or with spend and no booking, fails the gate."""
+    limit = ctx["rules"]["step_up_cost_per_booked"]
+    costs = []
+    for week in _gate_weeks(ctx):
+        row = ctx["bookings"].get((_norm(t), week))
+        if row is None:
+            return False, f"the step-up gate is unmet: no booked-appointment data for {t} the week of {week}"
+        costs.append((week, _per_booked(row["spend"], row["booked_appointments"])))
+    met = all(cost <= limit for _, cost in costs)
+    shown = [("none booked" if cost == float("inf") else f"${cost:,.2f}") + f" the week of {week}"
+             for week, cost in costs]
+    return met, (f"the step-up gate is {'met' if met else 'unmet'}: cost per booked appointment "
+                 f"{', '.join(shown)}, against ${limit:,.2f}")
+
+
+def _capacity_row(t, ctx):
+    """Territory t's capacity sheet row, if it has a next open install date."""
+    row = (ctx["capacity"] or {}).get(_norm(t))
+    return row if row and row.get("next_open_install_date") else None
+
+
+def _capacity_stale(t, ctx):
+    """Why territory t's capacity is not known to be current, or None: the sheet was not
+    read, t has no row, or its row is older than capacity_max_age_hours."""
+    if ctx["capacity"] is None:
+        return "the capacity sheet could not be read"
+    row = _capacity_row(t, ctx)
+    if row is None:
+        return f"the capacity sheet has no next open install date for {t}"
+    updated, limit = _aware(row.get("updated_at")), ctx["rules"]["capacity_max_age_hours"]
+    if updated is None:
+        return f"{t}'s capacity row has no update time"
+    age = (ctx["now"] - updated).total_seconds() / 3600
+    if age > limit:
+        return f"{t}'s capacity row was last updated {age:.0f} hours ago, over the {limit:g} hour limit"
+    return None
+
+
+def _propose_capacity_pauses(acct):
+    """Pause every budget holder (a Google campaign, a Meta ad set) in a territory whose next
+    open install date is after capacity_pause_date: a job booked there now could not be
+    installed in time. It only lowers spend, so a stale row still pauses. Brand campaigns
+    are never touched, and the agent never turns a paused holder back on. Returns
+    (changes, reason there are none)."""
+    names, changes = LEVELS[acct["level"]], []
+    pause = _rule_date(acct["rules"], "capacity_pause_date")
+    for s in acct["settings"]:
+        t = acct["territory"].get((s["account_id"], s[names["id"]]))
+        row = t and _capacity_row(t, acct)
+        if not row or s["brand"] or row["next_open_install_date"] <= pause:
+            continue
+        changes.append({
+            "status": "proposed", "account_id": s["account_id"], "target_type": acct["level"],
+            "target_id": s[names["id"]], "target_name": s[names["name"]], "field": STATUS,
+            "old": "ENABLED", "new": "PAUSED",
+            "reason": f"{t}'s next open install date {row['next_open_install_date']} is after {pause}",
+        })
+    return changes, None if changes else "no territory's next open install date is after capacity_pause_date"
+
+
+def _propose_taper(acct, paused):
+    """From taper_start, cut every budget the agent may move by taper_daily_pct of today's
+    budget, in whole cents, every day. Shared budgets, brand campaigns and holders paused
+    today are left alone. Returns (changes, reason there are none)."""
+    rules, names = acct["rules"], LEVELS[acct["level"]]
+    pct, changes = rules["taper_daily_pct"], []
+    for s in acct["settings"]:
+        if s["brand"] or s["budget_shared"] or not s[BUDGET] or (s["account_id"], s[names["id"]]) in paused:
+            continue
+        cut = int(s[BUDGET] * pct) // 10_000 * 10_000  # whole cents
+        if cut > 0:
+            changes.append(_change(s, -cut, f"the taper: {pct * 100:g}% a day from {rules['taper_start']}",
+                                   acct["level"]))
+    return changes, None if changes else "the taper found no budget the agent may cut"
+
+
+def _capacity_alerts(acct, day_log, mode):
+    """One alert row for each territory whose capacity row is missing or stale, the first
+    time today any platform's run finds it. The key leaves out the platform, so the other
+    platform's run finds the row and stays quiet. Raises into the territory are held all the
+    while (_capacity_open). Returns the new rows."""
+    seen, rows = {r["key"] for r in day_log}, []
+    for t in sorted(set(acct["territory"].values())):
+        why = _capacity_stale(t, acct)
+        key = hashlib.sha256(json.dumps([acct["run_date"], "capacity_alert", _norm(t)]).encode()).hexdigest()
+        if why and key not in seen:
+            rows.append({**dict.fromkeys(EDIT), "run_date": acct["run_date"], "platform": acct["platform"],
+                         "mode": mode, "status": "capacity_alert", "target_type": "territory", "target_id": t,
+                         "target_name": t, "reason": why, "checks": [], "key": key})
+    return rows
+
+
+def _alert_text(rows):
+    lines = [f"Ads agent, {rows[0]['platform']}, {rows[0]['run_date']}: CAPACITY SHEET NOT CURRENT. No budget "
+             "raise goes into these territories until the run can read a current row for each:"]
+    lines += [f"• {r['target_name']}: {r['reason']}." for r in rows]
+    return "\n".join(lines)

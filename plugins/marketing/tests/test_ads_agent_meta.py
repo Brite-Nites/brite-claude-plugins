@@ -16,7 +16,7 @@ import copy
 import json
 import sys
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -24,7 +24,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from ads_agent.fakes import FakeGoogleAds, FakeMetaAds, FakeSlack, FakeWarehouse  # noqa: E402
+from ads_agent.fakes import FakeCapacity, FakeGoogleAds, FakeMetaAds, FakeSlack, FakeWarehouse  # noqa: E402
 from ads_agent.run import approve, run  # noqa: E402
 
 NOW = datetime(2026, 10, 6, 14, 0, tzinfo=timezone.utc)      # 08:00 Oct 6 in Denver
@@ -34,14 +34,26 @@ START = "2026-09-22"  # a path test start two weeks before TODAY: the path test 
 ACCOUNT = "0000000002"
 BUDGET, GOAL = "daily_budget_micros", "optimization_goal"
 
-# Weeks 1-2 rules plus Meta's own. The time zone is an example.
+# Weeks 1-2 rules plus Meta's own. The time zone is an example. The season rules (BC-28220,
+# tested in test_ads_agent_season.py) are mid-season: every territory has room and meets
+# the step-up gate.
 RULES = {"weekly_ceiling": 2000, "max_move_pct": 0.25, "min_conversions": 3,
          "weeks_1_2": True, "emergency_stop": False,
          "target_cpl": 50, "kill_multiple": 3, "compare_multiple": 5,
          "timezone": "America/Denver", "max_lead_count_gap": 0.20,
+         "season_start": "2026-09-28", "step_up_cost_per_booked": 300, "step_up_weeks": 2,
+         "capacity_pause_date": "2026-12-10", "taper_start": "2026-12-01", "taper_daily_pct": 0.10,
+         "territory_freeze_date": "2026-11-09", "capacity_max_age_hours": 48,
          "meta_path_test_start": None, "retire_after_days": 7, "retire_spend_floor": 5,
          "meta_budget_limited_spend_pct": 0.95}
 AUTONOMOUS = dict(RULES, weeks_1_2=False)  # from about week 3
+
+# Each ad set's territory, as the ad results snapshot names it.
+TERRITORY = {"6001": "territory-a", "6002": "territory-b", "6003": "territory-c"}
+BOOKED = [{"platform": p, "territory": t, "week_start": week, "spend": 840.0, "booked_appointments": 3}
+          for p in ("google_ads", "meta_ads") for t in TERRITORY.values() for week in ("2026-09-21", "2026-09-28")]
+OPEN = [{"territory": t, "next_open_install_date": date(2026, 11, 20), "updated_at": NOW - timedelta(hours=2)}
+        for t in TERRITORY.values()]
 
 SAFE = {"geo_locations": {"cities": [{"key": "900001", "name": "Fake City", "radius": 15, "distance_unit": "mile"}]}}
 DESTINATION = {"site": "WEBSITE", "instant_form": "ON_AD"}
@@ -78,7 +90,7 @@ def _result(ad_set_id, ad_id, spend, leads, booked=None):
     """One ad snapshot row. booked_appointments is there only when a test gives it: the
     mart has no such column yet."""
     row = {"platform": "meta_ads", "account_id": ACCOUNT, "campaign_id": "5001", "ad_group_id": ad_set_id,
-           "ad_id": ad_id, "spend": spend, "conversions": leads}
+           "ad_id": ad_id, "territory": TERRITORY.get(ad_set_id, "territory-a"), "spend": spend, "conversions": leads}
     if booked is not None:
         row["booked_appointments"] = booked
     return row
@@ -104,15 +116,18 @@ def _creative(ad_id, ai_edited=False, approved_by=None, platform="meta_ads"):
 
 
 def _fakes(ad_sets=AD_SETS, ads=ADS, results=RESULTS, spend=FULL, lead_counts=AGREED, creative=()):
-    return FakeWarehouse([], results, lead_counts, creative), FakeMetaAds(ad_sets, ads, spend=spend), FakeSlack()
+    return (FakeWarehouse([], results, lead_counts, creative, bookings=BOOKED), FakeMetaAds(ad_sets, ads, spend=spend),
+            FakeSlack())
 
 
 def _run(warehouse, meta, slack, rules=RULES, now=NOW, **kw):
-    return run(warehouse=warehouse, adapter=meta, slack=slack, rules=rules, now=now, mode="propose", **kw)
+    return run(warehouse=warehouse, adapter=meta, capacity=FakeCapacity(OPEN), slack=slack, rules=rules, now=now,
+               mode="propose", **kw)
 
 
 def _act(warehouse, meta, slack, rules=AUTONOMOUS, now=NOW, **kw):
-    return run(warehouse=warehouse, adapter=meta, slack=slack, rules=rules, now=now, mode="act", **kw)
+    return run(warehouse=warehouse, adapter=meta, capacity=FakeCapacity(OPEN), slack=slack, rules=rules, now=now,
+               mode="act", **kw)
 
 
 def _approve(warehouse, key, rules=RULES, now=NOW):
@@ -331,7 +346,8 @@ def test_a_meta_cut_cannot_pay_for_a_google_raise():
           target_type="campaign", target_id="1001", field=BUDGET, old=100_000_000, new=120_000_000)
 
     _act(warehouse, meta, slack)
-    out = run(warehouse=warehouse, adapter=google, slack=slack, rules=AUTONOMOUS, now=NOW, mode="act")
+    out = run(warehouse=warehouse, adapter=google, capacity=FakeCapacity(OPEN), slack=slack, rules=AUTONOMOUS,
+              now=NOW, mode="act")
 
     assert google.write_calls == []
     assert "only written as half of a planned move" in _reason(out, "seed-xcut-0002:pair")
@@ -564,6 +580,7 @@ def test_the_cli_runs_the_platform_it_is_given(monkeypatch, tmp_path):
     monkeypatch.setenv("META_ADS_SYSTEM_USER_TOKEN", "fake-token")
     seen = []
     monkeypatch.setattr(cli, "SnowflakeWarehouse", lambda: "a fake warehouse")
+    monkeypatch.setattr(cli, "CapacitySheet", lambda: "a fake capacity sheet")
     monkeypatch.setattr(cli, "run", lambda **kw: seen.append(kw) or {"changes": []})
     rules = tmp_path / "rules.json"
     rules.write_text(json.dumps(RULES))
@@ -574,6 +591,7 @@ def test_the_cli_runs_the_platform_it_is_given(monkeypatch, tmp_path):
 
     [kw] = seen
     assert isinstance(kw["adapter"], adapters.MetaAds) and kw["mode"] == "propose" and kw["emit"]
+    assert kw["capacity"] == "a fake capacity sheet"
     assert no_platform.value.code == 2
 
 
@@ -717,6 +735,27 @@ def test_meta_adapter_refuses_a_write_it_cannot_verify(graph_env, change, reply,
     assert not [c for c in graph.calls if c[0] == "POST"]
 
 
+def test_meta_adapter_pauses_an_ad_set_and_never_turns_one_on(graph_env):
+    """The capacity pause (BC-28220): an active ad set is paused after a re-read. One that is
+    no longer active is left alone, and turning an ad set on is not built."""
+    from ads_agent.adapters import MetaAds
+
+    pause = _change(field="status", old="ENABLED", new="PAUSED")
+    graph = FakeGraph({("GET", "6001"): [{"account_id": ACCOUNT, "status": "ACTIVE"},
+                                         {"account_id": ACCOUNT, "status": "PAUSED"}],
+                       ("POST", "6001"): {"success": True}})
+    meta = MetaAds(http=graph)
+
+    meta.apply(pause)
+    with pytest.raises(RuntimeError, match="no longer active"):
+        meta.apply(pause)
+    with pytest.raises(NotImplementedError, match="not built for Meta"):
+        meta.apply(_change(field="status", old="PAUSED", new="ENABLED"))
+
+    posts = [(path, body) for method, path, _, body in graph.calls if method == "POST"]
+    assert posts == [("/v24.0/6001", {"status": "PAUSED"})]
+
+
 def _real_warehouse(monkeypatch, replies):
     from ads_agent import adapters
 
@@ -730,13 +769,14 @@ def _real_warehouse(monkeypatch, replies):
 
 def test_real_warehouse_reads_booked_appointments_only_when_the_column_exists(monkeypatch):
     base = {"platform": "meta_ads", "account_id": ACCOUNT, "campaign_id": "5001", "ad_group_id": 6001,
-            "ad_id": 7001, "spend": Decimal("12.5"), "conversions": Decimal(2), "window_start_date": "2026-09-22"}
+            "ad_id": 7001, "territory": "territory-a", "spend": Decimal("12.5"), "conversions": Decimal(2),
+            "window_start_date": "2026-09-22"}
     warehouse, sent = _real_warehouse(monkeypatch, [[base], [dict(base, booked_appointments=Decimal(1))]])
 
     before, after = warehouse.read_ad_snapshot(), warehouse.read_ad_snapshot()
 
     expected = {"platform": "meta_ads", "account_id": ACCOUNT, "campaign_id": "5001", "ad_group_id": "6001",
-                "ad_id": "7001", "spend": 12.5, "conversions": 2.0}
+                "ad_id": "7001", "territory": "territory-a", "spend": 12.5, "conversions": 2.0}
     assert before == [expected]
     assert after == [dict(expected, booked_appointments=1.0)]
     assert all("MART_ADS_AGENT_AD_RESULTS_SNAPSHOT" in sql for sql, _ in sent)

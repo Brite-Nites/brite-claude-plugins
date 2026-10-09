@@ -1,5 +1,6 @@
 """The ads-agent run seam (BC-28215 propose, BC-28216 act, BC-28522 run date, BC-28219 data
-freeze; spec BC-28205 Testing Decisions).
+freeze; spec BC-28205 Testing Decisions). The season rules (BC-28220) have their own file,
+test_ads_agent_season.py; here every run is mid-season with room in every territory.
 
 Fixture results snapshot + fixture account settings + rule settings in, change plan
 out, with fakes for Google Ads, the warehouse and Slack. Assertions are on the plan
@@ -15,7 +16,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import MappingProxyType
@@ -24,7 +25,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from ads_agent.fakes import FakeGoogleAds, FakeMetaAds, FakeSlack, FakeWarehouse  # noqa: E402
+from ads_agent.fakes import FakeCapacity, FakeGoogleAds, FakeMetaAds, FakeSlack, FakeWarehouse  # noqa: E402
 from ads_agent.run import approve, run  # noqa: E402
 
 NOW = datetime(2026, 10, 6, 14, 0, tzinfo=timezone.utc)
@@ -55,11 +56,24 @@ QUIET = [dict(s, budget_limited=False) for s in SETTINGS]  # no budget move to p
 
 # Weeks 1-2 (the launch default): act applies approved changes only, one a day. The time
 # zone is an example; NOW is 08:00 there, so TODAY is the same date in it and in UTC.
+# The season rules (BC-28220) are mid-season here: past season_start, before the freeze and
+# the taper. Every territory has room and meets the step-up gate (BOOKED, OPEN below).
 RULES = {"weekly_ceiling": 2000, "max_move_pct": 0.25, "min_conversions": 3,
          "weeks_1_2": True, "emergency_stop": False,
          "target_cpl": 50, "kill_multiple": 3, "compare_multiple": 5,
-         "timezone": "America/Denver", "max_lead_count_gap": 0.20}
+         "timezone": "America/Denver", "max_lead_count_gap": 0.20,
+         "season_start": "2026-09-28", "step_up_cost_per_booked": 300, "step_up_weeks": 2,
+         "capacity_pause_date": "2026-12-10", "taper_start": "2026-12-01", "taper_daily_pct": 0.10,
+         "territory_freeze_date": "2026-11-09", "capacity_max_age_hours": 48}
 AUTONOMOUS = dict(RULES, weeks_1_2=False)  # from about week 3
+
+TERRITORIES = ("territory-a", "territory-b", "territory-c")
+# $280 per booked appointment in both full weeks before TODAY, on both platforms.
+BOOKED = [{"platform": p, "territory": t, "week_start": week, "spend": 840.0, "booked_appointments": 3}
+          for p in ("google_ads", "meta_ads") for t in TERRITORIES for week in ("2026-09-21", "2026-09-28")]
+# Each territory's next open install date is well before the pause date, updated 2 hours ago.
+OPEN = [{"territory": t, "next_open_install_date": date(2026, 11, 20), "updated_at": NOW - timedelta(hours=2)}
+        for t in TERRITORIES]
 
 YESTERDAY = "2026-10-05"  # the day before TODAY: the lead counts the data freeze reads
 
@@ -87,16 +101,16 @@ def _ad_result(ad_group_id, ad_id, spend, leads, campaign_id="1003"):
 
 
 def _fakes(snapshot=SNAPSHOT, settings=SETTINGS, ad_snapshot=(), ads=(), lead_counts=AGREED):
-    return FakeWarehouse(snapshot, ad_snapshot, lead_counts), FakeGoogleAds(settings, ads), FakeSlack()
+    return FakeWarehouse(snapshot, ad_snapshot, lead_counts, bookings=BOOKED), FakeGoogleAds(settings, ads), FakeSlack()
 
 
 def _run(warehouse, google, slack, rules=RULES, now=NOW, **kw):
-    return run(warehouse=warehouse, adapter=google, slack=slack, rules=rules,
+    return run(warehouse=warehouse, adapter=google, capacity=FakeCapacity(OPEN), slack=slack, rules=rules,
                now=now, mode="propose", **kw)
 
 
 def _act(warehouse, google, slack, rules=AUTONOMOUS, now=NOW, **kw):
-    return run(warehouse=warehouse, adapter=google, slack=slack, rules=rules,
+    return run(warehouse=warehouse, adapter=google, capacity=FakeCapacity(OPEN), slack=slack, rules=rules,
                now=now, mode="act", **kw)
 
 
@@ -134,7 +148,8 @@ def test_propose_mode_makes_no_adapter_write():
     for c in plan["changes"]:
         _approve(warehouse, c["key"])
     _run(warehouse, google, slack, rules=AUTONOMOUS)
-    run(warehouse=warehouse, adapter=google, slack=slack, rules=AUTONOMOUS, now=NOW)  # no mode: propose
+    run(warehouse=warehouse, adapter=google, capacity=FakeCapacity(OPEN), slack=slack, rules=AUTONOMOUS,
+        now=NOW)  # no mode: propose
 
     assert [c for c in plan["changes"] if c["status"] == "proposed"], plan
     assert google.write_calls == []
@@ -163,7 +178,7 @@ def test_each_change_lists_target_old_new_reason_checks():
         assert c["status"] == "proposed"
         assert c["account_id"] == ACCOUNT and c["target_name"] and c["reason"]
         assert {k["name"] for k in c["checks"]} == {"max_move", "no_total_raise", "weekly_ceiling",
-                                                     "brand_untouched"}
+                                                     "brand_untouched", "step_up_gate", "capacity_open"}
         assert all(k["passed"] for k in c["checks"]), c["checks"]
 
 
@@ -248,7 +263,8 @@ def test_unknown_mode_is_refused_before_any_read():
     warehouse, google, slack = _fakes()
 
     with pytest.raises(ValueError, match="propose or act"):
-        run(warehouse=warehouse, adapter=google, slack=slack, rules=RULES, now=NOW, mode="apply")
+        run(warehouse=warehouse, adapter=google, capacity=FakeCapacity(OPEN), slack=slack, rules=RULES, now=NOW,
+            mode="apply")
     assert warehouse.calls == [] and google.calls == []
 
 
@@ -276,7 +292,8 @@ def test_flag_settings_must_be_true_or_false():
 def test_real_adapters_name_every_missing_env_var(monkeypatch):
     from ads_agent import adapters
 
-    for cls in (adapters.GoogleAds, adapters.MetaAds, adapters.SnowflakeWarehouse, adapters.SlackWebhook):
+    for cls in (adapters.GoogleAds, adapters.MetaAds, adapters.SnowflakeWarehouse, adapters.SlackWebhook,
+                adapters.CapacitySheet):
         for name in cls.ENV:
             monkeypatch.delenv(name, raising=False)
         with pytest.raises(adapters.MissingEnv) as err:
