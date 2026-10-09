@@ -795,6 +795,60 @@ def test_meta_adapter_pauses_an_ad_set_and_never_turns_one_on(graph_env):
     assert posts == [("/v24.0/6001", {"status": "PAUSED"})]
 
 
+CITIES = [{"key": k, "name": f"Fake city {k}", "radius": 15, "distance_unit": "mile"} for k in ("910001", "920001", "930001")]
+GEO_NOW = {"cities": CITIES, "location_types": ["home", "recent"]}
+TARGETING_NOW = {"geo_locations": GEO_NOW, "age_min": 18, "publisher_platforms": ["facebook", "instagram"]}
+
+
+def _removal(old=GEO_NOW, new=dict(GEO_NOW, cities=CITIES[:2])):
+    """A planned removal of a full territory's cities (BC-28579), as the change log holds it."""
+    return _change(target_id="6003", field="geo_locations", old=json.dumps(old), new=json.dumps(new))
+
+
+def test_meta_adapter_removes_locations_and_keeps_the_rest_of_the_targeting(graph_env):
+    """BC-28579. A locations change re-reads the ad set's targeting, and writes it back with
+    only geo_locations replaced: the age, placements and location types stay as Meta holds
+    them."""
+    from ads_agent.adapters import MetaAds
+
+    graph = FakeGraph({("GET", "6003"): {"account_id": ACCOUNT, "targeting": TARGETING_NOW},
+                       ("POST", "6003"): {"success": True}})
+
+    MetaAds(http=graph).apply(_removal())
+
+    [reread] = [c for c in graph.calls if c[0] == "GET"]
+    assert reread[2] == {"fields": "account_id,targeting"}
+    assert [(path, body) for method, path, _, body in graph.calls if method == "POST"] == [
+        ("/v24.0/6003", {"targeting": dict(TARGETING_NOW, geo_locations={"cities": CITIES[:2],
+                                                                          "location_types": ["home", "recent"]})})]
+
+
+@pytest.mark.parametrize("change, now, account, error", [
+    (_removal(), dict(TARGETING_NOW, geo_locations=dict(GEO_NOW, cities=CITIES[1:])), ACCOUNT,
+     "locations changed after the plan"),
+    (_removal(new=dict(GEO_NOW, cities=[*CITIES[:2], dict(CITIES[2], key="999999")])), TARGETING_NOW, ACCOUNT,
+     "only removes locations"),
+    (_removal(new=dict(GEO_NOW, cities=[dict(CITIES[0], radius=10), CITIES[1]])), TARGETING_NOW, ACCOUNT,
+     "only removes locations"),
+    (_removal(new=dict(GEO_NOW, cities=CITIES[:2], location_types=["home"])), TARGETING_NOW, ACCOUNT,
+     "only removes locations"),
+    (_removal(new={"location_types": ["home", "recent"]}), TARGETING_NOW, ACCOUNT, "no location"),
+    (_removal(), TARGETING_NOW, "0000000009", "not in ad account"),
+], ids=["moved-since-the-plan", "adds-a-city", "edits-a-radius", "edits-location-types", "leaves-none",
+        "other-account"])
+def test_meta_adapter_refuses_a_locations_change_that_is_not_a_plain_removal(graph_env, change, now, account, error):
+    """BC-28579. The adapter writes nothing when the locations moved since the plan, when the
+    change would add or edit a location or anything beside the locations, when it would
+    leave no location, or when the ad set is in another ad account."""
+    from ads_agent.adapters import MetaAds
+
+    graph = FakeGraph({("GET", "6003"): {"account_id": account, "targeting": now}})
+
+    with pytest.raises((RuntimeError, ValueError), match=error):
+        MetaAds(http=graph).apply(change)
+    assert not [c for c in graph.calls if c[0] == "POST"]
+
+
 def _real_warehouse(monkeypatch, replies):
     from ads_agent import adapters
 

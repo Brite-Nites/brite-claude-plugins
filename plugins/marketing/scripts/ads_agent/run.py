@@ -39,8 +39,9 @@ Slack alert a day. The watchdog is a separate run and still pauses.
 Meta (BC-28218). Every rule above applies unchanged. A Meta budget sits on the ad set, so
 a Meta move cuts one ad set and raises another; an ad's ad_group_id is its ad set. Meta's
 own rules, each in its own function below:
-- Housing: the agent never writes targeting, and holds a flag row for any ad set whose
-  targeting breaks Meta's Housing rules (`_housing_breaks`).
+- Housing: the agent holds a flag row for any ad set whose targeting breaks Meta's Housing
+  rules (`_housing_breaks`). It writes targeting only to remove a full territory's
+  locations from the instant-form ad set, with approval (BC-28579, below).
 - Two paths: each ad set is a market-site ad set or an instant-form ad set (`_path`).
 - The 50/50 path test: two weeks after `meta_path_test_start`, once both paths have booked
   appointments, the day's budget move goes toward the path with the lower cost per booked
@@ -72,6 +73,16 @@ sheet, read through the `capacity` adapter. Each rule in its own function below:
   or after taper_start is refused.
 - The territory freeze (`_territory_freeze`): from territory_freeze_date a move's cut and
   raise must sit in one territory.
+- 'multi' and capacity (BC-28579). 'multi' has no capacity sheet row of its own. The rule
+  key multi_territories maps each territory the instant-form ad set covers, spelled as the
+  sheet spells it, to that territory's Meta location keys in the ad set's targeting. A
+  raise into 'multi' needs a current, open row for every listed territory (`_multi_open`);
+  with the key missing or empty it is held. The daily alert names the listed territories
+  whose rows are missing or stale, not 'multi'. A listed territory past
+  capacity_pause_date proposes one change: the instant-form ad set's targeting without
+  that territory's locations (`_propose_location_removals`). It always waits for approval,
+  and is held unless it removes exactly those locations and stays Housing-safe
+  (`_location_removal`).
 The gate, the capacity check and the freeze hold both halves of a move together, and act
 checks them again just before each write.
 """
@@ -124,6 +135,11 @@ GATE_RULES = {
     "gate_channels": '"paid" (default): the gate counts bookings credited to this platform\'s paid ads; "all": any channel',
 }
 GATE_CHOICES = {"gate_clients": ("new", "any"), "gate_channels": ("paid", "all")}
+# The territories 'multi' covers (BC-28579), on both platforms. May be left out, but then no
+# raise goes into 'multi'.
+MULTI_RULES = {
+    "multi_territories": "each territory the instant-form ad set ('multi') covers, as the sheet spells it: [its Meta location keys]",
+}
 # (gate_clients, gate_channels): the territory weekly mart's column the gate divides spend by.
 GATE_COLUMNS = {("new", "paid"): "booked_paid_new", ("any", "paid"): "booked_paid_any_client",
                 ("new", "all"): "booked_all_new", ("any", "all"): "booked_all_any_client"}
@@ -133,16 +149,21 @@ MODES = ("propose", "act")
 PLAN = ("proposed", "held", "no_change")
 BUDGET, STATUS = "daily_budget_micros", "status"
 GOAL, TARGETING = "optimization_goal", "targeting"
+GEO = "geo_locations"  # the part of an ad set's targeting that holds its locations
 PAIR = ":pair"  # a move's raise is keyed <cut key>:pair; only the planner writes one
+MULTI = "multi"  # the territory of an ad set that serves several (BC-28577)
 
 # Per platform: the level that holds a daily budget, and what act mode may write, as
-# (target type, field). Anything else is refused, targeting and rule settings included
-# (ADR-0033 §2: the agent never changes its own rules). A budget holder's status is
-# written only to pause it for capacity (BC-28220); the adapters refuse any other status.
+# (target type, field). Anything else is refused, rule settings included (ADR-0033 §2: the
+# agent never changes its own rules). A budget holder's status is written only to pause it
+# for capacity (BC-28220); the adapters refuse any other status. Of a Meta ad set's
+# targeting, only its locations are written, and only to remove a full territory's
+# (BC-28579); the adapter refuses any other edit.
 PLATFORMS = {
     "google_ads": {"level": "campaign", "writable": {("campaign", BUDGET), ("campaign", STATUS), ("ad", STATUS)}},
     "meta_ads": {"level": "ad_set",
-                 "writable": {("ad_set", BUDGET), ("ad_set", GOAL), ("ad_set", STATUS), ("ad", STATUS)}},
+                 "writable": {("ad_set", BUDGET), ("ad_set", GOAL), ("ad_set", STATUS), ("ad_set", GEO),
+                              ("ad", STATUS)}},
 }
 # The keys that name a budget holder: its settings row's id and name, and the field of an
 # ad (or ad result) that points to it.
@@ -222,7 +243,7 @@ def run(*, warehouse, adapter, capacity, slack, rules, now, mode="propose", emit
         warehouse.write_change_log(new)  # the record first: a failed post or write loses no plan
     if alerts and not emit:
         warehouse.write_change_log(alerts)
-        slack.post(_alert_text(alerts))
+        slack.post(_alert_text(alerts, acct))
     if mode == "propose":
         if new and not emit:
             slack.post(summary(new, mode=mode))
@@ -338,12 +359,38 @@ def _check_rules(rules, platform=None):
     if bad:
         raise ValueError(f"rule settings out of range: {', '.join(bad)} (gate_clients is \"new\" or \"any\", "
                          "gate_channels is \"paid\" or \"all\")")
+    wrong = _bad_multi(rules.get("multi_territories"))
+    if wrong:
+        raise ValueError(f"rule setting multi_territories {wrong}")
     if platform == "meta_ads" and rules["meta_path_test_start"] is not None:
         start = rules["meta_path_test_start"]
         try:
             date.fromisoformat(start)
         except (TypeError, ValueError):
             raise ValueError(f"rule setting meta_path_test_start {start!r} is not a YYYY-MM-DD date or null") from None
+
+
+def _bad_multi(value):
+    """What is wrong with a multi_territories value (BC-28579), or None. Missing, null and {}
+    are not wrong here: they hold every raise into 'multi' (`_multi_open`)."""
+    if value is None or value == {}:
+        return None
+    if not isinstance(value, dict):
+        return 'must be a JSON object: {"<territory>": ["<Meta location key>", ...]}'
+    names, keys = [], []
+    for name, locations in value.items():
+        if not (isinstance(locations, list) and locations
+                and all(isinstance(k, str) and k.strip() for k in locations)):
+            return f"must map each territory to a list of its Meta location keys, as text; {name!r} does not"
+        names.append(_norm(name))
+        keys += [k.strip() for k in locations]
+    if "" in names or MULTI in names:
+        return "must name each territory as the capacity sheet does, not blank and not 'multi'"
+    if len(set(names)) < len(names):
+        return "names a territory twice"
+    if len(set(keys)) < len(keys):
+        return "lists a location key twice: removing one territory would remove another's location"
+    return None
 
 
 def _check_taper(rules, run_date):
@@ -404,6 +451,14 @@ def _edit(c):
         return f"daily budget ${c['old'] / 1_000_000:,.2f} → ${c['new'] / 1_000_000:,.2f}"
     if c["field"] == TARGETING:
         return "targeting is not Housing-safe; fix it by hand in Ads Manager"
+    if c["field"] == GEO:
+        old, new = _geo_of(c["old"]), _geo_of(c["new"])
+        if old is None or new is None:
+            return "locations: the planned change is not readable"
+        kept = _locations(new)
+        gone = [str(x.get("name") or x.get("key")) if isinstance(x, dict) else str(x)
+                for x in _locations(old) if x not in kept]
+        return f"locations: remove {len(gone)} ({', '.join(gone) or 'none'}), keep {len(kept)}"
     return f"{c['field']} {c['old'] or 'none'} → {c['new']}"
 
 
@@ -549,14 +604,16 @@ def _decide(c, *, plan, approved, applied, done, acct):
     # Meta's own limits and the season rules (BC-28220), again at write time. The season
     # checks see the move c is half of, so both halves are refused together.
     ctx = {**acct, "changes": _halves(c, plan)}
-    for check in (_housing_safe, _approved_creative, _step_up_gate, _capacity_open, _territory_freeze):
+    for check in (_housing_safe, _approved_creative, _step_up_gate, _capacity_open, _territory_freeze,
+                  _location_removal):
         got = check(c, ctx)
         if got and not got[0]:
             return "refuse", got[1]
     creates_or_deletes = c["target_type"] == "campaign" and c["field"] == STATUS and (
         c["old"] is None or c["new"] == "REMOVED")
-    # Switching what Meta optimises for is never automatic (BC-28218 4d).
-    if (rules["weeks_1_2"] or creates_or_deletes or c["field"] == GOAL) and change not in approved:
+    # Switching what Meta optimises for is never automatic (BC-28218 4d), and neither is
+    # removing a full territory's locations (BC-28579).
+    if (rules["weeks_1_2"] or creates_or_deletes or c["field"] in (GOAL, GEO)) and change not in approved:
         return "wait", "needs the Head of GTM's approval"
     if rules["weeks_1_2"] and {k.removesuffix(PAIR) for k in done} - {change}:
         return "refuse", "one change per platform per day while weeks_1_2 is on"
@@ -596,6 +653,8 @@ def _current(c, acct):
     unit = _unit_of(c, acct)
     if c["field"] in (BUDGET, GOAL):
         return unit and unit[c["field"]]
+    if c["field"] == GEO:
+        return unit and _spec((unit.get("targeting") or {}).get(GEO) or {})
     return "ENABLED" if unit else None  # settings list enabled budget holders only
 
 
@@ -623,7 +682,7 @@ def _plan(snapshot, ad_results, acct, now):
     if meta:
         retires, why_no_retire = _propose_ad_retires(ad_results, acct, {(c["account_id"], c["target_id"]) for c in kills})
         goals, why_no_goal = _propose_goal_switches(results, acct)
-        changes += retires + goals + _flag_housing_breaks(acct)
+        changes += retires + goals + _flag_housing_breaks(acct) + _propose_location_removals(acct)
         whys += [why_no_retire, why_no_goal]
     changes += pauses
     whys = [w for w in [*whys, why_no_pause] if w]
@@ -685,16 +744,23 @@ def _brand_untouched(c, ctx):
 
 def _housing_safe(c, ctx):
     """Meta only (BC-28218 4a). A change that does not only lower spend is held on an ad set
-    whose targeting breaks Meta's Housing rules. A targeting flag row always fails here."""
+    whose targeting breaks Meta's Housing rules. A targeting flag row always fails here. A
+    change to the locations is judged on the targeting it would leave (BC-28579)."""
     if ctx["platform"] != "meta_ads" or _reduces_spend(c):
         return None
     unit = _unit_of(c, ctx)
     if unit is None:
         return None
-    breaks = _housing_breaks(unit.get("targeting"))
+    targeting, after = unit.get("targeting"), ""
+    if c["field"] == GEO:
+        geo = _geo_of(c["new"])
+        if geo is None:
+            return False, "the planned locations are not readable"
+        targeting, after = {**(targeting or {}), GEO: geo}, " after the change"
+    breaks = _housing_breaks(targeting)
     if breaks:
-        return False, f"targeting breaks Meta's Housing rules: {'; '.join(breaks)}"
-    return True, "targeting is Housing-safe"
+        return False, f"targeting{after} breaks Meta's Housing rules: {'; '.join(breaks)}"
+    return True, f"targeting{after} is Housing-safe"
 
 
 def _approved_creative(c, ctx):
@@ -732,7 +798,8 @@ def _step_up_gate(c, ctx):
 
 def _capacity_open(c, ctx):
     """No raise into a territory whose capacity row is missing, stale or past the pause
-    date (BC-28220 rules 2 and 5). Both halves of the move pass or fail together."""
+    date (BC-28220 rules 2 and 5). 'multi' is judged on the territories it covers
+    (`_multi_open`, BC-28579). Both halves of the move pass or fail together."""
     move = _move_of(c, ctx)
     if move is None:
         return None
@@ -740,6 +807,8 @@ def _capacity_open(c, ctx):
     t = _territory_of(up, ctx)
     if t is None:
         return False, f"{up['target_name']} has no territory in the results snapshots, so its capacity is unknown"
+    if _norm(t) == MULTI:
+        return _multi_open(ctx)
     why = _capacity_stale(t, ctx)
     if why:
         return False, why
@@ -762,8 +831,37 @@ def _territory_freeze(c, ctx):
                    f"takes from {frm or 'an unknown territory'} and gives to {to or 'an unknown territory'}")
 
 
+def _location_removal(c, ctx):
+    """A change to an ad set's locations (BC-28579 rule 3) removes exactly the locations
+    multi_territories lists for the territories that are full today, and nothing else. Each
+    of those locations must be in the targeting it was planned on: a listed key the
+    targeting lacks means multi_territories is out of step with it. Some location must be
+    left. Act checks it again before the write, so a territory with room again keeps its
+    locations."""
+    if c["field"] != GEO:
+        return None
+    old, new = _geo_of(c["old"]), _geo_of(c["new"])
+    if old is None or new is None:
+        return False, "the planned locations are not readable"
+    full = _full_covered(ctx)
+    if not full:
+        return False, "no territory multi_territories lists is full today, so no location is removed"
+    names = " and ".join(t for t, _, _ in full)
+    have = _location_keys(old)
+    missing = [(t, [k for k in keys if k not in have]) for t, keys, _ in full]
+    missing = [f"{', '.join(keys)} for {t}" for t, keys in missing if keys]
+    if missing:
+        return False, (f"out of step: multi_territories lists location keys the targeting does not have "
+                       f"({'; '.join(missing)}); a person brings multi_territories in step with the targeting")
+    if new != _without(old, {k for _, keys, _ in full for k in keys}):
+        return False, f"the change does not remove exactly the locations multi_territories lists for {names}"
+    if not _locations(new):
+        return False, f"removing {names} would leave the ad set no location"
+    return True, f"removes the locations multi_territories lists for {names}, and only those"
+
+
 CHECKS = [_max_move, _no_total_raise, _weekly_ceiling, _brand_untouched, _housing_safe, _approved_creative,
-          _step_up_gate, _capacity_open, _territory_freeze]
+          _step_up_gate, _capacity_open, _territory_freeze, _location_removal]
 
 
 def _propose_budget_move(results, acct, among=None):
@@ -1111,6 +1209,9 @@ def _season(warehouse, capacity, snapshot, ad_results, acct):
     if unknown:
         notes.append(f"no territory in the results snapshots for {', '.join(unknown)}: the agent raises none of "
                      "them and pauses none of them for capacity")
+    if any(_norm(t) == MULTI for t in territory.values()) and not _multi(rules):
+        notes.append("multi_territories is not set in the rules file, so no raise goes into multi: the territories "
+                     "it covers, and their capacity, are unknown")
     return {"territory": territory, "capacity": sheet, "history": history, "bookings": bookings}, notes
 
 
@@ -1275,20 +1376,148 @@ def _capacity_alerts(acct, day_log, mode):
     """One alert row for each territory whose capacity row is missing or stale, the first
     time today any platform's run finds it. The key leaves out the platform, so the other
     platform's run finds the row and stays quiet. Raises into the territory are held all the
-    while (_capacity_open). Returns the new rows."""
+    while (_capacity_open). 'multi' has no row: the territories it covers are checked in its
+    place (BC-28579). Returns the new rows; the run posts them as one message."""
     seen, rows = {r["key"] for r in day_log}, []
-    for t in sorted(set(acct["territory"].values())):
+    for t in _alert_territories(acct):
         why = _capacity_stale(t, acct)
         key = hashlib.sha256(json.dumps([acct["run_date"], "capacity_alert", _norm(t)]).encode()).hexdigest()
         if why and key not in seen:
             rows.append({**dict.fromkeys(EDIT), "run_date": acct["run_date"], "platform": acct["platform"],
                          "mode": mode, "status": "capacity_alert", "target_type": "territory", "target_id": t,
                          "target_name": t, "reason": why, "checks": [], "key": key})
+            seen.add(key)
     return rows
 
 
-def _alert_text(rows):
+def _alert_territories(acct):
+    """The territories whose capacity rows a run checks: each budget holder's, with 'multi'
+    replaced by the territories multi_territories lists. Each once, by its sheet spelling."""
+    out = {}
+    for t in acct["territory"].values():
+        for name in (_multi(acct["rules"]) if _norm(t) == MULTI else [t]):
+            out.setdefault(_norm(name), name)
+    return sorted(out.values())
+
+
+def _alert_text(rows, acct):
     lines = [f"Ads agent, {rows[0]['platform']}, {rows[0]['run_date']}: CAPACITY SHEET NOT CURRENT. No budget "
              "raise goes into these territories until the run can read a current row for each:"]
     lines += [f"• {r['target_name']}: {r['reason']}." for r in rows]
+    covered = {_norm(t) for t in _multi(acct["rules"])} if MULTI in map(_norm, acct["territory"].values()) else set()
+    named = [r["target_name"] for r in rows if _norm(r["target_name"]) in covered]
+    if named:
+        lines.append(f"multi covers {', '.join(named)}, so no budget raise goes into multi either.")
     return "\n".join(lines)
+
+
+# --- 'multi' and capacity (BC-28579) --------------------------------------------------------
+
+
+def _multi(rules):
+    """multi_territories as {territory: [its Meta location keys]}, in the rules file's order;
+    {} when it is missing, null or empty. `_check_rules` has already refused a bad value."""
+    return {name.strip(): [k.strip() for k in keys] for name, keys in (rules.get("multi_territories") or {}).items()}
+
+
+def _multi_open(ctx):
+    """Capacity before a raise into 'multi', which has no row of its own: every territory
+    multi_territories lists must have a current row, open on or before capacity_pause_date.
+    With the key missing or empty, the territories it covers are unknown, so it is held."""
+    covers = _multi(ctx["rules"])
+    if not covers:
+        return False, "multi_territories is not set in the rules file, so the territories multi covers are unknown"
+    if ctx["capacity"] is None:
+        return False, "the capacity sheet could not be read"
+    stale = [why for t in covers if (why := _capacity_stale(t, ctx))]
+    if stale:
+        return False, f"multi covers territories whose capacity is not current: {'; '.join(stale)}"
+    pause = _rule_date(ctx["rules"], "capacity_pause_date")
+    full = _full_covered(ctx)
+    if full:
+        return False, "multi covers a full territory: " + "; ".join(
+            f"{t}'s next open install date {open_on} is after {pause}" for t, _, open_on in full)
+    return True, (f"each territory multi covers ({', '.join(covers)}) has a current row and a next open install "
+                  f"date on or before {pause}")
+
+
+def _full_covered(ctx):
+    """[(territory, its location keys, next open install date)] for each territory
+    multi_territories lists whose next open install date is after capacity_pause_date. A
+    stale row still counts, as it does for a pause: removing locations only narrows."""
+    pause = _rule_date(ctx["rules"], "capacity_pause_date")
+    out = []
+    for t, keys in _multi(ctx["rules"]).items():
+        row = _capacity_row(t, ctx)
+        if row and row["next_open_install_date"] > pause:
+            out.append((t, keys, row["next_open_install_date"]))
+    return out
+
+
+def _propose_location_removals(acct):
+    """Meta only (BC-28579 rule 3). When a territory multi_territories lists is full, one
+    change per instant-form ad set in 'multi': its locations without the full territories'.
+    Leads from a full territory would go to the BriteBase waitlist, so the ad stops reaching
+    it (Holden, 2026-10-06). The change always waits for approval (`_decide`), and is held
+    unless it removes exactly those locations and leaves the targeting Housing-safe
+    (`_location_removal`, `_housing_safe`). The agent never adds a location back."""
+    full = _full_covered(acct)
+    if not full:
+        return []
+    drop = {k for _, keys, _ in full for k in keys}
+    pause = acct["rules"]["capacity_pause_date"]
+    why = " and ".join(f"{t} is full (next open install date {open_on}, after {pause})" for t, _, open_on in full)
+    why += f", so the ad set stops targeting {'it' if len(full) == 1 else 'them'}"
+    changes = []
+    for s in acct["settings"]:
+        if (_norm(acct["territory"].get((s["account_id"], s["ad_set_id"]))) != MULTI or _path(s) != "instant_form"
+                or s["brand"]):
+            continue
+        geo = (s.get("targeting") or {}).get(GEO) or {}
+        changes.append({
+            "status": "proposed", "account_id": s["account_id"], "target_type": "ad_set",
+            "target_id": s["ad_set_id"], "target_name": s["ad_set_name"], "field": GEO,
+            "old": _spec(geo), "new": _spec(_without(geo, drop)),
+            "reason": why,
+        })
+    return changes
+
+
+def _spec(geo):
+    """A targeting spec part as one line of JSON, keys sorted: a change-log value that reads
+    back the same and gives the same change key on every run."""
+    return json.dumps(geo, sort_keys=True, separators=(",", ":"))
+
+
+def _geo_of(text):
+    """A change's planned locations, from its JSON text; None if they are not readable."""
+    try:
+        geo = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    return geo if isinstance(geo, dict) else None
+
+
+def _locations(geo):
+    """Every location in geo_locations: each entry of each list but location_types."""
+    return [x for kind, items in geo.items() if kind != "location_types" and isinstance(items, list) for x in items]
+
+
+def _location_keys(geo):
+    """The Meta location key of every location in geo_locations that has one."""
+    return {str(x["key"]) for x in _locations(geo) if isinstance(x, dict) and x.get("key") is not None}
+
+
+def _without(geo, keys):
+    """geo_locations less every location whose Meta key is in `keys`. A list the removal
+    empties is dropped; nothing else changes."""
+    out = {}
+    for kind, items in geo.items():
+        if isinstance(items, list) and kind != "location_types":
+            kept = [x for x in items
+                    if not (isinstance(x, dict) and x.get("key") is not None and str(x["key"]) in keys)]
+            if not kept and items:
+                continue
+            items = kept
+        out[kind] = items
+    return out

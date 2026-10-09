@@ -4,12 +4,13 @@ Same method names as the real adapters in `adapters.py`. Act mode (BC-28216) ass
 `write_calls`; Meta (BC-28218) has its own fake with the same shape; the season rules
 (BC-28220) add the capacity sheet and two warehouse reads. An ad snapshot row may carry
 booked_appointments, and a bookings row carries the territory weekly mart's four counts
-(BC-28577).
+(BC-28577). FakeMetaAds applies a locations write to the ad set's targeting (BC-28579).
 """
 
 from __future__ import annotations
 
 import copy
+import json
 
 
 class FakeGoogleAds:
@@ -74,6 +75,15 @@ class FakeMetaAds(FakeGoogleAds):
         if self.spend_fails:
             raise RuntimeError("fake insights failure")
         return [r for r in copy.deepcopy(self.spend) if r["account_id"] in account_ids]
+
+    def apply(self, change):
+        """As FakeGoogleAds, and a locations write (BC-28579) replaces the ad set's
+        targeting's geo_locations with the planned ones, so the next read returns them."""
+        super().apply(change)
+        if change["field"] == "geo_locations":
+            for s in self._settings:
+                if (s["account_id"], s[self.UNIT]) == (change["account_id"], change["target_id"]):
+                    s["targeting"] = {**(s.get("targeting") or {}), "geo_locations": json.loads(change["new"])}
 
 
 class FakeWarehouse:
