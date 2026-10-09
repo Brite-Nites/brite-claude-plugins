@@ -1,4 +1,5 @@
-"""The ads-agent run seam (BC-28215 propose, BC-28216 act; spec BC-28205 Testing Decisions).
+"""The ads-agent run seam (BC-28215 propose, BC-28216 act, BC-28522 run date; spec BC-28205
+Testing Decisions).
 
 Fixture results snapshot + fixture account settings + rule settings in, change plan
 out, with fakes for Google Ads, the warehouse and Slack. Assertions are on the plan
@@ -50,10 +51,12 @@ SETTINGS = [
 ]
 QUIET = [dict(s, budget_limited=False) for s in SETTINGS]  # no budget move to plan
 
-# Weeks 1-2 (the launch default): act applies approved changes only, one a day.
+# Weeks 1-2 (the launch default): act applies approved changes only, one a day. The time
+# zone is an example; NOW is 08:00 there, so TODAY is the same date in it and in UTC.
 RULES = {"weekly_ceiling": 2000, "max_move_pct": 0.25, "min_conversions": 3,
          "weeks_1_2": True, "emergency_stop": False,
-         "target_cpl": 50, "kill_multiple": 3, "compare_multiple": 5}
+         "target_cpl": 50, "kill_multiple": 3, "compare_multiple": 5,
+         "timezone": "America/Denver"}
 AUTONOMOUS = dict(RULES, weeks_1_2=False)  # from about week 3
 
 
@@ -71,18 +74,18 @@ def _fakes(snapshot=SNAPSHOT, settings=SETTINGS, ad_snapshot=(), ads=()):
     return FakeWarehouse(snapshot, ad_snapshot), FakeGoogleAds(settings, ads), FakeSlack()
 
 
-def _run(warehouse, google, slack, rules=RULES, **kw):
+def _run(warehouse, google, slack, rules=RULES, now=NOW, **kw):
     return run(warehouse=warehouse, adapter=google, slack=slack, rules=rules,
-               now=NOW, mode="propose", **kw)
+               now=now, mode="propose", **kw)
 
 
-def _act(warehouse, google, slack, rules=AUTONOMOUS, **kw):
+def _act(warehouse, google, slack, rules=AUTONOMOUS, now=NOW, **kw):
     return run(warehouse=warehouse, adapter=google, slack=slack, rules=rules,
-               now=NOW, mode="act", **kw)
+               now=now, mode="act", **kw)
 
 
-def _approve(warehouse, key, by="Fake Head of GTM"):
-    return approve(warehouse=warehouse, key=key, by=by, now=NOW)
+def _approve(warehouse, key, by="Fake Head of GTM", rules=RULES, now=NOW):
+    return approve(warehouse=warehouse, rules=rules, key=key, by=by, now=now)
 
 
 def _keys(plan):
@@ -307,6 +310,71 @@ def test_only_a_proposed_change_in_todays_plan_can_be_approved():
         _approve(warehouse, "f" * 12)
     with pytest.raises(ValueError, match="approver"):
         _approve(warehouse, held["key"], by=" ")
+
+
+# --- run date (BC-28522): the date in the rules' time zone, not in UTC --------------------
+# Tests carry their BC-28522 letter (a-c) in the docstring. Denver is UTC-6 in October.
+
+PLANNED = datetime(2026, 10, 6, 21, 0, tzinfo=timezone.utc)          # 15:00 Oct 6 in Denver
+EVENING = datetime(2026, 10, 7, 0, 30, tzinfo=timezone.utc)          # 18:30 Oct 6 in Denver
+AFTER_MIDNIGHT = datetime(2026, 10, 7, 6, 30, tzinfo=timezone.utc)   # 00:30 Oct 7 in Denver
+
+
+def test_an_approval_after_utc_midnight_finds_the_same_local_days_plan():
+    """a. Planned at 15:00 local. At 00:30 UTC the next day it is still the same date
+    locally, so the approval finds the plan and act applies it."""
+    warehouse, google, slack = _fakes()
+    plan = _run(warehouse, google, slack, now=PLANNED)
+    cut, raise_ = _keys(plan)
+
+    approval = _approve(warehouse, cut[:12], now=EVENING)
+    out = _act(warehouse, google, slack, rules=RULES, now=EVENING)
+
+    assert plan["run_date"] == approval["run_date"] == out["run_date"] == TODAY
+    assert approval["key"] == f"{cut}:approved"
+    assert out["changes"] == []  # act found the day's plan, so it planned nothing new
+    assert google.applied == [cut, raise_]
+
+
+def test_an_approval_after_local_midnight_finds_no_plan_for_the_new_day():
+    """b. Past local midnight it is a new run date with no plan yet: refused, nothing logged."""
+    warehouse, google, slack = _fakes()
+    cut, _ = _keys(_run(warehouse, google, slack, now=PLANNED))
+
+    with pytest.raises(ValueError, match="0 planned changes in the 2026-10-07 plan"):
+        _approve(warehouse, cut, now=AFTER_MIDNIGHT)
+    assert [r["status"] for r in warehouse.change_log] == ["proposed", "proposed"]
+
+
+@pytest.mark.parametrize("rules", [
+    {k: v for k, v in RULES.items() if k != "timezone"},
+    dict(RULES, timezone="America/Nowhere"),
+    dict(RULES, timezone="america/denver"),  # macOS's case-blind disk loads it; Linux does not
+    dict(RULES, timezone=-6),                # an offset is not a zone: it misses daylight saving
+], ids=["missing", "unknown", "wrong-case", "offset"])
+def test_a_missing_or_unknown_timezone_is_refused_before_any_read(rules):
+    """c. Plan, act and approve all refuse it before reading anything."""
+    warehouse, google, slack = _fakes()
+
+    with pytest.raises(ValueError, match="timezone"):
+        _run(warehouse, google, slack, rules=rules)
+    with pytest.raises(ValueError, match="timezone"):
+        _act(warehouse, google, slack, rules=rules)
+    with pytest.raises(ValueError, match="timezone"):
+        _approve(warehouse, "f" * 12, rules=rules)
+    assert warehouse.calls == [] and google.calls == []
+
+
+def test_a_clock_with_no_time_zone_is_refused_before_any_read():
+    # A bare clock time has no date until it has a zone; guessing the machine's would be silent.
+    warehouse, google, slack = _fakes()
+    bare = NOW.replace(tzinfo=None)
+
+    with pytest.raises(ValueError, match="no time zone"):
+        _run(warehouse, google, slack, now=bare)
+    with pytest.raises(ValueError, match="no time zone"):
+        _approve(warehouse, "f" * 12, now=bare)
+    assert warehouse.calls == [] and google.calls == []
 
 
 # --- act mode (BC-28216): the hard limits of ADR-0033 -------------------------------------
