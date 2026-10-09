@@ -5,7 +5,7 @@ user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash, Read
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   category: Paid Ads
 ---
 
@@ -70,6 +70,8 @@ platform per day. A budget move is one change.
    `ADS_AGENT_SNOWFLAKE_PRIVATE_KEY`, `ADS_AGENT_SNOWFLAKE_ROLE`,
    `ADS_AGENT_SNOWFLAKE_WAREHOUSE`, `ADS_AGENT_SLACK_WEBHOOK_URL`.
 2. Install the runtime libraries: `google-ads`, `snowflake-connector-python`, `cryptography`.
+   The machine also needs the IANA time zone data. macOS and most Linux have it; elsewhere
+   install `tzdata`.
 3. Write the rule settings to a JSON file outside this repo (this repo is public). Only a
    person edits this file:
    - `weekly_ceiling`: dollars a week.
@@ -80,9 +82,11 @@ platform per day. A budget move is one change.
    - `target_cpl`: target cost per lead, in dollars.
    - `kill_multiple`: 3.
    - `compare_multiple`: 5.
+   - `timezone`: an IANA time zone name, such as `America/Denver`. The run date is today's
+     date there, not in UTC, so an evening approval finds that day's plan.
 
-   `weeks_1_2` and `emergency_stop` must be JSON `true` or `false`. Anything else stops the
-   run.
+   `weeks_1_2` and `emergency_stop` must be JSON `true` or `false`. `timezone` must be an
+   exact IANA name. Anything else stops the run.
 4. Label every brand campaign `brand` in Google Ads.
 
 ## Daily flow, weeks 1-2
@@ -107,8 +111,11 @@ platform per day. A budget move is one change.
 
    ```bash
    cd "${CLAUDE_PLUGIN_ROOT}/scripts" && bws run --project-id <ads-agent project> -- \
-     python3 -m ads_agent approve <key> --by "<Head of GTM's name>"
+     python3 -m ads_agent approve <key> --by "<Head of GTM's name>" --rules <rules file>
    ```
+
+   The approval must fall on the plan's run date in the rules' `timezone`. After local
+   midnight the key matches nothing: run `propose` again for the new day.
 
 5. Preview what act would write, then run it:
 

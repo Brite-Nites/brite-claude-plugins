@@ -21,6 +21,11 @@ only if the pair's net is zero or less; a raise with no paired cut is always ref
 Weeks 1-2 (rule `weeks_1_2` on): act applies approved changes only, at most one change per
 platform per day. A move counts as one change, so one approval moves the money.
 
+The run date (BC-28522). Plan, approve and act all work on one day's plan: the calendar
+date of `now` in the rules' `timezone`, not in UTC. By the UTC date, an approval at 7 pm US
+Central would look for the next day's plan and fail. `now` itself is never converted, and a
+`now` with no time zone is refused.
+
 Where later tickets plug in:
 - Meta (BC-28218): pass a Meta adapter with the same `platform` / `read_settings` /
   `read_ads` / `apply` shape, budgets normalised to micros.
@@ -32,6 +37,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from zoneinfo import ZoneInfo, available_timezones
 
 # The rule settings a run needs. Values are config, never code, and never in this public
 # repo: a file passed with --rules until BC-28220's warehouse settings table exists. The
@@ -45,6 +51,7 @@ RULES = {
     "target_cpl": "target cost per lead in dollars (a conversion in the snapshot is a lead)",
     "kill_multiple": "an ad with zero leads turns off once it spends this many target_cpl (3)",
     "compare_multiple": "ads compare on cost per lead only once each spends this many target_cpl (5)",
+    "timezone": "IANA time zone name (Area/City); the run date is the calendar date there",
 }
 FLAGS = ("weeks_1_2", "emergency_stop")  # must be JSON true or false, so a typo fails loudly
 
@@ -69,7 +76,7 @@ def run(*, warehouse, adapter, slack, rules, now, mode="propose", emit=False):
     if mode not in MODES:
         raise ValueError(f"mode must be propose or act, not {mode!r}")
     _check_rules(rules)
-    run_date = now.date().isoformat()
+    run_date = _run_date(rules, now)
     log = [r for r in warehouse.read_change_log(run_date) if r["platform"] == adapter.platform]
     snapshot = [r for r in warehouse.read_snapshot() if r["platform"] == adapter.platform]
     ad_results = [r for r in warehouse.read_ad_snapshot() if r["platform"] == adapter.platform]
@@ -109,17 +116,19 @@ def run(*, warehouse, adapter, slack, rules, now, mode="propose", emit=False):
     return out
 
 
-def approve(*, warehouse, key, by, now):
+def approve(*, warehouse, rules, key, by, now):
     """Log the Head of GTM's approval of one proposed change in today's plan, as a new row
     keyed `<change key>:approved` with logged_by = the approver. Either half of a budget
     move approves the move: the row is keyed from the cut and covers both halves. `key` may
-    be a unique prefix of 8 or more characters. Approving the same change twice logs one row."""
+    be a unique prefix of 8 or more characters. Approving the same change twice logs one row.
+    `rules` is the run's rules file: its `timezone` says which day's plan is today's."""
     by = (by or "").strip()
     if not by:
         raise ValueError("name the approver with --by")
     if len(key) < 8:
         raise ValueError("give at least 8 characters of the change key")
-    run_date = now.date().isoformat()
+    _check_rules(rules)
+    run_date = _run_date(rules, now)
     plan = {r["key"]: r for r in warehouse.read_change_log(run_date) if r["status"] in PLAN}
     found = {k.removesuffix(PAIR) for k in plan if k.startswith(key)}
     if len(found) != 1:
@@ -174,6 +183,18 @@ def _check_rules(rules):
     bad = [k for k in FLAGS if not isinstance(rules[k], bool)]
     if bad:
         raise ValueError(f"rule settings must be true or false: {', '.join(bad)}")
+    zone = rules["timezone"]
+    # The exact name only. ZoneInfo alone would load "america/denver" from macOS's
+    # case-blind disk and refuse it on Linux.
+    if not isinstance(zone, str) or zone not in available_timezones():
+        raise ValueError(f"rule setting timezone {zone!r} is not in this machine's IANA time zone list")
+
+
+def _run_date(rules, now):
+    """The calendar date of `now` in the rules' time zone, as YYYY-MM-DD."""
+    if now.utcoffset() is None:
+        raise ValueError("now has no time zone, so its date is unknown")
+    return now.astimezone(ZoneInfo(rules["timezone"])).date().isoformat()
 
 
 def _key(c):

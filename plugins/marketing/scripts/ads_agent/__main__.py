@@ -2,11 +2,12 @@
 
     cd plugins/marketing/scripts
     bws run --project-id <ads-agent project> -- python3 -m ads_agent propose --rules <file> [--emit]
-    bws run --project-id <ads-agent project> -- python3 -m ads_agent approve <key> --by <name>
+    bws run --project-id <ads-agent project> -- python3 -m ads_agent approve <key> --by <name> --rules <file>
     bws run --project-id <ads-agent project> -- python3 -m ads_agent act --rules <file> [--emit]
 
 Prints the plan (or the approval row) as JSON. Exit 2 on a missing secret, a missing or
-bad rule setting, or a key that matches no proposed change in today's plan.
+bad rule setting, or a key that matches no proposed change in today's plan. Today is the
+date in the rules file's `timezone`.
 """
 
 from __future__ import annotations
@@ -34,14 +35,15 @@ def main(argv=None):
     s = sub.add_parser("approve", help="log the Head of GTM's approval of one proposed change in today's plan")
     s.add_argument("key", help="the change key, or a unique prefix of 8 or more characters")
     s.add_argument("--by", required=True, help="the approver, logged as logged_by")
+    s.add_argument("--rules", required=True, help="rule settings JSON; its timezone sets today's date")
     a = p.parse_args(argv)
     now = datetime.now(timezone.utc)
     try:
+        with open(a.rules, encoding="utf-8") as f:
+            rules = json.load(f)
         if a.command == "approve":
-            out = approve(warehouse=SnowflakeWarehouse(), key=a.key, by=a.by, now=now)
+            out = approve(warehouse=SnowflakeWarehouse(), rules=rules, key=a.key, by=a.by, now=now)
         else:
-            with open(a.rules, encoding="utf-8") as f:
-                rules = json.load(f)
             out = run(
                 warehouse=SnowflakeWarehouse(),
                 adapter=GoogleAds(),
