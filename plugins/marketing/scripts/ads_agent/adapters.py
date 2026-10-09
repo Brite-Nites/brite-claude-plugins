@@ -189,6 +189,25 @@ def _act(account_id):
     return "act_" + _digits(str(account_id).removeprefix("act_"), "ad account id")
 
 
+def _only_removes(old, new):
+    """True if geo_locations `new` is `old` with some locations taken out: each list of
+    locations in new holds only entries of old's same list, or is gone, and everything
+    else (location_types included) is as it was."""
+    for kind in old.keys() | new.keys():
+        before, after = old.get(kind), new.get(kind)
+        if kind == "location_types" or not isinstance(before, list):
+            if after != before:
+                return False
+        elif after is not None and (not isinstance(after, list) or any(x not in before for x in after)):
+            return False
+    return True
+
+
+def _has_location(geo):
+    """True if geo_locations still targets some place: any list entry but location_types."""
+    return any(items for kind, items in geo.items() if kind != "location_types" and isinstance(items, list))
+
+
 def _meta_goal(ad_set):
     """The run's name for what an ad set optimises for. leads: the pixel's Lead event on a
     site ad set, or an instant form's leads. booked_appointments: Meta's Schedule event on a
@@ -206,9 +225,10 @@ def _meta_goal(ad_set):
 class MetaAds:
     """Reads campaign, ad set and ad settings through the Meta Graph API. Act mode
     (BC-28218) writes through `apply`: an ad set's daily budget, an ad's status, an ad
-    set's switch from optimising for leads to booked appointments, or an ad set paused for
-    capacity (BC-28220). Nothing else is written: no targeting, no creative, no campaign,
-    ad set or ad is created, and no ad set is turned on.
+    set's switch from optimising for leads to booked appointments, an ad set paused for
+    capacity (BC-28220), or locations removed from an ad set's targeting (BC-28579).
+    Nothing else is written: no other targeting, no creative, no campaign, ad set or ad is
+    created, no location is added, and no ad set is turned on.
 
     Plain HTTPS, no SDK. The watchdog has its own Meta adapter (ads_watchdog/platforms.py);
     the two share no code, only the env var names.
@@ -380,6 +400,20 @@ class MetaAds:
                 self._post(ad_set_id, {"optimization_goal": "QUALITY_LEAD"})
             else:
                 self._post(ad_set_id, {"promoted_object": {**now["promoted_object"], "custom_event_type": "SCHEDULE"}})
+        elif where == ("ad_set", "geo_locations"):
+            # A full territory's locations out of the instant-form ad set (BC-28579). old and
+            # new are the planned geo_locations as JSON text. The rest of the targeting is
+            # written back as Meta holds it now.
+            ad_set_id = _digits(change["target_id"], "ad set id")
+            old, new = json.loads(change["old"]), json.loads(change["new"])
+            targeting = self._reread(ad_set_id, account, "targeting").get("targeting") or {}
+            if (targeting.get("geo_locations") or {}) != old:
+                raise RuntimeError("the ad set's locations changed after the plan; nothing written")
+            if not _only_removes(old, new):
+                raise ValueError("the change adds or edits a location; the agent only removes locations")
+            if not _has_location(new):
+                raise ValueError("the change would leave the ad set no location; nothing written")
+            self._post(ad_set_id, {"targeting": {**targeting, "geo_locations": new}})
         else:
             raise NotImplementedError(f"{where[0]} {where[1]} -> {change['new']} is not built for Meta")
 

@@ -5,14 +5,15 @@ user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash, Read
 metadata:
-  version: 0.7.0
+  version: 0.8.0
   category: Paid Ads
 ---
 
 # Ads agent (Google and Meta)
 
 One bounded run (BC-28215 propose, BC-28216 approve and act, BC-28218 Meta, BC-28220
-season rules; spec BC-28205): results snapshots in, change plan out. The rule is ADR-0033 in brite-gtm: the
+season rules, BC-28579 capacity for the instant-form ad set; spec BC-28205): results
+snapshots in, change plan out. The rule is ADR-0033 in brite-gtm: the
 agent may move money inside the ceiling a person set, and never sets money.
 
 Each run is for one platform, chosen with `--platform google_ads` or `--platform meta_ads`.
@@ -47,12 +48,14 @@ result is a new row whose key starts with the plan row's key.
      `target_cpl`, never before.
    - Ads in one ad group (on Meta, one ad set) are compared on cost per lead only once
      each has spent `compare_multiple` (5) times `target_cpl`. The worst of those turns off.
-7. Plans a pause for each campaign (on Meta, ad set) in a territory that is full.
+7. Plans a pause for each campaign (on Meta, ad set) in a territory that is full. On Meta,
+   it also plans removing a full territory's locations from the instant-form ad set
+   (season rule 6).
 8. On Meta, also plans the rules in "Meta's own rules" below.
 9. Runs each change through the limit checks (`max_move`, `no_total_raise`,
    `weekly_ceiling`, `brand_untouched`, `step_up_gate`, `capacity_open`,
-   `territory_freeze`, and on Meta `housing_safe` and `approved_creative`). A change that
-   fails a check is `held`.
+   `territory_freeze`, and on Meta `housing_safe`, `approved_creative` and
+   `location_removal`). A change that fails a check is `held`.
 10. Logs new rows and posts one Slack message. A re-run on the same day logs and posts
     nothing new. A capacity alert, if any, is a second message, once a day.
 
@@ -86,12 +89,13 @@ platforms: a cut on one platform never pays for a raise on the other.
 
 ## Meta's own rules
 
-1. **Housing-safe targeting.** The agent never writes targeting. Any active ad set whose
-   targeting breaks Meta's Housing rules gets a `held` targeting row naming each break: a
-   radius under 15 miles (or none), ZIP codes, an age or gender limit, or a lookalike
-   audience. An audience whose type cannot be read counts as a lookalike. A person fixes
-   the targeting by hand in Ads Manager. Until then, the agent also holds any change that
-   would add spend to that ad set; a cut or a turn-off still goes ahead.
+1. **Housing-safe targeting.** Any active ad set whose targeting breaks Meta's Housing
+   rules gets a `held` targeting row naming each break: a radius under 15 miles (or
+   none), ZIP codes, an age or gender limit, or a lookalike audience. An audience whose
+   type cannot be read counts as a lookalike. A person fixes the targeting by hand in Ads
+   Manager. Until then, the agent also holds any change that would add spend to that ad
+   set; a cut or a turn-off still goes ahead. The agent writes targeting only to remove a
+   full territory's locations from the instant-form ad set, with approval (season rule 6).
 2. **Two paths.** Each ad set is on the site path (destination: website, one ad set per
    territory) or the instant-form path (destination: a lead form on the ad, one ad set
    across Brite's Meta territories). The path comes from the destination, not the name.
@@ -160,13 +164,35 @@ capacity sheet ("Operations Health 2025-2026").
 3. **Capacity before a raise.** No raise goes into a territory whose capacity row is
    missing, older than `capacity_max_age_hours`, or past `capacity_pause_date`. A missing
    or stale row, or a sheet the run cannot read, also posts one Slack alert a day for both
-   platforms together.
+   platforms together. `multi` has no row; rule 6 says how it is judged.
 4. **The taper.** From `taper_start`, each day's plan cuts every budget the agent may move
    by `taper_daily_pct` of that day's budget, and plans no budget move. Brand campaigns and
    shared budgets are left alone. `taper_daily_pct` has no default: from `taper_start`, a
    run without it stops with exit code 2.
 5. **The territory freeze.** From `territory_freeze_date`, a move's cut and raise must be
    in the same territory.
+6. **The instant-form ad set (`multi`) and capacity (BC-28579).** `multi` has no row in
+   the capacity sheet. The rule key `multi_territories` maps each territory the
+   instant-form ad set covers, spelled as the sheet spells it, to that territory's Meta
+   location keys in the ad set's targeting. A person keeps it in step with the targeting.
+   - **Freshness.** If any listed territory's row is missing or older than
+     `capacity_max_age_hours`, no raise goes into `multi`. The day's capacity alert names
+     those territories, in one message, and says `multi` is held too. It never names
+     `multi` itself.
+   - **A full territory.** If any listed territory's next open install date is after
+     `capacity_pause_date`, no raise goes into `multi`. On Meta the plan also proposes one
+     change: the instant-form ad set's locations without that territory's. Leads from a
+     full territory go to the BriteBase waitlist, so the ad stops reaching it (Holden,
+     2026-10-06). The change always waits for the Head of GTM's approval, even after weeks
+     1-2. Act writes it through the Meta adapter, which re-reads the targeting and writes
+     back only the locations. The change is `held` when the targeting it would leave
+     breaks the Housing rules, when it would leave no location, or when a listed key is
+     not in the targeting (out of step). Act checks again before the write, so a territory
+     with room again keeps its locations. The agent never adds a location back.
+   - **Otherwise** a raise into `multi` follows every other limit, as before.
+   - **No key.** With `multi_territories` missing, `null` or `{}`, no raise goes into
+     `multi`, and the notes say why. No alert is sent for it.
+   - A site ad set's capacity check reads only its own territory's row, as before.
 
 The gate, the capacity check and the freeze hold both halves of a move together. Act
 checks them again just before each write.
@@ -182,9 +208,10 @@ Act mode re-checks every limit just before each write, whatever the plan said. I
 4. touches a brand campaign or its ads;
 5. writes anything while `emergency_stop` is true;
 6. writes a rule setting. The agent only reads the rules file, so it cannot clear the stop;
-7. on Meta, writes targeting, adds spend to an ad set that breaks the Housing rules, turns
-   on an ad from outside the approved library, or switches an optimisation goal without
-   approval;
+7. on Meta, writes targeting (beyond removing a full territory's locations from the
+   instant-form ad set, with approval), adds spend to an ad set that breaks the Housing
+   rules, turns on an ad from outside the approved library, or switches an optimisation
+   goal without approval;
 8. breaks a season rule: a move past a launch budget without the step-up gate, a raise
    into a territory whose capacity is full or not current, or a move between territories
    after `territory_freeze_date`. It writes a campaign's or ad set's status only to pause
@@ -243,11 +270,25 @@ platform per day. A budget move is one change.
        `taper_start`, and not after.
      - `gate_clients`: `"new"` or `"any"`. Optional; the default is `"new"`.
      - `gate_channels`: `"paid"` or `"all"`. Optional; the default is `"paid"`.
+     - `multi_territories`: each territory the instant-form ad set covers, spelled as in
+       the capacity sheet, mapped to that territory's Meta location keys in the ad set's
+       targeting (season rule 6). Copy the territories and their cities from brite-gtm's
+       instant-form location list (`docs/campaigns/residential-paid-ads/meta-launch/`),
+       and each city's key from the ad set in Ads Manager. Optional, but without it no
+       raise goes into `multi`. The shape, with placeholders:
+
+       ```json
+       "multi_territories": {
+         "<territory>": ["<Meta location key>", "<Meta location key>"],
+         "<another territory>": ["<Meta location key>"]
+       }
+       ```
 
    `weeks_1_2` and `emergency_stop` must be JSON `true` or `false`. `timezone` must be an
    exact IANA name. `step_up_weeks` must be a whole number. `gate_clients` and
-   `gate_channels`, when set, must be one of their two values, not `null`. Anything else
-   stops the run.
+   `gate_channels`, when set, must be one of their two values, not `null`.
+   `multi_territories`, when set, names each territory once (not `multi`), and each
+   location key once, as text. Anything else stops the run.
 4. Label every brand campaign `brand`: a label in Google Ads, an ad label in Meta.
 5. On Meta, confirm with the Head of GTM which events mean a booked appointment: Meta's
    Schedule event on the site pixel, and conversion leads on the instant form.
@@ -279,6 +320,11 @@ Run these steps for one platform at a time. `<platform>` is `google_ads` or `met
 
    If a capacity alert was posted, tell the Head of GTM which territories' rows in the
    capacity sheet need updating. Raises into them stay held until the rows are current.
+
+   If the plan proposes removing a territory's locations from the instant-form ad set,
+   name the territory and each location to the Head of GTM. Once it is applied, ask a
+   person to take that territory off `multi_territories`. Until then, each day's plan
+   holds an out-of-step row and no raise goes into `multi`.
 
 3. Show the Head of GTM each change: campaign, ad set or ad, old → new, reason, checks and
    key. Name any `held` change and the check it failed. Read out the `notes`.
@@ -318,6 +364,8 @@ Run these steps for one platform at a time. `<platform>` is `google_ads` or `met
 - Never work around a freeze, for example by raising `max_lead_count_gap` to get a plan.
 - Never work around a season rule, for example by moving `season_start` or raising
   `capacity_max_age_hours` to get a move through. Only the Head of GTM changes those values.
+  Never take a territory off `multi_territories` while its locations are still in the
+  instant-form ad set's targeting.
 - Never commit account ids, page ids, pixel ids, budgets, ceilings, results or change-log
   rows to this repo.
 - Exit code 2 names the missing secret, the bad rule setting, or the key that matched

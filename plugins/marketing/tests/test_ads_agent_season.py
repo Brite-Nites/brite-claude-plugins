@@ -4,15 +4,17 @@ spec BC-28205, workstream 4).
 The same seam as test_ads_agent_run.py: fixture snapshots, settings, capacity sheet rows,
 booked appointments and rules in; the plan and the fakes' recorded calls out. Each rule
 test names the brief item it covers in its docstring: 4a step-up gate, 4b capacity pause,
-4c stale capacity row, 4d taper, 4e territory freeze. The real capacity sheet reader is
-checked against a fake Sheets API at the end; nothing here calls Google or Snowflake.
+4c stale capacity row, 4d taper, 4e territory freeze, 4f 'multi' and capacity (BC-28579).
+The real capacity sheet reader is checked against a fake Sheets API at the end; nothing
+here calls Google or Snowflake.
 
 Every id, name, number and date here is synthetic. This repo is public: no real account
-ids, budgets, ceilings, results, sheet ids or step-up cost, ever.
+ids, budgets, ceilings, results, sheet ids, location keys or step-up cost, ever.
 """
 
 from __future__ import annotations
 
+import copy
 import sys
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -25,7 +27,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from ads_agent.fakes import FakeCapacity, FakeGoogleAds, FakeMetaAds, FakeSlack, FakeWarehouse  # noqa: E402
-from ads_agent.run import GATE_RULES, SEASON_RULES, approve, run  # noqa: E402
+from ads_agent.run import GATE_RULES, MULTI_RULES, SEASON_RULES, approve, run  # noqa: E402
 
 ACCOUNT, META_ACCOUNT = "0000000001", "0000000002"
 BUDGET = "daily_budget_micros"
@@ -531,6 +533,265 @@ def test_act_refuses_both_halves_of_a_cross_territory_move_after_the_freeze():
         assert "no money moves between territories from 2026-11-09" in _reason(out, key)
 
 
+# --- 4f: 'multi' and capacity (BC-28579) -----------------------------------------------------
+
+
+def _city(key):
+    """One city in a Meta targeting spec, at the Housing minimum radius."""
+    return {"key": key, "name": f"Fake city {key}", "region": "Fake State", "country": "US", "radius": 15,
+            "distance_unit": "mile"}
+
+
+# multi_territories: the territories the instant-form ad set covers, each with its cities' keys.
+COVERS = {"territory-a": ["910001", "910002"], "territory-b": ["920001"], "territory-c": ["930001", "930002"]}
+FORM_TARGETING = {"geo_locations": {"cities": [_city(k) for keys in COVERS.values() for k in keys],
+                                    "location_types": ["home", "recent"]},
+                  "publisher_platforms": ["facebook", "instagram"]}
+FORM_RULES = dict(META_RULES, multi_territories=COVERS)
+FORM_BUDGETS = {"6001": 100, "6002": 80, "6003": 60}  # dollars a day
+FORM_TERRITORY = {"6001": "territory-a", "6002": "territory-b", "6003": "multi"}
+MULTI_BOOKED = [_booked("multi", w, 280.0, "meta_ads") for w in MONDAYS]  # 'multi' meets its own gate
+GEO = "geo_locations"
+
+
+def _form_fakes(to="6003", sheet=None, targeting=FORM_TARGETING):
+    """Meta mid-season: site ad sets 6001 (territory-a, $100) and 6002 (territory-b, $80),
+    and the instant-form ad set 6003 ('multi', $60) with a city in each territory it
+    covers. 6002 has the worst cost per lead and `to` the best, and `to` spent its whole
+    budget yesterday, so the day's move is from 6002 to `to`. Every gate is met."""
+    ad_sets = [dict(_meta_ad_set(a), daily_budget_micros=d * M) for a, d in FORM_BUDGETS.items()]
+    ad_sets[2].update(ad_set_name="Fake instant-form ad set", destination_type="ON_AD",
+                      targeting=copy.deepcopy(targeting))
+    results = [dict(_meta_result(a, t), spend=120.0 if a == to else 800.0 if a == "6002" else 300.0,
+                    conversions=4 if a == "6002" else 6) for a, t in FORM_TERRITORY.items()]
+    spend = [{"account_id": META_ACCOUNT, "level": "ad_set", "id": to, "spend": float(FORM_BUDGETS[to])}]
+    return SimpleNamespace(warehouse=FakeWarehouse([], results, AGREED, bookings=MET + MULTI_BOOKED),
+                           google=FakeMetaAds(ad_sets, spend=spend),
+                           capacity=FakeCapacity(_sheet() if sheet is None else sheet), slack=FakeSlack())
+
+
+def _form_move(out, to="6003"):
+    """(cut, raise) of the day's move from 6002 to `to`."""
+    rows = _rows(out)
+    return rows[("6002", BUDGET)], rows[(to, BUDGET)]
+
+
+def _removal(out):
+    [row] = [c for c in out["changes"] if c["field"] == GEO]
+    return row
+
+
+def _form_cities(f):
+    """The keys of the cities the instant-form ad set targets now, as the fake serves it."""
+    form = next(s for s in f.google.read_settings([META_ACCOUNT]) if s["ad_set_id"] == "6003")
+    return [c["key"] for c in form["targeting"][GEO].get("cities", [])]
+
+
+C_FULL = {"open_on": date(2026, 12, 14)}  # after the Dec 10 pause date
+
+
+def test_a_raise_into_multi_goes_ahead_when_each_territory_it_covers_is_current_and_open():
+    """4f rules 1 and 4. 'multi' has no capacity row, so the raise into the instant-form ad
+    set is judged on the three territories multi_territories lists. Each has a current row,
+    open before the pause date: the move is proposed and act applies it. No alert, and no
+    change to the targeting."""
+    f = _form_fakes()
+
+    plan = _run(f, rules=FORM_RULES)
+    _run(f, rules=FORM_RULES, mode="act")
+
+    cut, up = _form_move(plan)
+    assert (up["old"], up["new"]) == (60 * M, 75 * M) and cut["status"] == up["status"] == "proposed"
+    assert _check(up, "capacity_open") == {
+        "name": "capacity_open", "passed": True,
+        "detail": "each territory multi covers (territory-a, territory-b, territory-c) has a current row and a next "
+                  "open install date on or before 2026-12-10"}
+    assert f.google.applied == [cut["key"], up["key"]]
+    assert not [c for c in plan["changes"] if c["field"] == GEO]
+    assert not [p for p in f.slack.posts if "CAPACITY SHEET NOT CURRENT" in p]
+
+
+def test_a_stale_row_for_a_territory_multi_covers_holds_raises_into_multi_and_alerts_once():
+    """4f rule 2. territory-b's row is 49 hours old and territory-c has none. The raise into
+    'multi' is held, both halves, naming each. One Slack alert names both territories, not
+    'multi', and says multi is held too; re-runs that day in either mode post no second."""
+    f = _form_fakes(sheet=_sheet(b={"hours_old": 49}, c=None))
+
+    plan = _run(f, rules=FORM_RULES)
+    _run(f, rules=FORM_RULES)
+    _run(f, rules=FORM_RULES, mode="act")
+
+    cut, up = _form_move(plan)
+    assert cut["status"] == up["status"] == "held" and _failed(cut) == _failed(up) == ["capacity_open"]
+    assert _check(up, "capacity_open")["detail"] == (
+        "multi covers territories whose capacity is not current: territory-b's capacity row was last updated 49 "
+        "hours ago, over the 48 hour limit; the capacity sheet has no next open install date for territory-c")
+    [alert] = [p for p in f.slack.posts if "CAPACITY SHEET NOT CURRENT" in p]
+    assert alert.splitlines()[1:] == [
+        "• territory-b: territory-b's capacity row was last updated 49 hours ago, over the 48 hour limit.",
+        "• territory-c: the capacity sheet has no next open install date for territory-c.",
+        "multi covers territory-b, territory-c, so no budget raise goes into multi either."]
+    assert [r["target_id"] for r in f.warehouse.change_log if r["status"] == "capacity_alert"] == [
+        "territory-b", "territory-c"]
+    assert f.google.write_calls == []
+
+
+def test_a_full_territory_multi_covers_holds_raises_and_proposes_removing_its_locations():
+    """4f rule 3. territory-c's next open install date is after the pause date. The raise
+    into 'multi' is held, and the plan proposes one change: the instant-form ad set's
+    locations without territory-c's two cities. It passes the Housing check on the
+    targeting it would leave, and act waits for approval even after weeks 1-2."""
+    f = _form_fakes(sheet=_sheet(c=C_FULL))
+
+    plan = _run(f, rules=FORM_RULES)
+    out = _run(f, rules=FORM_RULES, mode="act")
+
+    cut, up = _form_move(plan)
+    assert cut["status"] == up["status"] == "held" and _failed(up) == ["capacity_open"]
+    assert _check(up, "capacity_open")["detail"] == (
+        "multi covers a full territory: territory-c's next open install date 2026-12-14 is after 2026-12-10")
+    geo = _removal(plan)
+    assert (geo["target_type"], geo["target_id"], geo["status"]) == ("ad_set", "6003", "proposed")
+    assert geo["reason"] == ("territory-c is full (next open install date 2026-12-14, after 2026-12-10), so the ad "
+                             "set stops targeting it")
+    assert [(k["name"], k["passed"]) for k in geo["checks"]] == [
+        ("brand_untouched", True), ("housing_safe", True), ("location_removal", True)]
+    assert _check(geo, "housing_safe")["detail"] == "targeting after the change is Housing-safe"
+    assert "• Fake instant-form ad set: locations: remove 2 (Fake city 930001, Fake city 930002), keep 3." in (
+        f.slack.posts[0])
+    assert out["waiting"] == [geo["key"]] and f.google.write_calls == []
+    assert _form_cities(f) == ["910001", "910002", "920001", "930001", "930002"]
+
+
+def test_approving_the_removal_takes_out_only_the_full_territorys_locations():
+    """4f rule 3. Once the Head of GTM approves it, act writes the change through the Meta
+    adapter like any other: territory-c's cities leave the targeting, every other city and
+    setting stays, and the change log holds the plan, approval and apply rows."""
+    f = _form_fakes(sheet=_sheet(c=C_FULL))
+    geo = _removal(_run(f, rules=FORM_RULES))
+
+    approve(warehouse=f.warehouse, rules=FORM_RULES, key=geo["key"], by="Fake Head of GTM", now=NOW)
+    out = _run(f, rules=FORM_RULES, mode="act")
+
+    assert f.google.applied == [geo["key"]] and [r["status"] for r in out["results"]] == ["applied"]
+    assert _form_cities(f) == ["910001", "910002", "920001"]
+    form = next(s for s in f.google.read_settings([META_ACCOUNT]) if s["ad_set_id"] == "6003")
+    assert form["targeting"] == {"geo_locations": {"cities": FORM_TARGETING[GEO]["cities"][:3],
+                                                   "location_types": ["home", "recent"]},
+                                 "publisher_platforms": ["facebook", "instagram"]}
+    assert [r["status"] for r in f.warehouse.change_log if r["key"].startswith(geo["key"])] == [
+        "proposed", "approved", "applied"]
+
+
+def test_after_the_removal_the_plan_is_out_of_step_until_a_person_updates_multi_territories():
+    """4f rules 1 and 3. The day after territory-c's cities came out, multi_territories still
+    lists it: the plan holds an out-of-step row naming the missing keys, and raises into
+    'multi' stay held. Once a person takes territory-c off the list, the raise goes ahead."""
+    f = _form_fakes(sheet=_sheet(c=C_FULL))
+    approve(warehouse=f.warehouse, rules=FORM_RULES, key=_removal(_run(f, rules=FORM_RULES))["key"],
+            by="Fake Head of GTM", now=NOW)
+    _run(f, rules=FORM_RULES, mode="act")
+    f.capacity.rows = _sheet(_at("2026-10-07"), c=C_FULL)
+
+    next_day = _run(f, rules=FORM_RULES, now=_at("2026-10-07"))
+    f.capacity.rows = _sheet(_at("2026-10-08"), c=C_FULL)
+    in_step = dict(FORM_RULES, multi_territories={t: k for t, k in COVERS.items() if t != "territory-c"})
+    after = _run(f, rules=in_step, now=_at("2026-10-08"))
+
+    stale = _removal(next_day)
+    assert stale["status"] == "held" and _check(stale, "location_removal")["detail"] == (
+        "out of step: multi_territories lists location keys the targeting does not have (930001, 930002 for "
+        "territory-c); a person brings multi_territories in step with the targeting")
+    assert [c["status"] for c in _form_move(next_day)] == ["held", "held"]
+    assert [c["status"] for c in _form_move(after)] == ["proposed", "proposed"]
+    assert not [c for c in after["changes"] if c["field"] == GEO]
+
+
+@pytest.mark.parametrize("targeting, covers, failed, detail", [
+    (dict(FORM_TARGETING, age_min=25), COVERS, "housing_safe",
+     "targeting after the change breaks Meta's Housing rules: an age limit (25-65)"),
+    (FORM_TARGETING, dict(COVERS, **{"territory-c": ["930001", "930002", "939999"]}), "location_removal",
+     "out of step: multi_territories lists location keys the targeting does not have (939999 for territory-c); a "
+     "person brings multi_territories in step with the targeting"),
+    ({GEO: {"cities": [_city("930001"), _city("930002")]}}, {"territory-c": COVERS["territory-c"]},
+     "location_removal", "removing territory-c would leave the ad set no location"),
+], ids=["not-housing-safe", "out-of-step", "no-location-left"])
+def test_a_removal_is_held_unless_it_is_housing_safe_in_step_and_leaves_a_location(targeting, covers, failed,
+                                                                                   detail):
+    """4f rule 3. The removal is held when the targeting it would leave breaks the Housing
+    rules, when multi_territories lists a key the targeting does not have, or when it would
+    leave no location at all. Act never writes a held change."""
+    f = _form_fakes(sheet=_sheet(c=C_FULL), targeting=targeting)
+    rules = dict(FORM_RULES, multi_territories=covers)
+
+    geo = _removal(_run(f, rules=rules))
+    _run(f, rules=rules, mode="act")
+
+    assert geo["status"] == "held" and _failed(geo) == [failed]
+    assert _check(geo, failed)["detail"] == detail
+    assert GEO not in [c[1] for c in f.google.write_calls] and f.google.applied == []
+
+
+def test_act_keeps_the_locations_of_a_territory_with_room_again():
+    """4f rule 3, at write time. Planned and approved while territory-c was full; by the
+    time act runs, its row shows room before the pause date. Act refuses the change and
+    the targeting keeps every city."""
+    f = _form_fakes(sheet=_sheet(c=C_FULL))
+    geo = _removal(_run(f, rules=FORM_RULES))
+    approve(warehouse=f.warehouse, rules=FORM_RULES, key=geo["key"], by="Fake Head of GTM", now=NOW)
+    f.capacity.rows = _sheet()
+
+    out = _run(f, rules=FORM_RULES, mode="act")
+
+    assert _reason(out, geo["key"]) == "no territory multi_territories lists is full today, so no location is removed"
+    assert f.google.write_calls == [] and len(_form_cities(f)) == 5
+
+
+@pytest.mark.parametrize("rules", [META_RULES, dict(META_RULES, multi_territories=None),
+                                   dict(META_RULES, multi_territories={})], ids=["missing", "null", "empty"])
+def test_without_multi_territories_no_raise_goes_into_multi_and_the_run_says_why(rules):
+    """4f rule 5. With the key missing, null or empty, the territories 'multi' covers are
+    unknown: the raise into it is held, both halves, and the notes say why. No capacity
+    alert names 'multi', and no location is removed."""
+    f = _form_fakes(sheet=_sheet(c=C_FULL))
+
+    plan = _run(f, rules=rules)
+
+    cut, up = _form_move(plan)
+    assert cut["status"] == up["status"] == "held" and _failed(up) == ["capacity_open"]
+    assert _check(up, "capacity_open")["detail"] == (
+        "multi_territories is not set in the rules file, so the territories multi covers are unknown")
+    assert ("multi_territories is not set in the rules file, so no raise goes into multi: the territories it covers, "
+            "and their capacity, are unknown") in plan["notes"]
+    assert not [r for r in f.warehouse.change_log if r["status"] == "capacity_alert"]
+    assert not [c for c in plan["changes"] if c["field"] == GEO]
+
+
+@pytest.mark.parametrize("sheet, passed, detail", [
+    (_sheet(c=C_FULL), True, "territory-a's next open install date 2026-11-20 is on or before 2026-12-10"),
+    (_sheet(c=None), True, "territory-a's next open install date 2026-11-20 is on or before 2026-12-10"),
+    (_sheet(a={"hours_old": 49}), False,
+     "territory-a's capacity row was last updated 49 hours ago, over the 48 hour limit"),
+], ids=["a-covered-territory-is-full", "a-covered-territory-has-no-row", "its-own-row-is-stale"])
+def test_a_site_ad_sets_capacity_check_reads_only_its_own_territory(sheet, passed, detail):
+    """4f rule 4. A raise into a site ad set is judged on its own territory's row, as before
+    BC-28579: territory-c, which only 'multi' covers, being full or missing changes nothing,
+    and territory-a's own stale row still holds it."""
+    f = _form_fakes(to="6001", sheet=sheet)
+
+    cut, up = _form_move(_run(f, rules=FORM_RULES), to="6001")
+
+    assert (up["old"], up["new"]) == (100 * M, 120 * M)
+    assert _check(up, "capacity_open") == {"name": "capacity_open", "passed": passed, "detail": detail}
+
+
+def test_multi_territories_has_a_meaning_and_may_be_left_out():
+    """BC-28579. A one-line meaning, and not in RULES here: the season tests above run
+    without it."""
+    assert set(MULTI_RULES) == {"multi_territories"} and all(MULTI_RULES.values())
+    assert not set(MULTI_RULES) & set(RULES)
+
+
 # --- every value is a rule setting -----------------------------------------------------------
 
 
@@ -603,11 +864,23 @@ def test_each_gate_rule_has_a_meaning_and_may_be_left_out():
     pytest.param(dict(RULES, gate_clients="New"), "gate_clients", id="gate-clients-typo"),
     pytest.param(dict(RULES, gate_clients=None), "gate_clients", id="gate-clients-null"),
     pytest.param(dict(RULES, gate_channels="organic"), "gate_channels", id="gate-channels-unknown"),
+    *[pytest.param(dict(RULES, multi_territories=value), "multi_territories", id=f"multi-{name}") for name, value in [
+        ("a-list-of-names", ["territory-a", "territory-b"]),
+        ("a-key-not-in-a-list", {"territory-a": "910001"}),
+        ("no-keys", {"territory-a": []}),
+        ("a-key-as-a-number", {"territory-a": [910001]}),
+        ("a-blank-key", {"territory-a": [" "]}),
+        ("a-territory-twice", {"Territory-A": ["910001"], "territory-a ": ["910002"]}),
+        ("a-key-twice", {"territory-a": ["910001"], "territory-b": ["910001"]}),
+        ("multi-itself", {"multi": ["910001"]}),
+    ]],
 ])
 def test_season_rule_settings_are_checked_before_any_read(rules, name):
     """A missing or malformed season setting stops plan, act and approve before they read
     anything. Only taper_daily_pct may be missing, and only before taper_start; the gate
-    rules may be missing, for their defaults, but a value must be one of their choices."""
+    rules may be missing, for their defaults, but a value must be one of their choices.
+    multi_territories may be missing (4f rule 5), but a value must map each territory, once,
+    to its own Meta location keys as text (BC-28579)."""
     f = _fakes()
 
     with pytest.raises(ValueError, match=name):
