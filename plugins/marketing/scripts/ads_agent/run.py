@@ -14,6 +14,7 @@ results never edit a plan row. Each is a new row whose key starts with the plan 
     <plan key>:applied               act mode wrote it, or found it already in effect
     <plan key>:apply_failed:<hash>   act mode refused it or the write failed; reason says why
 Only `applied` is final. A refused or failed change is tried again on the next act run.
+A frozen run (below) logs one `frozen` row per platform per day and no plan rows.
 
 Act applies cuts first. A raise is written only after its own paired cut is applied, and
 only if the pair's net is zero or less; a raise with no paired cut is always refused.
@@ -26,6 +27,14 @@ date of `now` in the rules' `timezone`, not in UTC. By the UTC date, an approval
 Central would look for the next day's plan and fail. `now` itself is never converted, and a
 `now` with no time zone is refused.
 
+The data freeze (BC-28219). If the lead feed breaks, the snapshot shows no leads and the
+kill rule turns off good ads. So before planning, a run reads yesterday's row (the day
+before the run date) of the lead reconciliation mart for its platform. The run is frozen
+when the row is missing, when the platform's and BriteBase's lead counts differ by more
+than `max_lead_count_gap`, or when both counts are zero but the platform spent money. A
+frozen run plans, approves and applies nothing; it logs one `frozen` row and posts one
+Slack alert a day. The watchdog is a separate run and still pauses.
+
 Where later tickets plug in:
 - Meta (BC-28218): pass a Meta adapter with the same `platform` / `read_settings` /
   `read_ads` / `apply` shape, budgets normalised to micros.
@@ -37,6 +46,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date, timedelta
 from zoneinfo import ZoneInfo, available_timezones
 
 # The rule settings a run needs. Values are config, never code, and never in this public
@@ -52,6 +62,7 @@ RULES = {
     "kill_multiple": "an ad with zero leads turns off once it spends this many target_cpl (3)",
     "compare_multiple": "ads compare on cost per lead only once each spends this many target_cpl (5)",
     "timezone": "IANA time zone name (Area/City); the run date is the calendar date there",
+    "max_lead_count_gap": "writes freeze above this gap in yesterday's platform vs BriteBase lead counts (0.20 = 20%)",
 }
 FLAGS = ("weeks_1_2", "emergency_stop")  # must be JSON true or false, so a typo fails loudly
 
@@ -78,6 +89,10 @@ def run(*, warehouse, adapter, slack, rules, now, mode="propose", emit=False):
     _check_rules(rules)
     run_date = _run_date(rules, now)
     log = [r for r in warehouse.read_change_log(run_date) if r["platform"] == adapter.platform]
+    frozen = _freeze(warehouse, adapter.platform, run_date, rules)
+    if frozen:
+        return _frozen_run(frozen, log, warehouse=warehouse, slack=slack, rules=rules,
+                           run_date=run_date, mode=mode, platform=adapter.platform, emit=emit)
     snapshot = [r for r in warehouse.read_snapshot() if r["platform"] == adapter.platform]
     ad_results = [r for r in warehouse.read_ad_snapshot() if r["platform"] == adapter.platform]
     accounts = sorted({r["account_id"] for r in snapshot + ad_results + log if r["account_id"]})
@@ -97,7 +112,8 @@ def run(*, warehouse, adapter, slack, rules, now, mode="propose", emit=False):
             move[1]["key"] = f"{move[0]['key']}{PAIR}"
     logged = {r["key"] for r in log}
     new = [c for c in changes if c["key"] not in logged]
-    out = {"run_date": run_date, "mode": mode, "changes": new, "already_logged": len(changes) - len(new)}
+    out = {"run_date": run_date, "mode": mode, "changes": new, "already_logged": len(changes) - len(new),
+           "frozen": None}
     if new and not emit:
         warehouse.write_change_log(new)  # the record first: a failed post or write loses no plan
     if mode == "propose":
@@ -121,7 +137,8 @@ def approve(*, warehouse, rules, key, by, now):
     keyed `<change key>:approved` with logged_by = the approver. Either half of a budget
     move approves the move: the row is keyed from the cut and covers both halves. `key` may
     be a unique prefix of 8 or more characters. Approving the same change twice logs one row.
-    `rules` is the run's rules file: its `timezone` says which day's plan is today's."""
+    `rules` is the run's rules file: its `timezone` says which day's plan is today's. While
+    the change's platform is frozen (BC-28219), nothing is approved."""
     by = (by or "").strip()
     if not by:
         raise ValueError("name the approver with --by")
@@ -140,6 +157,10 @@ def approve(*, warehouse, rules, key, by, now):
     for c in halves:
         if c["status"] != "proposed":
             raise ValueError(f"change {c['key'][:12]} is {c['status']}: only a proposed change can be approved")
+    platform = halves[0]["platform"]
+    frozen = _freeze(warehouse, platform, run_date, rules)
+    if frozen:
+        raise ValueError(f"{platform} is frozen today, so nothing can be approved. Why: {frozen['detail']}")
     reason = f"approved by {by}" + (" (both halves of the move)" if len(halves) == 2 else "")
     row = dict(_result(halves[0], "approved", reason, mode="approve"), logged_by=by)
     warehouse.write_change_log([row])
@@ -232,6 +253,52 @@ def _campaign_of(c, campaigns, ads):
     if c["target_type"] == "campaign":
         return campaigns.get((c["account_id"], c["target_id"]))
     return None
+
+
+# --- the data freeze (BC-28219) ------------------------------------------------------------
+
+
+def _freeze(warehouse, platform, run_date, rules):
+    """Why the platform is frozen today, as a failed `lead_count_gap` check, or None. Reads
+    yesterday's lead reconciliation row: the day before the run date, in the rules' time zone.
+    gap_pct is |platform - BriteBase| / the larger count, null only when both are zero."""
+    day = (date.fromisoformat(run_date) - timedelta(days=1)).isoformat()
+    rows = [r for r in warehouse.read_lead_reconciliation(day) if r["platform"] == platform]
+    row = rows[0] if len(rows) == 1 else {}
+    leads, britebase, gap, spend = (row.get(k) for k in
+                                    ("platform_leads", "britebase_leads", "gap_pct", "platform_spend"))
+    limit = rules["max_lead_count_gap"]
+    if len(rows) != 1:
+        why = f"{len(rows)} lead count rows for {day}, not one: the lead feed may be broken"
+    elif leads == 0 and britebase == 0:
+        if spend == 0:
+            return None  # nothing spent, no leads either side: nothing disagrees
+        spent = "an unknown amount" if spend is None else f"${spend:,.2f}"
+        why = f"spend with no leads: {platform} spent {spent} on {day} and neither it nor BriteBase counted a lead"
+    elif gap is not None and gap <= limit:
+        return None
+    else:  # over the limit, or a null gap with a count above zero: not an agreed count
+        size = "the gap is unknown" if gap is None else f"a {gap:.1%} gap, over the {limit:.1%} limit"
+        why = f"{platform} counted {leads} leads on {day} and BriteBase {britebase}: {size}"
+    return {"name": "lead_count_gap", "passed": False, "detail": why, "lead_date": day,
+            "platform_leads": leads, "britebase_leads": britebase, "gap_pct": gap, "platform_spend": spend}
+
+
+def _frozen_run(check, log, *, warehouse, slack, rules, run_date, mode, platform, emit):
+    """A frozen run plans, approves and applies nothing. It logs one `frozen` row and posts
+    one alert per platform per day; a re-run finds the row and posts nothing new."""
+    row = {**dict.fromkeys(EDIT), "run_date": run_date, "platform": platform, "mode": mode,
+           "status": "frozen", "reason": check["detail"], "checks": [check],
+           "key": hashlib.sha256(json.dumps([run_date, platform, "frozen"]).encode()).hexdigest()}
+    if row["key"] not in {r["key"] for r in log} and not emit:
+        warehouse.write_change_log([row])  # the record first, as in an unfrozen run
+        slack.post(f"Ads agent, {platform}, {run_date} ({mode} mode): FROZEN. Why: {row['reason']}. "
+                   "The agent plans, approves and writes nothing until the lead count check passes. "
+                   "The watchdog still runs.")
+    out = {"run_date": run_date, "mode": mode, "changes": [], "already_logged": 0, "frozen": row}
+    if mode == "act":
+        out.update(results=[], waiting=[], emergency_stop=rules["emergency_stop"])
+    return out
 
 
 # --- act: apply today's plan -------------------------------------------------------------
