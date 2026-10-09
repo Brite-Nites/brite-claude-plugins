@@ -5,7 +5,7 @@ user-invocable: true
 disable-model-invocation: true
 allowed-tools: Bash, Read
 metadata:
-  version: 0.6.0
+  version: 0.7.0
   category: Paid Ads
 ---
 
@@ -36,7 +36,8 @@ result is a new row whose key starts with the plan row's key.
      on the ad set. One held by the campaign, or a lifetime budget, is never moved.
 4. Reads the season rules' inputs (see "The season rules" below): Operations' capacity
    sheet, the budget changes the agent applied since `season_start`, and booked
-   appointments per territory and week.
+   appointments per territory and week from
+   `ANALYTICS.MARTS.MART_ADS_AGENT_TERRITORY_WEEKLY`.
 5. Plans at most one budget move: from the worst cost per conversion to the best campaign
    (on Meta, ad set) that is limited by budget. Total daily budget stays the same. Shared
    budgets and brand campaigns are never moved. From `taper_start` it plans the taper
@@ -101,13 +102,14 @@ platforms: a cut on one platform never pays for a raise on the other.
      instead: one linked move toward the path with the lower cost per booked appointment.
      It repeats each day, capped by `max_move_pct`, until a person sets
      `meta_path_test_start` to `null`. Normal moves then resume.
-   - Booked appointments come from the snapshot's `booked_appointments` column. That column
-     does not exist yet, so for now the path test proposes no budget move and the notes
-     say why.
+   - Booked appointments, calls counted, come from the ad results snapshot's
+     `booked_appointments` column, summed per ad set.
+   - The path test proposes no budget move until both paths have at least one booked
+     appointment, or while any ad set's count is null. The notes say why.
 4. **Optimising for booked appointments.** Once an ad set optimised for leads has
    `min_conversions` booked appointments in the snapshot, the plan proposes switching it to
    optimise for booked appointments. Act never applies this switch without the Head of
-   GTM's approval, even after weeks 1-2. It needs the same missing column.
+   GTM's approval, even after weeks 1-2. It reads the same column.
 5. **Approved ads only.** The agent turns an ad on only if its row exists in
    `ANALYTICS.OPERATIONS.ADS_CREATIVE_INPUTS` and, when its photo was AI-edited, the row
    names `approved_by`.
@@ -137,9 +139,19 @@ capacity sheet ("Operations Health 2025-2026").
    - The run works out the launch budget as today's budget less every budget change the
      agent applied since `season_start`. A budget a person changes by hand counts as launch
      budget. Before `season_start`, the launch budget is today's budget.
-   - Booked appointments per territory are not in the warehouse yet. Until they are, no
-     territory meets the gate: every move that would lift a territory past its launch
+   - Booked appointments per territory and week come from
+     `ANALYTICS.MARTS.MART_ADS_AGENT_TERRITORY_WEEKLY`. A week's cost is the platform's
+     spend in the territory divided by one of the mart's four counts. Two rule keys choose
+     which count:
+     - `gate_clients`: `"new"` counts new clients only; `"any"` counts any client.
+     - `gate_channels`: `"paid"` counts bookings credited to this platform's paid ads;
+       `"all"` counts bookings from any channel.
+     - Left out, they default to `"new"` and `"paid"`: the `booked_paid_new` count.
+   - A week with no row, a null count or spend, or none of the chosen bookings fails the
+     gate. With no rows at all, every move that would lift a territory past its launch
      budget is held, and the notes say so.
+   - An ad set that serves several territories (the instant form) has the territory
+     `multi`. The gate treats `multi` as one more territory, judged on its own rows.
 2. **The capacity pause.** When a territory's next open install date is after
    `capacity_pause_date`, the plan pauses each campaign (on Meta, ad set) in it. A pause
    only lowers spend, so it goes ahead during the freeze and the taper, and even on a
@@ -229,9 +241,13 @@ platform per day. A budget move is one change.
      - `taper_start`: the first day of the taper.
      - `taper_daily_pct`: 0.10 means 10% a day. It may be missing or `null` until
        `taper_start`, and not after.
+     - `gate_clients`: `"new"` or `"any"`. Optional; the default is `"new"`.
+     - `gate_channels`: `"paid"` or `"all"`. Optional; the default is `"paid"`.
 
    `weeks_1_2` and `emergency_stop` must be JSON `true` or `false`. `timezone` must be an
-   exact IANA name. `step_up_weeks` must be a whole number. Anything else stops the run.
+   exact IANA name. `step_up_weeks` must be a whole number. `gate_clients` and
+   `gate_channels`, when set, must be one of their two values, not `null`. Anything else
+   stops the run.
 4. Label every brand campaign `brand`: a label in Google Ads, an ad label in Meta.
 5. On Meta, confirm with the Head of GTM which events mean a booked appointment: Meta's
    Schedule event on the site pixel, and conversion leads on the instant form.

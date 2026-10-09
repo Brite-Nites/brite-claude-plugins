@@ -2,7 +2,9 @@
 
 Same method names as the real adapters in `adapters.py`. Act mode (BC-28216) asserts on
 `write_calls`; Meta (BC-28218) has its own fake with the same shape; the season rules
-(BC-28220) add the capacity sheet and two warehouse reads.
+(BC-28220) add the capacity sheet and two warehouse reads. An ad snapshot row may carry
+booked_appointments, and a bookings row carries the territory weekly mart's four counts
+(BC-28577).
 """
 
 from __future__ import annotations
@@ -81,8 +83,9 @@ class FakeWarehouse:
         # Public, like change_log, so a test can break the lead feed between runs (BC-28219).
         self.lead_reconciliation = copy.deepcopy(list(lead_reconciliation))
         self.creative_inputs = copy.deepcopy(list(creative_inputs))
-        # Booked appointments per territory and week (BC-28220), which the real warehouse
-        # does not have yet: {"platform", "territory", "week_start", "spend", "booked_appointments"}.
+        # Booked appointments per territory and week (BC-28220), as the territory weekly mart
+        # holds them (BC-28577): {"platform", "territory", "week_start", "spend",
+        # "booked_paid_new", "booked_paid_any_client", "booked_all_new", "booked_all_any_client"}.
         self.bookings = copy.deepcopy(list(bookings))
         self.change_log: list[dict] = []
         self.calls: list[tuple] = []

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import sys
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -24,7 +25,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from ads_agent.fakes import FakeCapacity, FakeGoogleAds, FakeMetaAds, FakeSlack, FakeWarehouse  # noqa: E402
-from ads_agent.run import SEASON_RULES, approve, run  # noqa: E402
+from ads_agent.run import GATE_RULES, SEASON_RULES, approve, run  # noqa: E402
 
 ACCOUNT, META_ACCOUNT = "0000000001", "0000000002"
 BUDGET = "daily_budget_micros"
@@ -73,10 +74,14 @@ def _settings(campaigns):
             for c, _, dollars, _, _, limited in campaigns]
 
 
-def _booked(territory, week, per_booked, platform="google_ads"):
-    """One week of booked appointments in a territory, at `per_booked` dollars each."""
+COUNTS = ("booked_paid_new", "booked_paid_any_client", "booked_all_new", "booked_all_any_client")
+
+
+def _booked(territory, week, per_booked, platform="google_ads", **counts):
+    """One week of the territory weekly mart: 3 booked appointments in each of its four
+    counts, at `per_booked` dollars each. `counts` replaces any of the four."""
     return {"platform": platform, "territory": territory, "week_start": week, "spend": per_booked * 3,
-            "booked_appointments": 3}
+            **dict.fromkeys(COUNTS, 3), **counts}
 
 
 MONDAYS = [(date(2026, 9, 7) + timedelta(weeks=k)).isoformat() for k in range(17)]  # Sep 7 to Dec 28
@@ -153,9 +158,9 @@ def _seed(warehouse, day, **edit):
 
 
 def test_step_up_gate_holds_a_move_past_launch_budget_without_booked_appointments():
-    """4a, and the gap. No booked-appointment data exists yet (BC-28562), so a move that
-    lifts territory-a past its $100 launch budget is held, both halves, and act writes
-    nothing. The notes say why."""
+    """4a. The territory weekly mart has no rows for the gate's weeks, so a move that lifts
+    territory-a past its $100 launch budget is held, both halves, and act writes nothing.
+    The notes say why."""
     f = _fakes(bookings=())
 
     plan = _run(f)
@@ -173,7 +178,7 @@ def test_step_up_gate_holds_a_move_past_launch_budget_without_booked_appointment
 
 @pytest.mark.parametrize("bookings, status, detail", [
     ([_booked("territory-a", w, 280.0) for w in LAST_TWO], "proposed",
-     "the step-up gate is met: cost per booked appointment $280.00 the week of 2026-09-28, "
+     "the step-up gate is met: cost per booked appointment (booked_paid_new) $280.00 the week of 2026-09-28, "
      "$280.00 the week of 2026-09-21, against $300.00"),
     ([_booked("territory-a", w, 300.0) for w in LAST_TWO], "proposed", "the step-up gate is met"),
     ([_booked("territory-a", "2026-09-28", 280.0), _booked("territory-a", "2026-09-21", 310.0)], "held",
@@ -182,22 +187,66 @@ def test_step_up_gate_holds_a_move_past_launch_budget_without_booked_appointment
      "no booked-appointment data for territory-a the week of 2026-09-21"),
     ([_booked("territory-a", "2026-09-28", 280.0), _booked("territory-a", "2026-10-05", 280.0)], "held",
      "no booked-appointment data for territory-a the week of 2026-09-21"),
-    ([dict(_booked("territory-a", w, 280.0), booked_appointments=0) for w in LAST_TWO], "held",
+    ([_booked("territory-a", w, 280.0, booked_paid_new=0) for w in LAST_TWO], "held",
      "none booked the week of 2026-09-28"),
+    ([dict(_booked("territory-a", w, 280.0), spend=0.0, booked_paid_new=0) for w in LAST_TWO], "held",
+     "none booked the week of 2026-09-28"),
+    ([_booked("territory-a", w, 280.0, booked_paid_new=None) for w in LAST_TWO], "held",
+     "no booked-appointment data for territory-a the week of 2026-09-28"),
+    ([dict(_booked("territory-a", w, 280.0), spend=None) for w in LAST_TWO], "held",
+     "no booked-appointment data for territory-a the week of 2026-09-28"),
     ([_booked("territory-a", w, 280.0, platform="meta_ads") for w in LAST_TWO], "held",
      "no booked-appointment data for territory-a"),
     ([_booked("territory-b", w, 280.0) for w in LAST_TWO], "held", "no booked-appointment data for territory-a"),
 ], ids=["met", "at-the-cost", "one-week-over", "one-week-missing", "this-week-is-not-full", "none-booked",
-        "other-platform", "other-territory"])
+        "no-spend-none-booked", "null-count", "null-spend", "other-platform", "other-territory"])
 def test_step_up_gate_needs_each_of_the_last_full_weeks_at_or_under_the_cost(bookings, status, detail):
     """4a. Past its launch budget, territory-a needs step_up_weeks (2) full weeks, Monday to
     Sunday before this week, each at or under step_up_cost_per_booked ($300 here). The
-    week in progress, another platform's bookings and the cut's territory do not count."""
+    week in progress, another platform's bookings and the cut's territory do not count. A
+    null count or spend is no data, never zero (BC-28577)."""
     plan = _run(_fakes(bookings=bookings))
 
     cut, up = _move(plan)
     assert cut["status"] == up["status"] == status
     assert detail in _check(up, "step_up_gate")["detail"]
+
+
+# (rules added, the column they choose). Left out, the gate counts booked_paid_new.
+CHOICES = [({}, "booked_paid_new"), ({"gate_clients": "new", "gate_channels": "paid"}, "booked_paid_new"),
+           ({"gate_clients": "any", "gate_channels": "paid"}, "booked_paid_any_client"),
+           ({"gate_clients": "new", "gate_channels": "all"}, "booked_all_new"),
+           ({"gate_clients": "any", "gate_channels": "all"}, "booked_all_any_client")]
+
+
+@pytest.mark.parametrize("choice, column", CHOICES, ids=["default", "new-paid", "any-paid", "new-all", "any-all"])
+@pytest.mark.parametrize("weeks, status, detail", [
+    (((3, 0), (3, 0)), "proposed", "the step-up gate is met: cost per booked appointment ({column}) $280.00 the "
+                                   "week of 2026-09-28, $280.00 the week of 2026-09-21, against $300.00"),
+    (((2, 3), (3, 3)), "held", "the step-up gate is unmet: cost per booked appointment ({column}) $280.00 the "
+                               "week of 2026-09-28, $420.00 the week of 2026-09-21, against $300.00"),
+    (((0, 3), (0, 3)), "held", "the step-up gate is unmet: cost per booked appointment ({column}) none booked the "
+                               "week of 2026-09-28, none booked the week of 2026-09-21, against $300.00"),
+], ids=["two-weeks-under-opens", "one-week-over-shuts", "zero-bookings-shuts"])
+def test_the_gate_counts_the_column_its_rules_choose(choice, column, weeks, status, detail):
+    """4a with BC-28577. gate_clients ("new" or "any") and gate_channels ("paid" or "all")
+    choose which of the territory weekly mart's four counts the gate divides spend by. Left
+    out, the gate counts new clients' bookings credited to this platform's paid ads. Each
+    week spent $840; `weeks` gives (the chosen count, the other three) for Sep 21 and Sep
+    28. The other three always point the other way, so only the chosen column can give the
+    result: two weeks at $280 open the gate, one week at $420 keeps it shut, and so does a
+    territory with none of the chosen bookings."""
+    bookings = [_booked("territory-a", week, 280.0, **{c: n if c == column else rest for c in COUNTS})
+                for week, (n, rest) in zip(LAST_TWO, weeks)]
+    f = _fakes(bookings=bookings)
+
+    cut, up = _move(_run(f, rules=dict(RULES, **choice)))
+
+    assert cut["status"] == up["status"] == status
+    assert _failed(up) == ([] if status == "proposed" else ["step_up_gate"])
+    assert _check(up, "step_up_gate")["detail"] == (
+        "territory-a would go to $120.00 a day, over its $100.00 launch budget; " + detail.format(column=column))
+    assert ("read_booked_appointments", "google_ads", "2026-09-21") in f.warehouse.calls
 
 
 def test_money_moves_inside_a_territorys_launch_budget_without_the_gate():
@@ -534,6 +583,13 @@ def test_every_season_rule_has_a_meaning_and_is_required():
     assert all(SEASON_RULES.values())
 
 
+def test_each_gate_rule_has_a_meaning_and_may_be_left_out():
+    """gate_clients and gate_channels (BC-28577) have a one-line meaning each. RULES here
+    has neither: they have defaults (the gate-choice test's "default" case)."""
+    assert set(GATE_RULES) == {"gate_clients", "gate_channels"}
+    assert all(GATE_RULES.values()) and not set(GATE_RULES) & set(RULES)
+
+
 @pytest.mark.parametrize("rules, name", [
     *[pytest.param({k: v for k, v in RULES.items() if k != key}, key, id=f"missing-{key}")
       for key in SEASON if key != "taper_daily_pct"],
@@ -544,10 +600,14 @@ def test_every_season_rule_has_a_meaning_and_is_required():
     pytest.param(dict(RULES, step_up_cost_per_booked="300"), "step_up_cost_per_booked", id="cost-as-text"),
     pytest.param(dict(RULES, capacity_max_age_hours=-1), "capacity_max_age_hours", id="negative-hours"),
     pytest.param(dict(RULES, taper_daily_pct=10), "taper_daily_pct", id="taper-not-a-fraction"),
+    pytest.param(dict(RULES, gate_clients="New"), "gate_clients", id="gate-clients-typo"),
+    pytest.param(dict(RULES, gate_clients=None), "gate_clients", id="gate-clients-null"),
+    pytest.param(dict(RULES, gate_channels="organic"), "gate_channels", id="gate-channels-unknown"),
 ])
 def test_season_rule_settings_are_checked_before_any_read(rules, name):
     """A missing or malformed season setting stops plan, act and approve before they read
-    anything. Only taper_daily_pct may be missing, and only before taper_start."""
+    anything. Only taper_daily_pct may be missing, and only before taper_start; the gate
+    rules may be missing, for their defaults, but a value must be one of their choices."""
     f = _fakes()
 
     with pytest.raises(ValueError, match=name):
@@ -562,22 +622,33 @@ def test_season_rule_settings_are_checked_before_any_read(rules, name):
 # --- the real adapters, on fakes -------------------------------------------------------------
 
 
-def test_real_warehouse_has_no_booked_appointments_yet(monkeypatch):
-    """The gap (BC-28562): no table holds booked appointments per territory, so the real
-    read returns nothing and sends no query. The gate's record of applied changes is one
-    ranged read of the change log."""
+def test_real_warehouse_reads_booked_appointments_from_the_territory_weekly_mart(monkeypatch):
+    """BC-28577. One read of the territory weekly mart: the run's platform, from the oldest
+    gate week on. The connector's date and Decimal values come back as YYYY-MM-DD and
+    floats; a null count stays None, which the gate reads as no data. The gate's record of
+    applied changes is one ranged read of the change log."""
     from ads_agent import adapters
 
     for name in adapters.SnowflakeWarehouse.ENV:
         monkeypatch.setenv(name, "fake")
     warehouse, sent = adapters.SnowflakeWarehouse(), []
-    monkeypatch.setattr(warehouse, "_query", lambda sql, params=None, many=None: sent.append((sql, params)) or [])
+    replies = iter([[{"platform": "google_ads", "territory": "multi", "week_start": date(2026, 9, 21),
+                      "spend": Decimal("840.00"), "booked_paid_new": Decimal(3), "booked_paid_any_client": Decimal(4),
+                      "booked_all_new": Decimal(5), "booked_all_any_client": None}], []])
+    monkeypatch.setattr(warehouse, "_query",
+                        lambda sql, params=None, many=None: sent.append((sql, params)) or next(replies))
 
-    assert warehouse.read_booked_appointments("google_ads", "2026-09-21") == [] and sent == []
+    assert warehouse.read_booked_appointments("google_ads", "2026-09-21") == [
+        {"platform": "google_ads", "territory": "multi", "week_start": "2026-09-21", "spend": 840.0,
+         "booked_paid_new": 3.0, "booked_paid_any_client": 4.0, "booked_all_new": 5.0, "booked_all_any_client": None}]
     assert warehouse.read_change_log_since("2026-09-28") == []
-    [(sql, params)] = sent
-    assert sql.endswith("from ANALYTICS.OPERATIONS.ADS_AGENT_CHANGE_LOG where run_date >= %(d)s")
-    assert params == {"d": "2026-09-28"}
+    (sql, params), (log_sql, log_params) = sent
+    assert sql == ("select platform, territory, week_start, spend, booked_paid_new, booked_paid_any_client, "
+                   "booked_all_new, booked_all_any_client from ANALYTICS.MARTS.MART_ADS_AGENT_TERRITORY_WEEKLY "
+                   "where platform = %(p)s and week_start >= %(w)s")
+    assert params == {"p": "google_ads", "w": "2026-09-21"}
+    assert log_sql.endswith("from ANALYTICS.OPERATIONS.ADS_AGENT_CHANGE_LOG where run_date >= %(d)s")
+    assert log_params == {"d": "2026-09-28"}
 
 
 def test_capacity_sheet_reads_serial_dates_in_the_sheets_time_zone(monkeypatch):
