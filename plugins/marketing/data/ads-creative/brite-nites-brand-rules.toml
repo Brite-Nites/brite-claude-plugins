@@ -1,0 +1,95 @@
+# Brite Nites brand rules for the ads creative pipeline (BC-28299). Read by
+# scripts/ads_agent/creative.py (load_brand_rules): the brand check and the Claude judge.
+#
+# SOURCE: Brite Nites' signed brand book, kept in the private Brite-Nites/brand-hub repo as one
+# image per page at public/brand-guidelines/images/page_NN.webp. "p38" beside a value means book
+# page 38 (= page_38.webp). Read at brand-hub commit 9ddb0b1 on 2026-10-08. The values match
+# brand-hub's own transcription (src/lib/brand-colors.ts, src/lib/brand/seed/nites/), except
+# where a comment says otherwise.
+#
+# Values marked "pipeline setting" are not in the book. They tune the checks.
+#
+# STATUS: DRAFT until Sarah approves it. Change a book value only from the book, and cite the page.
+
+brand = "brite-nites"
+
+# ── Colors ──────────────────────────────────────────────────────────────────────────────────
+# Two schemes, Day and Night, plus two off-white / off-black neutrals (p37).
+[palette]
+"Yellow Cream" = "#F9EBC9"    # p38 (Day)
+"Vibrant Orange" = "#EA8105"  # p38 (Day)
+"Orange Red" = "#C24600"      # p38 (Day)
+"Sky Blue" = "#C6D8E5"        # p40 (Night)
+"Vibrant Blue" = "#3A559D"    # p40 (Night)
+"Deep Blue" = "#272E41"       # p40 (Night)
+"White" = "#FBFBFA"           # p42 (off-white; "technical and rare cases only")
+"Black" = "#131315"           # p42 (off-black; "technical and rare cases only")
+
+[schemes]
+day = ["Yellow Cream", "Vibrant Orange", "Orange Red"]  # p37, p38
+night = ["Sky Blue", "Vibrant Blue", "Deep Blue"]       # p37, p40
+additional = ["White", "Black"]                         # p42
+
+[color_rules]
+not_for_text = ["Vibrant Orange", "Vibrant Blue"]  # p39, p41, p43: middle tones are for fills and gradients
+never_background = ["Vibrant Orange"]              # p39, p43
+no_cross_scheme = true                             # p44: avoid low-contrast and cross-scheme pairs
+gradient_bans = [
+  ["Yellow Cream", "Orange Red"],  # p39
+  ["Sky Blue", "Deep Blue"],       # p41
+]
+# The six approved text-on-ground pairings. Any other pairing is off-brand.
+text_pairings = [
+  { text = "Yellow Cream", ground = "Orange Red" },  # p43
+  { text = "Orange Red", ground = "Yellow Cream" },  # p43
+  { text = "Orange Red", ground = "White" },         # p43
+  { text = "Sky Blue", ground = "Deep Blue" },       # p43
+  { text = "Sky Blue", ground = "Vibrant Blue" },    # p43
+  { text = "Deep Blue", ground = "Sky Blue" },       # p43
+]
+
+# ── Fonts ───────────────────────────────────────────────────────────────────────────────────
+[fonts."GT Eesti"]
+use = "accent: titles and quotes"  # p46
+min_size_pt = 20                   # p46, p48
+
+[fonts.Peclet]
+use = "supporting: body copy and small text"   # p47
+max_size_pt = 16                               # p47, p48
+bold = "Peclet Bold only for sub-headings at 16pt or smaller"  # p47
+
+[type]
+sizes_pt = [12, 14, 16, 20, 32, 42, 62]  # p49: 12-16 Peclet, 20-62 GT Eesti
+line_height = "Auto at 20pt and smaller; 100% at 32pt and larger"  # p49
+letter_spacing = "-1% at 42pt and larger; 0% at 32pt and smaller"  # p50
+
+# ── Logo ────────────────────────────────────────────────────────────────────────────────────
+[logo]
+clear_space_ratio = 0.5    # p29: clear space is 1/2 X, X = the full width of the logomark
+stacked_max_share = 0.30   # p26: the stacked wordmark at most ~30% of the time vs the horizontal one
+lockup = "the horizontal wordmark, then two short lines of tertiary text, three lines total"  # p27
+layout = "minimal: plenty of negative space, never a busy or overcrowded layout"  # p33-35
+donts = [
+  "Don't type out the wordmark",                # p32
+  "Don't stretch",                              # p32
+  "Don't outline",                              # p32
+  "Don't use unapproved colors",                # p32
+  "Don't apply shadows, effects, or patterns",  # p32
+  "Don't combine the logo and the wordmark",    # p32
+]
+# The six approved wordmark-on-ground pairings. Deep Blue on Vibrant Blue is for large-scale
+# logos only, never text (p30, p43). brand-hub's src/components/brand/logo-usage/matrix.ts lists
+# Sky Blue on Vibrant Blue here instead; page 30 shows Deep Blue, so this file follows the book.
+pairings = [
+  { mark = "Yellow Cream", ground = "Orange Red" },                     # p30
+  { mark = "Orange Red", ground = "Yellow Cream" },                     # p30
+  { mark = "Orange Red", ground = "White" },                            # p30
+  { mark = "Sky Blue", ground = "Deep Blue" },                          # p30
+  { mark = "Deep Blue", ground = "Vibrant Blue", large_scale_only = true },  # p30
+  { mark = "Deep Blue", ground = "Sky Blue" },                          # p30
+]
+
+# ── Check settings ──────────────────────────────────────────────────────────────────────────
+[checks]
+max_color_distance = 10.0  # pipeline setting: CIE76 limit from an overlay color to a locked color
+min_ocr_confidence = 0.9   # pipeline setting: below this the text read is not trusted; the ad fails
