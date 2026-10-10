@@ -39,6 +39,8 @@ Rationale: subtree is strictly more flexible than wholesale fork. If we never pu
 - Hooks that fire only in SFDX-adjacent contexts (cwd-aware)
 
 > **Update 2026-06-02 (as-built):** the command surface has grown from 3 to **7**. Original three: `deploy-sandbox`, `deploy-prod`, `post-deploy-runbook`. Added since: `setup-sandbox` (guided sandbox auth) and `doctor` (zero-mutation SF environment health check) — the onboarding → health lifecycle; plus `create-sf-campaign` and `update-sf-campaign-status` — the GTM campaign-sync seam, owned by `marketing` and governed by [ADR-015](015-gtm-sigma3-sf-campaign-sync.md), hosted here as commands. Per `CONTEXT.md`, campaign-sync is **not** part of revops's core charter (SF knowledge + deploy/ops discipline) — it is a seam revops hosts on marketing's behalf.
+>
+> **Update 2026-08-17 (superseded by [ADR-026](026-revops-promotion-topology.md), built in BC-19521):** the deploy command names above are historical. `deploy-sandbox` → `preview-changes`, `deploy-prod` → `push-to-production`, `setup-sandbox` → `setup-dev-workspace`, `doctor` → `check-environment-health`, `post-deploy-runbook` → `run-manual-post-deploy-steps`, plus two new commands (`submit-changes-to-integration`, `emergency-deploy-to-production`). Each old name survives as a deprecation stub. This note records the rename; ADR-026 records why.
 
 ### 3.4 MCP scope: `data,metadata,testing --no-telemetry`, GA-only
 

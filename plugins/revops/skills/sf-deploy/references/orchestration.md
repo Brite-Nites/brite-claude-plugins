@@ -1,189 +1,121 @@
 <!-- Parent: sf-deploy/SKILL.md -->
-<!-- Adapted from Jaganpro/sf-skills@ff1ab74 (MIT). Generic multi-skill orchestration still applies to Brite; see the "Brite notes" sections below for divergences. -->
 
-# Multi-Skill Orchestration: sf-deploy Perspective
+# Brite deployment orchestration
 
-This document details how sf-deploy fits into the multi-skill workflow for Salesforce development.
+Use this reference when a change spans metadata dependencies or more than one
+promotion lane. `brite-salesforce` owns the policy; this plugin only routes into its
+reviewed commands.
 
-> **Brite notes:**
-> - Brite does not use Agentforce — the "Integration + Agentforce Extended Order" and `sf-ai-agentscript` sections below are not applicable to brite-salesforce deploys.
-> - Every prod deploy that includes Apex or Flow metadata should be followed by a Tooling API SOQL verification step — see SKILL.md §Brite Deploy Discipline. The orchestration diagrams below show component ordering, not post-deploy verification.
+## One promotion topology
 
----
-
-## Standard Orchestration Order
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  STANDARD MULTI-SKILL ORCHESTRATION ORDER                                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  1. sf-metadata                                                             │
-│     └── Create object/field definitions (LOCAL files)                       │
-│                                                                             │
-│  2. sf-flow                                                                 │
-│     └── Create flow definitions (LOCAL files)                               │
-│                                                                             │
-│  3. sf-deploy  ◀── YOU ARE HERE                                            │
-│     └── Deploy all metadata (REMOTE)                                        │
-│                                                                             │
-│  4. sf-data                                                                 │
-│     └── Create test data (REMOTE - objects must exist!)                     │
-└─────────────────────────────────────────────────────────────────────────────┘
+```text
+feature branch from integration
+  → /revops:preview-changes in brite-dev-<name>
+  → feature → integration PR
+  → human squash merge; CI deploys briteint
+  → Kells-gated integration → main PR
+  → human merge commit to main
+  → /revops:push-to-production from main
+  → deploy-prod.yml deploy → activation → verification → summary
 ```
 
----
+The laptop lane ends at the developer's own org. Integration, UAT, and production are
+CI-owned. A local validation, quick deploy, or generic target alias cannot replace a
+promotion hop.
 
-## Why sf-deploy Goes Third (Not Last)
+## Authoring dependencies
 
-sf-deploy is the **bridge** between local files and the org:
+Prepare source in this order when the metadata requires it:
 
-| Before sf-deploy | After sf-deploy |
-|------------------|-----------------|
-| Metadata exists locally | Metadata exists in org |
-| Flows reference objects | Flows can run |
-| Data can't be created | sf-data can create records |
+1. objects and fields
+2. permission sets and profiles
+3. Apex classes and triggers
+4. Flows
+5. activation policy and post-deploy evidence
 
-**sf-data REQUIRES deployed objects**. The error `SObject type 'X' not supported` means objects weren't deployed.
+This is a dependency order, not permission to deploy each group separately. The
+selected lane decides how the complete reviewed change moves.
 
----
+## Lane procedures
 
-## Deploy Order WITHIN sf-deploy
+### Per-developer inner loop
 
-When deploying multiple metadata types:
+Run:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  INTERNAL DEPLOY ORDER                                                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  1. Custom Objects & Fields                                                 │
-│     └── Objects must exist before anything references them                  │
-│                                                                             │
-│  2. Permission Sets                                                         │
-│     └── Field-Level Security requires fields to exist                       │
-│                                                                             │
-│  3. Apex Classes                                                            │
-│     └── @InvocableMethod for Flow actions                                   │
-│                                                                             │
-│  4. Flows (as Draft)                                                        │
-│     └── Flows reference fields and Apex                                     │
-│                                                                             │
-│  5. Activate Flows                                                          │
-│     └── Change status Draft → Active                                        │
-└─────────────────────────────────────────────────────────────────────────────┘
+```text
+/revops:preview-changes --target-org brite-dev-<name>
 ```
 
-**Why this order?**
-- Flows need fields to exist
-- Users need Permission Sets for field visibility
-- Triggers may depend on active flows
-- Draft flows can be tested before activation
+The command resolves only an explicit per-dev alias, blocks on deployment concurrency,
+dry-runs the branch delta, deploys the same recomputed scope, runs applicable tests,
+and hands browser verification to the human. `--reconcile` widens source scope but
+does not widen the allowed branch or target org.
 
----
+Completion: the exact branch delta is proven in the named dev org, and no deletion is
+hidden in the normal deploy path.
 
-## Integration + Agentforce Extended Order
+### Integration
 
-When deploying agents with external API integrations:
+Run:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  AGENTFORCE DEPLOYMENT ORDER                                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  1. sf-connected-apps → Create OAuth Connected App                          │
-│  2. sf-integration    → Create Named Credential + External Service          │
-│  3. sf-apex           → Create @InvocableMethod (if needed)                 │
-│  4. sf-flow           → Create Flow wrapper                                 │
-│                                                                             │
-│  5. sf-deploy         ◀── FIRST DEPLOYMENT                                 │
-│     └── Deploy: Objects, Fields, Permission Sets, Apex, Flows              │
-│                                                                             │
-│  6. sf-ai-agentscript → Create agent with flow:// target                   │
-│                                                                             │
-│  7. sf-deploy         ◀── SECOND DEPLOYMENT (Agent Publish)                │
-│     └── sf agent publish authoring-bundle --api-name [AgentName]           │
-│                                                                             │
-│  8. sf-data           → Create test data                                    │
-└─────────────────────────────────────────────────────────────────────────────┘
+```text
+/revops:submit-changes-to-integration
 ```
 
----
+The command opens a PR to `integration`. Required checks and a human review gate the
+squash merge; CI owns the persistent `briteint` deploy. A developer never substitutes
+a local deploy to `briteint`.
 
-## Common Deployment Errors from Wrong Order
+Completion: the PR has current required evidence and a human decides the merge.
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `Invalid reference: Quote__c` | Object not deployed | Deploy objects first |
-| `Field does not exist: Status__c` | Field not deployed | Deploy fields first |
-| `no CustomObject named X found` | Permission Set deployed before object | Deploy objects, then Permission Sets |
-| `SObject type 'X' not supported` | sf-data ran before deploy | Deploy before creating data |
-| `Flow is invalid` | Flow references missing object | Deploy objects before flows |
-| `Flow not found` | Agent references undeploy flow | Deploy flows before agent publish |
+### Production
 
----
+After the Kells-gated promotion has merged into `main`, run:
 
-## Two-Step Deployment Pattern (Recommended)
-
-Always validate before deploying:
-
-```bash
-# Step 1: Dry-run validation
-sf project deploy start --dry-run --source-dir force-app --target-org alias
-
-# Step 2: Actual deployment (only if validation passes)
-sf project deploy start --source-dir force-app --target-org alias
+```text
+/revops:push-to-production --activation plan|canary|apply
 ```
 
----
+The command proves local and remote `main` agree, validates the workflow's exact input
+schema, records the selected activation scope, double-confirms, dispatches the exact
+CI workflow, and watches the returned run URL. The workflow owns the deploy, Apex gate,
+selected activation stage, six-type verification, and final summary.
 
-## Cross-Skill Dependencies
+Completion: the exact Actions receipt is green. `plan` is read-only; `canary` and
+`apply` are separate release-manager decisions. A Draft Flow is not permission for a
+manual production activation.
 
-Before deploying, verify these prerequisites:
+### Break glass
 
-| Dependency | Check Command | Required For |
-|------------|---------------|--------------|
-| TAF Package | `sf package installed list` | TAF trigger pattern |
-| Custom Objects | `sf sobject describe` | Apex/Flow field refs |
-| Permission Sets | `sf org list metadata --metadata-type PermissionSet` | FLS for fields |
-| Flows | `sf org list metadata --metadata-type Flow` | Agent actions |
+`/revops:emergency-deploy-to-production --reason "..." --second-admin <other-admin> --ack-url <evidence>` is the only local production
+path and exists solely for an Actions-down incident. It retains the production guards,
+records the exception, and leaves Flow activation blocked for a separate decision.
 
----
+Completion: the exception record and verification receipt exist. Break glass is never
+used to save time or bypass a red gate.
 
-## sf-ai-agentscript Integration
+## Deletions
 
-For agent deployments, use the specialized commands:
+Any metadata deletion stops the ordinary deploy path:
 
-```bash
-# Deploy dependencies first
-sf project deploy start --metadata ApexClass,Flow --target-org alias
+1. create `manifest/destructive/BC-<ticket>.xml`
+2. review the exact members and dependency impact
+3. use `.github/workflows/destructive-deploy.yml` in `validate-only` mode
+4. let the release manager perform the separately gated deploy
 
-# Validate agent syntax
-sf agent validate authoring-bundle --api-name AgentName --target-org alias --json
+The repository tripwire rejects root or auto-executed destructive manifests.
 
-# Publish agent
-sf agent publish authoring-bundle --api-name AgentName --target-org alias --json
+## Post-deploy ownership
 
-# Activate a specific BotVersion deterministically in automation
-sf agent activate --api-name AgentName --version N --target-org alias --json
-```
+| Concern | Owner |
+|---|---|
+| Flow activation in production | selected `plan|canary|apply` CI stage |
+| six-type component verification | `deploy-prod.yml` |
+| Named Credential org-issued URL | explicit manual production runbook |
+| Scheduled Apex recovery | explicit manual production runbook |
+| UI cache/browser verification | human sensor |
+| test data | `sf-data`, only after the metadata lane is complete |
 
-> If you omit `--version`, activation is interactive. For CI/CD and scripted orchestration, prefer `--version N --json`.
-
----
-
-## Invocation Patterns
-
-| From Skill | To sf-deploy | When |
-|------------|--------------|------|
-| sf-metadata | → sf-deploy | "Deploy objects to [org]" |
-| sf-flow | → sf-deploy | "Deploy flow with --dry-run" |
-| sf-apex | → sf-deploy | "Deploy classes with RunLocalTests" |
-| sf-ai-agentscript | → sf-deploy | "Deploy and publish agent" |
-
----
-
-## Related Documentation
-
-| Topic | Location |
-|-------|----------|
-| Deployment workflows | `sf-deploy/references/deployment-workflows.md` |
-| Agent deployment guide | `sf-deploy/references/agent-deployment-guide.md` |
-| Deploy script template | `sf-deploy/references/deploy.sh` |
+Return to the parent skill's Reference Map for worked examples and the final evidence
+handoff template. References stay one level deep so an agent never has to chase a
+second document from this one.

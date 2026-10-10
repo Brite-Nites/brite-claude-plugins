@@ -2762,6 +2762,53 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
+# Section 15a-bc-19521 — revops promotion-topology decision core (BC-19521)
+# ──────────────────────────────────────────────────────────────────────
+# Runs plugins/revops/scripts/test_promotion_topology.sh — the behavioral eval
+# for promotion_topology.py, the ADR-026 decision core behind alias
+# classification, per-developer org resolution, the BLOCKING concurrency probe,
+# and the config-gated guidance layer.
+#
+# The property under test is FAIL-CLOSED. The pre-BC-19521 concurrency lookback
+# was prose instructing the model NOT to halt on a query error, so a Tooling API
+# failure read as "nobody else is deploying". Every broken/hostile-input scenario
+# in the harness asserts a blocking verdict, never `clear` — including with the
+# override flag set, and including an in-flight deploy, which is not overridable.
+#
+# It also asserts the registry invariant the brite-salesforce PreToolUse deploy
+# policy hook (BC-19519) depends on: every non-`allow` org in
+# config/org-aliases.json appears in `protected_aliases` under its own alias and
+# every `aka`, and nothing appears there without a home in `orgs[]`. That is what
+# keeps one JSON file honest as the shared source across the two repos.
+# RESULT contract line drives the count (matches 15a-bc-12639 etc.).
+# ══════════════════════════════════════════════════════════════════════
+section "15a-bc-19521. revops promotion-topology decision core (BC-19521)"
+
+pt_harness="$REPO_ROOT/plugins/revops/scripts/test_promotion_topology.sh"
+pt_helper="$REPO_ROOT/plugins/revops/scripts/promotion_topology.py"
+pt_registry="$REPO_ROOT/plugins/revops/config/org-aliases.json"
+
+if [ ! -f "$pt_helper" ]; then
+  fail "plugins/revops/scripts/promotion_topology.py not found — the ADR-026 decision core is missing"
+elif [ ! -f "$pt_registry" ]; then
+  fail "plugins/revops/config/org-aliases.json not found — the shared protected-alias list is missing (BC-19519 consumes it)"
+elif [ ! -f "$pt_harness" ]; then
+  fail "plugins/revops/scripts/test_promotion_topology.sh not found — the fail-closed behavioral eval is missing"
+else
+  if pt_harness_out=$(bash "$pt_harness" "$pt_helper" 2>&1); then
+    pt_pass_count=$(printf '%s\n' "$pt_harness_out" | sed -n 's/^RESULT pass=\([0-9][0-9]*\) fail=.*/\1/p' | tail -1)
+    if [ -n "$pt_pass_count" ] && [ "$pt_pass_count" -gt 0 ]; then
+      pass "revops promotion-topology decision core (${pt_pass_count} assertions)"
+    else
+      fail "revops promotion-topology decision core — RESULT line missing or pass=0 (harness ran no assertions)"
+    fi
+  else
+    fail "revops promotion-topology decision core failed:"
+    printf '%s\n' "$pt_harness_out" | tail -30 | sed 's/^/          /' >&2
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════
 # Section 15a-bc-12701 — create-sf-campaign builder unit suite (BC-12701)
 # ──────────────────────────────────────────────────────────────────────
 # Runs plugins/revops/scripts/test_build_campaign_payload.sh — the unit/contract

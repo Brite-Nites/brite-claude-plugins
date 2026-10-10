@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0.0",
+  "linear": ["BC-19521", "BC-19519"],
+  "adr": "docs/decisions/026-revops-promotion-topology.md",
+  "authority": "brite-salesforce/CLAUDE.md and brite-salesforce ADR-016 (promotion topology, Amendment E) DEFINE Brite deploy discipline. This file MIRRORS that definition outward so agents in other repos inherit it. On any conflict brite-salesforce wins and this file is what is stale.",
+  "consumers": [
+    "plugins/revops commands in this repo (read via scripts/promotion_topology.py)",
+    "brite-salesforce PreToolUse deploy-policy hook (BC-19519) — reads this JSON directly, no Python dependency"
+  ],
+  "contract": "The JSON is the contract. `protected_aliases` and `dev_org.alias_pattern` are the two fields a policy hook needs; everything else is explanatory. Add orgs by adding an `orgs[]` entry AND its alias (plus every `aka`) to `protected_aliases` when `enforcement` is not `allow`.",
+  "enforcement_levels": {
+    "block": "A local `sf` deploy to this alias must be refused. The org is CI-deployed only.",
+    "warn": "A local `sf` deploy to this alias is legacy but not yet refused. Warn and point at the replacement.",
+    "allow": "A local `sf` deploy to this alias is the intended inner-loop path."
+  },
+  "dev_org": {
+    "alias_pattern": "^brite-dev-[a-z0-9][a-z0-9-]*$",
+    "example": "brite-dev-holden",
+    "enforcement": "allow",
+    "protected": false,
+    "lane": "inner-loop",
+    "description": "Per-developer sandbox. The only Salesforce org a developer deploys to directly from a laptop. Resolve the developer's own org rather than defaulting to one — see scripts/promotion_topology.py --resolve-dev-org."
+  },
+  "orgs": [
+    {
+      "alias": "brite-integration",
+      "aka": ["briteint"],
+      "enforcement": "block",
+      "protected": true,
+      "lane": "ci",
+      "branch": "integration",
+      "status": "active",
+      "deploy_via": "CI — brite-salesforce .github/workflows/deploy-integration.yml",
+      "description": "Shared integration org. Changes reach it by merging a PR into the `integration` branch, never by a laptop deploy. Replaces the shared brite-sandbox."
+    },
+    {
+      "alias": "brite-uat",
+      "aka": [],
+      "enforcement": "block",
+      "protected": true,
+      "lane": "ci",
+      "branch": "uat",
+      "status": "planned",
+      "deploy_via": "CI — promotion from `integration` to `uat` (ADR-026 Phase 2)",
+      "description": "User-acceptance org. Vocabulary is reserved now; the promote-to-uat command is ADR-026 Phase 2 and does not exist yet."
+    },
+    {
+      "alias": "brite-prod",
+      "aka": [],
+      "enforcement": "block",
+      "protected": true,
+      "lane": "ci",
+      "branch": "main",
+      "status": "active",
+      "deploy_via": "CI — brite-salesforce .github/workflows/deploy-prod.yml (BC-19513)",
+      "description": "Production. brite-salesforce ADR-016 section 6 and Amendment E retired the raw local prod deploy: CI is the only normal path. The documented last resort is a guarded validate to quick-deploy, run by /revops:emergency-deploy-to-production."
+    },
+    {
+      "alias": "brite-sandbox",
+      "aka": [],
+      "enforcement": "warn",
+      "protected": true,
+      "lane": "retiring",
+      "branch": null,
+      "status": "retiring",
+      "replaced_by": ["brite-dev-<name>", "brite-integration"],
+      "description": "The old single shared sandbox that did three jobs at once. Inner-loop work moves to the developer's own brite-dev-<name>; shared integration moves to brite-integration. Still `warn` rather than `block` so in-flight work is not stranded mid-migration."
+    }
+  ],
+  "protected_aliases": [
+    "brite-integration",
+    "briteint",
+    "brite-uat",
+    "brite-prod",
+    "brite-sandbox"
+  ],
+  "local_deploy_allowed": {
+    "aliases": [],
+    "patterns": ["^brite-dev-[a-z0-9][a-z0-9-]*$"],
+    "note": "An alias matching no entry here and no `orgs[]` entry is unknown. Treat unknown as blocked, not as allowed — fail closed."
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "_comment": "Copy to `.revops-pipeline.json` at the root of an SFDX repo (brite-salesforce). ADR-026 section 5: revops GUIDES from this file and never claims to enforce. Absent file = guidance no-ops, commands still run.",
+  "schema_version": "1.0.0",
+  "repo": "brite-salesforce",
+  "lanes": [
+    {
+      "name": "dev",
+      "org_alias": "brite-dev-<name>",
+      "branch": null,
+      "entered_by": "/revops:preview-changes",
+      "next": "integration"
+    },
+    {
+      "name": "integration",
+      "org_alias": "brite-integration",
+      "branch": "integration",
+      "entered_by": "/revops:submit-changes-to-integration",
+      "next": "uat"
+    },
+    {
+      "name": "uat",
+      "org_alias": "brite-uat",
+      "branch": "uat",
+      "entered_by": null,
+      "next": "production"
+    },
+    {
+      "name": "production",
+      "org_alias": "brite-prod",
+      "branch": "main",
+      "entered_by": "/revops:push-to-production",
+      "next": null
+    }
+  ],
+  "ci": {
+    "prod_workflow": "deploy-prod.yml",
+    "integration_workflow": "deploy-integration.yml",
+    "repo_slug": "Brite-Nites/brite-salesforce"
+  },
+  "concurrency": {
+    "lookback_hours": 24,
+    "block_on_recent": true,
+    "block_on_in_flight": true
+  }
+}

@@ -1,4 +1,4 @@
-"""Contract tests for the /revops:setup-sandbox slash command.
+"""Contract tests for the /revops:setup-dev-workspace slash command.
 
 Slash commands are Claude-orchestrated markdown, not executable code, so these
 tests verify the markdown's contract (frontmatter, declared tools, the seven
@@ -24,7 +24,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COMMAND_PATH = ROOT / "commands" / "setup-sandbox.md"
+COMMAND_PATH = ROOT / "commands" / "setup-dev-workspace.md"
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 
@@ -84,8 +84,8 @@ def test_seven_phase_topics_present() -> None:
     topics = {
         "tool detect (sf/node/gh)": ["sf --version", "node --version", "gh auth status"],
         "plugin-installed check": ["claude plugin list"],
-        "authenticate": ["sf org login web --alias brite-sandbox"],
-        "default target-org": ["sf config set target-org brite-sandbox"],
+        "authenticate": ["sf org login web --alias {dev-org}"],
+        "default target-org": ["sf config set target-org {dev-org}"],
         "connectivity probe": ["select id from organization limit 1"],
         "permission self-probe": ["permissionsetassignment"],
         "first-login handoff": ["new-user-first-login.md"],
@@ -101,11 +101,11 @@ def test_seven_phase_topics_present() -> None:
 def test_key_commands_present_verbatim() -> None:
     body = read_command()
     expected = [
-        "sf org login web --alias brite-sandbox",
-        "sf config set target-org brite-sandbox",
+        "sf org login web --alias {dev-org}",
+        "sf config set target-org {dev-org}",
         "claude plugin list",
         "sf org list",
-        "sf org display --target-org brite-sandbox",
+        "sf org display --target-org {dev-org}",
         "SELECT Id FROM Organization LIMIT 1",
     ]
     missing = [cmd for cmd in expected if cmd not in body]
@@ -125,18 +125,18 @@ def test_idempotent_early_exit_documented() -> None:
 
 
 def test_askuserquestion_at_each_gate() -> None:
-    """Exactly one gate prompt per non-terminal phase (no batched questions).
+    """Exactly seven setup/resolution gate prompts (no batched questions).
 
     Count the literal gate marker the command uses, not raw "AskUserQuestion"
     substrings (which are inflated by the frontmatter, intro prose, and Rules
-    mentions). Pinning to the 6 gated phases (Phase 7 is the terminal summary)
+    mentions). Pinning to the seven explicit gates (Phase 7 is the terminal summary)
     means the assertion breaks if a gate is added, removed, or two are batched
     into one — which is exactly the AC this test names.
     """
     body = read_command()
     gate_prompts = body.count("Ask via `AskUserQuestion`:")
-    assert gate_prompts == 6, (
-        "Expected exactly 6 gate prompts (one per non-terminal phase, Phases 1-6); "
+    assert gate_prompts == 7, (
+        "Expected exactly 7 setup/resolution gate prompts; "
         f"found {gate_prompts}. A batched or dropped gate would change this count."
     )
 
