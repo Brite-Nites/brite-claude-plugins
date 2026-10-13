@@ -1,118 +1,54 @@
-# sf-deploy
+# sf-deploy — Brite edition
 
-Comprehensive Salesforce DevOps automation using sf CLI v2. Validate, deploy, verify, and hand off cleanly to post-deploy activities.
+Deploy orchestration for `Brite-Nites/brite-salesforce`. The repository owns the
+metadata, and each environment is reached through one lane.
 
-## Features
+## Lanes
 
-- **Deployment Management**: Execute, validate, and monitor deployments
-- **DevOps Automation**: CI/CD pipelines, automated testing workflows
-- **Org Management**: Authentication, scratch orgs, environment management
-- **Quality Assurance**: Dry-run validation, tests, code coverage, pre-production verification
-- **Post-Deploy Handoff**: Guide users to the next safe step after validation or deployment
-- **Troubleshooting**: Debug failures, analyze logs, provide solutions
+| Destination | Entry point | Owner |
+|---|---|---|
+| `brite-dev-<name>` | `/revops:preview-changes --target-org brite-dev-<name>` | developer inner loop |
+| `briteint` | `/revops:submit-changes-to-integration` | integration PR + CI |
+| `main` / `brite-prod` | Kells-gated promotion, then `/revops:push-to-production --activation plan\|canary\|apply` | release manager + CI |
+| production break glass | `/revops:emergency-deploy-to-production --reason "..." --second-admin <other-admin> --ack-url <evidence>` | two-admin Actions-down exception |
 
-## Installation
+The local deploy surface accepts only an explicit per-developer alias. Shared
+integration, UAT, and production orgs are CI-owned. The normal production command
+dispatches and watches `deploy-prod.yml`; it does not deploy from the laptop.
 
-```bash
-# Install as part of sf-skills
-npx skills add Jaganpro/sf-skills
+## Safe sequence
 
-# Or install just this skill
-npx skills add Jaganpro/sf-skills --skill sf-deploy
-```
+1. Preview the feature-branch delta in the developer's own org.
+2. Open the feature → `integration` PR and let required CI validate it.
+3. A human squash-merges to `integration`; CI owns the persistent integration deploy.
+4. Kells opens and gates the `integration` → `main` promotion.
+5. A release manager selects production Flow activation scope and dispatches the CI
+   deploy from `main`.
+6. Read the exact Actions receipt. The selected activation stage and six-type
+   verifier run after a successful deploy, and the summary runs last.
+7. Use `/revops:run-manual-post-deploy-steps --production` only for the remainder CI
+   cannot automate. It does not activate production Flows.
 
-## Quick Start
+Metadata deletions leave this sequence: create
+`manifest/destructive/BC-<ticket>.xml` and follow the separate release-manager
+ceremony in `destructive-deploy.yml`. Never place an auto-executed destructive
+manifest at the repository root.
 
-### 1. Invoke the skill
+## References
 
-```
-Skill: sf-deploy
-Request: "Deploy all changes to org dev with validation"
-```
-
-### 2. Common operations
-
-| Operation | Example Request |
-|-----------|-----------------|
-| Deploy | "Deploy force-app to org dev" |
-| Validate | "Dry-run deploy to check for errors" |
-| Quick deploy | "Quick deploy validated changes" |
-| Cancel | "Cancel the current deployment" |
-| Status | "Check deployment status" |
-
-## Key Commands
-
-```bash
-# Validate before deploy (ALWAYS DO THIS)
-sf project deploy start --dry-run --source-dir force-app --target-org [alias]
-
-# Deploy with tests
-sf project deploy start --source-dir force-app --test-level RunLocalTests --target-org [alias]
-
-# Quick deploy (after validation)
-sf project deploy quick --job-id [id] --target-org [alias]
-
-# Check status
-sf project deploy report --job-id [id] --target-org [alias]
-
-# Cancel deployment
-sf project deploy cancel --job-id [id] --target-org [alias]
-```
-
-## Recommended post-validation flow
-
-After a successful dry run, guide the user to the next safe step:
-1. deploy now
-2. assign permission sets
-3. create test data with `sf-data`
-4. run tests or smoke checks
-5. combine multiple post-deploy steps in order
-
-## Orchestration Order
-
-```
-sf-metadata → sf-flow → sf-deploy → sf-data
-```
-
-**Within sf-deploy**:
-1. Objects/Fields
-2. Permission Sets
-3. Apex
-4. Flows (as Draft)
-5. Activate Flows
-
-## Best Practices
-
-| Rule | Details |
-|------|---------|
-| Always `--dry-run` first | Validate before actual deployment |
-| Deploy order matters | Objects → Permissions → Code |
-| Test levels | Use `RunLocalTests` for production |
-| Flow activation | Deploy as Draft, activate manually |
-| Post-deploy data | Hand off to `sf-data` rather than mixing raw data creation into deploy logic |
-
-## Cross-Skill Integration
-
-| Related Skill | When to Use |
-|---------------|-------------|
-| sf-metadata | Create objects/fields BEFORE deploy |
-| sf-testing | Run tests AFTER deployment |
-| sf-data | Create describe-validated test data AFTER deployment |
-
-## Documentation
-
-- [SKILL.md](SKILL.md) - Full workflow and orchestration guidance
-- [references/orchestration.md](references/orchestration.md) - Deployment sequencing
-- [references/deployment-workflows.md](references/deployment-workflows.md) - CI/CD and workflow examples
-- [references/deploy.sh](references/deploy.sh) - Sample deployment script
+- [SKILL.md](SKILL.md) — routing and operating rules
+- [references/deployment-workflows.md](references/deployment-workflows.md) — worked lane examples
+- [references/orchestration.md](references/orchestration.md) — dependency and promotion sequence
+- [references/trigger-deployment-safety.md](references/trigger-deployment-safety.md) — trigger-specific review gates
+- [references/deployment-report-template.md](references/deployment-report-template.md) — evidence handoff
 
 ## Requirements
 
-- sf CLI v2
-- Target Salesforce org
-- Proper permissions for deployment
+- `sf` CLI v2 for the per-dev command and the documented break-glass path
+- authenticated `gh` CLI for production CI dispatch
+- a current `brite-salesforce` checkout and an explicit lane decision
 
 ## License
 
-MIT License. See LICENSE file.
-Copyright (c) 2024-2026 Jag Valaiyapathy
+MIT License. Adapted from Jaganpro/sf-skills; Brite-specific deployment policy and
+orchestration are maintained by Brite Company.
