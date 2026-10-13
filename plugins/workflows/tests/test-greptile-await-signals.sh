@@ -87,6 +87,10 @@ STUB
 chmod +x "$TMP/bin/gh"
 
 export GREPTILE_FIXTURES="$TMP/fix"
+# Keep the historical mission-control fixture inside its own deadline forever.
+# Without an injected clock, case 9 started failing once wall time passed the
+# 2026-08-12 deadline even though the signal-recovery behavior was unchanged.
+export GREPTILE_AWAIT_NOW="$TRIGGER"
 mkdir -p "$GREPTILE_FIXTURES"
 echo '[]' > "$GREPTILE_FIXTURES/issue-comments.json"
 

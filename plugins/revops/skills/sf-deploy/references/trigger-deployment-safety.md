@@ -322,41 +322,33 @@ static void testAccountInsert_CRMSyncAsync_DoesNotBlock() {
 
 ---
 
-## 6. Deployment Commands for Trigger Safety
+## 6. Deployment lane for trigger safety
 
-### Validate Before Deploying
+### Prove the trigger in the per-dev lane
 
-```bash
-# Always validate triggers before deploying
-sf project deploy start --dry-run \
-    --source-dir force-app/main/default/triggers \
-    --source-dir force-app/main/default/classes \
-    --test-level RunLocalTests \
-    --target-org alias
+```text
+/revops:preview-changes --target-org brite-dev-<name>
 ```
 
-### Deploy with Test Coverage
+The preview command owns the branch-scoped dry-run, deploy, and applicable Apex tests.
+Keep the trigger and its paired test class in the same branch so the CI pairing guard
+and scratch validation see the complete behavior.
 
-```bash
-# Deploy triggers with their test classes
-sf project deploy start \
-    --source-dir force-app/main/default/triggers \
-    --source-dir force-app/main/default/classes \
-    --test-level RunSpecifiedTests \
-    --tests AccountTriggerTest,ContactTriggerTest \
-    --target-org alias
+### Promote with the repository evidence
+
+Open the feature → `integration` PR with
+`/revops:submit-changes-to-integration`. Required CI proves the scratch deployment and
+test pairing; a human owns the squash merge and CI owns `briteint`.
+
+After the Kells-gated promotion reaches `main`, production moves only through:
+
+```text
+/revops:push-to-production --activation plan|canary|apply
 ```
 
-### Verify Trigger Order
-
-After deployment, verify trigger execution order if you have multiple triggers on the same object:
-
-```bash
-# Query trigger execution order (via Debug Logs)
-sf apex tail log --target-org alias
-
-# Or check in Setup: Object Manager → [Object] → Triggers
-```
+Read the exact Actions receipt for the Apex gate and post-deploy verifier. Diagnose a
+trigger-order problem from the reviewed source, tests, and lane receipts; do not replace
+the promotion evidence with an ad-hoc shared-org deploy or debug session.
 
 ---
 
@@ -376,4 +368,4 @@ sf apex tail log --target-org alias
 2. **Decouple independent processes** - Use async for cross-domain operations
 3. **Test cascade scenarios** - Verify both success and failure paths
 4. **Document trigger chains** - Future maintainers need to understand dependencies
-5. **Validate before deploying** - Use `--dry-run` to catch issues early
+5. **Validate through the lane** - Use the per-dev preview, required PR checks, and exact production receipt
