@@ -132,6 +132,7 @@ Organized tool-first because that's how a skill author thinks: "what does my ski
 
 ### Architectural rules that apply
 
+- **CAN-SPAM trio (every skill that creates, reuses, or sequences an Email Bison campaign — keep verbatim, do not delete).** Email Bison appends no unsubscribe link or address on its own. (1) Every campaign the skill creates or reuses has `can_unsubscribe: true`, sent in the **same** `update_campaign` PATCH body as `plain_text: true` — EB treats an omitted boolean as `false`, so a PATCH carrying only one resets the other, and any later PATCH re-sends both. (2) Every sequence step body carries the standard footer: the company name and the postal address `4080 S W Temple St, Ste A, Millcreek, UT 84107`. (3) Step 2 has `thread_reply: true` (reply-in-thread on) and a subject that carries no `Re:` — it only sends to a recipient who has not replied. If any of the three is missing the skill stops with `CAN-SPAM gate: launch stopped. Missing: <what is missing>.` and offers no bypass. Source: handbook `marketing/go-to-market/cold-outbound-copy-standards.md` § CAN-SPAM Compliance; full procedure in `/marketing:launch-campaign` § CAN-SPAM compliance gate.
 - {Rule 1 from outbound-sales-ops, brite-data-platform, or brite-salesforce, with source citation.}
 - {Rule 2.}
 - {...}
@@ -184,11 +185,11 @@ See [`plugins/marketing/tools/integrations/email-bison.md` §Common Workflows](.
 
 1. Availability check: call `get_active_workspace_info`. On failure, stop and report.
 2. Call `bulk_create_leads` with lead data — max 500 per call, chunk larger lists. Store the returned lead IDs. Re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8) — no upsert behavior; no `upsert_multiple_leads` endpoint exists (BC-6785 R-28 + BC-11072).
-3. Call `create_campaign` with `{name, max_emails_per_day, max_new_leads_per_day, tracking options}`. Store the returned campaign ID.
+3. Call `create_campaign` with `{name, max_emails_per_day, max_new_leads_per_day, tracking options}`. Store the returned campaign ID. Then call `update_campaign` with `{"plain_text": true, "can_unsubscribe": true}` in one body, read the campaign back with `get_campaign`, and stop if `can_unsubscribe` is not `true` (CAN-SPAM trio, section 4). Do the same for a reused campaign.
 4. Call `import_leads_to_campaign` with the lead IDs from step 2 — **MCP confirmation gate**. Do not auto-confirm. If the response flags leads already in another campaign, surface the `allow_parallel_sending` prompt to the user; never enable without explicit approval.
 5. Call `list_sender_emails`, filter `status: "connected"`, then call `attach_sender_emails_to_campaign` with the ID array.
 6. Call `create_schedule_from_template` with a `schedule_id`.
-7. Call `create_sequence_steps` (v1.1 endpoint — avoid the deprecated path) with `title` and the `sequence_steps` array.
+7. Call `create_sequence_steps` (v1.1 endpoint — avoid the deprecated path) with `title` and the `sequence_steps` array. Before the call, check that every `email_body` carries the company name and the postal address, and that step 2 has `thread_reply: true` with an `email_subject` free of `Re:`; stop with the CAN-SPAM gate message otherwise. Read the stored steps back and re-check.
 8. Call `resume_campaign` to start sending — **MCP confirmation gate**: this tool's description says "STARTS SENDING REAL EMAILS." First call returns a prompt; relay it verbatim; only repeat with confirmation after user approval.
 
 ### {Workflow 2: e.g. Check campaign health}
@@ -296,6 +297,7 @@ Anti-Slop guidance:
 - Do not fabricate statistics, case studies, or testimonials — always attribute to a source.
 - Do not produce output that ignores `docs/marketing-context.md`.
 - Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
+- Do not create, reuse, sequence, or activate an Email Bison campaign without the CAN-SPAM trio (`can_unsubscribe: true`, footer with company name and postal address in every step body, step-2 reply-in-thread with no `Re:`). Never offer a "proceed anyway".
 - {Skill-specific guardrail 1}
 - {Skill-specific guardrail 2}
 - {Skill-specific guardrail 3}
