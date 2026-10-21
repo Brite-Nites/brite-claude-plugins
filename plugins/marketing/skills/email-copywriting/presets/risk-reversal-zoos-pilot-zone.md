@@ -20,7 +20,7 @@ Base skeleton B adaptation tuned for Offer A (pilot-zone tactical complement) wi
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {ZONE_OR_SIGNAL} and wanted to reach out on a narrow angle with the guarantee shape included.<br><br>For {PILOT_ZONE_AREA} we'll run a one-season pilot with our partner {S4_PARTNER} on DMX-pixel hardware, underwrite the install cost, and carry the guarantee: if the zone doesn't hit {DWELL_THRESHOLD} dwell time measured by sensor or head-count (or attendance uplift in programmed hours if gate-scan is easier to pull), the case-study rights clause voids and you walk with the install and no obligation. We ran this motion at {LABS_PEER_VENUE} as a specialist add-on, complementary to their existing lighting vendor.<br><br>{Worth a 20-minute scope|Open to a scoping call|Happy to scope the pilot terms}? The guarantee structure is the point, and it's the reason the pilot holds up under committee review.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {ZONE_OR_SIGNAL} and wanted to reach out on a narrow angle with the guarantee shape included.<br><br>For {PILOT_ZONE_AREA} we'll run a one-season pilot with our partner {S4_PARTNER} on DMX-pixel hardware, underwrite the install cost, and carry the guarantee: if the zone doesn't hit {DWELL_THRESHOLD} dwell time measured by sensor or head-count (or attendance uplift in programmed hours if gate-scan is easier to pull), the case-study rights clause voids and you walk with the install and no obligation. We ran this motion at {LABS_PEER_VENUE} as a specialist add-on, complementary to their existing lighting vendor.<br><br>{Worth a 20-minute scope|Open to a scoping call|Happy to scope the pilot terms}? The guarantee structure is the point, and it's the reason the pilot holds up under committee review.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -28,11 +28,11 @@ Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {ZONE_OR_SIGNAL} and wanted to reach
 
 Tone: specificity on the measurement method. The bump names how dwell time (or the chosen substitute) is measured, so the committee can evaluate the guarantee structure against a real counting method rather than vendor language.
 
-**Subject:** `Re: {Pilot guarantee|Zone underwrite|On us}`
+**Subject:** `{Pilot guarantee|Zone underwrite|On us}`
 
 **Body:**
 
-{Following up|Circling back}, {FIRST_NAME}. On the measurement specifics: dwell time is counted by a pressure-sensor mat or an AI computer-vision pass on existing camera feeds, whichever is easier to install in {PILOT_ZONE_AREA}. The threshold is baselined against a comparable zone during the same hours the prior season, so the comparison is apples-to-apples. If either the measurement method or the baseline needs adjusting for your site, that's part of the scoping call.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Following up|Circling back}, {FIRST_NAME}. On the measurement specifics: dwell time is counted by a pressure-sensor mat or an AI computer-vision pass on existing camera feeds, whichever is easier to install in {PILOT_ZONE_AREA}. The threshold is baselined against a comparable zone during the same hours the prior season, so the comparison is apples-to-apples. If either the measurement method or the baseline needs adjusting for your site, that's part of the scoping call.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

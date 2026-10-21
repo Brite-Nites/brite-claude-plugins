@@ -18,17 +18,17 @@ Anchor on a guarantee-weight signal overlaid on the dual Offer A readiness cue: 
 
 **Body:**
 
-Hey {FIRST_NAME_INLINE}, {saw|noticed} {PROGRAM_NAME} running at {COMPANY} alongside the {OWNERSHIP_OR_CAPITAL_SIGNAL}, and {wanted to|figured I'd} reach out about a pilot structure sized for a property that already has a tenured incumbent vendor relationship.<br><br>For a single pilot zone ({PILOT_ZONE_EXAMPLE}, for instance), Brite Labs {underwrites|fronts} the full install cost in exchange for a revenue-native guarantee metric and case-study usage rights: peak-weekend ADR lift over comp-set baseline, direct-channel booking mix shift in the Q4 programming window, or F&B / spa attach rate on package guests, {your Director of Revenue|your revenue committee} picks the metric and the threshold. If the metric misses, the install stays, no invoice. On {LABS_CASE_STUDY} the pilot zone {delivered|measured} {PEER_METRIC_OUTCOME} in the first programming weekend.<br><br>{Would|Open to} a scoping call to pick the metric and the pilot canvas? {Not a bid response|No full-program commitment}, just a one-zone measured pilot with the risk on Brite's side.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME_INLINE}, {saw|noticed} {PROGRAM_NAME} running at {COMPANY} alongside the {OWNERSHIP_OR_CAPITAL_SIGNAL}, and {wanted to|figured I'd} reach out about a pilot structure sized for a property that already has a tenured incumbent vendor relationship.<br><br>For a single pilot zone ({PILOT_ZONE_EXAMPLE}, for instance), Brite Labs {underwrites|fronts} the full install cost in exchange for a revenue-native guarantee metric and case-study usage rights: peak-weekend ADR lift over comp-set baseline, direct-channel booking mix shift in the Q4 programming window, or F&B / spa attach rate on package guests, {your Director of Revenue|your revenue committee} picks the metric and the threshold. If the metric misses, the install stays, no invoice. On {LABS_CASE_STUDY} the pilot zone {delivered|measured} {PEER_METRIC_OUTCOME} in the first programming weekend.<br><br>{Would|Open to} a scoping call to pick the metric and the pilot canvas? {Not a bid response|No full-program commitment}, just a one-zone measured pilot with the risk on Brite's side.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 
 ## Step 2 bump
 
-**Subject:** `Re: {Underwrite install|Measured pilot|Revenue-native}`
+**Subject:** `{Underwrite install|Measured pilot|Revenue-native}`
 
 **Body:**
 
-{Following up|Circling back}, {FIRST_NAME_INLINE}. Underwriting a pilot install takes longer to evaluate than a standard vendor pitch, and that is fair. To be specific about what Brite is proposing: we pay for the install, you pick the revenue-native metric and the threshold, and in exchange we use your property name and the measured outcome in our sales material. The trade is explicit and the risk sits on our side of the line.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Following up|Circling back}, {FIRST_NAME_INLINE}. Underwriting a pilot install takes longer to evaluate than a standard vendor pitch, and that is fair. To be specific about what Brite is proposing: we pay for the install, you pick the revenue-native metric and the threshold, and in exchange we use your property name and the measured outcome in our sales material. The trade is explicit and the risk sits on our side of the line.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 4
 

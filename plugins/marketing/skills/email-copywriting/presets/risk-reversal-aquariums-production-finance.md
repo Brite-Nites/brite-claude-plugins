@@ -22,7 +22,7 @@ Base skeleton B adaptation. Guarantee shape: first-season-breakeven-or-no-pay ag
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {scope|scale|shape} of what a full production-finance stack takes on, wanted to reach out directly.<br><br>For a program of this size we {offer|structure} a season guarantee: Brite {orchestrates|runs|delivers} the production-finance stack (title-sponsor close, city or CVB economic-dev partnership, ad revenue on DMX-pixel inventory), and the orchestration fee is not billed until the program breaks even at season close against {BASELINE_TERMS}. We ran this motion at {LABS_PEER_VENUE} with {S4_PARTNER} on the DMX-pixel component supply, and the year-two renewal landed on the default upside.<br><br>{Worth a 20-minute scope|Open to a scoping call|Happy to scope the breakeven terms} with {your team|Development|the committee}? Not a pitch, just the terms.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {scope|scale|shape} of what a full production-finance stack takes on, wanted to reach out directly.<br><br>For a program of this size we {offer|structure} a season guarantee: Brite {orchestrates|runs|delivers} the production-finance stack (title-sponsor close, city or CVB economic-dev partnership, ad revenue on DMX-pixel inventory), and the orchestration fee is not billed until the program breaks even at season close against {BASELINE_TERMS}. We ran this motion at {LABS_PEER_VENUE} with {S4_PARTNER} on the DMX-pixel component supply, and the year-two renewal landed on the default upside.<br><br>{Worth a 20-minute scope|Open to a scoping call|Happy to scope the breakeven terms} with {your team|Development|the committee}? Not a pitch, just the terms.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -30,11 +30,11 @@ Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {sco
 
 Tone: specificity as credibility. The bump names which line items count toward breakeven across the full multi-stream stack, so the committee can evaluate the guarantee structure against real accounting rather than marketing language.
 
-**Subject:** `Re: {Production underwrite|Season guarantee|Break-even terms}`
+**Subject:** `{Production underwrite|Season guarantee|Break-even terms}`
 
 **Body:**
 
-{Following up|Circling back}, {FIRST_NAME}. A guarantee across a full production-finance stack {takes time|deserves a real look|runs through committee}, which is fair. To be specific about breakeven: title-sponsor paid commitments for the program term, plus CVB or city public-dollar disbursement per the partnership agreement, plus ad-inventory pre-commits on the DMX-pixel display stack, plus incremental 21+ ticket revenue over prior-year baseline, plus F&B or bar attach on after-hours guests, all tallied against the orchestration fee at season close. If the math doesn't land, the fee isn't billed. That specificity is the point; it's what holds up under review.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Following up|Circling back}, {FIRST_NAME}. A guarantee across a full production-finance stack {takes time|deserves a real look|runs through committee}, which is fair. To be specific about breakeven: title-sponsor paid commitments for the program term, plus CVB or city public-dollar disbursement per the partnership agreement, plus ad-inventory pre-commits on the DMX-pixel display stack, plus incremental 21+ ticket revenue over prior-year baseline, plus F&B or bar attach on after-hours guests, all tallied against the orchestration fee at season close. If the math doesn't land, the fee isn't billed. That specificity is the point; it's what holds up under review.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

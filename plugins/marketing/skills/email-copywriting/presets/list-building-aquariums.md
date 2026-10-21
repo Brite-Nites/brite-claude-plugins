@@ -22,7 +22,7 @@ Base skeleton A adaptation with Offer 1 (Glow-Native 21+ Revenue-Share) slot fil
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {wanted to|figured I'd} reach out before the {program window|next season window|programming cadence} sets.<br><br>We {wrapped|just ran|recently delivered} a similar motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware we run at peer aquariums. The shape that {landed|fit|worked} there was humidity-rated architectural-gallery overlay sized for 21+ after-hours programming: Brite underwrites the install against a 3-5 year programmable-media lease, and we share revenue on incremental 21+ ticket revenue over prior-year baseline. The overlay lives on gallery walls, lobby architecture, and facade, so tank husbandry stays where it belongs.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {wanted to|figured I'd} reach out before the {program window|next season window|programming cadence} sets.<br><br>We {wrapped|just ran|recently delivered} a similar motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware we run at peer aquariums. The shape that {landed|fit|worked} there was humidity-rated architectural-gallery overlay sized for 21+ after-hours programming: Brite underwrites the install against a 3-5 year programmable-media lease, and we share revenue on incremental 21+ ticket revenue over prior-year baseline. The overlay lives on gallery walls, lobby architecture, and facade, so tank husbandry stays where it belongs.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -30,11 +30,11 @@ Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {wanted 
 
 Tone: matter-of-fact continuation, not a second pitch. The bump references the free asset and offers one scoping flexibility (which revenue stream gets the first scope), so the prospect can pick the easiest path into the conversation.
 
-**Subject:** `Re: {21+ revenue|After-hours|Adult-ticket}`
+**Subject:** `{21+ revenue|After-hours|Adult-ticket}`
 
 **Body:**
 
-{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope|shape} it around whichever revenue stream is most {load-bearing|active|in motion} for your program: 21+ ticket revenue over prior-year baseline, F&B or bar attach per-cap on after-hours guests, or membership-conversion uplift from the adult-program funnel.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope|shape} it around whichever revenue stream is most {load-bearing|active|in motion} for your program: 21+ ticket revenue over prior-year baseline, F&B or bar attach per-cap on after-hours guests, or membership-conversion uplift from the adult-program funnel.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

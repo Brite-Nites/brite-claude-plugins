@@ -18,17 +18,17 @@ Anchor on a dual signal: existing program press (package-launch, seasonal brand 
 
 **Body:**
 
-Hey {FIRST_NAME_INLINE}, {saw|noticed|caught} {PROGRAM_NAME} at {COMPANY} {run|publish|post} on {DATE_SIGNAL}, and {wanted to|figured I'd} reach out about a specific pilot structure that sits alongside an existing holiday program rather than replacing it.<br><br>For properties running a long-tenured program with an incumbent vendor, Brite Labs {underwrites|fronts} the install on a single pilot zone ({PILOT_ZONE_EXAMPLE}, for instance) in exchange for peak-weekend ADR lift measurement against your comp-set baseline plus direct-channel mix attribution in the Q4 programming window. On {LABS_CASE_STUDY} the pilot zone {delivered|measured} {PEER_ADR_LIFT} against the comp-set in the first programming weekend.<br><br>{Would|Open to} a rendered concept board for a named pilot zone at {COMPANY}? {No install commitment|No contract commitment} until the concept board clears your Director of Revenue review.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME_INLINE}, {saw|noticed|caught} {PROGRAM_NAME} at {COMPANY} {run|publish|post} on {DATE_SIGNAL}, and {wanted to|figured I'd} reach out about a specific pilot structure that sits alongside an existing holiday program rather than replacing it.<br><br>For properties running a long-tenured program with an incumbent vendor, Brite Labs {underwrites|fronts} the install on a single pilot zone ({PILOT_ZONE_EXAMPLE}, for instance) in exchange for peak-weekend ADR lift measurement against your comp-set baseline plus direct-channel mix attribution in the Q4 programming window. On {LABS_CASE_STUDY} the pilot zone {delivered|measured} {PEER_ADR_LIFT} against the comp-set in the first programming weekend.<br><br>{Would|Open to} a rendered concept board for a named pilot zone at {COMPANY}? {No install commitment|No contract commitment} until the concept board clears your Director of Revenue review.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 
 ## Step 2 bump
 
-**Subject:** `Re: {Pilot zone|ADR lift|Comp-set test}`
+**Subject:** `{Pilot zone|ADR lift|Comp-set test}`
 
 **Body:**
 
-{Circling back|Following up}, {FIRST_NAME_INLINE}. The concept board offer stands, and we can {scope|frame} it around whichever pilot canvas reads as most defensible to your revenue-committee (porte-cochere, pool deck, signature tower, or a specific main-lawn run). Measurement plan included, ADR-lift benchmark named upfront.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up}, {FIRST_NAME_INLINE}. The concept board offer stands, and we can {scope|frame} it around whichever pilot canvas reads as most defensible to your revenue-committee (porte-cochere, pool deck, signature tower, or a specific main-lawn run). Measurement plan included, ADR-lift benchmark named upfront.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 4
 

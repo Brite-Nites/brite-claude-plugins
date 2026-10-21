@@ -22,7 +22,7 @@ Base skeleton A adaptation with Offer B (retention infrastructure subscription) 
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out on a year-round angle.<br><br>We ran a similar motion at {LABS_PEER_VENUE}, productizing the loyalty-tier-integrated pattern for {the in-scope tier|mid-market regional operators|tribal enterprises with a mature carded-player program}. With our partner {S4_PARTNER} on the DMX-pixel hardware, the shape that {landed|fit|worked} was a multi-year subscription: Brite {owns|retains|holds} the programmable-media infrastructure and {licenses|operates} year-round content refresh (daily and weekly loyalty-tier tie-ins, compression-week amplification, F and B-concept thematic overlays), so your capex isn't the gating question. The infrastructure itself becomes the acquisition funnel for the carded-player program the way Unity-tier pricing {does today|works at peer properties|operates at the ceiling precedent}.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out on a year-round angle.<br><br>We ran a similar motion at {LABS_PEER_VENUE}, productizing the loyalty-tier-integrated pattern for {the in-scope tier|mid-market regional operators|tribal enterprises with a mature carded-player program}. With our partner {S4_PARTNER} on the DMX-pixel hardware, the shape that {landed|fit|worked} was a multi-year subscription: Brite {owns|retains|holds} the programmable-media infrastructure and {licenses|operates} year-round content refresh (daily and weekly loyalty-tier tie-ins, compression-week amplification, F and B-concept thematic overlays), so your capex isn't the gating question. The infrastructure itself becomes the acquisition funnel for the carded-player program the way Unity-tier pricing {does today|works at peer properties|operates at the ceiling precedent}.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -30,11 +30,11 @@ Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured
 
 Tone: matter-of-fact continuation, not a second pitch. The bump references the free asset and offers one scoping flexibility (which zone and which loyalty-tier integration point is most load-bearing), so the prospect can pick the easiest path into the conversation: hotel tower exterior, pool deck, porte-cochere, retail promenade, or F and B patio, paired with the Unity-tier-style pricing differential the property already runs.
 
-**Subject:** `Re: {Quick thought|Quick note|Thought}`
+**Subject:** `{Quick thought|Quick note|Thought}`
 
 **Body:**
 
-{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope it|shape it} around whichever zone and loyalty-tier integration point is most {load-bearing|active|in motion} for your program: hotel tower exterior, pool deck, porte-cochere, retail promenade, or F and B patio, paired with the carded-player differential pricing structure your Casino GM or Director of F and B is already running.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope it|shape it} around whichever zone and loyalty-tier integration point is most {load-bearing|active|in motion} for your program: hotel tower exterior, pool deck, porte-cochere, retail promenade, or F and B patio, paired with the carded-player differential pricing structure your Casino GM or Director of F and B is already running.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

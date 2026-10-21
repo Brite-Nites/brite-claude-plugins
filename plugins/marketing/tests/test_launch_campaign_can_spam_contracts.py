@@ -202,6 +202,29 @@ def test_resume_contract_names_the_can_spam_step_7_exception() -> None:
 # --- activation + metadata ---------------------------------------------------
 
 
+def test_step7_halt_leaves_a_breadcrumb_the_resume_can_read() -> None:
+    # After the halt `last_completed_phase` is 8, the same value as "Phase 9 never
+    # started". Only a per-campaign `sequence_ids`, written as step 6 creates each
+    # sequence, tells a fresh session to go to step 7 instead of re-running step 6.
+    p9 = phase("9", "10")
+    s6 = section(p9, "6. **Execute create per campaign.**", "7. **Verify per campaign.**")
+    assert "append each to the metadata's `sequence_ids` immediately" in s6
+    assert "`last_completed_phase` at 8" in s6
+    s7 = section(p9, "**Resume after a CAN-SPAM halt here.**", "8. **Append to metadata JSON.**")
+    assert "`last_completed_phase: 8` with `sequence_ids` present" in s7
+    assert "goes to step 7" in s7
+    line = next(l for l in read(COMMAND_PATH).splitlines() if l.startswith("- **Launch metadata JSON**"))
+    assert "`sequence_ids` present" in line, "the resume contract must name the breadcrumb"
+
+
+def test_error_recovery_table_has_the_step7_can_spam_halt_row() -> None:
+    rows = [l for l in read(COMMAND_PATH).splitlines() if l.startswith("| 9 SEQUENCE (CAN-SPAM halt at step 7)")]
+    assert len(rows) == 1, "exactly one step-7 CAN-SPAM halt row in the error-recovery table"
+    row = rows[0]
+    assert "`sequence_ids` present for every bucket" in row and "`last_completed_phase: 8`" in row
+    assert "resume at step 7" in row and "Never re-run step 6" in row
+
+
 def test_phase11_has_no_proceed_anyway_and_keeps_no_override() -> None:
     cmd = read(COMMAND_PATH)
     p11 = cmd[cmd.index("## Phase 11 "):]

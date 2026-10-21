@@ -24,7 +24,7 @@ Base skeleton B adaptation. Guarantee shape: first-season-breakeven-or-no-pay on
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {scope|scale|shape} of what {your team|the committee|Operations and Revenue} is taking on across the non-sport calendar, wanted to reach out directly.<br><br>For a program of this size we {offer|structure} a season guarantee: Brite {runs|orchestrates|delivers} the production-finance stack (regional tourism or CVB partnership, anchor F&B tenant co-marketing, regional or national category sponsor, plaza pixel ad revenue) and the fee is not billed until the program breaks even in year one against {BASELINE_TERMS} measured versus your prior-year same-calendar-window baseline. We've run this motion at {LABS_PEER_VENUE} (economics transfer cleanly; stadium calendar shape is different) with {S4_PARTNER} on DMX-pixel component supply, and the infrastructure scale sits in the {SCALE_ANCHOR} band.<br><br>{Worth a 20-minute scope|Open to a scoping call|Happy to scope the breakeven terms} with {your team|Revenue and Events|the committee}? Not a pitch, just the terms.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {scope|scale|shape} of what {your team|the committee|Operations and Revenue} is taking on across the non-sport calendar, wanted to reach out directly.<br><br>For a program of this size we {offer|structure} a season guarantee: Brite {runs|orchestrates|delivers} the production-finance stack (regional tourism or CVB partnership, anchor F&B tenant co-marketing, regional or national category sponsor, plaza pixel ad revenue) and the fee is not billed until the program breaks even in year one against {BASELINE_TERMS} measured versus your prior-year same-calendar-window baseline. We've run this motion at {LABS_PEER_VENUE} (economics transfer cleanly; stadium calendar shape is different) with {S4_PARTNER} on DMX-pixel component supply, and the infrastructure scale sits in the {SCALE_ANCHOR} band.<br><br>{Worth a 20-minute scope|Open to a scoping call|Happy to scope the breakeven terms} with {your team|Revenue and Events|the committee}? Not a pitch, just the terms.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -32,11 +32,11 @@ Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {sco
 
 Tone: specificity as credibility. The bump names which line items count toward breakeven, so the committee or owner-operator can evaluate the guarantee against real accounting rather than vendor marketing language.
 
-**Subject:** `Re: {Season guarantee|Program underwrite|Break-even terms}`
+**Subject:** `{Season guarantee|Program underwrite|Break-even terms}`
 
 **Body:**
 
-{Following up|Circling back}, {FIRST_NAME}. A guarantee at this scope {takes time|deserves a real look|runs through committee}, which is fair. To be specific on breakeven: incremental non-sport event revenue plus paid sponsor-inventory commitments plus anchor F&B tenant co-marketing revenue plus ad-revenue pre-commits on plaza pixel inventory, measured against your prior-year same-calendar-window baseline at season close. If the math doesn't land, the production-finance fee isn't billed. That specificity is the point; it's what holds up under ownership or board review.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Following up|Circling back}, {FIRST_NAME}. A guarantee at this scope {takes time|deserves a real look|runs through committee}, which is fair. To be specific on breakeven: incremental non-sport event revenue plus paid sponsor-inventory commitments plus anchor F&B tenant co-marketing revenue plus ad-revenue pre-commits on plaza pixel inventory, measured against your prior-year same-calendar-window baseline at season close. If the math doesn't land, the production-finance fee isn't billed. That specificity is the point; it's what holds up under ownership or board review.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

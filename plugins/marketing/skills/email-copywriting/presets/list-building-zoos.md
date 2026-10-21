@@ -22,7 +22,7 @@ Base skeleton A adaptation with Offer E (production-finance) slot fills. `{LABS_
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out before the season sets.<br><br>We just wrapped a similar motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware we run at {other AZA venues|peer zoos in the program circuit}. The shape that {landed|fit|worked} there was production-finance: Brite {orchestrates|runs|structures} the title sponsor plus city economic-dev partnership plus ad revenue on pixel inventory, so the capital outlay on your side {nets near zero|stays near zero|lands near zero}.<br><br>{Happy|Glad} to {pull|share|send} an {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out before the season sets.<br><br>We just wrapped a similar motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware we run at {other AZA venues|peer zoos in the program circuit}. The shape that {landed|fit|worked} there was production-finance: Brite {orchestrates|runs|structures} the title sponsor plus city economic-dev partnership plus ad revenue on pixel inventory, so the capital outlay on your side {nets near zero|stays near zero|lands near zero}.<br><br>{Happy|Glad} to {pull|share|send} an {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -30,11 +30,11 @@ Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured
 
 Tone: matter-of-fact continuation, not a second pitch. The bump references the free asset and offers one scoping flexibility (which revenue stream gets the first scope), so the prospect can pick the easiest path into the conversation.
 
-**Subject:** `Re: {Quick thought|Quick note|Thought}`
+**Subject:** `{Quick thought|Quick note|Thought}`
 
 **Body:**
 
-{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope it|shape it} around whichever revenue stream is most {load-bearing|active|in motion} for your program: title-sponsor close, city-partnership underwrite, or ad inventory on the pixel stack.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope it|shape it} around whichever revenue stream is most {load-bearing|active|in motion} for your program: title-sponsor close, city-partnership underwrite, or ad inventory on the pixel stack.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

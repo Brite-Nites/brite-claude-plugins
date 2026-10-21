@@ -24,7 +24,7 @@ Base skeleton A adaptation with Offer E (village production-finance) slot fills.
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out before the season sets.<br><br>We ran a similar motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware we run at {other regional independents|peer mid-market resorts in the Indy Pass circuit}. The shape that {landed|fit|worked} was production-finance: Brite {orchestrates|runs|structures} the tourism / destination-marketing partnership plus anchor F&B tenant co-marketing plus regional sponsor pledges plus ad revenue on the village pixel stack, so the capital outlay on your side {nets near zero|stays near zero|lands near zero}. The same village layer hedges the bad-snow-year F&B decline that showed up mid-teens YoY on the 2024-25 early-season ancillary scoreboard while lift revenue rose.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out before the season sets.<br><br>We ran a similar motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware we run at {other regional independents|peer mid-market resorts in the Indy Pass circuit}. The shape that {landed|fit|worked} was production-finance: Brite {orchestrates|runs|structures} the tourism / destination-marketing partnership plus anchor F&B tenant co-marketing plus regional sponsor pledges plus ad revenue on the village pixel stack, so the capital outlay on your side {nets near zero|stays near zero|lands near zero}. The same village layer hedges the bad-snow-year F&B decline that showed up mid-teens YoY on the 2024-25 early-season ancillary scoreboard while lift revenue rose.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -32,11 +32,11 @@ Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured
 
 Tone: matter-of-fact continuation, not a second pitch. The bump references the free asset and offers one scoping flexibility (which funding stream is most load-bearing), so the prospect can pick the easiest path into the conversation: tourism-bureau underwrite, F&B tenant co-marketing close, regional sponsor pledge, or ad inventory on the pixel stack.
 
-**Subject:** `Re: {Quick thought|Quick note|Thought}`
+**Subject:** `{Quick thought|Quick note|Thought}`
 
 **Body:**
 
-{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope it|shape it} around whichever funding stream is most {load-bearing|active|in motion} for your program: tourism or destination-marketing partnership, anchor F&B tenant co-marketing, regional sponsor close, or ad inventory on the village pixel stack.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope it|shape it} around whichever funding stream is most {load-bearing|active|in motion} for your program: tourism or destination-marketing partnership, anchor F&B tenant co-marketing, regional sponsor close, or ad inventory on the village pixel stack.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 
