@@ -52,9 +52,9 @@ Every artifact the skill emits MUST satisfy all of these rules before Write. Ada
 - No `{FIRST_NAME}` (or any merge variable) in the subject line. Subjects are the highest-impact spam signal; merge personalization in subjects under-performs generic subjects across every deliverability benchmark.
 - Subject line length 1-3 words, with 3-option spintax. Example: `{Quick|Fast|30s} {question|check|idea}`.
 - Spintax at the word level, not the sentence level: `{option1|option2|option3}`. Apply every 3-5 words where grammar permits — too little and EB sees identical sends; too much and the sentence loses meaning.
-- Step 2 subject does NOT include a `Re:` prefix. Email Bison auto-prepends `Re: ` at delivery whenever `thread_reply: true` (which step 2 always carries). Including `Re:` in the artifact produces a double-prefix (`"Re: Re: ..."`) in the recipient's inbox — verified BC-5906 round-2 Sx-14.
+- Step 2 subject does NOT include a `Re:` prefix. Step 2 sends only to a recipient who has not replied, so a `Re:` there is a deceptive subject line (CAN-SPAM); reply-in-thread (`thread_reply: true`, which step 2 always carries) is what threads it under step 1, not the subject text. Email Bison has been seen to add `Re: ` to a reply-in-thread step on its own, and an artifact subject that already starts with `Re:` double-prefixes (`"Re: Re: ..."`, BC-5906 round-2 Sx-14). `/marketing:launch-campaign` reads the stored step-2 subject back; the operator edits any stored `Re:` out in the Email Bison UI with reply-in-thread kept on.
 - Step 2 body references step 1 without summarizing it. One paragraph typical. Reinforces the offer without repeating the pitch.
-- Sign-off is `<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}` — spintax on the sign-off, no em-dash before the name.
+- Sign-off is `<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107` — spintax on the greeting word, no em-dash before the name. `[ENTITY_COMPANY_NAME]` is replaced at draft time with the literal company name for the run's entity (`Brite Nites` for `brite-nites`, `Brite Labs` for `brite-labs`); it is not an Email Bison variable and is never left in the artifact. The block ends BOTH step bodies (CAN-SPAM: `/marketing:launch-campaign` § CAN-SPAM compliance gate refuses an artifact whose step bodies lack the company name or the postal address) and replaces any sign-off in a preset body, which carries the old name-only sign-off.
 - `{SENDER_*}` variables (`{SENDER_FIRST_NAME}`, `{SENDER_EMAIL}`, `{SENDER_ROLE}`) are filled from `docs/marketing-context.md` first; Salesforce `User` object only if the marketing-context.md value is missing (see §5 Workflow 1).
 
 ### Hormozi value equation
@@ -82,16 +82,16 @@ Subject: {Quick|Fast|30s} {question|check|idea}
 
 Body:
 {%- assign recency = '{RECENCY_ANCHOR}' | strip | default: 'recent activity' -%}
-Saw the {{ recency }} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked closely|it mapped well} with a pattern we've been watching across {VERTICAL_DESCRIPTOR}.<br><br>{Most|A few|Several} {VERTICAL_DESCRIPTOR} teams we work with run into {SPECIFIC_FRICTION}, and one that {solved|shortcut|sidestepped} it was {PROOF_POINT_COMPANY}, who {PROOF_POINT_NUMBER} in {PROOF_POINT_TIMEFRAME}.<br><br>{Happy|Glad} to {pull|share|send} a {short|quick|focused} {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|interesting}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Saw the {{ recency }} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked closely|it mapped well} with a pattern we've been watching across {VERTICAL_DESCRIPTOR}.<br><br>{Most|A few|Several} {VERTICAL_DESCRIPTOR} teams we work with run into {SPECIFIC_FRICTION}, and one that {solved|shortcut|sidestepped} it was {PROOF_POINT_COMPANY}, who {PROOF_POINT_NUMBER} in {PROOF_POINT_TIMEFRAME}.<br><br>{Happy|Glad} to {pull|share|send} a {short|quick|focused} {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|interesting}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 ```
 
 **Step 2 bump:**
 
 ```
-Subject: {subject}   (EB auto-prepends "Re: " at delivery — do NOT include "Re:" in the artifact)
+Subject: {subject}   (no "Re:" — step 2 threads through reply-in-thread, not the subject line)
 
 Body:
-{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. {Still happy|Glad still} to send the {FREE_ASSET_NOUN} whenever it's {useful|helpful|timely}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. {Still happy|Glad still} to send the {FREE_ASSET_NOUN} whenever it's {useful|helpful|timely}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 ```
 
 #### Skeleton B — risk-reversal base
@@ -103,16 +103,16 @@ Subject: {Guarantee|Pilot|On us}
 
 Body:
 {%- assign recency = '{RECENCY_ANCHOR}' | strip | default: 'recent activity' -%}
-With the {{ recency }} at {COMPANY} {FIRST_NAME}, the {scope|spend|commitment} {feels serious|deserves care|reads as high-stakes}, and that's the kind of project we {take on|scope|pilot} with a {measurable|specific|concrete} guarantee.<br><br>For {COMPANY}'s {INITIATIVE_NOUN}, we can {run|deliver|execute} the first {PHASE_NOUN} with {GUARANTEE_TERMS}, so the risk sits with us and the {proof|outcome|signal} sits with you.<br><br>{Worth a 20-minute scope|Open to a quick scope call|Happy to scope a pilot}?<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+With the {{ recency }} at {COMPANY} {FIRST_NAME}, the {scope|spend|commitment} {feels serious|deserves care|reads as high-stakes}, and that's the kind of project we {take on|scope|pilot} with a {measurable|specific|concrete} guarantee.<br><br>For {COMPANY}'s {INITIATIVE_NOUN}, we can {run|deliver|execute} the first {PHASE_NOUN} with {GUARANTEE_TERMS}, so the risk sits with us and the {proof|outcome|signal} sits with you.<br><br>{Worth a 20-minute scope|Open to a quick scope call|Happy to scope a pilot}?<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 ```
 
 **Step 2 bump:**
 
 ```
-Subject: {subject}   (EB auto-prepends "Re: " at delivery — do NOT include "Re:" in the artifact)
+Subject: {subject}   (no "Re:" — step 2 threads through reply-in-thread, not the subject line)
 
 Body:
-{Know|Aware|Understand} this kind of {commitment|pilot|scope} takes {a beat|time|real review}. The guarantee terms are {flexible on|negotiable around} {TIMELINE} or {DELIVERABLE_SCOPE}, so if either needs to shift, {happy to|glad to} adjust.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Know|Aware|Understand} this kind of {commitment|pilot|scope} takes {a beat|time|real review}. The guarantee terms are {flexible on|negotiable around} {TIMELINE} or {DELIVERABLE_SCOPE}, so if either needs to shift, {happy to|glad to} adjust.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 ```
 
 ### Lazy-load per-vertical overrides
@@ -567,7 +567,7 @@ Six flows — the common paths operators actually run. Each flow states precondi
 
 | Score | Criteria |
 |------:|----------|
-| 10 | Artifact is EB-format-compliant (no `{{TOKEN}}` EB-token typos per regex `\{\{\s*[A-Z_]+\s*\}\}`; Liquid output `{{ var }}` is allowed in body for fallback patterns; no `<p>`, no em-dashes in body, no `{FIRST_NAME}` in subject, exactly 2 steps, sign-off spintax correct); Hormozi value equation visible in body copy (all 4 inputs map to specific paragraphs); entity-aware tier from the §3 matrix is picked and confirmed by operator; recency-waterfall anchor appears in the hook and cites the waterfall level; every `{VARIABLE}` in body + subject is declared in `custom_variables`; base or per-vertical preset is cited in the artifact; `situation_mining_source` cited when applicable; all §8 anti-slop guardrails pass validation. |
+| 10 | Artifact is EB-format-compliant (no `{{TOKEN}}` EB-token typos per regex `\{\{\s*[A-Z_]+\s*\}\}`; Liquid output `{{ var }}` is allowed in body for fallback patterns; no `<p>`, no em-dashes in body, no `{FIRST_NAME}` in subject, exactly 2 steps, sign-off spintax correct and followed by the company name and postal address in BOTH step bodies); Hormozi value equation visible in body copy (all 4 inputs map to specific paragraphs); entity-aware tier from the §3 matrix is picked and confirmed by operator; recency-waterfall anchor appears in the hook and cites the waterfall level; every `{VARIABLE}` in body + subject is declared in `custom_variables`; base or per-vertical preset is cited in the artifact; `situation_mining_source` cited when applicable; all §8 anti-slop guardrails pass validation. |
 | 7-9 | Mostly excellent with one gap — e.g. recency anchor cites a level but the signal is weak; one custom variable in the body is missing from the array; spintax is word-level but less dense than the 3-5 word guideline; sign-off is correct but not spintax-expanded. |
 | 4-6 | Functional but missing structural elements — e.g. value equation applied but proof point is generic (no numbers), or step 2 bump summarizes step 1 instead of referencing it, or tier was recommended but not confirmed with operator (D2 bypassed), or `vertical: null` without a valid fallback reason, or the preset file exists but wasn't read. |
 | 1-3 | Format violations (any one: `{{TOKEN}}` EB-token typo present per regex `\{\{\s*[A-Z_]+\s*\}\}` — note Liquid output `{{ var }}` is allowed and not a violation, `<p>` tag present, em-dash in body, `{FIRST_NAME}` in subject, >2 steps, Supply-vertical trigger like "installers" or "property mgmt" in body); OR `docs/marketing-context.md` was ignored (silent entity default); OR fact-claim framing ("you are X" instead of "we noticed X and thought Y"); OR fabricated proof point / statistic / case study not in marketing-context.md or operator input. |
@@ -593,6 +593,7 @@ Base guardrails (shared across marketing plugin) + skill-specific hard failures.
 - **Do not emit lowercase or mixed-case `{token}` references in subjects or bodies.** EB's render engine ONLY resolves UPPERCASE tokens (e.g., `{FIRST_NAME}`); lowercase or mixed-case tokens (`{first_name}`, `{First_Name}`) render as literal text in delivery — verified BC-6308 round-3 R-2a Preview Body output. If a draft contains any `{[a-z][A-Za-z_]*}` pattern, self-correct to UPPERCASE before emit. Hard failure if present in the written artifact.
 - **Do not emit `<p>` or `</p>` tags in body copy.** EB's HTML-to-plain converter eats `<p>` and corrupts the greeting-merged first sentence. Use `<br><br>` for paragraph breaks. Hard failure if present.
 - **Do not emit em-dashes (`—`) in body copy.** Known EB spam trigger. Auto-replace with commas, periods, or hyphens at draft time. Hard failure if present in the written artifact. (Em-dashes in this SKILL.md spec prose are OK where explaining the rule; the rule applies only to body template examples and generated artifact text.)
+- **Do not emit a step body without the CAN-SPAM footer.** `step_1.body` and `step_2.body` each end with the sign-off block: the literal entity company name and `4080 S W Temple St, Ste A, Millcreek, UT 84107`. A name-only sign-off (the old form) or a leftover `[ENTITY_COMPANY_NAME]` placeholder is a hard failure; `/marketing:launch-campaign` would stop on it in Phase 1.
 - **Do not emit sequences with more than 2 steps.** v0.1 of this skill supports step 1 + step 2 only. Longer sequences belong in `campaign-orchestration`'s multi-phase flow. Hard failure on 3+ steps.
 - **Do not emit `{FIRST_NAME}` (or any merge variable) in the subject line.** Subjects are the highest-impact spam signal; merge variables under-perform generic subjects across every deliverability benchmark. Hard failure.
 - **Do not frame inferences as facts.** Inherited from situation-mining §3 — body copy MUST read as hypothesis when referencing a prospect worldview or inferred signal. Write "we noticed the {INITIATIVE} announcement and thought it might line up with how your team is scoping {VERTICAL_DESCRIPTOR}" — never "your team is scoping {VERTICAL_DESCRIPTOR}." Fact-claim framing is a hard failure; §7 1-3 band.
