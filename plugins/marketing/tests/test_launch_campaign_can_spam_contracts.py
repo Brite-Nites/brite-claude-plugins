@@ -241,6 +241,29 @@ def test_phase11_refuses_to_activate_unverified_campaigns() -> None:
     assert "--no-sequence" in p11, "a campaign launched with --no-sequence has no verified footer"
 
 
+def test_step7_scoped_rerun_drops_the_deleted_campaigns_sequence_ids_entry() -> None:
+    step7 = section(read(COMMAND_PATH), "**Resume after a CAN-SPAM halt here.**", "\n8. ")
+    assert "dropped from `sequence_ids`" in step7
+
+
+def test_presets_readme_describes_step2_without_re_and_with_the_footer() -> None:
+    readme = read(ROOT / "skills" / "email-copywriting" / "presets" / "README.md")
+    assert "Re: {subject}" not in readme
+    assert "NO `Re:` prefix" in readme and POSTAL_ADDRESS in readme
+
+
+def test_phase11_rereads_campaigns_and_steps_before_activating() -> None:
+    p11 = section(read(COMMAND_PATH), "## Phase 11 ", "\n---\n\n## ")
+    pre = section(p11, "### Compliance precondition (CAN-SPAM gate)", "\n### ")
+    # The saved flags can be stale: the operator may edit Email Bison between the draft run and --activate.
+    assert "get_campaign" in pre and "get_sequence_steps" in pre, "re-read what Email Bison stores now"
+    assert "refresh" in pre.lower() and "compliance" in pre, "flags are refreshed from that read"
+    assert STOP_MESSAGE in pre, "any miss stops with the gate's message"
+    # The re-read precedes every prompt and the resume call, so it cannot be moved after activation.
+    for later in ("### Steps", "**User gate 11a", "fire the single `call_api`"):
+        assert p11.index("get_sequence_steps") < p11.index(later), f"re-read must precede {later!r}"
+
+
 def test_metadata_schema_records_compliance_results() -> None:
     cmd = read(COMMAND_PATH)
     for key in ("can_unsubscribe_applied", "footer_verified", "step_2_subject_verified"):
@@ -356,7 +379,8 @@ def test_copywriting_signoff_spec_carries_company_name_and_postal_address() -> N
     assert POSTAL_ADDRESS in spec
     assert "Brite Nites" in spec and "Brite Labs" in spec, "name is the literal entity company name"
     assert "not an Email Bison variable" in spec
-    assert "replaces any sign-off" in spec, "preset bodies carry the old sign-off; the rule overrides them"
+    assert "the presets' step bodies end with" in spec, "presets carry this same block"
+    assert "old name-only" not in spec, "no preset carries the old sign-off any more"
 
 
 def test_copywriting_every_skeleton_signoff_carries_the_footer() -> None:
