@@ -331,7 +331,7 @@ def test_integration_doc_records_the_thread_reply_measurement() -> None:
     assert "`thread_reply: false`" in row and "`thread_reply: true`" not in row
 
 
-def test_integration_doc_no_longer_says_eb_appends_eb_appends_unsubscribe_footers() -> None:
+def test_integration_doc_no_longer_says_eb_appends_unsubscribe_footers() -> None:
     d = read(INTEGRATION_PATH)
     assert not re.search(r"automatically appends? unsubscribe", d, re.IGNORECASE)
     # The negative above already held at base; this is the positive half that did not.
@@ -399,7 +399,7 @@ def test_orchestration_workflow_4_checks_before_resume_campaign() -> None:
     w4 = section(read(ORCHESTRATION_PATH), "### Workflow 4:", "### Workflow 5:")
     assert "Workflow 9" in w4 and STOP_MESSAGE in w4
     assert "get_campaign" in w4 and "get_sequence_steps" in w4, "re-read what Email Bison stored"
-    assert "`thread_reply: false` on step 2" in w4, "a stored thread_reply true blocks resume_campaign"
+    assert "every step after the first `thread_reply: false`" in w4, "a stored thread_reply true blocks resume_campaign"
     first_resume_call = w4.index("**Second gate — `resume_campaign`.**")
     assert w4.index("CAN-SPAM") < first_resume_call, "the check comes before the gated call"
     assert "do not call `resume_campaign`" in w4.lower() or "never call `resume_campaign`" in w4.lower()
@@ -501,6 +501,89 @@ def test_launch_campaign_never_sends_a_step_with_thread_reply_true() -> None:
     cmd = read(COMMAND_PATH)
     assert '"thread_reply": true' not in cmd
     assert "`thread_reply: true` on step 2" not in cmd
+
+
+# --- every check site refuses a `Re:` subject and a stored thread_reply true ------
+# Each pin reads ONE site, so deleting or softening the refusal there fails here
+# even though the same words appear elsewhere in the file.
+
+
+def line_starting(text: str, prefix: str) -> str:
+    return next(line for line in text.splitlines() if line.lstrip().startswith(prefix))
+
+
+def test_gate_item_3_has_no_accepted_or_operator_confirms_escape() -> None:
+    rule = line_starting(gate(), "3. **Non-responder step rule.**").lower()
+    for escape in ("accepted", "operator confirms", "unless", "may carry", "allowed"):
+        assert escape not in rule, f"gate item 3 must not carry an escape clause: {escape!r}"
+    assert "stops the launch" in rule
+    assert "the check runs on" in rule and "**stored** step-2 `thread_reply` and `email_subject`" in rule
+
+
+def test_phase1_artifact_check_refuses_a_re_subject() -> None:
+    line = line_starting(phase("1", "1b"), "- **CAN-SPAM compliance gate")
+    assert "`step_2.subject` carries no `Re:` prefix" in line
+    assert "Collect **every** failure and halt once" in line
+
+
+def test_phase9_non_negotiable_bullet_pins_thread_reply_false_and_no_re() -> None:
+    bullet = line_starting(phase("9", "10"), "- CAN-SPAM (")
+    assert "step 2 has `thread_reply: false` and a subject with no `Re:`" in bullet
+    assert "thread_reply: true" not in bullet
+
+
+def test_phase9_step2_hard_fails_a_re_subject() -> None:
+    bullet = line_starting(phase("9", "10"), "- `step_2.subject` does NOT start with `Re:`")
+    assert "HARD FAIL if it does" in bullet
+    assert "Allowed" not in bullet and "may start with" not in bullet
+
+
+def test_phase9_step7_readback_checks_stored_subject_has_no_re() -> None:
+    s7 = section(phase("9", "10"), "7. **Verify per campaign.**", "8. **Append to metadata JSON.**")
+    assert "(c) the stored step-2 `email_subject` carries no `Re:` prefix" in s7
+    assert "Any miss halts" in s7
+
+
+def test_phase11_reread_checks_stored_subject_has_no_re() -> None:
+    p11 = section(read(COMMAND_PATH), "## Phase 11 ", "\n---\n\n## ")
+    pre = section(p11, "### Compliance precondition (CAN-SPAM gate)", "\n### ")
+    assert "step 2 has `thread_reply: false` and a stored `email_subject` with no `Re:`" in pre
+
+
+def test_email_bison_workflow_9_step_4_refuses_re_and_thread_reply_true() -> None:
+    wf9 = section(read(SKILL_PATH), "### Workflow 9:", "\n---\n")
+    step4 = line_starting(wf9, "4. Every step sent to a recipient who has not replied")
+    assert "is created with `thread_reply: false` (thread reply off)" in step4
+    assert "an `email_subject` that carries no `Re:`" in step4
+    assert "if any shows `thread_reply: true` or a `Re:` subject, stop" in step4
+    assert "is created with `thread_reply: true`" not in step4
+
+
+def test_template_step_7_and_guardrail_say_every_step_after_the_first() -> None:
+    t = read(TEMPLATE_PATH)
+    step7 = line_starting(t, "7. Call `create_sequence_steps`")
+    assert "every step after the first is sent with `thread_reply: false`" in step7
+    assert "free of `Re:`" in step7 and "footer in every step body" in step7
+    assert "step 2 is sent with" not in step7
+    guard = line_starting(t, "- Do not create, reuse, sequence, or activate an Email Bison campaign")
+    assert "every step after the first sent with `thread_reply: false` and no `Re:`" in guard
+
+
+# --- campaign-orchestration re-read covers every step after the first -----------
+
+
+def test_orchestration_workflow_4_rereads_every_step_after_the_first() -> None:
+    w4 = section(read(ORCHESTRATION_PATH), "### Workflow 4:", "### Workflow 5:")
+    step2 = line_starting(w4, "2. **CAN-SPAM check")
+    assert "in every step body" in step2 and "both step bodies" not in step2
+    assert "on every step after the first `thread_reply: false` and an `email_subject` with no `Re:`" in step2
+    assert "`thread_reply: false` on step 2" not in step2, "step 2 alone is the old, narrower check"
+
+
+def test_orchestration_behavioural_test_covers_every_step_after_the_first() -> None:
+    line = line_starting(read(ORCHESTRATION_PATH), "- Given a request to create or resume a campaign whose `can_unsubscribe`")
+    assert "whose stored steps after the first have `thread_reply: true` or a subject that carries `Re:`" in line
+    assert "stored step 2 has" not in line
 
 
 # --- version bump -------------------------------------------------------------

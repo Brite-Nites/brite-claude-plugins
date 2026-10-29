@@ -189,7 +189,7 @@ See [`plugins/marketing/tools/integrations/email-bison.md` §Common Workflows](.
 4. Call `import_leads_to_campaign` with the lead IDs from step 2 — **MCP confirmation gate**. Do not auto-confirm. If the response flags leads already in another campaign, surface the `allow_parallel_sending` prompt to the user; never enable without explicit approval.
 5. Call `list_sender_emails`, filter `status: "connected"`, then call `attach_sender_emails_to_campaign` with the ID array.
 6. Call `create_schedule_from_template` with a `schedule_id`.
-7. Call `create_sequence_steps` (v1.1 endpoint — avoid the deprecated path) with `title` and the `sequence_steps` array. Before the call, check that every `email_body` carries the company name and the postal address, and that step 2 is sent with `thread_reply: false` and an `email_subject` free of `Re:`; stop with the CAN-SPAM gate message otherwise. Read the stored steps back and re-check.
+7. Call `create_sequence_steps` (v1.1 endpoint — avoid the deprecated path) with `title` and the `sequence_steps` array. Before the call, check that every `email_body` carries the company name and the postal address, and that every step after the first is sent with `thread_reply: false` and an `email_subject` free of `Re:`; stop with the CAN-SPAM gate message otherwise. Read the stored steps back and re-check every step after the first, and the footer in every step body.
 8. Call `resume_campaign` to start sending — **MCP confirmation gate**: this tool's description says "STARTS SENDING REAL EMAILS." First call returns a prompt; relay it verbatim; only repeat with confirmation after user approval.
 
 ### {Workflow 2: e.g. Check campaign health}
@@ -297,7 +297,7 @@ Anti-Slop guidance:
 - Do not fabricate statistics, case studies, or testimonials — always attribute to a source.
 - Do not produce output that ignores `docs/marketing-context.md`.
 - Do not recommend tools the plugin does not have access to (no hallucinated MCP servers, no assumed local clones).
-- Do not create, reuse, sequence, or activate an Email Bison campaign without the CAN-SPAM trio (`can_unsubscribe: true`, footer with company name and postal address in every step body, step 2 sent with `thread_reply: false` and no `Re:`). Never offer a "proceed anyway".
+- Do not create, reuse, sequence, or activate an Email Bison campaign without the CAN-SPAM trio (`can_unsubscribe: true`, footer with company name and postal address in every step body, every step after the first sent with `thread_reply: false` and no `Re:`). Never offer a "proceed anyway".
 - {Skill-specific guardrail 1}
 - {Skill-specific guardrail 2}
 - {Skill-specific guardrail 3}
