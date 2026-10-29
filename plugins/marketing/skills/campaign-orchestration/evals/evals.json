@@ -5,13 +5,13 @@
     {
       "id": 1,
       "prompt": "Design a 5-step outbound sequence for our mid-market SaaS ICP. I want A/B variants where it matters. Do not launch — I just want the sequence design for review.",
-      "expected_output": "Should read docs/marketing-context.md first if present (or warn and proceed). Should follow Workflow 2 (methodology-only, no MCP calls). Should produce a numbered list of 5 steps with order, wait_in_days, email_subject, email_body skeleton, variant (A or B), thread_reply (true for follow-ups, false for opener/breakup). Should apply the opener → value add → social proof → breakup → revival structure. Should test ONE variable at a time per step (subject OR opener OR CTA, not all three) with exactly two variants per step. Should cite 10-14 day total duration and 2-4 day wait spacing. Should NOT call any MCP tools. Should NOT reference Smartlead, Instantly, or Apollo.",
+      "expected_output": "Should read docs/marketing-context.md first if present (or warn and proceed). Should follow Workflow 2 (methodology-only, no MCP calls). Should produce a numbered list of 5 steps with order, wait_in_days, email_subject, email_body skeleton, variant (A or B), thread_reply (false on every step: each step after the first goes to a recipient who has not replied, and Email Bison adds Re: itself when thread reply is on). Should apply the opener → value add → social proof → breakup → revival structure. Should test ONE variable at a time per step (subject OR opener OR CTA, not all three) with exactly two variants per step. Should cite 10-14 day total duration and 2-4 day wait spacing. Should NOT call any MCP tools. Should NOT reference Smartlead, Instantly, or Apollo.",
       "assertions": [
         "Produces numbered list of exactly 5 steps",
         "Each step has order, wait_in_days, email_subject, email_body, variant, thread_reply",
         "Does not call any MCP tool (methodology-only workflow)",
         "A/B variants test one variable at a time with two variants per step",
-        "Step 1 is opener (thread_reply false); later steps are thread_reply true; revival or breakup is thread_reply false",
+        "Every step has thread_reply false and no Re: subject, because each step after the first goes to a recipient who has not replied",
         "Total sequence duration is 10-14 days",
         "Does not reference Smartlead, Instantly, or Apollo"
       ],

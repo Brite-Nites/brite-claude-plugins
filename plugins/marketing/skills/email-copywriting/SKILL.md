@@ -52,7 +52,7 @@ Every artifact the skill emits MUST satisfy all of these rules before Write. Ada
 - No `{FIRST_NAME}` (or any merge variable) in the subject line. Subjects are the highest-impact spam signal; merge personalization in subjects under-performs generic subjects across every deliverability benchmark.
 - Subject line length 1-3 words, with 3-option spintax. Example: `{Quick|Fast|30s} {question|check|idea}`.
 - Spintax at the word level, not the sentence level: `{option1|option2|option3}`. Apply every 3-5 words where grammar permits — too little and EB sees identical sends; too much and the sentence loses meaning.
-- Step 2 subject does NOT include a `Re:` prefix. Step 2 sends only to a recipient who has not replied, so a `Re:` there is a deceptive subject line (CAN-SPAM); reply-in-thread (`thread_reply: true`, which step 2 always carries) is what threads it under step 1, not the subject text. Email Bison has been seen to add `Re: ` to a reply-in-thread step on its own, and an artifact subject that already starts with `Re:` double-prefixes (`"Re: Re: ..."`, BC-5906 round-2 Sx-14). `/marketing:launch-campaign` reads the stored step-2 subject back; the operator edits any stored `Re:` out in the Email Bison UI with reply-in-thread kept on.
+- Step 2 subject does NOT include a `Re:` prefix. Step 2 sends only to a recipient who has not replied, so a `Re:` there is a deceptive subject line (CAN-SPAM); step 2 is sent unthreaded (`thread_reply: false`, which `/marketing:launch-campaign` sets itself) with its own subject, because Email Bison adds `Re: ` itself whenever thread reply is on (measured 2026-10-22: delivered subject `Re: Holiday Decor`). Do not write the subject so that it depends on threading under step 1. An artifact subject that already starts with `Re:` also double-prefixes (`"Re: Re: ..."`, BC-5906 round-2 Sx-14). `/marketing:launch-campaign` reads the stored step 2 back and stops on `thread_reply: true` or a `Re:` subject.
 - Step 2 body references step 1 without summarizing it. One paragraph typical. Reinforces the offer without repeating the pitch.
 - Sign-off is `<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107` — spintax on the greeting word, no em-dash before the name. `[ENTITY_COMPANY_NAME]` is replaced at draft time with the literal company name for the run's entity (`Brite Nites` for `brite-nites`, `Brite Labs` for `brite-labs`); it is not an Email Bison variable and is never left in the artifact. The block ends BOTH step bodies (CAN-SPAM: `/marketing:launch-campaign` § CAN-SPAM compliance gate refuses an artifact whose step bodies lack the company name or the postal address) and is the same block the presets' step bodies end with.
 - `{SENDER_*}` variables (`{SENDER_FIRST_NAME}`, `{SENDER_EMAIL}`, `{SENDER_ROLE}`) are filled from `docs/marketing-context.md` first; Salesforce `User` object only if the marketing-context.md value is missing (see §5 Workflow 1).
@@ -88,7 +88,7 @@ Saw the {{ recency }} at {COMPANY} {FIRST_NAME}, and {it lined up|it tracked clo
 **Step 2 bump:**
 
 ```
-Subject: {subject}   (no "Re:" — step 2 threads through reply-in-thread, not the subject line)
+Subject: {subject}   (no "Re:" — step 2 is sent unthreaded with its own subject)
 
 Body:
 {Circling back|Following up|Bumping this} in case it {got buried|slipped past|fell off}. {Still happy|Glad still} to send the {FREE_ASSET_NOUN} whenever it's {useful|helpful|timely}.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
@@ -109,7 +109,7 @@ With the {{ recency }} at {COMPANY} {FIRST_NAME}, the {scope|spend|commitment} {
 **Step 2 bump:**
 
 ```
-Subject: {subject}   (no "Re:" — step 2 threads through reply-in-thread, not the subject line)
+Subject: {subject}   (no "Re:" — step 2 is sent unthreaded with its own subject)
 
 Body:
 {Know|Aware|Understand} this kind of {commitment|pilot|scope} takes {a beat|time|real review}. The guarantee terms are {flexible on|negotiable around} {TIMELINE} or {DELIVERABLE_SCOPE}, so if either needs to shift, {happy to|glad to} adjust.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107

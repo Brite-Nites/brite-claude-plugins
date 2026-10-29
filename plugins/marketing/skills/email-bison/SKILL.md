@@ -72,7 +72,7 @@ This section translates the methodology into Brite's concrete stack. Every rule 
 - **The MCP itself gates 8 consequential tools** — mirror the two-call confirmation pattern in the Operational Runbook; do not introduce a parallel skill-level confirmation layer. `email-bison.md` §MCP confirmation gates.
 - **Bulk lead imports cap at 500 per call** — `bulk_create_leads` is the documented bulk tool with a 500-lead-per-call cap (`email-bison.md` §Rate limits). Re-POSTing a batch with any already-existing-lead email returns HTTP 422 atomic rejection (Sx-8) — no upsert behavior; no `upsert_multiple_leads` endpoint exists (BC-6785 R-28; mixed-batch verified BC-11072 spike). This skill does not run bulk imports end-to-end (that's `list-building`'s scope), but when helping with any tool whose name starts with `bulk_`, check `email-bison.md` or `discover_tools` for the documented cap before sending larger requests. Single-lead, confirmation-gated tools like `blacklist_lead` have no chunking concept — each call requires a separate user approval cycle; never loop them unattended.
 
-- **No campaign without the CAN-SPAM trio** — `can_unsubscribe: true` on the campaign, the company name and postal address in every step body, and a step-2 subject with no `Re:` (reply-in-thread on). Workflow 9; `/marketing:launch-campaign` § CAN-SPAM compliance gate.
+- **No campaign without the CAN-SPAM trio** — `can_unsubscribe: true` on the campaign, the company name and postal address in every step body, and, on every non-responder step, `thread_reply: false` with a subject that has no `Re:` (thread reply off). Workflow 9; `/marketing:launch-campaign` § CAN-SPAM compliance gate.
 
 ### Cross-skill boundaries
 
@@ -182,7 +182,7 @@ Cold outbound must carry an unsubscribe mechanism and a postal address (handbook
 1. Availability check — `get_active_workspace_info`.
 2. After `create_campaign` (or when reusing an existing campaign), call `update_campaign` (`PATCH /api/campaigns/{id}/update`) with `{"plain_text": true, "can_unsubscribe": true}` in the **same body**. EB's PATCH treats an omitted boolean as `false`, so a PATCH carrying only one of the two resets the other; any later PATCH must re-send both. Read the campaign back with `get_campaign` and confirm `can_unsubscribe` is `true`.
 3. Every sequence step body (`email_body`) carries the company name and the postal address `4080 S W Temple St, Ste A, Millcreek, UT 84107`.
-4. Step 2 is created with `thread_reply: true` (reply-in-thread on) and an `email_subject` that carries no `Re:` — it only sends to a recipient who has not replied. Read the stored step back; if it shows `Re:`, the subject is edited in the Email Bison UI with reply-in-thread kept on.
+4. Every step sent to a recipient who has not replied (every cold sequence step after the first, so step 2 in a 2-step sequence) is created with `thread_reply: false` (thread reply off) and an `email_subject` that carries no `Re:`. Email Bison adds `Re: ` itself whenever thread reply is on (measured 2026-10-22: delivered subject `Re: Holiday Decor`), and a `Re:` to someone who has not replied is a deceptive subject line, so threading is given up for these steps. Set `thread_reply: false` in the request body, then read the stored steps back; if any shows `thread_reply: true` or a `Re:` subject, stop, and the operator turns thread reply off and drops the `Re:` in the Email Bison UI.
 5. If any of the three is missing, do not create, attach, or activate. Stop with: `CAN-SPAM gate: launch stopped. Missing: <what is missing>.` There is no "proceed anyway".
 
 ---
@@ -337,7 +337,7 @@ Structured eval scenarios with assertions and expected outputs are in `evals/eva
 - Output must not contain the strings "Smartlead", "Instantly", or "Apollo" as sequencer recommendations.
 - Given any tool listed in `email-bison.md` §MCP confirmation gates, output must describe the two-call pattern and relay the vendor's confirmation prompt — not auto-confirm.
 - Output must reference `plugins/marketing/tools/integrations/email-bison.md` when describing tool categories, workspace auth, or common workflows — not duplicate that content inline.
-- Given a request to create or reuse a campaign, output must set `can_unsubscribe: true` with `plain_text: true` in one PATCH body, require the footer (company name + `4080 S W Temple St, Ste A, Millcreek, UT 84107`) in every step body, and keep step 2 reply-in-thread with no `Re:` in its subject — or stop with `CAN-SPAM gate: launch stopped. Missing:` naming what is absent.
+- Given a request to create or reuse a campaign, output must set `can_unsubscribe: true` with `plain_text: true` in one PATCH body, require the footer (company name + `4080 S W Temple St, Ste A, Millcreek, UT 84107`) in every step body, and send step 2 with `thread_reply: false` and no `Re:` in its subject — or stop with `CAN-SPAM gate: launch stopped. Missing:` naming what is absent.
 - Given a webhook-creation request with a target URL that pattern-matches OutboundSync, output must warn about the double-subscription gotcha before proceeding.
 
 ### Tier 2 — Tool-assisted

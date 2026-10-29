@@ -68,15 +68,27 @@ def test_gate_section_names_all_three_requirements() -> None:
     assert "can_unsubscribe: true" in g, "gate must require can_unsubscribe: true"
     assert POSTAL_ADDRESS in g, "gate must carry the exact postal address"
     assert "company name" in g.lower(), "gate must require the company name in the footer"
-    assert "thread_reply" in g and "Re:" in g, "gate must state the step-2 subject rule"
+    assert "thread_reply: false" in g and "Re:" in g, "gate must state the non-responder step rule"
     assert "has not replied" in g, "step-2 rule is scoped to a recipient who has not replied"
+
+
+def test_gate_sets_thread_reply_false_and_refuses_thread_reply_true_or_a_re_subject() -> None:
+    g = gate()
+    rule = next(line for line in g.splitlines() if line.startswith("3. **Non-responder step rule.**"))
+    assert "thread reply OFF" in rule and "`thread_reply: false`" in rule
+    assert "sets `thread_reply: false` in the request body itself" in rule, "the gate sets it, not the operator"
+    assert "reads it back" in rule and "stored" in rule
+    assert "A stored `thread_reply: true` or a stored `Re:` stops the launch" in rule
+    assert "adds `Re: ` itself whenever thread reply is on" in rule, "the reason is the Email Bison behaviour"
+    assert "2026-10-22" in rule and "Re: Holiday Decor" in rule, "the measurement is recorded"
+    assert "threading is given up" in rule
 
 
 def test_gate_stop_message_names_what_is_missing() -> None:
     g = gate()
     assert STOP_MESSAGE in g, f"gate must define the stop message {STOP_MESSAGE!r}"
-    for item in ("can_unsubscribe", "footer", "step 2 subject"):
-        assert item in g.lower(), f"stop message must be able to name {item!r}"
+    for item in ("can_unsubscribe", "footer", "step 2 subject", "step 2 thread_reply is true"):
+        assert item in g.lower() or item in g, f"stop message must be able to name {item!r}"
 
 
 def test_gate_has_no_operator_opt_out() -> None:
@@ -156,11 +168,15 @@ def test_phase9_requires_footer_in_every_step_body() -> None:
     assert STOP_MESSAGE in p9 or "CAN-SPAM compliance gate" in p9
 
 
-def test_phase9_step2_threads_with_subject_that_carries_no_re() -> None:
+def test_phase9_sends_step2_unthreaded_with_subject_that_carries_no_re() -> None:
     p9 = phase("9", "10")
     body = section(p9, "3. **Build the request body.**", "4. **Show sequence plan.**")
     blocks = json_blocks(body)
-    assert blocks and '"thread_reply": true' in blocks[0], "step 2 keeps reply-in-thread on"
+    assert blocks, "Phase 9 step 3 must show the request body"
+    assert '"thread_reply": true' not in blocks[0], "no step may be sent with thread reply on"
+    assert blocks[0].count('"thread_reply": false') == 2, "step 1 and step 2 both go with thread reply off"
+    assert "Step 2 is sent with `thread_reply: false`" in body
+    assert "no edit of the subject survives that" in body and "threading is given up" in body
     assert "has not replied" in p9
     stale = "the artifact's bare step_2.subject becomes `\"Re: <subject>\"` in the recipient's inbox"
     assert stale not in p9, "stale claim: step 2 must NOT be documented as delivering `Re:`"
@@ -171,6 +187,8 @@ def test_phase9_verifies_stored_steps_not_just_the_request() -> None:
     verify = section(p9, "7. **Verify per campaign.**", "8. **Append to metadata JSON.**")
     for needle in ("footer", "thread_reply", "Re:"):
         assert needle in verify, f"Phase 9 step 7 read-back must check {needle!r}"
+    assert "(b) step 2 has `thread_reply: false`" in verify, "the read-back checks thread reply is OFF"
+    assert "a stored `thread_reply: true` or `Re:` on step 2" in verify, "and refuses a stored thread_reply true"
 
 
 def test_phase9_artifact_footer_check_is_pinned() -> None:
@@ -258,6 +276,7 @@ def test_phase11_rereads_campaigns_and_steps_before_activating() -> None:
     # The saved flags can be stale: the operator may edit Email Bison between the draft run and --activate.
     assert "get_campaign" in pre and "get_sequence_steps" in pre, "re-read what Email Bison stores now"
     assert "refresh" in pre.lower() and "compliance" in pre, "flags are refreshed from that read"
+    assert "step 2 has `thread_reply: false`" in pre, "the re-read refuses a stored thread_reply true"
     assert STOP_MESSAGE in pre, "any miss stops with the gate's message"
     # The re-read precedes every prompt and the resume call, so it cannot be moved after activation.
     for later in ("### Steps", "**User gate 11a", "fire the single `call_api`"):
@@ -277,8 +296,12 @@ def test_email_bison_skill_carries_the_rule() -> None:
     s = read(SKILL_PATH)
     assert "can_unsubscribe: true" in s
     assert POSTAL_ADDRESS in s
-    assert "thread_reply" in s and "Re:" in s
     assert "same body" in s.lower() or "same patch" in s.lower()
+    wf9 = section(s, "### Workflow 9:", "\n---\n")
+    assert "`thread_reply: false`" in wf9 and "Re:" in wf9
+    assert "2026-10-22" in wf9 and "Re: Holiday Decor" in wf9, "the measurement is recorded"
+    assert "threading is given up" in wf9
+    assert "stop" in wf9 and "`thread_reply: true`" in wf9, "a stored thread_reply true stops the launch"
 
 
 def test_email_bison_skill_refuses_noncompliant_campaign_creation() -> None:
@@ -295,7 +318,20 @@ def test_integration_doc_documents_the_same_calls() -> None:
     assert "has not replied" in d
 
 
-def test_integration_doc_no_longer_says_eb_appends_unsubscribe_footers() -> None:
+def test_integration_doc_records_the_thread_reply_measurement() -> None:
+    d = read(INTEGRATION_PATH)
+    gotcha = next(
+        (line for line in d.splitlines() if line.startswith("- **EB adds `Re: ` itself whenever `thread_reply` is on")),
+        None,
+    )
+    assert gotcha, "the Re: gotcha must say Email Bison adds Re: whenever thread reply is on"
+    assert "2026-10-22" in gotcha and "Re: Holiday Decor" in gotcha
+    assert "`thread_reply: false`" in gotcha and "threading is given up" in gotcha
+    row = next(line for line in d.splitlines() if line.startswith("| 6 |"))
+    assert "`thread_reply: false`" in row and "`thread_reply: true`" not in row
+
+
+def test_integration_doc_no_longer_says_eb_appends_eb_appends_unsubscribe_footers() -> None:
     d = read(INTEGRATION_PATH)
     assert not re.search(r"automatically appends? unsubscribe", d, re.IGNORECASE)
     # The negative above already held at base; this is the positive half that did not.
@@ -348,13 +384,22 @@ def test_orchestration_workflow_3_routes_creation_through_email_bison_workflow_9
     assert "Workflow 9" in w3 and "`email-bison`" in w3
     assert '{"plain_text": true, "can_unsubscribe": true}' in w3, "toggle goes in the same body"
     assert POSTAL_ADDRESS in w3 and "company name" in w3.lower()
-    assert "thread_reply" in w3 and "Re:" in w3 and "has not replied" in w3
+    assert "`thread_reply: false`" in w3 and "Re:" in w3 and "has not replied" in w3
+    assert "`thread_reply: true`" in w3, "a stored thread_reply true is refused"
+    assert "2026-10-22" in w3 and "threading is given up" in w3
+
+
+def test_orchestration_workflow_2_designs_every_step_with_thread_reply_false() -> None:
+    w2 = section(read(ORCHESTRATION_PATH), "### Workflow 2:", "### Workflow 3:")
+    assert "`thread_reply` (always `false` in a cold sequence" in w2
+    assert "true for follow-ups" not in w2
 
 
 def test_orchestration_workflow_4_checks_before_resume_campaign() -> None:
     w4 = section(read(ORCHESTRATION_PATH), "### Workflow 4:", "### Workflow 5:")
     assert "Workflow 9" in w4 and STOP_MESSAGE in w4
     assert "get_campaign" in w4 and "get_sequence_steps" in w4, "re-read what Email Bison stored"
+    assert "`thread_reply: false` on step 2" in w4, "a stored thread_reply true blocks resume_campaign"
     first_resume_call = w4.index("**Second gate — `resume_campaign`.**")
     assert w4.index("CAN-SPAM") < first_resume_call, "the check comes before the gated call"
     assert "do not call `resume_campaign`" in w4.lower() or "never call `resume_campaign`" in w4.lower()
@@ -383,6 +428,17 @@ def test_copywriting_signoff_spec_carries_company_name_and_postal_address() -> N
     assert "old name-only" not in spec, "no preset carries the old sign-off any more"
 
 
+def test_copywriting_says_step_2_is_sent_unthreaded_with_its_own_subject() -> None:
+    s = read(COPYWRITING_PATH)
+    rule = next(line for line in s.splitlines() if line.startswith("- Step 2 subject does NOT include a `Re:`"))
+    assert "step 2 is sent unthreaded (`thread_reply: false`" in rule
+    assert "2026-10-22" in rule and "Re: Holiday Decor" in rule
+    skeleton = [line for line in s.splitlines() if line.startswith("Subject: {subject}")]
+    assert len(skeleton) == 2 and all("sent unthreaded with its own subject" in line for line in skeleton)
+    readme = read(ROOT / "skills" / "email-copywriting" / "presets" / "README.md")
+    assert "sent unthreaded with its own subject" in readme
+
+
 def test_copywriting_every_skeleton_signoff_carries_the_footer() -> None:
     lines = [line for line in read(COPYWRITING_PATH).splitlines() if _SIGNOFF in line]
     assert len(lines) >= 4, "two skeletons x two steps"
@@ -405,8 +461,46 @@ def test_template_carries_the_same_rule() -> None:
     t = read(TEMPLATE_PATH)
     assert "can_unsubscribe: true" in t
     assert POSTAL_ADDRESS in t
-    assert "thread_reply" in t and "Re:" in t
+    assert "`thread_reply: false`" in t and "Re:" in t
+    assert "2026-10-22" in t and "threading is given up" in t
     assert STOP_MESSAGE in t
+
+
+# --- the old rule must be gone everywhere ---------------------------------------
+# "thread reply on, subject edited, no Re:" was disproved on 2026-10-22: Email Bison
+# adds `Re:` itself whenever thread reply is on. Nothing may still prescribe it.
+
+_OLD_THREADING_RULE = re.compile(
+    r"reply-in-thread"
+    r"|still threads|threads under|threads through|keeps? it threading"
+    r"|thread_reply\W+true for follow-ups|later steps are thread_reply true",
+    re.IGNORECASE,
+)
+_OLD_RULE_SKIP = ("tests", "data", "__pycache__")
+
+
+def test_no_marketing_file_still_prescribes_reply_in_thread_or_thread_reply_true() -> None:
+    files = [
+        p
+        for p in ROOT.rglob("*")
+        if p.suffix in (".md", ".json")
+        and p.name != "CHANGELOG.md"
+        and not any(part in _OLD_RULE_SKIP for part in p.relative_to(ROOT).parts)
+    ]
+    assert len(files) > 100, "the walk must reach the whole marketing tree"
+    offenders = [
+        f"{p.relative_to(ROOT)}:{n}"
+        for p in files
+        for n, line in enumerate(read(p).splitlines(), 1)
+        if _OLD_THREADING_RULE.search(line)
+    ]
+    assert not offenders, f"old 'reply-in-thread on / thread_reply true on step 2' rule survives: {offenders}"
+
+
+def test_launch_campaign_never_sends_a_step_with_thread_reply_true() -> None:
+    cmd = read(COMMAND_PATH)
+    assert '"thread_reply": true' not in cmd
+    assert "`thread_reply: true` on step 2" not in cmd
 
 
 # --- version bump -------------------------------------------------------------
