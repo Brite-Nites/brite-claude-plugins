@@ -559,6 +559,40 @@ def test_email_bison_workflow_9_step_4_refuses_re_and_thread_reply_true() -> Non
     assert "is created with `thread_reply: true`" not in step4
 
 
+def phase11_precondition() -> str:
+    p11 = section(read(COMMAND_PATH), "## Phase 11 ", "\n---\n\n## ")
+    pre = section(p11, "### Compliance precondition (CAN-SPAM gate)", "\n### ")
+    return line_starting(pre, "Before step 1 and before any prompt")
+
+
+def test_phase11_reread_requires_exactly_two_stored_steps_and_names_the_extras() -> None:
+    line = phase11_precondition()
+    assert "exactly 2 steps are stored, the same count Phase 9 step 7 confirms" in line
+    assert "the stop message names the extra steps" in line
+
+
+def test_phase11_reread_requires_the_footer_in_both_step_bodies() -> None:
+    line = phase11_precondition()
+    assert "both step bodies carry the entity's company name and the postal address" in line
+
+
+def test_email_bison_skill_guardrail_and_behavioural_test_cover_every_step_after_the_first() -> None:
+    s = read(SKILL_PATH)
+    guard = line_starting(s, "- **Do not create, reuse, or activate a campaign that lacks `can_unsubscribe: true`")
+    assert "every step after the first has `thread_reply: false` and no `Re:`" in guard
+    assert "step-2 subject rule" not in guard
+    test = line_starting(s, "- Given a request to create or reuse a campaign, output must set `can_unsubscribe: true`")
+    assert "send every step after the first with `thread_reply: false` and no `Re:` in its subject" in test
+    assert "send step 2 with" not in test
+
+
+def test_integration_gotcha_says_non_responder_steps_are_created_with_thread_reply_false() -> None:
+    d = read(INTEGRATION_PATH)
+    gotcha = line_starting(d, "- **EB adds `Re: ` itself whenever `thread_reply` is on")
+    assert "is therefore created with `thread_reply: false` and a BARE subject" in gotcha
+    assert "is therefore created with `thread_reply: true`" not in gotcha
+
+
 def test_template_step_7_and_guardrail_say_every_step_after_the_first() -> None:
     t = read(TEMPLATE_PATH)
     step7 = line_starting(t, "7. Call `create_sequence_steps`")
