@@ -22,7 +22,7 @@ Base skeleton A adaptation with Offer 2 (Production Finance E-analog) slot fills
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out before the programming cycle sets.<br><br>We {wrapped|just ran|recently delivered} a similar motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware we run at peer aquariums. The shape that {landed|fit|worked} there was production-finance: Brite {orchestrates|runs|structures} the title sponsor close (GEICO YuleTides and UPMC Wild Illuminations are the nearest precedents), plus the city or CVB economic-dev partnership, plus ad revenue on DMX-pixel inventory, so the capital outlay on your side {nets near zero|stays near zero|lands near zero}.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out before the programming cycle sets.<br><br>We {wrapped|just ran|recently delivered} a similar motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware we run at peer aquariums. The shape that {landed|fit|worked} there was production-finance: Brite {orchestrates|runs|structures} the title sponsor close (GEICO YuleTides and UPMC Wild Illuminations are the nearest precedents), plus the city or CVB economic-dev partnership, plus ad revenue on DMX-pixel inventory, so the capital outlay on your side {nets near zero|stays near zero|lands near zero}.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY} if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -30,11 +30,11 @@ Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured
 
 Tone: matter-of-fact continuation, not a second pitch. The bump references the free asset and offers one scoping flexibility (which revenue stream gets the first scope), so the prospect can pick the easiest path into the conversation.
 
-**Subject:** `Re: {Production-finance|Sponsor stack|CVB underwrite}`
+**Subject:** `{Production-finance|Sponsor stack|CVB underwrite}`
 
 **Body:**
 
-{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope|shape} it around whichever revenue stream is most {load-bearing|active|in motion} for your program: title-sponsor close against a named peer precedent, city or CVB co-funding against your regional economic-impact narrative, or ad-inventory pre-commits on the pixel stack.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope|shape} it around whichever revenue stream is most {load-bearing|active|in motion} for your program: title-sponsor close against a named peer precedent, city or CVB co-funding against your regional economic-impact narrative, or ad-inventory pre-commits on the pixel stack.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

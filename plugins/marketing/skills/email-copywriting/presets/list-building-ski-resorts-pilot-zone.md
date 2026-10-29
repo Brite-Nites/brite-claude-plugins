@@ -22,7 +22,7 @@ Base skeleton A adaptation tuned for Offer A (pilot-zone tactical complement). T
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {ZONE_OR_SIGNAL} and {figured I'd|wanted to} reach out on a narrow angle. Your existing holiday-lighting vendor covers the full village program, which makes sense, and this isn't a replacement conversation.<br><br>We'd like to run a rendered concept board (24"×36") for {PILOT_ZONE_AREA}, one specific area, so your team and the incumbent have a tangible artifact to evaluate. If it lands, we install the pilot zone for one season with our partner {S4_PARTNER} on DMX-pixel hardware. We ran this motion at {LABS_PEER_VENUE} as a specialist add-on. We'll underwrite the install cost; in exchange, we use the results (footage, metrics, resort name) in our sales material.<br><br>{Happy|Glad} to {pull|send|share} the concept board for {PILOT_ZONE_AREA} if {useful|helpful|timely}, no commitment beyond a look.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {ZONE_OR_SIGNAL} and {figured I'd|wanted to} reach out on a narrow angle. Your existing holiday-lighting vendor covers the full village program, which makes sense, and this isn't a replacement conversation.<br><br>We'd like to run a rendered concept board (24"×36") for {PILOT_ZONE_AREA}, one specific area, so your team and the incumbent have a tangible artifact to evaluate. If it lands, we install the pilot zone for one season with our partner {S4_PARTNER} on DMX-pixel hardware. We ran this motion at {LABS_PEER_VENUE} as a specialist add-on. We'll underwrite the install cost; in exchange, we use the results (footage, metrics, resort name) in our sales material.<br><br>{Happy|Glad} to {pull|send|share} the concept board for {PILOT_ZONE_AREA} if {useful|helpful|timely}, no commitment beyond a look.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -30,11 +30,11 @@ Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {ZONE_OR_SIGNAL} and {figured
 
 Tone: reinforce narrow scope. The bump makes clear the pilot is one zone, one season, complementary to the incumbent, so the decision-maker's internal positioning with the existing vendor relationship stays clean. If the pilot earns its keep, the incumbent stays lead on the full village program and the next zone scopes together.
 
-**Subject:** `Re: {One zone|Pilot zone|Short note}`
+**Subject:** `{One zone|Pilot zone|Short note}`
 
 **Body:**
 
-{Circling back|Following up|Bumping this}, {FIRST_NAME}. The concept board offer stands for {PILOT_ZONE_AREA}. To be clear on scope: one zone, one season, complementary to your existing village program. If the pilot earns its keep, the incumbent stays the lead on the full village program and we scope the next zone together.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up|Bumping this}, {FIRST_NAME}. The concept board offer stands for {PILOT_ZONE_AREA}. To be clear on scope: one zone, one season, complementary to your existing village program. If the pilot earns its keep, the incumbent stays the lead on the full village program and we scope the next zone together.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

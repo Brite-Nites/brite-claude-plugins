@@ -18,17 +18,17 @@ Anchor on the procurement-weight signal: ownership-group announcement, REIT earn
 
 **Body:**
 
-Hey {FIRST_NAME_INLINE}, {saw|noticed} the {CAPITAL_SIGNAL} at {COMPANY} {post|publish} on {DATE_SIGNAL}, and given the multi-year shape of what {your team|ownership} is scoping, wanted to reach out directly on the guarantee structure that fits a Branded Seasonal Program commitment.<br><br>{Given the|Because of the} 3-year contract term and the YoY refresh commitment, Brite Labs {offers|structures} a year-1 rate-premium floor on programs like this: if peak-weekend ADR does not lift {PEAK_LIFT_THRESHOLD} over your comp-set baseline in the first programming season, year 2 refresh and scope is {not billed|renegotiated}. On {LABS_CASE_STUDY} we {hit|exceeded} that bar and the property moved into year 2 {on schedule|ahead of schedule} with a refreshed program brand.<br><br>{Would|Open to} a {guaranteed-floor|scoped-floor} conversation with {your team|the Director of Revenue}? {Not a bid response|No full-bid commitment}, just a scoping call to see whether the year-1 floor fits your comp-set compression calendar.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME_INLINE}, {saw|noticed} the {CAPITAL_SIGNAL} at {COMPANY} {post|publish} on {DATE_SIGNAL}, and given the multi-year shape of what {your team|ownership} is scoping, wanted to reach out directly on the guarantee structure that fits a Branded Seasonal Program commitment.<br><br>{Given the|Because of the} 3-year contract term and the YoY refresh commitment, Brite Labs {offers|structures} a year-1 rate-premium floor on programs like this: if peak-weekend ADR does not lift {PEAK_LIFT_THRESHOLD} over your comp-set baseline in the first programming season, year 2 refresh and scope is {not billed|renegotiated}. On {LABS_CASE_STUDY} we {hit|exceeded} that bar and the property moved into year 2 {on schedule|ahead of schedule} with a refreshed program brand.<br><br>{Would|Open to} a {guaranteed-floor|scoped-floor} conversation with {your team|the Director of Revenue}? {Not a bid response|No full-bid commitment}, just a scoping call to see whether the year-1 floor fits your comp-set compression calendar.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 
 ## Step 2 bump
 
-**Subject:** `Re: {ADR guarantee|Year-1 floor|Revenue-share}`
+**Subject:** `{ADR guarantee|Year-1 floor|Revenue-share}`
 
 **Body:**
 
-{Following up|Circling back}, {FIRST_NAME_INLINE}. A year-1 floor structure takes longer to evaluate than a standard vendor pitch, and that is fair. To be specific about what is guaranteed: peak-weekend ADR lift over comp-set baseline measured by the STR trend report on your chosen comp-set, with year 2 scope and pricing contingent on that outcome being met. The specificity is the point, and it is the reason the structure holds up under ownership and revenue-committee review.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Following up|Circling back}, {FIRST_NAME_INLINE}. A year-1 floor structure takes longer to evaluate than a standard vendor pitch, and that is fair. To be specific about what is guaranteed: peak-weekend ADR lift over comp-set baseline measured by the STR trend report on your chosen comp-set, with year 2 scope and pricing contingent on that outcome being met. The specificity is the point, and it is the reason the structure holds up under ownership and revenue-committee review.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 4
 

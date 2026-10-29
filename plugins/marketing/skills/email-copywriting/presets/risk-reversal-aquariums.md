@@ -22,7 +22,7 @@ Base skeleton B adaptation. Guarantee shape: first-season-breakeven-or-no-pay. T
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {scope|scale|shape} of what {your team|the program committee|Development} is taking on, wanted to reach out directly.<br><br>For a program of this size we {offer|structure} a season guarantee: Brite {runs|delivers|installs} the humidity-rated architectural-gallery overlay (gallery walls, lobby architecture, facade, mezzanine), and the install fee is not billed until incremental 21+ ticket revenue over prior-year baseline clears Year 1 against {BASELINE_TERMS}. We ran this motion at {LABS_PEER_VENUE} with {S4_PARTNER} on the DMX-pixel component supply, and the year-two renewal landed on the default upside.<br><br>{Worth a 20-minute scope|Open to a scoping call|Happy to scope the breakeven terms} with {your team|Development|the committee}? Not a pitch, just the terms.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {scope|scale|shape} of what {your team|the program committee|Development} is taking on, wanted to reach out directly.<br><br>For a program of this size we {offer|structure} a season guarantee: Brite {runs|delivers|installs} the humidity-rated architectural-gallery overlay (gallery walls, lobby architecture, facade, mezzanine), and the install fee is not billed until incremental 21+ ticket revenue over prior-year baseline clears Year 1 against {BASELINE_TERMS}. We ran this motion at {LABS_PEER_VENUE} with {S4_PARTNER} on the DMX-pixel component supply, and the year-two renewal landed on the default upside.<br><br>{Worth a 20-minute scope|Open to a scoping call|Happy to scope the breakeven terms} with {your team|Development|the committee}? Not a pitch, just the terms.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -30,11 +30,11 @@ Hey {FIRST_NAME}, {saw|noticed} {COMPANY}'s {RECENCY_ANCHOR}, and given the {sco
 
 Tone: specificity as credibility. The bump names which line items count toward breakeven, so the committee can evaluate the guarantee structure against real accounting rather than marketing language.
 
-**Subject:** `Re: {Season guarantee|21+ underwrite|Break-even terms}`
+**Subject:** `{Season guarantee|21+ underwrite|Break-even terms}`
 
 **Body:**
 
-{Following up|Circling back}, {FIRST_NAME}. A guarantee like this {takes time|deserves a real look|runs through committee}, which is fair. To be specific about breakeven: gate-scan 21+ ticket revenue over prior-year baseline, plus F&B and bar attach paid commitments on after-hours guests, plus membership-conversion uplift measured through the adult-program funnel, all tallied against the install fee at season close. If the math doesn't land, the fee isn't billed. That specificity is the point; it's what holds up under review.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Following up|Circling back}, {FIRST_NAME}. A guarantee like this {takes time|deserves a real look|runs through committee}, which is fair. To be specific about breakeven: gate-scan 21+ ticket revenue over prior-year baseline, plus F&B and bar attach paid commitments on after-hours guests, plus membership-conversion uplift measured through the adult-program funnel, all tallied against the install fee at season close. If the math doesn't land, the fee isn't billed. That specificity is the point; it's what holds up under review.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

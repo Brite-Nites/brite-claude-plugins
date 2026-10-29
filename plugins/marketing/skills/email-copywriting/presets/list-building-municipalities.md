@@ -18,17 +18,17 @@ Anchor on the most recent public signal: RFP publish date, council vote date, or
 
 **Body:**
 
-Hey {FIRST_NAME_INLINE}, {saw|noticed|caught} {CITY}'s {DOWNTOWN_INITIATIVE} land on {DATE_SIGNAL} and {wanted to|figured I'd} reach out.<br><br>{We worked with|Brite Labs partnered with} {PEER_CITY} on {PROOF_POINT}, and the {result|outcome} was {measurable|concrete}: {PEER_METRIC} in {PEER_TIMEFRAME}.<br><br>{Would|Curious if} a {short|quick} audit of {CITY}'s current downtown lighting {be useful|make sense} as you {scope|shape} the next phase?<br>{Best|Cheers},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME_INLINE}, {saw|noticed|caught} {CITY}'s {DOWNTOWN_INITIATIVE} land on {DATE_SIGNAL} and {wanted to|figured I'd} reach out.<br><br>{We worked with|Brite Labs partnered with} {PEER_CITY} on {PROOF_POINT}, and the {result|outcome} was {measurable|concrete}: {PEER_METRIC} in {PEER_TIMEFRAME}.<br><br>{Would|Curious if} a {short|quick} audit of {CITY}'s current downtown lighting {be useful|make sense} as you {scope|shape} the next phase?<br>{Best|Cheers},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
 ## Step 2 bump
 
-**Subject:** `Re: {Quick thought|Quick note|Thought}`
+**Subject:** `{Quick thought|Quick note|Thought}`
 
 **Body:**
 
-{Circling back|Following up}, {FIRST_NAME_INLINE}. The {audit|walkthrough} offer stands, and we can {scope it|shape it} around whatever phase of {DOWNTOWN_INITIATIVE} is most {active|load-bearing} for your team right now.<br>{Best|Cheers},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up}, {FIRST_NAME_INLINE}. The {audit|walkthrough} offer stands, and we can {scope it|shape it} around whatever phase of {DOWNTOWN_INITIATIVE} is most {active|load-bearing} for your team right now.<br>{Best|Cheers},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

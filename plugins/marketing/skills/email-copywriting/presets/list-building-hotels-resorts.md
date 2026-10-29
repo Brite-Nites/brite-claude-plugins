@@ -18,17 +18,17 @@ Anchor on the capital-window signal: new GM appointment (the 6-12 month audit cy
 
 **Body:**
 
-Hey {FIRST_NAME_INLINE}, {saw|noticed|caught} {PROPERTY_SIGNAL} at {COMPANY} land on {DATE_SIGNAL} and {wanted to|figured I'd} reach out around the compression window that opens up behind a signal like that.<br><br>{We worked with|Brite Labs partnered with} {PEER_PROPERTY}, who {runs|has run} a named seasonal program for {PEER_TENURE}, and the direct-channel package structure {pulled|shifted} {PEER_ADR_LIFT} on peak weekends against their comp-set baseline plus {PEER_BOOKING_WINDOW} on shoulder-date pace.<br><br>{Would|Open to} a {short|quick} program design deck for {COMPANY} that {maps|scopes} named-program economics against your comp-set index and Q4 booking pace? Near-zero upfront capital, revenue-share structured against incremental ADR lift and attach.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME_INLINE}, {saw|noticed|caught} {PROPERTY_SIGNAL} at {COMPANY} land on {DATE_SIGNAL} and {wanted to|figured I'd} reach out around the compression window that opens up behind a signal like that.<br><br>{We worked with|Brite Labs partnered with} {PEER_PROPERTY}, who {runs|has run} a named seasonal program for {PEER_TENURE}, and the direct-channel package structure {pulled|shifted} {PEER_ADR_LIFT} on peak weekends against their comp-set baseline plus {PEER_BOOKING_WINDOW} on shoulder-date pace.<br><br>{Would|Open to} a {short|quick} program design deck for {COMPANY} that {maps|scopes} named-program economics against your comp-set index and Q4 booking pace? Near-zero upfront capital, revenue-share structured against incremental ADR lift and attach.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 
 ## Step 2 bump
 
-**Subject:** `Re: {Rate|ADR|Comp-set} {thought|check|scope}`
+**Subject:** `{Rate|ADR|Comp-set} {thought|check|scope}`
 
 **Body:**
 
-{Circling back|Following up}, {FIRST_NAME_INLINE}. The program design deck offer stands, and we can {scope|shape} it against whichever booking window or comp-set slice is {most active|most load-bearing} for your team right now, whether that's Q4 compression, a shoulder-date pull-forward, or direct-channel mix recovery.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up}, {FIRST_NAME_INLINE}. The program design deck offer stands, and we can {scope|shape} it against whichever booking window or comp-set slice is {most active|most load-bearing} for your team right now, whether that's Q4 compression, a shoulder-date pull-forward, or direct-channel mix recovery.<br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 4
 

@@ -22,7 +22,7 @@ Base skeleton A adaptation with Offer E (stadium production-finance) slot fills.
 
 **Body:**
 
-Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out before the non-sport calendar locks.<br><br>We ran a transferable motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware on programmable-media infrastructure at {SCALE_ANCHOR}-grade scale. The shape that {landed|fit|worked} was production-finance: Brite {orchestrates|runs|structures} the regional tourism or CVB partnership plus anchor F&B tenant co-marketing plus a regional or national category sponsor plus ad revenue on plaza pixel inventory, and takes revenue-share on incremental non-sport event revenue against your prior-year baseline. Venue capital commitment {near zero|stays near zero|lands near zero}.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY}'s off-season calendar if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured I'd|wanted to} reach out before the non-sport calendar locks.<br><br>We ran a transferable motion at {LABS_PEER_VENUE}, and our partner {S4_PARTNER} {sources|supplies} the DMX-pixel hardware on programmable-media infrastructure at {SCALE_ANCHOR}-grade scale. The shape that {landed|fit|worked} was production-finance: Brite {orchestrates|runs|structures} the regional tourism or CVB partnership plus anchor F&B tenant co-marketing plus a regional or national category sponsor plus ad revenue on plaza pixel inventory, and takes revenue-share on incremental non-sport event revenue against your prior-year baseline. Venue capital commitment {near zero|stays near zero|lands near zero}.<br><br>{Happy|Glad} to {pull|share|send} a {FREE_ASSET_NOUN} for {COMPANY}'s off-season calendar if {useful|helpful|timely}, no commitment.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
@@ -30,11 +30,11 @@ Hey {FIRST_NAME}, {saw|noticed|caught} {COMPANY}'s {RECENCY_ANCHOR} and {figured
 
 Tone: matter-of-fact continuation, not a second pitch. The bump names which revenue stream the scoping conversation can open on, so the prospect can pick the lowest-friction entry point.
 
-**Subject:** `Re: {Quick thought|Quick note|Thought}`
+**Subject:** `{Quick thought|Quick note|Thought}`
 
 **Body:**
 
-{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope it|shape it} around whichever revenue stream is most {load-bearing|active|in motion} for your program: CVB partnership close, anchor F&B tenant co-marketing, regional sponsor pledge, or ad inventory on plaza pixel displays.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}
+{Circling back|Following up|Bumping this}, {FIRST_NAME}. The {FREE_ASSET_NOUN} offer stands, and we can {scope it|shape it} around whichever revenue stream is most {load-bearing|active|in motion} for your program: CVB partnership close, anchor F&B tenant co-marketing, regional sponsor pledge, or ad inventory on plaza pixel displays.<br><br>{Best|Cheers|Thanks},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 

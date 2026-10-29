@@ -18,17 +18,17 @@ Anchor on the procurement-weight signal: RFP publish date, bond authorization da
 
 **Body:**
 
-Hey {FIRST_NAME_INLINE}, {saw|noticed} {CITY}'s {RFP_NAME} {post|publish} on {DATE_SIGNAL}, and given the {scope|scale} of what {your team|the committee} is taking on, wanted to reach out directly.<br><br>{Given the|Because of the} multi-year shape of {RFP_NAME}, Brite Labs {offers|structures} a phase-gate guarantee on projects like this: if phase 1 doesn't deliver {PHASE_1_OUTCOME} by {PHASE_1_MILESTONE}, phase 2 isn't billed. On {LABS_CASE_STUDY} we {hit|exceeded} that bar and the {city|partner} moved to phase 2 {on schedule|ahead of schedule}.<br><br>{Would|Open to} a {guaranteed pilot|scoped pilot} conversation with {your team|the selection committee}? {No full-bid commitment|Not a bid response}, just a scoping call to see whether the phase-gate structure fits {RFP_NAME}'s {cadence|timeline}.<br>{Best|Cheers},<br>{SENDER_FIRST_NAME}
+Hey {FIRST_NAME_INLINE}, {saw|noticed} {CITY}'s {RFP_NAME} {post|publish} on {DATE_SIGNAL}, and given the {scope|scale} of what {your team|the committee} is taking on, wanted to reach out directly.<br><br>{Given the|Because of the} multi-year shape of {RFP_NAME}, Brite Labs {offers|structures} a phase-gate guarantee on projects like this: if phase 1 doesn't deliver {PHASE_1_OUTCOME} by {PHASE_1_MILESTONE}, phase 2 isn't billed. On {LABS_CASE_STUDY} we {hit|exceeded} that bar and the {city|partner} moved to phase 2 {on schedule|ahead of schedule}.<br><br>{Would|Open to} a {guaranteed pilot|scoped pilot} conversation with {your team|the selection committee}? {No full-bid commitment|Not a bid response}, just a scoping call to see whether the phase-gate structure fits {RFP_NAME}'s {cadence|timeline}.<br>{Best|Cheers},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 1
 
 ## Step 2 bump
 
-**Subject:** `Re: {Phase-gate terms|Scoped pilot|Phase guarantee}`
+**Subject:** `{Phase-gate terms|Scoped pilot|Phase guarantee}`
 
 **Body:**
 
-{Following up|Circling back}, {FIRST_NAME_INLINE}. Risk-reversal structures like the phase-gate take longer to evaluate than a standard pitch, which is fair. To be specific about what's guaranteed: {PHASE_1_OUTCOME} measured by {MEASUREMENT_METHOD}, with phase 2 scope and pricing contingent on that outcome being met. That specificity is the point, and it's the reason the structure holds up under committee review.<br>{Best|Cheers},<br>{SENDER_FIRST_NAME}
+{Following up|Circling back}, {FIRST_NAME_INLINE}. Risk-reversal structures like the phase-gate take longer to evaluate than a standard pitch, which is fair. To be specific about what's guaranteed: {PHASE_1_OUTCOME} measured by {MEASUREMENT_METHOD}, with phase 2 scope and pricing contingent on that outcome being met. That specificity is the point, and it's the reason the structure holds up under committee review.<br>{Best|Cheers},<br>{SENDER_FIRST_NAME}<br>[ENTITY_COMPANY_NAME]<br>4080 S W Temple St, Ste A, Millcreek, UT 84107
 
 **wait_in_days:** 3
 
