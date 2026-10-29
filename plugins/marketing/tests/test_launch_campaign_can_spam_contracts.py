@@ -87,13 +87,21 @@ def test_gate_sets_thread_reply_false_and_refuses_thread_reply_true_or_a_re_subj
 def test_gate_stop_message_names_what_is_missing() -> None:
     g = gate()
     assert STOP_MESSAGE in g, f"gate must define the stop message {STOP_MESSAGE!r}"
-    for item in ("can_unsubscribe", "footer", "step 2 subject", "step 2 thread_reply is true"):
+    for item in (
+        "can_unsubscribe",
+        "footer",
+        "step 2 subject",
+        "step 2 thread_reply is true",
+        "{n} steps stored on campaign {id} (expected 2)",
+    ):
         assert item in g.lower() or item in g, f"stop message must be able to name {item!r}"
 
 
 def test_gate_has_no_operator_opt_out() -> None:
     g = gate()
     assert "no operator opt-out" in g.lower()
+    for escape in ("accepted", "operator confirms", "unless", "may carry", "allowed"):
+        assert escape not in g.lower(), f"gate section must not carry an escape clause: {escape!r}"
     assert "--skip-compliance" not in read(COMMAND_PATH)
     assert "--no-footer" not in read(COMMAND_PATH)
 

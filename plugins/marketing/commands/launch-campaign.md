@@ -75,7 +75,7 @@ Cold outbound must carry an unsubscribe mechanism and a postal address (handbook
 
 **Stop message.** On any failure, halt and print exactly this, naming every missing item (not just the first):
 
-> CAN-SPAM gate: launch stopped. Missing: {comma-separated list from: can_unsubscribe on campaign {id}; footer company name in step {1|2}; footer postal address in step {1|2}; step 2 thread_reply is true (must be false); step 2 subject carries `Re:`}. Fix the copy artifact or the campaign and re-run.
+> CAN-SPAM gate: launch stopped. Missing: {comma-separated list from: can_unsubscribe on campaign {id}; footer company name in step {1|2}; footer postal address in step {1|2}; step 2 thread_reply is true (must be false); step 2 subject carries `Re:`; {n} steps stored on campaign {id} (expected 2)}. Fix the copy artifact or the campaign and re-run.
 
 ---
 
