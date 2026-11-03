@@ -785,7 +785,7 @@ def _ver(v: str) -> tuple[int, ...]:
 
 def test_marketing_version_bumped_and_mirrored() -> None:
     plugin = json.loads(PLUGIN_JSON.read_text(encoding="utf-8"))["version"]
-    assert _ver(plugin) > _ver("0.16.9"), "per-PR bump: command/skills changed"
+    assert _ver(plugin) > _ver("0.16.10"), "per-PR bump: command/skills changed"
     entry = next(
         p for p in json.loads(MARKETPLACE_JSON.read_text(encoding="utf-8"))["plugins"]
         if p["name"] == "marketing"
@@ -834,3 +834,24 @@ def test_phase11_turns_off_a_link_still_held_before_activation() -> None:
     line = phase11_precondition()
     assert "A campaign still in `toggle_held_on` whose stored step bodies now all carry the reply line" in line
     assert '`{"plain_text": true, "can_unsubscribe": false}`' in line and "leaves `toggle_held_on` before activation" in line
+
+
+# --- HTML entities are decoded before matching --------------------------------
+# A body saved as HTML can store the apostrophe as `&#39;`; matching the raw text
+# would read `you&#39;re` as a missing opt-out line and halt the launch.
+
+_DECODE = "decoding HTML entities first"
+
+
+def test_gate_decodes_html_entities_before_matching_the_line_and_the_footer() -> None:
+    g = gate()
+    item1 = line_starting(g, "1. **Reply opt-out line.**")
+    assert _DECODE in item1 and "`you&#39;re` reads as `you're`" in item1
+    item2 = line_starting(g, "2. **Standard footer in every sequence step body.**")
+    assert "after decoding HTML entities and collapsing" in item2
+
+
+def test_email_bison_skill_and_template_decode_html_entities() -> None:
+    wf9 = section(read(SKILL_PATH), "### Workflow 9:", "\n---\n")
+    assert _DECODE in line_starting(wf9, "3. Every sequence step body")
+    assert _DECODE in read(TEMPLATE_PATH)
