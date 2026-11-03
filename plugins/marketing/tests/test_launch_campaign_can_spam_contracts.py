@@ -791,3 +791,39 @@ def test_marketing_version_bumped_and_mirrored() -> None:
         if p["name"] == "marketing"
     )
     assert entry["version"] == plugin
+
+
+# --- a reused campaign keeps its unsubscribe link until its steps carry the line ----
+# A reused campaign may be active and written under the old rule, with the link as its
+# only opt-out. Turning the link off before its stored steps are checked leaves it
+# sending with no opt-out at all (Greptile, PR #605).
+
+
+def test_phase5_step8_holds_the_link_on_a_reused_campaign_without_the_line() -> None:
+    s8 = phase5_step8()
+    hold = line_starting(s8, "**A reused campaign keeps its unsubscribe link until its stored steps carry the reply line.**")
+    assert "`get_sequence_steps`" in hold and "any stored step body lacks the reply opt-out line" in hold
+    assert "the value it reads back now instead of `false`" in hold and "`toggle_held_on`" in hold
+    assert "Never turn the link off on a campaign whose stored steps lack the line." in hold
+
+
+def test_phase9_step7_turns_a_held_link_off_only_after_the_line_is_confirmed() -> None:
+    s7 = section(phase("9", "10"), "7. **Verify per campaign.**", "8. **Append to metadata JSON.**")
+    off = s7[s7.index("**Then turn off a held link.**"):]
+    assert "whose stored step bodies all carry the reply line" in off
+    assert '`{"plain_text": true, "can_unsubscribe": false}`' in off and "`get_campaign`" in off
+    assert "A campaign that fails the line check keeps its link." in off
+
+
+def test_metadata_records_toggle_held_on() -> None:
+    cmd = read(COMMAND_PATH)
+    assert '"toggle_held_on": []' in cmd
+    assert "`toggle_held_on` (the campaign IDs from step 8 whose link was kept" in phase("5", "6")
+
+
+def test_email_bison_skill_and_template_hold_the_link_on_reused_campaigns() -> None:
+    wf9 = section(read(SKILL_PATH), "### Workflow 9:", "\n---\n")
+    assert "Never turn the link off on a campaign whose stored steps lack the line." in wf9
+    assert "only after step 3 is confirmed on the stored steps" in wf9
+    t = read(TEMPLATE_PATH)
+    assert "never turn the link off on a campaign whose stored steps lack it" in t
