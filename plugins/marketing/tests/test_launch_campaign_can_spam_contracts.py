@@ -1,8 +1,10 @@
 """Contract tests for the CAN-SPAM launch gate in /marketing:launch-campaign.
 
-Cold outbound went out with no unsubscribe toggle, no postal address and a `Re:`
-subject on step 2. The command, the email-bison skill and the outbound skill
-template now refuse to launch a campaign that is missing any of them. These
+Cold outbound went out with no opt-out, no postal address and a `Re:` subject on
+step 2. The command, the email-bison skill and the outbound skill template now
+refuse to launch a campaign that is missing any of them. Since 2026-11 the opt-out
+is a reply line in every step body (`OPTOUT_LINE`), not Email Bison's unsubscribe
+toggle, which stays off (`can_unsubscribe: false`) per the handbook. These
 tests pin the markdown contract; the commands are Claude-orchestrated, so
 nothing here executes a launch (and nothing calls Email Bison).
 
@@ -26,6 +28,8 @@ PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT.parents[1] / ".claude-plugin" / "marketplace.json"
 
 POSTAL_ADDRESS = "4080 S W Temple St, Ste A, Millcreek, UT 84107"
+OPTOUT_LINE = "If you're not interested, please reply with 'remove.'"
+PATCH_BODY = '{"plain_text": true, "can_unsubscribe": false}'
 GATE_HEADING = "## CAN-SPAM compliance gate"
 # The stop message every missing item is reported through.
 STOP_MESSAGE = "CAN-SPAM gate: launch stopped. Missing:"
@@ -65,11 +69,29 @@ def json_blocks(text: str) -> list[str]:
 
 def test_gate_section_names_all_three_requirements() -> None:
     g = gate()
-    assert "can_unsubscribe: true" in g, "gate must require can_unsubscribe: true"
+    assert OPTOUT_LINE in g, "gate must require the reply opt-out line"
+    assert "can_unsubscribe: true" not in g, "the toggle is no longer a gate requirement"
     assert POSTAL_ADDRESS in g, "gate must carry the exact postal address"
     assert "company name" in g.lower(), "gate must require the company name in the footer"
     assert "thread_reply: false" in g and "Re:" in g, "gate must state the non-responder step rule"
     assert "has not replied" in g, "step-2 rule is scoped to a recipient who has not replied"
+
+
+def test_gate_item_1_is_the_reply_optout_line_in_every_step_body() -> None:
+    rule = line_starting(gate(), "1. **Reply opt-out line.**")
+    assert f"the exact line `{OPTOUT_LINE}`" in rule
+    assert "`step_1.body` AND `step_2.body` (every step body)" in rule
+    assert "collapsing `<br>` tags and whitespace to single spaces" in rule
+    assert "`’ ‘ “ ”`" in rule and "straight forms" in rule, "curly quotes are read as straight ones"
+    assert "A step body without it fails." in rule
+    assert "The toggle is not a gate item" in rule and "`can_unsubscribe: false`" in rule
+    assert "stays off per the handbook" in rule
+
+
+def test_gate_intro_points_at_the_handbook_and_the_2026_11_decision() -> None:
+    intro = gate().split("\n1. ", 1)[0]
+    assert "cold-outbound-copy-standards.md` § CAN-SPAM Compliance" in intro
+    assert "decided 2026-11" in intro and "not Email Bison's unsubscribe link" in intro
 
 
 def test_gate_sets_thread_reply_false_and_refuses_thread_reply_true_or_a_re_subject() -> None:
@@ -87,8 +109,9 @@ def test_gate_sets_thread_reply_false_and_refuses_thread_reply_true_or_a_re_subj
 def test_gate_stop_message_names_what_is_missing() -> None:
     g = gate()
     assert STOP_MESSAGE in g, f"gate must define the stop message {STOP_MESSAGE!r}"
+    assert "reply opt-out line in step {1|2}" in g
+    assert "can_unsubscribe on campaign" not in g, "the toggle is not a stop-message item any more"
     for item in (
-        "can_unsubscribe",
         "footer",
         "step 2 subject",
         "step 2 thread_reply is true",
@@ -112,18 +135,26 @@ def test_gate_runs_in_phase_1_before_any_mutation() -> None:
     assert "step_1.body" in gate() and "step_2.body" in gate(), "footer is checked in BOTH step bodies"
 
 
-# --- can_unsubscribe at Phase 5 ---------------------------------------------
+def test_phase1_artifact_check_requires_the_reply_optout_line() -> None:
+    line = line_starting(phase("1", "1b"), "- **CAN-SPAM compliance gate")
+    assert "(items 1, 2 and 3 of § CAN-SPAM compliance gate)" in line
+    assert f"each contain the reply opt-out line `{OPTOUT_LINE}`" in line
 
 
-def test_phase5_patch_sends_plain_text_and_can_unsubscribe_in_one_body() -> None:
+# --- the toggle at Phase 5: sent off, in the same body as plain_text ----------
+
+
+def test_phase5_patch_sends_plain_text_and_can_unsubscribe_false_in_one_body() -> None:
     p5 = phase("5", "6")
     bodies = [b for b in json_blocks(p5) if '"plain_text": true' in b]
     assert bodies, "Phase 5 must show the PATCH body as a json block"
-    assert any('"can_unsubscribe": true' in b for b in bodies), (
-        "plain_text and can_unsubscribe must be sent in the SAME PATCH body so "
-        "neither resets the other (EB treats an omitted boolean as false)"
+    assert any(PATCH_BODY in b for b in bodies), (
+        "plain_text: true and can_unsubscribe: false must be sent in the SAME PATCH body "
+        "(EB treats an omitted boolean as false)"
     )
+    assert '"can_unsubscribe": true' not in p5, "the toggle stays off per the handbook"
     assert "same body" in p5.lower() or "same patch" in p5.lower()
+    assert "Never PATCH either one alone" in p5
 
 
 def test_phase5_no_longer_claims_a_single_plain_text_patch() -> None:
@@ -131,7 +162,8 @@ def test_phase5_no_longer_claims_a_single_plain_text_patch() -> None:
     assert "single `plain_text: true` PATCH" not in p5, (
         "stale wording: the PATCH now carries both booleans"
     )
-    assert "re-send" in p5.lower() and "can_unsubscribe: true" in p5
+    assert "re-send" in p5.lower() and "`can_unsubscribe: false`" in p5
+    assert "can_unsubscribe: true" not in p5
 
 
 def test_phase5_applies_to_reused_campaigns_and_reads_back() -> None:
@@ -140,7 +172,7 @@ def test_phase5_applies_to_reused_campaigns_and_reads_back() -> None:
     assert "get_campaign" in p5
     assert re.search(r"read.?back", p5, re.IGNORECASE), "PATCH result must be read back"
     assert STOP_MESSAGE in p5 or "CAN-SPAM compliance gate" in p5, (
-        "a campaign whose can_unsubscribe is not true after the PATCH stops the launch"
+        "Phase 5 points at the gate the reply line is checked by"
     )
 
 
@@ -155,14 +187,24 @@ def test_phase5_step8_reaches_reused_campaigns_and_stops_on_readback_mismatch() 
     assert "fresh creates and reused campaigns alike" in s8
     assert "**Read back and stop on mismatch.**" in s8
     assert "`get_campaign` for every campaign ID" in s8
-    assert "`can_unsubscribe` is `true`" in s8
-    assert "can_unsubscribe on campaign {id}" in s8 and "stops the launch" in s8
+    assert "confirm `plain_text` is `true`" in s8, "plain_text is still read back"
+    assert "reads back `plain_text` as anything but `true` stops the launch" in s8
+    assert "`can_unsubscribe` is read but not gated" in s8 and "toggle stays off per the handbook" in s8
+    assert "`can_unsubscribe` is `true`" not in s8 and "can_unsubscribe on campaign" not in s8
+    assert "can_unsubscribe_applied" not in s8, "step 8 no longer records a toggle flag"
 
 
-def test_phase5_gate_prompt_discloses_can_unsubscribe() -> None:
+def test_phase5_gate_prompt_discloses_the_toggle_off_and_the_reply_line() -> None:
     p5 = phase("5", "6")
     gate5 = section(p5, "**User gate 5.**", "6. **Execute creates")
-    assert "can_unsubscribe: true" in gate5
+    assert "`can_unsubscribe: false`" in gate5 and "can_unsubscribe: true" not in gate5
+    assert "reply opt-out line in every step body is the opt-out" in gate5
+
+
+def test_phase5_step10_seeds_compliance_without_a_toggle_flag() -> None:
+    s10 = line_starting(phase("5", "6"), "10. **Append to metadata JSON.**")
+    assert "`compliance` seeded with all three flags `false`" in s10
+    assert "can_unsubscribe" not in s10
 
 
 # --- footer + step-2 subject at Phase 9 -------------------------------------
@@ -201,9 +243,23 @@ def test_phase9_verifies_stored_steps_not_just_the_request() -> None:
 
 def test_phase9_artifact_footer_check_is_pinned() -> None:
     p9 = phase("9", "10")
-    bullet = section(p9, "**Footer in every step body.**", "\n   - ")
+    bullet = section(p9, "**Opt-out line and footer in every step body.**", "\n   - ")
     assert POSTAL_ADDRESS in bullet and "step_1.body" in bullet and "step_2.body" in bullet
+    assert f"the reply opt-out line `{OPTOUT_LINE}`" in bullet
     assert "HARD FAIL" in bullet
+
+
+def test_phase9_non_negotiable_bullet_requires_the_reply_line() -> None:
+    bullet = line_starting(phase("9", "10"), "- CAN-SPAM (")
+    assert f"every step body carries the reply opt-out line `{OPTOUT_LINE}`" in bullet
+
+
+def test_phase9_step7_readback_checks_the_stored_reply_line_and_writes_its_flag() -> None:
+    s7 = section(phase("9", "10"), "7. **Verify per campaign.**", "8. **Append to metadata JSON.**")
+    assert "`email_body` each contain the reply opt-out line" in s7
+    assert "Record `compliance.optout_line_verified` (every stored step body carries the line)" in s7
+    assert "Only this read-back writes `compliance.optout_line_verified`" in s7
+    assert "stored opt-out line or footer missing" in s7
 
 
 def test_phase9_step7_halt_resumes_at_step_7_without_recreating_sequences() -> None:
@@ -276,6 +332,8 @@ def test_presets_readme_describes_step2_without_re_and_with_the_footer() -> None
     readme = read(ROOT / "skills" / "email-copywriting" / "presets" / "README.md")
     assert "Re: {subject}" not in readme
     assert "NO `Re:` prefix" in readme and POSTAL_ADDRESS in readme
+    assert f"the reply opt-out line `{OPTOUT_LINE}` as its own paragraph" in readme
+    assert "same opt-out line and CAN-SPAM sign-off block" in readme
 
 
 def test_phase11_rereads_campaigns_and_steps_before_activating() -> None:
@@ -285,6 +343,7 @@ def test_phase11_rereads_campaigns_and_steps_before_activating() -> None:
     assert "get_campaign" in pre and "get_sequence_steps" in pre, "re-read what Email Bison stores now"
     assert "refresh" in pre.lower() and "compliance" in pre, "flags are refreshed from that read"
     assert "step 2 has `thread_reply: false`" in pre, "the re-read refuses a stored thread_reply true"
+    assert "`can_unsubscribe` is `true`" not in pre, "the toggle is not re-checked as a gate item"
     assert STOP_MESSAGE in pre, "any miss stops with the gate's message"
     # The re-read precedes every prompt and the resume call, so it cannot be moved after activation.
     for later in ("### Steps", "**User gate 11a", "fire the single `call_api`"):
@@ -293,8 +352,30 @@ def test_phase11_rereads_campaigns_and_steps_before_activating() -> None:
 
 def test_metadata_schema_records_compliance_results() -> None:
     cmd = read(COMMAND_PATH)
-    for key in ("can_unsubscribe_applied", "footer_verified", "step_2_subject_verified"):
+    for key in ("optout_line_verified", "footer_verified", "step_2_subject_verified"):
         assert f'"{key}"' in cmd or f"`{key}" in cmd, f"metadata schema must record {key}"
+    assert '"compliance": {"optout_line_verified": true, "footer_verified": true, "step_2_subject_verified": true}' in cmd
+    assert '"can_unsubscribe_applied"' not in cmd, "the toggle flag is gone from the schema"
+
+
+def test_metadata_field_says_who_writes_optout_line_verified() -> None:
+    line = line_starting(read(COMMAND_PATH), "- Phase 5 step 10 / Phase 9 step 7 / Phase 11: `compliance:")
+    assert "written by the Phase 9 step 7 read-back and refreshed by the Phase 11 re-read" in line
+    assert "`optout_line_verified` is true only when every stored step body on ALL campaigns carries the reply opt-out line" in line
+    assert "Phase 11 refuses to activate unless all three are true" in line
+    assert "`can_unsubscribe_applied` in place of `optout_line_verified`; that key is ignored" in line
+
+
+def test_phase11_reread_requires_the_reply_line_and_refreshes_its_flag() -> None:
+    line = phase11_precondition()
+    assert f"both step bodies carry the reply opt-out line `{OPTOUT_LINE}`" in line
+    assert "(`optout_line_verified`, `footer_verified`, `step_2_subject_verified`)" in line
+    assert "Activation proceeds only if all three are **`true`** after the refresh" in line
+
+
+def test_error_recovery_row_names_the_optout_line() -> None:
+    row = line_starting(read(COMMAND_PATH), "| 9 SEQUENCE (CAN-SPAM halt at step 7)")
+    assert "a stored opt-out line, footer," in row and "`compliance.optout_line_verified`" in row
 
 
 # --- email-bison skill + integration notes ----------------------------------
@@ -302,10 +383,14 @@ def test_metadata_schema_records_compliance_results() -> None:
 
 def test_email_bison_skill_carries_the_rule() -> None:
     s = read(SKILL_PATH)
-    assert "can_unsubscribe: true" in s
+    assert "can_unsubscribe: true" not in s and '"can_unsubscribe": true' not in s
     assert POSTAL_ADDRESS in s
     assert "same body" in s.lower() or "same patch" in s.lower()
     wf9 = section(s, "### Workflow 9:", "\n---\n")
+    assert PATCH_BODY in wf9 and "confirm `plain_text` is `true`" in wf9
+    assert "The toggle's value is not a gate item" in wf9 and "decided 2026-11" in wf9
+    step3 = line_starting(wf9, "3. Every sequence step body")
+    assert f"the reply opt-out line `{OPTOUT_LINE}`" in step3 and "check the line in every step body" in step3
     assert "`thread_reply: false`" in wf9 and "Re:" in wf9
     assert "2026-10-22" in wf9 and "Re: Holiday Decor" in wf9, "the measurement is recorded"
     assert "threading is given up" in wf9
@@ -321,7 +406,9 @@ def test_email_bison_skill_refuses_noncompliant_campaign_creation() -> None:
 def test_integration_doc_documents_the_same_calls() -> None:
     d = read(INTEGRATION_PATH)
     row = next(line for line in d.splitlines() if line.startswith("| 2a |"))
-    assert "can_unsubscribe" in row and "plain_text" in row
+    assert "`plain_text: true` AND `can_unsubscribe: false` **in the same body**" in row
+    assert OPTOUT_LINE in row and "stop if `plain_text` is not `true`" in row
+    assert "can_unsubscribe: true" not in row
     assert POSTAL_ADDRESS in d
     assert "has not replied" in d
 
@@ -355,7 +442,9 @@ def test_integration_doc_can_unsubscribe_gotcha_is_pinned() -> None:
     assert gotcha, "the can_unsubscribe default-false gotcha must exist in Known gotchas"
     assert "appends no unsubscribe footer" in gotcha
     assert POSTAL_ADDRESS in gotcha
-    assert "same `update_campaign` body" in gotcha and "read it back" in gotcha
+    assert "same `update_campaign` body" in gotcha and "read `plain_text` back" in gotcha
+    assert "Brite keeps it off (decided 2026-11" in gotcha and OPTOUT_LINE in gotcha
+    assert "Set `can_unsubscribe: true`" not in gotcha
 
 
 # Lines that mention EB prepending `Re:` are allowed only as history or as the
@@ -390,7 +479,9 @@ ORCHESTRATION_PATH = ROOT / "skills" / "campaign-orchestration" / "SKILL.md"
 def test_orchestration_workflow_3_routes_creation_through_email_bison_workflow_9() -> None:
     w3 = section(read(ORCHESTRATION_PATH), "### Workflow 3:", "### Workflow 4:")
     assert "Workflow 9" in w3 and "`email-bison`" in w3
-    assert '{"plain_text": true, "can_unsubscribe": true}' in w3, "toggle goes in the same body"
+    assert PATCH_BODY in w3, "toggle goes in the same body, switched off"
+    assert OPTOUT_LINE in read(ORCHESTRATION_PATH)
+    assert "stop if `plain_text` is not `true`" in w3 and "decided 2026-11" in w3
     assert POSTAL_ADDRESS in w3 and "company name" in w3.lower()
     assert "`thread_reply: false`" in w3 and "Re:" in w3 and "has not replied" in w3
     assert "`thread_reply: true`" in w3, "a stored thread_reply true is refused"
@@ -454,12 +545,34 @@ def test_copywriting_every_skeleton_signoff_carries_the_footer() -> None:
         assert POSTAL_ADDRESS in line and "[ENTITY_COMPANY_NAME]" in line, line[-120:]
 
 
+def test_copywriting_every_skeleton_puts_the_reply_line_right_before_the_signoff() -> None:
+    lines = [
+        line for line in read(COPYWRITING_PATH).splitlines()
+        if _SIGNOFF in line and not line.startswith("- ")  # skeleton bodies, not spec bullets
+    ]
+    assert len(lines) == 4, "two skeletons x two steps"
+    for line in lines:
+        assert f"<br><br>{OPTOUT_LINE}<br><br>{_SIGNOFF}" in line, line[-160:]
+        assert line.count(OPTOUT_LINE) == 1
+
+
+def test_copywriting_spec_states_the_reply_line_rule() -> None:
+    spec = line_starting(read(COPYWRITING_PATH), "- Every step body carries the reply opt-out line")
+    assert f"`{OPTOUT_LINE}` as its own paragraph immediately before the sign-off block" in spec
+    assert "in step 1 and step 2" in spec and "no spintax" in spec
+    assert "decided 2026-11" in spec and "cold-outbound-copy-standards.md` § CAN-SPAM Compliance" in spec
+    assert "leave it out of the paragraph count and any length guidance" in spec
+
+
 def test_copywriting_checklist_and_guardrails_require_the_footer() -> None:
     s = read(COPYWRITING_PATH)
     row = next(line for line in s.splitlines() if "Artifact is EB-format-compliant" in line)
     assert "company name and postal address" in row
+    assert f"the reply opt-out line `{OPTOUT_LINE}` as its own paragraph before the sign-off" in row
     guard = s[s.index("## Anti-Slop Guardrails"):]
     assert POSTAL_ADDRESS in guard, "a body without the footer must be a hard failure"
+    optout = line_starting(guard, "- **Do not emit a step body without the reply opt-out line.**")
+    assert OPTOUT_LINE in optout and "hard failure" in optout
 
 
 # --- outbound skill template -------------------------------------------------
@@ -467,7 +580,11 @@ def test_copywriting_checklist_and_guardrails_require_the_footer() -> None:
 
 def test_template_carries_the_same_rule() -> None:
     t = read(TEMPLATE_PATH)
-    assert "can_unsubscribe: true" in t
+    assert "can_unsubscribe: true" not in t and '"can_unsubscribe": true' not in t
+    assert PATCH_BODY in t and "confirm `plain_text` is `true`" in t
+    trio = line_starting(t, "- **CAN-SPAM trio")
+    assert f"(1) Every sequence step body carries the reply opt-out line `{OPTOUT_LINE}`" in trio
+    assert "stays off (decided 2026-11)" in trio and "The toggle's value is not a gate item." in trio
     assert POSTAL_ADDRESS in t
     assert "`thread_reply: false`" in t and "Re:" in t
     assert "2026-10-22" in t and "threading is given up" in t
@@ -503,6 +620,31 @@ def test_no_marketing_file_still_prescribes_reply_in_thread_or_thread_reply_true
         if _OLD_THREADING_RULE.search(line)
     ]
     assert not offenders, f"old 'reply-in-thread on / thread_reply true on step 2' rule survives: {offenders}"
+
+
+# The toggle stays off since 2026-11: the reply line replaces it. Nothing may still
+# tell an author to switch it on.
+_TOGGLE_ON = ("can_unsubscribe: true", '"can_unsubscribe": true')
+_TOGGLE_SKIP = ("tests", "data", "docs", "__pycache__")
+
+
+def test_no_marketing_file_still_switches_the_unsubscribe_toggle_on() -> None:
+    files = [
+        p
+        for p in ROOT.rglob("*")
+        if p.is_file()
+        and p.suffix in (".md", ".json", ".py", ".sh", ".yml", ".yaml", ".txt", ".toml")
+        and p.name != "CHANGELOG.md"
+        and not any(part in _TOGGLE_SKIP for part in p.relative_to(ROOT).parts)
+    ]
+    assert len(files) > 100, "the walk must reach the whole marketing tree"
+    offenders = [
+        f"{p.relative_to(ROOT)}:{n}"
+        for p in files
+        for n, line in enumerate(read(p).splitlines(), 1)
+        if any(s in line for s in _TOGGLE_ON)
+    ]
+    assert not offenders, f"old 'can_unsubscribe true' rule survives: {offenders}"
 
 
 def test_launch_campaign_never_sends_a_step_with_thread_reply_true() -> None:
@@ -581,15 +723,16 @@ def test_phase11_reread_requires_exactly_two_stored_steps_and_names_the_extras()
 
 def test_phase11_reread_requires_the_footer_in_both_step_bodies() -> None:
     line = phase11_precondition()
-    assert "both step bodies carry the entity's company name and the postal address" in line
+    assert "`, the entity's company name and the postal address; step 2 has" in line
 
 
 def test_email_bison_skill_guardrail_and_behavioural_test_cover_every_step_after_the_first() -> None:
     s = read(SKILL_PATH)
-    guard = line_starting(s, "- **Do not create, reuse, or activate a campaign that lacks `can_unsubscribe: true`")
+    guard = line_starting(s, "- **Do not create, reuse, or activate a campaign that lacks the reply opt-out line in every step body")
     assert "every step after the first has `thread_reply: false` and no `Re:`" in guard
     assert "step-2 subject rule" not in guard
-    test = line_starting(s, "- Given a request to create or reuse a campaign, output must set `can_unsubscribe: true`")
+    test = line_starting(s, "- Given a request to create or reuse a campaign, output must send `plain_text: true` with `can_unsubscribe: false`")
+    assert f"require the reply opt-out line `{OPTOUT_LINE}` and the footer" in test
     assert "send every step after the first with `thread_reply: false` and no `Re:` in its subject" in test
     assert "send step 2 with" not in test
 
@@ -606,9 +749,11 @@ def test_template_step_7_and_guardrail_say_every_step_after_the_first() -> None:
     step7 = line_starting(t, "7. Call `create_sequence_steps`")
     assert "every step after the first is sent with `thread_reply: false`" in step7
     assert "free of `Re:`" in step7 and "footer in every step body" in step7
+    assert "carries the reply opt-out line, the company name" in step7
     assert "step 2 is sent with" not in step7
     guard = line_starting(t, "- Do not create, reuse, sequence, or activate an Email Bison campaign")
     assert "every step after the first sent with `thread_reply: false` and no `Re:`" in guard
+    assert "(reply opt-out line and footer" in guard
 
 
 # --- campaign-orchestration re-read covers every step after the first -----------
@@ -618,12 +763,15 @@ def test_orchestration_workflow_4_rereads_every_step_after_the_first() -> None:
     w4 = section(read(ORCHESTRATION_PATH), "### Workflow 4:", "### Workflow 5:")
     step2 = line_starting(w4, "2. **CAN-SPAM check")
     assert "in every step body" in step2 and "both step bodies" not in step2
+    assert f"the reply opt-out line `{OPTOUT_LINE}`" in step2
+    assert "can_unsubscribe: true" not in step2
     assert "on every step after the first `thread_reply: false` and an `email_subject` with no `Re:`" in step2
     assert "`thread_reply: false` on step 2" not in step2, "step 2 alone is the old, narrower check"
 
 
 def test_orchestration_behavioural_test_covers_every_step_after_the_first() -> None:
-    line = line_starting(read(ORCHESTRATION_PATH), "- Given a request to create or resume a campaign whose `can_unsubscribe`")
+    line = line_starting(read(ORCHESTRATION_PATH), "- Given a request to create or resume a campaign whose step bodies lack the reply opt-out line")
+    assert OPTOUT_LINE in line
     assert "whose stored steps after the first have `thread_reply: true` or a subject that carries `Re:`" in line
     assert "stored step 2 has" not in line
 
@@ -637,9 +785,52 @@ def _ver(v: str) -> tuple[int, ...]:
 
 def test_marketing_version_bumped_and_mirrored() -> None:
     plugin = json.loads(PLUGIN_JSON.read_text(encoding="utf-8"))["version"]
-    assert _ver(plugin) > _ver("0.16.8"), "per-PR bump: command/skills changed"
+    assert _ver(plugin) > _ver("0.16.9"), "per-PR bump: command/skills changed"
     entry = next(
         p for p in json.loads(MARKETPLACE_JSON.read_text(encoding="utf-8"))["plugins"]
         if p["name"] == "marketing"
     )
     assert entry["version"] == plugin
+
+
+# --- a reused campaign keeps its unsubscribe link until its steps carry the line ----
+# A reused campaign may be active and written under the old rule, with the link as its
+# only opt-out. Turning the link off before its stored steps are checked leaves it
+# sending with no opt-out at all (Greptile, PR #605).
+
+
+def test_phase5_step8_holds_the_link_on_a_reused_campaign_without_the_line() -> None:
+    s8 = phase5_step8()
+    hold = line_starting(s8, "**A reused campaign keeps its unsubscribe link until its stored steps carry the reply line.**")
+    assert "`get_sequence_steps`" in hold and "any stored step body lacks the reply opt-out line" in hold
+    assert "the value it reads back now instead of `false`" in hold and "`toggle_held_on`" in hold
+    assert "Never turn the link off on a campaign whose stored steps lack the line." in hold
+
+
+def test_phase9_step7_turns_a_held_link_off_only_after_the_line_is_confirmed() -> None:
+    s7 = section(phase("9", "10"), "7. **Verify per campaign.**", "8. **Append to metadata JSON.**")
+    off = s7[s7.index("**Then turn off a held link.**"):]
+    assert "whose stored step bodies all carry the reply line" in off
+    assert '`{"plain_text": true, "can_unsubscribe": false}`' in off and "`get_campaign`" in off
+    assert "A campaign that fails the line check keeps its link." in off
+
+
+def test_metadata_records_toggle_held_on() -> None:
+    cmd = read(COMMAND_PATH)
+    assert '"toggle_held_on": []' in cmd
+    assert "`toggle_held_on` (the campaign IDs from step 8 whose link was kept" in phase("5", "6")
+
+
+def test_email_bison_skill_and_template_hold_the_link_on_reused_campaigns() -> None:
+    wf9 = section(read(SKILL_PATH), "### Workflow 9:", "\n---\n")
+    assert "Never turn the link off on a campaign whose stored steps lack the line." in wf9
+    assert "only after step 3 is confirmed on the stored steps" in wf9
+    t = read(TEMPLATE_PATH)
+    assert "never turn the link off on a campaign whose stored steps lack it" in t
+
+
+def test_phase11_turns_off_a_link_still_held_before_activation() -> None:
+    # A --no-sequence run skips Phase 9 step 7, so the Phase 11 re-read is the last place to turn it off.
+    line = phase11_precondition()
+    assert "A campaign still in `toggle_held_on` whose stored step bodies now all carry the reply line" in line
+    assert '`{"plain_text": true, "can_unsubscribe": false}`' in line and "leaves `toggle_held_on` before activation" in line
