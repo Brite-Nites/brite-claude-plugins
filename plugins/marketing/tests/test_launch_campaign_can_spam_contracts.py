@@ -827,3 +827,10 @@ def test_email_bison_skill_and_template_hold_the_link_on_reused_campaigns() -> N
     assert "only after step 3 is confirmed on the stored steps" in wf9
     t = read(TEMPLATE_PATH)
     assert "never turn the link off on a campaign whose stored steps lack it" in t
+
+
+def test_phase11_turns_off_a_link_still_held_before_activation() -> None:
+    # A --no-sequence run skips Phase 9 step 7, so the Phase 11 re-read is the last place to turn it off.
+    line = phase11_precondition()
+    assert "A campaign still in `toggle_held_on` whose stored step bodies now all carry the reply line" in line
+    assert '`{"plain_text": true, "can_unsubscribe": false}`' in line and "leaves `toggle_held_on` before activation" in line
